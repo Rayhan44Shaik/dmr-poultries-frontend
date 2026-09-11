@@ -14,7 +14,6 @@ import StepDeliveries from "../components/StepDeliveries";
 import StepFarm from "../components/StepFarm";
 import StepPickup from "../components/StepPickup";
 import StepEnd from "../components/Step_5/StepEnd";
-import TripFinalKPI from "../components/TripFinalKPI";
 
 // --- Hooks ---
 import { useTripEntry } from "../hooks/useTripEntry";
@@ -181,28 +180,19 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     }
   }, [location.search, loadTripFromApi, trip.id]);
 
-  useEffect(() => {
-    // Success toast is now emitted centrally in useTripEntry (every submit/update).
-    registerStep2SuccessCallback(() => {
-      // Trip ID is already in URL. Stay on the form; maxAllowedStep advances to Step 3.
-    });
-  }, [registerStep2SuccessCallback]);
-
-  useEffect(() => {
-    // Success toast is now emitted centrally in useTripEntry (every submit/update).
-    registerStep3SuccessCallback(() => {
-      // Trip ID is already in URL. Stay on the form; maxAllowedStep advances to Step 4.
-    });
-  }, [registerStep3SuccessCallback]);
-
-  useEffect(() => {
-    registerStep4SuccessCallback(() => {
-      /* Stay on the submitted trip so the locked Step 4 view is visible. */
-    });
-  }, [registerStep4SuccessCallback]);
-
-  const handleStatusChange = (trip: Trip, status: TripStatus) => {
-    changeStatus(trip, status);
+  const handleStatusChange = async (trip: Trip, status: TripStatus, approvedBy?: string) => {
+    // Pending tab may list wizard-done trips still marked Draft in storage —
+    // promote Draft→Pending first, then Pending→Completed so the API accepts it.
+    if (
+      status === "Completed" &&
+      trip.status === "Draft" &&
+      (trip.endStepSubmitted || trip.expensesStepSubmitted)
+    ) {
+      await changeStatus(trip, "Pending");
+      await changeStatus({ ...trip, status: "Pending" }, "Completed", approvedBy);
+      return;
+    }
+    await changeStatus(trip, status, approvedBy);
   };
 
   /** Bilingual, human-readable name for a step index (never a raw i18n key). */
@@ -335,31 +325,43 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     clearTripIdFromUrl();
   }, [clearTrip, clearTripIdFromUrl, setIsEditing, setTrip, location.search]);
 
-  // After first Step 1 submit: toast, reset the wizard to Create New Trip,
-  // and let Recent Trips pick up the saved trip (onTripsChanged). Resume
-  // from Recent to continue Farm / Pickup / Delivery / Diesel.
+  // After ANY step submit: close the wizard and show "Create New Trip".
+  // Resume the same trip from Recent Trip Activity when the next step is needed.
+  // Success toast is emitted centrally in useTripEntry.
   useEffect(() => {
-    // Success toast is now emitted centrally in useTripEntry (every submit/update).
     registerStep1SuccessCallback(() => {
       clearForm();
     });
   }, [registerStep1SuccessCallback, clearForm]);
 
+  useEffect(() => {
+    registerStep2SuccessCallback(() => {
+      clearForm();
+    });
+  }, [registerStep2SuccessCallback, clearForm]);
+
+  useEffect(() => {
+    registerStep3SuccessCallback(() => {
+      clearForm();
+    });
+  }, [registerStep3SuccessCallback, clearForm]);
+
+  useEffect(() => {
+    registerStep4SuccessCallback(() => {
+      clearForm();
+    });
+  }, [registerStep4SuccessCallback, clearForm]);
+
   /**
-   * Bottom "Cancel" on any step = DISCARD unsaved local edits only.
+   * Common edit navigation (all steps 1–5):
    *
-   *  - A brand-new trip that was never created has nothing persisted → close
-   *    the editor back to the landing screen (handled by each step calling
-   *    `clearForm` while its own step is not submitted).
-   *  - Otherwise revert the working copy to the last server-confirmed state
-   *    (`savedTrip`, updated by every successful Save Progress / Submit) and
-   *    force the step to remount so any component-local form mirror
-   *    (StepStart's `form`, box tables, delivery rows…) re-hydrates from it.
+   *  Close (X / exit edit) → discard unsaved edits and return to the locked
+   *    submitted view for the current step (stay in the trip wizard).
+   *  Cancel (bottom bar) → leave the wizard entirely and show Create New Trip.
    *
-   * It NEVER deletes the trip or a step, and NEVER touches submitted flags or
-   * status — a successful Save survives Cancel + reopen (CASE B / D).
+   * Never deletes the trip or clears submitted flags/status.
    */
-  const discardStepChanges = useCallback(() => {
+  const exitEditToLocked = useCallback(() => {
     if (!trip.id) {
       clearForm();
       return;
@@ -369,6 +371,11 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     setEditingSubmittedStep(null);
     setStepRemountNonce((n) => n + 1);
   }, [trip.id, savedTrip, setTrip, clearForm]);
+
+  /** Bottom Cancel — close the whole entry and show Create New Trip. */
+  const cancelToLanding = useCallback(() => {
+    clearForm();
+  }, [clearForm]);
 
   const createNewTrip = useCallback(() => {
     const urlTripId = Number(new URLSearchParams(location.search).get("tripId"));
@@ -461,20 +468,52 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
   const isNewTrip = trip.id === 0 || !trip.tripNo;
 
+  /**
+   * Common editability for steps 1–5:
+   *  - Completed trips: never editable here
+   *  - Explicit edit of a submitted step (pencil / Recent Edit): that step opens editable
+   *  - Draft resume on the next incomplete step: editable
+   *  - Step 5 while Draft/Pending and editing: editable (same as other steps)
+   */
   const isEditable = (stepCompleted: boolean) => {
     if (trip.status === "Completed") return false;
-    if (editingSubmittedStep === effectiveViewStepIndex && isEditing) {
-      return canEditTrip || trip.status === "Draft" || trip.status === "Pending";
+    const mayEdit = canEditTrip || trip.status === "Draft" || trip.status === "Pending";
+    if (!mayEdit) return false;
+
+    // User chose Edit on this (or another) submitted step — only that step is editable.
+    if (editingSubmittedStep != null) {
+      return isEditing && editingSubmittedStep === effectiveViewStepIndex;
     }
-    if (effectiveViewStepIndex === 4) {
-      return isEditing && (canEditTrip || trip.status === "Draft" || trip.status === "Pending");
-    }
+
+    // Resume / new work on the next incomplete step.
     const isViewingActiveStep = !isTripEnded && effectiveViewStepIndex === currentStep;
     if (isViewingActiveStep && !stepCompleted) {
       return isNewTrip || isEditing || trip.status === "Draft";
     }
+
+    // Step 5 may be filled mid-trip (after Step 1) before final lock.
+    if (effectiveViewStepIndex === 4 && isEditing && !stepCompleted) {
+      return true;
+    }
+
     return false;
   };
+
+  /**
+   * Navigate wizard steps (common for all 1–5).
+   * - Highlights the selected step (never force-jumps to step 5).
+   * - Submitted steps open locked; use pencil / Recent Edit to edit.
+   * - Leaving a step clears edit-mode so ticks stay accurate.
+   */
+  const navigateToStep = useCallback(
+    (idx: number) => {
+      const safe = clampTripStepIndex(trip, idx);
+      setViewStepIndex(safe);
+      // Drop edit-mode when moving away so other steps stay locked (ticks stay).
+      setEditingSubmittedStep((prev) => (prev != null && prev !== safe ? null : prev));
+    },
+    [trip]
+  );
 
   const renderSelectedStep = () => {
     if (effectiveViewStepIndex === 0) {
@@ -504,7 +543,8 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           employeeOptions={employeeOpts}
           editable={isEditable(isStartCompleted)}
           canEdit={canEditTrip}
-          onCancel={discardStepChanges}
+          onCancel={cancelToLanding}
+          onExitEdit={exitEditToLocked}
           clearForm={clearForm}
           headerLoading={headerLoading}
           subscribeHeaderSaveStatus={subscribeHeaderSaveStatus}
@@ -539,7 +579,8 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           birdTypes={birdTypes}
           editable={isEditable(isFarmCompleted)}
           canEdit={canEditTrip}
-          onCancel={discardStepChanges}
+          onCancel={cancelToLanding}
+          onExitEdit={exitEditToLocked}
           clearForm={clearForm}
         />
       );
@@ -557,7 +598,8 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           updateBoxDetails={updateBoxDetails}
           editable={isEditable(isPickupCompleted)}
           canEdit={canEditTrip}
-          onCancel={discardStepChanges}
+          onCancel={cancelToLanding}
+          onExitEdit={exitEditToLocked}
           clearForm={clearForm}
         />
       );
@@ -579,7 +621,8 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           readOnly={!isEditable(isDeliveryCompleted)}
           editable={isEditable(isDeliveryCompleted)}
           canEdit={canEditTrip}
-          onCancel={discardStepChanges}
+          onCancel={cancelToLanding}
+          onExitEdit={exitEditToLocked}
           clearForm={clearForm}
           persistedDeliveries={savedTrip.deliveries || []}
         />
@@ -595,7 +638,8 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           updateTrip={updateTrip}
           editable={isEditable(isTripEnded)}
           canEdit={canEditTrip}
-          onCancel={discardStepChanges}
+          onCancel={cancelToLanding}
+          onExitEdit={exitEditToLocked}
           clearForm={clearForm}
           submitExpensesStep={submitEndTrip}
           saveEndProgress={saveEndProgress}
@@ -615,7 +659,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       <div className="bg-white rounded-3xl p-6 md:p-8 border border-slate-200/80 shadow-xl shadow-slate-100/70 space-y-6">
         {entryScreen === "prompt" ? (
           <div className="flex flex-col items-center justify-center text-center py-16 space-y-6">
-            <div className="h-20 w-20 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 shadow-inner">
+            <div className="h-20 w-20 rounded-full bg-blue-50/70 flex items-center justify-center text-blue-500 shadow-inner">
               <FileText size={36} />
             </div>
             <div className="space-y-2">
@@ -625,8 +669,9 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
               </p>
             </div>
             <button
+              type="button"
               onClick={createNewTrip}
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 px-8 py-3 text-sm font-bold text-white shadow-md shadow-blue-200 transition-all active:scale-95"
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-400 to-indigo-400 hover:from-blue-500 hover:to-indigo-500 px-8 py-3 text-sm font-bold text-white shadow-md shadow-blue-100 transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40 focus-visible:ring-offset-2"
             >
               <Plus size={18} />
               {t("ops.trip.create_new_trip")}
@@ -636,16 +681,17 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           <>
             <TripWizardStepper
               steps={TRIP_STEP_LABELS}
-              currentStep={isTripEnded ? 4 : effectiveViewStepIndex}
+              // Always highlight the step the user is viewing (not forced to 5).
+              currentStep={effectiveViewStepIndex}
               completedMask={getTripWizardCompletedMask(trip)}
               lockedSteps={lockedSteps}
               onStepClick={(idx) => {
-                setViewStepIndex(idx);
+                navigateToStep(idx);
               }}
               onLockedStepClick={(idx) => {
                 // A future step is locked until the previous step is actually
                 // submitted (backend state). Redirect to the correct next step.
-                setViewStepIndex(currentStep);
+                navigateToStep(currentStep);
                 showNotification(
                   t("ops.trip.step_locked", { locked: idx + 1, current: currentStep + 1, name: stepDisplayName(currentStep) }),
                   "info"
@@ -667,7 +713,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
             )}
 
             <div className="mt-6">{renderSelectedStep()}</div>
-            {<TripFinalKPI trip={savedTrip} deliveries={savedTrip.deliveries || []} />}
           </>
         )}
       </div>

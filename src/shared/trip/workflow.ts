@@ -154,12 +154,13 @@ export function isDraftStatus(status: TripStatus): boolean {
  * Backend source: backend/src/validation/trips.ts TRIP_STATUS_TRANSITIONS
  *
  * This governs the *status control* only:
- *   Draft    → Pending      (once Step 5 is submitted)
- *   Pending  → Completed     (once every step is submitted)
- *   Completed → (nothing — Completed stays Completed under ordinary editing)
+ *   Draft    → Pending      (once Step 5 is submitted — automatic on submit)
+ *   Pending  → Completed    (manual approve on Recent Trip Activity Pending tab)
+ *   Completed → (terminal for ordinary editing — leaves Pending list)
  *   Deleted  → (terminal)
  *
  * `Pending → Draft` MUST NEVER EXIST.
+ * Completed trips leave the Pending tab (shown on Trip List / accounts, not here).
  *
  * Deletion is NOT a status transition. Reaching `Deleted` is done exclusively
  * through the dedicated Delete action and its 10-second undo — never the status

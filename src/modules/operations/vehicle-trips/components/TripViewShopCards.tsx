@@ -69,40 +69,41 @@ function CommunicationIcon({
   onRetry?: () => void;
   className?: string;
 }) {
+  const { t } = useI18n();
   const isFailed = status === "failed" && !sending;
   const isSent = status === "sent";
   const isSending = status === "sending" || sending;
 
   const isWhatsApp = channel === "whatsapp";
   const pendingIconColor = isWhatsApp ? "text-green-500" : "text-slate-400";
-  const pendingBgColor = isWhatsApp ? "bg-green-50 hover:bg-green-100" : "bg-slate-100 hover:bg-slate-200";
-  const pendingBorderColor = isWhatsApp ? "border-green-200" : "border-slate-200";
+  const pendingBgColor = isWhatsApp ? "bg-green-50/70 hover:bg-green-50/80" : "bg-slate-100 hover:bg-slate-200";
+  const pendingBorderColor = isWhatsApp ? "border-green-100" : "border-slate-200";
 
   let iconColor = pendingIconColor;
   let bgColor = pendingBgColor;
   let borderColor = pendingBorderColor;
-  let tooltip = channel === "mail" ? "Send email" : "Send WhatsApp";
-  let ariaLabel = channel === "mail" ? "Send email" : "Send WhatsApp";
+  let tooltip = channel === "mail" ? t("ops.trip.send_email") : t("ops.trip.send_whatsapp");
+  let ariaLabel = tooltip;
 
   if (isSending) {
-    iconColor = "text-sky-600";
-    bgColor = "bg-sky-50 hover:bg-sky-100";
-    borderColor = "border-sky-200";
-    tooltip = channel === "mail" ? "Sending email..." : "Sending WhatsApp...";
+    iconColor = "text-sky-500";
+    bgColor = "bg-sky-50/70 hover:bg-sky-50/80";
+    borderColor = "border-sky-100";
+    tooltip = channel === "mail" ? t("ops.trip.sending_email") : t("ops.trip.sending_whatsapp");
     ariaLabel = tooltip;
   } else if (isSent) {
-    iconColor = "text-emerald-600";
-    bgColor = "bg-emerald-50 hover:bg-emerald-100";
-    borderColor = "border-emerald-200";
+    iconColor = "text-emerald-500";
+    bgColor = "bg-emerald-50/70 hover:bg-emerald-50/80";
+    borderColor = "border-emerald-100";
     tooltip = channel === "mail"
-      ? `Email sent ${sendCount > 0 ? `${sendCount} time${sendCount > 1 ? "s" : ""}` : ""}`
-      : `WhatsApp sent ${sendCount > 0 ? `${sendCount} time${sendCount > 1 ? "s" : ""}` : ""}`;
+      ? t("ops.trip.email_sent_times", { count: sendCount })
+      : t("ops.trip.whatsapp_sent_times", { count: sendCount });
     ariaLabel = tooltip;
   } else if (isFailed) {
-    iconColor = "text-red-600";
-    bgColor = "bg-red-50 hover:bg-red-100";
-    borderColor = "border-red-200";
-    tooltip = channel === "mail" ? "Email failed — click to retry" : "WhatsApp failed — click to retry";
+    iconColor = "text-red-500";
+    bgColor = "bg-red-50/70 hover:bg-red-50/80";
+    borderColor = "border-red-100";
+    tooltip = channel === "mail" ? t("ops.trip.email_failed_retry") : t("ops.trip.whatsapp_failed_retry");
     ariaLabel = tooltip;
   }
 
@@ -124,7 +125,7 @@ function CommunicationIcon({
           <Icon size={16} />
         )}
         {isSent && sendCount > 0 && (
-          <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-600 text-white text-[10px] font-bold leading-none px-1 border-2 border-white">
+          <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-500 text-white text-[10px] font-bold leading-none px-1 border-2 border-white">
             {sendCount > 9 ? "9+" : sendCount}
           </span>
         )}
@@ -134,9 +135,9 @@ function CommunicationIcon({
           type="button"
           onClick={onRetry}
           disabled={disabled}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-amber-50 px-2.5 py-1.5 text-[11px] font-semibold text-amber-700 hover:bg-amber-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title="Retry"
-          aria-label="Retry"
+          className="inline-flex items-center gap-1.5 rounded-xl border border-amber-100 bg-amber-50/70 px-2.5 py-1.5 text-[11px] font-semibold text-amber-500 hover:bg-amber-50/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          title={t("ops.trip.retry")}
+          aria-label={t("ops.trip.retry")}
         >
           <RotateCw size={12} />
         </button>
@@ -217,7 +218,7 @@ export function TripViewShopCards({
       {/* Deliveries Header with Search on same row */}
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 flex-1 min-w-0">
-          <Package size={18} className="text-emerald-600 shrink-0" />
+          <Package size={18} className="text-emerald-500 shrink-0" />
           <h3 className="text-sm font-bold text-slate-800 truncate">
             {t("ops.trip.step.deliveries")}
             <span className="normal-case font-semibold text-[11px] text-slate-400 ml-1">({deliveries.length})</span>
@@ -297,8 +298,8 @@ export function TripViewShopCards({
                   <span
                     className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-bold border ${
                       isWeightMode
-                        ? "bg-purple-50 text-purple-700 border-purple-200/60"
-                        : "bg-amber-50 text-amber-700 border-amber-200/60"
+                        ? "bg-purple-50/70 text-purple-500 border-purple-200/60"
+                        : "bg-amber-50/70 text-amber-500 border-amber-200/60"
                     }`}
                   >
                     {isWeightMode ? t("ops.trip.weight_mode") : t("ops.trip.box_mode")}
@@ -316,23 +317,23 @@ export function TripViewShopCards({
                     icon={<Bird size={11} />}
                     label={t("common.birds")}
                     value={display(delivery.birds)}
-                    iconColor="text-sky-600"
+                    iconColor="text-sky-500"
                   />
                   <MetricBlock
                     icon={<Scale size={11} />}
                     label={t("common.weight")}
                     value={delivery.weight ? `${delivery.weight.toFixed(2)} ${t("common.kg")}` : "—"}
-                    iconColor="text-emerald-600"
+                    iconColor="text-emerald-500"
                   />
                 </div>
 
                 {/* Mortality - compact red warning row */}
                 {(mortalityCount > 0 || mortKg > 0) && (
                   <div className="flex items-center justify-between px-2 py-1.5 bg-red-50/60 rounded-lg border border-red-100 text-[11px]">
-                    <span className="text-red-600 font-semibold flex items-center gap-1">
+                    <span className="text-red-500 font-semibold flex items-center gap-1">
                       <AlertCircle size={12} className="text-rose-500" /> {t("ops.trip.mortality_birds")}
                     </span>
-                    <span className="text-red-700 font-bold">
+                    <span className="text-red-500 font-bold">
                       {mortalityCount} {t("common.birds").toLowerCase()} · {mortKg ? mortKg.toFixed(2) : "0.00"} {t("common.kg")}
                     </span>
                   </div>
@@ -360,13 +361,13 @@ export function TripViewShopCards({
                 {/* Capture info + bird type */}
                 <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium pt-0.5">
                   <div className="flex items-center gap-1">
-                    <span className="h-4 w-4 rounded bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                    <span className="h-4 w-4 rounded bg-indigo-50/70 text-indigo-500 flex items-center justify-center shrink-0">
                       <Clock size={12} />
                     </span>
                     <span>{t("ops.trip.captured")} {delivery.autoCaptureTime || "—"}</span>
                   </div>
                   {delivery.birdType ? (
-                    <span className="px-2 py-0.5 bg-sky-50 text-sky-700 font-semibold rounded-md text-[10px] border border-sky-100">
+                    <span className="px-2 py-0.5 bg-sky-50/70 text-sky-500 font-semibold rounded-md text-[10px] border border-sky-100">
                       {delivery.birdType}
                     </span>
                   ) : null}
@@ -374,10 +375,10 @@ export function TripViewShopCards({
 
                 {/* Failure reasons */}
                 {failedReason && (
-                  <p className="text-[11px] text-red-600 px-1 truncate" title={failedReason}>{failedReason}</p>
+                  <p className="text-[11px] text-red-500 px-1 truncate" title={failedReason}>{failedReason}</p>
                 )}
                 {whatsappFailedReason && (
-                  <p className="text-[11px] text-red-600 px-1 truncate" title={whatsappFailedReason}>WhatsApp: {whatsappFailedReason}</p>
+                  <p className="text-[11px] text-red-500 px-1 truncate" title={whatsappFailedReason}>WhatsApp: {whatsappFailedReason}</p>
                 )}
 
                 {/* Communication Controls - Icon only */}
@@ -386,7 +387,7 @@ export function TripViewShopCards({
                   <button
                     type="button"
                     onClick={() => onDownloadPdf(delivery)}
-                    className="inline-flex items-center justify-center w-9 h-9 rounded-xl border border-red-200 bg-red-50 hover:bg-red-100 text-red-700 transition-colors active:scale-95"
+                    className="inline-flex items-center justify-center w-9 h-9 rounded-xl border border-red-100 bg-red-50/70 hover:bg-red-50/80 text-red-500 transition-colors active:scale-95"
                     title={t("ops.trip.create_pdf_title")}
                     aria-label={t("ops.trip.create_pdf")}
                   >

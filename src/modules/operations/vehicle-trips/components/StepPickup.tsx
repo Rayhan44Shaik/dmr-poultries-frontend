@@ -7,6 +7,8 @@ import type { Trip, BoxDetail } from "../types/trip";
 import { getVehicles } from "../../../masters/vehicles/services/vehicleService";
 import { generatePickupReportPDF } from "../utils/generatePickupPDF";
 import { StepCloseButton, WizardActionBar, WizardStepNotice } from "./WizardStepUI";
+import { TripNoBadge } from "./TripNoBadge";
+import { StepKpiCard } from "./WizardControls";
 import { calculatePickupTotals, calculateBoxAvgWeight } from "../../../../shared/trip/calculations";
 import {
   TRIP_FIELD_DEFINITIONS,
@@ -24,7 +26,10 @@ interface Props {
   savePickupProgress?: (data: Partial<Trip>) => Promise<boolean>;
   editable?: boolean;
   canEdit?: boolean;
+  /** Bottom Cancel → leave wizard / Create New Trip. */
   onCancel?: () => void;
+  /** Header Close while editing → locked submitted view. */
+  onExitEdit?: () => void;
   clearForm?: () => void;
 }
 
@@ -90,8 +95,8 @@ function ConfirmationModal({
   const { t } = useI18n();
   if (!isOpen) return null;
 
-  const iconColor = type === "warning" ? "text-amber-600" : "text-blue-600";
-  const borderColor = type === "warning" ? "border-amber-200" : "border-slate-200";
+  const iconColor = type === "warning" ? "text-amber-500" : "text-blue-500";
+  const borderColor = type === "warning" ? "border-amber-100" : "border-slate-200";
   const bgGradient = type === "warning"
     ? "from-amber-50 to-orange-50"
     : "from-blue-50 to-slate-50";
@@ -121,8 +126,8 @@ function ConfirmationModal({
             onClick={onConfirm}
             className={`h-10 px-5 rounded-lg text-sm font-bold text-white shadow-sm transition-all hover:shadow-md active:scale-[0.98] inline-flex items-center justify-center shrink-0 ${
               type === "warning"
-                ? "bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700"
-                : "bg-blue-600 hover:bg-blue-700"
+                ? "bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-500 hover:to-orange-500"
+                : "bg-blue-500 hover:bg-blue-600"
             }`}
           >
             {t(confirmLabel)}
@@ -143,12 +148,18 @@ export default function StepPickup({
   editable = false,
   canEdit = false,
   onCancel,
+  onExitEdit,
   clearForm,
 }: Props) {
   const { t } = useI18n();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  /** Same-tick double-submit guard. */
+  const submitLockRef = useRef(false);
   const [isSaving, setIsSaving] = useState(false);
-  const [isLocalEditing, setIsLocalEditing] = useState(false);
+  const [isLocalEditing, setIsLocalEditing] = useState(Boolean(editable));
+  useEffect(() => {
+    if (editable) setIsLocalEditing(true);
+  }, [editable, trip.id]);
   const [removedBoxNos, setRemovedBoxNos] = useState<number[]>([]);
   const [rows, setRows] = useState<Row[]>(() => {
     const details = trip.boxDetails || [];
@@ -457,17 +468,19 @@ export default function StepPickup({
     setIsSaving(false);
   };
 
-  // ─── Cancel discards unsaved Step 3 fields (no API / no draft) ─────
-  const handleClose = () => {
-    if (clearForm && !trip.pickupStepSubmitted) {
-      clearForm();
-      return;
-    }
+  // Bottom Cancel → leave wizard (Create New Trip). Close → locked submitted view.
+  const handleCancel = () => {
+    setIsLocalEditing(false);
     if (onCancel) {
       onCancel();
       return;
     }
+    clearForm?.();
+  };
+
+  const handleExitToLocked = () => {
     setIsLocalEditing(false);
+    onExitEdit?.();
   };
 
   // ─── Submit / Update with confirmation ─────────────────────────────
@@ -499,6 +512,8 @@ export default function StepPickup({
       onConfirm: () => {
         setConfirmation((prev) => ({ ...prev, isOpen: false }));
         void (async () => {
+          if (submitLockRef.current || isSubmitting) return;
+          submitLockRef.current = true;
           setIsSubmitting(true);
           try {
             const success = await submitPickupStep({
@@ -512,6 +527,7 @@ export default function StepPickup({
               setToast({ message: t("ops.trip.failed_submit_pickup"), type: "error" });
             }
           } finally {
+            submitLockRef.current = false;
             setIsSubmitting(false);
           }
         })();
@@ -552,70 +568,70 @@ export default function StepPickup({
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
-          <div className="flex items-center gap-2.5">
-            <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0">
-              3
-            </span>
-            <h2 className="text-xl font-bold text-slate-800 tracking-tight">
-              {t("ops.trip.title.pickup").toUpperCase()}
-            </h2>
+          <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+            <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+              <Package size={18} className="text-amber-500" />
+              {t("ops.trip.title.pickup")}
+            </h3>
+            <TripNoBadge tripNo={trip.tripNo} />
           </div>
           <div className="flex items-center gap-2 shrink-0">
 
+            {/* Locked / view: pencil only — no top Close X */}
             {canEdit && (
               <button
+                type="button"
                 onClick={() => setIsLocalEditing(true)}
                 className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95"
-                title={t("ops.trip.edit_pickup_kpi")}
+                title={t("ops.trip.edit_step")}
               >
                 <Pencil size={14} />
               </button>
             )}
-            <StepCloseButton onClose={clearForm} />
             <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
               {t("ops.trip.submitted_locked")}
             </span>
           </div>
         </div>
 
-        {/* 5 Column Compact Deliveries-Style KPI Cards Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 pt-2">
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
-              <span className="h-5 w-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center shrink-0"><Clock size={ 12 } /></span> {t("ops.trip.time")}
-            </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{officialPickupTime || "--"}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
-              <span className="h-5 w-5 rounded-md bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0"><Scale size={ 12 } /></span> {t("ops.trip.dc_wt")}
-            </span>
-            <span className="text-xs font-bold text-slate-800">{trip.dcWeight ? `${Number(trip.dcWeight).toFixed(2)} Kg` : t("ops.trip.not_entered")}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
-              <span className="h-5 w-5 rounded-md bg-sky-100 text-sky-600 flex items-center justify-center shrink-0"><Bird size={ 12 } /></span> {t("common.birds")}
-            </span>
-            <span className="text-xs font-bold text-slate-800">{trip.totalBirds}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
-              <span className="h-5 w-5 rounded-md bg-amber-100 text-amber-600 flex items-center justify-center shrink-0"><Box size={ 12 } /></span> {t("common.boxes")}
-            </span>
-            <span className="text-xs font-bold text-slate-800">{trip.boxes} / {maxBoxes}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
-              <span className="h-5 w-5 rounded-md bg-purple-100 text-purple-600 flex items-center justify-center shrink-0"><Gauge size={ 12 } /></span> {t("ops.trip.avg_wt")}
-            </span>
-            <span className="text-xs font-bold text-slate-800">{trip.avgWeight ? `${trip.avgWeight} Kg` : "—"}</span>
-          </div>
+        {/* Same StepKpiCard font/layout as steps 1–2 / 4–5 (time first) */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 pt-2">
+          <StepKpiCard
+            icon={Clock}
+            tone="bg-blue-50/70 text-blue-500"
+            label={t("ops.trip.time")}
+            value={officialPickupTime || "--"}
+          />
+          <StepKpiCard
+            icon={Scale}
+            tone="bg-emerald-50/70 text-emerald-500"
+            label={t("ops.trip.dc_wt")}
+            value={trip.dcWeight ? `${Number(trip.dcWeight).toFixed(2)} Kg` : t("ops.trip.not_entered")}
+          />
+          <StepKpiCard
+            icon={Bird}
+            tone="bg-sky-50/70 text-sky-500"
+            label={t("common.birds")}
+            value={trip.totalBirds != null ? String(trip.totalBirds) : t("ops.trip.not_entered")}
+          />
+          <StepKpiCard
+            icon={Box}
+            tone="bg-amber-50/70 text-amber-500"
+            label={t("common.boxes")}
+            value={`${trip.boxes ?? 0} / ${maxBoxes || "—"}`}
+          />
+          <StepKpiCard
+            icon={Gauge}
+            tone="bg-purple-50/70 text-purple-500"
+            label={t("ops.trip.avg_wt")}
+            value={trip.avgWeight ? `${trip.avgWeight} Kg` : "—"}
+          />
         </div>
 
         {/* DC Photo Status Card */}
         {photos.length > 0 && (
           <div className="bg-white p-3 rounded-xl border border-slate-200 flex items-center gap-3 text-xs font-medium text-slate-700 flex-wrap">
-            <span className="h-5 w-5 rounded-md bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0"><Camera size={ 16 } /></span>
+            <span className="h-5 w-5 rounded-md bg-emerald-50/80 text-emerald-500 flex items-center justify-center shrink-0"><Camera size={ 16 } /></span>
             <span>{t("ops.trip.photos_uploaded", { count: photos.length })}</span>
             {photos.map((p) => (
               <img key={p.key} src={p.data} alt="Pickup" className="h-12 w-12 object-cover rounded-lg border border-slate-200" />
@@ -687,7 +703,7 @@ export default function StepPickup({
                 onClick={downloadImage}
                 disabled={busyAction !== null}
                 aria-label={t("ops.trip.download_image")}
-                className="flex items-center justify-center p-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg shadow-xs transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
+                className="flex items-center justify-center p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg shadow-xs transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
                 title={t("ops.trip.download_image")}
               >
                 <Download size={16} className={busyAction === "image" ? "animate-pulse" : ""} />
@@ -697,7 +713,7 @@ export default function StepPickup({
               onClick={generatePDF}
               disabled={busyAction !== null}
               aria-label={t("ops.trip.download_pdf")}
-              className="flex items-center justify-center p-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg shadow-xs transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
+              className="flex items-center justify-center p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-xs transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
               title={t("ops.trip.download_pdf")}
             >
               <FileText size={16} className={busyAction === "pdf" ? "animate-pulse" : ""} />
@@ -788,19 +804,21 @@ export default function StepPickup({
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-6 shadow-sm">
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-4 gap-3">
-          <div className="flex items-center gap-2.5">
-            <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0">
-              3
-            </span>
-            <h2 className="text-xl font-bold text-slate-800 tracking-tight">
-              {t("ops.trip.title.pickup").toUpperCase()}
-            </h2>
+          <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+            <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+              <Package size={18} className="text-amber-500" />
+              {t("ops.trip.title.pickup")}
+            </h3>
+            <TripNoBadge tripNo={trip.tripNo} />
           </div>
-          <div className="flex items-center gap-3">
-
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Edit mode only: animated Close X → locked submitted view */}
+            {(isEditMode || isLocalEditing) && trip.pickupStepSubmitted ? (
+              <StepCloseButton onClose={handleExitToLocked} animated />
+            ) : null}
             {(isEditMode || isLocalEditing) && trip.pickupStepSubmitted && (
               <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
-                {t("ops.trip.editing_trip", { no: trip.tripNo })}
+                {t("ops.trip.editable_view")}
               </span>
             )}
           </div>
@@ -808,7 +826,7 @@ export default function StepPickup({
 
         {/* Official time capture — set once at submit, cannot be edited */}
         <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
-          <span className="h-5 w-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center shrink-0"><Clock size={ 14 } /></span>
+          <span className="h-5 w-5 rounded-md bg-blue-50/80 text-blue-500 flex items-center justify-center shrink-0"><Clock size={ 14 } /></span>
           {officialPickupTime ? (
             <>
               <span className="font-semibold text-slate-700">{officialPickupTime}</span>
@@ -827,7 +845,7 @@ export default function StepPickup({
         {/* Image Upload Section — two DC photo slots */}
         <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/50">
           <label className="text-sm font-semibold text-slate-600 flex items-center gap-2 flex-wrap">
-            <span className="h-6 w-6 rounded-md bg-sky-100 text-sky-600 flex items-center justify-center shrink-0">
+            <span className="h-6 w-6 rounded-md bg-sky-50/80 text-sky-500 flex items-center justify-center shrink-0">
               <Camera size={14} />
             </span>
             {t("ops.trip.field.dc_photo")} {TRIP_FIELD_DEFINITIONS.dcPhotoKey.required && <span className="text-red-500">*</span>}
@@ -844,7 +862,7 @@ export default function StepPickup({
                   <button
                     type="button"
                     onClick={() => void removeImage(p.key)}
-                    className="absolute -top-1.5 -right-1.5 bg-red-600 hover:bg-red-700 text-white rounded-full w-5 h-5 text-[10px] leading-5 shadow-sm transition-all active:scale-90"
+                    className="absolute -top-1.5 -right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full w-5 h-5 text-[10px] leading-5 shadow-sm transition-all active:scale-90"
                     title={t("ops.trip.remove_photo")}
                   >
                     ×
@@ -881,7 +899,7 @@ export default function StepPickup({
         <div>
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-semibold text-slate-600 flex items-center gap-2">
-              <span className="h-6 w-6 rounded-md bg-violet-100 text-violet-600 flex items-center justify-center shrink-0">
+              <span className="h-6 w-6 rounded-md bg-violet-50/80 text-violet-500 flex items-center justify-center shrink-0">
                 <Package size={14} />
               </span>
               {t("ops.trip.box_entries", { max: maxBoxes || "—" })}
@@ -921,7 +939,7 @@ export default function StepPickup({
                             <button
                               type="button"
                               onClick={addRow}
-                              className="w-full h-8 text-[10px] font-bold uppercase tracking-wide text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg"
+                              className="w-full h-8 text-[10px] font-bold uppercase tracking-wide text-blue-500 bg-blue-50/70 hover:bg-blue-50/70 border border-blue-100 rounded-lg"
                             >
                               <Plus size={12} className="inline mr-1" /> {t("ops.trip.add_box")}
                             </button>
@@ -995,42 +1013,40 @@ export default function StepPickup({
           <p className="text-[10px] text-slate-400 mt-1.5">
             {t("ops.trip.use_tab_navigate")}
             {!isLastRowComplete && rows.length > 0 && (
-              <span className="text-amber-600 ml-2">⚠️ {t("ops.trip.fill_current_box_warn")}</span>
+              <span className="text-amber-500 ml-2">⚠️ {t("ops.trip.fill_current_box_warn")}</span>
             )}
             {rows.length >= maxBoxes && (
-              <span className="text-red-600 ml-2 font-bold">🚫 {t("ops.trip.box_limit_reached", { max: maxBoxes })}</span>
+              <span className="text-red-500 ml-2 font-bold">🚫 {t("ops.trip.box_limit_reached", { max: maxBoxes })}</span>
             )}
           </p>
         </div>
 
-        {/* Totals Summary Bar - Deliveries Style KPI Cards */}
+        {/* Totals — same StepKpiCard font as locked view / other steps */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-slate-100">
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
-              <span className="h-5 w-5 rounded-md bg-amber-100 text-amber-600 flex items-center justify-center shrink-0"><Box size={ 12 } /></span> {t("common.boxes")}
-            </span>
-            <span className="text-xs font-bold text-slate-800">{totals.boxes} / {maxBoxes}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
-              <span className="h-5 w-5 rounded-md bg-sky-100 text-sky-600 flex items-center justify-center shrink-0"><Bird size={ 12 } /></span> {t("common.birds")}
-            </span>
-            <span className="text-xs font-bold text-slate-800">{totals.totalBirds}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
-              <span className="h-5 w-5 rounded-md bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0"><Scale size={ 12 } /></span> {t("ops.trip.dc_wt")}
-            </span>
-            <span className="text-xs font-bold text-slate-800">{totals.dcWeight.toFixed(2)} Kg</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
-              <span className="h-5 w-5 rounded-md bg-purple-100 text-purple-600 flex items-center justify-center shrink-0"><Gauge size={ 12 } /></span> {t("ops.trip.avg_wt")}
-            </span>
-            <span className="text-xs font-bold text-slate-800">
-              {totals.avgWeight > 0 ? `${totals.avgWeight} Kg` : "—"}
-            </span>
-          </div>
+          <StepKpiCard
+            icon={Box}
+            tone="bg-amber-50/70 text-amber-500"
+            label={t("common.boxes")}
+            value={`${totals.boxes} / ${maxBoxes || "—"}`}
+          />
+          <StepKpiCard
+            icon={Bird}
+            tone="bg-sky-50/70 text-sky-500"
+            label={t("common.birds")}
+            value={String(totals.totalBirds)}
+          />
+          <StepKpiCard
+            icon={Scale}
+            tone="bg-emerald-50/70 text-emerald-500"
+            label={t("ops.trip.dc_wt")}
+            value={`${totals.dcWeight.toFixed(2)} Kg`}
+          />
+          <StepKpiCard
+            icon={Gauge}
+            tone="bg-purple-50/70 text-purple-500"
+            label={t("ops.trip.avg_wt")}
+            value={totals.avgWeight > 0 ? `${totals.avgWeight} Kg` : "—"}
+          />
         </div>
 
         <WizardStepNotice
@@ -1038,7 +1054,7 @@ export default function StepPickup({
           dirty={hasUnsavedChanges}
         />
         <WizardActionBar
-          onCancel={handleClose}
+          onCancel={handleCancel}
           onSave={savePickupProgress ? handleSaveProgress : undefined}
           onSubmit={handleSubmit}
           busy={isSaving || isSubmitting}

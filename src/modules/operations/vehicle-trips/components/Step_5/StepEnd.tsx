@@ -3,9 +3,12 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   Pencil,
-  AlertTriangle } from "lucide-react";
+  AlertTriangle,
+  Receipt
+} from "lucide-react";
 import type { Trip } from "../../types/trip";
 import { StepCloseButton, WizardActionBar, WizardStepNotice } from "../WizardStepUI";
+import { TripNoBadge } from "../TripNoBadge";
 import GeneralExpensesTable from "./GeneralExpensesTable";
 import DieselExpensesTable from "./DieselExpensesTable";
 import { useI18n } from "../../../../../i18n";
@@ -26,8 +29,8 @@ function ConfirmationModal({ isOpen, title, message, confirmLabel = "ops.trip.ye
 }) {
   const { t } = useI18n();
   if (!isOpen) return null;
-  const iconColor = type === "warning" ? "text-amber-600" : "text-emerald-600";
-  const borderColor = type === "warning" ? "border-amber-200" : "border-emerald-200";
+  const iconColor = type === "warning" ? "text-amber-500" : "text-emerald-500";
+  const borderColor = type === "warning" ? "border-amber-100" : "border-emerald-100";
   const bgGradient = type === "warning" ? "from-amber-50 to-orange-50" : "from-emerald-50 to-teal-50";
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
@@ -45,7 +48,7 @@ function ConfirmationModal({ isOpen, title, message, confirmLabel = "ops.trip.ye
         </div>
         <div className="flex justify-end gap-3 px-6 py-4 bg-slate-50 border-t border-slate-100">
           <button onClick={onCancel} className="h-10 px-5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium text-slate-600 transition-all shadow-xs inline-flex items-center justify-center shrink-0">{t(cancelLabel)}</button>
-          <button onClick={onConfirm} className={`h-10 px-5 rounded-lg text-sm font-bold text-white shadow-xs transition-all active:scale-[0.98] inline-flex items-center justify-center shrink-0 ${type === "warning" ? "bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700" : "bg-emerald-600 hover:bg-emerald-700"}`}>
+          <button onClick={onConfirm} className={`h-10 px-5 rounded-lg text-sm font-bold text-white shadow-xs transition-all active:scale-[0.98] inline-flex items-center justify-center shrink-0 ${type === "warning" ? "bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-500 hover:to-orange-500" : "bg-emerald-500 hover:bg-emerald-600"}`}>
             {t(confirmLabel)}
           </button>
         </div>
@@ -85,7 +88,10 @@ interface Props {
   submitStartStep?: (data: Partial<Trip>) => boolean | Promise<boolean>;
   editable?: boolean;
   canEdit?: boolean;
+  /** Bottom Cancel → leave wizard / Create New Trip. */
   onCancel?: () => void;
+  /** Close while editing → locked submitted view. */
+  onExitEdit?: () => void;
   clearForm?: () => void;
 }
 
@@ -95,15 +101,22 @@ export default function StepEnd({
   submitExpensesStep,
   saveEndProgress,
   submitStartStep,
-  editable: _editable = false,
+  editable = false,
   canEdit = true,
   onCancel,
+  onExitEdit,
   clearForm,
 }: Props) {
   const { t } = useI18n();
   // ─── State ─────────────────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLocalEditing, setIsLocalEditing] = useState(false);
+  /** Same-tick double-submit guard for final expenses submit. */
+  const submitLockRef = useRef(false);
+  // Parent `editable` (Recent Edit / step edit) opens the form immediately.
+  const [isLocalEditing, setIsLocalEditing] = useState(Boolean(editable));
+  useEffect(() => {
+    if (editable) setIsLocalEditing(true);
+  }, [editable, trip.id]);
   const [errorMsg, setErrorMsg] = useState("");
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" | "info" } | null>(null);
   const [confirmation, setConfirmation] = useState<{
@@ -148,11 +161,40 @@ export default function StepEnd({
       destinationTolls: (tripData as any).destinationTolls ?? (tripData as any).deliveryTolls ?? "",
       remarks: (tripData as any).remarks ?? "",
     };
-    // Copy all diesel fields from trip
+    // Copy any already-flattened diesel* fields from the trip record.
     Object.keys(tripData).forEach(key => {
       if (key.startsWith("diesel")) {
         (data as any)[key] = (tripData as any)[key];
       }
+    });
+    // Hydrate dieselEntries[] → dieselLtr1 / dieselRate1 / … so the diesel
+    // table shows fuel bills from dieselEntries (incl. bill image) when present.
+    const entries = Array.isArray(tripData.dieselEntries) ? tripData.dieselEntries : [];
+    entries.forEach((entry, idx) => {
+      // Unlimited diesel bills — use entry.rowIndex as-is (1-based).
+      const raw = Number(entry.rowIndex);
+      const n = Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : idx + 1;
+      const d = data as Record<string, unknown>;
+      const empty = (v: unknown) => v == null || v === "";
+      if (empty(d[`dieselLtr${n}`])) d[`dieselLtr${n}`] = entry.litres ?? "";
+      if (empty(d[`dieselRate${n}`])) d[`dieselRate${n}`] = entry.rate ?? "";
+      if (empty(d[`dieselMeter${n}`])) d[`dieselMeter${n}`] = entry.meter ?? "";
+      if (empty(d[`dieselBunk${n}`])) d[`dieselBunk${n}`] = entry.bunkName ?? "";
+      if (empty(d[`dieselGpsLat${n}`])) d[`dieselGpsLat${n}`] = entry.gpsLat ?? "";
+      if (empty(d[`dieselGpsLon${n}`])) d[`dieselGpsLon${n}`] = entry.gpsLon ?? "";
+      if (empty(d[`dieselGpsAccuracy${n}`])) d[`dieselGpsAccuracy${n}`] = entry.gpsAccuracy ?? "";
+      if (empty(d[`dieselGpsCapturedAt${n}`])) d[`dieselGpsCapturedAt${n}`] = entry.gpsCapturedAt ?? "";
+      // Always prefer real bill image from the entry when sheet slot is empty.
+      if (empty(d[`dieselImage${n}`]) && entry.imageData) {
+        d[`dieselImage${n}`] = entry.imageData;
+        d[`dieselImageName${n}`] = entry.imageName ?? d[`dieselImageName${n}`] ?? "";
+      } else if (empty(d[`dieselImageName${n}`]) && entry.imageName) {
+        d[`dieselImageName${n}`] = entry.imageName;
+      }
+      if (empty(d[`dieselId${n}`])) d[`dieselId${n}`] = entry.id ?? "";
+      if (empty(d[`dieselClientKey${n}`])) d[`dieselClientKey${n}`] = entry.clientKey ?? `diesel-${n}`;
+      if (d[`dieselSubmitted${n}`] == null) d[`dieselSubmitted${n}`] = entry.submitted !== false;
+      if (empty(d[`dieselSubmittedAt${n}`])) d[`dieselSubmittedAt${n}`] = entry.submittedAt ?? "";
     });
     return data;
   };
@@ -162,6 +204,11 @@ export default function StepEnd({
 
   // ─── Reset sheetData when trip changes ──────────────────────────
   const prevTripId = useRef<number>(trip.id);
+  const dieselHydrateKey = Array.isArray(trip.dieselEntries)
+    ? trip.dieselEntries
+        .map((e) => `${e?.id ?? ""}:${String(e?.imageData || "").length}:${e?.litres ?? ""}`)
+        .join("|")
+    : "";
   useEffect(() => {
     if (trip.id !== prevTripId.current) {
       prevTripId.current = trip.id;
@@ -169,8 +216,57 @@ export default function StepEnd({
       setIsSubmittedLocal(false);
       setErrorMsg("");
       setIsLocalEditing(false);
+      return;
     }
-  }, [trip.id, trip]);
+    // Same trip: if dieselEntries arrive/update (API load), merge bill images
+    // without wiping user edits on other fields.
+    if (!dieselHydrateKey) return;
+    setSheetData((prev) => {
+      const next = { ...prev } as SheetData;
+      const entries = Array.isArray(trip.dieselEntries) ? trip.dieselEntries : [];
+      let changed = false;
+      entries.forEach((entry, idx) => {
+        const raw = Number(entry.rowIndex);
+        const n = Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : idx + 1;
+        const empty = (v: unknown) => v == null || v === "";
+        if (empty(next[`dieselLtr${n}`]) && entry.litres != null) {
+          next[`dieselLtr${n}`] = entry.litres as any;
+          changed = true;
+        }
+        if (empty(next[`dieselRate${n}`]) && entry.rate != null) {
+          next[`dieselRate${n}`] = entry.rate as any;
+          changed = true;
+        }
+        if (empty(next[`dieselMeter${n}`]) && entry.meter != null) {
+          next[`dieselMeter${n}`] = entry.meter as any;
+          changed = true;
+        }
+        if (empty(next[`dieselBunk${n}`]) && entry.bunkName) {
+          next[`dieselBunk${n}`] = entry.bunkName as any;
+          changed = true;
+        }
+        if (empty(next[`dieselImage${n}`]) && entry.imageData) {
+          next[`dieselImage${n}`] = entry.imageData as any;
+          next[`dieselImageName${n}`] = (entry.imageName || next[`dieselImageName${n}`] || "") as any;
+          changed = true;
+        }
+        if (empty(next[`dieselGpsLat${n}`]) && entry.gpsLat != null) {
+          next[`dieselGpsLat${n}`] = entry.gpsLat as any;
+          next[`dieselGpsLon${n}`] = entry.gpsLon as any;
+          changed = true;
+        }
+        if (next[`dieselSubmitted${n}`] == null && entry.submitted !== false) {
+          next[`dieselSubmitted${n}`] = true as any;
+          changed = true;
+        }
+        if (empty(next[`dieselId${n}`]) && entry.id != null) {
+          next[`dieselId${n}`] = entry.id as any;
+          changed = true;
+        }
+      });
+      return changed ? next : prev;
+    });
+  }, [trip.id, trip, dieselHydrateKey]);
 
   // ─── Part K: durable local Step 5 draft + offline Save Progress queue ──
   const userTouchedRef = useRef(false);
@@ -283,6 +379,19 @@ export default function StepEnd({
   const remainingBalance =
     Number(trip.advanceAmount || 0) - totalAllExpenses - totalDieselAmount;
 
+  /** Indian grouping: ₹1,000.00 / ₹1,00,000.00 */
+  const formatInr = (n: number) =>
+    `₹${Number(n || 0).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+
+  const submittedTimeDisplay =
+    sheetData.submittedAtTimestamp ||
+    (trip as any).expensesStepSubmittedAt ||
+    (trip as any).submittedAtTimestamp ||
+    "";
+
   const highestDieselMeter = dieselIndices.reduce((max, idx) => {
     const val = Number(sheetData[`dieselMeter${idx}`] || 0);
     return val > max ? val : max;
@@ -345,6 +454,8 @@ export default function StepEnd({
   // the trip to Pending. Works before Step 4 (Part H unchanged).
   const canDurable = trip.id > 0 && Boolean(trip.startStepSubmitted);
   const handleSaveProgress = async () => {
+    if (submitLockRef.current || isSubmitting) return;
+    submitLockRef.current = true;
     setIsSubmitting(true);
     try {
       const canonical = prepareFinalPayload(false);
@@ -372,12 +483,14 @@ export default function StepEnd({
         if (success) savedSheetRef.current = JSON.stringify(sheetData);
       }
     } finally {
+      submitLockRef.current = false;
       setIsSubmitting(false);
     }
   };
 
   // ─── Initiate submit ──────────────────────────────────────────────
   const handleInitiateSubmit = () => {
+    if (submitLockRef.current || isSubmitting) return;
     // Part K: final Submit needs the server. Offline, keep every entered value
     // locally, keep the trip's existing authoritative status, and do NOT set
     // Pending / endStepSubmitted / expensesStepSubmitted / submittedAt.
@@ -403,14 +516,11 @@ export default function StepEnd({
       }
     });
     let requiredMinMeter = openingMeter;
-    let requiredMinLabel = t("ops.trip.start_meter_label", { meter: openingMeter });
     if (actualDestMeter > requiredMinMeter) {
       requiredMinMeter = actualDestMeter;
-      requiredMinLabel = t("ops.trip.dest_meter_label", { meter: actualDestMeter });
     }
     if (highestDieselMeter > requiredMinMeter) {
       requiredMinMeter = highestDieselMeter;
-      requiredMinLabel = t("ops.trip.diesel_entry_label", { meter: highestDieselMeter });
     }
     if (requiredMinMeter > 0 && endMeterNum <= requiredMinMeter) {
       setErrorMsg(t("ops.trip.meter_must_greater_than", { meter: requiredMinMeter }));
@@ -476,6 +586,8 @@ export default function StepEnd({
   };
 
   const executeSubmit = async () => {
+    if (submitLockRef.current || isSubmitting) return;
+    submitLockRef.current = true;
     setIsSubmitting(true);
     setErrorMsg("");
     try {
@@ -493,36 +605,46 @@ export default function StepEnd({
         // and any queued Save op for this trip are now obsolete.
         void discardDraft();
         setToast({ message: t("ops.trip.step5_submitted"), type: "success" });
+        // Close wizard → Create New Trip landing (same as steps 1–4).
+        // Prefer clearForm so Recent Trips can pick up the finished trip.
+        if (clearForm) {
+          clearForm();
+        }
       } else {
         // Single inline presentation — the inline error box below shows the
         // same message; do NOT duplicate it through the notice toast.
         setErrorMsg(t("ops.trip.failed_save_step"));
       }
     } catch (err: any) {
-      console.error("Submit error:", err);
       // Server-authoritative failure: keep every entered value in the durable
       // draft, keep the trip's existing status, show a retryable message.
       setErrorMsg(err?.message || t("ops.trip.failed_save_step"));
     } finally {
+      submitLockRef.current = false;
       setIsSubmitting(false);
     }
   };
 
-  const handleCloseView = () => {
-    if (isLocalEditing) {
-      setIsLocalEditing(false);
-      setToast({ message: t("ops.trip.edit_cancelled"), type: "info" });
-      // Discard the in-progress edits of this SUBMITTED step: the parent
-      // reverts the working copy to the last saved trip and remounts Step 5.
-      onCancel?.();
+  /** Close (while editing submitted) → locked submitted view. */
+  const handleExitToLocked = () => {
+    setIsLocalEditing(false);
+    setToast({ message: t("ops.trip.edit_cancelled"), type: "info" });
+    if (onExitEdit) {
+      onExitEdit();
       return;
     }
-    // Cancel active wizard — discard unsaved Step 5 only.
-    if (clearForm) {
-      clearForm();
-      return;
-    }
+    // Fallback discard without leaving the trip.
     onCancel?.();
+  };
+
+  /** Bottom Cancel → leave wizard / Create New Trip. */
+  const handleCloseView = () => {
+    setIsLocalEditing(false);
+    if (onCancel) {
+      onCancel();
+      return;
+    }
+    clearForm?.();
   };
 
   // ─── Render ──────────────────────────────────────────────────────
@@ -541,52 +663,72 @@ export default function StepEnd({
         // ─── Locked View ──────────────────────────────────────────────
         <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-3 shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 gap-3">
-            <div className="flex items-center gap-2">
-              <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0">5</span>
-              <h2 className="text-xl font-bold text-slate-800 tracking-tight">{t("ops.trip.title.expenses").toUpperCase()} ({t("ops.trip.submitted").toUpperCase()})</h2>
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
+              <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+                <Receipt size={18} className="text-orange-500" />
+                {t("ops.trip.title.expenses")}
+              </h3>
+              <TripNoBadge tripNo={trip.tripNo} />
             </div>
             <div className="flex items-center gap-2 shrink-0">
-
+              {/* Locked / view: pencil only — no top Close X */}
               {canEdit && (
                 <button
+                  type="button"
                   onClick={() => setIsLocalEditing(true)}
-                  className="bg-white hover:bg-slate-50 p-1.5 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95"
-                  title={t("common.edit")}
+                  className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95"
+                  title={t("ops.trip.edit_step")}
                 >
                   <Pencil size={14} />
                 </button>
               )}
-              <StepCloseButton onClose={clearForm} />
-              <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap">
+              <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
                 {t("ops.trip.submitted_locked")}
               </span>
             </div>
           </div>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-2.5 pt-1">
-            <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
-              <p className="text-xs text-slate-500 font-medium">{t("ops.trip.date_time")}</p>
-              <p className="text-xs font-semibold text-slate-900 mt-0.5">{sheetData.submittedAtTimestamp || (trip as any).expensesStepSubmittedAt || "--"}</p>
-            </div>
-            <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
-              <p className="text-xs text-slate-500 font-medium">{t("operations.vehicle_no")}</p>
-              <p className="text-xs font-semibold text-slate-900 mt-0.5">{trip.vehicleNo || "--"}</p>
-            </div>
-            <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
-              <p className="text-xs text-slate-500 font-medium">{t("operations.advance")}</p>
-              <p className="text-xs font-semibold text-emerald-700 mt-0.5">₹{Number(trip.advanceAmount || 0).toFixed(2)}</p>
-            </div>
-            <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
-              <p className="text-xs text-slate-500 font-medium">{t("operations.total_expenses")}</p>
-              <p className="text-xs font-semibold text-red-600 mt-0.5">₹{totalAllExpenses.toFixed(2)}</p>
-            </div>
-            <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
-              <p className="text-xs text-slate-500 font-medium">{t("ops.trip.total_diesel")}</p>
-              <p className="text-xs font-semibold text-blue-600 mt-0.5">₹{totalDieselAmount.toFixed(2)}</p>
-            </div>
-            <div className="bg-slate-50/50 border border-slate-200/80 p-2.5 rounded-lg">
-              <p className="text-xs text-slate-500 font-medium">{t("ops.trip.remaining_balance")}</p>
-              <p className="text-xs font-semibold text-emerald-600 mt-0.5">₹{remainingBalance.toFixed(2)}</p>
-            </div>
+          {/* Equal-size field boxes with clean margins (not KPI tiles) */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+            {[
+              {
+                label: t("ops.trip.date_time"),
+                value: submittedTimeDisplay || "—",
+                tone: "border-sky-100 bg-sky-50/40 text-slate-700",
+              },
+              {
+                label: t("operations.vehicle_no"),
+                value: trip.vehicleNo || "—",
+                tone: "border-indigo-100 bg-indigo-50/40 text-indigo-500",
+              },
+              {
+                label: t("ops.trip.field_advance_given"),
+                value: formatInr(Number(trip.advanceAmount || 0)),
+                tone: "border-emerald-100 bg-emerald-50/40 text-emerald-500",
+              },
+              {
+                label: t("operations.total_expenses"),
+                value: formatInr(totalAllExpenses),
+                tone: "border-rose-100 bg-rose-50/40 text-rose-500",
+              },
+              {
+                label: t("ops.trip.total_diesel"),
+                value: formatInr(totalDieselAmount),
+                tone: "border-blue-100 bg-blue-50/40 text-blue-500",
+              },
+              {
+                label: t("ops.trip.field_total_all"),
+                value: formatInr(totalAllExpenses + totalDieselAmount),
+                tone: "border-slate-200 bg-slate-50/60 text-slate-700",
+              },
+            ].map((f) => (
+              <div
+                key={f.label}
+                className={`rounded-xl border px-3 py-2.5 min-w-0 shadow-sm ${f.tone}`}
+              >
+                <p className="text-xs uppercase font-semibold text-slate-400 tracking-wide truncate">{f.label}</p>
+                <p className="text-sm font-bold text-slate-800 mt-1 tabular-nums truncate leading-snug">{f.value}</p>
+              </div>
+            ))}
           </div>
           <GeneralExpensesTable
             sheetData={sheetData}
@@ -618,14 +760,66 @@ export default function StepEnd({
         // ─── Editable View ────────────────────────────────────────────
         <div className="bg-white border border-slate-200 rounded-2xl p-4 sm:p-5 space-y-4 shadow-sm">
           <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
-            <div className="flex items-center gap-2">
-              <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0">5</span>
-              <h2 className="text-xl font-bold text-slate-800 tracking-tight">{t("ops.trip.title.expenses").toUpperCase()}</h2>
+            <div className="flex flex-wrap items-center gap-2 min-w-0">
+              <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+                <Receipt size={18} className="text-orange-500" />
+                {t("ops.trip.title.expenses")}
+              </h3>
+              <TripNoBadge tripNo={trip.tripNo} />
             </div>
             <div className="flex items-center gap-2">
+              {/* Edit mode only: animated Close X → locked submitted view */}
+              {isSubmitted ? (
+                <StepCloseButton onClose={handleExitToLocked} animated />
+              ) : null}
+              <span className="text-[11px] text-slate-700 font-medium bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200 whitespace-nowrap">
+                {t("ops.trip.editable_view")}
+              </span>
+            </div>
+          </div>
 
-              <span className="text-[11px] text-slate-700 font-medium bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200 whitespace-nowrap">{t("ops.trip.editable_view")}</span>
-            </div>
+          {/* Equal-size field boxes with clean margins (live totals while editing) */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
+            {[
+              {
+                label: t("ops.trip.date_time"),
+                value: submittedTimeDisplay || t("ops.trip.time_pending_short"),
+                tone: "border-sky-100 bg-sky-50/40 text-slate-700",
+              },
+              {
+                label: t("operations.vehicle_no"),
+                value: trip.vehicleNo || "—",
+                tone: "border-indigo-100 bg-indigo-50/40 text-indigo-500",
+              },
+              {
+                label: t("ops.trip.field_advance_given"),
+                value: formatInr(Number(trip.advanceAmount || 0)),
+                tone: "border-emerald-100 bg-emerald-50/40 text-emerald-500",
+              },
+              {
+                label: t("operations.total_expenses"),
+                value: formatInr(totalAllExpenses),
+                tone: "border-rose-100 bg-rose-50/40 text-rose-500",
+              },
+              {
+                label: t("ops.trip.total_diesel"),
+                value: formatInr(totalDieselAmount),
+                tone: "border-blue-100 bg-blue-50/40 text-blue-500",
+              },
+              {
+                label: t("ops.trip.field_total_all"),
+                value: formatInr(totalAllExpenses + totalDieselAmount),
+                tone: "border-slate-200 bg-slate-50/60 text-slate-700",
+              },
+            ].map((f) => (
+              <div
+                key={f.label}
+                className={`rounded-xl border px-3 py-2.5 min-w-0 shadow-sm ${f.tone}`}
+              >
+                <p className="text-xs uppercase font-semibold text-slate-400 tracking-wide truncate">{f.label}</p>
+                <p className="text-sm font-bold text-slate-800 mt-1 tabular-nums truncate leading-snug">{f.value}</p>
+              </div>
+            ))}
           </div>
 
           <GeneralExpensesTable
@@ -656,7 +850,7 @@ export default function StepEnd({
           />
 
           {errorMsg ? (
-            <div className="p-2.5 bg-red-50 border border-red-200 text-red-700 text-xs font-semibold rounded-lg">
+            <div className="p-2.5 bg-red-50/70 border border-red-100 text-red-500 text-xs font-semibold rounded-lg">
               {errorMsg}
             </div>
           ) : null}
@@ -676,10 +870,9 @@ export default function StepEnd({
             />
           </div>
 
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 grid grid-cols-1 sm:grid-cols-3 gap-2 font-bold text-xs text-slate-900">
-            <div>{t("operations.total_expenses")}: <span className="text-red-600">₹{totalAllExpenses.toFixed(2)}</span></div>
-            <div>{t("ops.trip.total_diesel")}: <span className="text-blue-600">₹{totalDieselAmount.toFixed(2)}</span></div>
-            <div>{t("ops.trip.balance_remaining")}: <span className="text-emerald-600">₹{remainingBalance.toFixed(2)}</span></div>
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center justify-between gap-2 font-bold text-xs text-slate-900">
+            <span>{t("ops.trip.balance_remaining")}</span>
+            <span className="text-emerald-500 tabular-nums">{formatInr(remainingBalance)}</span>
           </div>
 
           <WizardStepNotice

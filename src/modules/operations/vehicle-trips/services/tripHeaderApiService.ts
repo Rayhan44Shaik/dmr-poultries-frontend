@@ -184,7 +184,6 @@ export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {
     id: num(raw.id, defaults.id),
     tripNo: str(raw.tripNo ?? raw.trip_no, defaults.tripNo),
     tripDate: normalizeDate(raw.tripDate ?? raw.trip_date) || defaults.tripDate,
-    status: normalizeStatus(raw.status ?? defaults.status),
     startTime: formatStartTimeForDisplay(raw.startTime ?? raw.start_time) || defaults.startTime,
     vehicleId: numOrZero(raw.vehicleId ?? raw.vehicle_id ?? defaults.vehicleId),
     vehicleNo: str(raw.vehicleNo ?? raw.vehicle_no, defaults.vehicleNo),
@@ -203,6 +202,15 @@ export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {
     deliveryStepSubmitted: Boolean(raw.deliveryStepSubmitted ?? raw.delivery_step_submitted ?? defaults.deliveryStepSubmitted),
     endStepSubmitted: Boolean(raw.endStepSubmitted ?? raw.end_step_submitted ?? defaults.endStepSubmitted),
     expensesStepSubmitted: Boolean(raw.expensesStepSubmitted ?? raw.expenses_step_submitted ?? defaults.expensesStepSubmitted),
+    // If wizard is fully submitted but status still says Draft, treat as Pending
+    // so the trip never sits in the Draft tab after Step 5.
+    status: (() => {
+      const endDone = Boolean(raw.endStepSubmitted ?? raw.end_step_submitted ?? defaults.endStepSubmitted);
+      const expDone = Boolean(raw.expensesStepSubmitted ?? raw.expenses_step_submitted ?? defaults.expensesStepSubmitted);
+      const base = normalizeStatus(raw.status ?? defaults.status);
+      if ((endDone || expDone) && base === "Draft") return "Pending";
+      return base;
+    })(),
     expensesStepSubmittedAt: raw.expensesStepSubmittedAt != null || raw.expenses_step_submitted_at != null
       ? formatStartTimeForDisplay(raw.expensesStepSubmittedAt ?? raw.expenses_step_submitted_at)
       : defaults.expensesStepSubmittedAt,
@@ -420,6 +428,8 @@ export type DieselSubmitPayload = {
   gpsCapturedAt: string | null;
   imageData: string;
   imageName?: string | null;
+  /** 1-based diesel table row slot (dieselLtr1, dieselLtr2, … — unlimited). */
+  rowIndex?: number;
 };
 
 export async function submitTripDiesel(tripId: number, payload: DieselSubmitPayload): Promise<Trip> {
@@ -662,6 +672,10 @@ export async function submitTripStep(
     body = {
       ...toStep5Payload(trip as Partial<Trip> & Record<string, unknown>),
       mode: "submit",
+      // Final Step 5 submit always moves Draft → Pending (never Completed).
+      status: "Pending",
+      endStepSubmitted: true,
+      expensesStepSubmitted: true,
     };
   }
   const { data } = await apiPost<ApiTripRecord>(

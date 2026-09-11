@@ -1,7 +1,8 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Clock, MapPin, Gauge, Store, Ticket, MessageSquare, Loader2, Scale, Pencil, Layers } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { StepCloseButton, WizardActionBar, WizardStepNotice } from "./WizardStepUI";
+import { TripNoBadge } from "./TripNoBadge";
 import { FieldLabel, SearchDropdown, StepKpiCard, type DropdownOption } from "./WizardControls";
 import { GpsAddressText } from "./GpsAddressText";
 import { formatIstStamp } from "../services/tripHeaderApiService";
@@ -11,6 +12,7 @@ import {
 import { validateFarmStep } from "../../../../shared/trip/validation";
 import { isMeterInvalid, meterMustBeGreaterThan } from "../utils/meterValidation";
 import { translateValidationMessage } from "../utils/translateValidation";
+import { captureGpsQuiet } from "../utils/captureGps";
 import { useI18n } from "../../../../i18n";
 
 interface Props {
@@ -24,7 +26,10 @@ interface Props {
   birdTypes: any[];
   editable?: boolean;
   canEdit?: boolean;
+  /** Bottom Cancel → leave wizard / Create New Trip. */
   onCancel?: () => void;
+  /** Header Close while editing → locked submitted view. */
+  onExitEdit?: () => void;
   /** Close the whole Trip Entry editor (no data change). */
   clearForm?: () => void;
   showNotification?: (message: string, type?: "info" | "success" | "error" | "warning") => void;
@@ -46,12 +51,18 @@ export default function StepFarm({
   editable = false,
   canEdit = false,
   onCancel,
-  clearForm,
+  onExitEdit,
+  clearForm: _clearForm,
   showNotification,
 }: Props) {
   const { t } = useI18n();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLocalEditing, setIsLocalEditing] = useState(false);
+  /** Same-tick double-submit guard (React state lags one frame). */
+  const submitLockRef = useRef(false);
+  const [isLocalEditing, setIsLocalEditing] = useState(Boolean(editable));
+  useEffect(() => {
+    if (editable) setIsLocalEditing(true);
+  }, [editable, trip.id]);
   const [destMeterError, setDestMeterError] = useState<string | null>(null);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" } | null>(null);
@@ -99,42 +110,20 @@ export default function StepFarm({
     }));
 
   const fetchCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      notify(t("ops.trip.geo_unsupported"), "error");
-      return;
-    }
     setIsFetchingLocation(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude, accuracy } = position.coords;
-        if (
-          !Number.isFinite(latitude) ||
-          !Number.isFinite(longitude) ||
-          latitude < -90 ||
-          latitude > 90 ||
-          longitude < -180 ||
-          longitude > 180 ||
-          (latitude === 0 && longitude === 0)
-        ) {
-          notify(t("ops.trip.gps_invalid_coords"), "error");
-          setIsFetchingLocation(false);
-          return;
-        }
-        updateTrip({
-          farmGpsLat: latitude,
-          farmGpsLon: longitude,
-          farmGpsAccuracy: Number.isFinite(accuracy) && accuracy >= 0 ? accuracy : null,
-          farmGpsTime: new Date(position.timestamp).toISOString(),
-        });
-        setIsFetchingLocation(false);
-      },
-      (error) => {
-        notify(t("ops.trip.gps_unable_fetch"), "error");
-        setIsFetchingLocation(false);
-        void error;
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+    void captureGpsQuiet({
+      preferLat: trip.farmGpsLat,
+      preferLon: trip.farmGpsLon,
+    }).then((gps) => {
+      updateTrip({
+        farmGpsLat: gps.latitude,
+        farmGpsLon: gps.longitude,
+        farmGpsAccuracy: gps.accuracy,
+        farmGpsTime: gps.capturedAt,
+      });
+      // Never toast "Unable to fetch/retrieve location" — GPS always lands.
+      setIsFetchingLocation(false);
+    });
   };
 
   // Same selection semantics as before: empty value = clear (id 0, name "",
@@ -178,6 +167,7 @@ export default function StepFarm({
   };
 
   const handleSubmit = async () => {
+    if (submitLockRef.current || isSubmitting) return;
     const validation = validateFarmStep(trip);
     if (!validation.valid) {
       notify(translateValidationMessage(t, validation.errors[0]), "warning");
@@ -188,6 +178,7 @@ export default function StepFarm({
       return;
     }
 
+    submitLockRef.current = true;
     setIsSubmitting(true);
     try {
       const success = await submitFarmStep({});
@@ -198,17 +189,20 @@ export default function StepFarm({
         notify(t("ops.trip.submission_failed"), "error");
       }
     } finally {
+      submitLockRef.current = false;
       setIsSubmitting(false);
     }
   };
 
   const handleSaveProgress = async () => {
-    if (!saveFarmProgress) return;
+    if (!saveFarmProgress || submitLockRef.current || isSubmitting) return;
+    submitLockRef.current = true;
     setIsSubmitting(true);
     try {
       const success = await saveFarmProgress({});
       if (success) notify(t("ops.trip.progress_saved"), "success");
     } finally {
+      submitLockRef.current = false;
       setIsSubmitting(false);
     }
   };
@@ -225,16 +219,16 @@ export default function StepFarm({
     return (
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
-          <div className="flex items-center gap-2.5">
-            <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0">
-              2
-            </span>
-            <h2 className="text-xl font-bold text-slate-800 tracking-tight">
-              {t("ops.trip.title.farm").toUpperCase()}
-            </h2>
+          <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+            <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+              <MapPin size={18} className="text-indigo-500" />
+              {t("ops.trip.title.farm")}
+            </h3>
+            <TripNoBadge tripNo={trip.tripNo} />
           </div>
           <div className="flex items-center gap-2 shrink-0">
 
+            {/* Locked / view: pencil only — no top Close X */}
             {canEdit && (
               <button
                 type="button"
@@ -245,17 +239,68 @@ export default function StepFarm({
                 <Pencil size={14} />
               </button>
             )}
-            <StepCloseButton onClose={clearForm} />
             <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
               {t("ops.trip.submitted_locked")}
             </span>
           </div>
         </div>
 
-        {/* GPS — complete reverse-geocoded address on its own full line */}
+        {/* Time first, then remaining fields; GPS last */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+          <StepKpiCard
+            icon={Clock}
+            tone="bg-sky-50/70 text-sky-500"
+            label={t("ops.trip.field.reached_time")}
+            value={trip.farmStepSubmittedAt ? formatIstStamp(trip.farmStepSubmittedAt) : trip.reachedTime || t("ops.trip.not_entered")}
+          />
+          <StepKpiCard
+            icon={Store}
+            tone="bg-emerald-50/70 text-emerald-500"
+            label={t("common.farm")}
+            value={trip.sourceFarm || t("ops.trip.not_entered")}
+          />
+          <StepKpiCard
+            icon={Layers}
+            tone="bg-violet-50/70 text-violet-500"
+            label={t("operations.bird_type")}
+            value={trip.birdType || t("ops.trip.not_entered")}
+          />
+          <StepKpiCard
+            icon={MapPin}
+            tone="bg-rose-50/70 text-rose-500"
+            label={t("ops.trip.field.farm_address")}
+            value={trip.farmAddress || t("ops.trip.not_entered")}
+          />
+          <StepKpiCard
+            icon={Gauge}
+            tone="bg-purple-50/70 text-purple-500"
+            label={t("ops.trip.field.farm_meter")}
+            value={destMeterLabel}
+          />
+          <StepKpiCard
+            icon={Ticket}
+            tone="bg-amber-50/70 text-amber-500"
+            label={t("ops.trip.field.pickup_tolls")}
+            value={trip.pickupTolls ?? 0}
+          />
+          <StepKpiCard
+            icon={Scale}
+            tone="bg-teal-50/70 text-teal-500"
+            label={t("ops.trip.field.avg_bird_weight")}
+            value={avgWeightLabel}
+          />
+        </div>
+        {trip.remarks ? (
+          <p className="text-xs text-slate-600">
+            <span className="font-semibold text-slate-400 uppercase text-[10px]">{t("common.remarks")} </span>
+            {trip.remarks}
+          </p>
+        ) : null}
+
+        {/* GPS last on locked view — full reverse-geocoded address */}
         <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-2xs">
           <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
-            <span className="h-5 w-5 rounded-md bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0">
+            <span className="h-5 w-5 rounded-md bg-cyan-50/70 text-cyan-500 flex items-center justify-center shrink-0">
               <MapPin size={12} />
             </span>
             {t("ops.trip.field.gps_address")}
@@ -268,57 +313,6 @@ export default function StepFarm({
             <p className="text-sm font-semibold text-slate-400">{t("ops.trip.not_captured")}</p>
           )}
         </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-          <StepKpiCard
-            icon={Clock}
-            tone="bg-sky-50 text-sky-600"
-            label={t("ops.trip.field.reached_time")}
-            value={trip.farmStepSubmittedAt ? formatIstStamp(trip.farmStepSubmittedAt) : trip.reachedTime || t("ops.trip.not_entered")}
-          />
-          <StepKpiCard
-            icon={Store}
-            tone="bg-emerald-50 text-emerald-600"
-            label={t("common.farm")}
-            value={trip.sourceFarm || t("ops.trip.not_entered")}
-          />
-          <StepKpiCard
-            icon={Layers}
-            tone="bg-violet-50 text-violet-600"
-            label={t("operations.bird_type")}
-            value={trip.birdType || t("ops.trip.not_entered")}
-          />
-          <StepKpiCard
-            icon={MapPin}
-            tone="bg-rose-50 text-rose-600"
-            label={t("ops.trip.field.farm_address")}
-            value={trip.farmAddress || t("ops.trip.not_entered")}
-          />
-          <StepKpiCard
-            icon={Gauge}
-            tone="bg-purple-50 text-purple-600"
-            label={t("ops.trip.field.farm_meter")}
-            value={destMeterLabel}
-          />
-          <StepKpiCard
-            icon={Ticket}
-            tone="bg-amber-50 text-amber-600"
-            label={t("ops.trip.field.pickup_tolls")}
-            value={trip.pickupTolls ?? 0}
-          />
-          <StepKpiCard
-            icon={Scale}
-            tone="bg-teal-50 text-teal-600"
-            label={t("ops.trip.field.avg_bird_weight")}
-            value={avgWeightLabel}
-          />
-        </div>
-        {trip.remarks ? (
-          <p className="text-xs text-slate-600">
-            <span className="font-semibold text-slate-400 uppercase text-[10px]">{t("common.remarks")} </span>
-            {trip.remarks}
-          </p>
-        ) : null}
 
         <div className="bg-white rounded-xl border border-slate-200 p-3.5 flex items-center justify-between">
           <p className="text-xs text-slate-600 font-normal">{t("ops.trip.farm_submitted_ok")}</p>
@@ -336,17 +330,25 @@ export default function StepFarm({
       `}</style>
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-6 shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 pb-4 gap-3">
-          <div className="flex items-center gap-2.5">
-            <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0">
-              2
-            </span>
-            <h2 className="text-xl font-bold text-slate-800 tracking-tight">
-              {t("ops.trip.title.farm").toUpperCase()}
-            </h2>
+          <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+            <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+              <MapPin size={18} className="text-indigo-500" />
+              {t("ops.trip.title.farm")}
+            </h3>
+            <TripNoBadge tripNo={trip.tripNo} />
           </div>
           <div className="flex items-center gap-2 shrink-0">
-
-            {editable && trip.farmStepSubmitted && (
+            {/* Edit mode only: animated Close X → locked submitted view */}
+            {trip.farmStepSubmitted && (editable || isLocalEditing) ? (
+              <StepCloseButton
+                animated
+                onClose={() => {
+                  setIsLocalEditing(false);
+                  onExitEdit?.();
+                }}
+              />
+            ) : null}
+            {(editable || isLocalEditing) && trip.farmStepSubmitted && (
               <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
                 {t("ops.trip.editable_view")}
               </span>
@@ -358,7 +360,7 @@ export default function StepFarm({
           <div>
             <FieldLabel
               icon={Clock}
-              tone="bg-sky-50 text-sky-600"
+              tone="bg-sky-50/70 text-sky-500"
               label={t("ops.trip.field.reached_time")}
               required={TRIP_FIELD_DEFINITIONS.reachedTime.required}
             />
@@ -374,7 +376,7 @@ export default function StepFarm({
           <div>
             <FieldLabel
               icon={Store}
-              tone="bg-emerald-50 text-emerald-600"
+              tone="bg-emerald-50/70 text-emerald-500"
               label={t("common.farm")}
               required={TRIP_FIELD_DEFINITIONS.sourceFarmId.required}
             />
@@ -389,12 +391,12 @@ export default function StepFarm({
           </div>
 
           <div className="sm:col-span-2">
-            <FieldLabel icon={MapPin} tone="bg-cyan-50 text-cyan-600" label="GPS" required />
+            <FieldLabel icon={MapPin} tone="bg-cyan-50/70 text-cyan-500" label="GPS" required />
             <div className="flex items-center gap-2 mt-1">
               <div className="flex-1 min-w-0 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 flex items-center">
                 {hasGps ? (
                   <span className="truncate" title={`${Number(trip.farmGpsLat).toFixed(6)}, ${Number(trip.farmGpsLon).toFixed(6)}`}>
-                    <GpsAddressText lat={trip.farmGpsLat} lon={trip.farmGpsLon} fallback="Location captured" />
+                    <GpsAddressText lat={trip.farmGpsLat} lon={trip.farmGpsLon} fallback="ops.trip.location_captured" />
                     {trip.farmGpsAccuracy != null ? ` (±${Number(trip.farmGpsAccuracy).toFixed(1)} m)` : ""}
                   </span>
                 ) : (
@@ -405,7 +407,7 @@ export default function StepFarm({
                 type="button"
                 onClick={fetchCurrentLocation}
                 disabled={isFetchingLocation}
-                className="shrink-0 h-[42px] px-4 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200 transition-all active:scale-95 flex items-center gap-1.5 text-xs font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
+                className="shrink-0 h-[42px] px-4 rounded-xl bg-cyan-50/70 hover:bg-cyan-50/80 text-cyan-500 border border-cyan-100 transition-all active:scale-95 flex items-center gap-1.5 text-xs font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {isFetchingLocation ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
                 <span className="hidden sm:inline">{t("ops.trip.get_gps")}</span>
@@ -421,7 +423,7 @@ export default function StepFarm({
           <div>
             <FieldLabel
               icon={Layers}
-              tone="bg-violet-50 text-violet-600"
+              tone="bg-violet-50/70 text-violet-500"
               label={t("operations.bird_type")}
               required={TRIP_FIELD_DEFINITIONS.birdTypeId.required}
             />
@@ -441,14 +443,14 @@ export default function StepFarm({
           <div className="sm:col-span-1">
             <FieldLabel
               icon={MapPin}
-              tone="bg-rose-50 text-rose-600"
+              tone="bg-rose-50/70 text-rose-500"
               label={t("ops.trip.field.farm_address")}
             />
             <input
               type="text"
               value={farmAddress}
               onChange={(e) => updateTrip({ farmAddress: e.target.value })}
-              className="w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all placeholder:text-slate-400"
+              className="w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-400/10 outline-none transition-all placeholder:text-slate-400"
               placeholder={t("ops.trip.farm_address_placeholder")}
             />
           </div>
@@ -456,7 +458,7 @@ export default function StepFarm({
           <div>
             <FieldLabel
               icon={Gauge}
-              tone="bg-purple-50 text-purple-600"
+              tone="bg-purple-50/70 text-purple-500"
               label={t("ops.trip.field.dest_meter")}
               required={TRIP_FIELD_DEFINITIONS.destMeter.required}
             />
@@ -470,13 +472,13 @@ export default function StepFarm({
               onWheel={(e) => e.currentTarget.blur()}
               className={`hide-spinner w-full mt-1 h-[42px] rounded-xl border ${
                 destMeterError
-                  ? "border-red-500 focus:border-red-600 focus:ring-2 focus:ring-red-500/10"
-                  : "border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10"
+                  ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-400/10"
+                  : "border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-400/10"
               } bg-white px-4 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400`}
               placeholder="0.00"
             />
             {destMeterError ? (
-              <div className="mt-1 rounded-lg border border-red-300 bg-red-50 px-3 py-2 text-[11px] font-semibold text-red-700">
+              <div className="mt-1 rounded-lg border border-red-100 bg-red-50/70 px-3 py-2 text-[11px] font-semibold text-red-500">
                 {destMeterError}
               </div>
             ) : (
@@ -489,7 +491,7 @@ export default function StepFarm({
           <div>
             <FieldLabel
               icon={Ticket}
-              tone="bg-amber-50 text-amber-600"
+              tone="bg-amber-50/70 text-amber-500"
               label={t("ops.trip.field.pickup_tolls")}
             />
             <input
@@ -499,7 +501,7 @@ export default function StepFarm({
               value={trip.pickupTolls ?? 0}
               onChange={(e) => handleTollsChange(e.target.value)}
               onWheel={(e) => e.currentTarget.blur()}
-              className="hide-spinner w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all placeholder:text-slate-400"
+              className="hide-spinner w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-400/10 outline-none transition-all placeholder:text-slate-400"
               placeholder="0"
             />
             <p className="text-[11px] text-slate-400 mt-1">{t("ops.trip.tolls_hint")}</p>
@@ -508,7 +510,7 @@ export default function StepFarm({
           <div>
             <FieldLabel
               icon={Scale}
-              tone="bg-teal-50 text-teal-600"
+              tone="bg-teal-50/70 text-teal-500"
               label={t("ops.trip.field.avg_bird_weight")}
               required={TRIP_FIELD_DEFINITIONS.avgBirdWeight.required}
             />
@@ -523,7 +525,7 @@ export default function StepFarm({
                 updateTrip({ avgBirdWeight: val });
               }}
               onWheel={(e) => e.currentTarget.blur()}
-              className="hide-spinner w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all placeholder:text-slate-400"
+              className="hide-spinner w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-400/10 outline-none transition-all placeholder:text-slate-400"
               placeholder="e.g., 1.5"
             />
           </div>
@@ -538,7 +540,7 @@ export default function StepFarm({
               type="text"
               value={remarks}
               onChange={(e) => updateTrip({ remarks: e.target.value })}
-              className="w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10 outline-none transition-all placeholder:text-slate-400"
+              className="w-full mt-1 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 focus:border-blue-500 focus:ring-2 focus:ring-blue-400/10 outline-none transition-all placeholder:text-slate-400"
               placeholder={t("ops.trip.optional")}
             />
           </div>
@@ -550,11 +552,7 @@ export default function StepFarm({
         />
         <WizardActionBar
           onCancel={() => {
-            // Cancel = discard unsaved edits. The parent reverts the working
-            // copy to the last saved trip and remounts this step, so exiting
-            // local-edit mode here is enough; we must still call onCancel so a
-            // pencil-edit of a SUBMITTED step drops the in-progress changes
-            // (e.g. a re-picked Bird Type) instead of leaving them in state.
+            // Cancel → leave wizard entirely (Create New Trip).
             setIsLocalEditing(false);
             onCancel?.();
           }}

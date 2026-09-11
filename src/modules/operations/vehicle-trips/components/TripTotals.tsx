@@ -24,33 +24,33 @@ function TripTotals({ rows }: Props) {
       label: t("ops.trip.total_shops"),
       value: totals.totalShops,
       icon: <Store size={18} />,
-      bg: "bg-blue-50",
-      textColor: "text-blue-700",
-      border: "border-blue-200"
+      bg: "bg-blue-50/70",
+      textColor: "text-blue-500",
+      border: "border-blue-100"
     },
     {
       label: t("ops.trip.total_birds"),
       value: totals.totalBirds.toLocaleString(),
       icon: <Bird size={18} />,
-      bg: "bg-green-50",
-      textColor: "text-green-700",
-      border: "border-green-200"
+      bg: "bg-green-50/70",
+      textColor: "text-green-500",
+      border: "border-green-100"
     },
     {
       label: t("ops.trip.total_weight"),
       value: `${totals.totalWeight.toFixed(2)} Kg`,
       icon: <Scale size={18} />,
-      bg: "bg-orange-50",
-      textColor: "text-orange-700",
-      border: "border-orange-200"
+      bg: "bg-orange-50/70",
+      textColor: "text-orange-500",
+      border: "border-orange-100"
     },
     {
       label: t("operations.total_mortality"),
       value: totals.totalMortality,
       icon: <HeartPulse size={18} />,
-      bg: "bg-red-50",
-      textColor: "text-red-600",
-      border: "border-red-200"
+      bg: "bg-red-50/70",
+      textColor: "text-red-500",
+      border: "border-red-100"
     },
   ];
 

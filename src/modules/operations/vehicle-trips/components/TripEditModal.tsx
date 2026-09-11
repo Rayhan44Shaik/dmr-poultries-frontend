@@ -26,8 +26,8 @@ function TripEditModal({ open, trip, onClose, onEdit }: Props) {
       <div className="bg-white rounded-2xl shadow-xl w-[480px]">
         <div className="flex items-center justify-between px-6 py-5 border-b">
           <div className="flex items-center gap-3">
-            <div className="h-12 w-12 rounded-xl bg-green-100 flex items-center justify-center">
-              <Pencil size={22} className="text-green-700" />
+            <div className="h-12 w-12 rounded-xl bg-green-50/80 flex items-center justify-center">
+              <Pencil size={22} className="text-green-500" />
             </div>
             <div>
               <h2 className="text-xl font-bold text-slate-800">{t("ops.trip.edit_trip")}</h2>
@@ -70,7 +70,7 @@ function TripEditModal({ open, trip, onClose, onEdit }: Props) {
           </button>
           <button
             onClick={handleEdit}
-            className="h-10 px-5 rounded-xl bg-green-700 hover:bg-green-800 text-white inline-flex items-center justify-center shrink-0"
+            className="h-10 px-5 rounded-xl bg-green-500 hover:bg-green-800 text-white inline-flex items-center justify-center shrink-0"
           >
             {t("ops.trip.edit_trip")}
           </button>

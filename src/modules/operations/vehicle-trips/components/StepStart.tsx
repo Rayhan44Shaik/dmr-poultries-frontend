@@ -26,6 +26,7 @@ import {
   formatIstStamp,
 } from "../services/tripHeaderApiService";
 import { StepCloseButton, WizardActionBar, WizardStepNotice, type WizardNoticeState } from "./WizardStepUI";
+import { TripNoBadge } from "./TripNoBadge";
 import { FieldLabel, SearchDropdown, MultiSearchDropdown, StepKpiCard, type DropdownOption } from "./WizardControls";
 import { translateValidationMessage } from "../utils/translateValidation";
 import {
@@ -52,7 +53,10 @@ interface Props {
   employeeOptions: EmployeeOption[];
   editable?: boolean;
   canEdit?: boolean;
+  /** Bottom Cancel → leave wizard / Create New Trip. */
   onCancel?: () => void;
+  /** Header Close while editing a submitted step → back to locked view. */
+  onExitEdit?: () => void;
   clearForm?: () => void;
   headerLoading?: boolean;
   subscribeHeaderSaveStatus: (listener: () => void) => () => void;
@@ -147,7 +151,7 @@ const TripDateField = React.memo(function TripDateField({ tripDate }: { tripDate
     <div>
       <FieldLabel
         icon={Calendar}
-        tone="bg-sky-50 text-sky-600"
+        tone="bg-sky-50/70 text-sky-500"
         label={t("ops.trip.field.trip_date")}
         required={TRIP_FIELD_DEFINITIONS.tripDate.required}
       />
@@ -165,7 +169,7 @@ const StartTimeField = React.memo(function StartTimeField({ startTime }: { start
     <div>
       <FieldLabel
         icon={Clock}
-        tone="bg-blue-50 text-blue-600"
+        tone="bg-blue-50/70 text-blue-500"
         label={t("ops.trip.field.start_time")}
         required={TRIP_FIELD_DEFINITIONS.startTime.required}
       />
@@ -213,7 +217,7 @@ const VehicleField = React.memo(function VehicleField({
     <div>
       <FieldLabel
         icon={Truck}
-        tone="bg-blue-50 text-blue-600"
+        tone="bg-blue-50/70 text-blue-500"
         label={t("operations.vehicle_no")}
         required={TRIP_FIELD_DEFINITIONS.vehicleId.required}
       />
@@ -261,7 +265,7 @@ const SupervisorField = React.memo(function SupervisorField({
     <div>
       <FieldLabel
         icon={User}
-        tone="bg-indigo-50 text-indigo-600"
+        tone="bg-indigo-50/70 text-indigo-500"
         label={t("common.supervisor")}
         required={TRIP_FIELD_DEFINITIONS.supervisorId.required}
       />
@@ -309,7 +313,7 @@ const DriverField = React.memo(function DriverField({
     <div>
       <FieldLabel
         icon={User}
-        tone="bg-emerald-50 text-emerald-600"
+        tone="bg-emerald-50/70 text-emerald-500"
         label={t("common.driver")}
         required={TRIP_FIELD_DEFINITIONS.driverId.required}
       />
@@ -349,7 +353,7 @@ const HelpersField = React.memo(function HelpersField({
     <div>
       <FieldLabel
         icon={Users}
-        tone="bg-teal-50 text-teal-600"
+        tone="bg-teal-50/70 text-teal-500"
         label={t("ops.trip.field.helpers")}
         required={TRIP_FIELD_DEFINITIONS.helpers.required}
       />
@@ -389,7 +393,7 @@ const LoadersField = React.memo(function LoadersField({
     <div>
       <FieldLabel
         icon={Users}
-        tone="bg-amber-50 text-amber-600"
+        tone="bg-amber-50/70 text-amber-500"
         label={t("ops.trip.field.loaders")}
         required={TRIP_FIELD_DEFINITIONS.loaders.required}
       />
@@ -437,7 +441,7 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
       <div className="flex items-center justify-between gap-2">
         <FieldLabel
           icon={Gauge}
-          tone="bg-purple-50 text-purple-600"
+          tone="bg-purple-50/70 text-purple-500"
           label={t("ops.trip.field.opening_meter")}
           required={TRIP_FIELD_DEFINITIONS.openingMeter.required}
         />
@@ -454,13 +458,13 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
         disabled={disabled}
         className={`hide-spinner w-full mt-1 h-[42px] rounded-xl border bg-white px-4 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400 ${
           invalid
-            ? "border-red-500 focus:border-red-600 focus:ring-2 focus:ring-red-500/10"
-            : "border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10"
+            ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-400/10"
+            : "border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-400/10"
         }`}
         placeholder="0.00"
       />
       {error ? (
-        <p className="mt-1.5 text-xs font-medium text-red-600 flex items-start gap-1">
+        <p className="mt-1.5 text-xs font-medium text-red-500 flex items-start gap-1">
           <span aria-hidden>⚠</span>
           <span>{error}</span>
         </p>
@@ -508,7 +512,7 @@ const AdvanceField = React.memo(function AdvanceField({
     <div>
       <FieldLabel
         icon={Wallet}
-        tone="bg-orange-50 text-orange-600"
+        tone="bg-orange-50/70 text-orange-500"
         label={t("operations.advance")}
         required={TRIP_FIELD_DEFINITIONS.advanceAmount.required}
       />
@@ -521,8 +525,8 @@ const AdvanceField = React.memo(function AdvanceField({
         disabled={disabled}
         className={`hide-spinner w-full mt-1 h-[42px] rounded-xl border bg-white px-4 text-sm font-medium text-slate-800 outline-none transition-all placeholder:text-slate-400 ${
           invalid
-            ? "border-red-500 focus:border-red-600 focus:ring-2 focus:ring-red-500/10"
-            : "border-slate-200 focus:border-blue-600 focus:ring-2 focus:ring-blue-500/10"
+            ? "border-red-500 focus:border-red-500 focus:ring-2 focus:ring-red-400/10"
+            : "border-slate-200 focus:border-blue-500 focus:ring-2 focus:ring-blue-400/10"
         }`}
         placeholder="0.00"
       />
@@ -545,6 +549,7 @@ function StepStart({
   editable = false,
   canEdit = false,
   onCancel,
+  onExitEdit,
   clearForm,
   headerLoading = false,
   subscribeHeaderSaveStatus: _subscribeHeaderSaveStatus,
@@ -553,7 +558,10 @@ function StepStart({
   const { t } = useI18n();
   const [form, setForm] = useState<Step1FormState>(() => tripToForm(loadSnapshot));
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLocalEditing, setIsLocalEditing] = useState(false);
+  const [isLocalEditing, setIsLocalEditing] = useState(Boolean(editable));
+  useEffect(() => {
+    if (editable) setIsLocalEditing(true);
+  }, [editable, tripId]);
   const [showErrors, setShowErrors] = useState(false);
   const [notice, setNotice] = useState<WizardNoticeState>(null);
   const [latestMeter, setLatestMeter] = useState<{
@@ -744,18 +752,26 @@ function StepStart({
     event.preventDefault();
   }, []);
 
+  /** Bottom Cancel → always leave wizard (Create New Trip). */
   const handleCancelEdit = useCallback(() => {
-    if (!startStepSubmitted && clearForm) {
-      // Brand-new trip, nothing persisted → close the editor.
-      clearForm();
+    setIsLocalEditing(false);
+    if (onCancel) {
+      onCancel();
       return;
     }
-    // Editing a submitted Step 1: discard unsaved edits. The parent reverts the
-    // working copy to the last saved trip and remounts this step (the local
-    // `form` re-hydrates from the restored snapshot).
+    clearForm?.();
+  }, [onCancel, clearForm]);
+
+  /** Header Close while editing submitted step → locked submitted view. */
+  const handleExitToLocked = useCallback(() => {
     setIsLocalEditing(false);
+    if (onExitEdit) {
+      onExitEdit();
+      return;
+    }
+    // Fallback: discard local edits only.
     onCancel?.();
-  }, [startStepSubmitted, clearForm, onCancel]);
+  }, [onExitEdit, onCancel]);
 
   const inputsLocked = headerLoading || isSubmitting;
   const submitLabel = startStepSubmitted
@@ -815,13 +831,15 @@ function StepStart({
     return (
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
-          <div className="flex items-center gap-2.5">
-            <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0">
-              1
-            </span>
-            <h2 className="text-xl font-bold text-slate-800 tracking-tight">{t("ops.trip.title.start").toUpperCase()}</h2>
+          <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+            <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+              <Clock size={18} className="text-indigo-500" />
+              {t("ops.trip.title.start")}
+            </h3>
+            <TripNoBadge tripNo={loadSnapshot.tripNo || tripNo} />
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {/* Locked / view: pencil only — no top Close X */}
             {canEdit && (
               <button
                 type="button"
@@ -832,7 +850,6 @@ function StepStart({
                 <Pencil size={14} />
               </button>
             )}
-            <StepCloseButton onClose={clearForm} />
             <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
               {t("ops.trip.submitted_locked")}
             </span>
@@ -840,57 +857,58 @@ function StepStart({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
-          <StepKpiCard
-            icon={ClipboardList}
-            tone="bg-slate-100 text-slate-500"
-            label={t("operations.trip_no")}
-            value={loadSnapshot.tripNo || "--"}
-          />
-          <StepKpiCard
-            icon={Calendar}
-            tone="bg-sky-50 text-sky-600"
-            label={t("ops.trip.field.trip_date")}
-            value={loadSnapshot.tripDate || "--"}
-          />
+          {/* Time first on locked view, then remaining fields */}
           <StepKpiCard
             icon={Clock}
-            tone="bg-blue-50 text-blue-600"
+            tone="bg-blue-50/70 text-blue-500"
             label={t("ops.trip.field.start_time")}
             value={loadSnapshot.startStepSubmittedAt ? formatIstStamp(loadSnapshot.startStepSubmittedAt) : formatStartTimeForDisplay(startTime) || "--"}
           />
           <StepKpiCard
+            icon={ClipboardList}
+            tone="bg-slate-100 text-slate-500"
+            label={t("operations.trip_no")}
+            value={loadSnapshot.tripNo || tripNo || "--"}
+          />
+          <StepKpiCard
+            icon={Calendar}
+            tone="bg-sky-50/70 text-sky-500"
+            label={t("ops.trip.field.trip_date")}
+            value={loadSnapshot.tripDate || "--"}
+          />
+          <StepKpiCard
             icon={Truck}
-            tone="bg-blue-50 text-blue-600"
+            tone="bg-blue-50/70 text-blue-500"
             label={t("operations.vehicle_no")}
             value={loadSnapshot.vehicleNo || "--"}
           />
           <StepKpiCard
             icon={User}
-            tone="bg-indigo-50 text-indigo-600"
+            tone="bg-indigo-50/70 text-indigo-500"
             label={t("common.supervisor")}
             value={loadSnapshot.supervisorName || "--"}
           />
           <StepKpiCard
             icon={User}
-            tone="bg-emerald-50 text-emerald-600"
+            tone="bg-emerald-50/70 text-emerald-500"
             label={t("common.driver")}
             value={loadSnapshot.driverName || "--"}
           />
           <StepKpiCard
             icon={Users}
-            tone="bg-teal-50 text-teal-600"
+            tone="bg-teal-50/70 text-teal-500"
             label={t("ops.trip.field.helpers")}
             value={loadSnapshot.helpers?.join(", ") || "--"}
           />
           <StepKpiCard
             icon={Users}
-            tone="bg-amber-50 text-amber-600"
+            tone="bg-amber-50/70 text-amber-500"
             label={t("ops.trip.field.loaders")}
             value={loadSnapshot.loaders?.join(", ") || "--"}
           />
           <StepKpiCard
             icon={Gauge}
-            tone="bg-purple-50 text-purple-600"
+            tone="bg-purple-50/70 text-purple-500"
             label={t("ops.trip.field.opening_meter")}
             value={
               loadSnapshot.openingMeter == null
@@ -900,7 +918,7 @@ function StepStart({
           />
           <StepKpiCard
             icon={Wallet}
-            tone="bg-orange-50 text-orange-600"
+            tone="bg-orange-50/70 text-orange-500"
             label={t("operations.advance")}
             value={
               loadSnapshot.advanceAmount == null
@@ -930,19 +948,26 @@ function StepStart({
       >
         {headerLoading && <p className="text-xs text-slate-500">{t("ops.trip.loading_trip_header")}</p>}
         <div className="flex items-center justify-between border-b border-slate-100 pb-4 gap-3">
-          <div className="flex items-center gap-2.5">
-            <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0">
-              1
-            </span>
-            <h2 className="text-xl font-bold text-slate-800 tracking-tight">{t("ops.trip.title.start").toUpperCase()}</h2>
+          <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+            <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+              <Clock size={18} className="text-indigo-500" />
+              {t("ops.trip.title.start")}
+            </h3>
+            <TripNoBadge tripNo={tripNo || loadSnapshot.tripNo} />
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {/* Part E: no top-right X in first-submit / Edit mode — the bottom
                 action bar Cancel is the only cancel affordance. */}
             {((editable && startStepSubmitted) || isLocalEditing) && (
-              <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
-                {tripNo ? t("ops.trip.editing_trip", { no: tripNo }) : t("ops.trip.editable_view")}
-              </span>
+              <>
+                {/* Edit mode only: animated Close X → locked submitted view */}
+                {startStepSubmitted ? (
+                  <StepCloseButton onClose={handleExitToLocked} animated />
+                ) : null}
+                <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
+                  {t("ops.trip.editable_view")}
+                </span>
+              </>
             )}
           </div>
         </div>
@@ -1034,6 +1059,7 @@ function areStepStartPropsEqual(prev: Props, next: Props): boolean {
     prev.submitStartStep === next.submitStartStep &&
     prev.hasUnsavedChanges === next.hasUnsavedChanges &&
     prev.onCancel === next.onCancel &&
+    prev.onExitEdit === next.onExitEdit &&
     prev.clearForm === next.clearForm &&
     prev.subscribeHeaderSaveStatus === next.subscribeHeaderSaveStatus &&
     prev.getHeaderSaveStatus === next.getHeaderSaveStatus &&

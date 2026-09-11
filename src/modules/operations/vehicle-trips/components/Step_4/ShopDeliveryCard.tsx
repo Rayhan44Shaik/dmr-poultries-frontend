@@ -13,11 +13,11 @@ interface Props {
 /** Soft, low-eye-strain tints for box-number chips in the card. */
 const BOX_CHIP_PALETTE = [
   "bg-slate-100 text-slate-700 border-slate-200",
-  "bg-sky-50 text-sky-700 border-sky-100",
-  "bg-indigo-50 text-indigo-700 border-indigo-100",
-  "bg-teal-50 text-teal-700 border-teal-100",
-  "bg-amber-50 text-amber-700 border-amber-100",
-  "bg-rose-50 text-rose-600 border-rose-100",
+  "bg-sky-50/70 text-sky-500 border-sky-100",
+  "bg-indigo-50/70 text-indigo-500 border-indigo-100",
+  "bg-teal-50/70 text-teal-500 border-teal-100",
+  "bg-amber-50/70 text-amber-500 border-amber-100",
+  "bg-rose-50/70 text-rose-500 border-rose-100",
 ];
 
 export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props) {
@@ -41,8 +41,8 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
             <div
               className={`h-8 w-8 rounded-lg flex items-center justify-center shrink-0 border ${
                 isWeightMode
-                  ? "bg-purple-50 text-purple-600 border-purple-100"
-                  : "bg-blue-50 text-blue-600 border-blue-100"
+                  ? "bg-purple-50/70 text-purple-500 border-purple-100"
+                  : "bg-blue-50/70 text-blue-500 border-blue-100"
               }`}
               title={isWeightMode ? t("ops.trip.weight_mode") : t("ops.trip.box_mode")}
             >
@@ -57,7 +57,7 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
             {!readOnly && (
               <button
                 onClick={() => onEdit(row)}
-                className="p-1.5 rounded-lg bg-slate-50 hover:bg-blue-50 text-slate-500 hover:text-blue-600 border border-slate-200/60 transition-colors flex items-center justify-center"
+                className="p-1.5 rounded-lg bg-slate-50 hover:bg-blue-50/70 text-slate-500 hover:text-blue-500 border border-slate-200/60 transition-colors flex items-center justify-center"
                 title={t("ops.trip.edit_shop_delivery")}
               >
                 <Pencil size={13} className="stroke-[2]" />
@@ -65,7 +65,7 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
             )}
             <button
               onClick={() => onPDF(row)}
-              className="p-1.5 rounded-lg bg-slate-50 hover:bg-rose-50 text-slate-500 hover:text-rose-600 border border-slate-200/60 transition-colors flex items-center justify-center"
+              className="p-1.5 rounded-lg bg-slate-50 hover:bg-rose-50/70 text-slate-500 hover:text-rose-500 border border-slate-200/60 transition-colors flex items-center justify-center"
               title={t("ops.trip.download_pdf")}
             >
               <FileText size={13} className="stroke-[2]" />
@@ -151,13 +151,13 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
               </span>
             )}
             {row.birdType ? (
-              <span className="px-1.5 py-px rounded bg-blue-50 text-blue-700 font-semibold text-[10px] border border-blue-100 shrink-0">
+              <span className="px-1.5 py-px rounded bg-blue-50/70 text-blue-500 font-semibold text-[10px] border border-blue-100 shrink-0">
                 {row.birdType}
               </span>
             ) : null}
           </div>
           <div className="flex items-center gap-1 shrink-0 text-slate-600">
-            <span className="h-4 w-4 rounded bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+            <span className="h-4 w-4 rounded bg-indigo-50/70 text-indigo-500 flex items-center justify-center shrink-0">
               <Clock size={11} className="stroke-[2]" />
             </span>
             <span>{t("ops.trip.captured")} {row.autoCaptureTime || "—"}</span>

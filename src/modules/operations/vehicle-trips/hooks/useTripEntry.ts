@@ -476,7 +476,8 @@ export function useTripEntry(
         endStepSubmitted: true,
         expensesStepSubmitted: true,
       });
-      applySavedTrip(submitted);
+      // Step 5 final submit always lands as Pending (never Completed, never stay Draft).
+      applySavedTrip({ ...submitted, status: "Pending" as TripStatus });
       setEndStepSubmitted(true);
       notifyRef.current?.(translate("ops.trip.step5_submitted"), "success");
       return true;

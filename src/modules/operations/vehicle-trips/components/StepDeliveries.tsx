@@ -1,11 +1,13 @@
 import React, { useState, useMemo } from "react";
 import {
-  Lock,
-  Pencil } from "lucide-react";
+  Pencil,
+  Package
+} from "lucide-react";
 import UnLoadingTable from "./Step_4";
 import type { ShopDelivery, Trip, BoxDetail } from "../types/trip";
 import { getDeliveriesBalanceError } from "../../../../shared/trip/validation";
 import { StepCloseButton } from "./WizardStepUI";
+import { TripNoBadge } from "./TripNoBadge";
 import { useI18n } from "../../../../i18n";
 
 interface Props {
@@ -21,7 +23,10 @@ interface Props {
   readOnly?: boolean;
   editable?: boolean;
   canEdit?: boolean;
+  /** Bottom Cancel → leave wizard / Create New Trip. */
   onCancel?: () => void;
+  /** Close while editing → locked submitted view. */
+  onExitEdit?: () => void;
   boxDetails?: BoxDetail[];
   persistedDeliveries?: ShopDelivery[];
 }
@@ -39,14 +44,18 @@ export default function StepDeliveries({
   readOnly: _readOnly = false,
   editable = false,
   canEdit = true,
-  onCancel: _onCancel,
+  onCancel,
+  onExitEdit,
   boxDetails = [],
   persistedDeliveries,
 }: Props) {
   const { t } = useI18n();
 
-  // Step-level edit mode
-  const [isStepEditing, setIsStepEditing] = useState(false);
+  // Step-level edit mode (parent `editable` opens edit immediately)
+  const [isStepEditing, setIsStepEditing] = useState(Boolean(editable));
+  React.useEffect(() => {
+    if (editable) setIsStepEditing(true);
+  }, [editable, trip.id]);
 
   // Shop-level edit mode
   const [editingShopId, setEditingShopId] = useState<string | number | null>(null);
@@ -75,17 +84,29 @@ export default function StepDeliveries({
   };
 
   const handleCancelStepEdit = () => {
-    // Lightweight: exit step-edit / shop-edit mode only. This runs as part of
-    // the normal per-shop save flow (Step_4 index.closeForm() calls
-    // onCancelEdit after every successful shop save), so it MUST NOT discard
-    // `rows` — a per-shop save writes straight to the parent working copy and
-    // is persisted by "Save Progress" / Submit. Unsaved shop-form input is
-    // discarded by the shop form's own Cancel (form-local state).
-    setIsStepEditing(false);
+    // Lightweight: exit shop-form only (called after per-shop save). Must NOT
+    // discard rows or leave the trip wizard.
     setEditingShopId(null);
   };
 
+  /** Close while editing a submitted step → locked submitted view. */
+  const handleExitToLocked = () => {
+    setIsStepEditing(false);
+    setEditingShopId(null);
+    if (onExitEdit) {
+      onExitEdit();
+      return;
+    }
+  };
+
+  /** Bottom Cancel / leave wizard → Create New Trip landing. */
   const handleCancelWizard = () => {
+    setIsStepEditing(false);
+    setEditingShopId(null);
+    if (onCancel) {
+      onCancel();
+      return;
+    }
     clearForm();
   };
 
@@ -115,13 +136,12 @@ export default function StepDeliveries({
     <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-6 shadow-sm">
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-3">
-        <div className="flex items-center gap-2.5">
-          <span className="bg-blue-600 text-white w-9 h-9 rounded-xl flex items-center justify-center text-sm font-bold shrink-0">
-            4
-          </span>
-          <h2 className="text-xl font-bold text-slate-800 tracking-tight">
-            {t("ops.trip.title.deliveries").toUpperCase()}
-          </h2>
+        <div className="flex flex-wrap items-center gap-2.5 min-w-0">
+          <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+            <Package size={18} className="text-emerald-500" />
+            {t("ops.trip.title.deliveries")}
+          </h3>
+          <TripNoBadge tripNo={trip.tripNo} />
         </div>
 
         <div className="flex items-center gap-2 flex-wrap shrink-0">
@@ -129,6 +149,7 @@ export default function StepDeliveries({
               cancel affordance in first-submit / Edit mode. */}
           {isLocked ? (
             <div className="flex items-center gap-2">
+              {/* Locked / view: pencil only — no top Close X */}
               {canEdit && (
                 <button
                   type="button"
@@ -139,15 +160,20 @@ export default function StepDeliveries({
                   <Pencil size={14} />
                 </button>
               )}
-              <StepCloseButton onClose={handleCancelWizard} />
-              <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap flex items-center gap-1.5">
-                <Lock size={12} className="text-slate-500" /> {t("ops.trip.submitted_locked")}
+              <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
+                {t("ops.trip.submitted_locked")}
               </span>
             </div>
-          ) : trip.deliveryStepSubmitted || editingShopId ? (
-            <span className="text-xs text-blue-700 font-semibold bg-blue-50 px-3 py-1 rounded-full border border-blue-200 whitespace-nowrap">
-              {editingShopId ? t("ops.trip.editing_shop_details") : t("ops.trip.step_unlocked")}
-            </span>
+          ) : trip.deliveryStepSubmitted || editingShopId || isStepEditing ? (
+            <div className="flex items-center gap-2">
+              {/* Edit mode only: animated Close X → locked submitted view */}
+              {trip.deliveryStepSubmitted ? (
+                <StepCloseButton onClose={handleExitToLocked} animated />
+              ) : null}
+              <span className="text-xs text-blue-500 font-semibold bg-blue-50/70 px-3 py-1 rounded-full border border-blue-100 whitespace-nowrap">
+                {editingShopId ? t("ops.trip.editing_shop_details") : t("ops.trip.step_unlocked")}
+              </span>
+            </div>
           ) : null}
         </div>
       </div>

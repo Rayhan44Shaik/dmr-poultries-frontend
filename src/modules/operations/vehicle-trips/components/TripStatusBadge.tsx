@@ -9,7 +9,7 @@ function TripStatusBadge({ status }: Props) {
   const { t } = useI18n();
   const styles = {
     Pending: "bg-yellow-100 text-yellow-700",
-    Completed: "bg-green-100 text-green-700",
+    Completed: "bg-green-50/80 text-green-500",
   };
 
   return (

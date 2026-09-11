@@ -76,7 +76,7 @@ export default function BoxSelector({
         className={`w-full flex items-center justify-between px-4 py-3 rounded-xl border text-sm font-medium transition-all touch-manipulation ${
           disabled || availableBoxes.length === 0
             ? "border-slate-200 bg-slate-100 text-slate-400 cursor-not-allowed"
-            : "border-slate-200 bg-white hover:border-blue-300 focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 text-slate-700"
+            : "border-slate-200 bg-white hover:border-blue-100 focus:border-blue-500 focus:ring-4 focus:ring-blue-400/10 text-slate-700"
         }`}
       >
         <span className="flex items-center gap-2">
@@ -116,7 +116,7 @@ export default function BoxSelector({
                 type="checkbox"
                 checked={allSelected}
                 onChange={toggleAll}
-                className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                className="w-4 h-4 rounded border-slate-300 text-blue-500 focus:ring-blue-500"
               />
               {t("ops.trip.select_all_boxes", { count: availableBoxes.length })}
             </label>
@@ -135,7 +135,7 @@ export default function BoxSelector({
                   key={box.boxNo}
                   className={`flex items-center gap-3 px-2 py-2 rounded-lg cursor-pointer transition-colors ${
                     selectedIds.includes(box.boxNo)
-                      ? "bg-blue-50 border border-blue-200"
+                      ? "bg-blue-50/70 border border-blue-100"
                       : "hover:bg-slate-50 border border-transparent"
                   }`}
                 >
@@ -143,10 +143,10 @@ export default function BoxSelector({
                     type="checkbox"
                     checked={selectedIds.includes(box.boxNo)}
                     onChange={() => toggleBox(box.boxNo)}
-                    className="w-4 h-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 shrink-0"
+                    className="w-4 h-4 rounded border-slate-300 text-blue-500 focus:ring-blue-500 shrink-0"
                   />
                   <span className="text-xs font-medium text-slate-700 flex-1 flex items-center gap-2 flex-wrap">
-                    <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded text-[10px] font-bold">
+                    <span className="bg-blue-50/80 text-blue-500 px-2 py-0.5 rounded text-[10px] font-bold">
                       {box.boxNo}
                     </span>
                     <span className="text-slate-600">{box.birds} {t("common.birds")}</span>
