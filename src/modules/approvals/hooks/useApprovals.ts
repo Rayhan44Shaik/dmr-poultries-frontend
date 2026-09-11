@@ -59,6 +59,8 @@ const isPendingPayment = (payment: Payment): boolean => payment.status === 'Draf
 
 export interface UseApprovalsResult {
   trips: Trip[];
+  /** Completed trips still awaiting shop-wise rate entry. */
+  rateTrips: Trip[];
   maintenance: MaintenanceEvent[];
   payments: Payment[];
   loading: boolean;

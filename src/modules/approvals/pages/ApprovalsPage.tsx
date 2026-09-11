@@ -19,7 +19,7 @@ import { ConfirmDialog } from '../../../ui/ConfirmDialog';
 import { EmptyState } from '../../../ui/EmptyState';
 import { SearchInput } from '../../../ui/SearchInput';
 import { uiBadgeClass } from '../../../shared/ui/uiTokens';
-import { useApprovals, type ApprovalActivity, type ApprovalKind } from '../hooks/useApprovals';
+import { useApprovals, type ApprovalActivity } from '../hooks/useApprovals';
 import { ApprovalKpiCards } from '../components/ApprovalKpiCards';
 import { ApprovalDetailsModal, type ApprovalEntry } from '../components/ApprovalDetailsModal';
 import { RejectReasonDialog } from '../components/RejectReasonDialog';
@@ -45,8 +45,9 @@ const TABS: { id: Tab; label: string; icon: typeof Truck }[] = [
   { id: 'payments', label: 'Payments', icon: Banknote },
 ];
 
-const KIND_LABEL: Record<ApprovalKind, string> = {
+const KIND_LABEL: Record<ApprovalEntry['kind'], string> = {
   trip: 'trip',
+  rate: 'rate entry',
   maintenance: 'maintenance bill',
   payment: 'payment',
 };
@@ -226,14 +227,17 @@ export default function ApprovalsPage() {
       const failures: string[] = [];
       for (const entry of entries) {
         try {
+          // Rate entries are completed on the Rate Entry page (deep-linked),
+          // not approved/rejected from this queue.
+          if (entry.kind === 'rate') continue;
           if (mode === 'approve') {
             if (entry.kind === 'trip') await approveTrip(entry.trip, approver);
             else if (entry.kind === 'maintenance') await approveMaintenance(entry.maintenance, approver);
-            else await approvePayment(entry.payment, approver);
+            else if (entry.kind === 'payment') await approvePayment(entry.payment, approver);
           } else {
             if (entry.kind === 'trip') await returnTrip(entry.trip, approver, reason || '');
             else if (entry.kind === 'maintenance') await rejectMaintenance(entry.maintenance, reason || '');
-            else await cancelPayment(entry.payment, reason || '');
+            else if (entry.kind === 'payment') await cancelPayment(entry.payment, reason || '');
           }
           ok += 1;
         } catch {

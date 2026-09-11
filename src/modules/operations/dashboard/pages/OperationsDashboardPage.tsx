@@ -9,7 +9,7 @@ import CollectionsPie from "../components/CollectionsPie";
 import RecentTripsTable from "../components/RecentTripsTable";
 import ActiveCounts from "../components/ActiveCounts";
 import PendingCollectionsByShop from "../components/PendingCollectionsByShop";
-import ApprovalCalendar from "../components/ApprovalCalendar";
+import PendingApprovalsPanel from "../components/PendingApprovalsPanel";
 import { Calendar, ArrowRightLeft } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import { useI18n } from "../../../../i18n";
@@ -211,6 +211,7 @@ function OperationsDashboardPage() {
   if (!isRangeSelected) {
     return (
       <div className="space-y-4">
+        <PendingApprovalsPanel />
         <div className="flex justify-end">
           <RangeDatePicker
             startDate={startDate}
@@ -235,7 +236,9 @@ function OperationsDashboardPage() {
 
   if (isLoading) {
     return (
-      <div className="w-full flex flex-col items-center justify-center py-24 space-y-4 bg-white rounded-2xl border border-slate-200/80 shadow-sm">
+      <div className="min-w-0 space-y-5">
+        <PendingApprovalsPanel />
+        <div className="w-full flex flex-col items-center justify-center py-24 space-y-4 bg-white rounded-2xl border border-slate-200/80 shadow-sm">
         <div className="relative w-12 h-12">
           <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
           <div className="absolute inset-0 rounded-full border-4 border-t-blue-600 animate-spin" />
@@ -244,12 +247,14 @@ function OperationsDashboardPage() {
           {t("ops.dashboard.syncing")}
         </p>
       </div>
+      </div>
     );
   }
 
   if (error) {
     return (
       <div className="space-y-4">
+        <PendingApprovalsPanel />
         <div className="flex justify-end">
           <RangeDatePicker
             startDate={startDate}
@@ -273,9 +278,10 @@ function OperationsDashboardPage() {
 
   return (
     <div className="min-w-0 space-y-5">
-      {/* Calendar and approval summary stay together on one simple line. */}
-      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-slate-200/80 bg-white px-3 py-2 shadow-sm">
-        <ApprovalCalendar startDate={startDate} endDate={endDate} />
+      {/* Live pending-approval summary (trips · rates · bills · payments). */}
+      <PendingApprovalsPanel />
+
+      <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl border border-slate-200/80 bg-white px-3 py-2 shadow-sm">
         <RangeDatePicker
           startDate={startDate}
           endDate={endDate}
