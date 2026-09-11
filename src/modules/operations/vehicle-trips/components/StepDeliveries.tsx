@@ -1,6 +1,5 @@
 import React, { useState, useMemo } from "react";
 import {
-  Lock,
   Pencil,
   Package
 } from "lucide-react";
@@ -161,8 +160,8 @@ export default function StepDeliveries({
                   <Pencil size={14} />
                 </button>
               )}
-              <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap flex items-center gap-1.5">
-                <Lock size={12} className="text-slate-500" /> {t("ops.trip.submitted_locked")}
+              <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
+                {t("ops.trip.submitted_locked")}
               </span>
             </div>
           ) : trip.deliveryStepSubmitted || editingShopId || isStepEditing ? (

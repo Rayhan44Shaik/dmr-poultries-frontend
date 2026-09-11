@@ -238,23 +238,7 @@ export default function StepFarm({
           </div>
         </div>
 
-        {/* GPS — complete reverse-geocoded address on its own full line */}
-        <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-2xs">
-          <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
-            <span className="h-5 w-5 rounded-md bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0">
-              <MapPin size={12} />
-            </span>
-            {t("ops.trip.field.gps_address")}
-          </span>
-          {hasGps ? (
-            <p className="text-sm font-semibold text-slate-800 break-words leading-relaxed">
-              <GpsAddressText lat={trip.farmGpsLat} lon={trip.farmGpsLon} fallback={t("ops.trip.location_captured")} />
-            </p>
-          ) : (
-            <p className="text-sm font-semibold text-slate-400">{t("ops.trip.not_captured")}</p>
-          )}
-        </div>
-
+        {/* Time first, then remaining fields; GPS last */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <StepKpiCard
             icon={Clock}
@@ -305,6 +289,23 @@ export default function StepFarm({
             {trip.remarks}
           </p>
         ) : null}
+
+        {/* GPS last on locked view — full reverse-geocoded address */}
+        <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-2xs">
+          <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
+            <span className="h-5 w-5 rounded-md bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0">
+              <MapPin size={12} />
+            </span>
+            {t("ops.trip.field.gps_address")}
+          </span>
+          {hasGps ? (
+            <p className="text-sm font-semibold text-slate-800 break-words leading-relaxed">
+              <GpsAddressText lat={trip.farmGpsLat} lon={trip.farmGpsLon} fallback={t("ops.trip.location_captured")} />
+            </p>
+          ) : (
+            <p className="text-sm font-semibold text-slate-400">{t("ops.trip.not_captured")}</p>
+          )}
+        </div>
 
         <div className="bg-white rounded-xl border border-slate-200 p-3.5 flex items-center justify-between">
           <p className="text-xs text-slate-600 font-normal">{t("ops.trip.farm_submitted_ok")}</p>

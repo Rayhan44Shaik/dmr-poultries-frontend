@@ -857,6 +857,13 @@ function StepStart({
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 pt-2">
+          {/* Time first on locked view, then remaining fields */}
+          <StepKpiCard
+            icon={Clock}
+            tone="bg-blue-50 text-blue-600"
+            label={t("ops.trip.field.start_time")}
+            value={loadSnapshot.startStepSubmittedAt ? formatIstStamp(loadSnapshot.startStepSubmittedAt) : formatStartTimeForDisplay(startTime) || "--"}
+          />
           <StepKpiCard
             icon={ClipboardList}
             tone="bg-slate-100 text-slate-500"
@@ -868,12 +875,6 @@ function StepStart({
             tone="bg-sky-50 text-sky-600"
             label={t("ops.trip.field.trip_date")}
             value={loadSnapshot.tripDate || "--"}
-          />
-          <StepKpiCard
-            icon={Clock}
-            tone="bg-blue-50 text-blue-600"
-            label={t("ops.trip.field.start_time")}
-            value={loadSnapshot.startStepSubmittedAt ? formatIstStamp(loadSnapshot.startStepSubmittedAt) : formatStartTimeForDisplay(startTime) || "--"}
           />
           <StepKpiCard
             icon={Truck}

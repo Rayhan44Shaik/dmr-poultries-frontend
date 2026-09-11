@@ -677,7 +677,7 @@ export default function StepEnd({
                   <Pencil size={14} />
                 </button>
               )}
-              <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap">
+              <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
                 {t("ops.trip.submitted_locked")}
               </span>
             </div>
