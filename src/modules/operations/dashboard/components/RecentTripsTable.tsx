@@ -37,12 +37,14 @@ export default function RecentTripsTable({ trips }: RecentTripsTableProps) {
             </tr>
           </thead>
           <tbody>
-            {tripList.map((trip) => (
-              <tr key={trip.id} className="border-t hover:bg-slate-50">
+            {tripList.map((trip, index) => {
+              const weight = Number.isFinite(Number(trip.weight)) ? Number(trip.weight) : 0;
+              return (
+              <tr key={trip.id ?? `${trip.tripNo}-${index}`} className="border-t hover:bg-slate-50">
                 <td className="px-3 py-2 font-medium text-blue-700">{trip.tripNo}</td>
                 <td className="px-3 py-2">{trip.vehicleNo}</td>
                 <td className="px-3 py-2">{trip.shopName}</td>
-                <td className="px-3 py-2 text-right">{trip.weight.toFixed(2)}</td>
+                <td className="px-3 py-2 text-right">{weight.toFixed(2)}</td>
                 <td className="px-3 py-2 text-center">
                   <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${
                     trip.status === "Completed" ? "bg-green-100 text-green-700" : "bg-yellow-100 text-yellow-700"
@@ -63,7 +65,8 @@ export default function RecentTripsTable({ trips }: RecentTripsTableProps) {
                   </Link>
                 </td>
               </tr>
-            ))}
+              );
+            })}
           </tbody>
         </table>
       </div>

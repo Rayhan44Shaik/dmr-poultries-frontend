@@ -18,6 +18,10 @@ export default function PendingCollectionsByShop({ data }: Props) {
   const items = useMemo(() => {
     if (!data || !Array.isArray(data)) return [];
     return [...data]
+      .map((item) => ({
+        shopName: item.shopName || "Unknown shop",
+        pendingAmount: Number.isFinite(Number(item.pendingAmount)) ? Number(item.pendingAmount) : 0,
+      }))
       .sort((a, b) => b.pendingAmount - a.pendingAmount)
       .slice(0, 10);
   }, [data]);

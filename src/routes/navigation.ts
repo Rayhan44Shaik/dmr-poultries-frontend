@@ -388,14 +388,6 @@ export const NAV_SECTIONS: NavSection[] = [
         tone: "emerald",
         keywords: "emi loan installment",
       },
-      {
-        label: "Analytics",
-        labelKey: "nav.analytics",
-        path: "/fleet?tab=analytics",
-        icon: BarChart3,
-        tone: "violet",
-        keywords: "analytics vehicle performance",
-      },
 
       {
         label: "FASTag",
@@ -469,8 +461,8 @@ export const NAV_SECTIONS: NavSection[] = [
     labelKey: "nav.accounts",
     icon: ReceiptIndianRupee,
     children: [      {
-        label: "Accounts Dashboard",
-        labelKey: "nav.accountsDashboard",
+        label: "Analysis",
+        labelKey: "nav.analysis",
         path: "/accounts?tab=summary",
         icon: BarChart3,
         tone: "indigo",
@@ -492,14 +484,6 @@ export const NAV_SECTIONS: NavSection[] = [
         tone: "lime",
         keywords: "farmer farm payment poultry",
       },
-      {
-        label: "New Payment Entry",
-        labelKey: "nav.newPaymentEntry",
-        path: "/accounts?tab=new-payments",
-        icon: CreditCard,
-        tone: "emerald",
-        keywords: "payment entry new",
-      },
     ],
   },
 
@@ -518,22 +502,6 @@ export const NAV_SECTIONS: NavSection[] = [
         tone: "teal",
         keywords: "shop ledger statement",
       },
-      {
-        label: "Daily / Weekly Reports",
-        labelKey: "nav.dailyWeeklyReports",
-        path: "/reports?tab=weekly",
-        icon: CalendarDays,
-        tone: "sky",
-        keywords: "daily weekly reports",
-      },
-      {
-        label: "shopSales",
-        labelKey: "nav.shopSalesReport",
-        path: "/reports?tab=shopSales",
-        icon: ShoppingBag,
-        tone: "indigo",
-        keywords: "shop sales report",
-      },
       // Collection Report now lives in Operations → Collection. The Reports
       // menu item opens that single implementation instead of a duplicate.
       {
@@ -545,20 +513,12 @@ export const NAV_SECTIONS: NavSection[] = [
         keywords: "collection report register",
       },
       {
-        label: "Vehicle Reports",
-        labelKey: "nav.vehicleReports",
-        path: "/reports?tab=vehicle",
-        icon: Truck,
-        tone: "amber",
-        keywords: "vehicle reports fleet",
-      },
-      {
-        label: "expenses",
-        labelKey: "nav.expensesReport",
-        path: "/reports?tab=expenses",
-        icon: FileText,
-        tone: "rose",
-        keywords: "Expenses",
+        label: "Vehicle Analytics",
+        labelKey: "nav.analytics",
+        path: "/fleet?tab=analytics",
+        icon: BarChart3,
+        tone: "violet",
+        keywords: "vehicle analytics performance fleet",
       },
     ],
   },

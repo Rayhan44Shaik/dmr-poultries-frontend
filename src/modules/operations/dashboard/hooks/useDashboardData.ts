@@ -9,6 +9,34 @@ import {
 
 export type { DashboardData };
 
+function filterForRange(data: DashboardData, from: Date | null, to: Date | null): DashboardData {
+  if (!from || !to || data.trendData.length === 0) return data;
+  const start = new Date(from); start.setHours(0, 0, 0, 0);
+  const end = new Date(to); end.setHours(23, 59, 59, 999);
+  const trendData = data.trendData.filter((point) => {
+    const date = new Date(`${point.date}T12:00:00`);
+    return date >= start && date <= end;
+  });
+  if (trendData.length === 0) return { ...data, trendData: [], mortalityData: [] };
+  const sourceTrips = data.trendData.reduce((sum, point) => sum + point.trips, 0) || 1;
+  const selectedTrips = trendData.reduce((sum, point) => sum + point.trips, 0);
+  const factor = selectedTrips / sourceTrips;
+  const scale = (value: number) => Math.round(value * factor);
+  return {
+    ...data,
+    totalTrips: selectedTrips,
+    totalSalesWeight: Math.round(data.totalSalesWeight * factor),
+    totalSalesAmount: scale(data.totalSalesAmount),
+    totalCollections: scale(data.totalCollections),
+    pendingCollections: scale(data.pendingCollections),
+    totalExpenses: scale(data.totalExpenses),
+    fuelExpense: scale(data.fuelExpense),
+    tripExpense: scale(data.tripExpense),
+    trendData,
+    mortalityData: data.mortalityData.filter((point) => trendData.some((item) => item.date === point.date)),
+  };
+}
+
 const initialData: DashboardData = {
   totalTrips: 0,
   totalSalesWeight: 0,
@@ -59,14 +87,14 @@ export function useDashboardData(
     setError(null);
     try {
       const dashboard = await loadOperationsDashboard();
-      setData(dashboard);
+      setData(filterForRange(dashboard, _fromDate, _toDate));
     } catch (err) {
       setError(handleApiError(err));
       setData(initialData);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [_fromDate, _toDate]);
 
   useEffect(() => {
     void loadData();

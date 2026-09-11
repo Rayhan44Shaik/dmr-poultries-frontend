@@ -43,6 +43,7 @@ export default {
   'nav.attendance': 'హాజరు',
   'nav.deductions': 'తగ్గింపులు',
   'nav.accountsDashboard': 'అకౌంట్స్ డ్యాష్‌బోర్డ్',
+  'nav.analysis': 'విశ్లేషణ',
   'nav.collectionRegister': 'చెల్లింపుల రిజిస్టర్',
   'nav.farmerPayments': 'ఫారం చెల్లింపు',
   'nav.newPaymentEntry': 'కొత్త చెల్లింపు నమోదు',

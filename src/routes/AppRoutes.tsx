@@ -38,7 +38,7 @@ function lazyShell(page: () => Promise<PageModule>) {
 
 // Lazy components are created once at module level (stable identity).
 const pages = {
-  dashboard: React.lazy(lazyShell(() => import("../modules/dashboard/DashboardPage"))),
+  dashboard: React.lazy(lazyShell(() => import("../modules/operations/dashboard/pages/OperationsDashboardPage"))),
   masters: React.lazy(lazyShell(() => import("../modules/masters/pages/MastersPage"))),
   mastersShops: React.lazy(lazyShell(() => import("../modules/masters/shops/pages/ShopsPage"))),
   mastersFarms: React.lazy(lazyShell(() => import("../modules/masters/farms/pages/FarmsPage"))),
