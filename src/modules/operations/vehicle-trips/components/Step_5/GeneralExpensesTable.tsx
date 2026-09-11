@@ -115,7 +115,11 @@ export default function GeneralExpensesTable({
       : 0;
 
   let totalDieselLiters = 0;
-  for (let i = 1; i <= 6; i++) {
+  // Sum every submitted diesel slot — no max row count.
+  const dieselKeys = Object.keys(sheetData || {}).filter((k) => /^dieselSubmitted\d+$/.test(k));
+  for (const key of dieselKeys) {
+    const i = Number(key.replace("dieselSubmitted", ""));
+    if (!Number.isFinite(i) || i < 1) continue;
     if (!sheetData[`dieselSubmitted${i}`]) continue;
     totalDieselLiters += Number(sheetData[`dieselLtr${i}`] || 0);
   }

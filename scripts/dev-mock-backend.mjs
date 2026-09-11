@@ -1661,7 +1661,7 @@ function buildVolumeTestTrips({ stamp }) {
       "Kodad",
       "Vijayawada",
     ];
-    const billCount = 6; // 5–10 range; UI diesel table max is 6
+    const billCount = 6; // sample volume; UI allows unlimited diesel bills
     const dieselEntries = Array.from({ length: billCount }, (_, di) => {
       const litres = 18 + ((i * 3 + di * 7) % 25);
       const rate = 94.5 + ((i + di) % 6) * 0.75;
@@ -1671,7 +1671,7 @@ function buildVolumeTestTrips({ stamp }) {
       const withBill = true;
       return {
         id: di + 1,
-        rowIndex: di + 1, // 1-based so StepEnd hydrates dieselLtr1…dieselLtr6
+        rowIndex: di + 1, // 1-based so StepEnd hydrates dieselLtrN
         litres,
         rate: Number(rate.toFixed(2)),
         amount,
@@ -2283,10 +2283,11 @@ function applyDieselCreate(trip, body) {
   const rate = numOrNull(body.rate);
   const existing = trip.dieselEntries || [];
   // Prefer client 1-based rowIndex so edits map back to dieselLtrN correctly.
+  // No upper limit — trips may carry any number of diesel bills.
   const requested = numOrNull(body.rowIndex);
   const rowIndex =
-    requested != null && requested >= 1 && requested <= 6
-      ? requested
+    requested != null && requested >= 1
+      ? Math.floor(requested)
       : existing.length + 1;
   const meter = numOrNull(body.meter);
   const chainErr = dieselMeterChainError(trip, meter, rowIndex, null);
@@ -2321,8 +2322,8 @@ function applyDieselUpdate(trip, existing, body) {
   const meter = body.meter != null && body.meter !== "" ? numOrNull(body.meter) : existing.meter;
   const rowIndexRaw = numOrNull(body.rowIndex);
   const rowIndex =
-    rowIndexRaw != null && rowIndexRaw >= 1 && rowIndexRaw <= 6
-      ? rowIndexRaw
+    rowIndexRaw != null && rowIndexRaw >= 1
+      ? Math.floor(rowIndexRaw)
       : existing.rowIndex != null
         ? existing.rowIndex
         : 1;

@@ -161,7 +161,9 @@ export default function StepEnd({
     // table shows sample fuel bills (incl. bill image) without a prior submit.
     const entries = Array.isArray(tripData.dieselEntries) ? tripData.dieselEntries : [];
     entries.forEach((entry, idx) => {
-      const n = Math.min(6, Math.max(1, Number(entry.rowIndex) > 0 ? Number(entry.rowIndex) : idx + 1));
+      // Unlimited diesel bills — use entry.rowIndex as-is (1-based).
+      const raw = Number(entry.rowIndex);
+      const n = Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : idx + 1;
       const d = data as Record<string, unknown>;
       const empty = (v: unknown) => v == null || v === "";
       if (empty(d[`dieselLtr${n}`])) d[`dieselLtr${n}`] = entry.litres ?? "";
@@ -214,7 +216,8 @@ export default function StepEnd({
       const entries = Array.isArray(trip.dieselEntries) ? trip.dieselEntries : [];
       let changed = false;
       entries.forEach((entry, idx) => {
-        const n = Math.min(6, Math.max(1, Number(entry.rowIndex) > 0 ? Number(entry.rowIndex) : idx + 1));
+        const raw = Number(entry.rowIndex);
+        const n = Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : idx + 1;
         const empty = (v: unknown) => v == null || v === "";
         if (empty(next[`dieselLtr${n}`]) && entry.litres != null) {
           next[`dieselLtr${n}`] = entry.litres as any;

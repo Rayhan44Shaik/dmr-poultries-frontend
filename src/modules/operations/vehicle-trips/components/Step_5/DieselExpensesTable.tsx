@@ -57,6 +57,35 @@ function hasRealBill(image: unknown) {
   return s.length >= 40;
 }
 
+/** Collect every diesel row slot on the sheet — no max count. */
+function collectDieselSlotIndices(data: Record<string, unknown> | null | undefined): number[] {
+  const found = new Set<number>();
+  if (!data) return [];
+  for (const key of Object.keys(data)) {
+    const m = key.match(
+      /^diesel(?:Ltr|Rate|Meter|Bunk|Image|ImageName|Submitted|SubmittedAt|Id|ClientKey|GpsLat|GpsLon|GpsAccuracy|GpsCapturedAt|Amount)(\d+)$/
+    );
+    if (m) {
+      const n = Number(m[1]);
+      if (Number.isFinite(n) && n >= 1) found.add(n);
+    }
+  }
+  return Array.from(found).sort((a, b) => a - b);
+}
+
+/** True when a diesel slot has any meaningful content. */
+function dieselSlotActive(data: Record<string, unknown>, i: number): boolean {
+  return !!(
+    data[`dieselSubmitted${i}`] ||
+    data[`dieselLtr${i}`] ||
+    data[`dieselRate${i}`] ||
+    data[`dieselMeter${i}`] ||
+    data[`dieselBunk${i}`] ||
+    data[`dieselImage${i}`] ||
+    data[`dieselId${i}`]
+  );
+}
+
 export default function DieselExpensesTable({
   tripId,
   sheetData,
@@ -88,46 +117,21 @@ export default function DieselExpensesTable({
   const fallbackDateStr = `${yyyy}${mm}${dd}`;
 
   /** Keep visible rows in sync when parent hydrates dieselEntries → sheet slots
-   *  (sample bills / resume). Without this, bills stay empty after first mount. */
+   *  (sample bills / resume). No upper limit on how many diesel bills. */
   useEffect(() => {
-    const activeIndices: number[] = [];
-    for (let i = 1; i <= 6; i++) {
-      const submitted = sheetData[`dieselSubmitted${i}`];
-      const ltr = sheetData[`dieselLtr${i}`];
-      const rate = sheetData[`dieselRate${i}`];
-      const meter = sheetData[`dieselMeter${i}`];
-      const bunk = sheetData[`dieselBunk${i}`];
-      const img = sheetData[`dieselImage${i}`];
-      if (submitted || ltr || rate || meter || bunk || img) activeIndices.push(i);
-    }
-    if (activeIndices.length === 0) activeIndices.push(1);
+    const slots = collectDieselSlotIndices(sheetData as Record<string, unknown>);
+    const activeFromSheet = slots.filter((i) =>
+      dieselSlotActive(sheetData as Record<string, unknown>, i)
+    );
     setRowIndices((prev) => {
-      const same =
-        prev.length === activeIndices.length && prev.every((v, i) => v === activeIndices[i]);
-      return same ? prev : activeIndices;
+      // Preserve draft-only rows the user just added that are not yet on sheet content.
+      const draftOnly = prev.filter((n) => n >= 1 && !activeFromSheet.includes(n));
+      const next = Array.from(new Set([...activeFromSheet, ...draftOnly])).sort((a, b) => a - b);
+      const final = next.length > 0 ? next : [1];
+      const same = prev.length === final.length && prev.every((v, i) => v === final[i]);
+      return same ? prev : final;
     });
-  }, [
-    // Re-run when any diesel slot appears/changes (hydration from trip.dieselEntries)
-    sheetData.dieselLtr1,
-    sheetData.dieselLtr2,
-    sheetData.dieselLtr3,
-    sheetData.dieselLtr4,
-    sheetData.dieselLtr5,
-    sheetData.dieselLtr6,
-    sheetData.dieselImage1,
-    sheetData.dieselImage2,
-    sheetData.dieselImage3,
-    sheetData.dieselImage4,
-    sheetData.dieselImage5,
-    sheetData.dieselImage6,
-    sheetData.dieselSubmitted1,
-    sheetData.dieselSubmitted2,
-    sheetData.dieselSubmitted3,
-    sheetData.dieselSubmitted4,
-    sheetData.dieselSubmitted5,
-    sheetData.dieselSubmitted6,
-    tripId,
-  ]);
+  }, [sheetData, tripId]);
 
   useEffect(() => {
     if (toastMessage) {
@@ -201,24 +205,18 @@ export default function DieselExpensesTable({
   };
 
   const handleAddRow = () => {
-    if (rowIndices.length >= 6) {
-      notifyUser(t("ops.trip.max_6_diesel"), "warning");
-      return;
-    }
     const lastRow = rowIndices[rowIndices.length - 1] ?? 0;
     // Require the current last entry to be submitted before opening a new slot.
     if (lastRow > 0 && !sheetData[`dieselSubmitted${lastRow}`]) {
       notifyUser(t("ops.trip.submit_diesel_first"), "warning");
       return;
     }
+    // Next free id — no upper limit on diesel bills.
     let nextId = lastRow + 1;
-    if (nextId > 6 || rowIndices.includes(nextId)) {
-      nextId = [1, 2, 3, 4, 5, 6].find((n) => !rowIndices.includes(n)) ?? 0;
+    if (rowIndices.includes(nextId)) {
+      nextId = Math.max(0, ...rowIndices) + 1;
     }
-    if (!nextId) {
-      notifyUser(t("ops.trip.max_6_diesel"), "warning");
-      return;
-    }
+    if (!nextId || nextId < 1) nextId = 1;
     const nextKey =
       typeof crypto !== "undefined" && crypto.randomUUID
         ? crypto.randomUUID()
@@ -659,7 +657,7 @@ export default function DieselExpensesTable({
     return null;
   };
 
-  /** Flatten trip.dieselEntries[] → dieselLtrN / dieselRateN / … sheet keys. */
+  /** Flatten trip.dieselEntries[] → dieselLtrN / dieselRateN / … sheet keys (unlimited rows). */
   const flattenDieselEntries = (saved: Trip | Record<string, unknown>): Record<string, unknown> => {
     const updates: Record<string, unknown> = {};
     // Keep any already-flattened diesel* keys the API may return.
@@ -669,8 +667,13 @@ export default function DieselExpensesTable({
     const entries = Array.isArray((saved as Trip)?.dieselEntries)
       ? ((saved as Trip).dieselEntries as NonNullable<Trip["dieselEntries"]>)
       : [];
-    // Clear slots first so deleted rows don't leave stale sheet values.
-    for (let i = 1; i <= 6; i++) {
+    // Clear every known sheet slot (current UI + API flatten keys) so deletes don't leave stale values.
+    const clearSlots = new Set<number>([
+      ...collectDieselSlotIndices(sheetData as Record<string, unknown>),
+      ...collectDieselSlotIndices(updates),
+      ...rowIndices,
+    ]);
+    for (const i of clearSlots) {
       updates[`dieselId${i}`] = "";
       updates[`dieselLtr${i}`] = "";
       updates[`dieselRate${i}`] = "";
@@ -688,7 +691,8 @@ export default function DieselExpensesTable({
       updates[`dieselClientKey${i}`] = "";
     }
     entries.forEach((entry, idx) => {
-      const n = Math.min(6, Math.max(1, Number(entry.rowIndex) > 0 ? Number(entry.rowIndex) : idx + 1));
+      const raw = Number(entry.rowIndex);
+      const n = Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : idx + 1;
       const litres = entry.litres ?? "";
       const rate = entry.rate ?? "";
       const amount =
@@ -714,6 +718,12 @@ export default function DieselExpensesTable({
       updates[`dieselClientKey${n}`] = entry.clientKey ?? `diesel-${n}`;
     });
     return updates;
+  };
+
+  /** Rebuild visible row list from flattened sheet (unlimited). */
+  const rowsFromFlattened = (flattened: Record<string, unknown>): number[] => {
+    const nextRows = collectDieselSlotIndices(flattened).filter((i) => dieselSlotActive(flattened, i));
+    return nextRows.length > 0 ? nextRows : [1];
   };
 
   const handleRowSubmit = async (num: number) => {
@@ -836,16 +846,7 @@ export default function DieselExpensesTable({
       }
       flattened[`dieselSubmitted${num}`] = true;
       applyBatchUpdates(flattened);
-
-      // Keep visible row indices in sync with what the sheet now holds.
-      const nextRows: number[] = [];
-      for (let i = 1; i <= 6; i++) {
-        if (flattened[`dieselSubmitted${i}`] || flattened[`dieselLtr${i}`] || flattened[`dieselId${i}`]) {
-          nextRows.push(i);
-        }
-      }
-      if (nextRows.length === 0) nextRows.push(1);
-      setRowIndices(nextRows);
+      setRowIndices(rowsFromFlattened(flattened));
 
       cancelEdit();
       notifyUser(t("ops.trip.row_submitted", { row: num }), "success");
@@ -864,14 +865,7 @@ export default function DieselExpensesTable({
       const saved = await deleteTripDiesel(tripId, entryId);
       const flattened = flattenDieselEntries(saved as Trip);
       applyBatchUpdates(flattened);
-      const nextRows: number[] = [];
-      for (let i = 1; i <= 6; i++) {
-        if (flattened[`dieselSubmitted${i}`] || flattened[`dieselLtr${i}`] || flattened[`dieselId${i}`]) {
-          nextRows.push(i);
-        }
-      }
-      if (nextRows.length === 0) nextRows.push(1);
-      setRowIndices(nextRows);
+      setRowIndices(rowsFromFlattened(flattened));
       notifyUser(t("ops.trip.row_deleted", { row: num }), "success");
     } catch (err) {
       notifyUser(handleApiError(err), "error");
@@ -884,11 +878,8 @@ export default function DieselExpensesTable({
 
   const lastRowIndex = rowIndices[rowIndices.length - 1];
   const isLastRowSubmitted = !!sheetData[`dieselSubmitted${lastRowIndex}`];
-  const atMaxDieselRows = rowIndices.length >= 6;
-  // Add Diesel only after the current last entry is submitted (and under max 6).
-  // After S.No 06 is submitted the button is hidden — max 6 bills.
-  const canAddDieselRow = !readOnly && !atMaxDieselRows && isLastRowSubmitted;
-  const showAddDieselButton = !readOnly && !atMaxDieselRows;
+  // Unlimited diesel bills — Add stays available after each submitted entry.
+  const canAddDieselRow = !readOnly && isLastRowSubmitted;
   const visibleRows = readOnly
     ? rowIndices.filter((num) => sheetData[`dieselSubmitted${num}`])
     : rowIndices;
@@ -924,33 +915,24 @@ export default function DieselExpensesTable({
                 </div>
               ) : null}
             </div>
-            {showAddDieselButton ? (
-              <button
-                type="button"
-                onClick={handleAddRow}
-                disabled={!canAddDieselRow}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg shadow-sm transition-all shrink-0 ${
-                  canAddDieselRow
-                    ? "bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 cursor-pointer"
-                    : "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
-                }`}
-                title={
-                  canAddDieselRow
-                    ? t("ops.trip.add_diesel_entry")
-                    : t("ops.trip.submit_diesel_first")
-                }
-              >
-                <Plus size={14} />
-                <span>{t("ops.trip.add_diesel_entry")}</span>
-              </button>
-            ) : atMaxDieselRows && !readOnly ? (
-              <span
-                className="inline-flex items-center px-2.5 py-1 text-[11px] font-semibold text-slate-500 bg-slate-50 border border-slate-200 rounded-lg"
-                title={t("ops.trip.max_6_diesel")}
-              >
-                {t("ops.trip.max_6_diesel")}
-              </span>
-            ) : null}
+            <button
+              type="button"
+              onClick={handleAddRow}
+              disabled={!canAddDieselRow}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg shadow-sm transition-all shrink-0 ${
+                canAddDieselRow
+                  ? "bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 cursor-pointer"
+                  : "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
+              }`}
+              title={
+                canAddDieselRow
+                  ? t("ops.trip.add_diesel_entry")
+                  : t("ops.trip.submit_diesel_first")
+              }
+            >
+              <Plus size={14} />
+              <span>{t("ops.trip.add_diesel_entry")}</span>
+            </button>
           </div>
         </div>
       )}

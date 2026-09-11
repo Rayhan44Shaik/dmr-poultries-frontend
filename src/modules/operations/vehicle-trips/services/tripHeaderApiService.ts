@@ -428,7 +428,7 @@ export type DieselSubmitPayload = {
   gpsCapturedAt: string | null;
   imageData: string;
   imageName?: string | null;
-  /** 1-based diesel table row slot (dieselLtr1…dieselLtr6). */
+  /** 1-based diesel table row slot (dieselLtr1, dieselLtr2, … — unlimited). */
   rowIndex?: number;
 };
 
