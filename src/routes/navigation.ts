@@ -469,8 +469,8 @@ export const NAV_SECTIONS: NavSection[] = [
     labelKey: "nav.accounts",
     icon: ReceiptIndianRupee,
     children: [      {
-        label: "Accounts Dashboard",
-        labelKey: "nav.accountsDashboard",
+        label: "Analysis",
+        labelKey: "nav.analysis",
         path: "/accounts?tab=summary",
         icon: BarChart3,
         tone: "indigo",
