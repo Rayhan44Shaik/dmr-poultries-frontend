@@ -720,8 +720,8 @@ export default function StepEnd({
                 key={f.label}
                 className={`rounded-xl border px-3 py-2.5 min-w-0 shadow-sm ${f.tone}`}
               >
-                <p className="text-[10px] font-semibold text-slate-500 tracking-wide truncate">{f.label}</p>
-                <p className="text-sm font-bold mt-1 tabular-nums truncate leading-snug">{f.value}</p>
+                <p className="text-xs uppercase font-semibold text-slate-400 tracking-wide truncate">{f.label}</p>
+                <p className="text-sm font-bold text-slate-800 mt-1 tabular-nums truncate leading-snug">{f.value}</p>
               </div>
             ))}
           </div>
@@ -811,8 +811,8 @@ export default function StepEnd({
                 key={f.label}
                 className={`rounded-xl border px-3 py-2.5 min-w-0 shadow-sm ${f.tone}`}
               >
-                <p className="text-[10px] font-semibold text-slate-500 tracking-wide truncate">{f.label}</p>
-                <p className="text-sm font-bold mt-1 tabular-nums truncate leading-snug">{f.value}</p>
+                <p className="text-xs uppercase font-semibold text-slate-400 tracking-wide truncate">{f.label}</p>
+                <p className="text-sm font-bold text-slate-800 mt-1 tabular-nums truncate leading-snug">{f.value}</p>
               </div>
             ))}
           </div>

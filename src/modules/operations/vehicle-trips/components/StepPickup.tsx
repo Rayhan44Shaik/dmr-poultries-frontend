@@ -8,6 +8,7 @@ import { getVehicles } from "../../../masters/vehicles/services/vehicleService";
 import { generatePickupReportPDF } from "../utils/generatePickupPDF";
 import { StepCloseButton, WizardActionBar, WizardStepNotice } from "./WizardStepUI";
 import { TripNoBadge } from "./TripNoBadge";
+import { StepKpiCard } from "./WizardControls";
 import { calculatePickupTotals, calculateBoxAvgWeight } from "../../../../shared/trip/calculations";
 import {
   TRIP_FIELD_DEFINITIONS,
@@ -588,38 +589,38 @@ export default function StepPickup({
           </div>
         </div>
 
-        {/* 5 Column Compact Deliveries-Style KPI Cards Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3 pt-2">
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
-              <span className="h-5 w-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center shrink-0"><Clock size={ 12 } /></span> {t("ops.trip.time")}
-            </span>
-            <span className="text-xs font-bold text-slate-800 truncate">{officialPickupTime || "--"}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
-              <span className="h-5 w-5 rounded-md bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0"><Scale size={ 12 } /></span> {t("ops.trip.dc_wt")}
-            </span>
-            <span className="text-xs font-bold text-slate-800">{trip.dcWeight ? `${Number(trip.dcWeight).toFixed(2)} Kg` : t("ops.trip.not_entered")}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
-              <span className="h-5 w-5 rounded-md bg-sky-100 text-sky-600 flex items-center justify-center shrink-0"><Bird size={ 12 } /></span> {t("common.birds")}
-            </span>
-            <span className="text-xs font-bold text-slate-800">{trip.totalBirds}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
-              <span className="h-5 w-5 rounded-md bg-amber-100 text-amber-600 flex items-center justify-center shrink-0"><Box size={ 12 } /></span> {t("common.boxes")}
-            </span>
-            <span className="text-xs font-bold text-slate-800">{trip.boxes} / {maxBoxes}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
-              <span className="h-5 w-5 rounded-md bg-purple-100 text-purple-600 flex items-center justify-center shrink-0"><Gauge size={ 12 } /></span> {t("ops.trip.avg_wt")}
-            </span>
-            <span className="text-xs font-bold text-slate-800">{trip.avgWeight ? `${trip.avgWeight} Kg` : "—"}</span>
-          </div>
+        {/* Same StepKpiCard font/layout as steps 1–2 / 4–5 (time first) */}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 pt-2">
+          <StepKpiCard
+            icon={Clock}
+            tone="bg-blue-50 text-blue-600"
+            label={t("ops.trip.time")}
+            value={officialPickupTime || "--"}
+          />
+          <StepKpiCard
+            icon={Scale}
+            tone="bg-emerald-50 text-emerald-600"
+            label={t("ops.trip.dc_wt")}
+            value={trip.dcWeight ? `${Number(trip.dcWeight).toFixed(2)} Kg` : t("ops.trip.not_entered")}
+          />
+          <StepKpiCard
+            icon={Bird}
+            tone="bg-sky-50 text-sky-600"
+            label={t("common.birds")}
+            value={trip.totalBirds != null ? String(trip.totalBirds) : t("ops.trip.not_entered")}
+          />
+          <StepKpiCard
+            icon={Box}
+            tone="bg-amber-50 text-amber-600"
+            label={t("common.boxes")}
+            value={`${trip.boxes ?? 0} / ${maxBoxes || "—"}`}
+          />
+          <StepKpiCard
+            icon={Gauge}
+            tone="bg-purple-50 text-purple-600"
+            label={t("ops.trip.avg_wt")}
+            value={trip.avgWeight ? `${trip.avgWeight} Kg` : "—"}
+          />
         </div>
 
         {/* DC Photo Status Card */}
@@ -1015,34 +1016,32 @@ export default function StepPickup({
           </p>
         </div>
 
-        {/* Totals Summary Bar - Deliveries Style KPI Cards */}
+        {/* Totals — same StepKpiCard font as locked view / other steps */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-slate-100">
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
-              <span className="h-5 w-5 rounded-md bg-amber-100 text-amber-600 flex items-center justify-center shrink-0"><Box size={ 12 } /></span> {t("common.boxes")}
-            </span>
-            <span className="text-xs font-bold text-slate-800">{totals.boxes} / {maxBoxes}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
-              <span className="h-5 w-5 rounded-md bg-sky-100 text-sky-600 flex items-center justify-center shrink-0"><Bird size={ 12 } /></span> {t("common.birds")}
-            </span>
-            <span className="text-xs font-bold text-slate-800">{totals.totalBirds}</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
-              <span className="h-5 w-5 rounded-md bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0"><Scale size={ 12 } /></span> {t("ops.trip.dc_wt")}
-            </span>
-            <span className="text-xs font-bold text-slate-800">{totals.dcWeight.toFixed(2)} Kg</span>
-          </div>
-          <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-2xs">
-            <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1">
-              <span className="h-5 w-5 rounded-md bg-purple-100 text-purple-600 flex items-center justify-center shrink-0"><Gauge size={ 12 } /></span> {t("ops.trip.avg_wt")}
-            </span>
-            <span className="text-xs font-bold text-slate-800">
-              {totals.avgWeight > 0 ? `${totals.avgWeight} Kg` : "—"}
-            </span>
-          </div>
+          <StepKpiCard
+            icon={Box}
+            tone="bg-amber-50 text-amber-600"
+            label={t("common.boxes")}
+            value={`${totals.boxes} / ${maxBoxes || "—"}`}
+          />
+          <StepKpiCard
+            icon={Bird}
+            tone="bg-sky-50 text-sky-600"
+            label={t("common.birds")}
+            value={String(totals.totalBirds)}
+          />
+          <StepKpiCard
+            icon={Scale}
+            tone="bg-emerald-50 text-emerald-600"
+            label={t("ops.trip.dc_wt")}
+            value={`${totals.dcWeight.toFixed(2)} Kg`}
+          />
+          <StepKpiCard
+            icon={Gauge}
+            tone="bg-purple-50 text-purple-600"
+            label={t("ops.trip.avg_wt")}
+            value={totals.avgWeight > 0 ? `${totals.avgWeight} Kg` : "—"}
+          />
         </div>
 
         <WizardStepNotice

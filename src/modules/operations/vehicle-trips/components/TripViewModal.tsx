@@ -1,8 +1,7 @@
 // src/modules/operations/vehicle-trips/components/TripViewModal.tsx
 // Read-only Trip View for Recent / Trip List.
-// Step 4 uses the same locked StepDeliveries layout as Trip Entry after submit.
-// Step 5 uses the same locked StepEnd layout. Email/WhatsApp bulk actions stay
-// in the modal header for completed trips.
+// Steps 1–5 embed the same locked Trip Entry components (shared fonts/layout).
+// Email/WhatsApp bulk actions stay in the modal header for completed trips.
 
 import React, { useState } from "react";
 import {
@@ -11,16 +10,8 @@ import {
   ShieldCheck,
   Send,
   Loader2,
-  Clock,
   UserCheck,
   FileDown,
-  Calendar,
-  Truck,
-  User,
-  Gauge,
-  Wallet,
-  Users,
-  Package,
 } from "lucide-react";
 import { WhatsAppIcon } from "../../../../ui/WhatsAppIcon";
 import type { Trip } from "../types/trip";
@@ -31,14 +22,15 @@ import {
   isTripWizardComplete,
   TRIP_STEP_LABELS,
   TRIP_STEP_KEYS,
+  getNextIncompleteTripStep,
 } from "../../../../shared/trip";
 import { generateTripReportPDF, type TripReportEmailInfo } from "../utils/generateTripPDF";
 import { useTripDeliveryEmails } from "../hooks/useTripDeliveryEmails";
 import { useTripDeliveryWhatsApps } from "../hooks/useTripDeliveryWhatsApps";
-import { FarmStepView, PickupStepView } from "./TripStepViews";
-import { StepKpiCard } from "./WizardControls";
-import { getNextIncompleteTripStep } from "../../../../shared/trip";
 import { useI18n } from "../../../../i18n";
+import StepStart from "./StepStart";
+import StepFarm from "./StepFarm";
+import StepPickup from "./StepPickup";
 import StepEnd from "./Step_5/StepEnd";
 import StepDeliveries from "./StepDeliveries";
 
@@ -57,109 +49,70 @@ interface Props {
   initialStep?: number;
 }
 
-/** Read-only Step 1 (Trip Start) details — same "Farm Details" format. */
-function Step1View({ trip }: { trip: Trip }) {
-  const { t } = useI18n();
-  return (
-    <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
-      <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
-        <Clock size={18} className="text-indigo-600" />
-        {t("ops.trip.title.start")}
-      </h3>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <StepKpiCard
-          icon={Calendar}
-          tone="bg-blue-50 text-blue-600"
-          label={t("ops.trip.field.trip_date")}
-          value={trip.tripDate || "—"}
-        />
-        <StepKpiCard
-          icon={Clock}
-          tone="bg-sky-50 text-sky-600"
-          label={t("ops.trip.field.start_time")}
-          value={trip.startTime || "—"}
-        />
-        <StepKpiCard
-          icon={Truck}
-          tone="bg-emerald-50 text-emerald-600"
-          label={t("common.vehicle")}
-          value={trip.vehicleNo || "—"}
-        />
-        <StepKpiCard
-          icon={UserCheck}
-          tone="bg-violet-50 text-violet-600"
-          label={t("common.supervisor")}
-          value={trip.supervisorName || "—"}
-        />
-        <StepKpiCard
-          icon={User}
-          tone="bg-indigo-50 text-indigo-600"
-          label={t("common.driver")}
-          value={trip.driverName || "—"}
-        />
-        <StepKpiCard
-          icon={Gauge}
-          tone="bg-purple-50 text-purple-600"
-          label={t("ops.trip.field.opening_meter")}
-          value={trip.openingMeter != null ? `${trip.openingMeter} KM` : t("ops.trip.not_entered")}
-        />
-        <StepKpiCard
-          icon={Wallet}
-          tone="bg-amber-50 text-amber-600"
-          label={t("operations.advance")}
-          value={trip.advanceAmount != null ? `₹ ${trip.advanceAmount.toLocaleString()}` : t("ops.trip.not_entered")}
-        />
-        <StepKpiCard
-          icon={Users}
-          tone="bg-teal-50 text-teal-600"
-          label={t("ops.trip.field.helpers")}
-          value={trip.helpers?.join(", ") || "—"}
-        />
-        <StepKpiCard
-          icon={Package}
-          tone="bg-cyan-50 text-cyan-600"
-          label={t("ops.trip.field.loaders")}
-          value={trip.loaders?.join(", ") || "—"}
-        />
-        <StepKpiCard
-          icon={ShieldCheck}
-          tone="bg-rose-50 text-rose-600"
-          label={t("common.status")}
-          value={trip.startStepSubmitted ? t("ops.trip.submitted") : t("ops.trip.not_submitted")}
-        />
-      </div>
-    </section>
-  );
-}
+/** No-op helpers so locked step components stay read-only in Recent view. */
+const noop = () => {};
+const noopAsyncFalse = async () => false;
+const noopFalse = () => false;
 
 /**
- * Read-only Step 5 for Recent / Trip List view — same detailed submitted layout
- * as the locked Expenses form (summary boxes, full expense tables, diesel with
- * GPS address + fuel bill image preview). No edit controls.
+ * Recent / Trip List step views embed the SAME locked step components as Trip Entry
+ * so layout + fonts match exactly (shared StepKpiCard typography).
  */
-function Step5View({ trip }: { trip: Trip }) {
-  // Force the locked submitted path inside StepEnd (expenses already done).
-  const viewTrip: Trip = {
-    ...trip,
-    expensesStepSubmitted: true,
-    endStepSubmitted: true,
-  };
+function Step1View({ trip }: { trip: Trip }) {
+  const viewTrip: Trip = { ...trip, startStepSubmitted: true };
   return (
-    <StepEnd
-      trip={viewTrip}
-      updateTrip={() => {}}
-      canEdit={false}
+    <StepStart
+      tripId={trip.id}
+      tripNo={trip.tripNo}
+      startTime={trip.startTime || ""}
+      startStepSubmitted
+      loadSnapshot={viewTrip}
+      updateTrip={noop}
+      submitStartStep={noopAsyncFalse}
+      vehicleOptions={[]}
+      employeeOptions={[]}
       editable={false}
-      clearForm={() => {}}
-      onCancel={() => {}}
+      canEdit={false}
+      clearForm={noop}
+      subscribeHeaderSaveStatus={() => noop}
+      getHeaderSaveStatus={() => "idle"}
     />
   );
 }
 
-/**
- * Read-only Step 4 for Recent / Trip List view — exact same locked submitted
- * layout as Trip Entry Step 4 (KPIs, shop cards, PDF). No edit controls.
- */
+function Step2View({ trip, birdTypes }: { trip: Trip; birdTypes: BirdType[] }) {
+  const viewTrip: Trip = { ...trip, farmStepSubmitted: true };
+  return (
+    <StepFarm
+      trip={viewTrip}
+      setTrip={noop as React.Dispatch<React.SetStateAction<Trip>>}
+      updateTrip={noop}
+      submitFarmStep={noopFalse}
+      farms={[]}
+      birdTypes={birdTypes}
+      editable={false}
+      canEdit={false}
+      clearForm={noop}
+    />
+  );
+}
+
+function Step3View({ trip }: { trip: Trip }) {
+  const viewTrip: Trip = { ...trip, pickupStepSubmitted: true };
+  return (
+    <StepPickup
+      trip={viewTrip}
+      setTrip={noop as React.Dispatch<React.SetStateAction<Trip>>}
+      updateTrip={noop}
+      updateBoxDetails={noop}
+      submitPickupStep={noopFalse}
+      editable={false}
+      canEdit={false}
+      clearForm={noop}
+    />
+  );
+}
+
 function Step4View({
   trip,
   shops,
@@ -169,25 +122,40 @@ function Step4View({
   shops: Shop[];
   birdTypes: BirdType[];
 }) {
-  const viewTrip: Trip = {
-    ...trip,
-    deliveryStepSubmitted: true,
-  };
+  const viewTrip: Trip = { ...trip, deliveryStepSubmitted: true };
   const deliveries = Array.isArray(trip.deliveries) ? trip.deliveries : [];
   return (
     <StepDeliveries
       rows={deliveries}
-      setRows={() => {}}
+      setRows={noop as React.Dispatch<React.SetStateAction<typeof deliveries>>}
       shops={shops}
       birdTypes={birdTypes}
       trip={viewTrip}
-      updateDeliveries={() => {}}
-      submitDeliveriesStep={() => false}
-      clearForm={() => {}}
+      updateDeliveries={noop}
+      submitDeliveriesStep={noopFalse}
+      clearForm={noop}
       canEdit={false}
       editable={false}
       boxDetails={trip.boxDetails || []}
       persistedDeliveries={deliveries}
+    />
+  );
+}
+
+function Step5View({ trip }: { trip: Trip }) {
+  const viewTrip: Trip = {
+    ...trip,
+    expensesStepSubmitted: true,
+    endStepSubmitted: true,
+  };
+  return (
+    <StepEnd
+      trip={viewTrip}
+      updateTrip={noop}
+      canEdit={false}
+      editable={false}
+      clearForm={noop}
+      onCancel={noop}
     />
   );
 }
@@ -251,34 +219,29 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, initialStep }: P
     await generateTripReportPDF(trip, emailInfo);
   };
 
-  /**
-   * Every step (complete or incomplete) uses the same plain "Farm Details"
-   * style: icon + title-case label, KPI cards — never the numbered
-   * "1 TRIP DETAILS" wizard header. Steps that have not been submitted yet
-   * show a gentle empty-state instead of the editable form.
-   */
+  /** Each step embeds the locked Trip Entry component (same layout + fonts). */
+  const emptyStep = (
+    <div className="mt-8 text-center p-12 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">
+      {t("ops.trip.select_completed_step")}
+    </div>
+  );
+
   const renderStepContent = () => {
     switch (safeViewStepIndex) {
       case 0:
-        return isStartCompleted
-          ? <Step1View trip={trip} />
-          : <div className="mt-8 text-center p-12 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">{t("ops.trip.select_completed_step")}</div>;
+        return isStartCompleted ? <Step1View trip={trip} /> : emptyStep;
       case 1:
-        return <FarmStepView trip={trip} />;
+        return trip.farmStepSubmitted
+          ? <Step2View trip={trip} birdTypes={birdTypes} />
+          : emptyStep;
       case 2:
-        return trip.pickupStepSubmitted
-          ? <PickupStepView trip={trip} />
-          : <div className="mt-8 text-center p-12 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">{t("ops.trip.select_completed_step")}</div>;
+        return trip.pickupStepSubmitted ? <Step3View trip={trip} /> : emptyStep;
       case 3:
-        if (!isDeliveryCompleted) {
-          return <div className="mt-8 text-center p-12 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">{t("ops.trip.select_completed_step")}</div>;
-        }
-        // Same locked submitted layout as Trip Entry Step 4.
-        return <Step4View trip={trip} shops={shops} birdTypes={birdTypes} />;
+        return isDeliveryCompleted
+          ? <Step4View trip={trip} shops={shops} birdTypes={birdTypes} />
+          : emptyStep;
       case 4:
-        return isEndCompleted
-          ? <Step5View trip={trip} />
-          : <div className="mt-8 text-center p-12 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">{t("ops.trip.select_completed_step")}</div>;
+        return isEndCompleted ? <Step5View trip={trip} /> : emptyStep;
       default:
         return null;
     }
