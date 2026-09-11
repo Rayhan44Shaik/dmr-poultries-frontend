@@ -57,7 +57,7 @@ function getApprovalItems(startDate?: Date, endDate?: Date): ApprovalItem[] {
     {
       label: "Trips to approve",
       count: trips.filter((trip) => !trip.deleted && isPending(trip.status)).length,
-      href: "/operations?tab=vehicle-trips",
+      href: "/operations?tab=trip-entry&status=Pending",
       icon: Route,
       tone: "border-blue-100 bg-blue-50 text-blue-700",
       hint: "Pending trip approvals",
@@ -65,7 +65,7 @@ function getApprovalItems(startDate?: Date, endDate?: Date): ApprovalItem[] {
     {
       label: "Maintenance bills",
       count: maintenance.filter((bill) => !bill.deletedAt && bill.paymentStatus !== "approved").length,
-      href: "/fleet?tab=history",
+      href: "/fleet?tab=entry",
       icon: Wrench,
       tone: "border-amber-100 bg-amber-50 text-amber-700",
       hint: "Bills awaiting approval",
@@ -81,7 +81,7 @@ function getApprovalItems(startDate?: Date, endDate?: Date): ApprovalItem[] {
     {
       label: "Payments to approve",
       count: payments.filter((payment) => isPending(payment.status)).length,
-      href: "/accounts?tab=payment-book",
+      href: "/accounts?tab=paid-payments",
       icon: CreditCard,
       tone: "border-emerald-100 bg-emerald-50 text-emerald-700",
       hint: "Payment bills awaiting approval",
