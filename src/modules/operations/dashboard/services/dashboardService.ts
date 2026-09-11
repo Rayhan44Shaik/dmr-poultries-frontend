@@ -110,11 +110,76 @@ export async function loadOperationsDashboard(): Promise<DashboardData> {
     const { data } = await apiGet<OperationsDashboardApiResponse>(DASHBOARD_PATH);
     return mapDashboardResponse(data);
   } catch {
+    // The development preview has no production dashboard API. Use a complete
+    // in-memory showcase so every Operations Dashboard panel can be reviewed;
+    // production continues to use the real API/local fallback only.
+    if (import.meta.env.DEV) return demoDashboard();
     // Offline fallback — derive the same KPI surface from the localStorage
     // stores the entry flows write to, so the overview stays usable when the
     // local PostgreSQL backend is not running.
     return offlineDashboard();
   }
+}
+
+/** Complete frontend-only showcase for the development preview. */
+function demoDashboard(): DashboardData {
+  const today = new Date();
+  const date = (offset: number) => {
+    const value = new Date(today);
+    value.setDate(value.getDate() - offset);
+    return value.toISOString().slice(0, 10);
+  };
+  const trendData = Array.from({ length: 7 }, (_, index) => ({
+    date: date(6 - index),
+    trips: [5, 7, 6, 9, 8, 11, 10][index],
+    weight: [4200, 5600, 4800, 7300, 6500, 8100, 7600][index],
+    mortality: [42, 38, 51, 35, 46, 31, 28][index],
+  }));
+  const recentTrips = [
+    { tripNo: 'TRP-2601', vehicleNumber: 'AP-16-XY-4821', driverName: 'Ravi Kumar', tripDate: date(0), status: 'Completed', totalWeight: 7600 },
+    { tripNo: 'TRP-2600', vehicleNumber: 'AP-16-AB-7314', driverName: 'Srinivas G', tripDate: date(1), status: 'Completed', totalWeight: 8100 },
+    { tripNo: 'TRP-2599', vehicleNumber: 'AP-16-CD-1908', driverName: 'Mohan Rao', tripDate: date(2), status: 'Pending', totalWeight: 6500 },
+  ];
+  return {
+    totalTrips: 56,
+    totalSalesWeight: 44100,
+    totalSalesAmount: 684500,
+    totalCollections: 548200,
+    pendingCollections: 136300,
+    totalExpenses: 92800,
+    fuelExpense: 43600,
+    tripExpense: 49200,
+    todaysTrips: 10,
+    weeklyTrips: 56,
+    monthlyTrips: 184,
+    trendData,
+    topShops: [
+      { shopName: 'Sri Balaji Poultry Traders', amount: 128500 },
+      { shopName: 'Venkatadri Egg Suppliers', amount: 104200 },
+      { shopName: 'Annapurna Farms Outlet', amount: 88600 },
+      { shopName: 'Kakatiya Poultry Point', amount: 74200 },
+    ],
+    collectionsByMode: [{ name: 'Cash', value: 214500 }, { name: 'Union Bank', value: 186700 }, { name: 'HDFC Bank', value: 147000 }],
+    expensesByCategory: [{ name: 'Fuel', value: 43600 }, { name: 'Trip', value: 28000 }, { name: 'Maintenance', value: 21200 }],
+    mortalityData: trendData.map(point => ({ date: point.date, mortality: point.mortality })),
+    recentTrips,
+    activeVehicles: 18,
+    activeDrivers: 24,
+    activeHelpers: 31,
+    totalShops: 100,
+    totalFarms: 24,
+    pendingCollectionsByShop: [
+      { shopName: 'Sri Balaji Poultry Traders', pendingAmount: 38200 },
+      { shopName: 'Annapurna Farms Outlet', pendingAmount: 27500 },
+      { shopName: 'Kakatiya Poultry Point', pendingAmount: 19600 },
+      { shopName: 'Venkatadri Egg Suppliers', pendingAmount: 14800 },
+    ],
+    usedVehicles: 14,
+    usedDrivers: 20,
+    usedHelpers: 26,
+    usedShops: 38,
+    usedFarms: 12,
+  };
 }
 
 /** LocalStorage-derived fallback for GET /api/operations/dashboard. */
