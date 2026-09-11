@@ -666,19 +666,17 @@ export default function StepEnd({
               <TripNoBadge tripNo={trip.tripNo} />
             </div>
             <div className="flex items-center gap-2 shrink-0">
+              {/* Locked / view: pencil only — no top Close X */}
               {canEdit && (
                 <button
                   type="button"
                   onClick={() => setIsLocalEditing(true)}
-                  className="inline-flex items-center gap-1.5 bg-white hover:bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-300 text-emerald-800 text-[11px] font-bold transition-all active:scale-95 shadow-sm"
-                  title={t("common.edit")}
+                  className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95"
+                  title={t("ops.trip.edit_step")}
                 >
-                  <Pencil size={13} />
-                  <span>{t("common.edit")}</span>
+                  <Pencil size={14} />
                 </button>
               )}
-              {/* Close only when used as the Trip Entry wizard (not Recent view embed). */}
-              {canEdit ? <StepCloseButton onClose={clearForm || onCancel} /> : null}
               <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap">
                 {t("ops.trip.submitted_locked")}
               </span>
@@ -765,11 +763,13 @@ export default function StepEnd({
               <TripNoBadge tripNo={trip.tripNo} />
             </div>
             <div className="flex items-center gap-2">
-              {/* Close → locked submitted view (when already submitted). */}
+              {/* Edit mode only: animated Close X → locked submitted view */}
               {isSubmitted ? (
-                <StepCloseButton onClose={handleExitToLocked} />
+                <StepCloseButton onClose={handleExitToLocked} animated />
               ) : null}
-              <span className="text-[11px] text-slate-700 font-medium bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200 whitespace-nowrap">{t("ops.trip.editable_view")}</span>
+              <span className="text-[11px] text-slate-700 font-medium bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200 whitespace-nowrap">
+                {t("ops.trip.editable_view")}
+              </span>
             </div>
           </div>
 

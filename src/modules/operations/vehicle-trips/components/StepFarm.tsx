@@ -221,6 +221,7 @@ export default function StepFarm({
           </div>
           <div className="flex items-center gap-2 shrink-0">
 
+            {/* Locked / view: pencil only — no top Close X */}
             {canEdit && (
               <button
                 type="button"
@@ -231,7 +232,6 @@ export default function StepFarm({
                 <Pencil size={14} />
               </button>
             )}
-            <StepCloseButton onClose={clearForm || onCancel} />
             <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
               {t("ops.trip.submitted_locked")}
             </span>
@@ -330,8 +330,17 @@ export default function StepFarm({
             <TripNoBadge tripNo={trip.tripNo} />
           </div>
           <div className="flex items-center gap-2 shrink-0">
-
-            {editable && trip.farmStepSubmitted && (
+            {/* Edit mode only: animated Close X → locked submitted view */}
+            {trip.farmStepSubmitted && (editable || isLocalEditing) ? (
+              <StepCloseButton
+                animated
+                onClose={() => {
+                  setIsLocalEditing(false);
+                  onExitEdit?.();
+                }}
+              />
+            ) : null}
+            {(editable || isLocalEditing) && trip.farmStepSubmitted && (
               <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
                 {t("ops.trip.editable_view")}
               </span>
@@ -533,36 +542,19 @@ export default function StepFarm({
           notice={toast ? { type: toast.type === "warning" ? "info" : toast.type, message: toast.message } : null}
           dirty={hasUnsavedChanges}
         />
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          {/* Close while editing submitted step → locked view (not full exit). */}
-          {trip.farmStepSubmitted && (editable || isLocalEditing) ? (
-            <button
-              type="button"
-              onClick={() => {
-                setIsLocalEditing(false);
-                onExitEdit?.();
-              }}
-              className="h-10 px-4 rounded-xl border border-slate-200 bg-white text-slate-600 text-[13px] font-semibold hover:bg-slate-50"
-            >
-              {t("common.close")}
-            </button>
-          ) : (
-            <span />
-          )}
-          <WizardActionBar
-            onCancel={() => {
-              // Cancel → leave wizard entirely (Create New Trip).
-              setIsLocalEditing(false);
-              onCancel?.();
-            }}
-            onSave={saveFarmProgress ? handleSaveProgress : undefined}
-            onSubmit={handleSubmit}
-            busy={isSubmitting}
-            saveDisabled={!hasUnsavedChanges}
-            submitDisabled={!!destMeterError}
-            submitLabel={trip.farmStepSubmitted ? "ops.trip.update_farm_details" : "ops.trip.submit_farm_details"}
-          />
-        </div>
+        <WizardActionBar
+          onCancel={() => {
+            // Cancel → leave wizard entirely (Create New Trip).
+            setIsLocalEditing(false);
+            onCancel?.();
+          }}
+          onSave={saveFarmProgress ? handleSaveProgress : undefined}
+          onSubmit={handleSubmit}
+          busy={isSubmitting}
+          saveDisabled={!hasUnsavedChanges}
+          submitDisabled={!!destMeterError}
+          submitLabel={trip.farmStepSubmitted ? "ops.trip.update_farm_details" : "ops.trip.submit_farm_details"}
+        />
       </div>
     </>
   );

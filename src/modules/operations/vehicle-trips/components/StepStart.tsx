@@ -839,6 +839,7 @@ function StepStart({
             <TripNoBadge tripNo={loadSnapshot.tripNo || tripNo} />
           </div>
           <div className="flex items-center gap-2 shrink-0">
+            {/* Locked / view: pencil only — no top Close X */}
             {canEdit && (
               <button
                 type="button"
@@ -849,7 +850,6 @@ function StepStart({
                 <Pencil size={14} />
               </button>
             )}
-            <StepCloseButton onClose={clearForm || onCancel} />
             <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
               {t("ops.trip.submitted_locked")}
             </span>
@@ -959,9 +959,9 @@ function StepStart({
                 action bar Cancel is the only cancel affordance. */}
             {((editable && startStepSubmitted) || isLocalEditing) && (
               <>
-                {/* Close → exit edit, stay on locked submitted view */}
+                {/* Edit mode only: animated Close X → locked submitted view */}
                 {startStepSubmitted ? (
-                  <StepCloseButton onClose={handleExitToLocked} />
+                  <StepCloseButton onClose={handleExitToLocked} animated />
                 ) : null}
                 <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
                   {t("ops.trip.editable_view")}

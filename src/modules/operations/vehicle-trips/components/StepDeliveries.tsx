@@ -150,6 +150,7 @@ export default function StepDeliveries({
               cancel affordance in first-submit / Edit mode. */}
           {isLocked ? (
             <div className="flex items-center gap-2">
+              {/* Locked / view: pencil only — no top Close X */}
               {canEdit && (
                 <button
                   type="button"
@@ -160,16 +161,15 @@ export default function StepDeliveries({
                   <Pencil size={14} />
                 </button>
               )}
-              <StepCloseButton onClose={handleCancelWizard} />
               <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap flex items-center gap-1.5">
                 <Lock size={12} className="text-slate-500" /> {t("ops.trip.submitted_locked")}
               </span>
             </div>
           ) : trip.deliveryStepSubmitted || editingShopId || isStepEditing ? (
             <div className="flex items-center gap-2">
-              {/* Close → back to locked submitted (not full exit). */}
+              {/* Edit mode only: animated Close X → locked submitted view */}
               {trip.deliveryStepSubmitted ? (
-                <StepCloseButton onClose={handleExitToLocked} />
+                <StepCloseButton onClose={handleExitToLocked} animated />
               ) : null}
               <span className="text-xs text-blue-700 font-semibold bg-blue-50 px-3 py-1 rounded-full border border-blue-200 whitespace-nowrap">
                 {editingShopId ? t("ops.trip.editing_shop_details") : t("ops.trip.step_unlocked")}

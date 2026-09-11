@@ -3,15 +3,19 @@ import { useI18n } from "../../../../i18n";
 export { TripNoBadge } from "./TripNoBadge";
 
 /**
- * Header "Close" control for a submitted / locked step.
- *
- * CLOSES the Trip Entry editor and returns to the landing state. It does NOT
- * delete the trip, change submitted flags, change status, or clear any backend
- * data — reopening the trip reloads everything from the API. Deliberately
- * distinct from the bottom action-bar "Cancel", which only discards unsaved
- * edits to the step currently being edited.
+ * Top-right Close (X) — shown ONLY while a submitted step is in Edit mode.
+ * Animates in when Edit is clicked; returns to locked submitted/view mode.
+ * Never shown on locked/submitted/view (no edit) headers.
+ * Distinct from bottom Cancel, which leaves the wizard entirely.
  */
-export function StepCloseButton({ onClose }: { onClose?: () => void }) {
+export function StepCloseButton({
+  onClose,
+  animated = true,
+}: {
+  onClose?: () => void;
+  /** Fade/scale entrance when Edit opens (default true). */
+  animated?: boolean;
+}) {
   const { t } = useI18n();
   if (!onClose) return null;
   return (
@@ -20,9 +24,14 @@ export function StepCloseButton({ onClose }: { onClose?: () => void }) {
       onClick={onClose}
       aria-label={t("common.close")}
       title={t("common.close")}
-      className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 transition-all active:scale-95"
+      className={`bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 shadow-sm active:scale-95 origin-center transition-colors ${
+        animated ? "animate-scale-in" : ""
+      }`}
     >
-      <X size={14} />
+      <X
+        size={14}
+        className={animated ? "transition-transform duration-200 ease-out hover:rotate-90" : undefined}
+      />
     </button>
   );
 }

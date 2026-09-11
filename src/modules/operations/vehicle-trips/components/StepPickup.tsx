@@ -571,16 +571,17 @@ export default function StepPickup({
           </div>
           <div className="flex items-center gap-2 shrink-0">
 
+            {/* Locked / view: pencil only — no top Close X */}
             {canEdit && (
               <button
+                type="button"
                 onClick={() => setIsLocalEditing(true)}
                 className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95"
-                title={t("ops.trip.edit_pickup_kpi")}
+                title={t("ops.trip.edit_step")}
               >
                 <Pencil size={14} />
               </button>
             )}
-            <StepCloseButton onClose={clearForm || onCancel} />
             <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
               {t("ops.trip.submitted_locked")}
             </span>
@@ -804,7 +805,11 @@ export default function StepPickup({
             </h3>
             <TripNoBadge tripNo={trip.tripNo} />
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 shrink-0">
+            {/* Edit mode only: animated Close X → locked submitted view */}
+            {(isEditMode || isLocalEditing) && trip.pickupStepSubmitted ? (
+              <StepCloseButton onClose={handleExitToLocked} animated />
+            ) : null}
             {(isEditMode || isLocalEditing) && trip.pickupStepSubmitted && (
               <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
                 {t("ops.trip.editable_view")}
@@ -1044,28 +1049,15 @@ export default function StepPickup({
           notice={toast ? { type: toast.type, message: toast.message } : null}
           dirty={hasUnsavedChanges}
         />
-        <div className="flex items-center justify-between gap-2 flex-wrap">
-          {trip.pickupStepSubmitted && isEditMode ? (
-            <button
-              type="button"
-              onClick={handleExitToLocked}
-              className="h-10 px-4 rounded-xl border border-slate-200 bg-white text-slate-600 text-[13px] font-semibold hover:bg-slate-50"
-            >
-              {t("common.close")}
-            </button>
-          ) : (
-            <span />
-          )}
-          <WizardActionBar
-            onCancel={handleCancel}
-            onSave={savePickupProgress ? handleSaveProgress : undefined}
-            onSubmit={handleSubmit}
-            busy={isSaving || isSubmitting}
-            saveDisabled={false}
-            submitDisabled={!canSubmit || (trip.pickupStepSubmitted && !isEditMode)}
-            submitLabel={isEditMode ? "ops.trip.update_pickup" : "ops.trip.submit_pickup"}
-          />
-        </div>
+        <WizardActionBar
+          onCancel={handleCancel}
+          onSave={savePickupProgress ? handleSaveProgress : undefined}
+          onSubmit={handleSubmit}
+          busy={isSaving || isSubmitting}
+          saveDisabled={false}
+          submitDisabled={!canSubmit || (trip.pickupStepSubmitted && !isEditMode)}
+          submitLabel={isEditMode ? "ops.trip.update_pickup" : "ops.trip.submit_pickup"}
+        />
       </div>
 
       {/* Confirmation Modal */}
