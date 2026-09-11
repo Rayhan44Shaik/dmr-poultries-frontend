@@ -9,6 +9,26 @@ import { X } from "lucide-react";
 import { NAV_SECTIONS, NAV_TONE_CLASS, type NavChild } from "../../routes/navigation";
 import { useI18n } from "../../i18n";
 import BrandMark from "../BrandMark";
+import { usePendingApprovals } from "../../modules/approvals/hooks/usePendingApprovals";
+
+/** Pending-approval count surfaced as a badge on specific nav entries. */
+function navApprovalBadge(path: string, approvals: ReturnType<typeof usePendingApprovals>): number {
+  if (!approvals.loaded) return 0;
+  switch (path) {
+    case "/approvals":
+      return approvals.total;
+    case "/operations?tab=trip-entry":
+      return approvals.trips.count;
+    case "/fleet?tab=entry":
+      return approvals.maintenance.count;
+    case "/operations?tab=rate-entry":
+      return approvals.rateEntries.count;
+    case "/accounts?tab=paid-payments":
+      return approvals.payments.count;
+    default:
+      return 0;
+  }
+}
 
 interface SidebarProps {
   open: boolean;
@@ -26,6 +46,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   const pathname = location.pathname;
   const search = location.search;
   const { t } = useI18n();
+  const pendingApprovals = usePendingApprovals();
 
   // Close the popup on route change.
   useEffect(() => {
@@ -117,6 +138,8 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
                 const active = isChildActive(child, pathname, search);
                 const label = child.labelKey ? t(child.labelKey) : child.label;
                 const tone = NAV_TONE_CLASS[child.tone ?? "slate"];
+                const badgeCount = navApprovalBadge(child.path, pendingApprovals);
+                const isApprovalHub = child.path === "/approvals";
 
                 return child.soon ? (
                   <li key={child.label}>
@@ -151,6 +174,18 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
                         strokeWidth={2}
                         className={`shrink-0 ${active ? tone.iconActive : tone.icon}`} />
                       <span className="flex-1 truncate text-left">{label}</span>
+                      {badgeCount > 0 && (
+                        <span
+                          title={`${badgeCount} pending approval${badgeCount === 1 ? "" : "s"}`}
+                          className={`ml-auto inline-flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full px-1 text-[10px] font-bold tabular-nums ${
+                            isApprovalHub
+                              ? "bg-amber-500 text-white"
+                              : "bg-amber-100 text-amber-800 dark:bg-amber-500/20 dark:text-amber-300"
+                          }`}
+                        >
+                          {badgeCount > 99 ? "99+" : badgeCount}
+                        </span>
+                      )}
                     </Link>
                   </li>
                 );
