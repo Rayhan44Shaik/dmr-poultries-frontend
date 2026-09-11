@@ -1173,7 +1173,11 @@ export default function DieselExpensesTable({
                   </td>
 
                   {/* Bill — upload control only while editing (or new draft row) */}
-                  <td className="py-2 px-1 text-center align-middle overflow-visible">
+                  <td
+                    className="py-2 px-1 text-center align-middle overflow-visible relative z-10"
+                    onClick={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
+                  >
                     <input
                       type="file"
                       accept="image/jpeg,image/jpg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
@@ -1184,7 +1188,7 @@ export default function DieselExpensesTable({
                       onChange={(e) => handleImageUpload(num, e)}
                     />
                     {hasRealBill(imageVal) ? (
-                      <div className="inline-flex flex-col items-center justify-center gap-0.5 min-w-0">
+                      <div className="inline-flex flex-col items-center justify-center gap-0.5 min-w-0 pointer-events-auto">
                         <BillPreviewLink href={String(imageVal)} fileName={String(imageNameVal)} />
                         {/* Replace / remove bill only in edit mode */}
                         {!readOnly && (isEditingThisRow || (!isSubmitted && !locked)) && (

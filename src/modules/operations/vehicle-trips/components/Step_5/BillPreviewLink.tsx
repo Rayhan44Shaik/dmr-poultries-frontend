@@ -4,10 +4,10 @@ import { ExternalLink, X, ZoomIn } from "lucide-react";
 import { useI18n } from "../../../../../i18n";
 
 /**
- * Compact "Uploaded" link for diesel fuel bills.
- * - Hover: small portal preview (never clipped by table overflow)
- * - Click: neat full-screen lightbox here (view only — no edit)
- * - Lightbox also has "Open in new tab" for a perfect full-size check
+ * Compact "Uploaded" control for diesel fuel bills (view only).
+ * - Hover: small preview card
+ * - Click Uploaded / preview / "view bill": large in-page lightbox
+ * - Lightbox: Open in new tab for full-size check
  */
 export function BillPreviewLink({
   href,
@@ -41,12 +41,12 @@ export function BillPreviewLink({
     const el = anchorRef.current;
     if (!el) return;
     const r = el.getBoundingClientRect();
-    const tipW = Math.min(280, Math.max(220, window.innerWidth * 0.55));
+    const tipW = Math.min(300, Math.max(240, window.innerWidth * 0.55));
     const gap = 10;
     const spaceBelow = window.innerHeight - r.bottom;
     const spaceAbove = r.top;
     const place: "above" | "below" =
-      spaceBelow >= 220 || spaceBelow >= spaceAbove ? "below" : "above";
+      spaceBelow >= 240 || spaceBelow >= spaceAbove ? "below" : "above";
     let left = r.left + r.width / 2 - tipW / 2;
     left = Math.max(8, Math.min(left, window.innerWidth - tipW - 8));
     const top = place === "below" ? r.bottom + gap : r.top - gap;
@@ -62,53 +62,79 @@ export function BillPreviewLink({
 
   const scheduleHide = useCallback(() => {
     clearHide();
-    hideTimer.current = setTimeout(() => setHoverOpen(false), 180);
+    // Longer delay so user can move into the tip and click "view bill".
+    hideTimer.current = setTimeout(() => setHoverOpen(false), 400);
   }, [clearHide]);
 
   const openLightbox = useCallback(
-    (e?: React.MouseEvent) => {
+    (e?: React.SyntheticEvent) => {
       e?.preventDefault();
       e?.stopPropagation();
       clearHide();
       setHoverOpen(false);
+      if (!href) return;
       setLightboxOpen(true);
     },
-    [clearHide]
+    [clearHide, href]
   );
 
-  const closeLightbox = useCallback(() => setLightboxOpen(false), []);
+  const closeLightbox = useCallback((e?: React.SyntheticEvent) => {
+    e?.preventDefault();
+    e?.stopPropagation();
+    setLightboxOpen(false);
+  }, []);
 
-  /** Open the bill image in a real browser tab (works for data: / blob: / http). */
+  /** Open bill image in a real browser tab (data: / blob: / http). */
   const openInNewTab = useCallback(
-    (e?: React.MouseEvent) => {
+    (e?: React.SyntheticEvent) => {
       e?.preventDefault();
       e?.stopPropagation();
       if (!href) return;
+
+      const safeName = String(fileName || "fuel-bill").replace(/[<>&"']/g, "");
+
+      // Large data: URLs break if embedded in an HTML string — open image directly.
+      const isHugeData = href.startsWith("data:") && href.length > 80_000;
+
       try {
-        // Prefer a clean HTML page so the image is centered and sharp.
-        const safeName = String(fileName || "fuel-bill").replace(/[<>&"']/g, "");
+        if (isHugeData || href.startsWith("blob:") || href.startsWith("http")) {
+          const win = window.open(href, "_blank", "noopener,noreferrer");
+          if (win) return;
+        }
+
+        // Build a neat viewer page; for moderate data: URLs put src on the img.
         const html = `<!DOCTYPE html><html><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width,initial-scale=1"/><title>${safeName}</title>
 <style>
-  html,body{margin:0;height:100%;background:#0f172a;display:flex;flex-direction:column;font-family:system-ui,sans-serif}
-  header{flex:0 0 auto;padding:10px 16px;background:#1e293b;color:#e2e8f0;font-size:13px;font-weight:600;display:flex;justify-content:space-between;align-items:center;gap:12px}
-  main{flex:1;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto}
-  img{max-width:100%;max-height:calc(100vh - 64px);object-fit:contain;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.45);background:#fff}
+html,body{margin:0;height:100%;background:#0f172a;display:flex;flex-direction:column;font-family:system-ui,sans-serif}
+header{flex:0 0 auto;padding:10px 16px;background:#1e293b;color:#e2e8f0;font-size:13px;font-weight:600}
+main{flex:1;display:flex;align-items:center;justify-content:center;padding:16px;overflow:auto}
+img{max-width:100%;max-height:calc(100vh - 64px);object-fit:contain;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,.45);background:#fff}
 </style></head><body>
-<header><span>${safeName}</span><span style="opacity:.7;font-weight:500">Fuel bill</span></header>
-<main><img src="${href.replace(/"/g, "&quot;")}" alt="${safeName}"/></main>
+<header>${safeName}</header>
+<main><img id="bill" alt="${safeName}"/></main>
+<script>
+(function(){
+  var img=document.getElementById("bill");
+  var src=${JSON.stringify(href)};
+  img.src=src;
+})();
+</script>
 </body></html>`;
-        const blob = new Blob([html], { type: "text/html" });
+        const blob = new Blob([html], { type: "text/html;charset=utf-8" });
         const url = URL.createObjectURL(blob);
         const win = window.open(url, "_blank", "noopener,noreferrer");
         if (!win) {
-          // Popup blocked — fall back to direct image open.
+          // Popup blocked — still try direct image.
           window.open(href, "_blank", "noopener,noreferrer");
         } else {
-          // Revoke after the tab has a chance to load.
-          window.setTimeout(() => URL.revokeObjectURL(url), 60_000);
+          window.setTimeout(() => URL.revokeObjectURL(url), 120_000);
         }
       } catch {
-        window.open(href, "_blank", "noopener,noreferrer");
+        try {
+          window.open(href, "_blank", "noopener,noreferrer");
+        } catch {
+          /* ignore */
+        }
       }
     },
     [href, fileName]
@@ -130,7 +156,7 @@ export function BillPreviewLink({
   useEffect(() => {
     if (!lightboxOpen) return;
     const onKey = (ev: KeyboardEvent) => {
-      if (ev.key === "Escape") closeLightbox();
+      if (ev.key === "Escape") setLightboxOpen(false);
     };
     const prevOverflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
@@ -139,25 +165,27 @@ export function BillPreviewLink({
       document.body.style.overflow = prevOverflow;
       window.removeEventListener("keydown", onKey);
     };
-  }, [lightboxOpen, closeLightbox]);
+  }, [lightboxOpen]);
+
+  const tipW = "min(18.75rem, calc(100vw - 16px))";
 
   const hoverTip =
     hoverOpen && !lightboxOpen && typeof document !== "undefined"
       ? createPortal(
           <div
             id={tipId}
-            role="tooltip"
-            className="fixed z-[9999] pointer-events-auto"
+            role="dialog"
+            className="fixed z-[99999] pointer-events-auto"
             style={{
               top: pos.place === "below" ? pos.top : undefined,
               bottom: pos.place === "above" ? Math.max(8, window.innerHeight - pos.top) : undefined,
               left: pos.left,
-              width: "min(17.5rem, calc(100vw - 16px))",
+              width: tipW,
             }}
             onMouseEnter={showHover}
             onMouseLeave={scheduleHide}
           >
-            <div className="rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/20 overflow-hidden ring-1 ring-black/5">
+            <div className="rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/25 overflow-hidden ring-1 ring-black/5">
               <div className="bg-slate-50 px-3 py-2 border-b border-slate-100">
                 <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
                   {t("ops.trip.bill_uploaded_row")}
@@ -166,15 +194,40 @@ export function BillPreviewLink({
                   {fileName}
                 </p>
               </div>
-              <div className="p-2.5 bg-white">
+              {/* Whole image area opens lightbox */}
+              <button
+                type="button"
+                className="block w-full p-2.5 bg-white text-left cursor-zoom-in border-0"
+                onClick={openLightbox}
+                onMouseDown={(e) => e.preventDefault()}
+                title={t("ops.trip.bill_open_full")}
+              >
                 <img
                   src={href}
                   alt={fileName}
-                  className="w-full h-40 object-contain rounded-md border border-slate-100 bg-slate-50"
+                  className="w-full h-44 object-contain rounded-md border border-slate-100 bg-slate-50 pointer-events-none"
+                  draggable={false}
                 />
-              </div>
-              <div className="px-3 py-1.5 bg-slate-50 border-t border-slate-100 text-[10px] text-slate-500 font-medium text-center">
-                {t("ops.trip.bill_open_full")}
+              </button>
+              <div className="px-2.5 py-2 bg-slate-50 border-t border-slate-100 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={openLightbox}
+                  onMouseDown={(e) => e.preventDefault()}
+                  className="flex-1 h-8 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-[11px] font-bold shadow-sm"
+                >
+                  {t("ops.trip.bill_open_full")}
+                </button>
+                <button
+                  type="button"
+                  onClick={openInNewTab}
+                  onMouseDown={(e) => e.preventDefault()}
+                  className="h-8 px-2.5 rounded-lg border border-emerald-300 bg-white hover:bg-emerald-50 text-emerald-800 text-[11px] font-bold inline-flex items-center gap-1"
+                  title={t("ops.trip.bill_open_new_tab")}
+                >
+                  <ExternalLink size={12} />
+                  <span className="hidden sm:inline">{t("ops.trip.bill_open_new_tab")}</span>
+                </button>
               </div>
             </div>
           </div>,
@@ -186,20 +239,21 @@ export function BillPreviewLink({
     lightboxOpen && typeof document !== "undefined"
       ? createPortal(
           <div
-            className="fixed inset-0 z-[10000] flex items-center justify-center p-3 sm:p-6"
+            className="fixed inset-0 z-[100000] flex items-center justify-center p-3 sm:p-6"
             role="dialog"
             aria-modal="true"
             aria-label={t("ops.trip.bill_uploaded_row")}
+            onClick={(e) => e.stopPropagation()}
           >
-            {/* Backdrop */}
-            <button
-              type="button"
-              className="absolute inset-0 bg-slate-900/70 backdrop-blur-[2px]"
-              aria-label={t("common.close")}
+            <div
+              className="absolute inset-0 bg-slate-900/75 backdrop-blur-[2px]"
               onClick={closeLightbox}
+              aria-hidden
             />
-            {/* Panel */}
-            <div className="relative z-10 w-full max-w-3xl max-h-[92vh] flex flex-col rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden">
+            <div
+              className="relative z-10 w-full max-w-3xl max-h-[92vh] flex flex-col rounded-2xl bg-white shadow-2xl border border-slate-200 overflow-hidden"
+              onClick={(e) => e.stopPropagation()}
+            >
               <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-100 bg-slate-50 shrink-0">
                 <div className="min-w-0">
                   <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
@@ -213,7 +267,7 @@ export function BillPreviewLink({
                   <button
                     type="button"
                     onClick={openInNewTab}
-                    className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold shadow-sm active:scale-[0.98]"
+                    className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-bold shadow-sm"
                     title={t("ops.trip.bill_open_new_tab")}
                   >
                     <ExternalLink size={14} strokeWidth={2.25} />
@@ -231,11 +285,15 @@ export function BillPreviewLink({
                 </div>
               </div>
               <div className="flex-1 min-h-0 overflow-auto bg-slate-100/80 p-3 sm:p-5 flex items-center justify-center">
-                <img
-                  src={href}
-                  alt={fileName}
-                  className="max-w-full max-h-[min(78vh,900px)] w-auto h-auto object-contain rounded-lg border border-slate-200 bg-white shadow-md"
-                />
+                {href ? (
+                  <img
+                    src={href}
+                    alt={fileName}
+                    className="max-w-full max-h-[min(78vh,900px)] w-auto h-auto object-contain rounded-lg border border-slate-200 bg-white shadow-md"
+                  />
+                ) : (
+                  <p className="text-sm text-slate-500">{t("ops.trip.bill_image_required")}</p>
+                )}
               </div>
               <div className="px-4 py-2.5 border-t border-slate-100 bg-white text-[11px] text-slate-500 font-medium flex items-center justify-between gap-2 shrink-0">
                 <span className="inline-flex items-center gap-1">
@@ -265,11 +323,12 @@ export function BillPreviewLink({
         onMouseEnter={showHover}
         onMouseLeave={scheduleHide}
         onFocus={showHover}
-        onBlur={scheduleHide}
+        // Do NOT hide on blur — that killed clicks on the hover tip before.
         onClick={openLightbox}
+        onPointerDown={(e) => e.stopPropagation()}
         className={
           className ||
-          "text-[11px] text-emerald-700 font-semibold underline decoration-emerald-300/70 hover:decoration-emerald-600 leading-tight whitespace-nowrap cursor-pointer bg-transparent border-0 p-0"
+          "inline-flex items-center gap-0.5 text-[11px] text-emerald-700 font-semibold underline decoration-emerald-300/70 hover:decoration-emerald-600 leading-tight whitespace-nowrap cursor-pointer bg-transparent border-0 p-0.5 rounded hover:bg-emerald-50"
         }
         title={t("ops.trip.bill_open_full")}
       >
