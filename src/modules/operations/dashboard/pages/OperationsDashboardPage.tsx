@@ -10,9 +10,10 @@ import RecentTripsTable from "../components/RecentTripsTable";
 import ActiveCounts from "../components/ActiveCounts";
 import PendingCollectionsByShop from "../components/PendingCollectionsByShop";
 import PendingApprovalsPanel from "../components/PendingApprovalsPanel";
-import { Calendar, ArrowRightLeft } from "lucide-react";
+import { Calendar, ArrowRightLeft, RefreshCw } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import { useI18n } from "../../../../i18n";
+import { kickApprovalSnapshot } from "../../../approvals/services/approvalSnapshot";
 
 // -------- Helper: get previous Monday–Sunday --------
 const getPreviousWeekRange = () => {
@@ -106,9 +107,9 @@ function RangeDatePicker({
         <button
           type="button"
           onClick={toggleCalendar}
-          className="h-9 px-3.5 rounded-xl border border-slate-200/80 bg-slate-50/70 flex items-center gap-2 text-xs font-bold text-slate-700 hover:border-blue-500/50 hover:bg-slate-100/80 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all active:scale-[0.98]"
+          className="h-10 px-4 rounded-xl border border-slate-200/80 bg-slate-50/70 flex items-center gap-2 text-[13px] font-bold text-slate-700 hover:border-blue-500/50 hover:bg-slate-100/80 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all active:scale-[0.98]"
         >
-          <Calendar size={14} className="text-blue-600" />
+          <Calendar size={16} className="text-blue-600" />
           <span>
             {startDate && endDate
               ? `${formatDate(startDate)} – ${formatDate(endDate)}`
@@ -208,17 +209,48 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
     setEndDate(e);
   };
 
+  // Manual "refresh everything" — dashboard KPIs/charts AND pending counters.
+  const [refreshing, setRefreshing] = useState(false);
+  const handleRefreshAll = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    try {
+      await Promise.all([refetch(), kickApprovalSnapshot()]);
+    } finally {
+      // Keep the spin visible briefly so the tap reads as an action.
+      window.setTimeout(() => setRefreshing(false), 450);
+    }
+  };
+
+  const rangePicker = (
+    <RangeDatePicker
+      startDate={startDate}
+      endDate={endDate}
+      onRangeChange={handleRangeChange}
+    />
+  );
+
+  const headerActions = (
+    <>
+      <button
+        type="button"
+        onClick={handleRefreshAll}
+        disabled={refreshing}
+        title="Refresh all data"
+        aria-label="Refresh all data"
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200/80 bg-slate-50/70 text-slate-600 transition-all hover:border-blue-500/50 hover:bg-slate-100/80 hover:text-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-500/10 active:scale-[0.96] disabled:opacity-60"
+      >
+        <RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />
+      </button>
+      {rangePicker}
+    </>
+  );
+
   if (!isRangeSelected) {
     return (
       <div className={`min-w-0 space-y-4 ${embedded ? "" : "p-4 sm:p-5 lg:p-6"}`}>
         <PendingApprovalsPanel
-          actions={
-            <RangeDatePicker
-              startDate={startDate}
-              endDate={endDate}
-              onRangeChange={handleRangeChange}
-            />
-          }
+          actions={headerActions}
         />
         <div className="flex items-center justify-center h-96 bg-white rounded-2xl border border-slate-200/80 shadow-sm p-8">
           <div className="text-center max-w-sm">
@@ -239,13 +271,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
     return (
       <div className={`min-w-0 space-y-5 ${embedded ? "" : "p-4 sm:p-5 lg:p-6"}`}>
         <PendingApprovalsPanel
-          actions={
-            <RangeDatePicker
-              startDate={startDate}
-              endDate={endDate}
-              onRangeChange={handleRangeChange}
-            />
-          }
+          actions={headerActions}
         />
         <div className="w-full flex flex-col items-center justify-center py-24 space-y-4 bg-white rounded-2xl border border-slate-200/80 shadow-sm">
         <div className="relative w-12 h-12">
@@ -264,13 +290,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
     return (
       <div className={`min-w-0 space-y-4 ${embedded ? "" : "p-4 sm:p-5 lg:p-6"}`}>
         <PendingApprovalsPanel
-          actions={
-            <RangeDatePicker
-              startDate={startDate}
-              endDate={endDate}
-              onRangeChange={handleRangeChange}
-            />
-          }
+          actions={headerActions}
         />
         <div className="flex flex-col items-center justify-center py-24 space-y-4 bg-white rounded-2xl border border-slate-200/80 shadow-sm px-6">
           <p className="text-sm font-semibold text-red-700 text-center">{error}</p>
@@ -290,13 +310,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
     <div className={`min-w-0 space-y-5 ${embedded ? "" : "p-4 sm:p-5 lg:p-6"}`}>
       {/* Pending-approval KPIs and date-range filter on one slim row. */}
       <PendingApprovalsPanel
-        actions={
-          <RangeDatePicker
-            startDate={startDate}
-            endDate={endDate}
-            onRangeChange={handleRangeChange}
-          />
-        }
+        actions={headerActions}
       />
 
       <div className="relative z-10">

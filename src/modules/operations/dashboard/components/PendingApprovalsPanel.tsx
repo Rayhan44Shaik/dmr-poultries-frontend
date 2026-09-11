@@ -54,7 +54,7 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
     {
       key: "maintenance",
       label: "Maintenance",
-      href: "/fleet?tab=entry",
+      href: "/fleet?tab=entry&view=pending",
       icon: Wrench,
       count: q.maintenance.count,
       chip: "bg-violet-100 text-violet-600",
@@ -74,12 +74,12 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
   return (
     <section
       aria-label="Pending approvals"
-      className="flex flex-wrap items-center gap-x-1 gap-y-1.5 rounded-xl border border-slate-200/70 bg-white px-2.5 py-2 shadow-sm"
+      className="flex flex-wrap items-center gap-x-1 gap-y-1.5 rounded-xl border border-slate-200/70 bg-white px-3 py-2.5 shadow-sm"
     >
       {loading ? (
         <div className="flex items-center gap-4 px-1">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="h-7 w-24 animate-pulse rounded-md bg-slate-100" />
+            <div key={i} className="h-8 w-24 animate-pulse rounded-md bg-slate-100" />
           ))}
         </div>
       ) : allClear ? (
@@ -97,7 +97,7 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
                 key={stat.key}
                 to={stat.href}
                 title={`${stat.count} ${stat.label} pending approval`}
-                className={`flex items-center gap-2 rounded-lg px-2.5 py-1 transition-colors sm:px-3 ${stat.hover} ${
+                className={`flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-colors sm:px-3 ${stat.hover} ${
                   empty ? "opacity-40 hover:bg-transparent" : ""
                 }`}
               >
