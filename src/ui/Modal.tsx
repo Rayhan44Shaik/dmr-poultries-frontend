@@ -96,6 +96,12 @@ export interface ModalProps {
   footerClassName?: string;
   /** Accessible label used when there is no visible title. */
   "aria-label"?: string;
+  /**
+   * Extra classes on the overlay only — the scrim behind the panel. Used to
+   * flatten the default 1px backdrop blur where a form must keep the page
+   * behind it readable. The panel itself is never affected.
+   */
+  overlayClassName?: string;
 }
 
 export function Modal({
@@ -115,6 +121,7 @@ export function Modal({
   className,
   bodyClassName,
   footerClassName,
+  overlayClassName,
   "aria-label": ariaLabel,
 }: ModalProps) {
   const isOpened = Boolean(isOpen ?? open);
@@ -136,7 +143,7 @@ export function Modal({
 
   const dialog = (
     <div
-      className={cn(uiOverlayClass, "z-[60] flex items-end justify-center p-0 sm:items-center sm:p-4")}
+      className={cn(uiOverlayClass, "z-[60] flex items-end justify-center p-0 sm:items-center sm:p-4", overlayClassName)}
       onMouseDown={(event) => {
         // Only a press that STARTS on the overlay closes the dialog, so a user
         // who selects text inside the panel and releases over the overlay does

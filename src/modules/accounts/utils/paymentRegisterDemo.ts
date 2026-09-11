@@ -14,7 +14,9 @@ export function createDemoPayments(reference = new Date()): Payment[] {
     const sequence = String(index % 3 + 1).padStart(3, '0');
     return {
       id: `demo-payment-${index + 1}`,
-      paymentNo: `Pay-${date.split('-').reverse().join('')}-${sequence}`,
+      // Year-first, matching the `PAY-YYYYMMDD-###` convention the legacy
+      // PaymentService already writes, so numbers sort in the same order they read.
+      paymentNo: `Pay-${date.replace(/-/g, '')}-${sequence}`,
       paymentDate: date,
       paymentType: PAYMENT_TYPES[index % PAYMENT_TYPES.length],
       paymentMode: PAYMENT_MODES[index % PAYMENT_MODES.length],
