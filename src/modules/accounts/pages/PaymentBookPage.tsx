@@ -126,12 +126,20 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
      and for one short beat on sample data, which makes no request at all — so
      the click is never silently swallowed. */
   const [spinBeat, setSpinBeat] = useState(false);
+  const [filterAction, setFilterAction] = useState<'search' | 'clear' | 'refresh' | null>(null);
   const spinTimer = useRef<number | null>(null);
   const spinning = spinBeat || loading;
-  const handleRefresh = useCallback(() => {
+  const animateFilterAction = (action: 'search' | 'clear' | 'refresh') => {
+    setFilterAction(action);
     setSpinBeat(true);
     if (spinTimer.current !== null) window.clearTimeout(spinTimer.current);
-    spinTimer.current = window.setTimeout(() => setSpinBeat(false), 700);
+    spinTimer.current = window.setTimeout(() => {
+      setSpinBeat(false);
+      setFilterAction(null);
+    }, 700);
+  };
+  const handleRefresh = useCallback(() => {
+    animateFilterAction('refresh');
     if (demoRef.current) showNotification('Sample data is up to date. No server request was made.', 'info');
     else void loadPayments();
   }, [loadPayments, showNotification]);
@@ -149,6 +157,7 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
     setFilters(previous => ({ ...previous, [key]: value }));
   };
   const clearFilters = () => {
+    animateFilterAction('clear');
     setSelectedId(null);
     const cleared = { ...weekRange(), type: '', mode: '', search: '' };
     setFilters(cleared);
@@ -160,6 +169,7 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   const invalidRange = Boolean(filters.from && filters.to && filters.from > filters.to);
   const applyFilters = () => {
     if (invalidRange) return;
+    animateFilterAction('search');
     setSelectedId(null);
     setAppliedFilters({ ...filters });
     setPage(1);
@@ -305,8 +315,8 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
         <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2">
           <SearchInput value={filters.search} onChange={v => changeFilter('search', v)} aria-label="Search payments" placeholder="Payment no, payee, reference…" wrapperClassName="w-full sm:flex-1 sm:min-w-56" />
           <div className="flex w-full items-center justify-end gap-1.5 sm:w-auto">
-            <Button size="lg" icon={<Search size={16} />} onClick={applyFilters} disabled={invalidRange}>Search</Button>
-            <Button variant="secondary" size="lg" icon={<RotateCcw size={15} />} aria-label="Clear filters" title="Clear filters" onClick={clearFilters}>Clear</Button>
+            <Button size="lg" icon={<Search size={16} className={filterAction === 'search' ? 'animate-pulse' : undefined} />} onClick={applyFilters} disabled={invalidRange}>Search</Button>
+            <Button variant="secondary" size="lg" icon={<RotateCcw size={15} className={filterAction === 'clear' ? 'animate-spin' : undefined} />} aria-label="Clear filters" title="Clear filters" onClick={clearFilters}>Clear</Button>
             <Button variant="custom" size="lg" iconOnly aria-label="Refresh" title="Refresh records" className={uiActionToneClass.refresh} disabled={spinning} onClick={handleRefresh}>
               <RefreshCw size={16} strokeWidth={2} aria-hidden="true" className={spinning ? 'animate-spin' : undefined} />
             </Button>
