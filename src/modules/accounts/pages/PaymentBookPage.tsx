@@ -320,7 +320,7 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
             <Button variant="custom" size="lg" iconOnly aria-label="Refresh" title="Refresh records" className={uiActionToneClass.refresh} disabled={spinning} onClick={handleRefresh}>
               <RefreshCw size={16} strokeWidth={2} aria-hidden="true" className={`transition-transform duration-500 hover:rotate-180 ${spinning ? 'animate-[spin_0.6s_ease-in-out_1]' : ''}`} />
             </Button>
-            <Button size="lg" icon={<Plus size={16} />} onClick={() => setIsNewModalOpen(true)}>New Payment</Button>
+            <Button size="lg" icon={<Plus size={16} className="transition-transform duration-200 hover:scale-125 active:scale-90" />} onClick={() => setIsNewModalOpen(true)}>New Payment</Button>
           </div>
         </div>
         {invalidRange && <p role="alert" className="mt-2 text-xs text-red-600">From Date must be on or before To Date.</p>}
