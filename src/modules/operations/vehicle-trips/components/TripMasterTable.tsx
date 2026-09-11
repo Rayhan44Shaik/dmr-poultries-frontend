@@ -104,9 +104,9 @@ function TripMasterTable({ trips, selectedRowId, onRowClick, startIndex = 0 }: P
                     onClick={() => onRowClick(trip)}
                     className={`cursor-pointer transition-all duration-150 ${
                       isSelected
-                        ? "bg-blue-50/85 border-l-4 border-l-blue-600 shadow-sm"
-                        : "hover:bg-slate-50/60"
-                    } ${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"}`}
+                        ? "bg-blue-100 border-l-4 border-l-blue-600 shadow-sm ring-1 ring-inset ring-blue-300"
+                        : `hover:bg-slate-50/60 ${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"}`
+                    }`}
                   >
                     <td className="px-4 py-3 text-center text-xs text-slate-500 font-medium w-10">
                       {isSelected ? <Check size={15} className="text-blue-500 inline" /> : serialNo}

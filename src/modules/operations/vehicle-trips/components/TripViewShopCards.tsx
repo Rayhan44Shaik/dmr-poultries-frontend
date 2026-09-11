@@ -419,7 +419,7 @@ export function TripViewShopCards({
                   )}
 
                   {/* Communication status icons */}
-                  <div className="ml-auto flex items-center gap-1 text-[10px]" aria-label="Communication status">
+                  <div className="ml-auto flex items-center gap-1 text-[10px]" aria-label={t("ops.trip.communication_status")}>
                     {status === "sent" && <CheckCircle2 size={12} className="text-emerald-500" />}
                     {status === "failed" && <XCircle size={12} className="text-red-500" />}
                     {whatsappStatus === "sent" && <CheckCircle2 size={12} className="text-green-500" />}
