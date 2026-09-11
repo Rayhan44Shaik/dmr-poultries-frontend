@@ -201,17 +201,28 @@ export default function DieselExpensesTable({
   };
 
   const handleAddRow = () => {
-    const lastRow = rowIndices[rowIndices.length - 1];
-    if (!sheetData[`dieselSubmitted${lastRow}`]) {
-      notifyUser(t("ops.trip.submit_diesel_first"), "warning");
-      return;
-    }
-    if (lastRow >= 6) {
+    if (rowIndices.length >= 6) {
       notifyUser(t("ops.trip.max_6_diesel"), "warning");
       return;
     }
-    const nextId = lastRow + 1;
-    const nextKey = typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `diesel-${Date.now()}`;
+    const lastRow = rowIndices[rowIndices.length - 1] ?? 0;
+    // Require the current last entry to be submitted before opening a new slot.
+    if (lastRow > 0 && !sheetData[`dieselSubmitted${lastRow}`]) {
+      notifyUser(t("ops.trip.submit_diesel_first"), "warning");
+      return;
+    }
+    let nextId = lastRow + 1;
+    if (nextId > 6 || rowIndices.includes(nextId)) {
+      nextId = [1, 2, 3, 4, 5, 6].find((n) => !rowIndices.includes(n)) ?? 0;
+    }
+    if (!nextId) {
+      notifyUser(t("ops.trip.max_6_diesel"), "warning");
+      return;
+    }
+    const nextKey =
+      typeof crypto !== "undefined" && crypto.randomUUID
+        ? crypto.randomUUID()
+        : `diesel-${Date.now()}`;
     applyBatchUpdates({
       [`dieselLtr${nextId}`]: "",
       [`dieselRate${nextId}`]: "",
@@ -228,53 +239,88 @@ export default function DieselExpensesTable({
       [`dieselClientKey${nextId}`]: nextKey,
     });
     setDraftClientKey(nextKey);
-    setRowIndices((prev) => [...prev, nextId]);
+    setRowIndices((prev) => (prev.includes(nextId) ? prev : [...prev, nextId].sort((a, b) => a - b)));
+    // Open the new row for editing so Upload Bill is immediately available.
+    setEditingRow(nextId);
+    setIsEditingSubmitted(false);
+    setDraftData({
+      [`dieselLtr${nextId}`]: "",
+      [`dieselRate${nextId}`]: "",
+      [`dieselMeter${nextId}`]: "",
+      [`dieselBunk${nextId}`]: "",
+      [`dieselGpsLat${nextId}`]: "",
+      [`dieselGpsLon${nextId}`]: "",
+      [`dieselGpsAccuracy${nextId}`]: "",
+      [`dieselGpsCapturedAt${nextId}`]: "",
+      [`dieselImage${nextId}`]: "",
+      [`dieselImageName${nextId}`]: "",
+      [`dieselClientKey${nextId}`]: nextKey,
+      [`dieselId${nextId}`]: "",
+    });
     notifyUser(t("ops.trip.new_row_added"), "success");
   };
 
   const handleImageUpload = async (index: number, e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    const allowed = ["image/jpeg", "image/jpg", "image/png"];
-    if (!allowed.includes(file.type) && !/\.(jpe?g|png)$/i.test(file.name)) {
+    // Accept common camera formats; compressor normalises to JPEG.
+    const okType =
+      ["image/jpeg", "image/jpg", "image/png", "image/webp", "image/heic", "image/heif", ""].includes(
+        file.type
+      ) || /\.(jpe?g|png|webp|heic|heif)$/i.test(file.name);
+    if (!okType) {
       notifyUser(t("ops.trip.bill_jpeg_png"), "error");
       e.target.value = "";
       return;
     }
-    // Up to 5 MB accepted — everything is auto-compressed to ≤ ~100 KB on
-    // store (quality-first JPEG stepping keeps bills crisp), so disk usage
-    // stays flat no matter what the camera produces.
-    if (file.size > 5 * 1024 * 1024) {
+    // Up to 8 MB accepted — auto-compressed to ≤ ~120 KB for storage.
+    if (file.size > 8 * 1024 * 1024) {
       notifyUser(t("ops.trip.image_size_5mb"), "error");
       e.target.value = "";
       return;
     }
     const sequence = String(index).padStart(3, "0");
     try {
-      // Compress hard on size but keep receipts readable: high-res long edge,
-      // quality-first JPEG steps (see compressImage.ts). Clarity is preserved.
       const compressed = await compressImageFile(file, {
         maxBytes: 120 * 1024,
         maxDimension: 1800,
         minDimension: 720,
       });
-      const result = compressed.dataUrl;
-      if (!/^data:image\/(jpeg|jpg|png);base64,/i.test(result)) {
-        notifyUser(t("ops.trip.bill_jpeg_png"), "error");
+      let result = compressed.dataUrl;
+      // If codec failed (e.g. HEIC), fall back to raw FileReader data URL when possible.
+      if (!result || (!/^data:image\//i.test(result) && !result.startsWith("blob:"))) {
+        result = await new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ""));
+          reader.onerror = () => reject(new Error("read_failed"));
+          reader.readAsDataURL(file);
+        });
+      }
+      if (!result || !/^data:image\//i.test(result)) {
+        notifyUser(t("ops.trip.failed_read_image"), "error");
         e.target.value = "";
         return;
       }
-      // Recompressed output is always JPEG.
       const newFileName = `BILL-${fallbackDateStr}-${sequence}.jpg`;
-      if (editingRow === index) {
-        setDraftField(`dieselImageName${index}`, newFileName);
-        setDraftField(`dieselImage${index}`, result);
-      } else {
-        applyBatchUpdates({
-          [`dieselImageName${index}`]: newFileName,
-          [`dieselImage${index}`]: result,
-        });
-      }
+      // Always persist to sheet so the bill is never lost if edit-mode state
+      // hasn't flushed yet (e.g. openBillPicker → startEdit → file dialog).
+      applyBatchUpdates({
+        [`dieselImageName${index}`]: newFileName,
+        [`dieselImage${index}`]: result,
+      });
+      // Keep draft in sync when this row is being edited.
+      setDraftData((prev) => {
+        if (editingRow !== index && Object.keys(prev).length === 0) return prev;
+        // If we just opened edit for this row, or already editing it, mirror bill.
+        if (editingRow === index || prev[`dieselClientKey${index}`] !== undefined || prev[`dieselLtr${index}`] !== undefined) {
+          return {
+            ...prev,
+            [`dieselImageName${index}`]: newFileName,
+            [`dieselImage${index}`]: result,
+          };
+        }
+        return prev;
+      });
       if (compressed.compressed) {
         notifyUser(
           t("ops.trip.photo_auto_compressed", {
@@ -290,6 +336,19 @@ export default function DieselExpensesTable({
       notifyUser(t("ops.trip.failed_read_image"), "error");
     }
     e.target.value = "";
+  };
+
+  /** Open the bill file picker; auto-enter edit mode if the row is locked/submitted. */
+  const openBillPicker = (num: number) => {
+    if (readOnly) return;
+    const isSubmitted = !!sheetData[`dieselSubmitted${num}`];
+    if (isSubmitted && editingRow !== num) {
+      startEdit(num);
+      // Wait a tick so draft state is ready before the file dialog opens.
+      window.setTimeout(() => fileInputRefs.current[num]?.click(), 0);
+      return;
+    }
+    fileInputRefs.current[num]?.click();
   };
 
   const handleClearRow = (num: number) => {
@@ -794,6 +853,8 @@ export default function DieselExpensesTable({
 
   const lastRowIndex = rowIndices[rowIndices.length - 1];
   const isLastRowSubmitted = !!sheetData[`dieselSubmitted${lastRowIndex}`];
+  // Add Diesel only after the current last entry is submitted (and under max 6).
+  const canAddDieselRow = !readOnly && rowIndices.length < 6 && isLastRowSubmitted;
   const visibleRows = readOnly
     ? rowIndices.filter((num) => sheetData[`dieselSubmitted${num}`])
     : rowIndices;
@@ -832,12 +893,19 @@ export default function DieselExpensesTable({
             <button
               type="button"
               onClick={handleAddRow}
-              disabled={!isLastRowSubmitted || rowIndices.length >= 6}
+              disabled={!canAddDieselRow}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold rounded-lg shadow-sm transition-all shrink-0 ${
-                isLastRowSubmitted && rowIndices.length < 6
+                canAddDieselRow
                   ? "bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 cursor-pointer"
                   : "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
               }`}
+              title={
+                canAddDieselRow
+                  ? t("ops.trip.add_diesel_entry")
+                  : rowIndices.length >= 6
+                    ? t("ops.trip.max_6_diesel")
+                    : t("ops.trip.submit_diesel_first")
+              }
             >
               <Plus size={14} />
               <span>{t("ops.trip.add_diesel_entry")}</span>
@@ -1086,11 +1154,11 @@ export default function DieselExpensesTable({
                     </div>
                   </td>
 
-                  {/* Bill — compact text; portal tooltip so first rows never clip */}
-                  <td className="py-2 px-1 text-center align-middle overflow-visible">
+                  {/* Bill — always offer Upload when editable; auto-edit if row was submitted */}
+                  <td className="py-2 px-1.5 text-center align-middle overflow-visible">
                     <input
                       type="file"
-                      accept="image/*"
+                      accept="image/jpeg,image/jpg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
                       className="hidden"
                       ref={(el) => {
                         fileInputRefs.current[num] = el;
@@ -1098,31 +1166,49 @@ export default function DieselExpensesTable({
                       onChange={(e) => handleImageUpload(num, e)}
                     />
                     {hasRealBill(imageVal) ? (
-                      <div className="inline-flex flex-col items-center justify-center gap-0.5">
+                      <div className="inline-flex flex-col items-center justify-center gap-1 min-w-0">
                         <BillPreviewLink href={String(imageVal)} fileName={String(imageNameVal)} />
-                        {!locked && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              if (isEditingThisRow) {
-                                setDraftField(`dieselImage${num}`, "");
-                                setDraftField(`dieselImageName${num}`, "");
-                              } else {
-                                applyBatchUpdates({ [`dieselImage${num}`]: "", [`dieselImageName${num}`]: "" });
-                              }
-                            }}
-                            className="text-[9px] font-medium text-slate-400 hover:text-red-600 leading-none"
-                            title={t("common.delete")}
-                          >
-                            {t("common.remove")}
-                          </button>
+                        {!readOnly && (
+                          <div className="flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => openBillPicker(num)}
+                              className="text-[10px] font-semibold text-emerald-700 hover:underline"
+                              title={t("ops.trip.upload_bill")}
+                            >
+                              {t("ops.trip.choose_image")}
+                            </button>
+                            {(isEditingThisRow || !isSubmitted) && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (isEditingThisRow) {
+                                    setDraftField(`dieselImage${num}`, "");
+                                    setDraftField(`dieselImageName${num}`, "");
+                                  } else {
+                                    applyBatchUpdates({
+                                      [`dieselImage${num}`]: "",
+                                      [`dieselImageName${num}`]: "",
+                                    });
+                                    handleChange(`dieselImage${num}`, "");
+                                    handleChange(`dieselImageName${num}`, "");
+                                  }
+                                }}
+                                className="text-[10px] font-medium text-slate-400 hover:text-red-600"
+                                title={t("common.delete")}
+                              >
+                                {t("common.remove")}
+                              </button>
+                            )}
+                          </div>
                         )}
                       </div>
-                    ) : !locked ? (
+                    ) : !readOnly ? (
                       <button
                         type="button"
-                        onClick={() => fileInputRefs.current[num]?.click()}
-                        className="text-[11px] font-semibold text-slate-600 hover:text-emerald-700 underline decoration-slate-300 hover:decoration-emerald-500 underline-offset-2 whitespace-nowrap px-0.5 py-0.5"
+                        onClick={() => openBillPicker(num)}
+                        className="inline-flex items-center justify-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 text-[11px] font-bold text-emerald-800 shadow-sm active:scale-[0.98] whitespace-nowrap"
+                        title={t("ops.trip.upload_bill")}
                       >
                         {t("ops.trip.upload_bill")}
                       </button>
