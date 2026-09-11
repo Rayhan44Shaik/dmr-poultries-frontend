@@ -121,10 +121,13 @@ function RangeDatePicker({
 
       {isOpen && (
         <div
-          className={`absolute right-0 z-50 w-[min(30rem,calc(100vw-2rem))] rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-xl shadow-slate-900/5 backdrop-blur-xl border-t-blue-500 border-t-2 ${dropdownPositionClass}`}
+          className={`absolute right-0 z-50 w-[min(24rem,calc(100vw-2rem))] rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-xl shadow-slate-900/5 backdrop-blur-xl border-t-blue-500 border-t-2 ${dropdownPositionClass}`}
         >
           <div className="space-y-4">
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            {/* Stacked full-width fields: the shared DatePicker reserves right
+                space for its clear/calendar icons, so two narrow columns clip
+                the DD/MM/YYYY value. */}
+            <div className="grid grid-cols-1 gap-3.5">
               <div>
                 <label className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
                   {t("ops.dashboard.start_date")}
@@ -151,7 +154,7 @@ function RangeDatePicker({
               </div>
             </div>
 
-            <div className="flex flex-col gap-2 border-t border-slate-100 pt-4 sm:flex-row sm:justify-end">
+            <div className="flex justify-end gap-2 whitespace-nowrap border-t border-slate-100 pt-4">
               <button
                 type="button"
                 onClick={() => {
@@ -161,7 +164,7 @@ function RangeDatePicker({
                   onRangeChange(weekAgo, today);
                   setIsOpen(false);
                 }}
-                className="rounded-lg bg-blue-50 px-5 py-2.5 text-[13px] font-bold text-blue-700 transition-colors hover:bg-blue-100"
+                className="rounded-lg bg-blue-50 px-4 py-2 text-[13px] font-bold text-blue-700 transition-colors hover:bg-blue-100"
               >
                 {t("ops.dashboard.last_7_days")}
               </button>
@@ -174,7 +177,7 @@ function RangeDatePicker({
                   onRangeChange(monthAgo, today);
                   setIsOpen(false);
                 }}
-                className="rounded-lg bg-slate-50 px-5 py-2.5 text-[13px] font-bold text-slate-700 transition-colors hover:bg-slate-100"
+                className="rounded-lg bg-slate-50 px-4 py-2 text-[13px] font-bold text-slate-700 transition-colors hover:bg-slate-100"
               >
                 {t("ops.dashboard.last_30_days")}
               </button>
