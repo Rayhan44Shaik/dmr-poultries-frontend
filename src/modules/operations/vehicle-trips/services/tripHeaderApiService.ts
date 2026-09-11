@@ -796,11 +796,14 @@ export async function fetchLastClosingMeter(
 export async function changeTripStatus(
   id: number,
   status: TripStatus,
-  approvedBy?: string
+  approvedBy?: string,
+  reason?: string
 ): Promise<Trip> {
   const { data } = await apiPatch<ApiTripRecord>(`${TRIPS_PATH}/${id}/status`, {
     status,
     approvedBy,
+    // Approval Center "send back to Draft" (Pending → Draft) records why.
+    ...(reason ? { reason } : {}),
   });
   return mapApiTripToTrip(data);
 }

@@ -25,8 +25,15 @@ const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
   const [selectKey, setSelectKey] = useState(0);
   const [, setSelectedId] = useState<string | null>(null);
   
-  // Updated view mode to support Pending, Approved, and Deleted
-  const [viewMode, setViewMode] = useState<ViewMode>('pending');
+  // Updated view mode to support Pending, Approved, and Deleted.
+  // Deep links (e.g. the dashboard "Maintenance" tile ?view=pending) land on
+  // the exact view they promise.
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    const requested = new URLSearchParams(window.location.search).get('view');
+    return requested === 'approved' || requested === 'deleted' || requested === 'pending'
+      ? requested
+      : 'pending';
+  });
 
   // --- Approval Dialog State ---
   const [approveDialog, setApproveDialog] = useState<{

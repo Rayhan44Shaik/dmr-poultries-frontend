@@ -1,6 +1,7 @@
 import React, { Suspense } from "react";
 import { Routes, Route } from "react-router-dom";
 import { useI18n } from "../i18n";
+import { lazyWithRetry } from "./lazyWithRetry";
 
 // Auth — eager: the "/" route must paint as fast as possible.
 import LoginPage from "../modules/auth/LoginPage";
@@ -38,21 +39,21 @@ function lazyShell(page: () => Promise<PageModule>) {
 
 // Lazy components are created once at module level (stable identity).
 const pages = {
-  dashboard: React.lazy(lazyShell(() => import("../modules/operations/dashboard/pages/OperationsDashboardPage"))),
-  masters: React.lazy(lazyShell(() => import("../modules/masters/pages/MastersPage"))),
-  mastersShops: React.lazy(lazyShell(() => import("../modules/masters/shops/pages/ShopsPage"))),
-  mastersFarms: React.lazy(lazyShell(() => import("../modules/masters/farms/pages/FarmsPage"))),
-  mastersVehicles: React.lazy(lazyShell(() => import("../modules/masters/vehicles/pages/VehiclesPage"))),
-  mastersEmployees: React.lazy(lazyShell(() => import("../modules/masters/employees/pages/EmployeesPage"))),
-  mastersBanks: React.lazy(lazyShell(() => import("../modules/masters/banks/pages/BanksPage"))),
-  mastersBirdTypes: React.lazy(lazyShell(() => import("../modules/masters/bird-types/pages/BirdTypesPage"))),
-  operations: React.lazy(lazyShell(() => import("../modules/operations/pages/OperationsPages"))),
-  accounts: React.lazy(lazyShell(() => import("../modules/accounts/pages/AccountsPage"))),
-  fleet: React.lazy(lazyShell(() => import("../modules/fleet-operations/pages/FleetPages"))),
-  staff: React.lazy(lazyShell(() => import("../modules/staff/pages/StaffPages"))),
-  reports: React.lazy(lazyShell(() => import("../modules/reports/pages/ReportsDashboardPage"))),
-  settings: React.lazy(lazyShell(() => import("../modules/settings/pages/SettingsPage"))),
-  supervisorMobile: React.lazy(() => import("../modules/supervisor-mobile/pages/SupervisorMobilePage")),
+  dashboard: lazyWithRetry(lazyShell(() => import("../modules/operations/dashboard/pages/OperationsDashboardPage"))),
+  masters: lazyWithRetry(lazyShell(() => import("../modules/masters/pages/MastersPage"))),
+  mastersShops: lazyWithRetry(lazyShell(() => import("../modules/masters/shops/pages/ShopsPage"))),
+  mastersFarms: lazyWithRetry(lazyShell(() => import("../modules/masters/farms/pages/FarmsPage"))),
+  mastersVehicles: lazyWithRetry(lazyShell(() => import("../modules/masters/vehicles/pages/VehiclesPage"))),
+  mastersEmployees: lazyWithRetry(lazyShell(() => import("../modules/masters/employees/pages/EmployeesPage"))),
+  mastersBanks: lazyWithRetry(lazyShell(() => import("../modules/masters/banks/pages/BanksPage"))),
+  mastersBirdTypes: lazyWithRetry(lazyShell(() => import("../modules/masters/bird-types/pages/BirdTypesPage"))),
+  operations: lazyWithRetry(lazyShell(() => import("../modules/operations/pages/OperationsPages"))),
+  accounts: lazyWithRetry(lazyShell(() => import("../modules/accounts/pages/AccountsPage"))),
+  fleet: lazyWithRetry(lazyShell(() => import("../modules/fleet-operations/pages/FleetPages"))),
+  staff: lazyWithRetry(lazyShell(() => import("../modules/staff/pages/StaffPages"))),
+  reports: lazyWithRetry(lazyShell(() => import("../modules/reports/pages/ReportsDashboardPage"))),
+  settings: lazyWithRetry(lazyShell(() => import("../modules/settings/pages/SettingsPage"))),
+  supervisorMobile: lazyWithRetry(() => import("../modules/supervisor-mobile/pages/SupervisorMobilePage")),
 };
 
 function PageLoading() {

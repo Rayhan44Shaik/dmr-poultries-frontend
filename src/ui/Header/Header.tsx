@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import type { LucideIcon } from "lucide-react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import {
+  Banknote,
   Bell,
   Check,
   ChevronDown,
@@ -19,12 +20,14 @@ import {
   Menu,
   Moon,
   Plus,
+  ReceiptText,
   Search,
   Settings,
   ShieldAlert,
   Sun,
   Truck,
   UserRound,
+  Wrench,
 } from "lucide-react";
 import { QUICK_ACTIONS, resolveRoute } from "../../routes/navigation";
 import { useTheme } from "../../providers/ThemeProvider";
@@ -32,6 +35,8 @@ import { useAuth } from "../../providers/authContext";
 import { useI18n } from "../../i18n";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { getPendingCollectionSnapshot, subscribePendingCollectionSnapshot } from "../../modules/operations/collections/services/collectionSnapshot";
+import { usePendingApprovals } from "../../modules/approvals/hooks/usePendingApprovals";
+import { startApprovalPolling } from "../../modules/approvals/services/approvalSnapshot";
 import { tripService } from "../../modules/operations/vehicle-trips/services/tripService";
 import { getDocuments } from "../../modules/fleet-operations/services/storage";
 import { getCurrentUser } from "../../modules/settings/services";
@@ -165,6 +170,10 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
   // Reading the header must not initialize unrelated collection/sales APIs.
   // Cache updates stay reactive; download alerts only when explicitly opened.
   const pendingCollections = useSyncExternalStore(subscribePendingCollectionSnapshot, getPendingCollectionSnapshot, getPendingCollectionSnapshot);
+  const pendingApprovals = usePendingApprovals();
+
+  // Single app-wide poller for pending approval counts (bell + sidebar badges).
+  useEffect(() => startApprovalPolling(), []);
   const [notificationPhase, setNotificationPhase] = useState<'idle' | 'loading' | 'error'>('idle');
   const notificationRead = useRef(false);
   const notificationMounted = useRef(false);
@@ -262,6 +271,69 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.key, language, pendingCollections]);
 
+  /* ----- Pending-approval notifications (trips · bills · rates · payments) ----- */
+  const approvalNotifications = useMemo<NotificationItem[]>(() => {
+    if (!pendingApprovals.loaded) return [];
+    const now = formatRelativeTime(new Date());
+    const items: NotificationItem[] = [];
+    const q = pendingApprovals;
+    if (q.trips.count > 0) {
+      items.push({
+        id: "approval-trips",
+        icon: Truck,
+        tone: "warning",
+        title: `${q.trips.count} trip${q.trips.count === 1 ? "" : "s"} waiting for approval`,
+        description: `${q.trips.items.map((i) => i.ref).slice(0, 2).join(", ")}${q.trips.count > 2 ? " …" : ""} · ${q.trips.birds.toLocaleString("en-IN")} birds`,
+        time: now,
+        path: "/operations?tab=trip-entry&status=Pending",
+      });
+    }
+    if (q.maintenance.count > 0) {
+      items.push({
+        id: "approval-maintenance",
+        icon: Wrench,
+        tone: "warning",
+        title: `${q.maintenance.count} maintenance bill${q.maintenance.count === 1 ? "" : "s"} to verify`,
+        description: `Bill rates pending · ${formatINR(q.maintenance.value)} · ${q.maintenance.items.map((i) => i.ref).slice(0, 2).join(", ")}${q.maintenance.count > 2 ? " …" : ""}`,
+        time: now,
+        path: "/fleet?tab=entry",
+      });
+    }
+    if (q.rateEntries.count > 0) {
+      items.push({
+        id: "approval-rates",
+        icon: ReceiptText,
+        tone: "info",
+        title: `${q.rateEntries.count} completed trip${q.rateEntries.count === 1 ? "" : "s"} need rate entry`,
+        description: q.rateEntries.items.map((i) => i.ref).slice(0, 2).join(", ") + (q.rateEntries.count > 2 ? " …" : ""),
+        time: now,
+        path: "/operations?tab=rate-entry",
+      });
+    }
+    if (q.payments.count > 0) {
+      items.push({
+        id: "approval-payments",
+        icon: Banknote,
+        tone: "warning",
+        title: `${q.payments.count} payment${q.payments.count === 1 ? "" : "s"} to approve`,
+        description: `${formatINR(q.payments.value)} awaiting sign-off · ${q.payments.items.map((i) => i.sub).slice(0, 2).join(", ")}${q.payments.count > 2 ? " …" : ""}`,
+        time: now,
+        path: "/accounts?tab=paid-payments",
+      });
+    }
+    return items;
+  }, [pendingApprovals]);
+
+  // Approval alerts lead the bell; operational alerts follow.
+  const allNotifications = useMemo(
+    () => [...approvalNotifications, ...notifications],
+    [approvalNotifications, notifications]
+  );
+  // Bell badge counts every waiting record (not just the grouped rows).
+  const notificationBadge = pendingApprovals.loaded
+    ? pendingApprovals.total + notifications.length
+    : notifications.length;
+
   const title = route.page?.labelKey ? t(route.page.labelKey) : (route.page?.label ?? route.section?.label ?? "");
   const sectionLabel = route.section?.labelKey ? t(route.section.labelKey) : route.section?.label;
 
@@ -333,7 +405,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
       <Dropdown
         width="w-[360px] max-w-[calc(100vw-2rem)]"
         trigger={(open, toggle) => (
-          <IconButton label={t("header.notifications")} onClick={() => { toggle(); if (!open) loadCollectionNotifications(); }} badge={notifications.length}>
+          <IconButton label={t("header.notifications")} onClick={() => { toggle(); if (!open) loadCollectionNotifications(); }} badge={notificationBadge}>
             <Bell size={18} />
           </IconButton>
         )}
@@ -343,7 +415,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
             <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3 dark:border-slate-700">
               <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{t("header.notifications")}</p>
               <span className="rounded-full bg-brand-50 px-2 py-0.5 text-[11px] font-semibold text-brand-700 dark:bg-brand-500/15 dark:text-brand-300">
-                {notifications.length} {t("header.new")}
+                {notificationBadge} {t("header.new")}
               </span>
             </div>
             <div className="max-h-[320px] overflow-y-auto">
@@ -356,7 +428,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
                   <button type="button" onClick={loadCollectionNotifications} className="mt-2 rounded-lg px-3 py-1.5 font-semibold text-brand-700 hover:bg-brand-50">{t("common.retry")}</button>
                 </div>
               )}
-              {notifications.length === 0 ? (pendingCollections.loaded ? (
+              {allNotifications.length === 0 ? (pendingCollections.loaded ? (
                 <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
                   <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400 dark:bg-slate-700">
                     <Check size={18} />
@@ -365,7 +437,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
                   <p className="text-xs text-slate-400">{t("header.noNotificationsDesc")}</p>
                 </div>
               ) : null) : (
-                notifications.map((n) => {
+                allNotifications.map((n) => {
                   const Icon = n.icon;
                   return (
                   <Link
