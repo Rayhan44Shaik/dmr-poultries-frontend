@@ -313,7 +313,7 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
           <MasterDropdown label="Payment Mode" hideLabel className="min-w-0 flex-1 sm:flex-none sm:w-52 [&>button]:h-11 [&>button]:text-sm" value={filters.mode} options={modes} placeholder="All payment modes" onChange={v => changeFilter('mode', v)} searchable allowClear />
         </div>
         <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2">
-          <SearchInput value={filters.search} onChange={v => changeFilter('search', v)} aria-label="Search payments" placeholder="Payment no, payee, reference…" wrapperClassName="w-full sm:flex-1 sm:min-w-56" />
+          <SearchInput value={filters.search} onChange={v => changeFilter('search', v)} onSearch={() => applyFilters()} aria-label="Search payments" placeholder="Payment no, payee, reference…" wrapperClassName="w-full sm:flex-1 sm:min-w-56" />
           <div className="flex w-full items-center justify-end gap-1.5 sm:w-auto">
             <Button size="lg" icon={<Search size={16} className={`transition-transform duration-300 hover:-translate-y-1 ${filterAction === 'search' ? 'animate-[bounce_0.6s_ease-in-out_1]' : ''}`} />} onClick={applyFilters} disabled={invalidRange}>Search</Button>
             <Button variant="secondary" size="lg" icon={<RotateCcw size={15} className={`transition-transform duration-500 hover:rotate-180 ${filterAction === 'clear' ? 'animate-[spin_0.6s_ease-in-out_1]' : ''}`} />} aria-label="Clear filters" title="Clear filters" onClick={clearFilters}>Clear</Button>
