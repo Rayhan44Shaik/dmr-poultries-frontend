@@ -273,10 +273,9 @@ function OperationsDashboardPage() {
 
   return (
     <div className="min-w-0 space-y-5">
-      <ApprovalCalendar startDate={startDate} endDate={endDate} />
-
-      {/* Date Range Selector Bar */}
-      <div className="flex flex-wrap justify-end items-center gap-2">
+      {/* Calendar and approval summary stay together on one simple line. */}
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 rounded-xl border border-slate-200/80 bg-white px-3 py-2 shadow-sm">
+        <ApprovalCalendar startDate={startDate} endDate={endDate} />
         <RangeDatePicker
           startDate={startDate}
           endDate={endDate}

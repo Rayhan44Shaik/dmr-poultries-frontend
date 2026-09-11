@@ -106,47 +106,22 @@ export default function ApprovalCalendar({ startDate, endDate }: ApprovalCalenda
   const total = items.reduce((sum, item) => sum + item.count, 0);
 
   return (
-    <section className="rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm" aria-label="Approval calendar">
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex items-center gap-2">
-          <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-slate-900 text-white">
-            <CalendarDays size={16} />
-          </span>
-          <div>
-            <h2 className="text-sm font-black text-slate-800">Approval calendar</h2>
-            <p className="text-[11px] font-medium text-slate-400">
-              {startDate && endDate
-                ? `Synced to ${startDate.toLocaleDateString("en-IN", { day: "2-digit", month: "short" })} – ${endDate.toLocaleDateString("en-IN", { day: "2-digit", month: "short" })}`
-                : "Synced to selected dashboard range"}
-            </p>
-          </div>
-        </div>
-        <span className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${total ? "bg-rose-50 text-rose-700" : "bg-emerald-50 text-emerald-700"}`}>
-          {total} pending
-        </span>
-      </div>
-
-      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 xl:grid-cols-4">
-        {items.map((item) => {
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.label}
-              to={item.href}
-              className={`group flex min-w-0 items-center gap-3 rounded-xl border p-3 transition hover:-translate-y-0.5 hover:shadow-sm ${item.tone}`}
-            >
-              <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-white/80">
-                <Icon size={17} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-xs font-bold">{item.label}</span>
-                <span className="mt-0.5 block truncate text-[10px] font-medium opacity-70">{item.hint}</span>
-              </span>
-              <span className="text-xl font-black tabular-nums">{item.count}</span>
+    <div className="flex min-w-0 flex-1 items-center gap-2 text-xs text-slate-500" aria-label="Approval summary">
+      <CalendarDays size={15} className="shrink-0 text-slate-400" />
+      <span className="shrink-0 font-semibold text-slate-600">Needs attention:</span>
+      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+        {items.map((item, index) => (
+          <span key={item.label} className="whitespace-nowrap">
+            {index > 0 && <span className="mr-3 text-slate-300">•</span>}
+            <Link to={item.href} className="font-bold text-slate-700 hover:text-blue-600 hover:underline">
+              {item.count} {item.label.toLowerCase()}
             </Link>
-          );
-        })}
+          </span>
+        ))}
       </div>
-    </section>
+      <span className={`ml-auto hidden shrink-0 font-bold sm:inline ${total ? "text-amber-600" : "text-emerald-600"}`}>
+        {total ? `${total} pending` : "All clear"}
+      </span>
+    </div>
   );
 }
