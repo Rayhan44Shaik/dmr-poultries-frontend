@@ -573,6 +573,8 @@ export default {
   'ops.trip.row_submitted': 'వరుస సమర్పించాం.',
   'ops.trip.save_and_new': 'సేవ్ చేసి కొత్తది',
   'ops.trip.save_progress': 'పురోగతి సేవ్',
+  'ops.trip.wizard_steps': 'ట్రిప్ స్టెప్‌లు',
+  'ops.trip.step_actions': 'స్టెప్ చర్యలు',
   'ops.trip.save_trip': 'ట్రిప్ సేవ్ చేయండి',
   'ops.trip.search_box_number': 'బాక్స్ నంబర్ వెతకండి…',
   'ops.trip.search_driver': 'డ్రైవర్ వెతకండి…',

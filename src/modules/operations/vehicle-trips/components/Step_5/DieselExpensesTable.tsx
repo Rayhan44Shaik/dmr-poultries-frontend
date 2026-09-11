@@ -53,7 +53,7 @@ function hasRealBill(image: unknown) {
   if (typeof image !== "string") return false;
   const s = image.trim();
   if (!s || /^(bill|key|true|yes)$/i.test(s)) return false;
-  // data: URLs (JPEG/PNG/SVG) or long base64 — sample SVG bills are ~2–4KB
+  // data: URLs (JPEG/PNG/SVG) or long base64 bill images
   if (s.startsWith("data:image") || s.startsWith("blob:") || s.startsWith("http")) return true;
   return s.length >= 40;
 }
@@ -118,7 +118,7 @@ export default function DieselExpensesTable({
   const fallbackDateStr = `${yyyy}${mm}${dd}`;
 
   /** Keep visible rows in sync when parent hydrates dieselEntries → sheet slots
-   *  (sample bills / resume). No upper limit on how many diesel bills. */
+   *  (API dieselEntries / resume). No upper limit on how many diesel bills. */
   useEffect(() => {
     const slots = collectDieselSlotIndices(sheetData as Record<string, unknown>);
     const activeFromSheet = slots.filter((i) =>

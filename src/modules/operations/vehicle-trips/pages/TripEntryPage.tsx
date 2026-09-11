@@ -377,9 +377,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     clearForm();
   }, [clearForm]);
 
-  /** @deprecated alias — older step props still call discard; maps to exit edit. */
-  const discardStepChanges = exitEditToLocked;
-
   const createNewTrip = useCallback(() => {
     const urlTripId = Number(new URLSearchParams(location.search).get("tripId"));
     if (Number.isFinite(urlTripId) && urlTripId > 0) {
@@ -672,8 +669,9 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
               </p>
             </div>
             <button
+              type="button"
               onClick={createNewTrip}
-              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-400 to-indigo-400 hover:from-blue-500 hover:to-indigo-500 px-8 py-3 text-sm font-bold text-white shadow-md shadow-blue-100 transition-all active:scale-95"
+              className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-400 to-indigo-400 hover:from-blue-500 hover:to-indigo-500 px-8 py-3 text-sm font-bold text-white shadow-md shadow-blue-100 transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/40 focus-visible:ring-offset-2"
             >
               <Plus size={18} />
               {t("ops.trip.create_new_trip")}

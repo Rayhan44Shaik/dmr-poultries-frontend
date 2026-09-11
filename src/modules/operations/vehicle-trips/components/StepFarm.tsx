@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { Clock, MapPin, Gauge, Store, Ticket, MessageSquare, Loader2, Scale, Pencil, Layers } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { StepCloseButton, WizardActionBar, WizardStepNotice } from "./WizardStepUI";
@@ -52,11 +52,13 @@ export default function StepFarm({
   canEdit = false,
   onCancel,
   onExitEdit,
-  clearForm,
+  clearForm: _clearForm,
   showNotification,
 }: Props) {
   const { t } = useI18n();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  /** Same-tick double-submit guard (React state lags one frame). */
+  const submitLockRef = useRef(false);
   const [isLocalEditing, setIsLocalEditing] = useState(Boolean(editable));
   useEffect(() => {
     if (editable) setIsLocalEditing(true);
@@ -165,6 +167,7 @@ export default function StepFarm({
   };
 
   const handleSubmit = async () => {
+    if (submitLockRef.current || isSubmitting) return;
     const validation = validateFarmStep(trip);
     if (!validation.valid) {
       notify(translateValidationMessage(t, validation.errors[0]), "warning");
@@ -175,6 +178,7 @@ export default function StepFarm({
       return;
     }
 
+    submitLockRef.current = true;
     setIsSubmitting(true);
     try {
       const success = await submitFarmStep({});
@@ -185,17 +189,20 @@ export default function StepFarm({
         notify(t("ops.trip.submission_failed"), "error");
       }
     } finally {
+      submitLockRef.current = false;
       setIsSubmitting(false);
     }
   };
 
   const handleSaveProgress = async () => {
-    if (!saveFarmProgress) return;
+    if (!saveFarmProgress || submitLockRef.current || isSubmitting) return;
+    submitLockRef.current = true;
     setIsSubmitting(true);
     try {
       const success = await saveFarmProgress({});
       if (success) notify(t("ops.trip.progress_saved"), "success");
     } finally {
+      submitLockRef.current = false;
       setIsSubmitting(false);
     }
   };

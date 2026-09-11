@@ -54,7 +54,10 @@ export default function TripWizardStepper({
   const stepStatus = resolveStepperCompletion(completedMask);
 
   return (
-    <div className="flex items-center gap-1 md:gap-1.5 overflow-x-auto scrollbar-none py-1.5 px-1 select-none">
+    <nav
+      className="flex items-center gap-1 md:gap-1.5 overflow-x-auto scrollbar-none py-1.5 px-1 select-none"
+      aria-label={t("ops.trip.wizard_steps")}
+    >
       {steps.map((label, index) => {
         const stepKey = TRIP_STEP_KEYS[index] ?? String(index);
         const stepLabel = t(`ops.trip.step.${stepKey}`);
@@ -143,6 +146,7 @@ export default function TripWizardStepper({
                   onStepClick?.(index);
                 }}
                 disabled={!isLocked && !onStepClick}
+                aria-disabled={isLocked || undefined}
                 className={pillClasses}
                 aria-current={isActive ? "step" : undefined}
                 aria-label={t("ops.trip.step_aria", { step: index + 1, label: stepLabel }) + (isLocked ? ` (${t("ops.trip.locked")})` : "")}
@@ -162,6 +166,6 @@ export default function TripWizardStepper({
           </Fragment>
         );
       })}
-    </div>
+    </nav>
   );
 }

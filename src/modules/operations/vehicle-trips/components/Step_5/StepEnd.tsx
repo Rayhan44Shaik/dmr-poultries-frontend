@@ -110,6 +110,8 @@ export default function StepEnd({
   const { t } = useI18n();
   // ─── State ─────────────────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false);
+  /** Same-tick double-submit guard for final expenses submit. */
+  const submitLockRef = useRef(false);
   // Parent `editable` (Recent Edit / step edit) opens the form immediately.
   const [isLocalEditing, setIsLocalEditing] = useState(Boolean(editable));
   useEffect(() => {
@@ -166,7 +168,7 @@ export default function StepEnd({
       }
     });
     // Hydrate dieselEntries[] → dieselLtr1 / dieselRate1 / … so the diesel
-    // table shows sample fuel bills (incl. bill image) without a prior submit.
+    // table shows fuel bills from dieselEntries (incl. bill image) when present.
     const entries = Array.isArray(tripData.dieselEntries) ? tripData.dieselEntries : [];
     entries.forEach((entry, idx) => {
       // Unlimited diesel bills — use entry.rowIndex as-is (1-based).
@@ -452,6 +454,8 @@ export default function StepEnd({
   // the trip to Pending. Works before Step 4 (Part H unchanged).
   const canDurable = trip.id > 0 && Boolean(trip.startStepSubmitted);
   const handleSaveProgress = async () => {
+    if (submitLockRef.current || isSubmitting) return;
+    submitLockRef.current = true;
     setIsSubmitting(true);
     try {
       const canonical = prepareFinalPayload(false);
@@ -479,12 +483,14 @@ export default function StepEnd({
         if (success) savedSheetRef.current = JSON.stringify(sheetData);
       }
     } finally {
+      submitLockRef.current = false;
       setIsSubmitting(false);
     }
   };
 
   // ─── Initiate submit ──────────────────────────────────────────────
   const handleInitiateSubmit = () => {
+    if (submitLockRef.current || isSubmitting) return;
     // Part K: final Submit needs the server. Offline, keep every entered value
     // locally, keep the trip's existing authoritative status, and do NOT set
     // Pending / endStepSubmitted / expensesStepSubmitted / submittedAt.
@@ -510,14 +516,11 @@ export default function StepEnd({
       }
     });
     let requiredMinMeter = openingMeter;
-    let requiredMinLabel = t("ops.trip.start_meter_label", { meter: openingMeter });
     if (actualDestMeter > requiredMinMeter) {
       requiredMinMeter = actualDestMeter;
-      requiredMinLabel = t("ops.trip.dest_meter_label", { meter: actualDestMeter });
     }
     if (highestDieselMeter > requiredMinMeter) {
       requiredMinMeter = highestDieselMeter;
-      requiredMinLabel = t("ops.trip.diesel_entry_label", { meter: highestDieselMeter });
     }
     if (requiredMinMeter > 0 && endMeterNum <= requiredMinMeter) {
       setErrorMsg(t("ops.trip.meter_must_greater_than", { meter: requiredMinMeter }));
@@ -583,6 +586,8 @@ export default function StepEnd({
   };
 
   const executeSubmit = async () => {
+    if (submitLockRef.current || isSubmitting) return;
+    submitLockRef.current = true;
     setIsSubmitting(true);
     setErrorMsg("");
     try {
@@ -611,11 +616,11 @@ export default function StepEnd({
         setErrorMsg(t("ops.trip.failed_save_step"));
       }
     } catch (err: any) {
-      console.error("Submit error:", err);
       // Server-authoritative failure: keep every entered value in the durable
       // draft, keep the trip's existing status, show a retryable message.
       setErrorMsg(err?.message || t("ops.trip.failed_save_step"));
     } finally {
+      submitLockRef.current = false;
       setIsSubmitting(false);
     }
   };

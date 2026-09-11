@@ -153,6 +153,8 @@ export default function StepPickup({
 }: Props) {
   const { t } = useI18n();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  /** Same-tick double-submit guard. */
+  const submitLockRef = useRef(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isLocalEditing, setIsLocalEditing] = useState(Boolean(editable));
   useEffect(() => {
@@ -510,6 +512,8 @@ export default function StepPickup({
       onConfirm: () => {
         setConfirmation((prev) => ({ ...prev, isOpen: false }));
         void (async () => {
+          if (submitLockRef.current || isSubmitting) return;
+          submitLockRef.current = true;
           setIsSubmitting(true);
           try {
             const success = await submitPickupStep({
@@ -523,6 +527,7 @@ export default function StepPickup({
               setToast({ message: t("ops.trip.failed_submit_pickup"), type: "error" });
             }
           } finally {
+            submitLockRef.current = false;
             setIsSubmitting(false);
           }
         })();

@@ -32,7 +32,7 @@ export default function GeneralExpensesTable({
   averageKmLtr: _averageKmLtr,
   openingMeter,
   destMeter,
-  trip,
+  trip: _trip,
   readOnly = false,
   onMeterNotice,
 }: GeneralExpensesTableProps) {

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import TripFilters from "../components/TripFilters";
 import TripKPICards from "../components/TripKPICards";
 import TripMasterTable from "../components/TripMasterTable";
@@ -30,7 +30,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalTrips, setTotalTrips] = useState(0);
-  const [isLoading, setIsLoading] = useState(false);
+  const [, setIsLoading] = useState(false);
   const [search, setSearch] = useState("");
   const [vehicle, setVehicle] = useState("All Vehicles");
   const [supervisor, setSupervisor] = useState("All Supervisors");
@@ -77,25 +77,6 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     setCurrentPage(1);
   };
 
-  const filteredTrips = useMemo(() => {
-    const text = search.toLowerCase();
-    return trips.filter((trip) => {
-      const searchMatched =
-        text === "" ||
-        trip.tripNo.toLowerCase().includes(text) ||
-        trip.vehicleNo.toLowerCase().includes(text) ||
-        trip.driverName.toLowerCase().includes(text) ||
-        trip.supervisorName.toLowerCase().includes(text) ||
-        trip.sourceFarm.toLowerCase().includes(text);
-      const vehicleMatched = vehicle === "All Vehicles" || trip.vehicleNo === vehicle;
-      const supervisorMatched =
-        supervisor === "All Supervisors" || trip.supervisorName === supervisor;
-      const farmMatched = farm === "All Sources" || trip.sourceFarm === farm;
-      const fromMatched = !fromDate || trip.tripDate >= fromDate;
-      const toMatched = !toDate || trip.tripDate <= toDate;
-      return searchMatched && vehicleMatched && supervisorMatched && farmMatched && fromMatched && toMatched;
-    });
-  }, [trips, search, vehicle, supervisor, farm, fromDate, toDate]);
 
   const [viewOpen, setViewOpen] = useState(false);
   const [selectedRowId, setSelectedRowId] = useState<number | null>(null);

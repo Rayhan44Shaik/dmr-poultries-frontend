@@ -579,6 +579,8 @@ export default {
   'ops.trip.row_submitted': 'Row submitted.',
   'ops.trip.save_and_new': 'Save & New',
   'ops.trip.save_progress': 'Save Progress',
+  'ops.trip.wizard_steps': 'Trip steps',
+  'ops.trip.step_actions': 'Step actions',
   'ops.trip.save_trip': 'Save Trip',
   'ops.trip.search_box_number': 'Search box number…',
   'ops.trip.search_driver': 'Search driver…',

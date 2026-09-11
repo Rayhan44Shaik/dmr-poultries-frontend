@@ -1,9 +1,8 @@
 // src/modules/operations/vehicle-trips/utils/generateShopPDF.ts
 // (Referenced helper or included components as part of UnLoadingTable module)
 
-import { useRef } from "react";
 // src/modules/operations/vehicle-trips/components/Step_4/UnLoadingTable.tsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { 
   Plus, Clock, Building2, Users, Scale, AlertCircle, Search, X, 
   AlertTriangle, FileText, Box
@@ -338,6 +337,7 @@ export default function UnLoadingTable({
   // ─── Saving & Toast State ─────────────────────────────────────────
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitLockRef = useRef(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" | "info" } | null>(null);
   const hasUnsavedChanges = JSON.stringify(safeRows) !== JSON.stringify(persistedRows ?? []);
 
@@ -499,7 +499,7 @@ export default function UnLoadingTable({
 
   // ─── Manual Save Progress Handler ──────────────────────────────
   const handleSaveProgress = async () => {
-    if (readOnly || !saveDeliveries) return;
+    if (readOnly || !saveDeliveries || isSaving) return;
     setIsSaving(true);
     try {
       const success = await saveDeliveries();
@@ -538,7 +538,8 @@ export default function UnLoadingTable({
         onConfirm: () => {
           setConfirmation((prev) => ({ ...prev, isOpen: false }));
           void (async () => {
-            if (isSubmitting) return;
+            if (submitLockRef.current || isSubmitting) return;
+            submitLockRef.current = true;
             setIsSubmitting(true);
             try {
               let success = true;
@@ -556,6 +557,7 @@ export default function UnLoadingTable({
                 setToast({ message: t("ops.trip.failed_submit_delivery"), type: "error" });
               }
             } finally {
+              submitLockRef.current = false;
               setIsSubmitting(false);
             }
           })();
@@ -573,7 +575,8 @@ export default function UnLoadingTable({
         onConfirm: () => {
           setConfirmation((prev) => ({ ...prev, isOpen: false }));
           void (async () => {
-            if (isSubmitting) return;
+            if (submitLockRef.current || isSubmitting) return;
+            submitLockRef.current = true;
             setIsSubmitting(true);
             try {
               const success = submitDeliveries ? (await submitDeliveries()) !== false : false;
@@ -583,6 +586,7 @@ export default function UnLoadingTable({
                 if (showForm) closeForm();
               }
             } finally {
+              submitLockRef.current = false;
               setIsSubmitting(false);
             }
           })();

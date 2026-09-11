@@ -94,26 +94,32 @@ export function WizardActionBar({
   const base =
     "group w-full sm:w-auto h-10 px-5 rounded-xl text-[13px] font-semibold transition-all duration-200 ease-out active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-50 inline-flex items-center justify-center gap-2 shrink-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400/30 focus-visible:ring-offset-1";
   return (
-    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2.5 sm:gap-3 pt-4 border-t border-slate-100">
+    <div
+      className="flex flex-col sm:flex-row items-stretch sm:items-center justify-end gap-2.5 sm:gap-3 pt-4 border-t border-slate-100"
+      role="group"
+      aria-label={t("ops.trip.step_actions")}
+    >
       <button
         type="button"
         onClick={onCancel}
         disabled={busy}
+        aria-busy={busy || undefined}
         className={`${base} border border-slate-200 bg-white text-slate-700 shadow-xs hover:border-slate-300 hover:bg-slate-50 hover:shadow-sm`}
       >
-        <X size={15} className="shrink-0 transition-transform duration-200 group-hover:rotate-90" /> {t("common.cancel")}
+        <X size={15} className="shrink-0 transition-transform duration-200 group-hover:rotate-90" aria-hidden /> {t("common.cancel")}
       </button>
       {onSave && (
         <button
           type="button"
           onClick={() => void onSave()}
           disabled={busy || saveDisabled}
+          aria-busy={busy || undefined}
           className={`${base} border border-blue-100 bg-blue-50/70 text-blue-500 hover:bg-blue-50/80 hover:border-blue-100 hover:shadow-sm`}
         >
           {busy ? (
-            <Loader2 size={15} className="animate-spin shrink-0" />
+            <Loader2 size={15} className="animate-spin shrink-0" aria-hidden />
           ) : (
-            <Save size={15} className="shrink-0 transition-transform duration-200 group-hover:-translate-y-0.5" />
+            <Save size={15} className="shrink-0 transition-transform duration-200 group-hover:-translate-y-0.5" aria-hidden />
           )}{" "}
           {t(saveLabel)}
         </button>
@@ -122,12 +128,13 @@ export function WizardActionBar({
         type="button"
         onClick={() => void onSubmit()}
         disabled={busy || submitDisabled}
+        aria-busy={busy || undefined}
         className={`${base} bg-blue-500 text-white shadow-sm shadow-blue-400/25 hover:bg-blue-600 hover:shadow-md hover:shadow-blue-400/30 hover:-translate-y-0.5 disabled:hover:translate-y-0 disabled:hover:shadow-sm`}
       >
         {busy ? (
-          <Loader2 size={15} className="animate-spin shrink-0" />
+          <Loader2 size={15} className="animate-spin shrink-0" aria-hidden />
         ) : (
-          <Send size={15} className="shrink-0 transition-transform duration-200 group-hover:translate-x-0.5" />
+          <Send size={15} className="shrink-0 transition-transform duration-200 group-hover:translate-x-0.5" aria-hidden />
         )}{" "}
         {t(submitLabel)}
       </button>
