@@ -36,3 +36,10 @@ export interface PaymentAudit {
   performedBy: string;
   performedAt: string;
 }
+
+/**
+ * The subset of a payment a form may write. Everything else (id, payment number,
+ * audit stamps, attachments) is owned by the server — or, in the sample preview,
+ * by the register's own in-memory rows.
+ */
+export type PaymentWritePayload = Omit<Payment, 'id' | 'paymentNo' | 'createdAt' | 'updatedAt' | 'attachments'>;

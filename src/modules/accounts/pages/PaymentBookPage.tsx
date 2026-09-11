@@ -6,7 +6,7 @@ import { PaymentViewModal } from '../components/payment-book/PaymentViewModal';
 import { PaymentEditModal } from '../components/payment-book/PaymentEditModal';
 import { NewPaymentModal } from '../components/payment-book/NewPaymentModal';
 import { deletePayment, listPayments, updatePayment } from '../services/paymentApiService';
-import type { Payment } from '../types/payment.types';
+import type { Payment, PaymentWritePayload } from '../types/payment.types';
 import { DatePicker } from '../../../components/common/DatePicker';
 import { canEditItem, canDeleteItem } from '../../../utils/dateUtils';
 import { weekRange } from '../../../utils/businessDate';
@@ -19,10 +19,10 @@ import '../../masters/styles/masters.css';
 import { Button } from '../../../ui/Button';
 import { SearchInput } from '../../../ui/SearchInput';
 import { uiActionToneClass, uiBadgeClass } from '../../../shared/ui/uiTokens';
-import { createDemoPayments } from '../utils/paymentRegisterDemo';
+import { applyDemoWrite, createDemoPayments, resetDemoPayments } from '../utils/paymentRegisterDemo';
 import { EmptyState } from '../../../ui/EmptyState';
 import { Pagination } from '../../../ui/Pagination';
-import { filterPayments, PAYMENT_TYPES, PAYMENT_MODES, paymentCurrency } from '../utils/paymentRegister';
+import { filterPayments, PAYMENT_TYPES, PAYMENT_MODES, paymentCurrency, paymentNoDisplay } from '../utils/paymentRegister';
 
 type PaymentView = 'pending' | 'approved' | 'deleted';
 const PAYMENT_VIEWS: { value: PaymentView; label: string; selectedClass: string; hint?: string }[] = [
@@ -43,7 +43,11 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   const [approvalError, setApprovalError] = useState('');
   const approvingRef = useRef(false);
   const [demo, setDemo] = useState(import.meta.env.DEV);
-  const [demoPayments] = useState(() => createDemoPayments());
+  // Sample rows are state, not a one-shot constant: the preview is writable (see
+  // `persistSample`) so create/edit/approve/delete can be exercised without a
+  // server. Nothing written here ever reaches a payment endpoint.
+  const [demoPayments, setDemoPayments] = useState(() => createDemoPayments());
+  const demoRows = useRef(demoPayments);
   const demoRef = useRef(demo);
   const mounted = useRef(false);
   const [realPayments, setPayments] = useState<Payment[]>([]);
@@ -171,13 +175,44 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   const safePage = Math.min(page, Math.max(1, Math.ceil(filtered.length / pageSize)));
   const rows = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
   const selectedPayment = rows.find(payment => payment.id === selectedId) ?? null;
-  const handleSave = () => {
+
+  /* ---- sample preview: in-memory writes -----------------------------------
+     A sample row is real enough to work with and never real enough to save.
+     Writes patch this component's rows only; the `demo-payment-` prefix is what
+     every guard below (and the delete controller) checks, so rows created here
+     keep it and stay inside the sandbox. */
+  const isSample = (payment: Payment) => payment.id.startsWith('demo-payment-');
+  const writeDemoRows = useCallback((next: Payment[]) => {
+    demoRows.current = next;
+    setDemoPayments(next);
+  }, []);
+  const persistSample = useCallback(async (payload: PaymentWritePayload, target: Payment | null): Promise<Payment> => {
+    // One short beat so the sheet's saving state behaves like the network path.
+    await new Promise(resolve => setTimeout(resolve, 200));
+    const next = applyDemoWrite(demoRows.current, payload, target);
+    writeDemoRows(next.rows);
+    return next.saved;
+  }, [writeDemoRows]);
+  const resetDemo = () => {
     setSelectedId(null);
-    showNotification('Payment saved successfully', 'success');
-    void loadPayments(true);
+    writeDemoRows(resetDemoPayments());
+    showNotification('Sample rows rebuilt. Nothing was sent to the server.', 'info');
+  };
+
+  const handleSave = (saved: Payment) => {
+    setSelectedId(null);
+    const sample = saved.id.startsWith('demo-payment-');
+    showNotification(sample ? 'Sample row updated — saved in this preview only.' : 'Payment saved successfully', sample ? 'info' : 'success');
+    // Real rows reload from the server; there is nothing to reload for a sample.
+    if (!sample) void loadPayments(true);
   };
   const { requestDelete, cancel, pendingItems, isPending } = usePendingDelete<string>(async id => {
-    if (demoRef.current || id.startsWith('demo-payment-')) return;
+    if (id.startsWith('demo-payment-')) {
+      // The countdown committed on a preview row: remove it locally, no request.
+      writeDemoRows(demoRows.current.filter(row => row.id !== id));
+      showNotification('Sample row removed — this preview only.', 'info');
+      return;
+    }
     try {
       await deletePayment(id);
       showNotification('Payment deleted successfully', 'success');
@@ -188,16 +223,21 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   });
 
   const selectedBusy = Boolean(selectedPayment && (isPending(selectedPayment.id) || approving));
-  const canEditSelected = Boolean(selectedPayment && !demo && !selectedBusy && canEditItem(selectedPayment.createdAt));
-  const canDeleteSelected = Boolean(selectedPayment && !demo && !selectedBusy && canDeleteItem(selectedPayment.createdAt));
+  // Eligibility follows the row, not the mode: sample rows are always inside the
+  // window (their stamps are synthetic and this week's), real rows keep the
+  // 10-day rule and the server path.
+  const inEditWindow = (payment: Payment) => isSample(payment) || canEditItem(payment.createdAt);
+  const canEditSelected = Boolean(selectedPayment && !selectedBusy && inEditWindow(selectedPayment));
+  const canDeleteSelected = Boolean(selectedPayment && !selectedBusy && (isSample(selectedPayment) || canDeleteItem(selectedPayment.createdAt)));
   const canApproveSelected = Boolean(canEditSelected && selectedPayment?.status === 'Draft');
-  const readOnlyHint = demo ? 'Sample data is read-only. Switch to real payments to make changes.' : undefined;
+  const sampleHint = 'Sample row · changes stay in this preview and are never sent to the server.';
 
   const confirmApproval = async () => {
     const payment = approvalPayment;
-    if (!payment || approvingRef.current || demoRef.current || payment.id.startsWith('demo-payment-')) return;
-    const current = realPayments.find(item => item.id === payment.id);
-    if (!current || current.status !== 'Draft' || !canEditItem(current.createdAt) || isPending(payment.id)) {
+    if (!payment || approvingRef.current) return;
+    const sample = isSample(payment);
+    const current = (sample ? demoRows.current : realPayments).find(item => item.id === payment.id);
+    if (!current || current.status !== 'Draft' || (!sample && (!canEditItem(current.createdAt) || isPending(payment.id)))) {
       setApprovalError('This payment is no longer eligible for approval. Refresh the register and try again.');
       return;
     }
@@ -205,6 +245,17 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
     setApproving(true);
     setApprovalError('');
     try {
+      if (sample) {
+        // Preview only: flip the row in memory so the list can be seen to change.
+        await new Promise(resolve => setTimeout(resolve, 200));
+        const now = new Date().toISOString();
+        writeDemoRows(demoRows.current.map(row => row.id === payment.id ? { ...row, status: 'Approved' as const, updatedAt: now } : row));
+        if (!mounted.current) return;
+        setSelectedId(null);
+        setApprovalPayment(null);
+        showNotification('Sample row approved — this preview only.', 'info');
+        return;
+      }
       // Reuse the existing partial-update contract; never synthesize success.
       const saved = await updatePayment(payment.id, { status: 'Approved' });
       if (saved.id !== payment.id || saved.status !== 'Approved') {
@@ -231,7 +282,8 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
       <div className="flex flex-wrap items-center justify-end gap-2">
         {demo && <span className={uiBadgeClass('warning')}>Sample data</span>}
         <Button variant="secondary" aria-pressed={demo} disabled={!!pendingItems.length || approving} onClick={toggleDemo}>{demo ? 'Back to real payments' : 'Preview sample data'}</Button>
-        <Button icon={<Plus size={16} />} disabled={demo} title={demo ? 'Return to real payments to create a payment' : undefined} onClick={() => { if (!demoRef.current) setIsNewModalOpen(true); }}>New Payment</Button>
+        {demo && <Button variant="ghost" size="sm" icon={<RotateCcw size={14} />} title="Rebuild the sample rows, discarding preview edits" onClick={resetDemo}>Reset sample rows</Button>}
+        <Button icon={<Plus size={16} />} onClick={() => setIsNewModalOpen(true)}>New Payment</Button>
       </div>
       <section aria-label="Payment filters" className="rounded-xl border border-slate-200 bg-white p-3">
         <div className="flex flex-wrap items-center gap-2">
@@ -276,26 +328,26 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
               </Button>)}
             </div>
           </div>
-          {selectedPayment ? <div role="group" aria-label="Selected payment actions" title={readOnlyHint} className="flex flex-wrap items-center gap-2">
+          {selectedPayment ? <div role="group" aria-label="Selected payment actions" title={isSample(selectedPayment) ? sampleHint : undefined} className="flex flex-wrap items-center gap-2">
             <span className="sr-only">Selected payment: {selectedPayment.paymentNo || selectedPayment.paidTo}</span>
             {/* Sample rows are read-only by design; said in words next to the
                 buttons rather than hidden in a tooltip nobody discovers. */}
-            {demo && <span className={uiBadgeClass('warning')}>Sample row · read-only</span>}
+            {isSample(selectedPayment) && <span className={uiBadgeClass('info')}>Sample row · preview edits</span>}
             <Button variant="secondary" size="sm" icon={<Pencil size={14} />} aria-label="Edit selected payment" disabled={!canEditSelected}
-              title={readOnlyHint ?? (canEditSelected ? 'Edit selected payment' : 'Payments older than 10 days cannot be edited')}
+              title={canEditSelected ? (isSample(selectedPayment) ? 'Update this sample row (preview only)' : 'Edit selected payment') : 'Payments older than 10 days cannot be edited'}
               onClick={() => { if (canEditSelected) setEditingPayment(selectedPayment); }}>Edit</Button>
             <Button variant="success" size="sm" icon={<CheckCircle2 size={14} />} aria-label="Approve selected payment" disabled={!canApproveSelected}
-              title={readOnlyHint ?? (selectedPayment.status !== 'Draft' ? 'This payment is already approved' : !canEditItem(selectedPayment.createdAt) ? 'Payments older than 10 days cannot be approved' : 'Approve selected pending payment')}
+              title={canApproveSelected ? (isSample(selectedPayment) ? 'Approve this sample row (preview only)' : 'Approve selected pending payment') : selectedPayment.status !== 'Draft' ? 'This payment is already approved' : 'Payments older than 10 days cannot be approved'}
               onClick={() => { if (canApproveSelected) { setApprovalError(''); setApprovalPayment(selectedPayment); } }}>Approve</Button>
             <Button variant="destructiveOutline" size="sm" icon={<Trash2 size={14} />} aria-label="Delete selected payment" disabled={!canDeleteSelected}
-              title={readOnlyHint ?? (canDeleteSelected ? 'Delete selected payment' : 'Payments older than 10 days cannot be deleted')}
+              title={canDeleteSelected ? (isSample(selectedPayment) ? 'Remove this sample row (preview only)' : 'Delete selected payment') : 'Payments older than 10 days cannot be deleted'}
               onClick={() => { if (canDeleteSelected) requestDelete(selectedPayment.id, { label: `Deleting payment to ${selectedPayment.paidTo}` }); }}>Delete</Button>
           </div> : status !== 'deleted' && filtered.length > 0 && (
             /* Replaces the old "Filtered total" readout: the register is a work
                list, so the empty slot invites the row action instead of showing
                an amount that never drives anything. */
             <p className="text-[11px] text-slate-400">
-              {demo ? 'Sample rows are read-only — select one to view details.' : 'Select a row to edit, approve or delete.'}
+              {demo ? 'Sample rows work like real ones here — select one to view, edit, approve or delete.' : 'Select a row to edit, approve or delete.'}
             </p>
           )}
         </div>
@@ -320,17 +372,21 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
         </div>)}</div>
       </Modal>
       <ConfirmDialog isOpen={!!approvalPayment} title="Approve Payment" tone="primary" confirmLabel="Approve Payment" loading={approving}
-        record={approvalPayment ? `${approvalPayment.paymentNo} · ${approvalPayment.paidTo} · ${paymentCurrency.format(approvalPayment.amount)}` : undefined}
+        record={approvalPayment ? `${paymentNoDisplay(approvalPayment.paymentNo)} · ${approvalPayment.paidTo} · ${paymentCurrency.format(approvalPayment.amount)}` : undefined}
         message={<>Mark this pending payment as approved?{approvalError && <span role="alert" className="mt-2 block text-rose-700">{approvalError}</span>}</>}
         onConfirm={() => void confirmApproval()} onCancel={() => { if (!approvingRef.current) { setApprovalPayment(null); setApprovalError(''); } }} />
-      <NewPaymentModal isOpen={isNewModalOpen} onClose={() => setIsNewModalOpen(false)} onSave={handleSave} />
-      <PaymentEditModal isOpen={!!editingPayment} payment={editingPayment} onClose={() => setEditingPayment(null)} onSave={handleSave} />
+      <NewPaymentModal isOpen={isNewModalOpen} onClose={() => setIsNewModalOpen(false)} onSave={handleSave} persist={demo ? persistSample : undefined} />
+      {/* The write path follows the ROW, not the toggle: flipping to sample data
+          while a real payment is open must never downgrade its save to a local
+          patch (or vice versa). */}
+      <PaymentEditModal isOpen={!!editingPayment} payment={editingPayment} onClose={() => setEditingPayment(null)} onSave={handleSave}
+        persist={editingPayment && isSample(editingPayment) ? persistSample : undefined} />
       {/* The sheet hands edit back to the register, which owns the row's
           eligibility rules; closing first keeps only one dialog mounted. */}
       <PaymentViewModal isOpen={!!viewingPayment} payment={viewingPayment} onClose={() => setViewingPayment(null)}
         onEdit={viewingPayment ? () => { const next = viewingPayment; setViewingPayment(null); setEditingPayment(next); } : undefined}
-        canEdit={Boolean(viewingPayment && !demo && !isPending(viewingPayment.id) && !approving && canEditItem(viewingPayment.createdAt))}
-        editHint={demo ? readOnlyHint : 'Payments older than 10 days cannot be edited.'} />
+        canEdit={Boolean(viewingPayment && !isPending(viewingPayment.id) && !approving && (isSample(viewingPayment) || canEditItem(viewingPayment.createdAt)))}
+        editHint={viewingPayment && !isSample(viewingPayment) ? 'Payments older than 10 days cannot be edited.' : 'Another action on this payment is still running.'} />
     </div>
   );
 }

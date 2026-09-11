@@ -14,7 +14,7 @@ import type { Payment } from '../../types/payment.types';
 import { EmptyState, type EmptyVariant } from '../../../../ui/EmptyState';
 import { StatusBadge } from '../../../../ui/StatusBadge';
 import { Button } from '../../../../ui/Button';
-import { paymentCurrency, paymentStatusLabel } from '../../utils/paymentRegister';
+import { paymentCurrency, paymentNoDisplay, paymentStatusLabel } from '../../utils/paymentRegister';
 import { PaymentModeMark, PaymentTypeMark } from './PaymentGlyphMarks';
 import { uiTableClass, uiTableHeadClass, uiTableThClass, uiTableTdClass, uiTableRowClass, uiTableRowSelectedClass } from '../../../../shared/ui/uiTokens';
 
@@ -74,7 +74,7 @@ export function PaymentTable({ payments, loading, error, selectedId, onSelect, e
               title={error ? 'Records unavailable' : emptyVariant === 'no-data' ? 'No payments recorded yet' : 'No payments found'}
               description={error ? 'Use Refresh to try again.' : emptyVariant === 'no-data' ? 'New payments will appear here once recorded.' : 'Try adjusting your search or date, type and mode filters.'} />}
           </td></tr> : payments.map(payment => (
-            <tr key={payment.id} aria-label={`Payment ${payment.paymentNo || payment.paidTo}`} aria-selected={selectedId === payment.id} tabIndex={0}
+            <tr key={payment.id} aria-label={`Payment ${paymentNoDisplay(payment.paymentNo) || payment.paidTo}`} aria-selected={selectedId === payment.id} tabIndex={0}
               onClick={() => onSelect(selectedId === payment.id ? null : payment.id)}
               onKeyDown={event => {
                 // A nested View button keeps its native Enter/Space behavior.
@@ -87,7 +87,7 @@ export function PaymentTable({ payments, loading, error, selectedId, onSelect, e
                 }
               }}
               className={`cursor-pointer outline-none focus-visible:shadow-[inset_0_0_0_2px_var(--color-emerald-500)] ${selectedId === payment.id ? uiTableRowSelectedClass : `${uiTableRowClass} ${payment.status === 'Cancelled' ? 'bg-slate-50 text-slate-400' : ''}`}`}>
-              <td className={`${uiTableTdClass} whitespace-nowrap font-semibold text-slate-900`}>{payment.paymentNo || <span className="font-normal text-slate-400">Not assigned</span>}</td>
+              <td className={`${uiTableTdClass} whitespace-nowrap font-semibold text-slate-900`}>{paymentNoDisplay(payment.paymentNo) || <span className="font-normal text-slate-400">Not assigned</span>}</td>
               <td className={`${uiTableTdClass} whitespace-nowrap tabular-nums text-slate-600`}>{payment.paymentDate.slice(0, 10).split('-').reverse().join('/')}</td>
               <td className={`${uiTableTdClass} min-w-40`}><PaymentTypeMark type={payment.paymentType} /></td>
               <td className={`${uiTableTdClass} min-w-36 font-medium text-slate-800`}>{payment.paidTo}</td>
@@ -96,7 +96,7 @@ export function PaymentTable({ payments, loading, error, selectedId, onSelect, e
               <td className={`${uiTableTdClass} whitespace-nowrap text-slate-500`}>{payment.referenceNo || '—'}</td>
               <td className={uiTableTdClass}><StatusBadge status={payment.status} label={paymentStatusLabel(payment.status)} tone={payment.status === 'Draft' ? 'warning' : undefined} /></td>
               <td className={uiTableTdClass}><div className="flex justify-end gap-1">
-                <Button variant="ghost" size="xs" iconOnly aria-label={`View ${payment.paymentNo || payment.paidTo}`} title="View payment" onClick={event => { event.stopPropagation(); onView(payment); }}><Eye size={15} /></Button>
+                <Button variant="ghost" size="xs" iconOnly aria-label={`View ${paymentNoDisplay(payment.paymentNo) || payment.paidTo}`} title="View payment" onClick={event => { event.stopPropagation(); onView(payment); }}><Eye size={15} /></Button>
 
               </div></td>
             </tr>

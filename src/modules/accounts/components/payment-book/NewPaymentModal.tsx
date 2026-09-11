@@ -20,7 +20,7 @@ import { PAYMENT_TYPES } from '../../utils/paymentRegister';
 import { inrInWords } from '../../utils/inrInWords';
 import { PaymentGlyphChip } from './PaymentGlyphMarks';
 import { paymentModeGlyph, paymentTypeGlyph } from '../../utils/paymentRegisterGlyphs';
-import type { Payment } from '../../types/payment.types';
+import type { Payment, PaymentWritePayload } from '../../types/payment.types';
 import { createPayment } from '../../services/paymentApiService';
 import { PaymentService } from '../../services/PaymentService';
 import { getBanks } from '../../../masters/banks/services/bankService';
@@ -31,6 +31,8 @@ interface NewPaymentModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (payment: Payment) => void;
+  /** Replaces the API write; see `PaymentEditModalProps.persist`. */
+  persist?: (payload: PaymentWritePayload, target: Payment | null) => Promise<Payment>;
 }
 
 const TRANSACTION_METHODS = ['UPI', 'Netbanking', 'RTGS', 'NEFT', 'Cheque'];
@@ -49,7 +51,7 @@ export function NewPaymentModal(props: NewPaymentModalProps) {
   return props.isOpen ? <PaymentForm {...props} /> : null;
 }
 
-function PaymentForm({ isOpen, onClose, onSave }: NewPaymentModalProps) {
+function PaymentForm({ isOpen, onClose, onSave, persist }: NewPaymentModalProps) {
   const formId = useId();
   // ids are ASCII-safe: the rupee sign in "Amount (₹)" must not reach an id.
   const fieldId = (text: string) => `${formId}-${text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')}`;
@@ -160,7 +162,7 @@ function PaymentForm({ isOpen, onClose, onSave }: NewPaymentModalProps) {
     };
 
     try {
-      const saved = await createPayment(paymentData);
+      const saved = persist ? await persist(paymentData, null) : await createPayment(paymentData);
       onSave(saved);
       onClose();
     } catch (error) {

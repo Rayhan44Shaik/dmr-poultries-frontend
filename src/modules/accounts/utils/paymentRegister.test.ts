@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { weekRange } from '../../../utils/businessDate';
-import { filterPayments, paymentCurrency, paymentStatusLabel } from './paymentRegister';
+import { filterPayments, paymentCurrency, paymentNoDisplay, paymentStatusLabel } from './paymentRegister';
 import type { Payment } from '../types/payment.types';
 
 const base: Payment = {
@@ -55,6 +55,24 @@ test('demo fixtures have unique sequential numbers, supported statuses and valid
   assert.deepEqual(createDemoPayments(new Date(2026, 8, 10)), samples);
 });
 
+
+test('payment numbers READ year-first without the stored value being rewritten', () => {
+  assert.equal(paymentNoDisplay('Pay-07092026-001'), 'Pay-20260907-001');
+  assert.equal(paymentNoDisplay('Pay-13092026-001'), 'Pay-20260913-001');  // 13 can only be a day
+  assert.equal(paymentNoDisplay('PAY-20260907-001'), 'PAY-20260907-001');  // already year-first
+  assert.equal(paymentNoDisplay('Pay-99132026-001'), 'Pay-99132026-001');  // impossible month → untouched
+  assert.equal(paymentNoDisplay('LEGACY-42'), 'LEGACY-42');                // no date to reorder
+  assert.equal(paymentNoDisplay(''), '');
+  assert.equal(paymentNoDisplay(undefined), '');
+  // Idempotent: a formatter that reshuffled its own output would corrupt numbers.
+  assert.equal(paymentNoDisplay(paymentNoDisplay('Pay-07092026-001')), 'Pay-20260907-001');
+});
+test('search matches the stored number and the number shown in the table', () => {
+  for (const search of ['Pay-10092026-001', 'pay-20260910-001', '20260910']) {
+    assert.ok(filterPayments(payments, { ...filters, search }).some(p => p.id === '1'), search);
+  }
+  assert.equal(payments[0].paymentNo, 'Pay-10092026-001'); // display-only, never mutated
+});
 
 test('Pending is a display label only; existing API statuses remain unchanged', () => {
   assert.equal(paymentStatusLabel('Draft'), 'Pending');
