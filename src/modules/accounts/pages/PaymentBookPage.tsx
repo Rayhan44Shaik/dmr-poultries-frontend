@@ -315,8 +315,8 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
         <div className="mt-2 flex flex-wrap items-center gap-2 border-t border-slate-100 pt-2">
           <SearchInput value={filters.search} onChange={v => changeFilter('search', v)} aria-label="Search payments" placeholder="Payment no, payee, reference…" wrapperClassName="w-full sm:flex-1 sm:min-w-56" />
           <div className="flex w-full items-center justify-end gap-1.5 sm:w-auto">
-            <Button size="lg" icon={<Search size={16} className={filterAction === 'search' ? 'animate-pulse' : undefined} />} onClick={applyFilters} disabled={invalidRange}>Search</Button>
-            <Button variant="secondary" size="lg" icon={<RotateCcw size={15} className={filterAction === 'clear' ? 'animate-spin' : undefined} />} aria-label="Clear filters" title="Clear filters" onClick={clearFilters}>Clear</Button>
+            <Button size="lg" icon={<Search size={16} className={`transition-transform duration-300 hover:-translate-y-1 ${filterAction === 'search' ? 'animate-[bounce_0.6s_ease-in-out_1]' : ''}`} />} onClick={applyFilters} disabled={invalidRange}>Search</Button>
+            <Button variant="secondary" size="lg" icon={<RotateCcw size={15} className={`transition-transform duration-500 hover:rotate-180 ${filterAction === 'clear' ? 'animate-[spin_0.6s_ease-in-out_1]' : ''}`} />} aria-label="Clear filters" title="Clear filters" onClick={clearFilters}>Clear</Button>
             <Button variant="custom" size="lg" iconOnly aria-label="Refresh" title="Refresh records" className={uiActionToneClass.refresh} disabled={spinning} onClick={handleRefresh}>
               <RefreshCw size={16} strokeWidth={2} aria-hidden="true" className={`transition-transform duration-500 hover:rotate-180 ${spinning ? 'animate-[spin_0.6s_ease-in-out_1]' : ''}`} />
             </Button>
