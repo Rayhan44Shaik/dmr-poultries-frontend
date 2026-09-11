@@ -653,11 +653,13 @@ export default function StepEnd({
 
               {canEdit && (
                 <button
+                  type="button"
                   onClick={() => setIsLocalEditing(true)}
-                  className="bg-white hover:bg-slate-50 p-1.5 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95"
+                  className="inline-flex items-center gap-1.5 bg-white hover:bg-emerald-50 px-2.5 py-1.5 rounded-lg border border-emerald-300 text-emerald-800 text-[11px] font-bold transition-all active:scale-95 shadow-sm"
                   title={t("common.edit")}
                 >
-                  <Pencil size={14} />
+                  <Pencil size={13} />
+                  <span>{t("common.edit")}</span>
                 </button>
               )}
               <StepCloseButton onClose={clearForm} />

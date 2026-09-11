@@ -302,25 +302,42 @@ export default function DieselExpensesTable({
         return;
       }
       const newFileName = `BILL-${fallbackDateStr}-${sequence}.jpg`;
-      // Always persist to sheet so the bill is never lost if edit-mode state
-      // hasn't flushed yet (e.g. openBillPicker → startEdit → file dialog).
-      applyBatchUpdates({
+      const imagePatch = {
         [`dieselImageName${index}`]: newFileName,
         [`dieselImage${index}`]: result,
-      });
-      // Keep draft in sync when this row is being edited.
-      setDraftData((prev) => {
-        if (editingRow !== index && Object.keys(prev).length === 0) return prev;
-        // If we just opened edit for this row, or already editing it, mirror bill.
-        if (editingRow === index || prev[`dieselClientKey${index}`] !== undefined || prev[`dieselLtr${index}`] !== undefined) {
-          return {
-            ...prev,
-            [`dieselImageName${index}`]: newFileName,
-            [`dieselImage${index}`]: result,
-          };
-        }
-        return prev;
-      });
+      };
+      // Always persist on the sheet immediately.
+      applyBatchUpdates(imagePatch);
+
+      const rowWasSubmitted = !!sheetData[`dieselSubmitted${index}`];
+      // Submitted rows must enter edit mode so Save/Submit can keep the new bill.
+      // Do this here (after file pick) — never defer the file dialog itself.
+      if (editingRow === index) {
+        setDraftData((prev) => ({ ...prev, ...imagePatch }));
+      } else if (rowWasSubmitted) {
+        const newDraft: Record<string, any> = {};
+        const fields = [
+          "dieselLtr",
+          "dieselRate",
+          "dieselMeter",
+          "dieselBunk",
+          "dieselGpsLat",
+          "dieselGpsLon",
+          "dieselGpsAccuracy",
+          "dieselGpsCapturedAt",
+          "dieselImage",
+          "dieselImageName",
+          "dieselClientKey",
+          "dieselId",
+        ];
+        fields.forEach((f) => {
+          newDraft[`${f}${index}`] = sheetData[`${f}${index}`] ?? "";
+        });
+        Object.assign(newDraft, imagePatch);
+        setDraftData(newDraft);
+        setIsEditingSubmitted(true);
+        setEditingRow(index);
+      }
       if (compressed.compressed) {
         notifyUser(
           t("ops.trip.photo_auto_compressed", {
@@ -338,17 +355,20 @@ export default function DieselExpensesTable({
     e.target.value = "";
   };
 
-  /** Open the bill file picker; auto-enter edit mode if the row is locked/submitted. */
+  /**
+   * Open the bill file picker in the SAME user click.
+   * Browsers block file dialogs opened after setTimeout/async — that was why
+   * Upload Bill appeared to do nothing on already-submitted diesel rows.
+   */
   const openBillPicker = (num: number) => {
     if (readOnly) return;
-    const isSubmitted = !!sheetData[`dieselSubmitted${num}`];
-    if (isSubmitted && editingRow !== num) {
-      startEdit(num);
-      // Wait a tick so draft state is ready before the file dialog opens.
-      window.setTimeout(() => fileInputRefs.current[num]?.click(), 0);
+    const input = fileInputRefs.current[num];
+    if (!input) {
+      notifyUser(t("ops.trip.failed_read_image"), "error");
       return;
     }
-    fileInputRefs.current[num]?.click();
+    input.value = "";
+    input.click();
   };
 
   const handleClearRow = (num: number) => {
@@ -804,6 +824,17 @@ export default function DieselExpensesTable({
         flattened[`dieselSubmitted${num}`] = true;
         flattened[`dieselClientKey${num}`] = payload.clientKey;
       }
+      // Never drop the bill we just uploaded — some responses omit large imageData.
+      if (payload.imageData && !hasRealBill(flattened[`dieselImage${num}`])) {
+        flattened[`dieselImage${num}`] = payload.imageData;
+        flattened[`dieselImageName${num}`] = payload.imageName ?? flattened[`dieselImageName${num}`] ?? "";
+      }
+      if (payload.imageData && hasRealBill(payload.imageData)) {
+        // Prefer the bill the user just sent over a stale/empty server copy.
+        flattened[`dieselImage${num}`] = payload.imageData;
+        if (payload.imageName) flattened[`dieselImageName${num}`] = payload.imageName;
+      }
+      flattened[`dieselSubmitted${num}`] = true;
       applyBatchUpdates(flattened);
 
       // Keep visible row indices in sync with what the sheet now holds.
@@ -1169,14 +1200,14 @@ export default function DieselExpensesTable({
                       <div className="inline-flex flex-col items-center justify-center gap-1 min-w-0">
                         <BillPreviewLink href={String(imageVal)} fileName={String(imageNameVal)} />
                         {!readOnly && (
-                          <div className="flex items-center gap-1.5">
+                          <div className="flex flex-col items-center gap-0.5">
                             <button
                               type="button"
                               onClick={() => openBillPicker(num)}
-                              className="text-[10px] font-semibold text-emerald-700 hover:underline"
+                              className="inline-flex items-center justify-center rounded-md border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-800 shadow-sm whitespace-nowrap"
                               title={t("ops.trip.upload_bill")}
                             >
-                              {t("ops.trip.choose_image")}
+                              {t("ops.trip.upload_bill")}
                             </button>
                             {(isEditingThisRow || !isSubmitted) && (
                               <button
@@ -1207,7 +1238,7 @@ export default function DieselExpensesTable({
                       <button
                         type="button"
                         onClick={() => openBillPicker(num)}
-                        className="inline-flex items-center justify-center gap-1 rounded-lg border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 text-[11px] font-bold text-emerald-800 shadow-sm active:scale-[0.98] whitespace-nowrap"
+                        className="inline-flex items-center justify-center gap-1 rounded-lg border border-emerald-400 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1.5 text-[11px] font-bold text-emerald-800 shadow-sm active:scale-[0.98] whitespace-nowrap"
                         title={t("ops.trip.upload_bill")}
                       >
                         {t("ops.trip.upload_bill")}
