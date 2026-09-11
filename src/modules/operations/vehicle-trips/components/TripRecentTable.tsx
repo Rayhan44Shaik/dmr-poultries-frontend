@@ -206,15 +206,15 @@ function TripRecentTable({
   const getStepBadge = (trip: Trip) => {
     // Completed may still exist on older sample rows — show label only (no status change option).
     if (trip.status === "Completed") {
-      return { label: t("status.completed"), color: "bg-emerald-50/70 text-emerald-500 border-emerald-100", icon: <CheckCircle size={12} />, resume: false };
+      return { label: t("status.completed"), color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <CheckCircle size={12} />, resume: false };
     }
     if (trip.status === "Pending") {
-      return { label: t("status.pending"), color: "bg-amber-50/70 text-amber-500 border-amber-100", icon: <Clock size={12} />, resume: false };
+      return { label: t("status.pending"), color: "bg-amber-50 text-amber-700 border-amber-200", icon: <Clock size={12} />, resume: false };
     }
     // Defensive: wizard fully submitted but status still Draft → treat as Pending
     // (Step 5 submit should have moved it; never show Completed from Draft).
     if (isTripWizardComplete(trip)) {
-      return { label: t("status.pending"), color: "bg-amber-50/70 text-amber-500 border-amber-100", icon: <Clock size={12} />, resume: false };
+      return { label: t("status.pending"), color: "bg-amber-50 text-amber-700 border-amber-200", icon: <Clock size={12} />, resume: false };
     }
     // A Draft trip always has Step 1 submitted (trips are created on Step 1
     // submit), so it is always mid-workflow: show ONLY which step is pending
@@ -222,7 +222,7 @@ function TripRecentTable({
     const nextStep = getNextIncompleteTripStep(trip);
     return {
       label: t("ops.trip.step_label", { step: nextStep + 1 }),
-      color: "bg-emerald-50/70 text-emerald-500 border-emerald-100",
+      color: "bg-emerald-50 text-emerald-700 border-emerald-200",
       icon: <FileText size={12} />,
       resume: true,
     };
