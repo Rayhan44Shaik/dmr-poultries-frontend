@@ -114,12 +114,12 @@ function TripRecentTable({
       return { label: t("status.completed"), color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <CheckCircle size={12} />, resume: false };
     }
     if (trip.status === "Pending") {
-      return { label: t("status.pending"), color: "bg-amber-50 text-amber-700 border-amber-200", icon: <Clock size={12} />, resume: false };
+      return { label: t("status.pending"), color: "bg-orange-50 text-orange-700 border-orange-200", icon: <Clock size={12} />, resume: false };
     }
     // Defensive: wizard fully submitted but status still Draft → treat as Pending
     // (Step 5 submit should have moved it; never show Completed from Draft).
     if (isTripWizardComplete(trip)) {
-      return { label: t("status.pending"), color: "bg-amber-50 text-amber-700 border-amber-200", icon: <Clock size={12} />, resume: false };
+      return { label: t("status.pending"), color: "bg-orange-50 text-orange-700 border-orange-200", icon: <Clock size={12} />, resume: false };
     }
     // A Draft trip always has Step 1 submitted (trips are created on Step 1
     // submit), so it is always mid-workflow: show ONLY which step is pending
@@ -127,7 +127,7 @@ function TripRecentTable({
     const nextStep = getNextIncompleteTripStep(trip);
     return {
       label: t("ops.trip.step_label", { step: nextStep + 1 }),
-      color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      color: "bg-blue-50 text-blue-700 border-blue-200",
       icon: <FileText size={12} />,
       resume: true,
     };
@@ -291,10 +291,10 @@ function TripRecentTable({
                 const isActive = statusFilter === tab;
                 const activeClass =
                   tab === "Draft"
-                    ? "bg-emerald-50/80 text-emerald-500 shadow-sm"
+                    ? "bg-blue-50 text-blue-700 shadow-sm"
                     : tab === "Pending"
-                    ? "bg-orange-50/80 text-orange-500 shadow-sm"
-                    : "bg-rose-50/80 text-rose-500 shadow-sm";
+                    ? "bg-orange-50 text-orange-700 shadow-sm"
+                    : "bg-red-50 text-red-700 shadow-sm";
                 const label = (() => {
                   const k = "status." + tab.toLowerCase();
                   const v = t(k);
@@ -371,7 +371,7 @@ function TripRecentTable({
                   const isDeleted = trip.deleted === true;
 
                   return (
-                    <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-all duration-150 group ${isDeleted ? "bg-rose-50/40 hover:bg-rose-50/70 border-l-4 border-l-rose-400" : isSelected ? "bg-blue-50/80 shadow-inner border-l-4 border-l-blue-600" : "hover:bg-slate-50/80"}`}>
+                    <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-all duration-150 group ${isDeleted ? "bg-red-50/50 hover:bg-red-50/80 border-l-4 border-l-red-400" : isSelected ? "bg-blue-50/80 shadow-inner border-l-4 border-l-blue-600" : "hover:bg-slate-50/80"}`}>
                       <td className="px-4 py-3 font-bold text-emerald-700 text-xs">
                         <span className={`bg-emerald-100 px-2 py-1 rounded-md border border-emerald-300 text-emerald-700 ${isDeleted ? "opacity-60 line-through" : ""}`}>{trip.tripNo}</span>
                       </td>
@@ -386,7 +386,7 @@ function TripRecentTable({
                       <td className="px-4 py-3 text-center text-xs font-bold text-rose-500">{trip.totalMortality}</td>
                       <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                         {isDeleted ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm bg-rose-50/80 text-rose-500 border border-rose-200/80"><AlertCircle size={12} /> {t("status.deleted")}</span>
+                          <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm bg-red-50 text-red-700 border border-red-200"><AlertCircle size={12} /> {t("status.deleted")}</span>
                         ) : (() => {
                           // Draft: resume badge. Pending: dropdown to move → Completed
                           // (then leaves Pending tab). Deletion = Delete + 10s undo.
@@ -408,13 +408,13 @@ function TripRecentTable({
                                 <select
                                   value="Pending"
                                   onChange={(e) => handleStatusChange(trip, e.target.value as TripStatus)}
-                                  className="w-full appearance-none rounded-xl px-3 py-1.5 text-xs font-bold border transition-all shadow-sm cursor-pointer pr-8 focus:outline-none focus:ring-2 focus:ring-offset-1 text-amber-500 border-amber-100 bg-amber-50/80 focus:ring-amber-500"
+                                  className="w-full appearance-none rounded-xl px-3 py-1.5 text-xs font-bold border transition-all shadow-sm cursor-pointer pr-8 focus:outline-none focus:ring-2 focus:ring-offset-1 text-orange-700 border-orange-200 bg-orange-50 focus:ring-orange-500"
                                   title={tSafe("ops.trip.move_to_completed") || "Move to Completed"}
                                 >
-                                  <option value="Pending" className="font-semibold bg-white text-amber-500">
+                                  <option value="Pending" className="font-semibold bg-white text-orange-700">
                                     ⏳ {tSafe("status.pending") || "Pending"}
                                   </option>
-                                  <option value="Completed" className="font-semibold bg-white text-emerald-500">
+                                  <option value="Completed" className="font-semibold bg-white text-emerald-700">
                                     ✅ {tSafe("status.completed") || "Completed"}
                                   </option>
                                 </select>

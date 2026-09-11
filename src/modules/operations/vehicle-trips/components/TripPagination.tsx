@@ -125,7 +125,7 @@ function TripPagination({ currentPage, totalPages, onPageChange, hidePageInfo = 
       {onPageSizeChange && pageSize != null && (
         <div className="mr-auto flex items-center gap-1.5">
           <span className="hidden text-xs font-semibold text-slate-600 sm:inline">
-            {t("common.rows")}
+            {t("common.rows_per_page")}
           </span>
           <MasterDropdown
             label={t("common.rows_per_page")}

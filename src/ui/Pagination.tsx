@@ -149,7 +149,7 @@ export function Pagination({
 
       {onPageSizeChange ? (
         <div className="mr-1 flex items-center gap-1.5">
-          <span className="hidden text-xs font-semibold text-slate-600 sm:inline">{t("common.rows", "Rows")}</span>
+          <span className="hidden text-xs font-semibold text-slate-600 sm:inline">{t("common.rows_per_page", "Rows per page")}</span>
           <MasterDropdown
             label={t("common.rows_per_page", "Rows per page")}
             hideLabel
