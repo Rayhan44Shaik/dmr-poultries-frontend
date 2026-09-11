@@ -99,17 +99,64 @@ function TripRecentTable({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  /** Effective list status: Step 5 fully submitted must never stay under Draft. */
+  const listStatus = (t: Trip): "Draft" | "Pending" | "Completed" | "Deleted" => {
+    if (t.deleted === true || t.status === "Deleted") return "Deleted";
+    if (t.status === "Completed") return "Completed";
+    // Wizard done (end/expenses submitted) OR explicit Pending → Pending tab
+    if (t.status === "Pending" || isTripWizardComplete(t)) return "Pending";
+    return "Draft";
+  };
+
+  const getStepBadge = (trip: Trip) => {
+    // Completed may still exist on older sample rows — show label only (no status change option).
+    if (trip.status === "Completed") {
+      return { label: t("status.completed"), color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <CheckCircle size={12} />, resume: false };
+    }
+    if (trip.status === "Pending") {
+      return { label: t("status.pending"), color: "bg-amber-50 text-amber-700 border-amber-200", icon: <Clock size={12} />, resume: false };
+    }
+    // Defensive: wizard fully submitted but status still Draft → treat as Pending
+    // (Step 5 submit should have moved it; never show Completed from Draft).
+    if (isTripWizardComplete(trip)) {
+      return { label: t("status.pending"), color: "bg-amber-50 text-amber-700 border-amber-200", icon: <Clock size={12} />, resume: false };
+    }
+    // A Draft trip always has Step 1 submitted (trips are created on Step 1
+    // submit), so it is always mid-workflow: show ONLY which step is pending
+    // next — no step name / farm detail.
+    const nextStep = getNextIncompleteTripStep(trip);
+    return {
+      label: t("ops.trip.step_label", { step: nextStep + 1 }),
+      color: "bg-emerald-50 text-emerald-700 border-emerald-200",
+      icon: <FileText size={12} />,
+      resume: true,
+    };
+  };
+
   const filterBySearch = (trips: Trip[]) => {
     if (!searchTerm.trim()) return trips;
     const lower = searchTerm.toLowerCase();
-    return trips.filter((t) =>
-      t.tripNo.toLowerCase().includes(lower) ||
-      t.tripDate.includes(lower) ||
-      t.vehicleNo.toLowerCase().includes(lower) ||
-      t.driverName.toLowerCase().includes(lower) ||
-      t.supervisorName.toLowerCase().includes(lower) ||
-      t.sourceFarm.toLowerCase().includes(lower)
-    );
+    // Collapse whitespace so "step1" and "step 1" both match "Step 1".
+    const squashed = lower.replace(/\s+/g, "");
+    return trips.filter((t) => {
+      // The status column renders a STEP BADGE, so the badge's own label is
+      // what has to be searchable ("Step 1"). Matching only the raw status
+      // field would never find the text the user can actually see.
+      const badge = getStepBadge(t).label.toLowerCase();
+      return (
+        t.tripNo.toLowerCase().includes(lower) ||
+        t.tripDate.includes(lower) ||
+        t.vehicleNo.toLowerCase().includes(lower) ||
+        t.driverName.toLowerCase().includes(lower) ||
+        t.supervisorName.toLowerCase().includes(lower) ||
+        t.sourceFarm.toLowerCase().includes(lower) ||
+        badge.includes(lower) ||
+        badge.replace(/\s+/g, "").includes(squashed) ||
+        // Also match the underlying status word (draft / pending / completed /
+        // deleted) even when the badge is showing a step instead.
+        listStatus(t).toLowerCase().includes(lower)
+      );
+    });
   };
 
   const sortedTrips = useMemo(() => {
@@ -119,15 +166,6 @@ function TripRecentTable({
       return b.id - a.id;
     });
   }, [safeTrips, searchTerm]);
-
-  /** Effective list status: Step 5 fully submitted must never stay under Draft. */
-  const listStatus = (t: Trip): "Draft" | "Pending" | "Completed" | "Deleted" => {
-    if (t.deleted === true || t.status === "Deleted") return "Deleted";
-    if (t.status === "Completed") return "Completed";
-    // Wizard done (end/expenses submitted) OR explicit Pending → Pending tab
-    if (t.status === "Pending" || isTripWizardComplete(t)) return "Pending";
-    return "Draft";
-  };
 
   const allDraft = sortedTrips.filter((t) => listStatus(t) === "Draft");
   // Pending tab: only Pending trips. Completed leaves this list (Trip List / accounts).
@@ -200,31 +238,6 @@ function TripRecentTable({
     setShowDeleteModal(false);
     setTripToDelete(null);
     setDeleteReason("");
-  };
-
-  const getStepBadge = (trip: Trip) => {
-    // Completed may still exist on older sample rows — show label only (no status change option).
-    if (trip.status === "Completed") {
-      return { label: t("status.completed"), color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <CheckCircle size={12} />, resume: false };
-    }
-    if (trip.status === "Pending") {
-      return { label: t("status.pending"), color: "bg-amber-50 text-amber-700 border-amber-200", icon: <Clock size={12} />, resume: false };
-    }
-    // Defensive: wizard fully submitted but status still Draft → treat as Pending
-    // (Step 5 submit should have moved it; never show Completed from Draft).
-    if (isTripWizardComplete(trip)) {
-      return { label: t("status.pending"), color: "bg-amber-50 text-amber-700 border-amber-200", icon: <Clock size={12} />, resume: false };
-    }
-    // A Draft trip always has Step 1 submitted (trips are created on Step 1
-    // submit), so it is always mid-workflow: show ONLY which step is pending
-    // next — no step name / farm detail.
-    const nextStep = getNextIncompleteTripStep(trip);
-    return {
-      label: t("ops.trip.step_label", { step: nextStep + 1 }),
-      color: "bg-emerald-50 text-emerald-700 border-emerald-200",
-      icon: <FileText size={12} />,
-      resume: true,
-    };
   };
 
   // Status control:

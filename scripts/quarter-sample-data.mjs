@@ -486,7 +486,7 @@ for (const date of OP_DATES) {
           masterRate: dayRate,
           lastTripRate: dayRate + between(r, -3, 3),
           lastTripDate: addDays(date, -between(r, 2, 9)),
-          lastTripNo: `TRP-${String(Math.max(1, tripSeq - between(r, 2, 20))).padStart(5, "0")}`,
+          lastTripNo: `TRP-${date.replace(/-/g, "")}-${String(between(r, 1, 6)).padStart(3, "0")}`,
           avgTripRate: dayRate + between(r, -2, 2),
           tripRateSamples: between(r, 3, 18),
         },
@@ -537,7 +537,7 @@ for (const date of OP_DATES) {
 
     const trip = {
       id: 10000 + tripSeq,
-      tripNo: `TRP-${String(tripSeq).padStart(5, "0")}`,
+      tripNo: `TRP-${date.replace(/-/g, "")}-${String(k + 1).padStart(3, "0")}`,
       tripDate: date,
 
       // Step 1

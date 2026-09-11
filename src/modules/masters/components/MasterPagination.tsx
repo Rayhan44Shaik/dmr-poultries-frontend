@@ -103,7 +103,7 @@ export default function MasterPagination({
       {children && <div className="mr-auto">{children}</div>}
       {onPageSizeChange && pageSize != null && (
         <div className="mr-1 flex items-center gap-1.5">
-          <span className="hidden text-[11px] font-medium text-slate-500 sm:inline">
+          <span className="hidden text-xs font-semibold text-slate-600 sm:inline">
             {t("common.rows")}
           </span>
           <MasterDropdown
@@ -128,7 +128,7 @@ export default function MasterPagination({
               if (Number.isFinite(next) && next !== pageSize) onPageSizeChange(next);
             }}
             disabled={disabled}
-            className="w-[86px] [&>button]:h-8 [&>button]:rounded-lg [&>button]:px-2 [&>button]:text-[11px]"
+            className="w-[86px] [&>button]:h-8 [&>button]:rounded-lg [&>button]:px-2 [&>button]:text-xs"
           />
         </div>
       )}
