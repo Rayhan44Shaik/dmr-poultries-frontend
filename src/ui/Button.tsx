@@ -101,6 +101,7 @@ export function Button({
   disabled,
   type,
   onClick,
+  title,
   "aria-label": ariaLabel,
   ...rest
 }: ButtonProps) {
@@ -121,6 +122,7 @@ export function Button({
       className={cn(
         iconOnly ? uiIconButton(resolvedVariant, size) : uiButton(resolvedVariant, size),
         // aria-disabled styling: mirrors the disabled look without dropping focus.
+        "group",
         "aria-disabled:cursor-not-allowed aria-disabled:opacity-55",
         className,
       )}
@@ -143,6 +145,14 @@ export function Button({
     >
       {loading ? <Spinner className={SPINNER_SIZE[size]} /> : icon}
       {children}
+      {title && (
+        <span
+          role="tooltip"
+          className="pointer-events-none absolute bottom-[calc(100%+6px)] right-0 z-[120] max-w-[220px] whitespace-normal line-clamp-2 rounded-md border border-slate-700/10 bg-slate-900 px-2.5 py-1.5 text-left text-[11px] font-medium leading-snug text-white opacity-0 shadow-lg transition-[opacity,transform] duration-150 group-hover:translate-y-0 group-hover:opacity-100 group-focus-visible:translate-y-0 group-focus-visible:opacity-100 translate-y-1"
+        >
+          {title}
+        </span>
+      )}
     </button>
   );
 }
