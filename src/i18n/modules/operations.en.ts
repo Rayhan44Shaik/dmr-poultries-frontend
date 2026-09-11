@@ -675,6 +675,7 @@ export default {
   'ops.trip.total_distance': 'Total Distance',
   'ops.trip.total_distance_km': 'Total Distance (KM)',
   'ops.trip.total_expense': 'Total Expense',
+  'ops.trip.communication_status': 'Communication status',
   'ops.trip.total_shops': 'Total Shops',
   'ops.trip.total_to_shops': 'Total to Shops',
   'ops.trip.total_toll_pickup': 'Total Toll (Pickup)',

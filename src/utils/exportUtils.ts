@@ -4,122 +4,194 @@ import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
 
+/** One brand identity for every PDF the product emits. */
+const BRAND_NAME = 'DMR POULTRIES';
+const BRAND_TAGLINE = 'Poultry Distribution & Logistics';
+const BRAND_GREEN: [number, number, number] = [5, 150, 105];
+const INK: [number, number, number] = [15, 23, 42];
+const MUTED: [number, number, number] = [100, 116, 139];
+const HAIRLINE: [number, number, number] = [226, 232, 240];
+
+export interface PdfFilterChip {
+  label: string;
+  value: string;
+}
+
+export interface PdfSummaryStat {
+  label: string;
+  value: string;
+}
+
+export interface ExportToPDFOptions {
+  /** "Applied filters" line — what this report was narrowed to. */
+  filters?: PdfFilterChip[];
+  /** Cumulative totals across the whole filtered set, not just this page. */
+  summary?: PdfSummaryStat[];
+  /** Columns rendered right-aligned (numeric). */
+  numericColumns?: number[];
+  /** Overrides the "Report" descriptor under the title. */
+  subtitle?: string;
+}
+
 /**
- * Generates and downloads an extremely polished, professional, and visually attractive PDF document.
+ * Generates and downloads a neat, branded A4 portrait report.
+ *
+ * Layout, top to bottom: brand bar, DMR header block with generation
+ * timestamp, the report title, the filters this data was narrowed by, a
+ * cumulative totals strip, then the data table with a footer on every page.
+ * Everything is measured off `pageWidth`/`pageHeight` so it stays inside the
+ * A4 margins no matter how many columns a caller passes.
  */
 export const exportToPDF = (
   title: string,
   headers: string[],
   rows: (string | number)[][],
-  filename: string
+  filename: string,
+  options: ExportToPDFOptions = {}
 ): void => {
-  const doc = new jsPDF({
-    orientation: 'portrait',
-    unit: 'mm',
-    format: 'a4',
-  });
+  const { filters = [], summary = [], numericColumns = [], subtitle } = options;
 
+  const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' });
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
-  const primaryColor = [37, 99, 235]; // Deep professional blue (#2563eb)
-  const secondaryColor = [71, 85, 105]; // Slate gray (#475569)
+  const M = 14; // page margin
+  const contentWidth = pageWidth - M * 2;
 
-  // ---------------------------------------------------------------------------
-  // 1. Decorative Header Accent Bar
-  // ---------------------------------------------------------------------------
-  doc.setFillColor(primaryColor[0], primaryColor[1], primaryColor[2]);
-  doc.rect(0, 0, pageWidth, 6, 'F');
+  // -- Brand bar ------------------------------------------------------------
+  doc.setFillColor(...BRAND_GREEN);
+  doc.rect(0, 0, pageWidth, 5, 'F');
 
-  // ---------------------------------------------------------------------------
-  // 2. Organization / Brand Header Block
-  // ---------------------------------------------------------------------------
+  // -- Brand block ----------------------------------------------------------
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(22);
-  doc.setTextColor(15, 23, 42); // Dark slate (#0f172a)
-  doc.text(title, 14, 22);
+  doc.setFontSize(17);
+  doc.setTextColor(...BRAND_GREEN);
+  doc.text(BRAND_NAME, M, 16);
 
   doc.setFont('helvetica', 'normal');
-  doc.setFontSize(10);
-  doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-  doc.text('Business Analytics & Performance Report', 14, 28);
+  doc.setFontSize(8.5);
+  doc.setTextColor(...MUTED);
+  doc.text(BRAND_TAGLINE, M, 21);
 
-  // Metadata block (Right aligned)
-  const currentDate = new Date().toLocaleDateString('en-GB', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
+  // Generated-on stamp, right aligned against the same margin.
+  const stamp = new Date().toLocaleString('en-GB', {
+    day: '2-digit', month: 'short', year: 'numeric',
+    hour: '2-digit', minute: '2-digit', hour12: true,
   });
   doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(secondaryColor[0], secondaryColor[1], secondaryColor[2]);
-  doc.text('GENERATED ON:', pageWidth - 14, 20, { align: 'right' });
-  
+  doc.setFontSize(7.5);
+  doc.setTextColor(...MUTED);
+  doc.text('GENERATED', pageWidth - M, 14, { align: 'right' });
   doc.setFont('helvetica', 'normal');
-  doc.text(currentDate, pageWidth - 14, 25, { align: 'right' });
+  doc.setFontSize(8.5);
+  doc.setTextColor(...INK);
+  doc.text(stamp, pageWidth - M, 19, { align: 'right' });
 
-  // ---------------------------------------------------------------------------
-  // 3. Divider Line
-  // ---------------------------------------------------------------------------
-  doc.setDrawColor(226, 232, 240); // Border color (#e2e8f0)
-  doc.setLineWidth(0.5);
-  doc.line(14, 34, pageWidth - 14, 34);
+  doc.setDrawColor(...HAIRLINE);
+  doc.setLineWidth(0.4);
+  doc.line(M, 25, pageWidth - M, 25);
 
-  // ---------------------------------------------------------------------------
-  // 4. Data Table Configuration with autoTable
-  // ---------------------------------------------------------------------------
+  // -- Report title ---------------------------------------------------------
+  let y = 33;
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(13);
+  doc.setTextColor(...INK);
+  doc.text(title, M, y);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8.5);
+  doc.setTextColor(...MUTED);
+  doc.text(subtitle ?? `${rows.length} record${rows.length === 1 ? '' : 's'}`, pageWidth - M, y, { align: 'right' });
+  y += 6;
+
+  // -- Applied filters ------------------------------------------------------
+  // Wrapped by hand so a long filter set cannot overflow the right margin.
+  if (filters.length) {
+    const text = filters.map((f) => `${f.label}: ${f.value}`).join('   |   ');
+    doc.setFont('helvetica', 'normal');
+    doc.setFontSize(8);
+    const lines = doc.splitTextToSize(text, contentWidth - 6) as string[];
+    const boxH = lines.length * 4 + 5;
+    doc.setFillColor(248, 250, 252);
+    doc.setDrawColor(...HAIRLINE);
+    doc.roundedRect(M, y, contentWidth, boxH, 1.5, 1.5, 'FD');
+    doc.setTextColor(...MUTED);
+    lines.forEach((line, i) => doc.text(line, M + 3, y + 6 + i * 4));
+    y += boxH + 4;
+  }
+
+  // -- Cumulative totals ----------------------------------------------------
+  // Evenly divided cards; these are the totals for the entire filtered set.
+  if (summary.length) {
+    const gap = 3;
+    const cardW = (contentWidth - gap * (summary.length - 1)) / summary.length;
+    const cardH = 14;
+    summary.forEach((stat, i) => {
+      const x = M + i * (cardW + gap);
+      doc.setFillColor(240, 253, 244);
+      doc.setDrawColor(187, 247, 208);
+      doc.roundedRect(x, y, cardW, cardH, 1.5, 1.5, 'FD');
+      doc.setFont('helvetica', 'normal');
+      doc.setFontSize(6.8);
+      doc.setTextColor(...MUTED);
+      doc.text(stat.label.toUpperCase(), x + 2.5, y + 5);
+      doc.setFont('helvetica', 'bold');
+      doc.setFontSize(10);
+      doc.setTextColor(...BRAND_GREEN);
+      doc.text(stat.value, x + 2.5, y + 11);
+    });
+    y += cardH + 5;
+  }
+
+  // -- Data table -----------------------------------------------------------
+  const columnStyles: Record<number, { halign: 'right' }> = {};
+  numericColumns.forEach((i) => { columnStyles[i] = { halign: 'right' }; });
+
   autoTable(doc, {
-    startY: 40,
+    startY: y,
     head: [headers],
-    body: rows,
+    body: rows.length ? rows : [[{ content: 'No records match the selected filters.', colSpan: headers.length, styles: { halign: 'center', textColor: MUTED } }] as never],
     theme: 'grid',
+    margin: { left: M, right: M, bottom: 18 },
+    tableWidth: 'auto',
     styles: {
       font: 'helvetica',
-      fontSize: 10,
-      cellPadding: 6,
-      textColor: [30, 41, 59], // Slate 800
-      lineColor: [226, 232, 240], // Light grid borders
-      lineWidth: 0.25,
+      fontSize: 7.5,
+      cellPadding: 2,
+      textColor: INK,
+      lineColor: HAIRLINE,
+      lineWidth: 0.1,
+      overflow: 'linebreak',
+      valign: 'middle',
     },
     headStyles: {
-      fillColor: [37, 99, 235], // Primary Blue Header
+      fillColor: BRAND_GREEN,
       textColor: [255, 255, 255],
       fontStyle: 'bold',
+      fontSize: 7.5,
+      cellPadding: 2.5,
       halign: 'left',
-      cellPadding: 7,
     },
-    alternateRowStyles: {
-      fillColor: [248, 250, 252], // Subtle zebra striping
-    },
-    columnStyles: {
-      0: { fontStyle: 'bold', cellWidth: 'auto' },
-    },
+    alternateRowStyles: { fillColor: [249, 250, 251] },
+    columnStyles,
     didDrawPage: (data) => {
-      // -----------------------------------------------------------------------
-      // 5. Professional Footer on Every Page
-      // -----------------------------------------------------------------------
-      const pageCount = doc.internal.pages.length - 1;
+      const pageCount = doc.getNumberOfPages();
+      doc.setDrawColor(...HAIRLINE);
+      doc.setLineWidth(0.3);
+      doc.line(M, pageHeight - 12, pageWidth - M, pageHeight - 12);
+
       doc.setFont('helvetica', 'normal');
-      doc.setFontSize(8.5);
-      doc.setTextColor(148, 163, 184); // Muted slate
-
-      // Footer divider line
-      doc.setDrawColor(241, 245, 249);
-      doc.line(14, pageHeight - 15, pageWidth - 14, pageHeight - 15);
-
-      // Left-aligned footer note
-      doc.text('Confidential Business Report • Generated Automatically', 14, pageHeight - 10);
-
-      // Right-aligned page number
+      doc.setFontSize(7.5);
+      doc.setTextColor(...MUTED);
+      doc.text(`${BRAND_NAME}  •  Confidential`, M, pageHeight - 7.5);
       doc.text(
         `Page ${data.pageNumber} of ${pageCount}`,
-        pageWidth - 14,
-        pageHeight - 10,
+        pageWidth - M,
+        pageHeight - 7.5,
         { align: 'right' }
       );
     },
   });
 
-  // Save the PDF file
   doc.save(`${filename}.pdf`);
 };
 

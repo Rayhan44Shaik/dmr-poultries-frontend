@@ -4,10 +4,13 @@ import { useI18n } from "../../../i18n";
 import { isEditableTarget } from "../../../utils/interaction";
 import { cn } from "../../../utils/cn";
 import {
+  MAX_CUSTOM_PAGE_SIZE,
+  PAGINATION_PAGE_SIZE_OPTIONS,
   uiPaginationBarClass,
   uiPaginationNavButtonClass,
   uiPaginationPageButtonClass,
 } from "../../../shared/ui/uiTokens";
+import MasterDropdown from "./MasterDropdown";
 
 interface Props {
   page: number;
@@ -15,6 +18,10 @@ interface Props {
   onPageChange: (page: number) => void;
   disabled?: boolean;
   children?: ReactNode;
+  /** Current rows-per-page. Pass with onPageSizeChange to show the control. */
+  pageSize?: number;
+  /** Omit to hide the rows-per-page control. */
+  onPageSizeChange?: (pageSize: number) => void;
 }
 
 /**
@@ -39,6 +46,8 @@ export default function MasterPagination({
   onPageChange,
   disabled,
   children,
+  pageSize,
+  onPageSizeChange,
 }: Props) {
   const { t } = useI18n();
 
@@ -92,6 +101,37 @@ export default function MasterPagination({
       )}
     >
       {children && <div className="mr-auto">{children}</div>}
+      {onPageSizeChange && pageSize != null && (
+        <div className="mr-1 flex items-center gap-1.5">
+          <span className="hidden text-xs font-semibold text-slate-600 sm:inline">
+            {t("common.rows_per_page")}
+          </span>
+          <MasterDropdown
+            label={t("common.rows_per_page")}
+            hideLabel
+            value={String(pageSize)}
+            options={PAGINATION_PAGE_SIZE_OPTIONS.map((size) => ({
+              value: String(size),
+              label: String(size),
+            }))}
+            // Matches the Salary Register's Department / Employee pickers:
+            // type to filter, or commit a count that is not a preset.
+            searchable
+            allowCustomValue
+            validateCustom={(raw) => {
+              if (!/^\d+$/.test(raw)) return null;
+              const n = Number(raw);
+              return n >= 1 && n <= MAX_CUSTOM_PAGE_SIZE ? String(n) : null;
+            }}
+            onChange={(value) => {
+              const next = Number(value);
+              if (Number.isFinite(next) && next !== pageSize) onPageSizeChange(next);
+            }}
+            disabled={disabled}
+            className="w-[86px] [&>button]:h-8 [&>button]:rounded-lg [&>button]:px-2 [&>button]:text-xs"
+          />
+        </div>
+      )}
       <nav
         aria-label={t("masters.ui.pagination")}
         className="flex items-center gap-1.5"

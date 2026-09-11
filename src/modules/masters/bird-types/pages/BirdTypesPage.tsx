@@ -22,7 +22,7 @@ import { buildBirdTypeBulkImportConfig } from "../bulkImportConfig";
 
 type BirdTypesPageProps = { embedded?: boolean };
 
-const ITEMS_PER_PAGE = 10;
+const DEFAULT_PAGE_SIZE = 10;
 
 function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
   const [showDialog, setShowDialog] = useState(false);
@@ -32,6 +32,7 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
   const [statusFilter, setStatusFilter] = useState("");
   const [sortOrder, setSortOrder] = useState("number");
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const { showNotification } = useSafeNotification();
@@ -46,7 +47,7 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
     editBirdType,
     removeBirdType,
     total, page: serverPage, exportRows,
-  } = useBirdTypes({ page: currentPage, pageSize: ITEMS_PER_PAGE, search, status: statusFilter, sort: sortOrder });
+  } = useBirdTypes({ page: currentPage, pageSize: pageSize, search, status: statusFilter, sort: sortOrder });
 
   const birdTypeBulkImportConfig = useMemo(
     () => buildBirdTypeBulkImportConfig({ addBirdTypesBulk, reload }),
@@ -59,7 +60,7 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
     setCurrentPage(1);
   };
 
-  const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const safePage = serverPage;
   const paginatedBirdTypes = birdTypes;
 
@@ -307,6 +308,11 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
             totalPages={totalPages}
             onPageChange={setCurrentPage}
             disabled={loading}
+            pageSize={pageSize}
+            onPageSizeChange={(next) => {
+              setPageSize(next);
+              setCurrentPage(1); // a new page size invalidates the current page
+            }}
           />
         )}
       </div>

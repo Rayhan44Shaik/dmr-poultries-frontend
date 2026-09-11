@@ -519,6 +519,12 @@ export const PAGINATION_DEFAULT_PAGE_SIZE = 20;
 
 export const PAGINATION_PAGE_SIZE_OPTIONS = [10, 20, 50, 100] as const;
 
+/**
+ * Upper bound for a typed rows-per-page value. Rendering an unbounded number of
+ * rows would freeze the tab, so custom entry is clamped to this.
+ */
+export const MAX_CUSTOM_PAGE_SIZE = 500;
+
 export const uiPaginationBarClass =
   "flex w-full max-w-full flex-wrap items-center justify-end gap-1.5 px-3 py-2";
 

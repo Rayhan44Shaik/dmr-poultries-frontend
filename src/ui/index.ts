@@ -37,6 +37,11 @@ export {
   type ActionButtonProps,
   type ActionToolbarProps,
 } from "./ExportActions";
+/** Canonical branded refresh control (emerald + animated hen logo). */
+export {
+  BrandRefreshButton,
+  type BrandRefreshButtonProps,
+} from "./BrandRefreshButton";
 
 /* --- forms --------------------------------------------------------------- */
 export { Field, type FieldProps, type FieldIds } from "./Field";
