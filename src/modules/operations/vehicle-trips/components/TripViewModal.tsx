@@ -13,17 +13,17 @@ import {
   FileDown,
 } from "lucide-react";
 import { WhatsAppIcon } from "../../../../ui/WhatsAppIcon";
-import type { Trip } from "../types/trip";
+import type { Trip, ShopDelivery } from "../types/trip";
 import type { Shop } from "../../../masters/shops/types/shop";
 import type { BirdType } from "../../../masters/bird-types/types/birdType";
 import {
   getTripWizardCompletedMask,
   isTripWizardComplete,
   TRIP_STEP_LABELS,
-  TRIP_STEP_KEYS,
   getNextIncompleteTripStep,
 } from "../../../../shared/trip";
 import { generateTripReportPDF, type TripReportEmailInfo } from "../utils/generateTripPDF";
+import { generateShopPDF } from "../utils/generateShopPDF";
 import { useTripDeliveryEmails } from "../hooks/useTripDeliveryEmails";
 import { useTripDeliveryWhatsApps } from "../hooks/useTripDeliveryWhatsApps";
 import { useI18n } from "../../../../i18n";
@@ -32,6 +32,7 @@ import StepFarm from "./StepFarm";
 import StepPickup from "./StepPickup";
 import StepEnd from "./Step_5/StepEnd";
 import StepDeliveries from "./StepDeliveries";
+import TripViewShopCards from "./TripViewShopCards";
 
 import TripWizardStepper from "./TripWizardStepper";
 import TripFinalKPI from "./TripFinalKPI";
@@ -118,13 +119,63 @@ function Step4View({
   trip,
   shops,
   birdTypes,
+  showCommunicationStatus,
+  emailState,
+  whatsappState,
 }: {
   trip: Trip;
   shops: Shop[];
   birdTypes: BirdType[];
+  showCommunicationStatus: boolean;
+  emailState: ReturnType<typeof useTripDeliveryEmails>;
+  whatsappState: ReturnType<typeof useTripDeliveryWhatsApps>;
 }) {
   const viewTrip: Trip = { ...trip, deliveryStepSubmitted: true };
   const deliveries = Array.isArray(trip.deliveries) ? trip.deliveries : [];
+
+  if (showCommunicationStatus) {
+    const downloadShopPdf = (delivery: ShopDelivery) => {
+      void generateShopPDF(
+        delivery as Parameters<typeof generateShopPDF>[0],
+        trip.boxDetails || [],
+        trip.tripNo,
+        trip.vehicleNo,
+        trip.supervisorName,
+        "",
+        trip.tripDate,
+        undefined,
+        undefined,
+        delivery.autoCaptureTime,
+        trip.driverName
+      );
+    };
+
+    return (
+      <TripViewShopCards
+        trip={trip}
+        shops={shops}
+        effectiveStatus={emailState.effectiveStatus}
+        busyIds={emailState.busyIds}
+        isBulkSending={emailState.isBulkSending}
+        bulkProgress={emailState.bulkProgress}
+        shopEmailFor={emailState.shopEmailFor}
+        sendCountFor={emailState.sendCountFor}
+        onSendOne={(delivery) => void emailState.sendOne(delivery)}
+        onDownloadPdf={downloadShopPdf}
+        emailCounts={emailState.counts}
+        whatsappEffectiveStatus={whatsappState.effectiveStatus}
+        whatsappBusyIds={whatsappState.busyIds}
+        whatsappIsBulkSending={whatsappState.isBulkSending}
+        shopWhatsAppFor={whatsappState.shopWhatsAppFor}
+        whatsappSendCountFor={whatsappState.sendCountFor}
+        onSendOneWhatsApp={(delivery) => void whatsappState.sendOne(delivery)}
+        whatsappCounts={whatsappState.counts}
+        failureReasonFor={emailState.failureReasonFor}
+        whatsappFailureReasonFor={whatsappState.failureReasonFor}
+      />
+    );
+  }
+
   return (
     <StepDeliveries
       rows={deliveries}
@@ -247,7 +298,16 @@ function TripViewModal({
         return trip.pickupStepSubmitted ? <Step3View trip={trip} /> : emptyStep;
       case 3:
         return isDeliveryCompleted
-          ? <Step4View trip={trip} shops={shops} birdTypes={birdTypes} />
+          ? (
+              <Step4View
+                trip={trip}
+                shops={shops}
+                birdTypes={birdTypes}
+                showCommunicationStatus={showCommunicationStatus}
+                emailState={emailState}
+                whatsappState={whatsappState}
+              />
+            )
           : emptyStep;
       case 4:
         return isEndCompleted ? <Step5View trip={trip} /> : emptyStep;
@@ -304,8 +364,8 @@ function TripViewModal({
             <div className="px-6 md:px-8 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-slate-100/50">
               <div className="flex items-center gap-3 flex-wrap">
                 {showCommunicationStatus && emailCounts.total > 0 && (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-sky-500" role="status" aria-live="polite">
-                    <Mail size={12} className="text-sky-500" />
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-red-100 bg-red-50/80 px-2.5 py-1 text-xs font-medium text-red-600" role="status" aria-live="polite">
+                    <Mail size={12} className="text-red-500" />
                     {emailState.isBulkSending ? (
                       <>
                         {t("ops.trip.sending")}... {emailState.bulkProgress?.sent ?? emailCounts.sent} / {emailState.bulkProgress?.total ?? emailCounts.total}
@@ -320,7 +380,7 @@ function TripViewModal({
                   </span>
                 )}
                 {showCommunicationStatus && whatsappCounts.total > 0 && (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#128C7E]" role="status" aria-live="polite">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[#25D366]/25 bg-[#25D366]/10 px-2.5 py-1 text-xs font-medium text-[#128C7E]" role="status" aria-live="polite">
                     <WhatsAppIcon size={12} className="text-[#25D366]" />
                     {whatsappState.isBulkSending ? (
                       <>
@@ -343,7 +403,7 @@ function TripViewModal({
                     type="button"
                     onClick={() => void emailState.sendAll()}
                     disabled={emailState.isBulkSending}
-                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-sky-400/25 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-2 rounded-xl border border-red-100 bg-red-50/90 hover:bg-red-100 px-4 py-2 text-xs font-semibold text-red-600 shadow-sm shadow-red-100/60 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                     title={t("ops.trip.send_email_all")}
                   >
                     {emailState.isBulkSending ? (
@@ -359,7 +419,7 @@ function TripViewModal({
                     type="button"
                     onClick={() => void whatsappState.sendAll()}
                     disabled={whatsappState.isBulkSending}
-                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#25D366] to-[#128C7E] hover:from-[#1ebe5d] hover:to-[#0f7a6d] px-4 py-2 text-xs font-semibold text-white shadow-md shadow-[#25D366]/25 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-2 rounded-xl border border-[#25D366] bg-[#25D366] hover:bg-[#1ebe5d] px-4 py-2 text-xs font-semibold text-white shadow-md shadow-[#25D366]/25 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                     title={t("ops.trip.send_whatsapp_all")}
                   >
                     {whatsappState.isBulkSending ? (
@@ -386,27 +446,6 @@ function TripViewModal({
 
         {/* ─── Body ─────────────────────────────────────────────────── */}
         <div className="py-6 md:py-8 px-4 md:px-8 overflow-y-auto space-y-5 flex-1">
-          {/* Trip identity strip — the trip number travels with every step view */}
-          <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 rounded-xl border border-slate-100 bg-slate-50/70 px-4 py-2.5 text-xs">
-            <span className="font-bold tracking-tight text-slate-800">{trip.tripNo}</span>
-            <span className="text-slate-300">·</span>
-            <span className="font-medium text-slate-500">{trip.tripDate}</span>
-            {trip.vehicleNo ? (
-              <>
-                <span className="text-slate-300">·</span>
-                <span className="font-medium text-slate-500">{trip.vehicleNo}</span>
-              </>
-            ) : null}
-            {trip.sourceFarm ? (
-              <>
-                <span className="text-slate-300">·</span>
-                <span className="font-medium text-slate-500">{trip.sourceFarm}</span>
-              </>
-            ) : null}
-            <span className="ml-auto inline-flex items-center gap-1.5 rounded-full bg-white border border-slate-200 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-indigo-500">
-              {t("ops.trip.step_label", { step: safeViewStepIndex + 1 })} · {t(`ops.trip.step.${TRIP_STEP_KEYS[safeViewStepIndex]}`)}
-            </span>
-          </div>
           <TripWizardStepper
             steps={TRIP_STEP_LABELS}
             currentStep={safeViewStepIndex}

@@ -50,6 +50,42 @@ export type TripViewShopCardsProps = {
   whatsappFailureReasonFor?: (deliveryId: number) => string | null;
 };
 
+function CommunicationCountChip({
+  channel,
+  count,
+  title,
+}: {
+  channel: "mail" | "whatsapp";
+  count: number;
+  title: string;
+}) {
+  const isWhatsApp = channel === "whatsapp";
+  const Icon = isWhatsApp ? WhatsAppIcon : Mail;
+  const safeCount = Math.max(0, Number(count) || 0);
+  const countLabel = safeCount > 99 ? "99+" : String(safeCount);
+
+  return (
+    <span
+      className={`relative inline-flex h-8 w-8 items-center justify-center rounded-xl border shadow-xs ${
+        isWhatsApp
+          ? "border-[#25D366]/25 bg-[#25D366]/10 text-[#25D366]"
+          : "border-red-100 bg-red-50/90 text-red-500"
+      }`}
+      title={title}
+      aria-label={title}
+    >
+      <Icon size={15} />
+      <span
+        className={`absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-extrabold leading-none text-white ring-2 ring-white ${
+          isWhatsApp ? "bg-[#25D366]" : "bg-red-500"
+        }`}
+      >
+        {countLabel}
+      </span>
+    </span>
+  );
+}
+
 function CommunicationIcon({
   channel,
   status,
@@ -75,9 +111,9 @@ function CommunicationIcon({
   const isSending = status === "sending" || sending;
 
   const isWhatsApp = channel === "whatsapp";
-  const pendingIconColor = isWhatsApp ? "text-[#25D366]" : "text-sky-500";
-  const pendingBgColor = isWhatsApp ? "bg-[#25D366]/10 hover:bg-[#25D366]/15" : "bg-sky-50/70 hover:bg-sky-50/80";
-  const pendingBorderColor = isWhatsApp ? "border-[#25D366]/25" : "border-sky-100";
+  const pendingIconColor = isWhatsApp ? "text-[#25D366]" : "text-red-500";
+  const pendingBgColor = isWhatsApp ? "bg-[#25D366]/10 hover:bg-[#25D366]/15" : "bg-red-50/80 hover:bg-red-100";
+  const pendingBorderColor = isWhatsApp ? "border-[#25D366]/25" : "border-red-100";
 
   let iconColor = pendingIconColor;
   let bgColor = pendingBgColor;
@@ -280,30 +316,38 @@ export function TripViewShopCards({
                 key={delivery.id}
                 className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-sm hover:shadow-md transition-shadow flex flex-col gap-2.5"
               >
-                {/* Header: Shop name, email, delivery mode badge */}
+                {/* Header: shop name + separate top communication logo counts */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-sm font-bold text-slate-800 truncate" title={delivery.shopName}>
                       {delivery.shopName || t("ops.trip.not_entered")}
                     </p>
-                    <p className="text-xs text-slate-500 truncate mt-0.5">
-                      {shopEmailFor(delivery)}
-                    </p>
-                    {shopWhatsAppFor && (
-                      <p className="text-xs text-slate-500 truncate mt-0.5">
-                        WhatsApp: {shopWhatsAppFor(delivery)}
-                      </p>
-                    )}
                   </div>
-                  <span
-                    className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-bold border ${
-                      isWeightMode
-                        ? "bg-purple-50/70 text-purple-500 border-purple-200/60"
-                        : "bg-amber-50/70 text-amber-500 border-amber-200/60"
-                    }`}
-                  >
-                    {isWeightMode ? t("ops.trip.weight_mode") : t("ops.trip.box_mode")}
-                  </span>
+                  <div className="shrink-0 flex flex-col items-end gap-1.5">
+                    <div className="flex items-center gap-1.5" aria-label={t("ops.trip.communication_status")}>
+                      <CommunicationCountChip
+                        channel="mail"
+                        count={sendCount}
+                        title={`${t("ops.trip.email")}: ${shopEmailFor(delivery)} · ${sendCount}`}
+                      />
+                      {shopWhatsAppFor && (
+                        <CommunicationCountChip
+                          channel="whatsapp"
+                          count={whatsappSendCount}
+                          title={`${t("ops.trip.whatsapp")}: ${shopWhatsAppFor(delivery)} · ${whatsappSendCount}`}
+                        />
+                      )}
+                    </div>
+                    <span
+                      className={`rounded-md px-2 py-0.5 text-[10px] font-bold border ${
+                        isWeightMode
+                          ? "bg-purple-50/70 text-purple-500 border-purple-200/60"
+                          : "bg-amber-50/70 text-amber-500 border-amber-200/60"
+                      }`}
+                    >
+                      {isWeightMode ? t("ops.trip.weight_mode") : t("ops.trip.box_mode")}
+                    </span>
+                  </div>
                 </div>
 
                 {/* Delivery Statistics - 3 equal columns */}
