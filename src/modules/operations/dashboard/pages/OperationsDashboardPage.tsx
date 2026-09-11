@@ -10,7 +10,7 @@ import RecentTripsTable from "../components/RecentTripsTable";
 import ActiveCounts from "../components/ActiveCounts";
 import PendingCollectionsByShop from "../components/PendingCollectionsByShop";
 import PendingApprovalsPanel from "../components/PendingApprovalsPanel";
-import { Calendar, ArrowRightLeft, RefreshCw } from "lucide-react";
+import { Calendar, CalendarRange, ArrowRightLeft, RefreshCw } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import { useI18n } from "../../../../i18n";
 import { kickApprovalSnapshot } from "../../../approvals/services/approvalSnapshot";
@@ -108,10 +108,13 @@ function RangeDatePicker({
         <button
           type="button"
           onClick={toggleCalendar}
-          className="h-11 px-5 rounded-xl border border-slate-200/80 bg-slate-50/70 flex items-center gap-2.5 text-sm font-bold text-slate-700 hover:border-emerald-500/50 hover:bg-slate-100/80 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all active:scale-[0.98]"
+          aria-label="Select date range"
+          className="group h-11 rounded-xl border border-emerald-200/80 bg-emerald-50/50 py-1.5 pl-2 pr-4 flex items-center gap-2.5 text-[13.5px] font-semibold tracking-tight text-emerald-950/85 shadow-sm hover:border-emerald-300 hover:bg-emerald-50 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all active:scale-[0.98]"
         >
-          <Calendar size={18} className="text-emerald-600" />
-          <span>
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-white text-emerald-600 ring-1 ring-emerald-200/70 transition-transform group-hover:scale-105">
+            <CalendarRange size={17} strokeWidth={2.2} />
+          </span>
+          <span className="whitespace-nowrap tabular-nums">
             {startDate && endDate
               ? `${formatDate(startDate)} – ${formatDate(endDate)}`
               : t("ops.dashboard.select_range")}

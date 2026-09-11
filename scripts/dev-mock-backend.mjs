@@ -473,6 +473,74 @@ const MAINTENANCE = [
   },
 ];
 
+// ── Sample Fleet Permits / Documents (RC, insurance, fitness, permit, PUC) ───
+// Reached at /api/fleet/permits (the Permits & Documents tab). Every vehicle
+// gets one of each document with deterministic validity; a few are seeded
+// expired / expiring soon so the dashboard "Documents" KPI and the matrix show
+// actionable rows. In-memory: edits survive until the stub restarts.
+const DOC_TYPES = ["insurance", "fitness", "permit", "puc", "rc"];
+// Base validity (days from today) per type, staggered slightly per vehicle.
+const DOC_BASE_DAYS = { insurance: 250, fitness: 400, permit: 330, puc: 90, rc: 600 };
+// Explicit overrides keyed `${vehicleId}:${docType}` → days-from-today.
+const DOC_OVERRIDE_DAYS = {
+  "3:rc": -42,          // RC expired
+  "5:insurance": -12,  // Insurance expired
+  "8:puc": -6,         // PUC expired
+  "2:fitness": 15,     // Fitness expiring within 30 days
+  "6:permit": 25,      // Permit expiring within 30 days
+};
+
+const PERMITS = [];
+{
+  let permitId = 5000;
+  for (const vehicle of VEHICLES) {
+    for (const docType of DOC_TYPES) {
+      const key = `${vehicle.id}:${docType}`;
+      const days = Object.prototype.hasOwnProperty.call(DOC_OVERRIDE_DAYS, key)
+        ? DOC_OVERRIDE_DAYS[key]
+        : DOC_BASE_DAYS[docType] + ((vehicle.id * 17) % 120);
+      const expiry = iso(addDays(new Date(), days));
+      const validityYears = docType === "rc" ? 15 : docType === "fitness" ? 8 : docType === "permit" ? 5 : 1;
+      const validFrom = iso(addDays(new Date(), days - validityYears * 365));
+      const vn = String(vehicle.vehicleNumber).replace(/\s+/g, "").slice(-4);
+      PERMITS.push({
+        id: permitId++,
+        vehicleId: vehicle.id,
+        vehicleNo: vehicle.vehicleNumber,
+        docType,
+        documentNumber: `${docType.toUpperCase()}-${vn}-${String(vehicle.id).padStart(3, "0")}`,
+        validFrom,
+        expiryDate: expiry,
+        remarks: days < 0 ? "Expired — renew immediately" : days <= 30 ? "Renewal due soon" : null,
+        hasDocument: true,
+        fileName: null,
+        mimeType: null,
+        fileSize: null,
+        createdBy: "owner",
+        createdAt: `${validFrom}T09:00:00.000Z`,
+        updatedAt: null,
+        _mock: true,
+      });
+    }
+  }
+}
+let nextPermitId = 6000;
+
+function permitSummary() {
+  const byType = {};
+  for (const docType of DOC_TYPES) byType[docType] = { total: 0, expired: 0, expiring: 0, safe: 0 };
+  const todayIso = iso(new Date());
+  for (const p of PERMITS) {
+    const bucket = byType[p.docType];
+    if (!bucket) continue;
+    bucket.total += 1;
+    if (p.expiryDate < todayIso) bucket.expired += 1;
+    else if (p.expiryDate <= iso(addDays(new Date(), 30))) bucket.expiring += 1;
+    else bucket.safe += 1;
+  }
+  return { total: PERMITS.length, byType, _mock: true };
+}
+
 // Authoritative "current odometer" per vehicle (what /meter-summary serves).
 // Chosen so the Upcoming Service panel shows due-soon, overdue and safe rows.
 const VEHICLE_METERS = {
@@ -2688,6 +2756,63 @@ const server = http.createServer((req, res) => {
     if (!record) return send(404, { error: "not_found", mock: true });
     record.deletedAt = new Date().toISOString();
     return send(200, { ...record, _mock: true });
+  }
+
+  // ── Fleet Permits & Documents (sample) ───────────────────────────────────
+  // GET /api/fleet/permits/summary — per-type expired/expiring/safe buckets.
+  if (url.pathname === "/api/fleet/permits/summary" && req.method === "GET") {
+    return send(200, permitSummary());
+  }
+
+  // GET /api/fleet/permits — every permit document across all vehicles.
+  if (url.pathname === "/api/fleet/permits" && req.method === "GET") {
+    return send(200, PERMITS.map((p) => ({ ...p })));
+  }
+
+  // PUT /api/fleet/permits/:vehicleId/:docType — create or update one record.
+  const permitUpsertMatch = url.pathname.match(
+    /^\/api\/fleet\/permits\/(\d+)\/(insurance|fitness|permit|puc|rc)$/
+  );
+  if (permitUpsertMatch && req.method === "PUT") {
+    readJsonBody(req).then((body) => {
+      const vehicleId = Number(permitUpsertMatch[1]);
+      const docType = permitUpsertMatch[2];
+      const vehicle = VEHICLE_BY_ID.get(vehicleId);
+      const existing = PERMITS.find((p) => p.vehicleId === vehicleId && p.docType === docType);
+      const expiryDate = body?.expiryDate || existing?.expiryDate || iso(addDays(new Date(), 365));
+      const payload = {
+        vehicleId,
+        vehicleNo: vehicle?.vehicleNumber || existing?.vehicleNo || `VH-${vehicleId}`,
+        docType,
+        documentNumber: body?.documentNumber ?? existing?.documentNumber ?? "",
+        validFrom: body?.validFrom ?? existing?.validFrom ?? null,
+        expiryDate,
+        remarks: body?.remarks ?? null,
+        hasDocument: true,
+        fileName: body?.fileName ?? existing?.fileName ?? null,
+        mimeType: body?.mimeType ?? existing?.mimeType ?? null,
+        fileSize: body?.fileSize ?? existing?.fileSize ?? null,
+        createdBy: body?.createdBy ?? existing?.createdBy ?? "owner",
+        updatedAt: new Date().toISOString(),
+      };
+      if (existing) Object.assign(existing, payload);
+      else PERMITS.push({ id: nextPermitId++, ...payload, createdAt: new Date().toISOString(), _mock: true });
+      send(200, { ...(existing ?? PERMITS[PERMITS.length - 1]), _mock: true });
+    });
+    return;
+  }
+
+  // DELETE /api/fleet/permits/:vehicleId/:docType — remove one record.
+  const permitDeleteMatch = url.pathname.match(
+    /^\/api\/fleet\/permits\/(\d+)\/(insurance|fitness|permit|puc|rc)$/
+  );
+  if (permitDeleteMatch && req.method === "DELETE") {
+    const vehicleId = Number(permitDeleteMatch[1]);
+    const docType = permitDeleteMatch[2];
+    const index = PERMITS.findIndex((p) => p.vehicleId === vehicleId && p.docType === docType);
+    if (index === -1) return send(404, { error: "not_found", mock: true });
+    const [removed] = PERMITS.splice(index, 1);
+    return send(200, { ...removed, _mock: true });
   }
 
   // ── Rate Entry (sample) ─────────────────────────────────────────────────

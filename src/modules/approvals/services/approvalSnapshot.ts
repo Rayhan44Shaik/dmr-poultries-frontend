@@ -16,6 +16,7 @@
 
 import { listTrips } from '../../operations/vehicle-trips/services/tripHeaderApiService';
 import { maintenanceApi, mapMaintenanceToEvent } from '../../fleet-operations/services/maintenanceApi';
+import permitApi from '../../fleet-operations/services/permitApi';
 import { listEligibleTrips } from '../../operations/shop-sales/services/rateEntryApiService';
 import { listPayments } from '../../accounts/services/paymentApiService';
 import { createDemoPayments } from '../../accounts/utils/paymentRegisterDemo';
@@ -46,6 +47,8 @@ export interface ApprovalSnapshot {
   maintenance: ApprovalQueue;
   rateEntries: ApprovalQueue;
   payments: ApprovalQueue;
+  /** Expired fleet permits/documents (RC, insurance, fitness, permit, PUC). */
+  documents: ApprovalQueue;
   total: number;
 }
 
@@ -60,6 +63,7 @@ const INITIAL: ApprovalSnapshot = {
   maintenance: { ...EMPTY_QUEUE },
   rateEntries: { ...EMPTY_QUEUE },
   payments: { ...EMPTY_QUEUE },
+  documents: { ...EMPTY_QUEUE },
   total: 0,
 };
 
@@ -110,9 +114,10 @@ export function refreshApprovalSnapshot(force = false): Promise<void> {
       maintenanceApi.list({ status: 'Pending', limit: 500 }),
       listEligibleTrips().catch(() => []),
       demoPayments ? Promise.resolve(createDemoPayments()) : listPayments().catch(() => []),
+      permitApi.list().catch(() => []),
     ]);
 
-    const [tripsResult, maintenanceResult, rateResult, paymentsResult] = results;
+    const [tripsResult, maintenanceResult, rateResult, paymentsResult, documentsResult] = results;
 
     // Trips awaiting approval (Pending, excluding the [ORDER] container trips).
     let tripsQueue = snapshot.trips;
@@ -186,7 +191,30 @@ export function refreshApprovalSnapshot(force = false): Promise<void> {
       };
     }
 
-    const anyFailed = results.some((r) => r.status === 'rejected');
+    // Expired fleet permits/documents (mirrors the Permits matrix threshold:
+    // expiry strictly before today is "expired"; within 30 days is "expiring").
+    let documentsQueue = snapshot.documents;
+    if (documentsResult.status === 'fulfilled') {
+      const todayIso = new Date().toISOString().slice(0, 10);
+      const expired = documentsResult.value.filter(
+        (doc) => doc.hasDocument !== false && !!doc.expiryDate && doc.expiryDate < todayIso
+      );
+      documentsQueue = {
+        count: expired.length,
+        value: 0,
+        items: expired.slice(0, cap).map((doc) => ({
+          id: `doc-${doc.id}`,
+          ref: doc.vehicleNo || `Vehicle ${doc.vehicleId}`,
+          sub: String(doc.docType).toUpperCase(),
+          waitingFrom: doc.expiryDate,
+        })),
+      };
+    }
+
+    // A permit failure alone must not make the approval counters look broken.
+    const anyFailed = results
+      .slice(0, 4)
+      .some((r) => r.status === 'rejected');
     lastSuccessAt = Date.now();
     publish({
       loaded: true,
@@ -197,6 +225,7 @@ export function refreshApprovalSnapshot(force = false): Promise<void> {
       maintenance: maintenanceQueue,
       rateEntries: rateQueue,
       payments: paymentQueue,
+      documents: documentsQueue,
     });
   })();
 

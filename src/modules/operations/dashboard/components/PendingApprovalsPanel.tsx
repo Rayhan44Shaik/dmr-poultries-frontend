@@ -12,6 +12,7 @@ import type { LucideIcon } from "lucide-react";
 import {
   Banknote,
   CheckCircle2,
+  FileWarning,
   ReceiptText,
   Truck,
   Wrench,
@@ -42,6 +43,12 @@ const preloaders: Record<string, () => void> = {
   },
   payments: () =>
     preloadOnce("accounts", () => import("../../../accounts/pages/AccountsPage")),
+  documents: () => {
+    preloadOnce("fleet", () => import("../../../fleet-operations/pages/FleetPages"));
+    preloadOnce("fleet-permits", () =>
+      import("../../../fleet-operations/pages/DocumentsExpiryPage")
+    );
+  },
 };
 
 interface Stat {
@@ -64,15 +71,15 @@ interface Stat {
 export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode }) {
   const q = usePendingApprovals();
   const loading = !q.loaded;
-  const allClear = q.loaded && q.total === 0;
+  const allClear = q.loaded && q.total === 0 && q.documents.count === 0;
 
-  // Warm the maintenance (Fleet) route on idle — it is the one destination
-  // loaded as a separate lazy chunk, so this makes its tile click instant.
+  // Warm the Fleet route (Maintenance + Documents tabs) on idle — these are
+  // loaded as separate lazy chunks, so warming makes their tile clicks instant.
   useEffect(() => {
     const idle =
       window.requestIdleCallback ?? ((cb: () => void) => window.setTimeout(cb, 1800));
-    const handle = idle(() => preloaders.maintenance());
-    return () => window.cancelIdleCallback?.(handle as number);
+    const handles = [idle(() => preloaders.maintenance()), idle(() => preloaders.documents())];
+    return () => handles.forEach((h) => window.cancelIdleCallback?.(h as number));
   }, []);
 
   const stats: Stat[] = [
@@ -122,16 +129,33 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
       icon: Banknote,
       count: q.payments.count,
       tip: "Draft payment requests waiting for approval",
-      tipClass: "right-0",
-      arrowClass: "right-4",
+      tipClass: "right-0 sm:right-auto sm:left-1/2 sm:-translate-x-1/2",
+      arrowClass: "right-4 sm:right-auto sm:left-1/2 sm:-translate-x-1/2",
       chip: "bg-emerald-100 text-emerald-600",
       hover: "hover:bg-emerald-50",
       dot: "bg-emerald-500",
     },
+    {
+      key: "documents",
+      label: "Documents",
+      href: "/fleet?tab=permits",
+      icon: FileWarning,
+      count: q.documents.count,
+      tip: "Expired vehicle documents — RC, insurance, fitness, permit, PUC",
+      tipClass: "left-0 sm:left-auto sm:right-0",
+      arrowClass: "left-4 sm:left-auto sm:right-4",
+      chip: "bg-rose-100 text-rose-600",
+      hover: "hover:bg-rose-50",
+      dot: "bg-rose-500",
+    },
   ];
 
   const tipLine = (stat: Stat): string =>
-    stat.count === 0 ? `No ${stat.label.toLowerCase()} pending right now` : stat.tip;
+    stat.count === 0
+      ? stat.key === "documents"
+        ? "No vehicle documents expired"
+        : `No ${stat.label.toLowerCase()} pending right now`
+      : stat.tip;
 
   return (
     <section
@@ -140,14 +164,14 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
     >
       {loading ? (
         <div className="flex items-center gap-4 px-1">
-          {[0, 1, 2, 3].map((i) => (
+          {[0, 1, 2, 3, 4].map((i) => (
             <div key={i} className="h-8 w-24 animate-pulse rounded-md bg-slate-100" />
           ))}
         </div>
       ) : allClear ? (
         <p className="flex items-center gap-1.5 px-1 text-[12px] font-semibold text-emerald-600">
           <CheckCircle2 size={14} strokeWidth={2.4} className="shrink-0" />
-          Nothing pending for approval
+          Nothing pending — all approvals clear and documents valid
         </p>
       ) : (
         <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
