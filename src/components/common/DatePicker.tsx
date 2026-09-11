@@ -464,6 +464,8 @@ export function DatePicker({
   const maxDate = useMemo(() => parseISODateLocal(maxDateStr), [maxDateStr]);
 
   const [isOpen, setIsOpen] = useState(false);
+  /** Horizontal anchoring of the popup; flipped to "right" near the viewport edge. */
+  const [popupAlign, setPopupAlign] = useState<"left" | "right">("left");
   const [month, setMonth] = useState<Date>(() => selectedDate ?? new Date());
   const [inputValue, setInputValue] = useState<string>(() => formatDisplay(selectedDate));
   const [inputError, setInputError] = useState<keyof typeof CALENDAR_COPY.en | "">("");
@@ -477,17 +479,39 @@ export function DatePicker({
     }
   }, [value]); // eslint-disable-line react-hooks/exhaustive-deps -- selectedDate derived from value
 
+  /* Keep the popup on-screen: a left-anchored 320px panel flips to the right
+     edge of its input when the right viewport space is too small. */
+  const recomputeAlign = useCallback(() => {
+    const POPUP_W = 320;
+    const GUTTER = 12;
+    const rect = containerRef.current?.getBoundingClientRect();
+    if (!rect || typeof window === "undefined") return;
+    const spaceRight = window.innerWidth - rect.left;
+    const spaceLeft = rect.right;
+    setPopupAlign(
+      spaceRight < POPUP_W + GUTTER && spaceLeft >= spaceRight ? "right" : "left"
+    );
+  }, []);
+
   /* ---------- notify open state ---------- */
   const setOpen = useCallback(
     (open: boolean) => {
       setIsOpen(open);
       onOpenChange?.(open);
-      if (open && selectedDate) {
-        setMonth(selectedDate);
+      if (open) {
+        if (selectedDate) setMonth(selectedDate);
+        recomputeAlign();
       }
     },
-    [onOpenChange, selectedDate]
+    [onOpenChange, selectedDate, recomputeAlign]
   );
+
+  /* Re-evaluate anchoring while open (resize / rotation). */
+  useEffect(() => {
+    if (!isOpen) return;
+    window.addEventListener("resize", recomputeAlign);
+    return () => window.removeEventListener("resize", recomputeAlign);
+  }, [isOpen, recomputeAlign]);
 
   /* ---------- outside click + Escape ---------- */
   useEffect(() => {
@@ -781,7 +805,9 @@ export function DatePicker({
           ref={popupRef}
           role="dialog"
           aria-label={copy.choose}
-          className={`absolute left-0 z-50 w-80 rounded-xl border border-slate-200 bg-white p-3 shadow-xl select-none text-slate-900 ${dropdownPositionClass} ${popupClassName}
+          className={`absolute z-50 w-[min(20rem,calc(100vw-1.5rem))] rounded-xl border border-slate-200 bg-white p-3 shadow-xl select-none text-slate-900 ${
+            popupAlign === "right" ? "right-0" : "left-0"
+          } ${dropdownPositionClass} ${popupClassName}
             [&_table]:w-full [&_table]:border-collapse [&_tr]:h-auto [&_td]:p-0 [&_th]:p-0 [&_th]:pb-2`}
         >
           {/* Single month/year toolbar (DayPicker built-in caption is hidden) */}
