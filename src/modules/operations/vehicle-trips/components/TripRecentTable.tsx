@@ -7,7 +7,6 @@ import type { Trip } from "../types/trip";
 import { canEditItem, canDeleteItem } from "../../../../utils/dateUtils";
 import { formatTripRecentDateWithDay } from "../utils/formatTripListDay";
 import TripPagination from "./TripPagination";
-import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
 import { getNextIncompleteTripStep, isTripWizardComplete, isValidTripStatusTransition, getValidNextStatuses, type TripStatus } from "../../../../shared/trip";
@@ -59,7 +58,7 @@ function TripRecentTable({
   const [selectedTripId, setSelectedTripId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<"Draft" | "Pending" | "Deleted">(initialStatus);
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
+  const [pageSize, setPageSize] = useState(10);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteReason, setDeleteReason] = useState("");
@@ -442,11 +441,20 @@ function TripRecentTable({
           </table>
         </div>
 
-        {shouldShowPagination(filteredTrips.length) && (
+        {/* Show the footer whenever the tab has rows — not only past the
+            10-row threshold. The bar also hosts rows-per-page, which must stay
+            reachable on small tabs (Pending/Deleted hold well under 10 rows,
+            and shouldShowPagination() was hiding the control there entirely). */}
+        {filteredTrips.length > 0 && (
           <TripPagination
             currentPage={currentPage}
             totalPages={Math.max(totalPages, 1)}
             onPageChange={setCurrentPage}
+            pageSize={pageSize}
+            onPageSizeChange={(next) => {
+              setPageSize(next);
+              setCurrentPage(1); // a new page size invalidates the current page
+            }}
           />
         )}
       </div>
