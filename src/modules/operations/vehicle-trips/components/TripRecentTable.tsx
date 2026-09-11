@@ -109,9 +109,22 @@ function TripRecentTable({
     });
   }, [safeTrips, searchTerm]);
 
-  const allDraft = sortedTrips.filter((t) => !t.deleted && t.status === "Draft");
-  const allPending = sortedTrips.filter((t) => !t.deleted && t.status === "Pending");
-  const allDeleted = sortedTrips.filter((t) => t.deleted === true || t.status === "Deleted");
+  /** Effective list status: Step 5 fully submitted must never stay under Draft. */
+  const listStatus = (t: Trip): "Draft" | "Pending" | "Completed" | "Deleted" => {
+    if (t.deleted === true || t.status === "Deleted") return "Deleted";
+    if (t.status === "Completed") return "Completed";
+    // Wizard done (end/expenses submitted) OR explicit Pending → Pending tab
+    if (t.status === "Pending" || isTripWizardComplete(t)) return "Pending";
+    return "Draft";
+  };
+
+  const allDraft = sortedTrips.filter((t) => listStatus(t) === "Draft");
+  // Pending tab shows Pending + any legacy Completed samples (no separate Completed tab)
+  const allPending = sortedTrips.filter((t) => {
+    const s = listStatus(t);
+    return s === "Pending" || s === "Completed";
+  });
+  const allDeleted = sortedTrips.filter((t) => listStatus(t) === "Deleted");
 
   /** Count beside “Recent Trip Activity” follows the selected tab (Draft/Pending/Deleted). */
   const selectedTabCount =

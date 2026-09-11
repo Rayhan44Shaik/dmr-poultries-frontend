@@ -2215,13 +2215,15 @@ function applyExpensesStep(trip, body) {
     trip.expensesStepSubmitted = true;
     trip.expensesStepSubmittedAt = new Date().toISOString();
     trip.submittedAtTimestamp = trip.expensesStepSubmittedAt;
-    // Step 5 final submit moves the trip Draft → Pending (never Completed here).
-    if (trip.status === "Draft" || !trip.status) {
+    // Step 5 final submit ALWAYS moves Draft → Pending (never Completed here).
+    if (trip.status !== "Completed" && trip.status !== "Deleted") {
       trip.status = "Pending";
     }
+  } else if (body.status === "Pending" && trip.status === "Draft") {
+    trip.status = "Pending";
   }
-  // Honour explicit status from client payload on submit as well.
-  if (body.status === "Pending" && (trip.status === "Draft" || body.mode === "submit")) {
+  // Safety: if flags say submitted, status must not remain Draft.
+  if ((trip.endStepSubmitted || trip.expensesStepSubmitted) && trip.status === "Draft") {
     trip.status = "Pending";
   }
   return trip;
@@ -2365,8 +2367,14 @@ function decorateTrip(trip) {
     .map(Number)
     .filter((n) => Number.isFinite(n) && n > 0);
   const kmSpread = meters.length >= 2 ? Math.max(...meters) - Math.min(...meters) : 0;
+  // Step 5 fully submitted ⇒ Pending (never leave as Draft in list responses).
+  // Completed stays Completed for older approved samples only.
+  const wizardDone = Boolean(trip.endStepSubmitted || trip.expensesStepSubmitted);
+  let status = trip.status || "Draft";
+  if (wizardDone && status === "Draft") status = "Pending";
   return {
     ...trip,
+    status,
     totalKm: Number(trip.totalKm) || kmSpread,
     totalShops: Number(trip.totalShops) || new Set(delivered.map((d) => d.shopId)).size,
     totalWeight: Number(trip.totalWeight) || Number(trip.dcWeight) || 0,

@@ -596,19 +596,46 @@ export default function StepEnd({
               </span>
             </div>
           </div>
-          {/* Advance / Total expenses / Diesel — separate summary cards (not on table top). */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
-            <div className="bg-emerald-50/60 border border-emerald-200/80 p-3 rounded-xl">
-              <p className="text-[11px] text-emerald-700/80 font-semibold uppercase tracking-wide">{t("operations.advance")}</p>
-              <p className="text-sm font-bold text-emerald-700 mt-1 tabular-nums">₹{Number(trip.advanceAmount || 0).toFixed(2)}</p>
-            </div>
-            <div className="bg-red-50/60 border border-red-200/80 p-3 rounded-xl">
-              <p className="text-[11px] text-red-700/80 font-semibold uppercase tracking-wide">{t("operations.total_expenses")}</p>
-              <p className="text-sm font-bold text-red-600 mt-1 tabular-nums">₹{totalAllExpenses.toFixed(2)}</p>
-            </div>
-            <div className="bg-blue-50/60 border border-blue-200/80 p-3 rounded-xl">
-              <p className="text-[11px] text-blue-700/80 font-semibold uppercase tracking-wide">{t("ops.trip.total_diesel")}</p>
-              <p className="text-sm font-bold text-blue-600 mt-1 tabular-nums">₹{totalDieselAmount.toFixed(2)}</p>
+          {/* Plain equal fields — not KPI cards: time, vehicle, advance, expenses, diesel, total */}
+          <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 divide-x divide-y divide-slate-100">
+              {[
+                {
+                  label: t("ops.trip.date_time"),
+                  value: sheetData.submittedAtTimestamp || (trip as any).expensesStepSubmittedAt || "—",
+                  tone: "text-slate-900",
+                },
+                {
+                  label: t("operations.vehicle_no"),
+                  value: trip.vehicleNo || "—",
+                  tone: "text-indigo-700",
+                },
+                {
+                  label: t("operations.advance"),
+                  value: `₹${Number(trip.advanceAmount || 0).toFixed(2)}`,
+                  tone: "text-emerald-700",
+                },
+                {
+                  label: t("operations.total_expenses"),
+                  value: `₹${totalAllExpenses.toFixed(2)}`,
+                  tone: "text-red-600",
+                },
+                {
+                  label: t("ops.trip.total_diesel"),
+                  value: `₹${totalDieselAmount.toFixed(2)}`,
+                  tone: "text-blue-600",
+                },
+                {
+                  label: t("common.total"),
+                  value: `₹${(totalAllExpenses + totalDieselAmount).toFixed(2)}`,
+                  tone: "text-slate-900",
+                },
+              ].map((f) => (
+                <div key={f.label} className="px-3 py-2.5 min-w-0 bg-slate-50/40">
+                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide truncate">{f.label}</p>
+                  <p className={`text-sm font-bold mt-0.5 tabular-nums truncate ${f.tone}`}>{f.value}</p>
+                </div>
+              ))}
             </div>
           </div>
           <GeneralExpensesTable
@@ -653,19 +680,46 @@ export default function StepEnd({
             </div>
           </div>
 
-          {/* Advance / Total expenses / Diesel — separate summary cards (not on table top). */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
-            <div className="bg-emerald-50/60 border border-emerald-200/80 p-3 rounded-xl">
-              <p className="text-[11px] text-emerald-700/80 font-semibold uppercase tracking-wide">{t("operations.advance")}</p>
-              <p className="text-sm font-bold text-emerald-700 mt-1 tabular-nums">₹{Number(trip.advanceAmount || 0).toFixed(2)}</p>
-            </div>
-            <div className="bg-red-50/60 border border-red-200/80 p-3 rounded-xl">
-              <p className="text-[11px] text-red-700/80 font-semibold uppercase tracking-wide">{t("operations.total_expenses")}</p>
-              <p className="text-sm font-bold text-red-600 mt-1 tabular-nums">₹{totalAllExpenses.toFixed(2)}</p>
-            </div>
-            <div className="bg-blue-50/60 border border-blue-200/80 p-3 rounded-xl">
-              <p className="text-[11px] text-blue-700/80 font-semibold uppercase tracking-wide">{t("ops.trip.total_diesel")}</p>
-              <p className="text-sm font-bold text-blue-600 mt-1 tabular-nums">₹{totalDieselAmount.toFixed(2)}</p>
+          {/* Same equal-size plain fields while editing (live totals). */}
+          <div className="rounded-xl border border-slate-200 overflow-hidden bg-white">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 divide-x divide-y divide-slate-100">
+              {[
+                {
+                  label: t("ops.trip.date_time"),
+                  value: sheetData.submittedAtTimestamp || t("ops.trip.auto_time_on_submit"),
+                  tone: "text-slate-900",
+                },
+                {
+                  label: t("operations.vehicle_no"),
+                  value: trip.vehicleNo || "—",
+                  tone: "text-indigo-700",
+                },
+                {
+                  label: t("operations.advance"),
+                  value: `₹${Number(trip.advanceAmount || 0).toFixed(2)}`,
+                  tone: "text-emerald-700",
+                },
+                {
+                  label: t("operations.total_expenses"),
+                  value: `₹${totalAllExpenses.toFixed(2)}`,
+                  tone: "text-red-600",
+                },
+                {
+                  label: t("ops.trip.total_diesel"),
+                  value: `₹${totalDieselAmount.toFixed(2)}`,
+                  tone: "text-blue-600",
+                },
+                {
+                  label: t("common.total"),
+                  value: `₹${(totalAllExpenses + totalDieselAmount).toFixed(2)}`,
+                  tone: "text-slate-900",
+                },
+              ].map((f) => (
+                <div key={f.label} className="px-3 py-2.5 min-w-0 bg-slate-50/40">
+                  <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide truncate">{f.label}</p>
+                  <p className={`text-sm font-bold mt-0.5 tabular-nums truncate ${f.tone}`}>{f.value}</p>
+                </div>
+              ))}
             </div>
           </div>
 

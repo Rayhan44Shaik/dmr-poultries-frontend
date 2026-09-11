@@ -14,7 +14,6 @@ import StepDeliveries from "../components/StepDeliveries";
 import StepFarm from "../components/StepFarm";
 import StepPickup from "../components/StepPickup";
 import StepEnd from "../components/Step_5/StepEnd";
-import TripFinalKPI from "../components/TripFinalKPI";
 
 // --- Hooks ---
 import { useTripEntry } from "../hooks/useTripEntry";
@@ -664,7 +663,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
             )}
 
             <div className="mt-6">{renderSelectedStep()}</div>
-            {<TripFinalKPI trip={savedTrip} deliveries={savedTrip.deliveries || []} />}
           </>
         )}
       </div>
