@@ -182,26 +182,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     }
   }, [location.search, loadTripFromApi, trip.id]);
 
-  useEffect(() => {
-    // Success toast is now emitted centrally in useTripEntry (every submit/update).
-    registerStep2SuccessCallback(() => {
-      // Trip ID is already in URL. Stay on the form; maxAllowedStep advances to Step 3.
-    });
-  }, [registerStep2SuccessCallback]);
-
-  useEffect(() => {
-    // Success toast is now emitted centrally in useTripEntry (every submit/update).
-    registerStep3SuccessCallback(() => {
-      // Trip ID is already in URL. Stay on the form; maxAllowedStep advances to Step 4.
-    });
-  }, [registerStep3SuccessCallback]);
-
-  useEffect(() => {
-    registerStep4SuccessCallback(() => {
-      /* Stay on the submitted trip so the locked Step 4 view is visible. */
-    });
-  }, [registerStep4SuccessCallback]);
-
   const handleStatusChange = (trip: Trip, status: TripStatus) => {
     changeStatus(trip, status);
   };
@@ -336,15 +316,32 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     clearTripIdFromUrl();
   }, [clearTrip, clearTripIdFromUrl, setIsEditing, setTrip, location.search]);
 
-  // After first Step 1 submit: toast, reset the wizard to Create New Trip,
-  // and let Recent Trips pick up the saved trip (onTripsChanged). Resume
-  // from Recent to continue Farm / Pickup / Delivery / Diesel.
+  // After ANY step submit: close the wizard and show "Create New Trip".
+  // Resume the same trip from Recent Trip Activity when the next step is needed.
+  // Success toast is emitted centrally in useTripEntry.
   useEffect(() => {
-    // Success toast is now emitted centrally in useTripEntry (every submit/update).
     registerStep1SuccessCallback(() => {
       clearForm();
     });
   }, [registerStep1SuccessCallback, clearForm]);
+
+  useEffect(() => {
+    registerStep2SuccessCallback(() => {
+      clearForm();
+    });
+  }, [registerStep2SuccessCallback, clearForm]);
+
+  useEffect(() => {
+    registerStep3SuccessCallback(() => {
+      clearForm();
+    });
+  }, [registerStep3SuccessCallback, clearForm]);
+
+  useEffect(() => {
+    registerStep4SuccessCallback(() => {
+      clearForm();
+    });
+  }, [registerStep4SuccessCallback, clearForm]);
 
   /**
    * Bottom "Cancel" on any step = DISCARD unsaved local edits only.

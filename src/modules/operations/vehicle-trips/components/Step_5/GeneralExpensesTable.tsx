@@ -206,252 +206,120 @@ export default function GeneralExpensesTable({
             </td>
           </tr>
 
-          {/* Expense rows */}
-          {readOnly ? (
-            <>
-              {[
-                [t("ops.trip.exp_meals"), sheetData.meals, "bg-orange-50 text-orange-600", UtensilsCrossed],
-                [t("ops.trip.exp_loading"), sheetData.loading, "bg-blue-50 text-blue-600", Package],
-                [t("ops.trip.exp_meals_tiffin"), sheetData.mealsTiffin, "bg-amber-50 text-amber-600", Coffee],
-                [t("ops.trip.exp_vehicle_maintenance"), sheetData.vehicleMaintenance, "bg-slate-100 text-slate-600", Wrench],
-                [t("ops.trip.exp_tea"), sheetData.othersRC, "bg-rose-50 text-rose-600", Coffee],
-                [t("ops.trip.exp_driver"), sheetData.others1Amt, "bg-indigo-50 text-indigo-600", User],
-                [t("ops.trip.exp_supervisor"), sheetData.others2Amt, "bg-violet-50 text-violet-600", UserCheck],
-                [t("ops.trip.exp_helper_loader"), sheetData.others3Amt, "bg-teal-50 text-teal-600", Users],
-                [t("common.other"), sheetData.others4Amt, "bg-slate-100 text-slate-500", MoreHorizontal],
-                [t("common.other"), sheetData.others5Amt, "bg-slate-100 text-slate-500", MoreHorizontal],
-              ]
-                .filter(([, amt]) => Number(amt) > 0)
-                .map(([label, amt, tone, Icon], i) => (
-                  <tr key={`${label}-${i}`} className="border-b border-slate-100">
-                    <td className="font-medium text-slate-700 py-2.5 px-3">
+          {/* Expense rows — always two equal columns (left group + right group),
+              same layout for editable and submitted/read-only views. */}
+          {(() => {
+            /** Left column categories (ops group) paired with right column (people / other). */
+            const leftItems: Array<{
+              key: string;
+              label: string;
+              value: unknown;
+              tone: string;
+              Icon: React.ComponentType<{ size?: number; className?: string }>;
+              field?: string;
+            }> = [
+              { key: "meals", label: t("ops.trip.exp_meals"), value: sheetData.meals, tone: "bg-orange-50 text-orange-600", Icon: UtensilsCrossed, field: "meals" },
+              { key: "loading", label: t("ops.trip.exp_loading"), value: sheetData.loading, tone: "bg-blue-50 text-blue-600", Icon: Package, field: "loading" },
+              { key: "mealsTiffin", label: t("ops.trip.exp_meals_tiffin"), value: sheetData.mealsTiffin, tone: "bg-amber-50 text-amber-600", Icon: Coffee, field: "mealsTiffin" },
+              { key: "vehicleMaintenance", label: t("ops.trip.exp_vehicle_maintenance"), value: sheetData.vehicleMaintenance, tone: "bg-slate-100 text-slate-600", Icon: Wrench, field: "vehicleMaintenance" },
+              { key: "othersRC", label: t("ops.trip.exp_tea"), value: sheetData.othersRC, tone: "bg-rose-50 text-rose-600", Icon: Coffee, field: "othersRC" },
+            ];
+            const rightItems: Array<{
+              key: string;
+              label: string;
+              value: unknown;
+              tone: string;
+              Icon: React.ComponentType<{ size?: number; className?: string }>;
+              field?: string;
+              rightBg?: string;
+            }> = [
+              { key: "others1Amt", label: t("ops.trip.exp_driver"), value: sheetData.others1Amt, tone: "bg-indigo-50 text-indigo-600", Icon: User, field: "others1Amt", rightBg: "bg-indigo-50/40" },
+              { key: "others2Amt", label: t("ops.trip.exp_supervisor"), value: sheetData.others2Amt, tone: "bg-violet-50 text-violet-600", Icon: UserCheck, field: "others2Amt", rightBg: "bg-violet-50/40" },
+              { key: "others3Amt", label: t("ops.trip.exp_helper_loader"), value: sheetData.others3Amt, tone: "bg-teal-50 text-teal-600", Icon: Users, field: "others3Amt", rightBg: "bg-teal-50/40" },
+              { key: "others4Amt", label: t("common.other"), value: sheetData.others4Amt, tone: "bg-slate-100 text-slate-500", Icon: MoreHorizontal, field: "others4Amt", rightBg: "bg-slate-50/50" },
+              { key: "others5Amt", label: t("common.other"), value: sheetData.others5Amt, tone: "bg-slate-100 text-slate-500", Icon: MoreHorizontal, field: "others5Amt", rightBg: "bg-slate-50/50" },
+            ];
+
+            const rowCount = Math.max(leftItems.length, rightItems.length);
+            const rows: React.ReactNode[] = [];
+            for (let i = 0; i < rowCount; i++) {
+              const left = leftItems[i];
+              const right = rightItems[i];
+              // In read-only, skip a paired row only when BOTH sides are empty/zero.
+              if (readOnly) {
+                const leftEmpty = !left || !(Number(left.value) > 0);
+                const rightEmpty = !right || !(Number(right.value) > 0);
+                if (leftEmpty && rightEmpty) continue;
+              }
+              rows.push(
+                <tr
+                  key={`exp-row-${i}`}
+                  className={`border-b border-slate-100 ${readOnly ? "" : "hover:bg-slate-50/40 transition-colors"}`}
+                >
+                  <td className="font-medium text-slate-700 py-2.5 px-3 w-[28%]">
+                    {left ? (
                       <span className="inline-flex items-center gap-2">
-                        <CatIcon icon={Icon as React.ComponentType<{ size?: number; className?: string }>} tone={String(tone)} />
-                        {label as string}
+                        <CatIcon icon={left.Icon} tone={left.tone} />
+                        {left.label}
                       </span>
-                    </td>
-                    <td colSpan={6} className="font-semibold text-slate-900 px-3 tabular-nums">₹{Number(amt).toFixed(2)}</td>
-                  </tr>
-                ))}
-            </>
-          ) : (
-            <>
-          <tr className="border-b border-slate-100 hover:bg-orange-50/30 transition-colors">
-            <td className="font-medium text-slate-700 py-2.5 px-3">
-              <span className="inline-flex items-center gap-2">
-                <CatIcon icon={UtensilsCrossed} tone="bg-orange-50 text-orange-600" />
-                {t("ops.trip.exp_meals")}
-              </span>
-            </td>
-            <td colSpan={2} className="p-0 border-r border-slate-200">
-              <input
-                type="number"
-                min="0"
-                placeholder="0.00"
-                value={formatZero(sheetData.meals)}
-                onKeyDown={blockInvalidChar}
-                onChange={(e) =>
-                  handleChange("meals", e.target.value === "" ? "" : Number(e.target.value))
-                }
-                onWheel={blockWheelChange}
-                className={numInputClass}
-              />
-            </td>
-            <td colSpan={2} className="font-medium text-slate-700 py-2.5 px-3 border-r border-slate-200 bg-indigo-50/40">
-              <span className="inline-flex items-center gap-2">
-                <CatIcon icon={User} tone="bg-indigo-100 text-indigo-600" />
-                {t("ops.trip.exp_driver")}
-              </span>
-            </td>
-            <td colSpan={2} className="p-0">
-              <input
-                type="number"
-                min="0"
-                placeholder="0.00"
-                value={formatZero(sheetData.others1Amt)}
-                onKeyDown={blockInvalidChar}
-                onChange={(e) =>
-                  handleChange("others1Amt", e.target.value === "" ? "" : Number(e.target.value))
-                }
-                onWheel={blockWheelChange}
-                className={numInputClass}
-              />
-            </td>
-          </tr>
-
-          <tr className="border-b border-slate-100 hover:bg-blue-50/30 transition-colors">
-            <td className="font-medium text-slate-700 py-2.5 px-3">
-              <span className="inline-flex items-center gap-2">
-                <CatIcon icon={Package} tone="bg-blue-50 text-blue-600" />
-                {t("ops.trip.exp_loading")}
-              </span>
-            </td>
-            <td colSpan={2} className="p-0 border-r border-slate-200">
-              <input
-                type="number"
-                min="0"
-                placeholder="0.00"
-                value={formatZero(sheetData.loading)}
-                onKeyDown={blockInvalidChar}
-                onChange={(e) =>
-                  handleChange("loading", e.target.value === "" ? "" : Number(e.target.value))
-                }
-                onWheel={blockWheelChange}
-                className={numInputClass}
-              />
-            </td>
-            <td colSpan={2} className="font-medium text-slate-700 py-2.5 px-3 border-r border-slate-200 bg-violet-50/40">
-              <span className="inline-flex items-center gap-2">
-                <CatIcon icon={UserCheck} tone="bg-violet-100 text-violet-600" />
-                {t("ops.trip.exp_supervisor")}
-              </span>
-            </td>
-            <td colSpan={2} className="p-0">
-              <input
-                type="number"
-                min="0"
-                placeholder="0.00"
-                value={formatZero(sheetData.others2Amt)}
-                onKeyDown={blockInvalidChar}
-                onChange={(e) =>
-                  handleChange("others2Amt", e.target.value === "" ? "" : Number(e.target.value))
-                }
-                onWheel={blockWheelChange}
-                className={numInputClass}
-              />
-            </td>
-          </tr>
-
-          <tr className="border-b border-slate-100 hover:bg-amber-50/30 transition-colors">
-            <td className="font-medium text-slate-700 py-2.5 px-3">
-              <span className="inline-flex items-center gap-2">
-                <CatIcon icon={Coffee} tone="bg-amber-50 text-amber-600" />
-                {t("ops.trip.exp_meals_tiffin")}
-              </span>
-            </td>
-            <td colSpan={2} className="p-0 border-r border-slate-200">
-              <input
-                type="number"
-                min="0"
-                placeholder="0.00"
-                value={formatZero(sheetData.mealsTiffin)}
-                onKeyDown={blockInvalidChar}
-                onChange={(e) =>
-                  handleChange("mealsTiffin", e.target.value === "" ? "" : Number(e.target.value))
-                }
-                onWheel={blockWheelChange}
-                className={numInputClass}
-              />
-            </td>
-            <td colSpan={2} className="font-medium text-slate-700 py-2.5 px-3 border-r border-slate-200 bg-teal-50/40">
-              <span className="inline-flex items-center gap-2">
-                <CatIcon icon={Users} tone="bg-teal-100 text-teal-600" />
-                {t("ops.trip.exp_helper_loader")}
-              </span>
-            </td>
-            <td colSpan={2} className="p-0">
-              <input
-                type="number"
-                min="0"
-                placeholder="0.00"
-                value={formatZero(sheetData.others3Amt)}
-                onKeyDown={blockInvalidChar}
-                onChange={(e) =>
-                  handleChange("others3Amt", e.target.value === "" ? "" : Number(e.target.value))
-                }
-                onWheel={blockWheelChange}
-                className={numInputClass}
-              />
-            </td>
-          </tr>
-
-          <tr className="border-b border-slate-100 hover:bg-slate-50/50 transition-colors">
-            <td className="font-medium text-slate-700 py-2.5 px-3">
-              <span className="inline-flex items-center gap-2">
-                <CatIcon icon={Wrench} tone="bg-slate-100 text-slate-600" />
-                {t("ops.trip.exp_vehicle_maintenance")}
-              </span>
-            </td>
-            <td colSpan={2} className="p-0 border-r border-slate-200">
-              <input
-                type="number"
-                min="0"
-                placeholder="0.00"
-                value={formatZero(sheetData.vehicleMaintenance)}
-                onKeyDown={blockInvalidChar}
-                onChange={(e) =>
-                  handleChange("vehicleMaintenance", e.target.value === "" ? "" : Number(e.target.value))
-                }
-                onWheel={blockWheelChange}
-                className={numInputClass}
-              />
-            </td>
-            <td colSpan={2} className="font-medium text-slate-700 py-2.5 px-3 border-r border-slate-200 bg-slate-50/50">
-              <span className="inline-flex items-center gap-2">
-                <CatIcon icon={MoreHorizontal} tone="bg-slate-100 text-slate-500" />
-                {t("common.other")}
-              </span>
-            </td>
-            <td colSpan={2} className="p-0">
-              <input
-                type="number"
-                min="0"
-                placeholder="0.00"
-                value={formatZero(sheetData.others4Amt)}
-                onKeyDown={blockInvalidChar}
-                onChange={(e) =>
-                  handleChange("others4Amt", e.target.value === "" ? "" : Number(e.target.value))
-                }
-                onWheel={blockWheelChange}
-                className={numInputClass}
-              />
-            </td>
-          </tr>
-
-          <tr className="border-b border-slate-100 hover:bg-rose-50/30 transition-colors">
-            <td className="font-medium text-slate-700 py-2.5 px-3">
-              <span className="inline-flex items-center gap-2">
-                <CatIcon icon={Coffee} tone="bg-rose-50 text-rose-600" />
-                {t("ops.trip.exp_tea")}
-              </span>
-            </td>
-            <td colSpan={2} className="p-0 border-r border-slate-200">
-              <input
-                type="number"
-                min="0"
-                placeholder="0.00"
-                value={formatZero(sheetData.othersRC)}
-                onKeyDown={blockInvalidChar}
-                onChange={(e) =>
-                  handleChange("othersRC", e.target.value === "" ? "" : Number(e.target.value))
-                }
-                onWheel={blockWheelChange}
-                className={numInputClass}
-              />
-            </td>
-            <td colSpan={2} className="font-medium text-slate-700 py-2.5 px-3 border-r border-slate-200 bg-slate-50/50">
-              <span className="inline-flex items-center gap-2">
-                <CatIcon icon={MoreHorizontal} tone="bg-slate-100 text-slate-500" />
-                {t("common.other")}
-              </span>
-            </td>
-            <td colSpan={2} className="p-0">
-              <input
-                type="number"
-                min="0"
-                placeholder="0.00"
-                value={formatZero(sheetData.others5Amt)}
-                onKeyDown={blockInvalidChar}
-                onChange={(e) =>
-                  handleChange("others5Amt", e.target.value === "" ? "" : Number(e.target.value))
-                }
-                onWheel={blockWheelChange}
-                className={numInputClass}
-              />
-            </td>
-          </tr>
-            </>
-          )}
+                    ) : null}
+                  </td>
+                  <td colSpan={2} className={`border-r border-slate-200 w-[22%] ${readOnly ? "font-semibold text-slate-900 px-3 tabular-nums" : "p-0"}`}>
+                    {left ? (
+                      readOnly ? (
+                        Number(left.value) > 0 ? `₹${Number(left.value).toFixed(2)}` : "—"
+                      ) : (
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="0.00"
+                          value={formatZero(left.value)}
+                          onKeyDown={blockInvalidChar}
+                          onChange={(e) =>
+                            handleChange(left.field!, e.target.value === "" ? "" : Number(e.target.value))
+                          }
+                          onWheel={blockWheelChange}
+                          className={numInputClass}
+                        />
+                      )
+                    ) : null}
+                  </td>
+                  <td
+                    colSpan={2}
+                    className={`font-medium text-slate-700 py-2.5 px-3 border-r border-slate-200 w-[28%] ${right?.rightBg ?? ""}`}
+                  >
+                    {right ? (
+                      <span className="inline-flex items-center gap-2">
+                        <CatIcon icon={right.Icon} tone={right.tone} />
+                        {right.label}
+                      </span>
+                    ) : null}
+                  </td>
+                  <td colSpan={2} className={`w-[22%] ${readOnly ? "font-semibold text-slate-900 px-3 tabular-nums" : "p-0"}`}>
+                    {right ? (
+                      readOnly ? (
+                        Number(right.value) > 0 ? `₹${Number(right.value).toFixed(2)}` : "—"
+                      ) : (
+                        <input
+                          type="number"
+                          min="0"
+                          placeholder="0.00"
+                          value={formatZero(right.value)}
+                          onKeyDown={blockInvalidChar}
+                          onChange={(e) =>
+                            handleChange(right.field!, e.target.value === "" ? "" : Number(e.target.value))
+                          }
+                          onWheel={blockWheelChange}
+                          className={numInputClass}
+                        />
+                      )
+                    ) : null}
+                  </td>
+                </tr>
+              );
+            }
+            return <>{rows}</>;
+          })()}
 
           <tr className="bg-slate-100/80 font-bold text-slate-800 text-xs border-b border-slate-200">
             <td className="py-2.5 px-3">{t("common.total")} (₹)</td>
