@@ -11,11 +11,10 @@
  *     lighting up further while refreshing.
  *   • Brand logo     — the DMR hen replaces the generic RefreshCw glyph, so the
  *     control is unmistakably ours.
- *   • Logo animation — while `loading`, four cues stack so the activity is
- *     obvious at a glance: an expanding ripple, a breathing halo, a sweeping
- *     orbit arc, and the hen hopping (crouch → launch → land squash).
- *     See `--animate-brand-*` in styles/tokens.css. At rest the hen lifts and
- *     tilts on hover.
+ *   • Logo animation — while `loading` the hen WALKS across the button: left
+ *     → right, a turn at the far end, then back again, looping, with a
+ *     footstep bob throughout. At rest, hovering makes it do a short dance.
+ *     See `--animate-brand-*` in styles/tokens.css.
  *
  * USAGE (identical everywhere — do not hand-roll a refresh button again):
  *
@@ -36,7 +35,7 @@
  * =============================================================================
  */
 
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import henLogo from "../assets/dmr-hen-cut-256.png";
 import { cn } from "../utils/cn";
 import { Button, type ButtonProps } from "./Button";
@@ -52,53 +51,66 @@ export interface BrandRefreshButtonProps
 }
 
 /**
- * The animated brand glyph. While loading, FOUR cues stack so the activity is
- * impossible to miss even though the glyph is only ~18px:
- *   1. an expanding ripple ring,      2. a breathing emerald halo,
- *   3. a sweeping emerald orbit arc,  4. the hen itself hopping.
- * At rest the hen simply lifts on hover.
+ * The animated brand glyph.
+ *
+ *   • loading — the hen WALKS along a track: it strolls left → right, turns
+ *     around at the far end, walks back, and turns again, looping. Two nested
+ *     elements keep the motion clean: the outer one travels and handles the
+ *     turn (scaleX flip), the inner one does the footstep bob. Combining both
+ *     on one element would fight over `transform`.
+ *   • at rest — hovering makes the hen do a short side-to-side dance, teasing
+ *     the animation before you click.
+ *
+ * No rings, halos or orbits — the hen alone carries the motion.
  */
 function BrandGlyph({ loading, compact }: { loading: boolean; compact: boolean }) {
-  const box = compact ? "size-[18px]" : "size-[22px]";
+  const size = compact ? 18 : 22;
+  // The hen walks a track a few times its own width, so the journey is a real
+  // stroll across the button rather than a twitch. Icon-only buttons are tight,
+  // so they get a shorter track.
+  const track = compact ? size + 14 : size + 34;
+  const distance = track - size;
+
   return (
-    <span className={cn("relative inline-flex shrink-0 items-center justify-center", box)}>
-      {loading && (
-        <>
-          {/* 1. Ripple — expands and fades outward, reads from a distance. */}
-          <span
+    <span
+      className="relative inline-flex shrink-0 items-center"
+      style={{ width: track, height: size }}
+    >
+      {/* Outer: travels left→right and flips to face the direction of travel. */}
+      <span
+        className={cn(
+          "absolute left-0 top-0 inline-flex items-center justify-center",
+          loading && "motion-safe:animate-[var(--animate-brand-walk)]",
+        )}
+        style={
+          {
+            width: size,
+            height: size,
+            "--walk-distance": `${distance}px`,
+          } as CSSProperties
+        }
+      >
+        {/* Inner: the footstep bob / hover dance. */}
+        <span
+          className={cn(
+            "inline-flex h-full w-full items-center justify-center",
+            loading
+              ? "motion-safe:animate-[var(--animate-brand-step)]"
+              : "motion-safe:group-hover:animate-[var(--animate-brand-dance)]",
+          )}
+        >
+          <img
+            src={henLogo}
+            alt=""
             aria-hidden="true"
-            className="absolute -inset-1 rounded-full border-2 border-emerald-500/60 motion-safe:animate-[var(--animate-brand-ripple)]"
-          />
-          {/* 2. Halo — soft breathing fill behind the hen. */}
-          <span
-            aria-hidden="true"
-            className="absolute -inset-0.5 rounded-full bg-emerald-400/45 blur-[1px] motion-safe:animate-[var(--animate-brand-pulse)]"
-          />
-          {/* 3. Orbit — a single emerald arc sweeping around the glyph. The
-                 transparent sides turn the ring into a chasing arc. */}
-          <span
-            aria-hidden="true"
+            draggable={false}
             className={cn(
-              "absolute -inset-1 rounded-full border-2",
-              "border-emerald-600 border-r-transparent border-b-transparent",
-              "motion-safe:animate-[var(--animate-brand-orbit)]",
+              "h-full w-full select-none object-contain",
+              loading && "drop-shadow-[0_1px_2px_rgb(5_150_105_/_0.45)]",
             )}
           />
-        </>
-      )}
-      {/* 4. The hen — hero of the animation, hopping on the spot. */}
-      <img
-        src={henLogo}
-        alt=""
-        aria-hidden="true"
-        draggable={false}
-        className={cn(
-          "relative h-full w-full select-none object-contain",
-          loading
-            ? "motion-safe:animate-[var(--animate-brand-hop)] drop-shadow-[0_1px_2px_rgb(5_150_105_/_0.45)]"
-            : "transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:rotate-3 group-active:translate-y-0",
-        )}
-      />
+        </span>
+      </span>
     </span>
   );
 }

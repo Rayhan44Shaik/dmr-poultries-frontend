@@ -315,9 +315,9 @@
    * <BrandRefreshButton> (ui/BrandRefreshButton.tsx); do not hand-roll another
    * refresh animation anywhere else. */
   --animate-brand-hop: brand-hop 0.85s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
-  --animate-brand-pulse: brand-pulse 1.4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
-  --animate-brand-orbit: brand-orbit 0.85s linear infinite;
-  --animate-brand-ripple: brand-ripple 1.2s cubic-bezier(0, 0.55, 0.45, 1) infinite;
+  --animate-brand-walk: brand-walk 2.6s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  --animate-brand-step: brand-step 0.42s ease-in-out infinite;
+  --animate-brand-dance: brand-dance 0.6s ease-in-out infinite;
 
   @keyframes fade-in {
     from { opacity: 0; }
@@ -354,22 +354,32 @@
     82%  { transform: translateY(0) scale(1.12, 0.86) rotate(-2deg); }   /* land   */
     100% { transform: translateY(0) scale(1, 1) rotate(0deg); }
   }
-  /* Emerald halo breathing behind the logo while loading. */
-  @keyframes brand-pulse {
-    0%, 100% { opacity: 0.4; transform: scale(0.85); }
-    50%      { opacity: 0.95; transform: scale(1.18); }
+  /* Hen "walk": strolls left -> right across the track, turns around at the
+   * far end (scaleX flip), walks back, then turns again. `--walk-distance` is
+   * set by the component so the same keyframes work at any track width. */
+  @keyframes brand-walk {
+    0%        { transform: translateX(0) scaleX(1); }
+    42%       { transform: translateX(var(--walk-distance, 34px)) scaleX(1); }
+    /* pause and turn to face the other way */
+    50%       { transform: translateX(var(--walk-distance, 34px)) scaleX(-1); }
+    92%       { transform: translateX(0) scaleX(-1); }
+    /* turn back to face forward */
+    100%      { transform: translateX(0) scaleX(1); }
   }
-  /* Emerald arc sweeping around the hen — the "refreshing" cue, replacing the
-   * generic spinner while keeping the brand glyph as the hero. */
-  @keyframes brand-orbit {
-    from { transform: rotate(0deg); }
-    to   { transform: rotate(360deg); }
+  /* The footstep bob layered on top of the walk: a small rise and fall with a
+   * peck-like tilt, so the hen reads as stepping rather than sliding. */
+  @keyframes brand-step {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    25%      { transform: translateY(-2.5px) rotate(-5deg); }
+    50%      { transform: translateY(0) rotate(0deg); }
+    75%      { transform: translateY(-2.5px) rotate(5deg); }
   }
-  /* Ring expanding outward from the glyph, like a dropped-stone ripple. */
-  @keyframes brand-ripple {
-    0%   { opacity: 0.55; transform: scale(0.75); }
-    70%  { opacity: 0;    transform: scale(1.6); }
-    100% { opacity: 0;    transform: scale(1.6); }
+  /* Hen "dance": a cheerful side-to-side wiggle used for the hover tease. */
+  @keyframes brand-dance {
+    0%, 100% { transform: translateY(0) rotate(0deg); }
+    25%      { transform: translateY(-3px) rotate(-9deg); }
+    50%      { transform: translateY(0) rotate(0deg); }
+    75%      { transform: translateY(-3px) rotate(9deg); }
   }
 }
 
