@@ -23,7 +23,7 @@ import autoTable from "jspdf-autotable";
 
 type FarmsPageProps = { embedded?: boolean };
 
-const ITEMS_PER_PAGE = 10;
+const DEFAULT_PAGE_SIZE = 10;
 
 function FarmsPage({ embedded = false }: FarmsPageProps) {
   const [showDialog, setShowDialog] = useState(false);
@@ -33,6 +33,7 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
   const [statusFilter, setStatusFilter] = useState("");
   const [sortOrder, setSortOrder] = useState("number");
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const { showNotification } = useSafeNotification();
@@ -47,7 +48,7 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
     editFarm,
     removeFarm,
     total, page: serverPage, exportRows,
-  } = useFarms({ page: currentPage, pageSize: ITEMS_PER_PAGE, search, status: statusFilter, sort: sortOrder });
+  } = useFarms({ page: currentPage, pageSize: pageSize, search, status: statusFilter, sort: sortOrder });
 
   const farmBulkImportConfig = useMemo(
     () => buildFarmBulkImportConfig({ addFarmsBulk, reload }),
@@ -60,7 +61,7 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
     setCurrentPage(1);
   };
 
-  const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const safePage = serverPage;
   const paginatedFarms = farms;
 
@@ -427,6 +428,11 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
             totalPages={totalPages}
             onPageChange={setCurrentPage}
             disabled={loading}
+            pageSize={pageSize}
+            onPageSizeChange={(next) => {
+              setPageSize(next);
+              setCurrentPage(1); // a new page size invalidates the current page
+            }}
           />
         )}
       </div>

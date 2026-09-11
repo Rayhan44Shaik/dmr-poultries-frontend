@@ -22,7 +22,7 @@ import { buildEmployeeBulkImportConfig } from "../bulkImportConfig";
 
 type EmployeesPageProps = { embedded?: boolean };
 
-const ITEMS_PER_PAGE = 10;
+const DEFAULT_PAGE_SIZE = 10;
 
 function EmployeesPage({ embedded = false }: EmployeesPageProps) {
   const { t } = useI18n();
@@ -33,6 +33,7 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
   const [statusFilter, setStatusFilter] = useState("");
   const [sortOrder, setSortOrder] = useState("number");
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [selectedDepartment, setSelectedDepartment] = useState("");
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
@@ -48,7 +49,7 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
     editEmployee,
     removeEmployee,
     total, page: serverPage, exportRows, facets,
-  } = useEmployees({ page: currentPage, pageSize: ITEMS_PER_PAGE, search, status: statusFilter, sort: sortOrder, department: selectedDepartment });
+  } = useEmployees({ page: currentPage, pageSize: pageSize, search, status: statusFilter, sort: sortOrder, department: selectedDepartment });
 
   const employeeBulkImportConfig = useMemo(
     () => buildEmployeeBulkImportConfig({ addEmployeesBulk, reload }),
@@ -68,7 +69,7 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
     setCurrentPage(1);
   };
 
-  const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const safePage = serverPage;
   const paginatedEmployees = employees;
 
@@ -404,6 +405,11 @@ function EmployeesPage({ embedded = false }: EmployeesPageProps) {
             totalPages={totalPages}
             onPageChange={setCurrentPage}
             disabled={loading}
+            pageSize={pageSize}
+            onPageSizeChange={(next) => {
+              setPageSize(next);
+              setCurrentPage(1); // a new page size invalidates the current page
+            }}
           />
         )}
       </div>
