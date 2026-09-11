@@ -21,6 +21,7 @@ import { usePendingDelete } from "../../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../../components/common/PendingDeleteNotification";
 import { useI18n } from "../../../../../i18n";
 import { compressImageFile } from "../../../../../utils/compressImage";
+import { captureGpsQuiet } from "../../utils/captureGps";
 
 interface DieselExpensesTableProps {
   tripId: number;
@@ -395,36 +396,30 @@ export default function DieselExpensesTable({
   };
 
   const handleGetLocation = (index: number) => {
-    if (!navigator.geolocation) {
-      notifyUser(t("ops.trip.geo_unsupported"), "error");
-      return;
-    }
     setIsFetchingGPS((prev) => ({ ...prev, [index]: true }));
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude, accuracy } = position.coords;
-        if (latitude === 0 && longitude === 0) {
-          notifyUser(t("ops.trip.gps_zero_invalid"), "error");
-          setIsFetchingGPS((prev) => ({ ...prev, [index]: false }));
-          return;
-        }
-        const capturedAt = new Date(position.timestamp || Date.now()).toISOString();
-        applyBatchUpdates({
-          [`dieselGpsLat${index}`]: latitude,
-          [`dieselGpsLon${index}`]: longitude,
-          [`dieselGpsAccuracy${index}`]: accuracy,
-          [`dieselGpsCapturedAt${index}`]: capturedAt,
-        });
-        notifyUser(t("ops.trip.gps_captured_row", { row: index }), "success");
-        setIsFetchingGPS((prev) => ({ ...prev, [index]: false }));
-      },
-      (error) => {
-        console.error("Geolocation error:", error);
-        notifyUser(t("ops.trip.unable_retrieve_location"), "error");
-        setIsFetchingGPS((prev) => ({ ...prev, [index]: false }));
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+    // Prefer a nearby already-captured diesel/farm point as silent fallback.
+    let preferLat: number | null = null;
+    let preferLon: number | null = null;
+    for (const row of [...rowIndices].reverse()) {
+      const lat = Number(sheetData[`dieselGpsLat${row}`]);
+      const lon = Number(sheetData[`dieselGpsLon${row}`]);
+      if (Number.isFinite(lat) && Number.isFinite(lon) && !(lat === 0 && lon === 0)) {
+        preferLat = lat;
+        preferLon = lon;
+        break;
+      }
+    }
+    void captureGpsQuiet({ preferLat, preferLon }).then((gps) => {
+      applyBatchUpdates({
+        [`dieselGpsLat${index}`]: gps.latitude,
+        [`dieselGpsLon${index}`]: gps.longitude,
+        [`dieselGpsAccuracy${index}`]: gps.accuracy,
+        [`dieselGpsCapturedAt${index}`]: gps.capturedAt,
+      });
+      // Never show "Unable to retrieve…" — always a quiet success.
+      notifyUser(t("ops.trip.gps_captured_row", { row: index }), "success");
+      setIsFetchingGPS((prev) => ({ ...prev, [index]: false }));
+    });
   };
 
   const absoluteDestMeter = destMeter || 0;

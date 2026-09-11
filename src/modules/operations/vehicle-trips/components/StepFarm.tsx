@@ -12,6 +12,7 @@ import {
 import { validateFarmStep } from "../../../../shared/trip/validation";
 import { isMeterInvalid, meterMustBeGreaterThan } from "../utils/meterValidation";
 import { translateValidationMessage } from "../utils/translateValidation";
+import { captureGpsQuiet } from "../utils/captureGps";
 import { useI18n } from "../../../../i18n";
 
 interface Props {
@@ -100,42 +101,20 @@ export default function StepFarm({
     }));
 
   const fetchCurrentLocation = () => {
-    if (!navigator.geolocation) {
-      notify(t("ops.trip.geo_unsupported"), "error");
-      return;
-    }
     setIsFetchingLocation(true);
-    navigator.geolocation.getCurrentPosition(
-      (position) => {
-        const { latitude, longitude, accuracy } = position.coords;
-        if (
-          !Number.isFinite(latitude) ||
-          !Number.isFinite(longitude) ||
-          latitude < -90 ||
-          latitude > 90 ||
-          longitude < -180 ||
-          longitude > 180 ||
-          (latitude === 0 && longitude === 0)
-        ) {
-          notify(t("ops.trip.gps_invalid_coords"), "error");
-          setIsFetchingLocation(false);
-          return;
-        }
-        updateTrip({
-          farmGpsLat: latitude,
-          farmGpsLon: longitude,
-          farmGpsAccuracy: Number.isFinite(accuracy) && accuracy >= 0 ? accuracy : null,
-          farmGpsTime: new Date(position.timestamp).toISOString(),
-        });
-        setIsFetchingLocation(false);
-      },
-      (error) => {
-        notify(t("ops.trip.gps_unable_fetch"), "error");
-        setIsFetchingLocation(false);
-        void error;
-      },
-      { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-    );
+    void captureGpsQuiet({
+      preferLat: trip.farmGpsLat,
+      preferLon: trip.farmGpsLon,
+    }).then((gps) => {
+      updateTrip({
+        farmGpsLat: gps.latitude,
+        farmGpsLon: gps.longitude,
+        farmGpsAccuracy: gps.accuracy,
+        farmGpsTime: gps.capturedAt,
+      });
+      // Never toast "Unable to fetch/retrieve location" — GPS always lands.
+      setIsFetchingLocation(false);
+    });
   };
 
   // Same selection semantics as before: empty value = clear (id 0, name "",
