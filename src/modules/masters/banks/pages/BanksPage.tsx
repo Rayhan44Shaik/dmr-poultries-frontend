@@ -23,7 +23,7 @@ type BanksPageProps = {
   embedded?: boolean;
 };
 
-const ITEMS_PER_PAGE = 10;
+const DEFAULT_PAGE_SIZE = 10;
 
 function BanksPage({ embedded = false }: BanksPageProps) {
   const [showDialog, setShowDialog] = useState(false);
@@ -35,6 +35,7 @@ function BanksPage({ embedded = false }: BanksPageProps) {
   const [sortOrder, setSortOrder] = useState("number");
 
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
 
   const [deletingId, setDeletingId] = useState<number | null>(null);
 
@@ -51,14 +52,14 @@ function BanksPage({ embedded = false }: BanksPageProps) {
     editBank,
     removeBank,
     total, page: serverPage, exportRows,
-  } = useBanks({ page: currentPage, pageSize: ITEMS_PER_PAGE, search, status: statusFilter, sort: sortOrder });
+  } = useBanks({ page: currentPage, pageSize: pageSize, search, status: statusFilter, sort: sortOrder });
 
   const handleSearchChange = (value: string) => {
     setSearch(value);
     setCurrentPage(1);
   };
 
-  const totalPages = Math.max(1, Math.ceil(total / ITEMS_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const safePage = serverPage;
   const paginatedBanks = banks;
 
@@ -369,6 +370,11 @@ function BanksPage({ embedded = false }: BanksPageProps) {
             totalPages={totalPages}
             onPageChange={setCurrentPage}
             disabled={loading}
+            pageSize={pageSize}
+            onPageSizeChange={(next) => {
+              setPageSize(next);
+              setCurrentPage(1); // a new page size invalidates the current page
+            }}
           />
         )}
       </div>

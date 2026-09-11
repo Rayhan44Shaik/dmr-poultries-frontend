@@ -9,6 +9,7 @@
 
 import React, { useState, useEffect, useMemo, useRef, useCallback } from "react";
 import { Check, ChevronDown, Search, X } from "lucide-react";
+import { useI18n } from "../../../../i18n";
 
 /** How many option rows are visible before the list scrolls. */
 const VISIBLE_ITEMS = 5;
@@ -168,6 +169,7 @@ export const SearchDropdown = React.memo(function SearchDropdown({
   onChange: (value: string) => void;
 }) {
   const { open, setOpen, query, setQuery, ref, searchRef, filtered } = useDropdownPanel();
+  const { t } = useI18n();
 
   const selected = useMemo(
     () => options.find((option) => option.value === value) || null,
@@ -248,7 +250,7 @@ export const SearchDropdown = React.memo(function SearchDropdown({
               );
             })}
             {filtered(options).length === 0 && (
-              <li className="px-3 h-9 flex items-center text-xs text-slate-400">No matches</li>
+              <li className="px-3 h-9 flex items-center text-xs text-slate-400">{t("masters.ui.no_matches")}</li>
             )}
           </ul>
         </div>
@@ -287,6 +289,7 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
   selectAllLabel?: string;
 }) {
   const { open, setOpen, query, setQuery, ref, searchRef, filtered } = useDropdownPanel();
+  const { t } = useI18n();
 
   const selectedSet = useMemo(() => new Set(selectedValues), [selectedValues]);
 
@@ -434,7 +437,7 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
               );
             })}
             {filtered(options).length === 0 && (
-              <li className="px-3 h-9 flex items-center text-xs text-slate-400">No matches</li>
+              <li className="px-3 h-9 flex items-center text-xs text-slate-400">{t("masters.ui.no_matches")}</li>
             )}
           </ul>
         </div>

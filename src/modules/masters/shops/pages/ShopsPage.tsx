@@ -25,7 +25,6 @@ import { useI18n } from "../../../../i18n";
 
 type ShopsPageProps = { embedded?: boolean };
 
-const PAGE_SIZE_OPTIONS = [10, 15, 20, 25] as const;
 const DEFAULT_PAGE_SIZE = 10;
 
 function ShopsPage({ embedded = false }: ShopsPageProps) {
@@ -481,22 +480,9 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
             totalPages={totalPages}
             onPageChange={setCurrentPage}
             disabled={loading}
-          >
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-medium text-slate-500">
-                {t("common.per_page")}
-              </span>
-              <MasterDropdown
-                label={t("common.per_page")}
-                hideLabel
-                value={String(pageSize)}
-                options={PAGE_SIZE_OPTIONS.map(String)}
-                onChange={(value) => handlePageSizeChange(Number(value))}
-                disabled={loading}
-                className="w-20"
-              />
-            </div>
-          </MasterPagination>
+            pageSize={pageSize}
+            onPageSizeChange={handlePageSizeChange}
+          />
         )}
       </div>
 

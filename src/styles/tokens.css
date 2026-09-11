@@ -310,6 +310,17 @@
   --animate-toast-in: toast-in 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-page-pop: page-pop 0.42s cubic-bezier(0.22, 1, 0.36, 1) both;
 
+  /* Brand refresh — the canonical "data is reloading" motion.
+   * The hen logo hops while the halo behind it breathes, so a refresh reads as
+   * the product doing work rather than a generic spinner. Used by
+   * <BrandRefreshButton> (ui/BrandRefreshButton.tsx); do not hand-roll another
+   * refresh animation anywhere else. */
+  --animate-brand-hop: brand-hop 0.85s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+  --animate-brand-walk: brand-walk 3s cubic-bezier(0.5, 0, 0.5, 1) infinite;
+  --animate-brand-step: brand-step 0.34s cubic-bezier(0.3, 0, 0.4, 1) infinite;
+  --animate-brand-peck: brand-peck 3s ease-in-out infinite;
+  --animate-brand-dance: brand-dance 0.75s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
+
   @keyframes fade-in {
     from { opacity: 0; }
     to { opacity: 1; }
@@ -337,6 +348,60 @@
   @keyframes page-pop {
     from { opacity: 0; transform: translateY(18px) scale(0.965); }
     to { opacity: 1; transform: translateY(0) scale(1); }
+  }
+  /* Hen "hop": crouch, spring up with a lean, then land with a squash.
+   * Deliberately pronounced — this is the primary "work is happening" signal,
+   * so it has to read clearly at 18px from normal viewing distance. */
+  @keyframes brand-hop {
+    0%   { transform: translateY(0) scale(1, 1) rotate(0deg); }
+    15%  { transform: translateY(1px) scale(1.08, 0.9) rotate(-3deg); }  /* crouch */
+    40%  { transform: translateY(-7px) scale(0.94, 1.12) rotate(6deg); } /* launch */
+    60%  { transform: translateY(-8px) scale(0.97, 1.06) rotate(3deg); } /* apex   */
+    82%  { transform: translateY(0) scale(1.12, 0.86) rotate(-2deg); }   /* land   */
+    100% { transform: translateY(0) scale(1, 1) rotate(0deg); }
+  }
+  /* Hen "walk": strolls left -> right across the track, turns around at the
+   * far end (scaleX flip), walks back, then turns again. `--walk-distance` is
+   * set by the component so the same keyframes work at any track width. */
+  /* Hen "walk": a strut with personality — sets off, pauses mid-way for a
+   * peck, carries on, turns at the far end, and struts back. The little holds
+   * are what make it feel alive rather than like a looping slider. */
+  @keyframes brand-walk {
+    0%   { transform: translateX(0) scaleX(1); }
+    8%   { transform: translateX(0) scaleX(1); }                                  /* gather */
+    22%  { transform: translateX(calc(var(--walk-distance, 7px) * 0.55)) scaleX(1); }
+    30%  { transform: translateX(calc(var(--walk-distance, 7px) * 0.55)) scaleX(1); } /* pause to peck */
+    44%  { transform: translateX(var(--walk-distance, 7px)) scaleX(1); }
+    52%  { transform: translateX(var(--walk-distance, 7px)) scaleX(-1); }          /* turn */
+    66%  { transform: translateX(calc(var(--walk-distance, 7px) * 0.45)) scaleX(-1); }
+    74%  { transform: translateX(calc(var(--walk-distance, 7px) * 0.45)) scaleX(-1); } /* pause */
+    90%  { transform: translateX(0) scaleX(-1); }
+    100% { transform: translateX(0) scaleX(1); }                                   /* turn back */
+  }
+  /* Footstep bob: a quick, bouncy rise and fall with an alternating lean, so
+   * each stride reads as a distinct step. Faster than the travel so several
+   * steps happen per crossing. */
+  @keyframes brand-step {
+    0%, 100% { transform: translateY(0) rotate(0deg) scale(1, 1); }
+    20%      { transform: translateY(-3px) rotate(-7deg) scale(0.96, 1.06); }
+    45%      { transform: translateY(0) rotate(0deg) scale(1.05, 0.95); }
+    70%      { transform: translateY(-3px) rotate(7deg) scale(0.96, 1.06); }
+  }
+  /* Peck: a sharp bob down, timed to land in the walk's pauses. Applied to a
+   * separate layer so it composes with the travel and the step bob. */
+  @keyframes brand-peck {
+    0%, 24%, 36%, 68%, 80%, 100% { transform: translateY(0) rotate(0deg); }
+    30%  { transform: translateY(2.5px) rotate(-16deg); }
+    74%  { transform: translateY(2.5px) rotate(16deg); }
+  }
+  /* Hen "dance": a bouncy, springy shimmy for the hover tease — bigger tilt
+   * and a squash-and-stretch so it genuinely looks like dancing. */
+  @keyframes brand-dance {
+    0%, 100% { transform: translateY(0) rotate(0deg) scale(1, 1); }
+    20%      { transform: translateY(-4px) rotate(-14deg) scale(0.94, 1.08); }
+    40%      { transform: translateY(0) rotate(0deg) scale(1.08, 0.92); }
+    60%      { transform: translateY(-4px) rotate(14deg) scale(0.94, 1.08); }
+    80%      { transform: translateY(0) rotate(0deg) scale(1.06, 0.94); }
   }
 }
 

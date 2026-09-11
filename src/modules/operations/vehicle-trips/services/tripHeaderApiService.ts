@@ -563,6 +563,9 @@ export interface TripListFilters {
   search?: string;
   page?: number;
   limit?: number;
+  /** Column key to sort by; the API whitelists the accepted values. */
+  sortBy?: string;
+  sortDir?: "asc" | "desc";
 }
 
 export interface PaginatedTripListResult {
@@ -590,6 +593,8 @@ export async function listCompletedTrips(filters: TripListFilters = {}): Promise
         search: filters.search,
         page: filters.page,
         limit: filters.limit,
+        sortBy: filters.sortBy,
+        sortDir: filters.sortDir,
       },
     }
   );

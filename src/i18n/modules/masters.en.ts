@@ -1,6 +1,7 @@
 export default {
   'masters.ui.search_options': 'Search...',
   'masters.ui.no_matches': 'No matches',
+  'masters.ui.use_value': 'Use {value}',
   'masters.ui.required_fields': 'Required fields',
   'masters.ui.clear_search': 'Clear search',
   'masters.ui.actions': 'Master actions',

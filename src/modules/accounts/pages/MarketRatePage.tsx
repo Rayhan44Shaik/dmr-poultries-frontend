@@ -6,6 +6,7 @@ import { DatePicker } from "../../../components/common/DatePicker";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
 import { handleApiError } from "../../../api";
 import { useI18n } from "../../../i18n";
+import { BrandRefreshButton } from "../../../ui";
 import { shiftMonths, toBusinessDate } from "../../../utils/businessDate";
 import {
   listMarketRates,
@@ -60,6 +61,9 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
   // Filter tab state ("This Week" selected by default)
   const [activeTab, setActiveTab] = useState<'This Week' | 'Month' | 'Quarter' | 'Custom Range'>('This Week');
   const [autoSaveStatus, setAutoSaveStatus] = useState<'Saved' | 'Saving...' | 'Error'>('Saved');
+  // Drives the branded refresh control's logo animation (and its
+  // double-activation guard) while the rates are being re-fetched.
+  const [refreshing, setRefreshing] = useState(false);
 
   // Feedback for Refresh / Clear goes through the ONE global notification
   // system (rendered by <NotificationHost /> in App.tsx). This page previously
@@ -452,10 +456,14 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
             {autoSaveStatus === 'Saving...' && <span className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full"><RefreshCw size={12} className="animate-spin"/> Saving</span>}
             {autoSaveStatus === 'Error' && <span className="flex items-center gap-1 text-xs text-rose-600 bg-rose-50 px-2 py-1 rounded-full"><AlertCircle size={12}/> Error</span>}
 
-            {/* Refresh button */}
-            <button
+            {/* Refresh — canonical branded control (emerald + animated hen).
+                Reuse <BrandRefreshButton> for refresh everywhere else too. */}
+            <BrandRefreshButton
+              loading={refreshing}
+              disabled={!fromDate || !toDate}
               onClick={() => {
                 if (fromDate && toDate) {
+                  setRefreshing(true);
                   setAutoSaveStatus("Saving...");
                   void listMarketRates(fromDate, toDate)
                     .then((rows) => {
@@ -486,14 +494,11 @@ export const MarketRatePage: React.FC<MarketRatePageProps> = ({ embedded = false
                         `Unable to refresh: ${handleApiError(err)}`,
                         'error'
                       );
-                    });
+                    })
+                    .finally(() => setRefreshing(false));
                 }
               }}
-              className="inline-flex items-center gap-1.5 bg-slate-50 border border-slate-200 hover:bg-slate-100 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-600 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500/30"
-            >
-              <RefreshCw size={14} />
-              <span>Refresh</span>
-            </button>
+            />
 
             {/* Save Market Rate button */}
             <button
