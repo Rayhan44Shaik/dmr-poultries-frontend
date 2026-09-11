@@ -388,14 +388,6 @@ export const NAV_SECTIONS: NavSection[] = [
         tone: "emerald",
         keywords: "emi loan installment",
       },
-      {
-        label: "Analytics",
-        labelKey: "nav.analytics",
-        path: "/fleet?tab=analytics",
-        icon: BarChart3,
-        tone: "violet",
-        keywords: "analytics vehicle performance",
-      },
 
       {
         label: "FASTag",
