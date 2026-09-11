@@ -9,7 +9,6 @@ import TripRecentTable from "../components/TripRecentTable";
 import TripViewModal from "../components/TripViewModal";
 import TripWizardStepper from "../components/TripWizardStepper";
 import { WizardStepNotice } from "../components/WizardStepUI";
-import { TripNoBadge } from "../components/TripNoBadge";
 import StepStart from "../components/StepStart";
 import StepDeliveries from "../components/StepDeliveries";
 import StepFarm from "../components/StepFarm";
@@ -632,27 +631,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
           </div>
         ) : (
           <>
-            {/* Always-visible trip identity while wizard is open */}
-            {trip.tripNo ? (
-              <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-indigo-100 bg-indigo-50/60 px-3 py-2">
-                <div className="flex flex-wrap items-center gap-2 min-w-0">
-                  <TripNoBadge tripNo={trip.tripNo} />
-                  {trip.vehicleNo ? (
-                    <span className="text-[11px] font-semibold text-slate-600 tabular-nums">
-                      {t("operations.vehicle_no")}: {trip.vehicleNo}
-                    </span>
-                  ) : null}
-                  {trip.tripDate ? (
-                    <span className="text-[11px] font-medium text-slate-500">{trip.tripDate}</span>
-                  ) : null}
-                </div>
-                {trip.status ? (
-                  <span className="text-[10px] font-bold uppercase tracking-wide text-indigo-700/80 bg-white/80 border border-indigo-100 rounded-full px-2 py-0.5">
-                    {trip.status}
-                  </span>
-                ) : null}
-              </div>
-            ) : null}
             <TripWizardStepper
               steps={TRIP_STEP_LABELS}
               currentStep={isTripEnded ? 4 : effectiveViewStepIndex}
