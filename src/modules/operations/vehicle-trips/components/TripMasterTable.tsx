@@ -1,7 +1,8 @@
 import React from "react";
-import { Check, Hash, Calendar, Truck, User, UserCog, Warehouse, Store, ShoppingBag, Bird, Scale, HeartPulse, ChevronLeft, ChevronRight } from "lucide-react";
+import { Check, Hash, Calendar, Truck, User, UserCog, Warehouse, ShoppingBag, Bird, Scale, HeartPulse, ChevronUp, ChevronDown } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { formatTripListDay } from "../utils/formatTripListDay";
+import { formatVehicleNumber } from "../../../../utils/format";
 import { useI18n } from "../../../../i18n";
 
 /** Column keys the API accepts for sorting. */
@@ -12,7 +13,6 @@ export type TripSortKey =
   | "driverName"
   | "supervisorName"
   | "sourceFarm"
-  | "lastShop"
   | "totalShops"
   | "totalBirds"
   | "totalWeight"
@@ -29,24 +29,20 @@ interface Props {
 }
 
 /**
- * Sort affordance: two side-by-side ticks (left = ascending, right =
- * descending) rather than stacked up/down arrows. Both are always rendered so
- * the header never changes width, and the active direction sits in a filled
- * emerald badge so it reads clearly against the grey header.
+ * Sort affordance: two stacked up/down chevrons (up = ascending, down =
+ * descending) instead of side-by-side left/right ticks. Both are always
+ * rendered so the header never changes width, and the active direction sits in
+ * a filled emerald badge so it reads clearly against the grey header.
  */
 function SortArrows({ active, dir }: { active: boolean; dir?: "asc" | "desc" }) {
   const base =
-    "inline-flex h-[18px] w-[18px] items-center justify-center rounded-md transition-colors";
+    "inline-flex h-[11px] w-[14px] items-center justify-center rounded-sm transition-colors";
   const on = "bg-emerald-600 text-white shadow-sm";
   const off = "text-slate-400 group-hover/sort:text-slate-600";
   return (
-    <span className="inline-flex items-center gap-0.5 shrink-0" aria-hidden="true">
-      <span className={`${base} ${active && dir === "asc" ? on : off}`}>
-        <ChevronLeft size={13} strokeWidth={3.5} />
-      </span>
-      <span className={`${base} ${active && dir === "desc" ? on : off}`}>
-        <ChevronRight size={13} strokeWidth={3.5} />
-      </span>
+    <span className="inline-flex flex-col items-center shrink-0" aria-hidden="true">
+      <ChevronUp size={12} strokeWidth={3.5} className={`${base} ${active && dir === "asc" ? on : off}`} />
+      <ChevronDown size={12} strokeWidth={3.5} className={`${base} ${active && dir === "desc" ? on : off}`} />
     </span>
   );
 }
@@ -123,12 +119,6 @@ function TripMasterTable({
                   <span>{t("ops.trip.source_farm")}</span>
                 </div>)}
               </th>
-              <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
-                {sortable("lastShop", <div className="flex items-center gap-1.5">
-                  <Store size={13} className="text-orange-500 flex-shrink-0" />
-                  <span>{t("ops.trip.last_shop")}</span>
-                </div>)}
-              </th>
               <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
                 {sortable("totalShops", <div className="flex items-center justify-center gap-1.5">
                   <ShoppingBag size={13} className="text-cyan-500 flex-shrink-0" />
@@ -158,7 +148,7 @@ function TripMasterTable({
           <tbody className="divide-y divide-slate-100">
             {trips.length === 0 ? (
               <tr>
-                <td colSpan={12} className="py-12 text-center text-slate-400 text-xs font-medium">
+                <td colSpan={11} className="py-12 text-center text-slate-400 text-xs font-medium">
                   {t("ops.trip.no_completed_trips")}
                 </td>
               </tr>
@@ -172,7 +162,7 @@ function TripMasterTable({
                     onClick={() => onRowClick(trip)}
                     className={`cursor-pointer transition-all duration-150 ${
                       isSelected
-                        ? "bg-blue-100 border-l-4 border-l-blue-600 shadow-sm ring-1 ring-inset ring-blue-300"
+                        ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200"
                         : `hover:bg-slate-50/60 ${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"}`
                     }`}
                   >
@@ -183,13 +173,10 @@ function TripMasterTable({
                       {trip.tripNo}
                     </td>
                     <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(trip.tripDate)}</td>
-                    <td className="px-4 py-3 text-xs font-medium text-slate-700 whitespace-nowrap">{trip.vehicleNo}</td>
+                    <td className="px-4 py-3 text-xs font-medium text-slate-700 whitespace-nowrap">{formatVehicleNumber(trip.vehicleNo)}</td>
                     <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">{trip.driverName || "-"}</td>
                     <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">{trip.supervisorName}</td>
                     <td className="px-4 py-3 text-xs text-slate-600 font-medium whitespace-nowrap">{trip.sourceFarm}</td>
-                    <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">
-                      {trip.lastShop || (trip.deliveries?.length ? trip.deliveries[trip.deliveries.length - 1].shopName : "--")}
-                    </td>
                     <td className="px-4 py-3 text-center text-xs font-bold text-slate-700 whitespace-nowrap">{trip.totalShops}</td>
                     <td className="px-4 py-3 text-center text-xs font-bold text-blue-500 whitespace-nowrap">{trip.totalBirds.toLocaleString()}</td>
                     <td className="px-4 py-3 text-center text-xs font-bold text-amber-500 whitespace-nowrap">{trip.totalWeight.toFixed(2)}</td>

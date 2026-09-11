@@ -512,6 +512,7 @@ export default {
   'ops.trip.mortality_birds': 'Mortality (Birds)',
   'ops.trip.mortality_weight': 'Mortality Weight',
   'ops.trip.mortality_weight_kg': 'Mortality Weight (KG)',
+  'ops.trip.mortality_short': 'MOR',
   'ops.trip.new_row_added': 'New row added.',
   'ops.trip.no_active_trip': 'No active trip',
   'ops.trip.no_active_bird_types': 'No other active bird types.',

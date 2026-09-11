@@ -162,10 +162,16 @@ function TripListPage({ embedded = false }: TripListPageProps) {
       });
   };
 
-  /** First click sorts ascending; clicking the active column flips direction. */
+  /** First click sorts ascending; second flips to descending; a third click on
+   *  the active column clears the sort entirely (deselect). */
   const handleSortChange = (key: TripSortKey) => {
     if (sortBy === key) {
-      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+      if (sortDir === "asc") {
+        setSortDir("desc");
+      } else {
+        setSortBy(null);
+        setSortDir("asc");
+      }
     } else {
       setSortBy(key);
       setSortDir("asc");

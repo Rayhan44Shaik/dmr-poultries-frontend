@@ -5,7 +5,8 @@ import { useSearchParams } from "react-router-dom";
 import { Eye, Pencil, History, Trash2, Clock, AlertCircle, Search, FileText, CheckCircle } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { canEditItem, canDeleteItem } from "../../../../utils/dateUtils";
-import { formatTripRecentDateWithDay } from "../utils/formatTripListDay";
+import { formatTripListDay } from "../utils/formatTripListDay";
+import { formatVehicleNumber } from "../../../../utils/format";
 import TripPagination from "./TripPagination";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
@@ -329,12 +330,12 @@ function TripRecentTable({
             <div className="h-5 w-px bg-slate-200 hidden sm:block" />
 
             <div className="flex items-center gap-1">
-              <button onClick={handleEditClick} disabled={!canEdit} className={`h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canEdit ? "bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-500 border border-emerald-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`} title={t("ops.trip.edit_selected_trip")}>
-                <Pencil size={13} />
+              <button onClick={handleEditClick} disabled={!canEdit} className={`group h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canEdit ? "bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-500 border border-emerald-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`} title={t("ops.trip.edit_selected_trip")}>
+                <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-brand-dance)]"><Pencil size={13} /></span>
                 <span className="hidden md:inline">{t("common.edit")}</span>
               </button>
-              <button onClick={openDeleteModal} disabled={!canDelete} className={`h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canDelete ? "bg-rose-50/70 hover:bg-rose-50/80 text-rose-500 border border-rose-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`} title={t("ops.trip.delete_selected_trip")}>
-                <Trash2 size={13} />
+              <button onClick={openDeleteModal} disabled={!canDelete} className={`group h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canDelete ? "bg-rose-50/70 hover:bg-rose-50/80 text-rose-500 border border-rose-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`} title={t("ops.trip.delete_selected_trip")}>
+                <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-brand-dance)]"><Trash2 size={13} /></span>
                 <span className="hidden md:inline">{t("common.delete")}</span>
               </button>
               <BrandRefreshButton onClick={() => onRefresh()} />
@@ -356,7 +357,7 @@ function TripRecentTable({
                 <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("ops.trip.shops")}</th>
                 <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("common.birds")}</th>
                 <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("ops.trip.weight_kg")}</th>
-                <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("operations.mortality_count")}</th>
+                <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("ops.trip.mortality_short")}</th>
                 <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("common.status")}</th>
                 <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("common.view")}</th>
               </tr>
@@ -370,12 +371,12 @@ function TripRecentTable({
                   const isDeleted = trip.deleted === true;
 
                   return (
-                    <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-all duration-150 group ${isDeleted ? "bg-red-50/50 hover:bg-red-50/80 border-l-4 border-l-red-400" : isSelected ? "bg-blue-100 shadow-inner border-l-4 border-l-blue-600 ring-1 ring-inset ring-blue-300" : "hover:bg-slate-50/80"}`}>
+                    <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-all duration-150 group ${isDeleted ? "bg-red-50/50 hover:bg-red-50/80 border-l-4 border-l-red-400" : isSelected ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200" : "hover:bg-slate-50/80"}`}>
                       <td className={`px-4 py-3 font-bold text-emerald-500 text-xs whitespace-nowrap ${isDeleted ? "opacity-60 line-through" : ""}`}>
                         {trip.tripNo}
                       </td>
-                      <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">{formatTripRecentDateWithDay(trip.tripDate)}</td>
-                      <td className="px-4 py-3 text-xs font-medium text-slate-700">{trip.vehicleNo}</td>
+                      <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(trip.tripDate)}</td>
+                      <td className="px-4 py-3 text-xs font-medium text-slate-700 whitespace-nowrap">{formatVehicleNumber(trip.vehicleNo)}</td>
                       <td className="px-4 py-3 text-xs text-slate-600">{trip.driverName}</td>
                       <td className="px-4 py-3 text-xs text-slate-600">{trip.supervisorName}</td>
                       <td className="px-4 py-3 text-xs text-slate-600 font-medium">{trip.sourceFarm}</td>

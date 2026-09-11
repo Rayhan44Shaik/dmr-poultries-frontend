@@ -188,12 +188,12 @@ function TripFilters({
               {t("ops.trip.view_selected")}
             </button>
           )}
-          <button onClick={onSearch} className={opsPrimaryButtonClass}>
-            <Search size={15} />
+          <button onClick={onSearch} className={`group ${opsPrimaryButtonClass}`}>
+            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-brand-dance)]"><Search size={15} /></span>
             {t("common.search")}
           </button>
-          <button onClick={onReset} className={opsSecondaryButtonClass}>
-            <RotateCcw size={14} />
+          <button onClick={onReset} className={`group ${opsSecondaryButtonClass}`}>
+            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-brand-dance)]"><RotateCcw size={14} /></span>
             {t("common.reset")}
           </button>
           {onRefresh && <BrandRefreshButton onClick={onRefresh} />}
