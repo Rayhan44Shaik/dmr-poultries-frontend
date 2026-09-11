@@ -14,6 +14,7 @@ import { getNextIncompleteTripStep, isTripWizardComplete, isValidTripStatusTrans
 import { useI18n } from "../../../../i18n";
 import { notify as globalNotify } from "../../../../ui/notifications/notificationStore";
 import { uniqueTripsById } from "../services/tripHeaderApiService";
+import { isOrderContainer } from "../../orders/ordersUtils";
 
 interface Props {
   trips?: Trip[];
@@ -36,7 +37,14 @@ function TripRecentTable({
   onStatusChange,
 }: Props) {
   const { t } = useI18n();
-  const safeTrips = uniqueTripsById(Array.isArray(trips) ? trips : []);
+  // Recent Trips lists REAL vehicle trips (TRP-*) only. The trips feed also
+  // carries Orders collection containers (ORD-*): rows with no vehicle that
+  // exist purely to hold a day's order plan. They are not trips, so they must
+  // never appear here. Filtered by isOrderContainer rather than by matching the
+  // "ORD-" prefix, so the rule stays tied to the actual data shape.
+  const safeTrips = uniqueTripsById(
+    (Array.isArray(trips) ? trips : []).filter((t) => !isOrderContainer(t)),
+  );
 
   /** Translate, but never surface a raw i18n key: returns "" when the key is missing. */
   const tSafe = (key: string, params?: Record<string, string | number>) => {
@@ -352,8 +360,8 @@ function TripRecentTable({
 
                   return (
                     <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-all duration-150 group ${isDeleted ? "bg-rose-50/40 hover:bg-rose-50/70 border-l-4 border-l-rose-400" : isSelected ? "bg-blue-50/80 shadow-inner border-l-4 border-l-blue-600" : "hover:bg-slate-50/80"}`}>
-                      <td className="px-4 py-3 font-bold text-emerald-500 text-xs">
-                        <span className={`bg-emerald-50/70 px-2 py-1 rounded-md border border-emerald-100/80 ${isDeleted ? "opacity-60 line-through" : ""}`}>{trip.tripNo}</span>
+                      <td className="px-4 py-3 font-bold text-emerald-700 text-xs">
+                        <span className={`bg-emerald-100 px-2 py-1 rounded-md border border-emerald-300 text-emerald-700 ${isDeleted ? "opacity-60 line-through" : ""}`}>{trip.tripNo}</span>
                       </td>
                       <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">{formatTripRecentDateWithDay(trip.tripDate)}</td>
                       <td className="px-4 py-3 text-xs font-medium text-slate-700">{trip.vehicleNo}</td>
