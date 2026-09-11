@@ -2283,6 +2283,32 @@ const USER = {
   permissions: ["*"],
 };
 
+/** Sorts trip rows by a whitelisted column before pagination. */
+function sortTrips(rows, sortBy, sortDir) {
+  if (!sortBy) return rows;
+  const dir = sortDir === "desc" ? -1 : 1;
+  const pick = {
+    tripNo: (t) => t.tripNo || "",
+    tripDate: (t) => t.tripDate || "",
+    vehicleNo: (t) => t.vehicleNo || "",
+    driverName: (t) => t.driverName || "",
+    supervisorName: (t) => t.supervisorName || "",
+    sourceFarm: (t) => t.sourceFarm || "",
+    lastShop: (t) => t.lastShop || "",
+    totalShops: (t) => t.totalShops ?? 0,
+    totalBirds: (t) => t.totalBirds ?? 0,
+    totalWeight: (t) => t.totalWeight ?? 0,
+    totalMortality: (t) => t.totalMortality ?? 0,
+  }[sortBy];
+  if (!pick) return rows;
+  return [...rows].sort((a, b) => {
+    const x = pick(a);
+    const y = pick(b);
+    if (typeof x === "number" && typeof y === "number") return (x - y) * dir;
+    return String(x).localeCompare(String(y), undefined, { numeric: true }) * dir;
+  });
+}
+
 function paginate(rows, params, defLimit = 200) {
   const page = Number(params.get("page") || 1);
   const limit = Number(params.get("limit") || defLimit);
@@ -2425,7 +2451,17 @@ const server = http.createServer(async (req, res) => {
     if (p === "/api/operations/dashboard")
       return send(200, operationsDashboard(q.get("fromDate"), q.get("toDate")));
     if (p === "/api/operations/trip-list")
-      return send(200, paginate(TRIPS.filter((t) => inRange(t.tripDate, q.get("fromDate"), q.get("toDate"))), q));
+      return send(
+        200,
+        paginate(
+          sortTrips(
+            TRIPS.filter((t) => inRange(t.tripDate, q.get("fromDate"), q.get("toDate"))),
+            q.get("sortBy"),
+            q.get("sortDir")
+          ),
+          q
+        )
+      );
     if (p === "/api/operations/vehicle-trips/list") return send(200, TRIPS);
 
     if (p === "/api/operations/rate-entry") {

@@ -1,5 +1,4 @@
 import React from "react";
-import Select from "react-select";
 import { FileText, FileSpreadsheet, Search, Eye, Calendar, Truck, UserCog, Warehouse, RotateCcw } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import {
@@ -10,10 +9,10 @@ import {
   opsSecondaryButtonClass,
   opsPdfButtonClass,
   opsExcelButtonClass,
-  opsReactSelectStyles,
 } from "../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../i18n";
 import { BrandRefreshButton } from "../../../../ui";
+import MasterDropdown from "../../../masters/components/MasterDropdown";
 
 interface Props {
   fromDate: string;
@@ -43,11 +42,6 @@ interface Props {
   totalCount?: number;
 }
 
-const containsFilter = (option: any, inputValue: string) => {
-  if (!inputValue) return true;
-  return option.label.toLowerCase().includes(inputValue.toLowerCase());
-};
-
 function TripFilters({
   fromDate,
   toDate,
@@ -75,11 +69,12 @@ function TripFilters({
   viewButtonRef,
 }: Props) {
   const { t } = useI18n();
-  const vehicleOptions = (vehicles || []).map((v) => ({ value: v, label: v }));
-  const supervisorOptions = (supervisors || []).map((v) => ({ value: v, label: v }));
-  const farmOptions = (farms || []).map((v) => ({ value: v, label: v }));
-
-  const selectStyles = opsReactSelectStyles();
+  // Plain string lists; MasterDropdown accepts string[] directly. The
+  // "All ..." sentinels are represented as an empty value so the dropdown
+  // shows its placeholder and the clear affordance behaves correctly.
+  const vehicleOptions = (vehicles || []).filter((v) => v !== "All Vehicles");
+  const supervisorOptions = (supervisors || []).filter((v) => v !== "All Supervisors");
+  const farmOptions = (farms || []).filter((v) => v !== "All Sources");
 
   return (
     <div className={opsFilterCardClass}>
@@ -115,14 +110,16 @@ function TripFilters({
             <Truck size={13} className="text-emerald-500 flex-shrink-0" />
             <span>{t("common.vehicle")}</span>
           </label>
-          <Select
+          <MasterDropdown
+            hideLabel
+            label={t("common.vehicle")}
+            value={vehicle === "All Vehicles" ? "" : vehicle}
             options={vehicleOptions}
-            value={vehicleOptions.find((x) => x.value === vehicle)}
-            onChange={(e) => setVehicle(e?.value || "All Vehicles")}
-            isSearchable
-            filterOption={containsFilter}
+            onChange={(next) => setVehicle(next || "All Vehicles")}
             placeholder={t("ops.trip.all_vehicles")}
-            styles={selectStyles}
+            searchable
+            allowClear
+            className="w-full"
           />
         </div>
 
@@ -131,14 +128,16 @@ function TripFilters({
             <UserCog size={13} className="text-emerald-500 flex-shrink-0" />
             <span>{t("common.supervisor")}</span>
           </label>
-          <Select
+          <MasterDropdown
+            hideLabel
+            label={t("common.supervisor")}
+            value={supervisor === "All Supervisors" ? "" : supervisor}
             options={supervisorOptions}
-            value={supervisorOptions.find((x) => x.value === supervisor)}
-            onChange={(e) => setSupervisor(e?.value || "All Supervisors")}
-            isSearchable
-            filterOption={containsFilter}
+            onChange={(next) => setSupervisor(next || "All Supervisors")}
             placeholder={t("ops.trip.all_supervisors")}
-            styles={selectStyles}
+            searchable
+            allowClear
+            className="w-full"
           />
         </div>
 
@@ -147,14 +146,16 @@ function TripFilters({
             <Warehouse size={13} className="text-emerald-500 flex-shrink-0" />
             <span>{t("ops.trip.source_farm")}</span>
           </label>
-          <Select
+          <MasterDropdown
+            hideLabel
+            label={t("ops.trip.source_farm")}
+            value={farm === "All Sources" ? "" : farm}
             options={farmOptions}
-            value={farmOptions.find((x) => x.value === farm)}
-            onChange={(e) => setFarm(e?.value || "All Sources")}
-            isSearchable
-            filterOption={containsFilter}
+            onChange={(next) => setFarm(next || "All Sources")}
             placeholder={t("ops.trip.all_sources")}
-            styles={selectStyles}
+            searchable
+            allowClear
+            className="w-full"
           />
         </div>
       </div>

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import TripFilters from "../components/TripFilters";
 import TripKPICards from "../components/TripKPICards";
-import TripMasterTable from "../components/TripMasterTable";
+import TripMasterTable, { type TripSortKey } from "../components/TripMasterTable";
 import TripViewModal from "../components/TripViewModal";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import { Pagination } from "../../../../ui";
@@ -19,6 +19,25 @@ import { useI18n } from "../../../../i18n";
 
 type TripListPageProps = { embedded?: boolean };
 
+/**
+ * Loads the shop / bird-type masters the view modal needs. Kept as a separate
+ * component so those requests only fire once the modal is actually opened,
+ * instead of on every Trip List page load.
+ */
+function TripViewModalWithMasters({
+  trip,
+  onClose,
+}: {
+  trip: Trip | null;
+  onClose: () => void;
+}) {
+  const { shops } = useShops();
+  const { birdTypes } = useBirdTypes();
+  return (
+    <TripViewModal open trip={trip} shops={shops} birdTypes={birdTypes} onClose={onClose} />
+  );
+}
+
 function TripListPage({ embedded = false }: TripListPageProps) {
   const { t } = useI18n();
   const { showNotification } = useSafeNotification();
@@ -35,6 +54,8 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   const [toDate, setToDate] = useState("");
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [pageSize, setPageSize] = useState(PAGINATION_DEFAULT_PAGE_SIZE);
+  const [sortBy, setSortBy] = useState<TripSortKey | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
 
   const refreshTrips = useCallback(async () => {
     setIsLoading(true);
@@ -48,6 +69,8 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         search: search || undefined,
         page: currentPage,
         limit: pageSize,
+        sortBy: sortBy ?? undefined,
+        sortDir: sortBy ? sortDir : undefined,
       });
       setTrips(result.data);
       setTotalTrips(result.meta.total);
@@ -56,7 +79,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [showNotification, t, currentPage, pageSize, fromDate, toDate, vehicle, supervisor, farm, search]);
+  }, [showNotification, t, currentPage, pageSize, fromDate, toDate, vehicle, supervisor, farm, search, sortBy, sortDir]);
 
   useEffect(() => {
     void refreshTrips();
@@ -69,6 +92,8 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     setFarm("All Sources");
     setFromDate("");
     setToDate("");
+    setSortBy(null);
+    setSortDir("asc");
     setCurrentPage(1);
   };
 
@@ -95,8 +120,6 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   }, []);
 
   const { vehicles: masterVehicles } = useVehicles();
-  const { shops } = useShops();
-  const { birdTypes } = useBirdTypes();
 
   const vehicleOptions = [
     "All Vehicles",
@@ -137,6 +160,17 @@ function TripListPage({ embedded = false }: TripListPageProps) {
       .catch(() => {
         showNotification(t("ops.trip.refresh_failed_using_cached"), "info");
       });
+  };
+
+  /** First click sorts ascending; clicking the active column flips direction. */
+  const handleSortChange = (key: TripSortKey) => {
+    if (sortBy === key) {
+      setSortDir((prev) => (prev === "asc" ? "desc" : "asc"));
+    } else {
+      setSortBy(key);
+      setSortDir("asc");
+    }
+    setCurrentPage(1);
   };
 
   const handleRowClick = (trip: Trip) => {
@@ -313,6 +347,9 @@ function TripListPage({ embedded = false }: TripListPageProps) {
           selectedRowId={selectedRowId}
           onRowClick={handleRowClick}
           startIndex={(currentPage - 1) * pageSize}
+          sortBy={sortBy}
+          sortDir={sortDir}
+          onSortChange={handleSortChange}
         />
         {shouldShowPagination(totalCompletedTrips) && (
           <Pagination
@@ -328,16 +365,15 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         )}
       </div>
 
-      <TripViewModal
-        open={viewOpen}
-        trip={selectedTrip}
-        shops={shops}
-        birdTypes={birdTypes}
-        onClose={() => {
-          setViewOpen(false);
-          setSelectedTrip(null);
-        }}
-      />
+      {viewOpen && (
+        <TripViewModalWithMasters
+          trip={selectedTrip}
+          onClose={() => {
+            setViewOpen(false);
+            setSelectedTrip(null);
+          }}
+        />
+      )}
     </div>
   );
 

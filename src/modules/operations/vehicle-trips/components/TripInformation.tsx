@@ -1,10 +1,10 @@
 import React, { useCallback, useMemo, useState } from "react";
 import { FileText, Truck, User, ShieldAlert, MapPin, Calendar, Gauge, DollarSign, MessageSquare } from "lucide-react";
-import Select from "react-select";
 import type { Trip } from "../types/trip";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import { useFuelKMValidator } from "../../../operations/fuel-expenses/hooks/useFuelKMValidator";
 import { useI18n } from "../../../../i18n";
+import MasterDropdown from "../../../masters/components/MasterDropdown";
 
 interface Props {
   trip: Trip;
@@ -15,16 +15,6 @@ interface Props {
   supervisors: any[];
   farms: any[];
 }
-
-const containsFilter = (option: any, inputValue: string) => {
-  if (!inputValue) return true;
-  return option.label.toLowerCase().includes(inputValue.toLowerCase());
-};
-
-const startsWithFilter = (option: any, inputValue: string) => {
-  if (!inputValue) return true;
-  return option.label.toLowerCase().startsWith(inputValue.toLowerCase());
-};
 
 function TripInformation({
   trip,
@@ -43,23 +33,23 @@ function TripInformation({
 
   // ---- Options ----
   const vehicleOptions = useMemo(
-    () => vehicles.map((v) => ({ value: v.id, label: v.vehicleNumber })),
+    () => vehicles.map((v) => v.vehicleNumber),
     [vehicles]
   );
 
   const driverOptions = useMemo(
-    () => drivers.map((d) => ({ value: d.employeeName, label: d.employeeName })),
+    () => drivers.map((d) => d.employeeName),
     [drivers]
   );
 
   const supervisorOptions = useMemo(
-    () => supervisors.map((s) => ({ value: s.employeeName, label: s.employeeName })),
+    () => supervisors.map((s) => s.employeeName),
     [supervisors]
   );
 
   // ---- Handlers ----
-  const handleVehicleSelect = (selected: any) => {
-    const vehicle = vehicles.find((v) => v.id === selected?.value);
+  const handleVehicleSelect = (selected: string) => {
+    const vehicle = vehicles.find((v) => v.vehicleNumber === selected);
     if (!vehicle) {
       setTrip((prev) => ({ ...prev, vehicleId: 0, vehicleNo: "" }));
       return;
@@ -71,17 +61,17 @@ function TripInformation({
     }));
   };
 
-  const handleDriverSelect = (selected: any) => {
+  const handleDriverSelect = (selected: string) => {
     setTrip((prev) => ({
       ...prev,
-      driverName: selected?.value || "",
+      driverName: selected || "",
     }));
   };
 
-  const handleSupervisorSelect = (selected: any) => {
+  const handleSupervisorSelect = (selected: string) => {
     setTrip((prev) => ({
       ...prev,
-      supervisorName: selected?.value || "",
+      supervisorName: selected || "",
     }));
   };
 
@@ -206,44 +196,6 @@ function TripInformation({
 
   const displayValue = (val: number | null | undefined) => (val == null || val === 0 ? "" : val);
 
-  const selectStyles = {
-    control: (base: any) => ({
-      ...base,
-      borderRadius: "0.75rem",
-      borderColor: "#e2e8f0",
-      boxShadow: "none",
-      minHeight: "42px",
-      fontSize: "14px",
-      backgroundColor: "#f8fafc",
-      transition: "all 0.2s ease",
-      "&:hover": { borderColor: "#cbd5e1" },
-      "&:focus-within": {
-        backgroundColor: "#ffffff",
-        borderColor: "#2563eb",
-        boxShadow: "0 0 0 4px rgba(37, 99, 235, 0.1)",
-      },
-    }),
-    option: (base: any, { isFocused, isSelected }: any) => ({
-      ...base,
-      backgroundColor: isSelected ? "#2563eb" : isFocused ? "#f1f5f9" : "transparent",
-      color: isSelected ? "white" : "#334155",
-      fontSize: "14px",
-      fontWeight: isSelected ? "500" : "normal",
-      cursor: "pointer",
-    }),
-    menu: (base: any) => ({
-      ...base,
-      zIndex: 50,
-      borderRadius: "0.75rem",
-      overflow: "hidden",
-      boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1)",
-      border: "1px solid #f1f5f9",
-    }),
-    placeholder: (base: any) => ({
-      ...base,
-      color: "#94a3b8",
-    }),
-  };
 
   return (
     <>
@@ -332,14 +284,16 @@ function TripInformation({
                 <Truck className="w-3.5 h-3.5 text-slate-400" />
                 {t("common.vehicle")} <span className="text-rose-500">*</span>
               </label>
-              <Select
+              <MasterDropdown
+                hideLabel
+                label={t("common.vehicle")}
+                value={trip.vehicleNo || ""}
                 options={vehicleOptions}
-                value={vehicleOptions.find((opt) => opt.value === trip.vehicleId) || null}
                 onChange={handleVehicleSelect}
-                isSearchable
-                filterOption={containsFilter}
                 placeholder={t("ops.trip.search_vehicle")}
-                styles={selectStyles}
+                searchable
+                allowClear
+                className="w-full"
               />
             </div>
 
@@ -349,14 +303,16 @@ function TripInformation({
                 <User className="w-3.5 h-3.5 text-slate-400" />
                 {t("common.supervisor")} <span className="text-rose-500">*</span>
               </label>
-              <Select
+              <MasterDropdown
+                hideLabel
+                label={t("common.supervisor")}
+                value={trip.supervisorName || ""}
                 options={supervisorOptions}
-                value={supervisorOptions.find((opt) => opt.value === trip.supervisorName) || null}
                 onChange={handleSupervisorSelect}
-                isSearchable
-                filterOption={startsWithFilter}
                 placeholder={t("ops.trip.search_supervisor")}
-                styles={selectStyles}
+                searchable
+                allowClear
+                className="w-full"
               />
             </div>
 
@@ -366,14 +322,16 @@ function TripInformation({
                 <User className="w-3.5 h-3.5 text-slate-400" />
                 {t("common.driver")} <span className="text-rose-500">*</span>
               </label>
-              <Select
+              <MasterDropdown
+                hideLabel
+                label={t("common.driver")}
+                value={trip.driverName || ""}
                 options={driverOptions}
-                value={driverOptions.find((opt) => opt.value === trip.driverName) || null}
                 onChange={handleDriverSelect}
-                isSearchable
-                filterOption={startsWithFilter}
                 placeholder={t("ops.trip.search_driver")}
-                styles={selectStyles}
+                searchable
+                allowClear
+                className="w-full"
               />
             </div>
 

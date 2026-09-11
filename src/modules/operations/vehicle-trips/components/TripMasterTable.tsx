@@ -1,18 +1,85 @@
 import React from "react";
-import { Check, Hash, Calendar, Truck, User, UserCog, Warehouse, Store, ShoppingBag, Bird, Scale, HeartPulse } from "lucide-react";
+import { Check, Hash, Calendar, Truck, User, UserCog, Warehouse, Store, ShoppingBag, Bird, Scale, HeartPulse, ChevronUp, ChevronDown } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { formatTripListDay } from "../utils/formatTripListDay";
 import { useI18n } from "../../../../i18n";
+
+/** Column keys the API accepts for sorting. */
+export type TripSortKey =
+  | "tripNo"
+  | "tripDate"
+  | "vehicleNo"
+  | "driverName"
+  | "supervisorName"
+  | "sourceFarm"
+  | "lastShop"
+  | "totalShops"
+  | "totalBirds"
+  | "totalWeight"
+  | "totalMortality";
 
 interface Props {
   trips: Trip[];
   selectedRowId?: number | null;
   onRowClick: (trip: Trip) => void;
   startIndex?: number;
+  sortBy?: TripSortKey | null;
+  sortDir?: "asc" | "desc";
+  onSortChange?: (key: TripSortKey) => void;
 }
 
-function TripMasterTable({ trips, selectedRowId, onRowClick, startIndex = 0 }: Props) {
+/**
+ * Two-chevron sort affordance. Both arrows are always rendered so the header
+ * never changes width when the sort flips; the active direction is the one
+ * shown in the brand green.
+ */
+function SortArrows({ active, dir }: { active: boolean; dir?: "asc" | "desc" }) {
+  return (
+    <span className="inline-flex flex-col -space-y-1 shrink-0" aria-hidden="true">
+      <ChevronUp
+        size={9}
+        strokeWidth={3}
+        className={active && dir === "asc" ? "text-emerald-600" : "text-slate-300"}
+      />
+      <ChevronDown
+        size={9}
+        strokeWidth={3}
+        className={active && dir === "desc" ? "text-emerald-600" : "text-slate-300"}
+      />
+    </span>
+  );
+}
+
+function TripMasterTable({
+  trips,
+  selectedRowId,
+  onRowClick,
+  startIndex = 0,
+  sortBy = null,
+  sortDir = "asc",
+  onSortChange,
+}: Props) {
   const { t } = useI18n();
+
+  /** Wraps a header's content in a sort button when sorting is enabled. */
+  const sortable = (key: TripSortKey, content: React.ReactNode, center = false) => {
+    if (!onSortChange) return content;
+    const active = sortBy === key;
+    return (
+      <button
+        type="button"
+        onClick={() => onSortChange(key)}
+        title={t("common.sort")}
+        aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+        className={`flex items-center gap-1.5 w-full uppercase tracking-wider font-bold text-[11px] transition-colors hover:text-emerald-700 ${
+          center ? "justify-center" : ""
+        } ${active ? "text-emerald-700" : ""}`}
+      >
+        {content}
+        <SortArrows active={active} dir={sortDir} />
+      </button>
+    );
+  };
   return (
     <div className="w-full overflow-x-auto">
       <table className="min-w-full text-sm text-left border-collapse">
@@ -20,70 +87,70 @@ function TripMasterTable({ trips, selectedRowId, onRowClick, startIndex = 0 }: P
             <tr className="whitespace-nowrap">
               <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider w-10">#</th>
               <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
-                <div className="flex items-center gap-1.5">
+                {sortable("tripNo", <div className="flex items-center gap-1.5">
                   <Hash size={13} className="text-slate-400 flex-shrink-0" />
                   <span>{t("operations.trip_no")}</span>
-                </div>
+                </div>)}
               </th>
               <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
-                <div className="flex items-center gap-1.5">
+                {sortable("tripDate", <div className="flex items-center gap-1.5">
                   <Calendar size={13} className="text-blue-500 flex-shrink-0" />
                   <span>{t("ops.trip.day")}</span>
-                </div>
+                </div>)}
               </th>
               <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
-                <div className="flex items-center gap-1.5">
+                {sortable("vehicleNo", <div className="flex items-center gap-1.5">
                   <Truck size={13} className="text-indigo-500 flex-shrink-0" />
                   <span>{t("common.vehicle")}</span>
-                </div>
+                </div>)}
               </th>
               <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
-                <div className="flex items-center gap-1.5">
+                {sortable("driverName", <div className="flex items-center gap-1.5">
                   <User size={13} className="text-emerald-500 flex-shrink-0" />
                   <span>{t("common.driver")}</span>
-                </div>
+                </div>)}
               </th>
               <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
-                <div className="flex items-center gap-1.5">
+                {sortable("supervisorName", <div className="flex items-center gap-1.5">
                   <UserCog size={13} className="text-purple-500 flex-shrink-0" />
                   <span>{t("common.supervisor")}</span>
-                </div>
+                </div>)}
               </th>
               <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
-                <div className="flex items-center gap-1.5">
+                {sortable("sourceFarm", <div className="flex items-center gap-1.5">
                   <Warehouse size={13} className="text-amber-500 flex-shrink-0" />
                   <span>{t("ops.trip.source_farm")}</span>
-                </div>
+                </div>)}
               </th>
               <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
-                <div className="flex items-center gap-1.5">
+                {sortable("lastShop", <div className="flex items-center gap-1.5">
                   <Store size={13} className="text-orange-500 flex-shrink-0" />
                   <span>{t("ops.trip.last_shop")}</span>
-                </div>
+                </div>)}
               </th>
               <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
-                <div className="flex items-center justify-center gap-1.5">
+                {sortable("totalShops", <div className="flex items-center justify-center gap-1.5">
                   <ShoppingBag size={13} className="text-cyan-500 flex-shrink-0" />
                   <span>{t("ops.trip.shops")}</span>
-                </div>
+                </div>, true)}
               </th>
               <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
-                <div className="flex items-center justify-center gap-1.5">
+                {sortable("totalBirds", <div className="flex items-center justify-center gap-1.5">
                   <Bird size={13} className="text-blue-500 flex-shrink-0" />
                   <span>{t("common.birds")}</span>
-                </div>
+                </div>, true)}
               </th>
               <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
-                <div className="flex items-center justify-center gap-1.5">
+                {sortable("totalWeight", <div className="flex items-center justify-center gap-1.5">
                   <Scale size={13} className="text-orange-500 flex-shrink-0" />
                   <span>{t("ops.trip.weight_kg")}</span>
-                </div>
+                </div>, true)}
               </th>
               <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
-                <div className="flex items-center justify-center gap-1.5">
+                {sortable("totalMortality", <div className="flex items-center justify-center gap-1.5">
                   <HeartPulse size={13} className="text-rose-500 flex-shrink-0" />
                   <span>{t("operations.mortality_count")}</span>
-                </div>
+                </div>, true)}
               </th>
             </tr>
           </thead>
