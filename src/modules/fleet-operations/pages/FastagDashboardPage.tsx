@@ -59,7 +59,7 @@ export default memo(FastagDashboardPage);
 */
 
 import { memo } from 'react';
-import { Construction, Sparkles, Wrench } from 'lucide-react';
+import { CreditCard, ScanLine, Sparkles, Wrench } from 'lucide-react';
 import { useI18n } from '../../../i18n';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 
@@ -90,14 +90,14 @@ const FastagDashboardPage = ({ embedded = false }: FastagDashboardPageProps) => 
             <span aria-hidden="true" className="absolute inset-0 rounded-full border border-emerald-200/70 animate-[ping_2.8s_ease-out_infinite]" />
             <span aria-hidden="true" className="absolute inset-2 rounded-full border border-dashed border-indigo-200 animate-[spin_12s_linear_infinite]" />
             <span className="relative flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-emerald-50 to-indigo-50 text-emerald-600 shadow-inner ring-1 ring-inset ring-white">
-              <Construction className="h-10 w-10 animate-[bounce_2.4s_ease-in-out_infinite]" strokeWidth={1.8} aria-hidden="true" />
+              <CreditCard className="h-10 w-10 animate-[bounce_2.4s_ease-in-out_infinite]" strokeWidth={1.8} aria-hidden="true" />
+              <ScanLine className="absolute -bottom-1 -right-1 h-6 w-6 text-indigo-500" strokeWidth={2} aria-hidden="true" />
             </span>
             <Sparkles className="absolute right-0 top-1 h-5 w-5 animate-pulse text-indigo-400" aria-hidden="true" />
             <Wrench className="absolute bottom-1 left-0 h-5 w-5 animate-[pulse_2s_ease-in-out_infinite] text-emerald-400" aria-hidden="true" />
           </div>
 
           <p className="relative mb-3 text-[11px] font-bold uppercase tracking-[0.24em] text-emerald-600">FASTAG</p>
-          <h1 className="relative text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">{t('fleet.fastag.management_title')}</h1>
           <div className="relative mx-auto mt-4 inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-amber-700">
             <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500" aria-hidden="true" />
             {t('fleet.fastag.under_construction')}
