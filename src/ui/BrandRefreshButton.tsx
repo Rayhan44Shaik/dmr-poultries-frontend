@@ -8,10 +8,9 @@
  *     it frames the hen like a badge and reads instantly as "refresh".
  *   • Brand logo     — the DMR hen replaces the generic RefreshCw glyph, so the
  *     control is unmistakably ours.
- *   • Refresh symbol — a circular refresh arrow forms a RING, and the hen sits
- *     inside it. The ring spins while `loading`; the hen dances in the middle
- *     (springy shimmy + peck), and wiggles on hover at rest.
- *     See `--animate-brand-*` in styles/tokens.css.
+ *   • Logo animation — while `loading` the hen DANCES inside the circle: a
+ *     springy shimmy with squash-and-stretch, punctuated by a peck. At rest it
+ *     wiggles on hover. See `--animate-brand-*` in styles/tokens.css.
  *
  * USAGE (identical everywhere — do not hand-roll a refresh button again):
  *
@@ -56,55 +55,21 @@ export interface BrandRefreshButtonProps
  * No walking track: inside a circle the hen stays centred and dances in place.
  */
 function BrandGlyph({ loading, compact }: { loading: boolean; compact: boolean }) {
-  const box = compact ? 22 : 26;
-  // The hen sits INSIDE the refresh ring, so it must be small enough to clear
-  // the stroke and the arrowhead.
-  const hen = Math.round(box * 0.46);
+  const size = compact ? 17 : 20;
 
   return (
     <span
       className="relative inline-flex shrink-0 items-center justify-center"
-      style={{ width: box, height: box }}
+      style={{ width: size, height: size }}
     >
-      {/* The refresh symbol itself: a circular arrow drawn as an SVG ring with
-          a gap and an arrowhead. It spins while loading. Drawn as a ring rather
-          than a lucide icon so the centre stays hollow for the hen. */}
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        aria-hidden="true"
-        className={cn(
-          "absolute inset-0 h-full w-full text-emerald-600",
-          loading && "motion-safe:animate-[var(--animate-brand-spin)]",
-        )}
-      >
-        {/* Arc: a near-complete circle, open at the top-right for the arrow. */}
-        <path
-          d="M21 12a9 9 0 1 1-2.64-6.36"
-          stroke="currentColor"
-          strokeWidth="1.9"
-          strokeLinecap="round"
-        />
-        {/* Arrowhead closing the loop. */}
-        <path
-          d="M21 3.2v5.2h-5.2"
-          stroke="currentColor"
-          strokeWidth="1.9"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-      </svg>
-
-      {/* The hen, centred inside the ring. Dance layer: shimmy while loading,
-          wiggle on hover at rest. */}
+      {/* Dance layer: the shimmy while loading, a wiggle on hover at rest. */}
       <span
         className={cn(
-          "relative inline-flex items-center justify-center",
+          "inline-flex h-full w-full items-center justify-center",
           loading
             ? "motion-safe:animate-[var(--animate-brand-dance)]"
             : "motion-safe:group-hover:animate-[var(--animate-brand-dance)]",
         )}
-        style={{ width: hen, height: hen }}
       >
         {/* Peck layer: a head-bob punctuating the dance. */}
         <span
@@ -118,12 +83,7 @@ function BrandGlyph({ loading, compact }: { loading: boolean; compact: boolean }
             alt=""
             aria-hidden="true"
             draggable={false}
-            // The hen is white; inside the emerald ring it needs a hairline
-            // emerald edge so the silhouette still reads at this size.
-            className={cn(
-              "h-full w-full select-none object-contain",
-              "[filter:drop-shadow(0.5px_0_0_var(--color-emerald-700))_drop-shadow(-0.5px_0_0_var(--color-emerald-700))_drop-shadow(0_0.5px_0_var(--color-emerald-700))_drop-shadow(0_-0.5px_0_var(--color-emerald-700))]",
-            )}
+            className="h-full w-full select-none object-contain"
           />
         </span>
       </span>
