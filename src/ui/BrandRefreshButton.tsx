@@ -4,18 +4,19 @@
  * =============================================================================
  * ONE refresh treatment for the whole application:
  *
- *   • Round emerald  — a circular control rather than a rounded rectangle, so
- *     it frames the hen like a badge and reads instantly as "refresh".
+ *   • Emerald pill   — a soft rounded-full capsule holding the hen and the
+ *     word "Refresh".
  *   • Brand logo     — the DMR hen replaces the generic RefreshCw glyph, so the
  *     control is unmistakably ours.
- *   • Logo animation — while `loading` the hen DANCES inside the circle: a
- *     springy shimmy with squash-and-stretch, punctuated by a peck. At rest it
- *     wiggles on hover. See `--animate-brand-*` in styles/tokens.css.
+ *   • Logo animation — the hen itself IS the animation: while `loading` it
+ *     dances in place, a springy shimmy with squash-and-stretch punctuated by
+ *     a peck. At rest it wiggles on hover. No spinner, no arrow, no ring — the
+ *     bird carries the whole thing. See `--animate-brand-*` in tokens.css.
  *
  * USAGE (identical everywhere — do not hand-roll a refresh button again):
  *
  *   <BrandRefreshButton loading={refreshing} onClick={reload} />
- *   <BrandRefreshButton loading={busy} onClick={reload} compact />   // smaller
+ *   <BrandRefreshButton loading={busy} onClick={reload} compact />   // icon only
  *
  * Built on the shared <Button variant="custom">, so height, padding, radius,
  * focus ring and the single-activation guard all come from the button system —
@@ -31,15 +32,18 @@
  * =============================================================================
  */
 
+import type { ReactNode } from "react";
 import henLogo from "../assets/dmr-hen-cut-256.png";
 import { cn } from "../utils/cn";
 import { Button, type ButtonProps } from "./Button";
 
 export interface BrandRefreshButtonProps
   extends Omit<ButtonProps, "variant" | "icon" | "iconOnly" | "children"> {
+  /** Visible text. Defaults to "Refresh". */
+  children?: ReactNode;
   /** Accessible name. Defaults to "Refresh data". */
   ariaLabel?: string;
-  /** Smaller circle for dense toolbars and table headers. */
+  /** Icon-only pill for dense toolbars and table headers. */
   compact?: boolean;
 }
 
@@ -92,6 +96,7 @@ function BrandGlyph({ loading, compact }: { loading: boolean; compact: boolean }
 }
 
 export function BrandRefreshButton({
+  children,
   ariaLabel,
   compact = false,
   loading = false,
@@ -99,6 +104,9 @@ export function BrandRefreshButton({
   size,
   ...rest
 }: BrandRefreshButtonProps) {
+  // The hen + the word "Refresh". Pass `compact` for the icon-only variant.
+  const label = children === undefined ? "Refresh" : children;
+  const iconOnly = compact || !label;
   const name = ariaLabel ?? "Refresh data";
 
   return (
@@ -110,31 +118,32 @@ export function BrandRefreshButton({
       aria-busy={loading || undefined}
       disabled={rest.disabled || loading}
       variant="custom"
-      // Always icon-only: the hen alone fills the circle, so there is no room
-      // for a text label. The accessible name carries the meaning instead.
-      iconOnly
-      size={compact ? "sm" : (size ?? "md")}
-      aria-label={name}
-      title={rest.title ?? "Refresh"}
+      size={compact ? "xs" : (size ?? "sm")}
+      iconOnly={iconOnly}
+      aria-label={iconOnly ? name : ariaLabel}
+      title={iconOnly ? name : rest.title}
       className={cn(
         "group",
-        // --- Round emerald control ------------------------------------------
-        // A circle rather than the usual rounded rectangle: it frames the hen
-        // like a badge and reads instantly as "the refresh control".
+        // --- Emerald pill ----------------------------------------------------
+        // Rounded-full so the hen and the label sit in one soft capsule.
         "!rounded-full",
         "border border-emerald-300/80 bg-gradient-to-b from-emerald-50 to-teal-100/80",
         "text-emerald-800 shadow-xs",
         "hover:border-emerald-400 hover:from-emerald-100 hover:to-teal-200/80",
+        "hover:text-emerald-900",
         "active:from-emerald-200 active:to-teal-200",
         "disabled:border-emerald-100 disabled:from-emerald-50/50 disabled:to-emerald-50/50",
-        "disabled:shadow-none",
-        // While refreshing the ring tints deeper, so the control reads as busy
-        // even at a glance.
+        "disabled:text-emerald-400 disabled:shadow-none",
+        // While refreshing the surface tints deeper, so the whole control reads
+        // as busy, not just the hen.
         loading && "border-emerald-400 from-emerald-100 to-teal-200/90",
+        !iconOnly && "gap-1.5 pl-2 pr-3",
         className,
       )}
       icon={<BrandGlyph loading={loading} compact={compact} />}
-    />
+    >
+      {iconOnly ? undefined : label}
+    </Button>
   );
 }
 
