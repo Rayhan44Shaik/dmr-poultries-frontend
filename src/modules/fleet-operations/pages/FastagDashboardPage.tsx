@@ -74,7 +74,7 @@ const FastagDashboardPage = ({ embedded = false }: FastagDashboardPageProps) => 
     <ErrorBoundary>
       <div
         className={`flex w-full items-center justify-center overflow-hidden ${
-          embedded ? 'min-h-[60vh] bg-slate-50/60' : 'min-h-screen bg-slate-50 px-4 py-6 md:px-8 md:py-8'
+          embedded ? 'min-h-[calc(100dvh-5rem)] bg-slate-50/60 px-4 py-8' : 'min-h-screen bg-slate-50 px-4 py-6 md:px-8 md:py-8'
         }`}
       >
         <div
