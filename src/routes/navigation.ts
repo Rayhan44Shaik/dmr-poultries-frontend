@@ -510,22 +510,6 @@ export const NAV_SECTIONS: NavSection[] = [
         tone: "teal",
         keywords: "shop ledger statement",
       },
-      {
-        label: "Daily / Weekly Reports",
-        labelKey: "nav.dailyWeeklyReports",
-        path: "/reports?tab=weekly",
-        icon: CalendarDays,
-        tone: "sky",
-        keywords: "daily weekly reports",
-      },
-      {
-        label: "shopSales",
-        labelKey: "nav.shopSalesReport",
-        path: "/reports?tab=shopSales",
-        icon: ShoppingBag,
-        tone: "indigo",
-        keywords: "shop sales report",
-      },
       // Collection Report now lives in Operations → Collection. The Reports
       // menu item opens that single implementation instead of a duplicate.
       {
@@ -535,22 +519,6 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: CreditCard,
         tone: "emerald",
         keywords: "collection report register",
-      },
-      {
-        label: "Vehicle Reports",
-        labelKey: "nav.vehicleReports",
-        path: "/reports?tab=vehicle",
-        icon: Truck,
-        tone: "amber",
-        keywords: "vehicle reports fleet",
-      },
-      {
-        label: "expenses",
-        labelKey: "nav.expensesReport",
-        path: "/reports?tab=expenses",
-        icon: FileText,
-        tone: "rose",
-        keywords: "Expenses",
       },
     ],
   },
