@@ -72,6 +72,15 @@ function DashboardPage() {
                 </button>
               </span>
             )}
+            {data?.sampleQuarter && (
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-sky-50 px-2 py-0.5 text-[10.5px] font-semibold text-sky-700 ring-1 ring-inset ring-sky-600/20 dark:bg-sky-500/10 dark:text-sky-300"
+                title={`Sample data served by scripts/quarter-sample-data.mjs · ${data.sampleQuarter.fromDate} → ${data.sampleQuarter.toDate}`}
+              >
+                <DatabaseZap size={11} />
+                {data.sampleQuarter.label}
+              </span>
+            )}
           </div>
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             {t("dashboard.subtitle")}

@@ -5,6 +5,7 @@
 
 import { apiGet, handleApiError } from "../../../../api";
 import { toBusinessDate } from '../../../../utils/businessDate';
+import type { SampleQuarter } from "../../../../sample/quarterSample";
 
 const DASHBOARD_PATH = "/operations/dashboard";
 
@@ -29,6 +30,10 @@ export type OperationsDashboardApiResponse = {
   mortalityData?: { date: string; mortality: number }[];
   recentTrips?: unknown[];
   pendingCollectionsByShop?: { shopName: string; pendingAmount: number }[];
+  /** Present only on the quarter sample API (scripts/quarter-sample-data.mjs). */
+  sample?: boolean;
+  today?: string;
+  quarter?: SampleQuarter | null;
   activeVehicles?: number;
   activeDrivers?: number;
   activeHelpers?: number;
@@ -71,6 +76,8 @@ export interface DashboardData {
   usedHelpers: number;
   usedShops: number;
   usedFarms: number;
+  /** Non-null only when these numbers came from the quarter sample API. */
+  sampleQuarter: SampleQuarter | null;
 }
 
 function toNumber(value: unknown): number {
@@ -122,6 +129,9 @@ export function mapDashboardResponse(
     usedHelpers: toNumber(raw?.usedHelpers),
     usedShops: toNumber(raw?.usedShops),
     usedFarms: toNumber(raw?.usedFarms),
+    // Only the sample server flags itself; a real backend leaves this null so
+    // no "sample data" badge is ever shown against production numbers.
+    sampleQuarter: raw?.sample === true && raw?.quarter ? raw.quarter : null,
   };
 }
 
@@ -132,8 +142,18 @@ export async function loadOperationsDashboard(
   from?: Date | null,
   to?: Date | null
 ): Promise<DashboardData> {
+  // Business dates (local calendar days, never toISOString) so the backend
+  // aggregates exactly the window the user picked.
+  const params: Record<string, string> = {};
+  const fromDate = from ? toBusinessDate(from) : "";
+  const toDate = to ? toBusinessDate(to) : "";
+  if (fromDate) params.fromDate = fromDate;
+  if (toDate) params.toDate = toDate;
+
   try {
-    const { data } = await apiGet<OperationsDashboardApiResponse>(DASHBOARD_PATH);
+    const { data } = await apiGet<OperationsDashboardApiResponse>(DASHBOARD_PATH, {
+      params: Object.keys(params).length > 0 ? params : undefined,
+    });
     return mapDashboardResponse(data);
   } catch {
     // The development preview has no production dashboard API. Use a complete
@@ -275,7 +295,7 @@ function demoDashboard(from: Date | null, to: Date | null): DashboardData {
     collectionsByMode: [], expensesByCategory: [], mortalityData: [], recentTrips: [],
     activeVehicles: 18, activeDrivers: 24, activeHelpers: 31, totalShops: 100, totalFarms: 24,
     pendingCollectionsByShop: [], usedVehicles: 14, usedDrivers: 20, usedHelpers: 26,
-    usedShops: 38, usedFarms: 12,
+    usedShops: 38, usedFarms: 12, sampleQuarter: null,
   };
   if (days.length === 0) return empty;
 
@@ -353,6 +373,7 @@ function demoDashboard(from: Date | null, to: Date | null): DashboardData {
     usedHelpers: 26,
     usedShops: 38,
     usedFarms: 12,
+    sampleQuarter: null,
   };
 }
 
@@ -416,6 +437,7 @@ function offlineDashboard(): DashboardData {
     usedHelpers: 0,
     usedShops: 0,
     usedFarms: 0,
+    sampleQuarter: null,
   };
 }
 

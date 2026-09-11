@@ -1,8 +1,12 @@
 # DMR Poultries — Full-Quarter Sample Data & Module-by-Module Testing Guide
 
 **Dataset file (the only file added):** `scripts/quarter-sample-data.mjs`
-**Quarter:** Q3 2026 — **2026-07-01 → 2026-09-30** (92 days, 79 operating days, Sundays off)
-**"Today" inside the dataset:** **2026-09-11**
+**Quarter:** a rolling **92-day window ending today** (Sundays off) — e.g. on
+2026-09-12 the window is 2026-06-13 → 2026-09-12 and the label reads
+"Quarter 3 — Jun to Sep 2026".
+**"Today" inside the dataset:** today in Asia/Kolkata, so the today / this-week /
+this-month tiles are always populated. Pin it for a reproducible capture with
+`SAMPLE_TODAY=2026-09-11 npm run dev:sample-api`.
 
 The dataset is a single standalone Node file that answers the same `/api/...`
 contracts the frontend already calls, so every page renders with a full quarter
@@ -99,8 +103,13 @@ Health check: `GET /api/quarter-summary` returns the full row-count manifest.
 | Leaves | 356 | 4 types × Approved/Pending/Rejected/Cancelled |
 | Duty assignments | 13,340 | Full 13-week roster, all 150 staff, every day |
 
-All values come from a seeded PRNG → **identical on every restart**, so screenshots
-and expectations stay stable. Books tie out: shop balance = opening + sales − collections.
+All values come from a seeded PRNG → **identical on every restart** for a given
+anchor date, so screenshots and expectations stay stable. Because the window
+follows today's date, exact row counts drift a little day to day (the table above
+was captured with the anchor on 2026-09-11); the shape — every module populated,
+books tying out — does not. Pin the anchor with `SAMPLE_TODAY=2026-09-11` to
+reproduce the numbers in this guide exactly. Books tie out: shop balance =
+opening + sales − collections.
 
 ---
 
@@ -110,7 +119,7 @@ and expectations stay stable. Books tie out: shop balance = opening + sales − 
 
 | Page | Route | What to verify |
 |---|---|---|
-| Dashboard | `/dashboard` | **KPI tiles:** 633 trips, ₹4.81 Cr sales, ₹4.04 Cr collections, ₹1.69 Cr pending, expenses ₹59.1 L (fuel ₹22.3 L + trip ₹12.3 L + maintenance ₹24.4 L). Today = 8 trips, week = 48, month = 207. **Panels (all populated):** Operational Trends line chart = 30 daily points (trips / weight / mortality); Outstanding Balances = top 10 shops; Collection Streams pie = Cash / Union Bank / HDFC; Recent Transit table = 10 latest trips with vehicle, driver, weight, status; Active Fleet counts = 22 vehicles, 29 drivers, 29 helpers, 192 shops, 10 farms. Change the date range → the trend chart and scaled KPIs follow. |
+| Dashboard | `/dashboard` | **KPI tiles** (whole quarter, captured on the 2026-09-11 anchor): 633 trips, ₹4.81 Cr sales, ₹4.04 Cr collections, ₹1.69 Cr pending, expenses ₹59.1 L (fuel ₹22.3 L + trip ₹12.3 L + maintenance ₹24.4 L). **Panels (all populated):** Operational Trends line chart = up to 30 daily points (trips / weight / mortality); Outstanding Balances = top 10 shops; Collection Streams pie = Cash / Union Bank / HDFC; Recent Transit table = 10 latest trips with vehicle, driver, weight, status; Active Fleet counts = 22 vehicles, 29 drivers, 29 helpers, 192 shops, 10 farms. Today / this-week / this-month tiles are anchored on the dataset's "today" and stay constant as you change the range; the rest of the KPIs are aggregated by the sample API for the exact range you pick, so changing the date range re-aggregates trips, sales, collections and expenses. An amber **Sample data** banner names the quarter window whenever the sample API is the source. |
 
 ### 3.2 Masters — `/masters`
 

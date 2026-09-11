@@ -44,13 +44,67 @@ const PORT = Number(process.env.PORT ?? process.env.MOCK_BACKEND_PORT ?? 4000);
 // 0. QUARTER DEFINITION + DETERMINISTIC HELPERS
 // ═══════════════════════════════════════════════════════════════════════════
 
-export const QUARTER = {
-  code: "Q3-2026",
-  label: "Quarter 3 — Jul to Sep 2026",
-  fromDate: "2026-07-01",
-  toDate: "2026-09-30",
-  months: ["2026-07", "2026-08", "2026-09"],
+// ── Rolling quarter anchored on "today" ─────────────────────────────────────
+// The dataset is generated relative to TODAY so every dashboard, report and
+// "today/this week/this month" tile stays populated no matter when the sample
+// server is started — a hard-coded quarter would read as empty the day after
+// it was captured. The window is a full 92 business days ending today.
+//
+// Default anchor: today in Asia/Kolkata (the ERP's business timezone).
+// Override with SAMPLE_TODAY=YYYY-MM-DD to reproduce an exact dataset.
+const pad2 = (n) => String(n).padStart(2, "0");
+const isoUtc = (d) =>
+  `${d.getUTCFullYear()}-${pad2(d.getUTCMonth() + 1)}-${pad2(d.getUTCDate())}`;
+const shiftIso = (value, days) => {
+  const [y, m, d] = value.split("-").map(Number);
+  const date = new Date(Date.UTC(y, m - 1, d));
+  date.setUTCDate(date.getUTCDate() + days);
+  return isoUtc(date);
 };
+/** Today in IST (UTC+05:30) as YYYY-MM-DD. */
+function istToday() {
+  return isoUtc(new Date(Date.now() + 5.5 * 60 * 60 * 1000));
+}
+const SAMPLE_TODAY_RAW = process.env.SAMPLE_TODAY;
+const SAMPLE_TODAY =
+  SAMPLE_TODAY_RAW && /^\d{4}-\d{2}-\d{2}$/.test(SAMPLE_TODAY_RAW.trim())
+    ? SAMPLE_TODAY_RAW.trim()
+    : istToday();
+
+const MONTH_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** A 92-day window ending on `anchor`, plus its display metadata. */
+function rollingQuarter(anchor) {
+  const [year, month] = anchor.split("-").map(Number);
+  const fromDate = shiftIso(anchor, -91);
+  const calendarIndex = Math.floor((month - 1) / 3); // 0 = Jan–Mar … 3 = Oct–Dec
+  const [fy, fm] = fromDate.split("-").map(Number);
+  const months = [];
+  let cursorYear = fy;
+  let cursorMonth = fm;
+  const [ty, tm] = anchor.split("-").map(Number);
+  while (cursorYear < ty || (cursorYear === ty && cursorMonth <= tm)) {
+    months.push(`${cursorYear}-${pad2(cursorMonth)}`);
+    cursorMonth += 1;
+    if (cursorMonth > 12) {
+      cursorMonth = 1;
+      cursorYear += 1;
+    }
+  }
+  return {
+    code: `Q${calendarIndex + 1}-${year}`,
+    label: `Quarter ${calendarIndex + 1} — ${MONTH_SHORT[fm - 1]} to ${MONTH_SHORT[tm - 1]} ${ty}`,
+    fromDate,
+    toDate: anchor,
+    months,
+    today: anchor,
+    /** True when the window follows the clock instead of a fixed calendar quarter. */
+    rolling: true,
+    days: 92,
+  };
+}
+
+export const QUARTER = rollingQuarter(SAMPLE_TODAY);
 
 const iso = (d) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(
@@ -389,7 +443,10 @@ const VEHICLE_METER = new Map(ACTIVE_VEHICLES.map((v) => [v.id, 40000 + v.id * 1
 let tripSeq = 0;
 let deliverySeq = 0;
 
-const TODAY = "2026-09-11"; // "today" inside the sample quarter
+// "Today" inside the sample dataset. Follows the real clock (IST) unless
+// SAMPLE_TODAY pins it, so dashboard tiles for today/this week/this month are
+// always populated.
+const TODAY = SAMPLE_TODAY;
 
 for (const date of OP_DATES) {
   for (let k = 0; k < TRIPS_PER_DAY; k += 1) {
@@ -1411,6 +1468,8 @@ function tripsIn(from, to) {
 
 function operationsDashboard(from = QUARTER.fromDate, to = QUARTER.toDate) {
   const trips = tripsIn(from, to);
+  // Unfiltered view of the whole dataset, for the "now" KPI tiles below.
+  const nowTrips = tripsIn();
   const sales = SHOP_SALES.filter((s) => inRange(s.tripDate, from, to));
   const cols = COLLECTIONS.filter((c) => c.status === "Approved" && inRange(c.collectionDate, from, to));
   const fuel = FUEL_EXPENSES.filter((f) => f.status === "Approved" && inRange(f.billDate, from, to));
@@ -1464,7 +1523,11 @@ function operationsDashboard(from = QUARTER.fromDate, to = QUARTER.toDate) {
     .slice(0, 10)
     .map((r) => ({ shopName: r.shopName, pendingAmount: round(r.currentPending, 2) }));
 
+  // Recent Transit lists REAL vehicle trips only: the feed also carries
+  // vehicle-less ORD-* order containers that exist purely to hold a day's
+  // order plan (the same rule the Trip List endpoint applies).
   const recentTrips = [...trips]
+    .filter((t) => !isOrderContainerRow(t))
     .sort((a, b) => b.tripDate.localeCompare(a.tripDate) || b.id - a.id)
     .slice(0, 10)
     .map((t) => ({
@@ -1498,9 +1561,11 @@ function operationsDashboard(from = QUARTER.fromDate, to = QUARTER.toDate) {
     fuelExpenses,
     totalExpenses: round(fuelExpenses + tripExpense + maintenanceCost, 2),
     tripExpense,
-    todaysTrips: trips.filter((t) => t.tripDate === TODAY).length,
-    weeklyTrips: trips.filter((t) => t.tripDate >= week && t.tripDate <= TODAY).length,
-    monthlyTrips: trips.filter((t) => monthOf(t.tripDate) === monthOf(TODAY)).length,
+    // "Today / this week / this month" describe the live day, so they are read
+    // from the whole dataset — they stay put when the user narrows the range.
+    todaysTrips: nowTrips.filter((t) => t.tripDate === TODAY).length,
+    weeklyTrips: nowTrips.filter((t) => t.tripDate >= week && t.tripDate <= TODAY).length,
+    monthlyTrips: nowTrips.filter((t) => monthOf(t.tripDate) === monthOf(TODAY)).length,
 
     // Panels / charts consumed by the Operations Dashboard page.
     trendData,
@@ -1520,6 +1585,9 @@ function operationsDashboard(from = QUARTER.fromDate, to = QUARTER.toDate) {
     usedHelpers,
     usedShops,
     usedFarms,
+    // Flags the payload as sample data so the dashboard can badge itself.
+    sample: true,
+    today: TODAY,
     quarter: QUARTER,
   };
 }
@@ -2367,9 +2435,14 @@ const server = http.createServer(async (req, res) => {
     // ── Meta / auth ────────────────────────────────────────────────────────
     if (p === "/api/health" || p === "/api/sync/health")
       return send(200, { status: "ok", quarter: QUARTER, sample: true });
+    // Sample-data manifest. The frontend probes this endpoint (short timeout)
+    // to detect that it is talking to the sample server rather than a real
+    // PostgreSQL backend, so it can label the UI accordingly.
     if (p === "/api/quarter-summary")
       return send(200, {
+        sample: true,
         quarter: QUARTER,
+        generatedAt: new Date().toISOString(),
         shops: SHOPS.length,
         employees: EMPLOYEES.length,
         farms: FARMS.length,
@@ -2840,9 +2913,23 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+// `npm run dev` starts this server alongside Vite. If a real backend already
+// owns the port, step aside quietly instead of crashing the dev command.
+server.on("error", (err) => {
+  if (err?.code === "EADDRINUSE") {
+    console.log(
+      `[quarter-sample-data] port ${PORT} is already in use — a backend is already running there, so no sample data will be served.`
+    );
+    process.exit(0);
+  }
+  console.error("[quarter-sample-data] server error:", err);
+  process.exit(1);
+});
+
 server.listen(PORT, "0.0.0.0", () => {
   const line = (k, v) => console.log(`  ${String(k).padEnd(22)} ${v}`);
   console.log(`\n[quarter-sample-data] ${QUARTER.label} (${QUARTER.fromDate} → ${QUARTER.toDate})`);
+  console.log(`[quarter-sample-data] "today" inside the dataset: ${TODAY}`);
   console.log(`[quarter-sample-data] listening on http://0.0.0.0:${PORT}  — SAMPLE DATA ONLY\n`);
   line("Shops", SHOPS.length);
   line("Employees", EMPLOYEES.length);

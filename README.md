@@ -12,26 +12,48 @@ npm run dev
 ### Demo / sample data (no database required)
 
 The repo ships a deterministic in-memory sample API so **every page of every
-module** renders fully populated in a hosted preview — no PostgreSQL needed.
+module** renders fully populated — no PostgreSQL needed. `npm run dev` starts it
+automatically next to Vite, so there is nothing else to run:
 
 ```bash
-# Terminal 1 — full-quarter sample API on port 4000 (the Vite proxy target)
-npm run mock:backend          # scripts/quarter-sample-data.mjs
-
-# Terminal 2 — frontend, auto-logged-in as the demo Owner
-VITE_DEMO_MODE=1 npm run dev -- --host 0.0.0.0
+npm install
+npm run dev          # sample API on :4000 + Vite on :5173, /api proxied
 ```
 
-- `npm run mock:backend` serves a complete **Q3 2026** quarter (200 shops, 150
-  employees, 10 farms, 24 vehicles, ~640 trips, ~6,000 delivery lines, ~4,900
+`npm run dev` is `concurrently` over two scripts:
+
+| Script | What it does |
+|---|---|
+| `npm run dev:sample-api` | `scripts/quarter-sample-data.mjs` on port 4000 (the Vite `/api` proxy target) |
+| `npm run dev:web` | Vite only — use this when you run the real backend instead |
+
+If something already listens on 4000 (the real backend, say), the sample server
+prints that and exits without failing the dev command.
+
+- The sample API serves a rolling **92-day quarter ending today** (200 shops, 150
+  employees, 10 farms, 24 vehicles, ~640 trips, ~7,700 delivery lines, ~4,700
   collections, plus banks, market rates, permits, EMI schedules, salaries,
-  leaves, duty roster, payments and farm payments). `GET /api/quarter-summary`
-  returns the full row-count manifest. Writes return `200 {ok:true}` so UI
-  flows complete, but the dataset stays immutable and byte-identical on restart.
-- `npm run mock:trips` serves the older, trip-wizard-focused sample
+  leaves, duty roster, payments and farm payments). Anchoring on today keeps the
+  today/this-week/this-month dashboard tiles populated; `SAMPLE_TODAY=YYYY-MM-DD`
+  pins the anchor when you need a byte-identical dataset.
+  `GET /api/quarter-summary` returns the row-count manifest. Writes return
+  `200 {ok:true}` so UI flows complete, but the dataset stays immutable and
+  byte-identical on restart.
+- `.env.development` sets `VITE_DEMO_MODE=1`, so `npm run dev` skips the login
+  gate and signs you in as the demo Owner. `VITE_DEMO_MODE` is only honoured when
+  `import.meta.env.DEV` is true, so a production build can never bypass auth —
+  drop the variable (or use `?demo=1` per URL) to exercise real login.
+- Pages can tell they are on sample data: `/api/quarter-summary` and the
+  `/api/operations/dashboard` payload carry `sample: true` plus the quarter
+  window, and both dashboards show a badge (amber "Sample data" on Operations, a
+  sky quarter chip on the Executive dashboard). Nothing is ever badged in a
+  production build, because the probe is dev-only.
+- `npm run mock:backend` is kept as an alias for `dev:sample-api` (start just the
+  sample API); `npm run mock:trips` serves the older, trip-wizard-focused sample
   (`scripts/dev-mock-backend.mjs`) with in-memory wizard save/submit support.
-- `VITE_DEMO_MODE=1` (or adding `?demo=1` to the URL) skips the login gate.
-  Auth is also stubbed by the sample API, so any credentials work too.
+- Auth is stubbed by the sample API, so any credentials work too.
+- To work against the real backend instead, run it on port 4000 and start the
+  frontend alone with `npm run dev:web`.
 
 Full module-by-module verification steps live in
 [`docs/QUARTER_SAMPLE_DATA_TESTING_GUIDE.md`](./docs/QUARTER_SAMPLE_DATA_TESTING_GUIDE.md).
@@ -125,11 +147,11 @@ coordination does not replace server-side authorization or write idempotency.
 To review **Vehicles → EMI** without connecting a real database:
 
 ```bash
-# Terminal 1: opt-in, in-memory demo API (never writes to PostgreSQL)
-npm run mock:backend          # full-quarter sample (12 financed EMI vehicles)
+# One command: sample API + frontend (sample API never writes to PostgreSQL)
+npm run dev                   # full-quarter sample (12 financed EMI vehicles)
 
-# Terminal 2: same-origin API calls through Vite's existing /api proxy
-VITE_DEMO_MODE=1 VITE_API_BASE_URL=/api npm run dev -- --host 0.0.0.0
+# Already running the sample API? Just the frontend, through Vite's /api proxy:
+npm run dev:web
 ```
 
 Open `/fleet?tab=emi` in the frontend preview. The demo includes **12 fictional
