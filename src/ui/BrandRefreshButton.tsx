@@ -4,13 +4,11 @@
  * =============================================================================
  * ONE refresh treatment for the whole application:
  *
- *   • Emerald light  — the same emerald the design system already uses for
- *     "safe, reversible, positive" actions (Excel / Import / focus rings), so
- *     refresh reads as part of the family instead of a new colour. A soft
- *     emerald→teal gradient with a ring at rest, deepening on hover, and
- *     lighting up further while refreshing.
+ *   • White surface  — a clean white button with an emerald border and label,
+ *     washing faintly emerald on hover and while refreshing.
  *   • Brand logo     — the DMR hen replaces the generic RefreshCw glyph, so the
- *     control is unmistakably ours.
+ *     control is unmistakably ours. The logo is a WHITE hen, so on this white
+ *     surface it is given an emerald CSS outline to keep it legible.
  *   • Logo animation — while `loading` the hen WALKS across the button: left
  *     → right, a turn at the far end, then back again, looping, with a
  *     footstep bob throughout. At rest, hovering makes it do a short dance.
@@ -111,7 +109,16 @@ function BrandGlyph({ loading, compact }: { loading: boolean; compact: boolean }
               alt=""
               aria-hidden="true"
               draggable={false}
-              className="h-full w-full select-none object-contain"
+              // The logo is a WHITE hen, which would be invisible on the white
+              // button. Four stacked drop-shadows (one per direction) trace an
+              // emerald outline around the silhouette. Done in CSS rather than
+              // baked into the PNG because it follows the alpha channel exactly
+              // and stays smooth at any size — a pre-rendered outline goes
+              // jagged once scaled down to 16px.
+              className={cn(
+                "h-full w-full select-none object-contain",
+                "[filter:drop-shadow(0.7px_0_0_var(--color-emerald-600))_drop-shadow(-0.7px_0_0_var(--color-emerald-600))_drop-shadow(0_0.7px_0_var(--color-emerald-600))_drop-shadow(0_-0.7px_0_var(--color-emerald-600))]",
+              )}
             />
           </span>
         </span>
@@ -150,20 +157,19 @@ export function BrandRefreshButton({
       title={iconOnly ? name : rest.title}
       className={cn(
         "group",
-        // --- Emerald "light" ------------------------------------------------
-        // A soft emerald→teal gradient rather than a flat tint: enough depth to
-        // feel deliberate, while staying clearly secondary to the solid emerald
-        // Save button beside it.
-        "border border-emerald-300/80 bg-gradient-to-b from-emerald-50 to-teal-100/80",
-        "text-emerald-800 shadow-xs",
-        "hover:border-emerald-400 hover:from-emerald-100 hover:to-teal-200/80",
-        "hover:text-emerald-900",
-        "active:from-emerald-200 active:to-teal-200",
-        "disabled:border-emerald-100 disabled:from-emerald-50/50 disabled:to-emerald-50/50",
-        "disabled:text-emerald-400 disabled:shadow-none",
-        // While refreshing the surface tints a touch deeper, so the whole
-        // control — not just the glyph — reads as busy.
-        loading && "border-emerald-400 from-emerald-100 to-teal-200/90",
+        // --- White surface --------------------------------------------------
+        // A clean white button with an emerald border and label. The white hen
+        // would vanish against it, so the glyph carries its own emerald outline
+        // (see BrandGlyph) — that outline is what makes the bird readable here.
+        "border border-emerald-300 bg-white",
+        "text-emerald-700 shadow-xs",
+        "hover:border-emerald-400 hover:bg-emerald-50/60 hover:text-emerald-800",
+        "active:bg-emerald-100/70",
+        "disabled:border-slate-200 disabled:bg-white",
+        "disabled:text-slate-400 disabled:shadow-none",
+        // While refreshing, a faint emerald wash so the whole control — not
+        // just the glyph — reads as busy.
+        loading && "border-emerald-400 bg-emerald-50/70",
         // Tighter gap than the button default: the hen's walking track already
         // carries its own trailing space, so the stock gap looks like a gap.
         !iconOnly && "gap-1 pl-2 pr-2.5",
