@@ -15,6 +15,9 @@ import {
 
 interface TrendChartProps {
   data: { date: string; trips: number; weight: number; mortality?: number }[];
+  /** Granularity selected on mount; the page keys the chart by window size so
+   *  it re-initialises when the date range crosses a bucket boundary. */
+  initialGranularity?: Granularity;
 }
 
 type Granularity = "daily" | "weekly" | "monthly";
@@ -105,9 +108,9 @@ const CustomLegend = ({ payload }: any) => (
   </div>
 );
 
-export default function TrendChart({ data }: TrendChartProps) {
+export default function TrendChart({ data, initialGranularity = "daily" }: TrendChartProps) {
   const { t } = useI18n();
-  const [granularity, setGranularity] = useState<Granularity>("daily");
+  const [granularity, setGranularity] = useState<Granularity>(initialGranularity);
 
   const chartData = data || [];
 

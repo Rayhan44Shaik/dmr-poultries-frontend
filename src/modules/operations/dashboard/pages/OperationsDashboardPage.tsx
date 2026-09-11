@@ -109,12 +109,60 @@ function RangeDatePicker({
       : "top-[calc(100%+8px)] mt-1";
 
   // ── Quick-range presets (segmented toggle) ────────────────────────────────
-  const RANGE_PRESETS = [
-    { key: "7d", label: "7D", word: "Last 7 days", Icon: CalendarDays, start: () => addDays(todayMidnight(), -6) },
-    { key: "15d", label: "15D", word: "Last 15 days", Icon: CalendarClock, start: () => addDays(todayMidnight(), -14) },
-    { key: "1m", label: "1M", word: "Last 1 month", Icon: CalendarRange, start: () => addDays(subMonths(todayMidnight(), 1), 1) },
-    { key: "qtr", label: "QTR", word: "Last quarter", Icon: Layers, start: () => addDays(subMonths(todayMidnight(), 3), 1) },
-  ] as const;
+  // Each preset owns a distinct colour: the sliding thumb, hover tint, live
+  // caption, trigger chip and Done button all take that colour when active.
+  type PresetTheme = {
+    from: string;
+    to: string;
+    soft: string;
+    text: string;
+    ring: string;
+    hoverText: string;
+    hoverIcon: string;
+    hoverBg: string;
+  };
+  const FALLBACK_THEME: PresetTheme = {
+    from: "#10b981", to: "#059669", soft: "#ecfdf5", text: "#047857", ring: "#a7f3d0",
+    hoverText: "hover:text-emerald-700", hoverIcon: "group-hover/opt:text-emerald-600", hoverBg: "hover:bg-emerald-100/70",
+  };
+  const RANGE_PRESETS: ReadonlyArray<{
+    key: string;
+    label: string;
+    word: string;
+    Icon: typeof CalendarDays;
+    start: () => Date;
+    theme: PresetTheme;
+  }> = [
+    {
+      key: "7d", label: "7D", word: "Last 7 days", Icon: CalendarDays,
+      start: () => addDays(todayMidnight(), -6),
+      theme: FALLBACK_THEME,
+    },
+    {
+      key: "15d", label: "15D", word: "Last 15 days", Icon: CalendarClock,
+      start: () => addDays(todayMidnight(), -14),
+      theme: {
+        from: "#0ea5e9", to: "#0284c7", soft: "#f0f9ff", text: "#0369a1", ring: "#bae6fd",
+        hoverText: "hover:text-sky-700", hoverIcon: "group-hover/opt:text-sky-600", hoverBg: "hover:bg-sky-100/70",
+      },
+    },
+    {
+      key: "1m", label: "1M", word: "Last 1 month", Icon: CalendarRange,
+      start: () => addDays(subMonths(todayMidnight(), 1), 1),
+      theme: {
+        from: "#8b5cf6", to: "#7c3aed", soft: "#f5f3ff", text: "#6d28d9", ring: "#ddd6fe",
+        hoverText: "hover:text-violet-700", hoverIcon: "group-hover/opt:text-violet-600", hoverBg: "hover:bg-violet-100/70",
+      },
+    },
+    {
+      key: "qtr", label: "QTR", word: "Last quarter", Icon: Layers,
+      start: () => addDays(subMonths(todayMidnight(), 3), 1),
+      theme: {
+        from: "#f59e0b", to: "#d97706", soft: "#fffbeb", text: "#b45309", ring: "#fde68a",
+        hoverText: "hover:text-amber-700", hoverIcon: "group-hover/opt:text-amber-600", hoverBg: "hover:bg-amber-100/70",
+      },
+    },
+  ];
 
   const activePreset = RANGE_PRESETS.find((preset) => {
     if (!startDate || !endDate) return false;
@@ -123,18 +171,17 @@ function RangeDatePicker({
       toInputDateString(startDate) === toInputDateString(expected) &&
       toInputDateString(endDate) === toInputDateString(todayMidnight())
     );
-  })?.key;
+  });
 
   const applyPreset = (preset: (typeof RANGE_PRESETS)[number]) => {
     onRangeChange(preset.start(), todayMidnight());
     setIsOpen(false);
   };
 
-  const activePresetIndex = RANGE_PRESETS.findIndex((p) => p.key === activePreset);
-  const activeWord =
-    activePreset != null
-      ? RANGE_PRESETS.find((p) => p.key === activePreset)?.word
-      : "Custom range";
+  const activePresetIndex = RANGE_PRESETS.findIndex((p) => p.key === activePreset?.key);
+  const themed = activePresetIndex >= 0;
+  const activeTheme = themed ? activePreset!.theme : FALLBACK_THEME;
+  const activeWord = themed ? activePreset!.word : "Custom range";
 
   const slateCalendarIcon = <Calendar size={15} className="text-emerald-600" />;
 
@@ -158,7 +205,14 @@ function RangeDatePicker({
             : "border-slate-200 hover:border-emerald-300 hover:shadow-md"
         }`}
       >
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600 ring-1 ring-inset ring-emerald-100 transition-transform duration-200 group-hover:scale-105">
+        <span
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all duration-200 group-hover:scale-105"
+          style={{
+            backgroundColor: activeTheme.soft,
+            color: activeTheme.text,
+            boxShadow: `inset 0 0 0 1px ${activeTheme.ring}`,
+          }}
+        >
           <CalendarRange size={16} strokeWidth={2.2} />
         </span>
         <span className="flex flex-col items-start leading-none">
@@ -170,16 +224,15 @@ function RangeDatePicker({
           </span>
         </span>
         {rangeDays != null && (
-          <span className="ml-0.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-extrabold tabular-nums text-emerald-700 ring-1 ring-inset ring-emerald-100">
-            {activePreset === "7d"
-              ? "7D"
-              : activePreset === "15d"
-                ? "15D"
-                : activePreset === "1m"
-                  ? "1M"
-                  : activePreset === "qtr"
-                    ? "QTR"
-                    : `${rangeDays}d`}
+          <span
+            className="ml-0.5 rounded-full px-2 py-0.5 text-[10px] font-extrabold tabular-nums ring-1 ring-inset transition-colors duration-200"
+            style={{
+              backgroundColor: activeTheme.soft,
+              color: activeTheme.text,
+              boxShadow: `inset 0 0 0 1px ${activeTheme.ring}`,
+            }}
+          >
+            {themed ? activePreset!.label : `${rangeDays}d`}
           </span>
         )}
         <ChevronDown
@@ -201,20 +254,24 @@ function RangeDatePicker({
               <div
                 role="tablist"
                 aria-label="Quick date range"
-                className="relative grid grid-cols-4 gap-1 rounded-xl bg-slate-100 p-1"
+                className="relative grid grid-cols-4 gap-1 rounded-xl bg-slate-100 p-1 transition-colors duration-200"
+                style={themed ? { backgroundColor: activeTheme.soft } : undefined}
               >
-                {/* Sliding emerald thumb (cell width + gap accounted for) */}
+                {/* Sliding colour thumb (cell width + gap accounted for); its
+                    gradient swaps to the active preset's colour as it slides. */}
                 <span
                   aria-hidden
-                  className="pointer-events-none absolute inset-y-1 left-1 w-[calc((100%-1.25rem)/4)] rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-sm shadow-emerald-600/30 ring-1 ring-emerald-600/20 transition-[transform,opacity] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+                  className="pointer-events-none absolute inset-y-1 left-1 w-[calc((100%-1.25rem)/4)] rounded-lg ring-1 ring-inset ring-white/25 transition-[transform,opacity] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
                   style={{
                     ["--i" as string]: String(Math.max(activePresetIndex, 0)),
                     transform: "translateX(calc(var(--i) * (100% + 0.25rem)))",
-                    opacity: activePresetIndex >= 0 ? 1 : 0,
+                    backgroundImage: `linear-gradient(to bottom right, ${activeTheme.from}, ${activeTheme.to})`,
+                    boxShadow: `0 2px 8px -2px ${activeTheme.from}99`,
+                    opacity: themed ? 1 : 0,
                   } as CSSProperties}
                 />
                 {RANGE_PRESETS.map((preset) => {
-                  const active = activePreset === preset.key;
+                  const active = activePreset?.key === preset.key;
                   const PresetIcon = preset.Icon;
                   return (
                     <button
@@ -225,16 +282,20 @@ function RangeDatePicker({
                       onClick={() => applyPreset(preset)}
                       aria-pressed={active}
                       aria-selected={active}
-                      className={`relative z-10 flex items-center justify-center gap-1 rounded-lg py-2 text-[12px] font-extrabold tracking-wide transition-colors duration-200 active:scale-95 motion-reduce:transition-none ${
+                      className={`group/opt relative z-10 flex items-center justify-center gap-1 rounded-lg py-2 text-[12px] font-extrabold tracking-wide transition-colors duration-200 active:scale-95 motion-reduce:transition-none ${
                         active
                           ? "text-white"
-                          : "text-slate-500 hover:bg-white/80 hover:text-emerald-700"
+                          : `text-slate-500 ${preset.theme.hoverBg} ${preset.theme.hoverText}`
                       }`}
                     >
                       <PresetIcon
                         size={13}
                         strokeWidth={2.4}
-                        className={active ? "text-white" : "text-slate-400"}
+                        className={
+                          active
+                            ? "text-white"
+                            : `text-slate-400 transition-colors ${preset.theme.hoverIcon}`
+                        }
                       />
                       {preset.label}
                     </button>
@@ -244,11 +305,15 @@ function RangeDatePicker({
               {/* Live description of the current selection */}
               <p className="mt-2 flex items-center justify-center gap-1.5 text-[11.5px] font-semibold text-slate-500">
                 <span
-                  className={`h-1.5 w-1.5 rounded-full ${
-                    activePreset != null ? "bg-emerald-500" : "bg-slate-300"
-                  }`}
+                  className="h-1.5 w-1.5 rounded-full transition-colors duration-200"
+                  style={{ backgroundColor: themed ? activeTheme.from : "#cbd5e1" }}
                 />
-                <span className="font-bold text-slate-600">{activeWord}</span>
+                <span
+                  className="font-bold transition-colors duration-200"
+                  style={{ color: themed ? activeTheme.text : "#475569" }}
+                >
+                  {activeWord}
+                </span>
                 {rangeLabel && <span className="tabular-nums text-slate-400">· {rangeLabel}</span>}
               </p>
             </div>
@@ -296,7 +361,11 @@ function RangeDatePicker({
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="rounded-lg bg-emerald-600 px-5 py-2 text-[13px] font-bold text-white shadow-sm transition-colors hover:bg-emerald-700 active:scale-[0.98]"
+                className="rounded-lg px-5 py-2 text-[13px] font-bold text-white shadow-sm transition-all duration-200 hover:brightness-110 active:scale-[0.98]"
+                style={{
+                  backgroundImage: `linear-gradient(to bottom right, ${activeTheme.from}, ${activeTheme.to})`,
+                  boxShadow: `0 2px 8px -2px ${activeTheme.from}80`,
+                }}
               >
                 Done
               </button>
@@ -454,7 +523,11 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
             <Link to="/operations?tab=vehicle-trips" className="shrink-0 text-[11px] font-bold text-blue-600 hover:underline">View details →</Link>
           </div>
           <div className="w-full overflow-hidden">
-            <TrendChart data={data?.trendData || []} />
+            <TrendChart
+              data={data?.trendData || []}
+              initialGranularity={(data?.trendData.length ?? 0) > 31 ? "weekly" : "daily"}
+              key={(data?.trendData.length ?? 0) > 31 ? "trend-weekly" : "trend-daily"}
+            />
           </div>
         </div>
         

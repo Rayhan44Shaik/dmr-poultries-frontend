@@ -1,6 +1,6 @@
 // src/modules/operations/dashboard/hooks/useDashboardData.ts
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   handleApiError,
   loadOperationsDashboard,
@@ -81,17 +81,26 @@ export function useDashboardData(
   const [previousData] = useState<DashboardData>(initialData);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Only the very first load shows the full-page spinner; later range changes
+  // keep the previous dashboard on screen while the new window aggregates.
+  const hasLoadedRef = useRef(false);
 
   const loadData = useCallback(async () => {
-    setIsLoading(true);
+    if (!hasLoadedRef.current) setIsLoading(true);
     setError(null);
     try {
-      const dashboard = await loadOperationsDashboard();
-      setData(filterForRange(dashboard, _fromDate, _toDate));
+      const dashboard = await loadOperationsDashboard(_fromDate, _toDate);
+      // The dev demo is already aggregated for the exact [from,to] window;
+      // real API payloads are trimmed/scaled client-side to match the range.
+      const scoped = import.meta.env.DEV
+        ? dashboard
+        : filterForRange(dashboard, _fromDate, _toDate);
+      setData(scoped);
     } catch (err) {
       setError(handleApiError(err));
       setData(initialData);
     } finally {
+      hasLoadedRef.current = true;
       setIsLoading(false);
     }
   }, [_fromDate, _toDate]);
