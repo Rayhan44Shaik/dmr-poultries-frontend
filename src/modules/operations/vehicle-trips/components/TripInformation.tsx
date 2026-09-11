@@ -262,14 +262,14 @@ function TripInformation({
         {/* Header Section */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80">
           <div className="flex items-center gap-3.5">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-600 flex items-center justify-center shadow-md shadow-emerald-500/20 text-white">
+            <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-400 flex items-center justify-center shadow-md shadow-emerald-400/20 text-white">
               <FileText className="w-5 h-5" />
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-800 tracking-tight">{t("ops.trip.trip_information")}</h3>
             </div>
           </div>
-          <div className="hidden sm:flex items-center gap-2 bg-emerald-50 text-emerald-700 px-3 py-1.5 rounded-full text-xs font-semibold border border-emerald-100/60 shadow-xs">
+          <div className="hidden sm:flex items-center gap-2 bg-emerald-50/70 text-emerald-500 px-3 py-1.5 rounded-full text-xs font-semibold border border-emerald-100/60 shadow-xs">
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
             {t("ops.trip.active_log_entry")}
           </div>
@@ -315,7 +315,7 @@ function TripInformation({
               <select
                 value={trip.sourceFarmId || ""}
                 onChange={handleFarmChange}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-sm text-slate-700 font-medium focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all cursor-pointer shadow-xs"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-sm text-slate-700 font-medium focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-400/10 outline-none transition-all cursor-pointer shadow-xs"
               >
                 <option value="">{t("operations.select_farm")}</option>
                 {farms.map((f) => (
@@ -390,7 +390,7 @@ function TripInformation({
                 value={trip.dcWeight !== undefined && trip.dcWeight !== 0 ? trip.dcWeight : ""}
                 onChange={handleDcWeightChange}
                 placeholder="0.00"
-                className="no-spinner w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-xs"
+                className="no-spinner w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-400/10 outline-none transition-all shadow-xs"
               />
             </div>
 
@@ -407,7 +407,7 @@ function TripInformation({
                 value={trip.totalBirds !== undefined && trip.totalBirds !== 0 ? trip.totalBirds : ""}
                 onChange={handleTotalBirdsChange}
                 placeholder="0"
-                className="no-spinner w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-xs"
+                className="no-spinner w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-400/10 outline-none transition-all shadow-xs"
               />
             </div>
 
@@ -423,7 +423,7 @@ function TripInformation({
                 value={displayValue(trip.totalMortality)}
                 onChange={(e) => handleNumericChange("totalMortality", e.target.value)}
                 placeholder="0"
-                className="no-spinner w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-xs"
+                className="no-spinner w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-400/10 outline-none transition-all shadow-xs"
               />
             </div>
 
@@ -440,7 +440,7 @@ function TripInformation({
                   value={displayValue(trip.openingMeter)}
                   onChange={handleOpeningMeterChange}
                   placeholder="0.00"
-                  className={`no-spinner w-full rounded-xl border ${openingKmError ? 'border-red-500' : 'border-slate-200'} bg-slate-50/50 px-4 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-xs`}
+                  className={`no-spinner w-full rounded-xl border ${openingKmError ? 'border-red-500' : 'border-slate-200'} bg-slate-50/50 px-4 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-400/10 outline-none transition-all shadow-xs`}
                 />
                 {openingKmError && <p className="mt-1 text-xs text-red-500">{openingKmError}</p>}
               </div>
@@ -459,7 +459,7 @@ function TripInformation({
                   value={displayValue(trip.closingMeter)}
                   onChange={handleClosingMeterChange}
                   placeholder="0.00"
-                  className={`no-spinner w-full rounded-xl border ${closingKmError ? 'border-red-500' : 'border-slate-200'} bg-slate-50/50 px-4 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-xs`}
+                  className={`no-spinner w-full rounded-xl border ${closingKmError ? 'border-red-500' : 'border-slate-200'} bg-slate-50/50 px-4 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-400/10 outline-none transition-all shadow-xs`}
                 />
                 {closingKmError && <p className="mt-1 text-xs text-red-500">{closingKmError}</p>}
               </div>
@@ -489,7 +489,7 @@ function TripInformation({
                 value={displayValue(trip.expense)}
                 onChange={(e) => handleNumericChange("expense", e.target.value)}
                 placeholder="0.00"
-                className="no-spinner w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-xs"
+                className="no-spinner w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-400/10 outline-none transition-all shadow-xs"
               />
             </div>
 
@@ -503,7 +503,7 @@ function TripInformation({
                 value={trip.remarks}
                 placeholder={t("ops.trip.optional_notes")}
                 onChange={(e) => updateField("remarks", e.target.value)}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-600 focus:ring-4 focus:ring-blue-500/10 outline-none transition-all shadow-xs"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2.5 text-sm font-medium text-slate-700 focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-400/10 outline-none transition-all shadow-xs"
               />
             </div>
 

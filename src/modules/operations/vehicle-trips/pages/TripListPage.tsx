@@ -30,6 +30,10 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalTrips, setTotalTrips] = useState(0);
+<<<<<<< HEAD
+=======
+  const [, setIsLoading] = useState(false);
+>>>>>>> 8e0ca012cdb27892d607b222770a0b7ccde23bf4
   const [search, setSearch] = useState("");
   const [vehicle, setVehicle] = useState("All Vehicles");
   const [supervisor, setSupervisor] = useState("All Supervisors");
@@ -75,6 +79,10 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     setCurrentPage(1);
   };
 
+<<<<<<< HEAD
+=======
+
+>>>>>>> 8e0ca012cdb27892d607b222770a0b7ccde23bf4
   const [viewOpen, setViewOpen] = useState(false);
   const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
 

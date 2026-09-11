@@ -27,6 +27,10 @@
 //   DELETE /api/trips/:id                      — Recent-table soft delete
 // Trips 9301–9304 are Drafts parked right after steps 1/2/3/4 so the Recent
 // Trips table shows a "Resume <step>" badge for every remaining step.
+// Volume test matrix (ids 9501–9650) adds bulk sample trips WITHOUT touching
+// the real ERP backend: 10 Drafts parked after each of Steps 1/2/3/4, plus 50
+// Step-5-ready Drafts (Steps 1–4 submitted) so Trip Entry Step 5 matching,
+// diesel, expenses and resume flows can be stress-tested end-to-end.
 // The seeded trips include several COMPLETED ones with farm details
 // (sourceFarm / totalBirds / dcWeight), full Step 2 farm data (address, meter,
 // GPS) and DC weighbridge photos, so the Accounts → Farm Payment page and its
@@ -850,6 +854,11 @@ function buildTrips() {
     // Box limit reached, single-DC-photo submitted, Pending fully submitted,
     // Completed with diesel + expenses, Deleted, bare Step-1 draft.
     ...buildScenarioTrips({ stamp, today, yesterday }),
+
+    // ── Volume test matrix: Steps 1–4 × 10 + Step 5 × 50 sample Drafts ─────
+    // Pure Trip-Entry sample data for UI matching / resume / Step 5 stress.
+    // New ids only (9501–9650) — never touches Orders or Farm-Payment seeds.
+    ...buildVolumeTestTrips({ stamp }),
   ];
 }
 
@@ -1112,20 +1121,20 @@ function buildScenarioTrips({ stamp, today, yesterday }) {
         }),
       ],
       dieselEntries: [
-        dieselRow(1, 0, {
+        dieselRow(1, 1, {
           litres: 42,
           rate: 95.5,
           meter: 70700,
-          bunk: "HP Petrol Bunk — Bhongir",
+          bunk: "Bhongir",
           gps: [17.5101, 78.6512],
           date: on(-3),
           withBill: true,
         }),
-        dieselRow(2, 1, {
+        dieselRow(2, 2, {
           litres: 20,
           rate: 96,
           meter: 71180,
-          bunk: "IOC Bunk — Keesara",
+          bunk: "Keesara",
           gps: [17.6231, 78.5905],
           date: on(-3),
           withBill: false,
@@ -1345,6 +1354,388 @@ function buildWalkthroughTrips({ stamp, today, yesterday }) {
   ];
 }
 
+/** Volume test matrix for Trip Entry wizard matching (sample data ONLY).
+ *  Counts: Step 1×10, Step 2×10, Step 3×10, Step 4×10, Step 5×50 = 90 Drafts.
+ *  IDs 9501–9650. Plain remarks (no "[ORDER]") so Orders classification is
+ *  untouched. Step 5 is the focus: each of the 50 is parked after deliveries
+ *  so Recent Trips shows "Resume: End Trip / Expenses (Step 5)" and the Step 5
+ *  form can be exercised with varied farms, shops, meters, and rates. */
+function buildVolumeTestTrips({ stamp }) {
+  const on = (offset) => iso(addDays(new Date(), offset));
+  const veh = (id) => VEHICLE_BY_ID.get(id)?.vehicleNumber ?? `AP 16 VOL ${id}`;
+  const FARM_POOL = [
+    { id: 1, name: "Sri Balaji Broiler Farm", address: "Survey 42, Keesara Road, Medchal — 501401", gps: [17.4849, 78.6033], tolls: 150 },
+    { id: 2, name: "Anand Agro Farms", address: "Plot 7, Bhongir Road, Yadadri — 508116", gps: [17.5151, 78.6497], tolls: 200 },
+    { id: 3, name: "Godavari Broiler Farm", address: "Near Prattipadu Cross, Guntur District — 522019", gps: [16.3067, 80.4365], tolls: 300 },
+    { id: 4, name: "Venkateswara Hatchery Farm", address: "Plot 21, Keesara Gutta Road, Keesara — 501301", gps: [17.5212, 78.6551], tolls: 175 },
+  ];
+  const DRIVERS = [
+    { id: 21, name: "Imran S" },
+    { id: 22, name: "Kiran P" },
+  ];
+  const SUPERVISORS = [
+    { id: 31, name: "Ramesh N" },
+    { id: 32, name: "Prakash V" },
+    { id: 33, name: "Anand T" },
+  ];
+  const HELPERS = ["Naveen Kumar", "Vinay Reddy", "Mahesh Y"];
+  const LOADERS = ["Malli", "Basha", "Raju"];
+  const BIRD_POOL = [
+    { id: 1, name: "Broiler", avg: 1.5 },
+    { id: 2, name: "Country Chicken", avg: 1.8 },
+    { id: 3, name: "Layer", avg: 1.6 },
+  ];
+  // Compact DC slip — keeps the bulk payload light while still rendering in Step 3/5 views.
+  const lightDcPhoto = (tripNo, farm, weightKg, date, slip = 1) => {
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="320" height="180"><rect width="320" height="180" fill="#ecfdf5"/><text x="16" y="36" font-family="Arial" font-size="14" fill="#0f766e">DC SLIP ${slip}</text><text x="16" y="70" font-family="Arial" font-size="12" fill="#0f172a">${tripNo}</text><text x="16" y="100" font-family="Arial" font-size="12" fill="#334155">${farm}</text><text x="16" y="130" font-family="Arial" font-size="12" fill="#334155">${date} · ${weightKg} kg</text></svg>`;
+    return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+  };
+  // Lightweight farm+pickup details (2 fixed boxes) — avoids 84-box blow-ups on volume rows.
+  const lightFarmPickup = ({ farm, address, destMeter, reachedTime, loadTime, tolls, avgBirdWeight, gps, tripNo, weightKg, birds, date, boxCount = 2 }) => {
+    const perBoxBirds = Math.max(1, Math.floor(birds / boxCount));
+    const remainder = birds - perBoxBirds * boxCount;
+    const perBirdKg = birds > 0 ? weightKg / birds : avgBirdWeight;
+    const boxDetails = Array.from({ length: boxCount }, (_, i) => {
+      const boxBirds = perBoxBirds + (i === 0 ? remainder : 0);
+      return {
+        boxNo: i + 1,
+        birds: boxBirds,
+        weight: Number((boxBirds * perBirdKg).toFixed(2)),
+        avgWeight: Number(perBirdKg.toFixed(3)),
+      };
+    });
+    return {
+      farmAddress: address,
+      destMeter,
+      reachedTime,
+      pickupTolls: tolls,
+      avgBirdWeight,
+      farmGpsLat: gps[0],
+      farmGpsLon: gps[1],
+      farmGpsAccuracy: 8,
+      farmGpsTime: `${date}T${reachedTime}:00`,
+      pickupLoadTime: loadTime,
+      boxes: boxCount,
+      boxDetails,
+      vehicleBoxCapacity: Math.max(12, boxCount + 4),
+      dcPhotoKey: `dc_photo_${tripNo}_1`,
+      dcPhotoMime: "image/svg+xml",
+      dcPhotoData: lightDcPhoto(tripNo, farm, weightKg, date, 1),
+      dcPhotoKey2: `dc_photo_${tripNo}_2`,
+      dcPhotoMime2: "image/svg+xml",
+      dcPhotoData2: lightDcPhoto(tripNo, farm, Math.round(weightKg * 0.98), date, 2),
+    };
+  };
+
+  const pick = (arr, i) => arr[i % arr.length];
+  const trips = [];
+  let id = 9501;
+
+  // Shared Step-1 crew + vehicle rotation (ids cycle 1–12).
+  // Per-date serial so numbers look like TRP-20260911-003 (never …-V93).
+  const dateSeq = new Map();
+  const nextTripNo = (date) => {
+    const n = (dateSeq.get(date) || 0) + 1;
+    dateSeq.set(date, n);
+    return `TRP-${stamp(date)}-${String(n).padStart(3, "0")}`;
+  };
+
+  const step1Base = (i, date, _daySeq) => {
+    const vehicleId = (i % 12) + 1;
+    const driver = pick(DRIVERS, i);
+    const supervisor = pick(SUPERVISORS, i + 1);
+    const bird = pick(BIRD_POOL, i);
+    return {
+      id: id++,
+      tripNo: nextTripNo(date),
+      tripDate: date,
+      status: "Draft",
+      vehicleId,
+      vehicleNo: veh(vehicleId),
+      driverId: driver.id,
+      driverName: driver.name,
+      supervisorId: supervisor.id,
+      supervisorName: supervisor.name,
+      openingMeter: 10000 + i * 317 + vehicleId * 40,
+      advanceAmount: 400 + (i % 6) * 100,
+      helpers: [pick(HELPERS, i), pick(HELPERS, i + 1)].filter((v, idx, a) => a.indexOf(v) === idx),
+      loaders: [pick(LOADERS, i)],
+      startStepSubmitted: true,
+      startTime: `${date}T0${5 + (i % 3)}:${String(10 + (i % 40)).padStart(2, "0")}:00`,
+      birdTypeId: bird.id,
+      birdType: bird.name,
+      farmBirdTypeId: bird.id,
+      farmBirdType: bird.name,
+      avgBirdWeight: bird.avg,
+      remarks: `Volume sample — Step matching test #${i + 1}`,
+    };
+  };
+
+  // ── Step 1 only (10) — Resume Step 2 ─────────────────────────────────────
+  for (let i = 0; i < 10; i += 1) {
+    const date = on(-(i % 5));
+    trips.push(
+      baseTrip({
+        ...step1Base(i, date, 11 + i),
+        remarks: `Sample · resume Step 2 (Farm)`,
+      })
+    );
+  }
+
+  // ── Steps 1–2 (10) — Resume Step 3 ───────────────────────────────────────
+  for (let i = 0; i < 10; i += 1) {
+    const date = on(-(i % 6));
+    const farm = pick(FARM_POOL, i);
+    const base = step1Base(10 + i, date, 21 + i);
+    const destMeter = base.openingMeter + 380 + i * 17;
+    trips.push(
+      baseTrip({
+        ...base,
+        sourceFarmId: farm.id,
+        sourceFarm: farm.name,
+        farmAddress: farm.address,
+        destMeter,
+        pickupTolls: farm.tolls,
+        farmGpsLat: farm.gps[0],
+        farmGpsLon: farm.gps[1],
+        farmGpsAccuracy: 9,
+        farmGpsTime: `${date}T06:${String(20 + (i % 30)).padStart(2, "0")}:00`,
+        vehicleBoxCapacity: 30 + (i % 5) * 4,
+        farmStepSubmitted: true,
+        remarks: `Sample · resume Step 3 (Pickup)`,
+      })
+    );
+  }
+
+  // ── Steps 1–3 (10) — Resume Step 4 ───────────────────────────────────────
+  for (let i = 0; i < 10; i += 1) {
+    const date = on(-(i % 7));
+    const farm = pick(FARM_POOL, i + 1);
+    const base = step1Base(20 + i, date, 31 + i);
+    const birds = 240 + i * 40;
+    const weightKg = Math.round(birds * (base.avgBirdWeight || 1.5));
+    const destMeter = base.openingMeter + 410 + i * 19;
+    const tripNo = base.tripNo;
+    // Order plan rows so Step 4 has shops waiting for delivery assignment.
+    const planShops = [
+      [1 + (i % 4), 2 + (i % 3)],
+      [3 + (i % 2), 5 + (i % 4), 8 + (i % 3)],
+    ][i % 2];
+    const deliveries = planShops.map((shopId, idx) => {
+      const shopBirds = Math.max(40, Math.floor(birds / planShops.length) - idx * 5);
+      const boxes = Math.max(1, Math.ceil(shopBirds / 100));
+      return planRow(idx + 1, shopId, boxes, shopBirds);
+    });
+    trips.push(
+      baseTrip({
+        ...base,
+        sourceFarmId: farm.id,
+        sourceFarm: farm.name,
+        totalBirds: birds,
+        dcWeight: weightKg,
+        pickupStepSubmitted: true,
+        farmStepSubmitted: true,
+        ...lightFarmPickup({
+          farm: farm.name,
+          address: farm.address,
+          destMeter,
+          reachedTime: `0${5 + (i % 3)}:${String(15 + (i % 40)).padStart(2, "0")}`,
+          loadTime: `0${6 + (i % 3)}:${String(5 + (i % 40)).padStart(2, "0")}`,
+          tolls: farm.tolls,
+          avgBirdWeight: base.avgBirdWeight || 1.5,
+          gps: farm.gps,
+          tripNo,
+          weightKg,
+          birds,
+          date,
+          boxCount: 2 + (i % 3),
+        }),
+        deliveries,
+        remarks: `Sample · resume Step 4 (Deliveries)`,
+      })
+    );
+  }
+
+  // ── Steps 1–4 (10) — Resume Step 5 (extra, on top of the 50 below) ───────
+  // Kept at 10 so Steps 1–4 each have exactly 10 parked drafts for matching.
+  for (let i = 0; i < 10; i += 1) {
+    const date = on(-(i % 8));
+    const farm = pick(FARM_POOL, i + 2);
+    const base = step1Base(30 + i, date, 41 + i);
+    const birds = 300 + i * 35;
+    const weightKg = Math.round(birds * (base.avgBirdWeight || 1.5));
+    const destMeter = base.openingMeter + 450 + i * 21;
+    const rate = 76 + (i % 5) * 0.5;
+    const shopA = 1 + (i % 6);
+    const shopB = 3 + ((i + 2) % 8);
+    const birdsA = Math.floor(birds * 0.55);
+    const birdsB = birds - birdsA;
+    const boxesA = Math.max(1, Math.ceil(birdsA / 100));
+    const boxesB = Math.max(1, Math.ceil(birdsB / 100));
+    trips.push(
+      baseTrip({
+        ...base,
+        sourceFarmId: farm.id,
+        sourceFarm: farm.name,
+        totalBirds: birds,
+        dcWeight: weightKg,
+        pickupStepSubmitted: true,
+        farmStepSubmitted: true,
+        deliveryStepSubmitted: true,
+        ...lightFarmPickup({
+          farm: farm.name,
+          address: farm.address,
+          destMeter,
+          reachedTime: `0${5 + (i % 3)}:${String(20 + (i % 35)).padStart(2, "0")}`,
+          loadTime: `0${6 + (i % 3)}:${String(10 + (i % 35)).padStart(2, "0")}`,
+          tolls: farm.tolls,
+          avgBirdWeight: base.avgBirdWeight || 1.5,
+          gps: farm.gps,
+          tripNo: base.tripNo,
+          weightKg,
+          birds,
+          date,
+          boxCount: 2 + (i % 2),
+        }),
+        deliveries: [
+          planRow(1, shopA, boxesA, birdsA, {
+            remarks: "",
+            rate,
+            amount: Math.round(birdsA * (base.avgBirdWeight || 1.5) * rate * 100) / 100,
+            autoCaptureTime: `${date}T09:${String(5 + (i % 40)).padStart(2, "0")}:00`,
+          }),
+          planRow(2, shopB, boxesB, birdsB, {
+            remarks: "",
+            rate: rate - 0.5,
+            amount: Math.round(birdsB * (base.avgBirdWeight || 1.5) * (rate - 0.5) * 100) / 100,
+            autoCaptureTime: `${date}T10:${String(10 + (i % 40)).padStart(2, "0")}:00`,
+          }),
+        ],
+        remarks: `Sample · resume Step 5 (Expenses)`,
+      })
+    );
+  }
+
+  // ── Steps 1–4 (50) — Step 5 FOCUS set ────────────────────────────────────
+  // Primary stress set for Step 5 matching: diesel ledger, expenses heads,
+  // closing meter, tolls, meals. Varied day offsets, farms, shops, bird counts.
+  for (let i = 0; i < 50; i += 1) {
+    const date = on(-(i % 14)); // spread across ~2 weeks
+    const farm = pick(FARM_POOL, i);
+    const base = step1Base(40 + i, date, 51 + i);
+    const birds = 280 + (i % 12) * 45; // 280–775
+    const avg = base.avgBirdWeight || 1.5;
+    const weightKg = Math.round(birds * avg);
+    const destMeter = base.openingMeter + 420 + (i % 20) * 23;
+    const rate = 75.5 + (i % 8) * 0.75;
+    // 2 or 3 delivered shops so Step 5 money trail has real delivery totals.
+    const shopCount = 2 + (i % 2);
+    const shopIds = [1 + (i % 10), 4 + ((i + 3) % 12), 8 + ((i + 5) % 15)].slice(0, shopCount);
+    let remaining = birds;
+    const deliveries = shopIds.map((shopId, idx) => {
+      const isLast = idx === shopIds.length - 1;
+      const shopBirds = isLast ? remaining : Math.max(50, Math.floor(birds / shopCount) - idx * 8);
+      remaining -= shopBirds;
+      const boxes = Math.max(1, Math.ceil(shopBirds / 100));
+      const shopRate = Number((rate - idx * 0.25).toFixed(2));
+      const shopWeight = Number((shopBirds * avg).toFixed(2));
+      return planRow(idx + 1, shopId, boxes, shopBirds, {
+        remarks: "",
+        rate: shopRate,
+        amount: Math.round(shopWeight * shopRate * 100) / 100,
+        weight: shopWeight,
+        farmWeight: shopWeight,
+        autoCaptureTime: `${date}T${String(8 + idx).padStart(2, "0")}:${String(5 + ((i + idx * 7) % 50)).padStart(2, "0")}:00`,
+      });
+    });
+    // Every unsubmitted Step-5 draft carries 6 fuel-bill rows (UI max) with
+    // bill images so diesel matching can be reviewed before Submit.
+    // Short bunk city labels (Kodad / Vijayawada style) — address comes from GPS.
+    const BUNKS = [
+      "Bhongir",
+      "Keesara",
+      "Medchal",
+      "Guntur",
+      "Yadadri",
+      "Shamshabad",
+      "Kodad",
+      "Vijayawada",
+    ];
+    const billCount = 6; // sample volume; UI allows unlimited diesel bills
+    const dieselEntries = Array.from({ length: billCount }, (_, di) => {
+      const litres = 18 + ((i * 3 + di * 7) % 25);
+      const rate = 94.5 + ((i + di) % 6) * 0.75;
+      const amount = Math.round(litres * rate * 100) / 100;
+      const bunk = BUNKS[(i + di) % BUNKS.length];
+      const meter = destMeter + 30 + di * 45 + (i % 12);
+      const withBill = true;
+      return {
+        id: di + 1,
+        rowIndex: di + 1, // 1-based so StepEnd hydrates dieselLtrN
+        litres,
+        rate: Number(rate.toFixed(2)),
+        amount,
+        meter,
+        bunkName: bunk,
+        gpsLat: farm.gps[0] + 0.008 + di * 0.002,
+        gpsLon: farm.gps[1] + 0.006 + di * 0.002,
+        gpsAccuracy: 6 + (di % 4),
+        gpsCapturedAt: `${date}T${String(10 + Math.floor(di / 2)).padStart(2, "0")}:${String(5 + di * 7).padStart(2, "0")}:00`,
+        imageData: withBill
+          ? dieselBillSvg({ bunk, litres, rate: Number(rate.toFixed(2)), amount: Math.round(amount), date, slip: di + 1 })
+          : null,
+        imageName: withBill ? `FUEL-${stamp(date)}-${String(di + 1).padStart(2, "0")}.svg` : null,
+        submitted: true,
+        submittedAt: `${date}T${String(10 + Math.floor(di / 2)).padStart(2, "0")}:${String(10 + di * 7).padStart(2, "0")}:00`,
+        clientKey: `vol-diesel-${base.id}-${di + 1}`,
+      };
+    });
+
+    trips.push(
+      baseTrip({
+        ...base,
+        sourceFarmId: farm.id,
+        sourceFarm: farm.name,
+        totalBirds: birds,
+        dcWeight: weightKg,
+        pickupStepSubmitted: true,
+        farmStepSubmitted: true,
+        deliveryStepSubmitted: true,
+        ...lightFarmPickup({
+          farm: farm.name,
+          address: farm.address,
+          destMeter,
+          reachedTime: `0${5 + (i % 3)}:${String(10 + (i % 45)).padStart(2, "0")}`,
+          loadTime: `0${6 + (i % 3)}:${String(5 + (i % 45)).padStart(2, "0")}`,
+          tolls: farm.tolls + (i % 4) * 25,
+          avgBirdWeight: avg,
+          gps: farm.gps,
+          tripNo: base.tripNo,
+          weightKg,
+          birds,
+          date,
+          boxCount: 2 + (i % 3),
+        }),
+        deliveries,
+        dieselEntries,
+        // Partial expense heads so Step 5 form shows progress without locking.
+        // NOT submitted — user can review fuel bills and submit manually.
+        meals: 300 + (i % 5) * 40,
+        loading: 450 + (i % 4) * 75,
+        mealsTiffin: 100 + (i % 3) * 25,
+        vehicleMaintenance: i % 4 === 0 ? 250 : 0,
+        othersRC: i % 3 === 0 ? 80 : 0,
+        others1Amt: 200 + (i % 6) * 50,
+        others2Amt: 150 + (i % 5) * 40,
+        others3Amt: i % 2 === 0 ? 120 : 0,
+        remarks: `Sample · Step 5 focus · ${billCount} diesel bills`,
+      })
+    );
+  }
+
+  return trips;
+}
+
 /** Completed trips with farm details for the Farm Payment page sample data. */
 function buildCompletedFarmTrips({ stamp }) {
   const on = (offset) => iso(addDays(new Date(), offset));
@@ -1552,8 +1943,9 @@ function decorateSeedStamps(trip) {
   }
   return trip;
 }
-// 9301–9304 are the seeded walkthrough Drafts; server-created trips start above them.
-let nextTripId = 9400;
+// 9301–9304 walkthrough + 9305–9310 scenarios + 9501–9650 volume matrix.
+// Server-created trips start above the volume block.
+let nextTripId = 9700;
 
 /** Persist a Step-4-shaped deliveries payload onto a trip (creates a container
  *  when id is 0 — the Orders Collection "Save Progress" first write). */
@@ -1823,21 +2215,91 @@ function applyExpensesStep(trip, body) {
     trip.expensesStepSubmitted = true;
     trip.expensesStepSubmittedAt = new Date().toISOString();
     trip.submittedAtTimestamp = trip.expensesStepSubmittedAt;
+    // Step 5 final submit ALWAYS moves Draft → Pending (never Completed here).
+    if (trip.status !== "Completed" && trip.status !== "Deleted") {
+      trip.status = "Pending";
+    }
+  } else if (body.status === "Pending" && trip.status === "Draft") {
+    trip.status = "Pending";
+  }
+  // Safety: if flags say submitted, status must not remain Draft.
+  if ((trip.endStepSubmitted || trip.expensesStepSubmitted) && trip.status === "Draft") {
+    trip.status = "Pending";
   }
   return trip;
+}
+
+/**
+ * Diesel meter chain: each reading must be strictly greater than the previous
+ * (farm destMeter for row 1, prior diesel meter for later rows).
+ * Returns an error message string or null when OK.
+ */
+function dieselMeterChainError(trip, candidateMeter, rowIndex, excludeEntryId) {
+  const meter = numOrNull(candidateMeter);
+  if (meter == null) return null;
+  const dest = numOrNull(trip.destMeter) || 0;
+  const others = (trip.dieselEntries || [])
+    .filter((e) => Number(e.id) !== Number(excludeEntryId))
+    .map((e) => ({
+      row: Number(e.rowIndex) > 0 ? Number(e.rowIndex) : 0,
+      meter: numOrNull(e.meter),
+      id: Number(e.id),
+    }))
+    .filter((e) => e.meter != null && e.meter > 0);
+
+  // Immediate previous diesel row (highest rowIndex < candidate), else farm dest meter.
+  let prev = dest > 0 ? dest : 0;
+  let prevRow = 0;
+  for (const e of others) {
+    if (rowIndex > 0 && e.row > 0) {
+      if (e.row < rowIndex && e.row >= prevRow) {
+        prevRow = e.row;
+        prev = e.meter;
+      }
+    } else if (e.meter > prev) {
+      // Unknown rowIndex — fall back to max of other meters as a lower bar.
+      prev = e.meter;
+    }
+  }
+  // Next diesel row (lowest rowIndex > candidate) — candidate must stay below it.
+  let nextMin = null;
+  for (const e of others) {
+    if (rowIndex > 0 && e.row > rowIndex) {
+      if (nextMin == null || e.meter < nextMin) nextMin = e.meter;
+    }
+  }
+  if (prev > 0 && meter <= prev) {
+    return `Meter reading must be greater than ${prev}.`;
+  }
+  if (nextMin != null && meter >= nextMin) {
+    return `Meter reading must be less than next bill reading (${nextMin}).`;
+  }
+  return null;
 }
 
 /** Step 5 diesel ledger (POST /api/trips/:id/diesel). */
 function applyDieselCreate(trip, body) {
   const litres = numOrNull(body.litres);
   const rate = numOrNull(body.rate);
+  const existing = trip.dieselEntries || [];
+  // Prefer client 1-based rowIndex so edits map back to dieselLtrN correctly.
+  // No upper limit — trips may carry any number of diesel bills.
+  const requested = numOrNull(body.rowIndex);
+  const rowIndex =
+    requested != null && requested >= 1
+      ? Math.floor(requested)
+      : existing.length + 1;
+  const meter = numOrNull(body.meter);
+  const chainErr = dieselMeterChainError(trip, meter, rowIndex, null);
+  if (chainErr) return { error: chainErr };
+
   const entry = {
-    id: (trip.dieselEntries || []).reduce((m, e) => Math.max(m, Number(e.id) || 0), 0) + 1,
-    rowIndex: (trip.dieselEntries || []).length,
+    id: existing.reduce((m, e) => Math.max(m, Number(e.id) || 0), 0) + 1,
+    rowIndex,
     litres,
     rate,
     amount: litres != null && rate != null ? Math.round(litres * rate * 100) / 100 : null,
-    meter: numOrNull(body.meter),
+    meter,
     bunkName: body.bunkName || null,
     gpsLat: numOrNull(body.gpsLat),
     gpsLon: numOrNull(body.gpsLon),
@@ -1849,8 +2311,49 @@ function applyDieselCreate(trip, body) {
     submittedAt: new Date().toISOString(),
     clientKey: body.clientKey || null,
   };
-  trip.dieselEntries = [...(trip.dieselEntries || []), entry];
+  trip.dieselEntries = [...existing, entry];
   return trip;
+}
+
+/** PATCH merge for a diesel entry — recompute amount; never drop id/rowIndex. */
+function applyDieselUpdate(trip, existing, body) {
+  const litres = body.litres != null && body.litres !== "" ? numOrNull(body.litres) : existing.litres;
+  const rate = body.rate != null && body.rate !== "" ? numOrNull(body.rate) : existing.rate;
+  const meter = body.meter != null && body.meter !== "" ? numOrNull(body.meter) : existing.meter;
+  const rowIndexRaw = numOrNull(body.rowIndex);
+  const rowIndex =
+    rowIndexRaw != null && rowIndexRaw >= 1
+      ? Math.floor(rowIndexRaw)
+      : existing.rowIndex != null
+        ? existing.rowIndex
+        : 1;
+  const chainErr = dieselMeterChainError(trip, meter, rowIndex, existing.id);
+  if (chainErr) return { error: chainErr };
+
+  Object.assign(existing, {
+    litres,
+    rate,
+    amount: litres != null && rate != null ? Math.round(Number(litres) * Number(rate) * 100) / 100 : existing.amount,
+    meter,
+    bunkName: body.bunkName != null ? body.bunkName || null : existing.bunkName,
+    gpsLat: body.gpsLat != null && body.gpsLat !== "" ? numOrNull(body.gpsLat) : existing.gpsLat,
+    gpsLon: body.gpsLon != null && body.gpsLon !== "" ? numOrNull(body.gpsLon) : existing.gpsLon,
+    gpsAccuracy:
+      body.gpsAccuracy !== undefined
+        ? body.gpsAccuracy === null || body.gpsAccuracy === ""
+          ? null
+          : numOrNull(body.gpsAccuracy)
+        : existing.gpsAccuracy,
+    gpsCapturedAt: body.gpsCapturedAt !== undefined ? body.gpsCapturedAt || null : existing.gpsCapturedAt,
+    imageData: body.imageData != null && body.imageData !== "" ? body.imageData : existing.imageData,
+    imageName: body.imageName !== undefined ? body.imageName || null : existing.imageName,
+    clientKey: body.clientKey || existing.clientKey,
+    rowIndex,
+    submitted: true,
+    submittedAt: existing.submittedAt || new Date().toISOString(),
+    id: existing.id,
+  });
+  return existing;
 }
 
 /** Fill the derived summary columns the ERP backend computes on read. Never
@@ -1865,8 +2368,14 @@ function decorateTrip(trip) {
     .map(Number)
     .filter((n) => Number.isFinite(n) && n > 0);
   const kmSpread = meters.length >= 2 ? Math.max(...meters) - Math.min(...meters) : 0;
+  // Step 5 fully submitted ⇒ Pending (never leave as Draft in list responses).
+  // Completed stays Completed for older approved samples only.
+  const wizardDone = Boolean(trip.endStepSubmitted || trip.expensesStepSubmitted);
+  let status = trip.status || "Draft";
+  if (wizardDone && status === "Draft") status = "Pending";
   return {
     ...trip,
+    status,
     totalKm: Number(trip.totalKm) || kmSpread,
     totalShops: Number(trip.totalShops) || new Set(delivered.map((d) => d.shopId)).size,
     totalWeight: Number(trip.totalWeight) || Number(trip.dcWeight) || 0,
@@ -1934,15 +2443,20 @@ const server = http.createServer((req, res) => {
         return send(404, { error: "trip_not_found", id: Number(statusMatch[1]), mock: true });
       }
       const next = body.status;
+      const wizardDone = Boolean(trip.endStepSubmitted || trip.expensesStepSubmitted);
+      // Wizard-done Draft is treated as Pending for approve → Completed.
+      const effectiveFrom =
+        trip.status === "Draft" && wizardDone && next === "Completed" ? "Pending" : trip.status;
       const valid =
         (trip.status === "Draft" && next === "Pending") ||
+        (effectiveFrom === "Pending" && next === "Completed") ||
         (trip.status === "Pending" && next === "Completed");
       if (!valid) {
         return send(422, { error: "invalid_status_transition", from: trip.status, to: next, mock: true });
       }
       trip.status = next;
       if (next === "Completed") trip.approvedBy = typeof body.approvedBy === "string" ? body.approvedBy : "Owner";
-      return send(200, trip);
+      return send(200, decorateTrip(trip));
     });
     return;
   }
@@ -1980,7 +2494,10 @@ const server = http.createServer((req, res) => {
     readJsonBody(req).then((body) => {
       const trip = TRIPS.find((t) => t.id === Number(dieselMatch[1]));
       if (!trip) return send(404, { error: "trip_not_found", id: Number(dieselMatch[1]), mock: true });
-      applyDieselCreate(trip, body);
+      const result = applyDieselCreate(trip, body);
+      if (result && result.error) {
+        return send(422, { error: "diesel_meter_invalid", message: result.error, mock: true });
+      }
       trip.updatedAt = new Date().toISOString();
       return send(200, decorateTrip(trip));
     });
@@ -1998,7 +2515,10 @@ const server = http.createServer((req, res) => {
       if (req.method === "DELETE") {
         trip.dieselEntries = entries.filter((e) => Number(e.id) !== entryId);
       } else {
-        Object.assign(existing, body, { id: existing.id });
+        const result = applyDieselUpdate(trip, existing, body);
+        if (result && result.error) {
+          return send(422, { error: "diesel_meter_invalid", message: result.error, mock: true });
+        }
       }
       trip.updatedAt = new Date().toISOString();
       return send(200, decorateTrip(trip));
@@ -2223,4 +2743,19 @@ server.listen(PORT, "0.0.0.0", () => {
   console.log(`[mock-backend] ${VEHICLES.length} sample EMI vehicles — open /fleet?tab=emi in the frontend preview`);
   console.log(`[mock-backend] ${MAINTENANCE.length} sample maintenance records — open /fleet?tab=maintenance in the frontend preview`);
   console.log(`[mock-backend] Trip-Entry samples: walkthrough Drafts 9301–9304 (Resume Steps 2/3/4/5) + scenario set 9305–9310 (box-limit, single-DC-photo, Pending all-5, Completed diesel+expenses, Deleted, bare Step-1)`);
+  const vol = TRIPS.filter((t) => t.id >= 9501 && t.id < 9700);
+  const volBy = (pred) => vol.filter(pred).length;
+  // S4 block is the first 10 delivery-submitted drafts; S5-focus is the rest (50).
+  const s4and5 = vol.filter(
+    (t) => t.deliveryStepSubmitted && !t.endStepSubmitted && !t.expensesStepSubmitted
+  );
+  console.log(
+    `[mock-backend] Volume test matrix 9501+: ` +
+      `S1=${volBy((t) => t.startStepSubmitted && !t.farmStepSubmitted)} ` +
+      `S2=${volBy((t) => t.farmStepSubmitted && !t.pickupStepSubmitted)} ` +
+      `S3=${volBy((t) => t.pickupStepSubmitted && !t.deliveryStepSubmitted)} ` +
+      `S4=${s4and5.slice(0, 10).length} ` +
+      `S5-focus=${Math.max(0, s4and5.length - 10)} ` +
+      `(total ${vol.length}; target 10+10+10+10+50=90)`
+  );
 });

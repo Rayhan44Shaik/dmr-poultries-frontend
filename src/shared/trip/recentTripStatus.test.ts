@@ -57,8 +57,9 @@ test("Part B: first incomplete step is reported (0-based)", () => {
   );
 });
 
-test("Part M: status control map — forward only, no Pending -> Draft, deletion is not a transition", () => {
+test("Part M: status control map — Draft→Pending; Pending→Completed; no Pending→Draft", () => {
   assert.deepEqual(TRIP_STATUS_TRANSITIONS.Draft, ["Pending"]);
+  // Pending may be approved to Completed on Recent Trip Activity.
   assert.deepEqual(TRIP_STATUS_TRANSITIONS.Pending, ["Completed"]);
   assert.deepEqual(TRIP_STATUS_TRANSITIONS.Completed, []);
   assert.deepEqual(TRIP_STATUS_TRANSITIONS.Deleted, []);
@@ -67,10 +68,13 @@ test("Part M: status control map — forward only, no Pending -> Draft, deletion
   for (const from of ["Draft", "Pending", "Completed", "Deleted"] as const) {
     assert.equal(TRIP_STATUS_TRANSITIONS[from].includes("Deleted"), false);
   }
+  assert.equal(TRIP_STATUS_TRANSITIONS.Draft.includes("Completed"), false);
+  assert.equal(TRIP_STATUS_TRANSITIONS.Pending.includes("Completed"), true);
 });
 
 test("Part N: valid / invalid transitions", () => {
   assert.equal(isValidTripStatusTransition("Draft", "Pending"), true);
+  // Pending → Completed is the approve path on Trip Entry Pending tab.
   assert.equal(isValidTripStatusTransition("Pending", "Completed"), true);
 
   assert.equal(isValidTripStatusTransition("Pending", "Draft"), false);
@@ -83,6 +87,8 @@ test("Part N: valid / invalid transitions", () => {
   assert.equal(isValidTripStatusTransition("Deleted", "Pending"), false);
 
   assert.equal(getValidNextStatuses("Pending").includes("Draft"), false);
+  assert.equal(getValidNextStatuses("Pending").includes("Completed"), true);
+  assert.equal(getValidNextStatuses("Pending").length, 1);
   assert.equal(getValidNextStatuses("Completed").includes("Draft"), false);
   assert.equal(getValidNextStatuses("Completed").length, 0);
 });

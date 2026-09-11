@@ -45,7 +45,9 @@ export interface CompressImageOptions {
 /** Default: keep the PERSISTED (base64) size ≤ 100 KB. */
 export const DEFAULT_IMAGE_MAX_BYTES = 100 * 1024;
 
-const QUALITY_STEPS = [0.85, 0.78, 0.7, 0.62, 0.55, 0.5];
+// Prefer higher JPEG quality so fuel slips stay sharp; only drop lower when
+// the byte budget still can't be met after a dimension shrink.
+const QUALITY_STEPS = [0.92, 0.88, 0.82, 0.76, 0.7, 0.64, 0.58];
 
 async function decodeImage(file: File): Promise<HTMLImageElement | ImageBitmap> {
   if (typeof createImageBitmap === "function") {

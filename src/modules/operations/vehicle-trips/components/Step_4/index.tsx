@@ -1,9 +1,8 @@
 // src/modules/operations/vehicle-trips/utils/generateShopPDF.ts
 // (Referenced helper or included components as part of UnLoadingTable module)
 
-import { useRef } from "react";
 // src/modules/operations/vehicle-trips/components/Step_4/UnLoadingTable.tsx
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { 
   Plus, Clock, Building2, Users, Scale, AlertCircle, Search, X, 
   AlertTriangle, FileText, Box
@@ -78,8 +77,8 @@ function ConfirmationModal({
   const { t } = useI18n();
   if (!isOpen) return null;
 
-  const iconColor = type === "warning" ? "text-amber-600" : "text-emerald-600";
-  const borderColor = type === "warning" ? "border-amber-200" : "border-emerald-200";
+  const iconColor = type === "warning" ? "text-amber-500" : "text-emerald-500";
+  const borderColor = type === "warning" ? "border-amber-100" : "border-emerald-100";
   const bgGradient = type === "warning"
     ? "from-amber-50 to-orange-50"
     : "from-emerald-50 to-teal-50";
@@ -109,8 +108,8 @@ function ConfirmationModal({
             onClick={onConfirm}
             className={`h-10 px-5 rounded-lg text-sm font-bold text-white shadow-xs transition-all active:scale-[0.98] inline-flex items-center justify-center shrink-0 ${
               type === "warning"
-                ? "bg-gradient-to-r from-amber-600 to-orange-600 hover:from-amber-700 hover:to-orange-700"
-                : "bg-emerald-600 hover:bg-emerald-700"
+                ? "bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-500 hover:to-orange-500"
+                : "bg-emerald-500 hover:bg-emerald-600"
             }`}
           >
             {t(confirmLabel)}
@@ -228,16 +227,16 @@ function DeliveryBalanceErrorPanel({
 }) {
   const { t } = useI18n();
   return (
-    <div className="rounded-xl border border-red-300 bg-red-50 p-4 space-y-2">
+    <div className="rounded-xl border border-red-100 bg-red-50/70 p-4 space-y-2">
       <div className="flex items-start gap-2">
-        <p className="text-sm font-bold text-red-800 flex items-center gap-1.5 flex-1">
-          <AlertCircle size={15} className="text-red-600" /> {t("ops.trip.balance_mismatch_fix")}
+        <p className="text-sm font-bold text-red-500 flex items-center gap-1.5 flex-1">
+          <AlertCircle size={15} className="text-red-500" /> {t("ops.trip.balance_mismatch_fix")}
         </p>
         {onClose && (
           <button
             type="button"
             onClick={onClose}
-            className="-m-1 rounded-md p-1 text-red-400 transition-colors hover:bg-red-100 hover:text-red-700"
+            className="-m-1 rounded-md p-1 text-red-400 transition-colors hover:bg-red-50/80 hover:text-red-500"
             aria-label={t("common.close")}
             title={t("common.close")}
           >
@@ -246,7 +245,7 @@ function DeliveryBalanceErrorPanel({
         )}
       </div>
       {error.birds && (
-        <div className="text-xs text-red-800 space-y-0.5">
+        <div className="text-xs text-red-500 space-y-0.5">
           <p className="font-semibold">{t("common.birds")}</p>
           <p className="pl-3">{t("ops.trip.pickup")}: <span className="font-bold">{error.birds.pickup}</span></p>
           <p className="pl-3">
@@ -254,13 +253,13 @@ function DeliveryBalanceErrorPanel({
             <span className="font-bold">{error.birds.mortality}</span> ={" "}
             <span className="font-bold">{error.birds.delivered + error.birds.mortality}</span>
           </p>
-          <p className="pl-3 text-red-700">
+          <p className="pl-3 text-red-500">
             {t("ops.trip.pickup_must_equal", { pickup: error.birds.pickup, total: error.birds.delivered + error.birds.mortality })}
           </p>
         </div>
       )}
       {error.weight && (
-        <div className="text-xs text-red-800 space-y-0.5">
+        <div className="text-xs text-red-500 space-y-0.5">
           <p className="font-semibold">{t("common.weight")}</p>
           <p className="pl-3">{t("ops.trip.farm")}: <span className="font-bold">{error.weight.farm.toFixed(2)} kg</span></p>
           <p className="pl-3">{t("ops.trip.delivered")}: <span className="font-bold">{error.weight.delivered.toFixed(2)} kg</span></p>
@@ -269,7 +268,7 @@ function DeliveryBalanceErrorPanel({
           <p className="pl-3">
             {t("ops.trip.expected")}: <span className="font-bold">{error.weight.expected.toFixed(2)} kg</span>
           </p>
-          <p className="pl-3 text-red-700">
+          <p className="pl-3 text-red-500">
             {t("ops.trip.farm_must_equal", { farm: error.weight.farm.toFixed(2), expected: error.weight.expected.toFixed(2) })}
           </p>
         </div>
@@ -338,6 +337,7 @@ export default function UnLoadingTable({
   // ─── Saving & Toast State ─────────────────────────────────────────
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const submitLockRef = useRef(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" | "info" } | null>(null);
   const hasUnsavedChanges = JSON.stringify(safeRows) !== JSON.stringify(persistedRows ?? []);
 
@@ -499,7 +499,7 @@ export default function UnLoadingTable({
 
   // ─── Manual Save Progress Handler ──────────────────────────────
   const handleSaveProgress = async () => {
-    if (readOnly || !saveDeliveries) return;
+    if (readOnly || !saveDeliveries || isSaving) return;
     setIsSaving(true);
     try {
       const success = await saveDeliveries();
@@ -538,7 +538,8 @@ export default function UnLoadingTable({
         onConfirm: () => {
           setConfirmation((prev) => ({ ...prev, isOpen: false }));
           void (async () => {
-            if (isSubmitting) return;
+            if (submitLockRef.current || isSubmitting) return;
+            submitLockRef.current = true;
             setIsSubmitting(true);
             try {
               let success = true;
@@ -556,6 +557,7 @@ export default function UnLoadingTable({
                 setToast({ message: t("ops.trip.failed_submit_delivery"), type: "error" });
               }
             } finally {
+              submitLockRef.current = false;
               setIsSubmitting(false);
             }
           })();
@@ -573,7 +575,8 @@ export default function UnLoadingTable({
         onConfirm: () => {
           setConfirmation((prev) => ({ ...prev, isOpen: false }));
           void (async () => {
-            if (isSubmitting) return;
+            if (submitLockRef.current || isSubmitting) return;
+            submitLockRef.current = true;
             setIsSubmitting(true);
             try {
               const success = submitDeliveries ? (await submitDeliveries()) !== false : false;
@@ -583,6 +586,7 @@ export default function UnLoadingTable({
                 if (showForm) closeForm();
               }
             } finally {
+              submitLockRef.current = false;
               setIsSubmitting(false);
             }
           })();
@@ -1045,7 +1049,7 @@ export default function UnLoadingTable({
               value={searchTerm}
               onChange={handleSearchChange}
               placeholder={t("ops.trip.search_shop_bird")}
-              className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200 rounded-lg text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all shadow-xs"
+              className="w-full pl-8 pr-7 py-1.5 bg-white border border-slate-200 rounded-lg text-xs placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-emerald-400/20 focus:border-emerald-500 transition-all shadow-xs"
             />
             {searchTerm && (
               <button
@@ -1062,26 +1066,26 @@ export default function UnLoadingTable({
         <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
           <button
             onClick={handleDownloadShopsPDF}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 text-blue-800 text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-50/70 hover:bg-blue-50/70 border border-blue-100 text-blue-500 text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
             title={t("ops.trip.shops_pdf_title")}
           >
-            <FileText size={15} className="text-blue-600" />
+            <FileText size={15} className="text-blue-500" />
             <span>{t("ops.trip.shops")} ({pendingShopsCount})</span>
           </button>
 
           <button
             onClick={handleDownloadBoxesPDF}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80 text-emerald-800 text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50/70 hover:bg-emerald-50/70 border border-emerald-100 text-emerald-500 text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
             title={t("ops.trip.boxes_pdf_title")}
           >
-            <Box size={15} className="text-emerald-600" />
+            <Box size={15} className="text-emerald-500" />
             <span>{t("ops.trip.boxes")} ({remainingBoxesCount})</span>
           </button>
 
           {!readOnly && !showForm && (
             <button
               onClick={openAddForm}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
             >
               <Plus size={15} className="text-emerald-100" />
               <span>{t("ops.trip.add_shop")}</span>
@@ -1090,64 +1094,76 @@ export default function UnLoadingTable({
         </div>
       </div>
 
-      {/* ─── TOP KPI SUMMARY CARDS ─── */}
+      {/* ─── TOP KPI SUMMARY — same font as StepKpiCard (all steps) ─── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
-          <span className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
-            <span className="h-5 w-5 rounded-md bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+        <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">
+          <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
+            <span className="h-5 w-5 rounded-md bg-indigo-50/70 text-indigo-500 flex items-center justify-center shrink-0">
               <Clock size={12} />
             </span>
-            {t("ops.trip.captured_time")}
+            <span className="truncate">{t("ops.trip.captured_time")}</span>
           </span>
-          <span className="text-xs font-bold text-slate-800 mt-1 truncate" title={topKpiTotals.lastCaptureTime}>
+          <span className="block text-sm font-bold text-slate-800 truncate" title={topKpiTotals.lastCaptureTime}>
             {topKpiTotals.lastCaptureTime}
           </span>
         </div>
-        <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
-          <span className="text-xs font-medium text-slate-500 flex items-center gap-1.5">
-            <span className="h-5 w-5 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+        <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">
+          <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
+            <span className="h-5 w-5 rounded-md bg-blue-50/70 text-blue-500 flex items-center justify-center shrink-0">
               <Building2 size={12} />
             </span>
-            {t("ops.trip.shops")}
+            <span className="truncate">{t("ops.trip.shops")}</span>
           </span>
-          <div className="flex items-center gap-3 mt-1">
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700" title={t("ops.trip.box_mode")}>
-              <Box size={13} className="text-blue-600" /> {boxModeCount}
+          <div className="flex items-center gap-3">
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-500" title={t("ops.trip.box_mode")}>
+              <Box size={13} className="text-blue-500" /> {boxModeCount}
             </span>
             <span className="h-4 w-px bg-slate-200" aria-hidden />
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-purple-700" title={t("ops.trip.weight_mode")}>
-              <Scale size={13} className="text-purple-600" /> {weightModeCount}
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-purple-500" title={t("ops.trip.weight_mode")}>
+              <Scale size={13} className="text-purple-500" /> {weightModeCount}
             </span>
-            <span className="text-base font-bold text-slate-800 ml-auto">{boxModeCount + weightModeCount}</span>
+            <span className="text-sm font-bold text-slate-800 ml-auto">{boxModeCount + weightModeCount}</span>
           </div>
         </div>
-        <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
-          <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
-            <Users size={13} className="text-emerald-600" /> {t("common.birds")}
+        <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">
+          <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
+            <span className="h-5 w-5 rounded-md bg-emerald-50/70 text-emerald-500 flex items-center justify-center shrink-0">
+              <Users size={12} />
+            </span>
+            <span className="truncate">{t("common.birds")}</span>
           </span>
-          <span className="text-base font-bold text-slate-800">{topKpiTotals.birds || "—"}</span>
+          <span className="block text-sm font-bold text-slate-800">{topKpiTotals.birds || "—"}</span>
         </div>
-        <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
-          <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
-            <Scale size={13} className="text-emerald-600" /> {t("ops.trip.weight_kg")}
+        <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">
+          <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
+            <span className="h-5 w-5 rounded-md bg-emerald-50/70 text-emerald-500 flex items-center justify-center shrink-0">
+              <Scale size={12} />
+            </span>
+            <span className="truncate">{t("ops.trip.weight_kg")}</span>
           </span>
-          <span className="text-base font-bold text-slate-800">
+          <span className="block text-sm font-bold text-slate-800">
             {topKpiTotals.weight ? topKpiTotals.weight.toFixed(2) : "—"}
           </span>
         </div>
-        <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
-          <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
-            <AlertCircle size={13} className="text-rose-500" /> {t("operations.mortality_count")}
+        <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">
+          <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
+            <span className="h-5 w-5 rounded-md bg-rose-50/70 text-rose-500 flex items-center justify-center shrink-0">
+              <AlertCircle size={12} />
+            </span>
+            <span className="truncate">{t("operations.mortality_count")}</span>
           </span>
-          <span className="text-base font-bold text-slate-800">
+          <span className="block text-sm font-bold text-slate-800">
             {topKpiTotals.mortality > 0 ? `${topKpiTotals.mortality} ${t("common.birds")}` : "—"}
           </span>
         </div>
-        <div className="bg-white border border-slate-200/80 p-3 rounded-xl flex flex-col justify-between shadow-xs">
-          <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
-            <Scale size={13} className="text-rose-500" /> {t("ops.trip.mortality_weight")}
+        <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">
+          <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
+            <span className="h-5 w-5 rounded-md bg-rose-50/70 text-rose-500 flex items-center justify-center shrink-0">
+              <Scale size={12} />
+            </span>
+            <span className="truncate">{t("ops.trip.mortality_weight")}</span>
           </span>
-          <span className="text-base font-bold text-slate-800">
+          <span className="block text-sm font-bold text-slate-800">
             {topKpiTotals.mortKg > 0 ? `${topKpiTotals.mortKg.toFixed(2)} kg` : "—"}
           </span>
         </div>
@@ -1198,7 +1214,7 @@ export default function UnLoadingTable({
                       <p className="font-medium text-slate-600">{t("ops.trip.no_matching_shops")}</p>
                       <p className="text-xs text-slate-400">
                         {t("ops.trip.try_another_keyword")}{" "}
-                        <button onClick={clearSearch} className="font-semibold text-emerald-600 hover:underline">
+                        <button onClick={clearSearch} className="font-semibold text-emerald-500 hover:underline">
                           {t("ops.trip.clear_search")}
                         </button>.
                       </p>
@@ -1208,7 +1224,7 @@ export default function UnLoadingTable({
                       <p className="font-medium text-slate-600">{t("ops.trip.no_shops_added")}</p>
                       {!readOnly && (
                         <p className="text-xs text-slate-400">
-                          {t("ops.trip.click_add_shop")} <span className="font-semibold text-emerald-600">{t("ops.trip.add_shop")}</span> {t("ops.trip.to_begin")}
+                          {t("ops.trip.click_add_shop")} <span className="font-semibold text-emerald-500">{t("ops.trip.add_shop")}</span> {t("ops.trip.to_begin")}
                         </p>
                       )}
                     </>
