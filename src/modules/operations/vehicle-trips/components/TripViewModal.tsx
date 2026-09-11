@@ -1,9 +1,8 @@
 // src/modules/operations/vehicle-trips/components/TripViewModal.tsx
-// Read-only Trip View. Never reuses editable Step wizard controls.
-// Completed trips are reviewed through the 5-step wizard — each step shows
-// ONLY its own persisted data. Incomplete trips keep the existing read-only
-// step presentation. Email status (Send All Mail → Total / Sent / Failed)
-// is per-shop and stays visible after the batch finishes.
+// Read-only Trip View for Recent / Trip List.
+// Step 4 uses the same locked StepDeliveries layout as Trip Entry after submit.
+// Step 5 uses the same locked StepEnd layout. Email/WhatsApp bulk actions stay
+// in the modal header for completed trips.
 
 import React, { useState } from "react";
 import {
@@ -24,7 +23,7 @@ import {
   Package,
 } from "lucide-react";
 import { WhatsAppIcon } from "../../../../ui/WhatsAppIcon";
-import type { Trip, ShopDelivery } from "../types/trip";
+import type { Trip } from "../types/trip";
 import type { Shop } from "../../../masters/shops/types/shop";
 import type { BirdType } from "../../../masters/bird-types/types/birdType";
 import {
@@ -33,16 +32,15 @@ import {
   TRIP_STEP_LABELS,
   TRIP_STEP_KEYS,
 } from "../../../../shared/trip";
-import { generateShopPDF } from "../utils/generateShopPDF";
 import { generateTripReportPDF, type TripReportEmailInfo } from "../utils/generateTripPDF";
 import { useTripDeliveryEmails } from "../hooks/useTripDeliveryEmails";
 import { useTripDeliveryWhatsApps } from "../hooks/useTripDeliveryWhatsApps";
-import TripViewShopCards from "./TripViewShopCards";
 import { FarmStepView, PickupStepView } from "./TripStepViews";
 import { StepKpiCard } from "./WizardControls";
 import { getNextIncompleteTripStep } from "../../../../shared/trip";
 import { useI18n } from "../../../../i18n";
 import StepEnd from "./Step_5/StepEnd";
+import StepDeliveries from "./StepDeliveries";
 
 import TripWizardStepper from "./TripWizardStepper";
 import TripFinalKPI from "./TripFinalKPI";
@@ -158,9 +156,45 @@ function Step5View({ trip }: { trip: Trip }) {
   );
 }
 
+/**
+ * Read-only Step 4 for Recent / Trip List view — exact same locked submitted
+ * layout as Trip Entry Step 4 (KPIs, shop cards, PDF). No edit controls.
+ */
+function Step4View({
+  trip,
+  shops,
+  birdTypes,
+}: {
+  trip: Trip;
+  shops: Shop[];
+  birdTypes: BirdType[];
+}) {
+  const viewTrip: Trip = {
+    ...trip,
+    deliveryStepSubmitted: true,
+  };
+  const deliveries = Array.isArray(trip.deliveries) ? trip.deliveries : [];
+  return (
+    <StepDeliveries
+      rows={deliveries}
+      setRows={() => {}}
+      shops={shops}
+      birdTypes={birdTypes}
+      trip={viewTrip}
+      updateDeliveries={() => {}}
+      submitDeliveriesStep={() => false}
+      clearForm={() => {}}
+      canEdit={false}
+      editable={false}
+      boxDetails={trip.boxDetails || []}
+      persistedDeliveries={deliveries}
+    />
+  );
+}
 
 
-function TripViewModal({ open, trip, onClose, shops, initialStep }: Props) {
+
+function TripViewModal({ open, trip, onClose, shops, birdTypes, initialStep }: Props) {
   const { t } = useI18n();
   // Completed trips open on Step 4 (Shop Deliveries); incomplete on Step 1.
   // A caller-provided initialStep wins (e.g. Farm Payment opens Step 2).
@@ -198,22 +232,6 @@ function TripViewModal({ open, trip, onClose, shops, initialStep }: Props) {
     : getNextIncompleteTripStep(trip);
   const lockedSteps = TRIP_STEP_LABELS.map((_, index) => index > maxAllowedViewStep);
   const safeViewStepIndex = Math.min(Math.max(0, viewStepIndex), maxAllowedViewStep);
-
-  const downloadShopPDF = async (delivery: ShopDelivery) => {
-    await generateShopPDF(
-      delivery,
-      trip.boxDetails || [],
-      trip.tripNo,
-      trip.vehicleNo,
-      trip.supervisorName,
-      undefined,
-      trip.tripDate,
-      undefined,
-      undefined,
-      delivery.autoCaptureTime,
-      trip.driverName
-    );
-  };
 
   // ─── Create PDF — professional A4 portrait trip report ────────────
   const downloadTripReport = async () => {
@@ -255,30 +273,8 @@ function TripViewModal({ open, trip, onClose, shops, initialStep }: Props) {
         if (!isDeliveryCompleted) {
           return <div className="mt-8 text-center p-12 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">{t("ops.trip.select_completed_step")}</div>;
         }
-        // Completed trips get the email/WhatsApp shop cards; incomplete keep
-        // the same shop cards without bulk-send chrome when counts are zero.
-        return (
-          <TripViewShopCards
-            trip={trip}
-            shops={shops}
-            effectiveStatus={emailState.effectiveStatus}
-            busyIds={emailState.busyIds}
-            isBulkSending={emailState.isBulkSending}
-            bulkProgress={emailState.bulkProgress}
-            shopEmailFor={emailState.shopEmailFor}
-            sendCountFor={emailState.sendCountFor}
-            onSendOne={(delivery) => void emailState.sendOne(delivery)}
-            onDownloadPdf={(delivery) => void downloadShopPDF(delivery)}
-            emailCounts={emailCounts}
-            whatsappEffectiveStatus={whatsappState.effectiveStatus}
-            whatsappBusyIds={whatsappState.busyIds}
-            whatsappIsBulkSending={whatsappState.isBulkSending}
-            shopWhatsAppFor={whatsappState.shopWhatsAppFor}
-            whatsappSendCountFor={whatsappState.sendCountFor}
-            onSendOneWhatsApp={(delivery) => void whatsappState.sendOne(delivery)}
-            whatsappCounts={whatsappCounts}
-          />
-        );
+        // Same locked submitted layout as Trip Entry Step 4.
+        return <Step4View trip={trip} shops={shops} birdTypes={birdTypes} />;
       case 4:
         return isEndCompleted
           ? <Step5View trip={trip} />
