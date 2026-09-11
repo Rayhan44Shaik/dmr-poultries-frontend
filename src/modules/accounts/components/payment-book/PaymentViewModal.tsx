@@ -12,7 +12,7 @@ import { Modal } from '../../../../ui/Modal';
 import { Button } from '../../../../ui/Button';
 import { StatusBadge } from '../../../../ui/StatusBadge';
 import { MasterSectionHeading } from '../../../masters/components/MasterForm';
-import { paymentCurrency, paymentStatusLabel } from '../../utils/paymentRegister';
+import { paymentCurrency, paymentNoDisplay, paymentStatusLabel } from '../../utils/paymentRegister';
 import { inrInWords } from '../../utils/inrInWords';
 import { PaymentModeMark, PaymentTypeMark } from './PaymentGlyphMarks';
 
@@ -84,7 +84,7 @@ export function PaymentViewModal({ isOpen, payment, onClose, onEdit, canEdit = f
   const showEdit = pending && Boolean(onEdit);
 
   return (
-    <Modal isOpen onClose={onClose} title="Payment Details" description={payment.paymentNo || 'Payment number not assigned'} size="xl"
+    <Modal isOpen onClose={onClose} title="Payment Details" description={paymentNoDisplay(payment.paymentNo) || 'Payment number not assigned'} size="xl"
       footer={<>
         {/* A disabled button alone reads as a bug, so the reason is stated next
             to it: the row simply is not in an editable state. */}
@@ -95,7 +95,7 @@ export function PaymentViewModal({ isOpen, payment, onClose, onEdit, canEdit = f
         )}
       </>}>
       <div className="space-y-4">
-        {payment.id.startsWith('demo-payment-') && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Sample payment · Read-only preview. Not a real transaction.</p>}
+        {payment.id.startsWith('demo-payment-') && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Sample payment · preview data. Edits stay in this browser and are never sent to the server.</p>}
 
         {/* FIGURE — accent bar, the amount, and the state it is in. Editing lives
             in the footer, next to Close, so there is exactly one edit control. */}

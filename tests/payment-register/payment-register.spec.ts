@@ -54,15 +54,26 @@ async function choose(page: Page, label: string, option: string) {
   await page.getByRole('option', { name: option, exact: true }).click();
 }
 
-test('demo is isolated, read-only, numbered and searchable within the three views', async ({ page }) => {
+test('demo is isolated, preview-writable, numbered and searchable within the three views', async ({ page }) => {
   const state = await setup(page);
   const reads = state.reads;
   const statuses = page.getByRole('group', { name: 'Payment status' });
   await page.getByRole('button', { name: 'Preview sample data' }).click();
   await expect(page.getByText('Sample data', { exact: true })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'New Payment', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'New Payment', exact: true })).toBeEnabled();
   await expect(register(page).getByRole('button', { name: /^Edit / })).toHaveCount(0);
   await expect(register(page).getByRole('button', { name: /^Delete / })).toHaveCount(0);
+  // Sample rows are writable IN MEMORY ONLY: the row visibly changes, while the
+  // payment endpoints stay untouched — that, not a disabled button, is the rule.
+  await rows(page).first().click();
+  await expect(page.getByRole('group', { name: 'Selected payment actions' })).toContainText('Sample row · preview edits');
+  await page.getByRole('button', { name: 'Edit selected payment' }).click();
+  const previewEdit = page.getByRole('dialog', { name: 'Edit Payment' });
+  await previewEdit.getByLabel('Paid To', { exact: false }).fill('Edited In Preview Only');
+  await previewEdit.getByRole('button', { name: 'Update Payment' }).click();
+  await expect(previewEdit).toHaveCount(0);
+  await expect(rows(page).first()).toContainText('Edited In Preview Only');
+  expect(state.writes).toBe(0);
   await expect(rows(page)).toHaveCount(5);
   await expect(page.getByLabel('From Date', { exact: true })).toHaveValue('07/09/2026');
   await expect(page.getByLabel('To Date', { exact: true })).toHaveValue('13/09/2026');
@@ -83,7 +94,7 @@ test('demo is isolated, read-only, numbered and searchable within the three view
   await statuses.getByRole('button', { name: 'Approved', exact: true }).click();
   await page.getByRole('button', { name: 'View Pay-20260907-001' }).click();
   const dialog = page.getByRole('dialog', { name: 'Payment Details' });
-  await expect(dialog.getByText('Sample payment · Read-only preview. Not a real transaction.')).toBeVisible();
+  await expect(dialog.getByText('Sample payment · preview data. Edits stay in this browser and are never sent to the server.')).toBeVisible();
   await page.keyboard.press('Escape');
   await expect(dialog).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'View Pay-20260907-001' })).toBeFocused();

@@ -1,6 +1,6 @@
 import { useRef, useState, type FormEvent } from 'react';
 import { parseBusinessDate, toBusinessDate } from '../../../../utils/businessDate';
-import type { Payment } from '../../types/payment.types';
+import type { Payment, PaymentWritePayload } from '../../types/payment.types';
 import { createPayment, updatePayment } from '../../services/paymentApiService';
 import { canEditItem } from '../../../../utils/dateUtils';
 import { Button } from '../../../../ui/Button';
@@ -10,13 +10,18 @@ import { Field } from '../../../../ui/Field';
 import { uiTextareaClass } from '../../../../shared/ui/uiTokens';
 import { DatePicker } from '../../../../components/common/DatePicker';
 import MasterDropdown from '../../../masters/components/MasterDropdown';
-import { PAYMENT_TYPES, PAYMENT_MODES, paymentStatusLabel } from '../../utils/paymentRegister';
+import { PAYMENT_TYPES, PAYMENT_MODES, paymentNoDisplay, paymentStatusLabel } from '../../utils/paymentRegister';
 
 interface PaymentEditModalProps {
   isOpen: boolean;
   payment: Payment | null;
   onClose: () => void;
   onSave: (payment: Payment) => void;
+  /**
+   * Replaces the API write. The sample preview mutates its own rows in memory,
+   * so a preview edit can never reach a payment endpoint. Omitted = the server.
+   */
+  persist?: (payload: PaymentWritePayload, target: Payment | null) => Promise<Payment>;
 }
 const CATEGORIES = ['Farmer', 'Fuel', 'Maintenance', 'Salary', 'Loan', 'Office', 'Tax', 'Other'];
 const STATUSES = (['Draft', 'Approved', 'Paid', 'Cancelled'] as const).map(value => ({ value, label: paymentStatusLabel(value) }));
@@ -25,7 +30,7 @@ export function PaymentEditModal(props: PaymentEditModalProps) {
   return props.isOpen ? <EditForm key={props.payment?.id ?? 'new'} {...props} /> : null;
 }
 
-function EditForm({ payment, onClose, onSave }: PaymentEditModalProps) {
+function EditForm({ payment, onClose, onSave, persist }: PaymentEditModalProps) {
   const [form, setForm] = useState(() => ({
     paymentDate: payment?.paymentDate ?? toBusinessDate(new Date()),
     paymentType: payment?.paymentType ?? PAYMENT_TYPES[0],
@@ -74,9 +79,11 @@ function EditForm({ payment, onClose, onSave }: PaymentEditModalProps) {
     };
 
     try {
-      const saved: Payment = isEditMode && payment
-        ? await updatePayment(payment.id, paymentData)
-        : await createPayment(paymentData);
+      const saved: Payment = persist
+        ? await persist(paymentData, payment ?? null)
+        : isEditMode && payment
+          ? await updatePayment(payment.id, paymentData)
+          : await createPayment(paymentData);
       onSave(saved);
       onClose();
     } catch (error) {
@@ -95,7 +102,7 @@ function EditForm({ payment, onClose, onSave }: PaymentEditModalProps) {
   }
   const valid = Boolean(parseBusinessDate(form.paymentDate) && form.paymentType && form.paymentMode && form.paidTo.trim() && form.referenceNo.trim() && Number.isFinite(form.amount) && form.amount > 0);
   return (
-    <Modal isOpen onClose={close} title={isEditMode ? 'Edit Payment' : 'New Payment'} description={payment?.paymentNo} size="lg"
+    <Modal isOpen onClose={close} title={isEditMode ? 'Edit Payment' : 'New Payment'} description={paymentNoDisplay(payment?.paymentNo)} size="lg"
       closeOnOverlay={false} closeOnEscape={!saving && !calendarOpen} showCloseButton={!saving}
       footer={<><Button variant="secondary" onClick={close} disabled={saving}>Cancel</Button><Button type="submit" form="edit-payment-form" disabled={!valid || saving} loading={saving}>{saving ? 'Saving…' : isEditMode ? 'Update Payment' : 'Create Payment'}</Button></>}>
       <form id="edit-payment-form" onSubmit={handleSubmit} noValidate>

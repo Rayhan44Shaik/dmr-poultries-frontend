@@ -16,7 +16,7 @@ Scope: **Payment Register only**. Verification date: 10 September 2026.
 - A row click selects one payment, highlights it, and exposes **Edit / Approve / Delete** in the table header. Selecting another row replaces the selection; clicking the selected row again or clicking outside the table clears it. Dialog interactions preserve the captured payment. Page/view/filter changes and completed refreshes clear stale selections.
 - Approval uses the existing `updatePayment(id, { status: 'Approved' })` contract after shared confirmation. It follows the existing edit-age restriction, rejects demo/already-approved records, prevents double submission, and checks the returned payment identity and status before reporting success.
 - Successful approval removes the record from Pending and makes it visible in Approved after refresh. Failed approval leaves the pending record unchanged and shows a retryable inline error. No approval endpoint or backend workflow was introduced.
-- Sample records remain read-only: selection is available, but mutation buttons are disabled with a read-only explanation.
+- Sample records are writable **in memory only**: create, edit, approve and delete patch the preview rows, and no payment endpoint is ever called for a `demo-payment-` id. **Reset sample rows** discards those edits.
 - The separate checkbox/selection column has been removed. Rows themselves are keyboard-focusable: Enter/Space toggles selection and Escape deselects. Nested View buttons keep their native behavior. Tests verify there are no checkboxes, exactly ten table columns, row-click and repeat-click behavior, and removal of header actions after an outside click.
 - Latest scoped verification: **13/13 browser tests**, **7/7 unit tests**, scoped ESLint and production build passed. Browser APIs were intercepted; real-server approval/persistence is still not verified. Desktop and mobile selected-row/header-action layouts were visually inspected.
 
@@ -32,7 +32,7 @@ The register-specific adoption and sample preview work is implemented and passes
 
 Continued from the existing local workspace without resetting earlier work. No global components, backend code, service contracts, authentication, authorization, runtime configuration files, or dependency manifests were changed in this pass. Existing payment type/mode/status/category fields, payload mapping, reference rules, age restrictions, and delayed-deletion controller remain authoritative.
 
-In the development preview, **Accounts → Payment Register** opens with the 18 sample payments automatically. Production still opens with real payments; use **Preview sample data** to opt into examples there. Click **Back to real payments** to leave demo mode. Samples remain read-only and never reach payment APIs.
+In the development preview, **Accounts → Payment Register** opens with the 18 sample payments automatically. Production still opens with real payments; use **Preview sample data** to opt into examples there. Click **Back to real payments** to leave demo mode. Sample rows can be edited for review, but those writes stay in the browser and never reach payment APIs.
 
 ## 3. Backend Protection
 
@@ -82,7 +82,7 @@ No other ERP module is included in this completion claim.
 | --- | --- | --- |
 | Payment Register overall | PARTIALLY COMPLETE | Implementation verified with fixtures; real API integration and repository release gates remain outstanding. |
 | Header and register filters | COMPLETE | Existing breadcrumb, weekly defaults, combined search/filter, Clear, keyboard dropdown behavior checked. |
-| Read-only sample preview | COMPLETE | 18 fictional records, unique date-sequential numbers, distinct from real data; no create/edit/delete in demo; demo refresh makes no payment request. |
+| Sample preview (in-memory writes) | COMPLETE | 18 fictional records with unique year-first date-sequential numbers (`Pay-YYYYMMDD-###`), distinct from real data; create/edit/approve/delete mutate the preview set only and never call a payment endpoint; **Reset sample rows** restores the pristine set; demo refresh makes no payment request. |
 | Table and pagination | COMPLETE | Shared table tokens/status badges/buttons/pager; pagination reset/clamping and no unnecessary page-change fetches. |
 | New Payment frontend form | COMPLETE | Shared controls/modal; required-field gating, decimal amount, save lock, failure preservation and mocked successful creation checked. |
 | Edit Payment frontend form | COMPLETE | Shared controls/modal; original fields/rules retained; request guard, visible error and mocked update checked. |
@@ -184,7 +184,7 @@ Earlier local work preserved: `src/modules/accounts/utils/paymentRegister.ts`, t
 
 ## 12. Risk Assessment
 
-**Medium.** Register-specific UI checks pass, frontend API payloads and lifecycle rules are preserved, sample data is read-only, and no dependency was added. However, this is a finance UI; live integration and repository-wide gate failures prevent a low-risk production assertion.
+**Medium.** Register-specific UI checks pass, frontend API payloads and lifecycle rules are preserved, sample writes stay in memory, and no dependency was added. However, this is a finance UI; live integration and repository-wide gate failures prevent a low-risk production assertion.
 
 ## 13. Final Recommendation
 
