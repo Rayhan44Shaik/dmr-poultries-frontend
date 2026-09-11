@@ -138,7 +138,7 @@ export default function StepDeliveries({
       <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-100 pb-4 gap-3">
         <div className="flex flex-wrap items-center gap-2.5 min-w-0">
           <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
-            <Package size={18} className="text-emerald-600" />
+            <Package size={18} className="text-emerald-500" />
             {t("ops.trip.title.deliveries")}
           </h3>
           <TripNoBadge tripNo={trip.tripNo} />
@@ -170,7 +170,7 @@ export default function StepDeliveries({
               {trip.deliveryStepSubmitted ? (
                 <StepCloseButton onClose={handleExitToLocked} animated />
               ) : null}
-              <span className="text-xs text-blue-700 font-semibold bg-blue-50 px-3 py-1 rounded-full border border-blue-200 whitespace-nowrap">
+              <span className="text-xs text-blue-600 font-semibold bg-blue-50 px-3 py-1 rounded-full border border-blue-200 whitespace-nowrap">
                 {editingShopId ? t("ops.trip.editing_shop_details") : t("ops.trip.step_unlocked")}
               </span>
             </div>

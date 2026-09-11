@@ -151,7 +151,7 @@ const TripDateField = React.memo(function TripDateField({ tripDate }: { tripDate
     <div>
       <FieldLabel
         icon={Calendar}
-        tone="bg-sky-50 text-sky-600"
+        tone="bg-sky-50/70 text-sky-500"
         label={t("ops.trip.field.trip_date")}
         required={TRIP_FIELD_DEFINITIONS.tripDate.required}
       />
@@ -169,7 +169,7 @@ const StartTimeField = React.memo(function StartTimeField({ startTime }: { start
     <div>
       <FieldLabel
         icon={Clock}
-        tone="bg-blue-50 text-blue-600"
+        tone="bg-blue-50/70 text-blue-500"
         label={t("ops.trip.field.start_time")}
         required={TRIP_FIELD_DEFINITIONS.startTime.required}
       />
@@ -217,7 +217,7 @@ const VehicleField = React.memo(function VehicleField({
     <div>
       <FieldLabel
         icon={Truck}
-        tone="bg-blue-50 text-blue-600"
+        tone="bg-blue-50/70 text-blue-500"
         label={t("operations.vehicle_no")}
         required={TRIP_FIELD_DEFINITIONS.vehicleId.required}
       />
@@ -265,7 +265,7 @@ const SupervisorField = React.memo(function SupervisorField({
     <div>
       <FieldLabel
         icon={User}
-        tone="bg-indigo-50 text-indigo-600"
+        tone="bg-indigo-50/70 text-indigo-500"
         label={t("common.supervisor")}
         required={TRIP_FIELD_DEFINITIONS.supervisorId.required}
       />
@@ -313,7 +313,7 @@ const DriverField = React.memo(function DriverField({
     <div>
       <FieldLabel
         icon={User}
-        tone="bg-emerald-50 text-emerald-600"
+        tone="bg-emerald-50/70 text-emerald-500"
         label={t("common.driver")}
         required={TRIP_FIELD_DEFINITIONS.driverId.required}
       />
@@ -353,7 +353,7 @@ const HelpersField = React.memo(function HelpersField({
     <div>
       <FieldLabel
         icon={Users}
-        tone="bg-teal-50 text-teal-600"
+        tone="bg-teal-50/70 text-teal-500"
         label={t("ops.trip.field.helpers")}
         required={TRIP_FIELD_DEFINITIONS.helpers.required}
       />
@@ -393,7 +393,7 @@ const LoadersField = React.memo(function LoadersField({
     <div>
       <FieldLabel
         icon={Users}
-        tone="bg-amber-50 text-amber-600"
+        tone="bg-amber-50/70 text-amber-500"
         label={t("ops.trip.field.loaders")}
         required={TRIP_FIELD_DEFINITIONS.loaders.required}
       />
@@ -441,7 +441,7 @@ const OpeningMeterField = React.memo(function OpeningMeterField({
       <div className="flex items-center justify-between gap-2">
         <FieldLabel
           icon={Gauge}
-          tone="bg-purple-50 text-purple-600"
+          tone="bg-purple-50/70 text-purple-500"
           label={t("ops.trip.field.opening_meter")}
           required={TRIP_FIELD_DEFINITIONS.openingMeter.required}
         />
@@ -512,7 +512,7 @@ const AdvanceField = React.memo(function AdvanceField({
     <div>
       <FieldLabel
         icon={Wallet}
-        tone="bg-orange-50 text-orange-600"
+        tone="bg-orange-50/70 text-orange-500"
         label={t("operations.advance")}
         required={TRIP_FIELD_DEFINITIONS.advanceAmount.required}
       />
@@ -833,7 +833,7 @@ function StepStart({
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
           <div className="flex flex-wrap items-center gap-2.5 min-w-0">
             <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
-              <Clock size={18} className="text-indigo-600" />
+              <Clock size={18} className="text-indigo-500" />
               {t("ops.trip.title.start")}
             </h3>
             <TripNoBadge tripNo={loadSnapshot.tripNo || tripNo} />
@@ -860,7 +860,7 @@ function StepStart({
           {/* Time first on locked view, then remaining fields */}
           <StepKpiCard
             icon={Clock}
-            tone="bg-blue-50 text-blue-600"
+            tone="bg-blue-50/70 text-blue-500"
             label={t("ops.trip.field.start_time")}
             value={loadSnapshot.startStepSubmittedAt ? formatIstStamp(loadSnapshot.startStepSubmittedAt) : formatStartTimeForDisplay(startTime) || "--"}
           />
@@ -872,43 +872,43 @@ function StepStart({
           />
           <StepKpiCard
             icon={Calendar}
-            tone="bg-sky-50 text-sky-600"
+            tone="bg-sky-50/70 text-sky-500"
             label={t("ops.trip.field.trip_date")}
             value={loadSnapshot.tripDate || "--"}
           />
           <StepKpiCard
             icon={Truck}
-            tone="bg-blue-50 text-blue-600"
+            tone="bg-blue-50/70 text-blue-500"
             label={t("operations.vehicle_no")}
             value={loadSnapshot.vehicleNo || "--"}
           />
           <StepKpiCard
             icon={User}
-            tone="bg-indigo-50 text-indigo-600"
+            tone="bg-indigo-50/70 text-indigo-500"
             label={t("common.supervisor")}
             value={loadSnapshot.supervisorName || "--"}
           />
           <StepKpiCard
             icon={User}
-            tone="bg-emerald-50 text-emerald-600"
+            tone="bg-emerald-50/70 text-emerald-500"
             label={t("common.driver")}
             value={loadSnapshot.driverName || "--"}
           />
           <StepKpiCard
             icon={Users}
-            tone="bg-teal-50 text-teal-600"
+            tone="bg-teal-50/70 text-teal-500"
             label={t("ops.trip.field.helpers")}
             value={loadSnapshot.helpers?.join(", ") || "--"}
           />
           <StepKpiCard
             icon={Users}
-            tone="bg-amber-50 text-amber-600"
+            tone="bg-amber-50/70 text-amber-500"
             label={t("ops.trip.field.loaders")}
             value={loadSnapshot.loaders?.join(", ") || "--"}
           />
           <StepKpiCard
             icon={Gauge}
-            tone="bg-purple-50 text-purple-600"
+            tone="bg-purple-50/70 text-purple-500"
             label={t("ops.trip.field.opening_meter")}
             value={
               loadSnapshot.openingMeter == null
@@ -918,7 +918,7 @@ function StepStart({
           />
           <StepKpiCard
             icon={Wallet}
-            tone="bg-orange-50 text-orange-600"
+            tone="bg-orange-50/70 text-orange-500"
             label={t("operations.advance")}
             value={
               loadSnapshot.advanceAmount == null
@@ -950,7 +950,7 @@ function StepStart({
         <div className="flex items-center justify-between border-b border-slate-100 pb-4 gap-3">
           <div className="flex flex-wrap items-center gap-2.5 min-w-0">
             <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
-              <Clock size={18} className="text-indigo-600" />
+              <Clock size={18} className="text-indigo-500" />
               {t("ops.trip.title.start")}
             </h3>
             <TripNoBadge tripNo={tripNo || loadSnapshot.tripNo} />

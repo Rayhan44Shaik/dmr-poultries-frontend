@@ -1062,19 +1062,19 @@ export default function UnLoadingTable({
         <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
           <button
             onClick={handleDownloadShopsPDF}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-50 hover:bg-blue-100 border border-blue-200/80 text-blue-800 text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-50 hover:bg-blue-50 border border-blue-100 text-blue-600 text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
             title={t("ops.trip.shops_pdf_title")}
           >
-            <FileText size={15} className="text-blue-600" />
+            <FileText size={15} className="text-blue-500" />
             <span>{t("ops.trip.shops")} ({pendingShopsCount})</span>
           </button>
 
           <button
             onClick={handleDownloadBoxesPDF}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80 text-emerald-800 text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50 hover:bg-emerald-50 border border-emerald-100 text-emerald-600 text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
             title={t("ops.trip.boxes_pdf_title")}
           >
-            <Box size={15} className="text-emerald-600" />
+            <Box size={15} className="text-emerald-500" />
             <span>{t("ops.trip.boxes")} ({remainingBoxesCount})</span>
           </button>
 
@@ -1094,7 +1094,7 @@ export default function UnLoadingTable({
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">
           <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
-            <span className="h-5 w-5 rounded-md bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+            <span className="h-5 w-5 rounded-md bg-indigo-50/70 text-indigo-500 flex items-center justify-center shrink-0">
               <Clock size={12} />
             </span>
             <span className="truncate">{t("ops.trip.captured_time")}</span>
@@ -1105,25 +1105,25 @@ export default function UnLoadingTable({
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">
           <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
-            <span className="h-5 w-5 rounded-md bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+            <span className="h-5 w-5 rounded-md bg-blue-50/70 text-blue-500 flex items-center justify-center shrink-0">
               <Building2 size={12} />
             </span>
             <span className="truncate">{t("ops.trip.shops")}</span>
           </span>
           <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-700" title={t("ops.trip.box_mode")}>
-              <Box size={13} className="text-blue-600" /> {boxModeCount}
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-600" title={t("ops.trip.box_mode")}>
+              <Box size={13} className="text-blue-500" /> {boxModeCount}
             </span>
             <span className="h-4 w-px bg-slate-200" aria-hidden />
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-purple-700" title={t("ops.trip.weight_mode")}>
-              <Scale size={13} className="text-purple-600" /> {weightModeCount}
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-purple-600" title={t("ops.trip.weight_mode")}>
+              <Scale size={13} className="text-purple-500" /> {weightModeCount}
             </span>
             <span className="text-sm font-bold text-slate-800 ml-auto">{boxModeCount + weightModeCount}</span>
           </div>
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">
           <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
-            <span className="h-5 w-5 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+            <span className="h-5 w-5 rounded-md bg-emerald-50/70 text-emerald-500 flex items-center justify-center shrink-0">
               <Users size={12} />
             </span>
             <span className="truncate">{t("common.birds")}</span>
@@ -1132,7 +1132,7 @@ export default function UnLoadingTable({
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">
           <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
-            <span className="h-5 w-5 rounded-md bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+            <span className="h-5 w-5 rounded-md bg-emerald-50/70 text-emerald-500 flex items-center justify-center shrink-0">
               <Scale size={12} />
             </span>
             <span className="truncate">{t("ops.trip.weight_kg")}</span>
@@ -1143,7 +1143,7 @@ export default function UnLoadingTable({
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">
           <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
-            <span className="h-5 w-5 rounded-md bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">
+            <span className="h-5 w-5 rounded-md bg-rose-50/70 text-rose-500 flex items-center justify-center shrink-0">
               <AlertCircle size={12} />
             </span>
             <span className="truncate">{t("operations.mortality_count")}</span>
@@ -1154,7 +1154,7 @@ export default function UnLoadingTable({
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">
           <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
-            <span className="h-5 w-5 rounded-md bg-rose-50 text-rose-500 flex items-center justify-center shrink-0">
+            <span className="h-5 w-5 rounded-md bg-rose-50/70 text-rose-500 flex items-center justify-center shrink-0">
               <Scale size={12} />
             </span>
             <span className="truncate">{t("ops.trip.mortality_weight")}</span>

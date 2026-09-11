@@ -36,7 +36,7 @@ function GpsAddressBlock({ trip }: { trip: Trip }) {
   return (
     <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-2xs">
       <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
-        <span className="h-5 w-5 rounded-md bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0">
+        <span className="h-5 w-5 rounded-md bg-cyan-50/70 text-cyan-500 flex items-center justify-center shrink-0">
           <MapPin size={12} />
         </span>
         {t("ops.trip.field.gps_address")}
@@ -67,50 +67,50 @@ export function FarmStepView({ trip }: { trip: Trip }) {
   return (
     <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
       <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
-        <MapPin size={18} className="text-indigo-600" />
+        <MapPin size={18} className="text-indigo-500" />
         {t("ops.trip.title.farm")}
       </h3>
 
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
         <StepKpiCard
           icon={Clock}
-          tone="bg-sky-50 text-sky-600"
+          tone="bg-sky-50/70 text-sky-500"
           label={t("ops.trip.field.reached_time")}
           value={trip.farmStepSubmittedAt ? formatIstStamp(trip.farmStepSubmittedAt) : trip.reachedTime || notEntered}
         />
         <StepKpiCard
           icon={Store}
-          tone="bg-emerald-50 text-emerald-600"
+          tone="bg-emerald-50/70 text-emerald-500"
           label={t("common.farm")}
           value={trip.sourceFarm || notEntered}
         />
         <StepKpiCard
           icon={Layers}
-          tone="bg-violet-50 text-violet-600"
+          tone="bg-violet-50/70 text-violet-500"
           label={t("operations.bird_type")}
           value={trip.birdType || notEntered}
         />
         <StepKpiCard
           icon={MapPin}
-          tone="bg-rose-50 text-rose-600"
+          tone="bg-rose-50/70 text-rose-500"
           label={t("ops.trip.field.farm_address")}
           value={trip.farmAddress?.trim() ? trip.farmAddress : notEntered}
         />
         <StepKpiCard
           icon={Gauge}
-          tone="bg-purple-50 text-purple-600"
+          tone="bg-purple-50/70 text-purple-500"
           label={t("ops.trip.field.farm_meter")}
           value={destMeterLabel}
         />
         <StepKpiCard
           icon={Ticket}
-          tone="bg-amber-50 text-amber-600"
+          tone="bg-amber-50/70 text-amber-500"
           label={t("ops.trip.field.pickup_tolls")}
           value={trip.pickupTolls == null ? notEntered : String(trip.pickupTolls)}
         />
         <StepKpiCard
           icon={Scale}
-          tone="bg-teal-50 text-teal-600"
+          tone="bg-teal-50/70 text-teal-500"
           label={t("ops.trip.field.avg_bird_weight")}
           value={avgWeightLabel}
         />
@@ -135,7 +135,7 @@ export function PickupStepView({ trip }: { trip: Trip }) {
     <section className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm">
       <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
         <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
-          <Package size={18} className="text-amber-600" />
+          <Package size={18} className="text-amber-500" />
           {t("ops.trip.title.pickup")}
         </h3>
         <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
@@ -145,28 +145,28 @@ export function PickupStepView({ trip }: { trip: Trip }) {
 
       {/* Time first — same StepKpiCard font as all other steps */}
       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 pt-2">
-        <StepKpiCard icon={Clock} tone="bg-blue-50 text-blue-600" label={t("ops.trip.time")} value={time} />
+        <StepKpiCard icon={Clock} tone="bg-blue-50/70 text-blue-500" label={t("ops.trip.time")} value={time} />
         <StepKpiCard
           icon={Scale}
-          tone="bg-emerald-50 text-emerald-600"
+          tone="bg-emerald-50/70 text-emerald-500"
           label={t("ops.trip.dc_wt")}
           value={trip.dcWeight != null ? `${Number(trip.dcWeight).toFixed(2)} Kg` : notEntered}
         />
         <StepKpiCard
           icon={Bird}
-          tone="bg-sky-50 text-sky-600"
+          tone="bg-sky-50/70 text-sky-500"
           label={t("common.birds")}
           value={trip.totalBirds != null ? String(trip.totalBirds) : notEntered}
         />
         <StepKpiCard
           icon={Box}
-          tone="bg-amber-50 text-amber-600"
+          tone="bg-amber-50/70 text-amber-500"
           label={t("common.boxes")}
           value={trip.boxes != null ? String(trip.boxes) : notEntered}
         />
         <StepKpiCard
           icon={Gauge}
-          tone="bg-purple-50 text-purple-600"
+          tone="bg-purple-50/70 text-purple-500"
           label={t("ops.trip.avg_wt")}
           value={trip.avgWeight != null ? `${trip.avgWeight} Kg` : "—"}
         />

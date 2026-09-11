@@ -21,14 +21,14 @@ import { useI18n } from "../../../../../i18n";
 /** Soft, eye-friendly tile palette cycled across the selected-box grid so each
  *  box number is easy to tell apart without harsh/bright colours. */
 const BOX_TILE_PALETTE = [
-  "bg-sky-50 border-sky-200 text-sky-700",
-  "bg-emerald-50 border-emerald-200 text-emerald-700",
-  "bg-violet-50 border-violet-200 text-violet-700",
-  "bg-amber-50 border-amber-200 text-amber-800",
-  "bg-rose-50 border-rose-200 text-rose-700",
-  "bg-teal-50 border-teal-200 text-teal-700",
-  "bg-indigo-50 border-indigo-200 text-indigo-700",
-  "bg-cyan-50 border-cyan-200 text-cyan-700",
+  "bg-sky-50 border-sky-200 text-sky-600",
+  "bg-emerald-50 border-emerald-200 text-emerald-600",
+  "bg-violet-50 border-violet-200 text-violet-600",
+  "bg-amber-50 border-amber-200 text-amber-600",
+  "bg-rose-50 border-rose-200 text-rose-600",
+  "bg-teal-50 border-teal-200 text-teal-600",
+  "bg-indigo-50 border-indigo-200 text-indigo-600",
+  "bg-cyan-50 border-cyan-200 text-cyan-600",
 ];
 
 export interface Props {
@@ -303,7 +303,7 @@ export default function ShopDeliveryForm({
         {/* Shop name + select boxes (side by side) */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <FormLabel icon={ShoppingCart} tone="bg-sky-50 text-sky-600" required>
+            <FormLabel icon={ShoppingCart} tone="bg-sky-50/70 text-sky-500" required>
               {t("operations.shop_name")}
             </FormLabel>
             <SearchDropdown
@@ -324,7 +324,7 @@ export default function ShopDeliveryForm({
           </div>
 
           <div>
-            <FormLabel icon={PackageCheck} tone="bg-emerald-50 text-emerald-600">
+            <FormLabel icon={PackageCheck} tone="bg-emerald-50/70 text-emerald-500">
               {t("ops.trip.select_available_boxes")}
             </FormLabel>
             {safeBoxDetails.length > 0 ? (
@@ -351,11 +351,11 @@ export default function ShopDeliveryForm({
         {/* Box numbers list (full width, neat at any count) */}
         <div>
           <div className="flex items-center gap-2 mb-1.5">
-            <span className="h-6 w-6 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+            <span className="h-6 w-6 rounded-lg bg-indigo-50/70 text-indigo-500 flex items-center justify-center shrink-0">
               <Tag size={13} />
             </span>
             <span className="text-xs font-semibold text-slate-600">{t("ops.trip.box_nos_list")}</span>
-            <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-indigo-50 px-1.5 text-xs font-bold text-indigo-700 tabular-nums">
+            <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md bg-indigo-50 px-1.5 text-xs font-bold text-indigo-600 tabular-nums">
               {selectedBoxIds.length}
             </span>
             {selectedBoxIds.length > 0 && !readOnly && (
@@ -414,14 +414,14 @@ export default function ShopDeliveryForm({
             <div className="space-y-3">
               <SimpleMetric
                 icon={Bird}
-                tone="bg-sky-50 text-sky-600"
+                tone="bg-sky-50/70 text-sky-500"
                 tint="bg-sky-50/50 border-sky-100"
                 label={t("ops.trip.farm_birds")}
                 value={farmBirds}
               />
               <SimpleMetric
                 icon={Scale}
-                tone="bg-blue-50 text-blue-600"
+                tone="bg-blue-50/70 text-blue-500"
                 tint="bg-blue-50/50 border-blue-100"
                 label={t("ops.trip.farm_weight_kg")}
                 value={farmWeight.toFixed(2)}
@@ -432,14 +432,14 @@ export default function ShopDeliveryForm({
             <div className="space-y-3">
               <SimpleMetric
                 icon={Truck}
-                tone="bg-emerald-50 text-emerald-600"
+                tone="bg-emerald-50/70 text-emerald-500"
                 tint="bg-emerald-50/50 border-emerald-100"
                 label={t("ops.trip.delivered_birds")}
                 value={deliveredBirds}
               />
               <SimpleMetric
                 icon={Scale}
-                tone="bg-teal-50 text-teal-600"
+                tone="bg-teal-50/70 text-teal-500"
                 tint="bg-teal-50/50 border-teal-100"
                 label={t("ops.trip.delivered_weight_kg")}
                 value={deliveredWeight > 0 ? deliveredWeight.toFixed(2) : "0.00"}
@@ -450,7 +450,7 @@ export default function ShopDeliveryForm({
             <div className="space-y-3">
               <MetricTile
                 icon={AlertCircle}
-                tone="bg-rose-50 text-rose-600"
+                tone="bg-rose-50/70 text-rose-500"
                 tint="bg-rose-50/50 border-rose-100"
                 label={t("ops.trip.mortality_birds")}
               >
@@ -470,7 +470,7 @@ export default function ShopDeliveryForm({
               </MetricTile>
               <SimpleMetric
                 icon={Scale}
-                tone="bg-amber-50 text-amber-600"
+                tone="bg-amber-50/70 text-amber-500"
                 tint="bg-amber-50/50 border-amber-100"
                 label={t("ops.trip.mortality_weight_kg")}
                 value={mortKg > 0 ? mortKg.toFixed(2) : "0.00"}
@@ -483,14 +483,14 @@ export default function ShopDeliveryForm({
             <div className="space-y-3">
               <SimpleMetric
                 icon={Bird}
-                tone="bg-sky-50 text-sky-600"
+                tone="bg-sky-50/70 text-sky-500"
                 tint="bg-sky-50/50 border-sky-100"
                 label={t("ops.trip.farm_birds")}
                 value={farmBirds}
               />
               <SimpleMetric
                 icon={Scale}
-                tone="bg-blue-50 text-blue-600"
+                tone="bg-blue-50/70 text-blue-500"
                 tint="bg-blue-50/50 border-blue-100"
                 label={t("ops.trip.farm_weight_kg")}
                 value={farmWeight.toFixed(2)}
@@ -501,7 +501,7 @@ export default function ShopDeliveryForm({
               <div className="space-y-3">
                 <MetricTile
                   icon={Truck}
-                  tone="bg-emerald-50 text-emerald-600"
+                  tone="bg-emerald-50/70 text-emerald-500"
                   tint="bg-emerald-50/50 border-emerald-100"
                   label={t("ops.trip.delivered_birds")}
                 >
@@ -532,7 +532,7 @@ export default function ShopDeliveryForm({
                 </MetricTile>
                 <MetricTile
                   icon={Scale}
-                  tone="bg-teal-50 text-teal-600"
+                  tone="bg-teal-50/70 text-teal-500"
                   tint="bg-teal-50/50 border-teal-100"
                   label={t("ops.trip.delivered_weight_kg")}
                 >
@@ -557,7 +557,7 @@ export default function ShopDeliveryForm({
               <div className="space-y-3">
                 <MetricTile
                   icon={AlertCircle}
-                  tone="bg-rose-50 text-rose-600"
+                  tone="bg-rose-50/70 text-rose-500"
                   tint="bg-rose-50/50 border-rose-100"
                   label={t("ops.trip.mortality_birds")}
                 >
@@ -572,7 +572,7 @@ export default function ShopDeliveryForm({
                 </MetricTile>
                 <MetricTile
                   icon={Scale}
-                  tone="bg-amber-50 text-amber-600"
+                  tone="bg-amber-50/70 text-amber-500"
                   tint="bg-amber-50/50 border-amber-100"
                   label={t("ops.trip.mortality_weight_kg")}
                 >
@@ -592,7 +592,7 @@ export default function ShopDeliveryForm({
 
         {/* Remarks */}
         <div>
-          <FormLabel icon={MessageSquare} tone="bg-violet-50 text-violet-600">
+          <FormLabel icon={MessageSquare} tone="bg-violet-50/70 text-violet-500">
             {t("common.remarks")}
           </FormLabel>
           <input

@@ -214,7 +214,7 @@ export default function StepFarm({
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
           <div className="flex flex-wrap items-center gap-2.5 min-w-0">
             <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
-              <MapPin size={18} className="text-indigo-600" />
+              <MapPin size={18} className="text-indigo-500" />
               {t("ops.trip.title.farm")}
             </h3>
             <TripNoBadge tripNo={trip.tripNo} />
@@ -242,43 +242,43 @@ export default function StepFarm({
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
           <StepKpiCard
             icon={Clock}
-            tone="bg-sky-50 text-sky-600"
+            tone="bg-sky-50/70 text-sky-500"
             label={t("ops.trip.field.reached_time")}
             value={trip.farmStepSubmittedAt ? formatIstStamp(trip.farmStepSubmittedAt) : trip.reachedTime || t("ops.trip.not_entered")}
           />
           <StepKpiCard
             icon={Store}
-            tone="bg-emerald-50 text-emerald-600"
+            tone="bg-emerald-50/70 text-emerald-500"
             label={t("common.farm")}
             value={trip.sourceFarm || t("ops.trip.not_entered")}
           />
           <StepKpiCard
             icon={Layers}
-            tone="bg-violet-50 text-violet-600"
+            tone="bg-violet-50/70 text-violet-500"
             label={t("operations.bird_type")}
             value={trip.birdType || t("ops.trip.not_entered")}
           />
           <StepKpiCard
             icon={MapPin}
-            tone="bg-rose-50 text-rose-600"
+            tone="bg-rose-50/70 text-rose-500"
             label={t("ops.trip.field.farm_address")}
             value={trip.farmAddress || t("ops.trip.not_entered")}
           />
           <StepKpiCard
             icon={Gauge}
-            tone="bg-purple-50 text-purple-600"
+            tone="bg-purple-50/70 text-purple-500"
             label={t("ops.trip.field.farm_meter")}
             value={destMeterLabel}
           />
           <StepKpiCard
             icon={Ticket}
-            tone="bg-amber-50 text-amber-600"
+            tone="bg-amber-50/70 text-amber-500"
             label={t("ops.trip.field.pickup_tolls")}
             value={trip.pickupTolls ?? 0}
           />
           <StepKpiCard
             icon={Scale}
-            tone="bg-teal-50 text-teal-600"
+            tone="bg-teal-50/70 text-teal-500"
             label={t("ops.trip.field.avg_bird_weight")}
             value={avgWeightLabel}
           />
@@ -293,7 +293,7 @@ export default function StepFarm({
         {/* GPS last on locked view — full reverse-geocoded address */}
         <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-2xs">
           <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
-            <span className="h-5 w-5 rounded-md bg-cyan-50 text-cyan-600 flex items-center justify-center shrink-0">
+            <span className="h-5 w-5 rounded-md bg-cyan-50/70 text-cyan-500 flex items-center justify-center shrink-0">
               <MapPin size={12} />
             </span>
             {t("ops.trip.field.gps_address")}
@@ -325,7 +325,7 @@ export default function StepFarm({
         <div className="flex items-center justify-between border-b border-slate-100 pb-4 gap-3">
           <div className="flex flex-wrap items-center gap-2.5 min-w-0">
             <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
-              <MapPin size={18} className="text-indigo-600" />
+              <MapPin size={18} className="text-indigo-500" />
               {t("ops.trip.title.farm")}
             </h3>
             <TripNoBadge tripNo={trip.tripNo} />
@@ -353,7 +353,7 @@ export default function StepFarm({
           <div>
             <FieldLabel
               icon={Clock}
-              tone="bg-sky-50 text-sky-600"
+              tone="bg-sky-50/70 text-sky-500"
               label={t("ops.trip.field.reached_time")}
               required={TRIP_FIELD_DEFINITIONS.reachedTime.required}
             />
@@ -369,7 +369,7 @@ export default function StepFarm({
           <div>
             <FieldLabel
               icon={Store}
-              tone="bg-emerald-50 text-emerald-600"
+              tone="bg-emerald-50/70 text-emerald-500"
               label={t("common.farm")}
               required={TRIP_FIELD_DEFINITIONS.sourceFarmId.required}
             />
@@ -384,7 +384,7 @@ export default function StepFarm({
           </div>
 
           <div className="sm:col-span-2">
-            <FieldLabel icon={MapPin} tone="bg-cyan-50 text-cyan-600" label="GPS" required />
+            <FieldLabel icon={MapPin} tone="bg-cyan-50/70 text-cyan-500" label="GPS" required />
             <div className="flex items-center gap-2 mt-1">
               <div className="flex-1 min-w-0 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 flex items-center">
                 {hasGps ? (
@@ -400,7 +400,7 @@ export default function StepFarm({
                 type="button"
                 onClick={fetchCurrentLocation}
                 disabled={isFetchingLocation}
-                className="shrink-0 h-[42px] px-4 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-cyan-700 border border-cyan-200 transition-all active:scale-95 flex items-center gap-1.5 text-xs font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
+                className="shrink-0 h-[42px] px-4 rounded-xl bg-cyan-50 hover:bg-cyan-100 text-cyan-600 border border-cyan-200 transition-all active:scale-95 flex items-center gap-1.5 text-xs font-semibold disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 {isFetchingLocation ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
                 <span className="hidden sm:inline">{t("ops.trip.get_gps")}</span>
@@ -416,7 +416,7 @@ export default function StepFarm({
           <div>
             <FieldLabel
               icon={Layers}
-              tone="bg-violet-50 text-violet-600"
+              tone="bg-violet-50/70 text-violet-500"
               label={t("operations.bird_type")}
               required={TRIP_FIELD_DEFINITIONS.birdTypeId.required}
             />
@@ -436,7 +436,7 @@ export default function StepFarm({
           <div className="sm:col-span-1">
             <FieldLabel
               icon={MapPin}
-              tone="bg-rose-50 text-rose-600"
+              tone="bg-rose-50/70 text-rose-500"
               label={t("ops.trip.field.farm_address")}
             />
             <input
@@ -451,7 +451,7 @@ export default function StepFarm({
           <div>
             <FieldLabel
               icon={Gauge}
-              tone="bg-purple-50 text-purple-600"
+              tone="bg-purple-50/70 text-purple-500"
               label={t("ops.trip.field.dest_meter")}
               required={TRIP_FIELD_DEFINITIONS.destMeter.required}
             />
@@ -484,7 +484,7 @@ export default function StepFarm({
           <div>
             <FieldLabel
               icon={Ticket}
-              tone="bg-amber-50 text-amber-600"
+              tone="bg-amber-50/70 text-amber-500"
               label={t("ops.trip.field.pickup_tolls")}
             />
             <input
@@ -503,7 +503,7 @@ export default function StepFarm({
           <div>
             <FieldLabel
               icon={Scale}
-              tone="bg-teal-50 text-teal-600"
+              tone="bg-teal-50/70 text-teal-500"
               label={t("ops.trip.field.avg_bird_weight")}
               required={TRIP_FIELD_DEFINITIONS.avgBirdWeight.required}
             />

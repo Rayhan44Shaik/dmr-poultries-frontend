@@ -148,7 +148,7 @@ export default function GeneralExpensesTable({
           <tr className="bg-gradient-to-r from-violet-50 via-slate-50 to-amber-50 text-[11px] font-bold text-slate-600 border-b border-slate-200">
             <td className="py-2 px-3 w-[28%]">
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-5 w-5 rounded-md bg-violet-100 text-violet-600 flex items-center justify-center">
+                <span className="h-5 w-5 rounded-md bg-violet-50/80 text-violet-500 flex items-center justify-center">
                   <Package size={11} />
                 </span>
                 {t("ops.trip.expense_category")}
@@ -159,7 +159,7 @@ export default function GeneralExpensesTable({
             </td>
             <td colSpan={2} className="py-2 px-3 w-[28%] border-r border-slate-200">
               <span className="inline-flex items-center gap-1.5">
-                <span className="h-5 w-5 rounded-md bg-amber-100 text-amber-600 flex items-center justify-center">
+                <span className="h-5 w-5 rounded-md bg-amber-50/80 text-amber-500 flex items-center justify-center">
                   <Users size={11} />
                 </span>
                 {t("ops.trip.expense_category")}
@@ -182,11 +182,11 @@ export default function GeneralExpensesTable({
               Icon: React.ComponentType<{ size?: number; className?: string }>;
               field?: string;
             }> = [
-              { key: "meals", label: t("ops.trip.exp_meals"), value: sheetData.meals, tone: "bg-orange-50 text-orange-600", Icon: UtensilsCrossed, field: "meals" },
-              { key: "loading", label: t("ops.trip.exp_loading"), value: sheetData.loading, tone: "bg-blue-50 text-blue-600", Icon: Package, field: "loading" },
-              { key: "mealsTiffin", label: t("ops.trip.exp_meals_tiffin"), value: sheetData.mealsTiffin, tone: "bg-amber-50 text-amber-600", Icon: Coffee, field: "mealsTiffin" },
+              { key: "meals", label: t("ops.trip.exp_meals"), value: sheetData.meals, tone: "bg-orange-50/70 text-orange-500", Icon: UtensilsCrossed, field: "meals" },
+              { key: "loading", label: t("ops.trip.exp_loading"), value: sheetData.loading, tone: "bg-blue-50/70 text-blue-500", Icon: Package, field: "loading" },
+              { key: "mealsTiffin", label: t("ops.trip.exp_meals_tiffin"), value: sheetData.mealsTiffin, tone: "bg-amber-50/70 text-amber-500", Icon: Coffee, field: "mealsTiffin" },
               { key: "vehicleMaintenance", label: t("ops.trip.exp_vehicle_maintenance"), value: sheetData.vehicleMaintenance, tone: "bg-slate-100 text-slate-600", Icon: Wrench, field: "vehicleMaintenance" },
-              { key: "othersRC", label: t("ops.trip.exp_tea"), value: sheetData.othersRC, tone: "bg-rose-50 text-rose-600", Icon: Coffee, field: "othersRC" },
+              { key: "othersRC", label: t("ops.trip.exp_tea"), value: sheetData.othersRC, tone: "bg-rose-50/70 text-rose-500", Icon: Coffee, field: "othersRC" },
             ];
             const rightItems: Array<{
               key: string;
@@ -197,9 +197,9 @@ export default function GeneralExpensesTable({
               field?: string;
               rightBg?: string;
             }> = [
-              { key: "others1Amt", label: t("ops.trip.exp_driver"), value: sheetData.others1Amt, tone: "bg-indigo-50 text-indigo-600", Icon: User, field: "others1Amt", rightBg: "bg-indigo-50/40" },
-              { key: "others2Amt", label: t("ops.trip.exp_supervisor"), value: sheetData.others2Amt, tone: "bg-violet-50 text-violet-600", Icon: UserCheck, field: "others2Amt", rightBg: "bg-violet-50/40" },
-              { key: "others3Amt", label: t("ops.trip.exp_helper_loader"), value: sheetData.others3Amt, tone: "bg-teal-50 text-teal-600", Icon: Users, field: "others3Amt", rightBg: "bg-teal-50/40" },
+              { key: "others1Amt", label: t("ops.trip.exp_driver"), value: sheetData.others1Amt, tone: "bg-indigo-50/70 text-indigo-500", Icon: User, field: "others1Amt", rightBg: "bg-indigo-50/40" },
+              { key: "others2Amt", label: t("ops.trip.exp_supervisor"), value: sheetData.others2Amt, tone: "bg-violet-50/70 text-violet-500", Icon: UserCheck, field: "others2Amt", rightBg: "bg-violet-50/40" },
+              { key: "others3Amt", label: t("ops.trip.exp_helper_loader"), value: sheetData.others3Amt, tone: "bg-teal-50/70 text-teal-500", Icon: Users, field: "others3Amt", rightBg: "bg-teal-50/40" },
               { key: "others4Amt", label: t("common.other"), value: sheetData.others4Amt, tone: "bg-slate-100 text-slate-500", Icon: MoreHorizontal, field: "others4Amt", rightBg: "bg-slate-50/50" },
               { key: "others5Amt", label: t("common.other"), value: sheetData.others5Amt, tone: "bg-slate-100 text-slate-500", Icon: MoreHorizontal, field: "others5Amt", rightBg: "bg-slate-50/50" },
             ];

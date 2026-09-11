@@ -890,7 +890,7 @@ export default function DieselExpensesTable({
               </span>
               <div
                 className={`flex items-center gap-1.5 px-2.5 py-1 rounded-md text-[11px] font-semibold border shrink-0 ${
-                  absoluteDestMeter > 0 ? "bg-blue-50 border-blue-200 text-blue-700" : "bg-red-50 border-red-200 text-red-700"
+                  absoluteDestMeter > 0 ? "bg-blue-50 border-blue-200 text-blue-600" : "bg-red-50 border-red-200 text-red-700"
                 }`}
               >
                 <Gauge size={12} />
@@ -1145,7 +1145,7 @@ export default function DieselExpensesTable({
                           <GpsAddressText
                             lat={gpsLat}
                             lon={gpsLon}
-                            className="block text-[11px] text-emerald-700 font-semibold underline decoration-emerald-300/80 hover:decoration-emerald-600 leading-snug cursor-help"
+                            className="block text-[11px] text-emerald-600 font-semibold underline decoration-emerald-300/80 hover:decoration-emerald-600 leading-snug cursor-help"
                             withTooltip
                             maxLines={2}
                           />
@@ -1196,7 +1196,7 @@ export default function DieselExpensesTable({
                             <button
                               type="button"
                               onClick={() => openBillPicker(num)}
-                              className="inline-flex items-center justify-center gap-0.5 rounded-md border border-emerald-300 bg-emerald-50 hover:bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-800"
+                              className="inline-flex items-center justify-center gap-0.5 rounded-md border border-emerald-300 bg-emerald-50 hover:bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-600"
                               title={t("ops.trip.upload_bill")}
                             >
                               <Upload size={11} strokeWidth={2.5} />
@@ -1229,7 +1229,7 @@ export default function DieselExpensesTable({
                       <button
                         type="button"
                         onClick={() => openBillPicker(num)}
-                        className="inline-flex items-center justify-center gap-1 rounded-lg border border-emerald-400 bg-emerald-50 hover:bg-emerald-100 px-2 py-1 text-[10px] font-bold text-emerald-800 shadow-sm active:scale-[0.98] whitespace-nowrap"
+                        className="inline-flex items-center justify-center gap-1 rounded-lg border border-emerald-400 bg-emerald-50 hover:bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-600 shadow-sm active:scale-[0.98] whitespace-nowrap"
                         title={t("ops.trip.upload_bill")}
                       >
                         <Upload size={12} strokeWidth={2.5} />
@@ -1245,7 +1245,7 @@ export default function DieselExpensesTable({
                     {readOnly || (isSubmitted && !isEditingThisRow) ? (
                       <div className="inline-flex items-center justify-center gap-1">
                         <span
-                          className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-100 text-emerald-600 border border-emerald-200"
+                          className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50/80 text-emerald-500 border border-emerald-200"
                           title={t("ops.trip.submitted")}
                           aria-label={t("ops.trip.submitted")}
                         >

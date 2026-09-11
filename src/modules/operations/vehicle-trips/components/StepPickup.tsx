@@ -565,7 +565,7 @@ export default function StepPickup({
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
           <div className="flex flex-wrap items-center gap-2.5 min-w-0">
             <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
-              <Package size={18} className="text-amber-600" />
+              <Package size={18} className="text-amber-500" />
               {t("ops.trip.title.pickup")}
             </h3>
             <TripNoBadge tripNo={trip.tripNo} />
@@ -593,31 +593,31 @@ export default function StepPickup({
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 pt-2">
           <StepKpiCard
             icon={Clock}
-            tone="bg-blue-50 text-blue-600"
+            tone="bg-blue-50/70 text-blue-500"
             label={t("ops.trip.time")}
             value={officialPickupTime || "--"}
           />
           <StepKpiCard
             icon={Scale}
-            tone="bg-emerald-50 text-emerald-600"
+            tone="bg-emerald-50/70 text-emerald-500"
             label={t("ops.trip.dc_wt")}
             value={trip.dcWeight ? `${Number(trip.dcWeight).toFixed(2)} Kg` : t("ops.trip.not_entered")}
           />
           <StepKpiCard
             icon={Bird}
-            tone="bg-sky-50 text-sky-600"
+            tone="bg-sky-50/70 text-sky-500"
             label={t("common.birds")}
             value={trip.totalBirds != null ? String(trip.totalBirds) : t("ops.trip.not_entered")}
           />
           <StepKpiCard
             icon={Box}
-            tone="bg-amber-50 text-amber-600"
+            tone="bg-amber-50/70 text-amber-500"
             label={t("common.boxes")}
             value={`${trip.boxes ?? 0} / ${maxBoxes || "—"}`}
           />
           <StepKpiCard
             icon={Gauge}
-            tone="bg-purple-50 text-purple-600"
+            tone="bg-purple-50/70 text-purple-500"
             label={t("ops.trip.avg_wt")}
             value={trip.avgWeight ? `${trip.avgWeight} Kg` : "—"}
           />
@@ -626,7 +626,7 @@ export default function StepPickup({
         {/* DC Photo Status Card */}
         {photos.length > 0 && (
           <div className="bg-white p-3 rounded-xl border border-slate-200 flex items-center gap-3 text-xs font-medium text-slate-700 flex-wrap">
-            <span className="h-5 w-5 rounded-md bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0"><Camera size={ 16 } /></span>
+            <span className="h-5 w-5 rounded-md bg-emerald-50/80 text-emerald-500 flex items-center justify-center shrink-0"><Camera size={ 16 } /></span>
             <span>{t("ops.trip.photos_uploaded", { count: photos.length })}</span>
             {photos.map((p) => (
               <img key={p.key} src={p.data} alt="Pickup" className="h-12 w-12 object-cover rounded-lg border border-slate-200" />
@@ -801,7 +801,7 @@ export default function StepPickup({
         <div className="flex items-center justify-between border-b border-slate-100 pb-4 gap-3">
           <div className="flex flex-wrap items-center gap-2.5 min-w-0">
             <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
-              <Package size={18} className="text-amber-600" />
+              <Package size={18} className="text-amber-500" />
               {t("ops.trip.title.pickup")}
             </h3>
             <TripNoBadge tripNo={trip.tripNo} />
@@ -821,7 +821,7 @@ export default function StepPickup({
 
         {/* Official time capture — set once at submit, cannot be edited */}
         <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
-          <span className="h-5 w-5 rounded-md bg-blue-100 text-blue-600 flex items-center justify-center shrink-0"><Clock size={ 14 } /></span>
+          <span className="h-5 w-5 rounded-md bg-blue-50/80 text-blue-500 flex items-center justify-center shrink-0"><Clock size={ 14 } /></span>
           {officialPickupTime ? (
             <>
               <span className="font-semibold text-slate-700">{officialPickupTime}</span>
@@ -840,7 +840,7 @@ export default function StepPickup({
         {/* Image Upload Section — two DC photo slots */}
         <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/50">
           <label className="text-sm font-semibold text-slate-600 flex items-center gap-2 flex-wrap">
-            <span className="h-6 w-6 rounded-md bg-sky-100 text-sky-600 flex items-center justify-center shrink-0">
+            <span className="h-6 w-6 rounded-md bg-sky-50/80 text-sky-500 flex items-center justify-center shrink-0">
               <Camera size={14} />
             </span>
             {t("ops.trip.field.dc_photo")} {TRIP_FIELD_DEFINITIONS.dcPhotoKey.required && <span className="text-red-500">*</span>}
@@ -894,7 +894,7 @@ export default function StepPickup({
         <div>
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-semibold text-slate-600 flex items-center gap-2">
-              <span className="h-6 w-6 rounded-md bg-violet-100 text-violet-600 flex items-center justify-center shrink-0">
+              <span className="h-6 w-6 rounded-md bg-violet-50/80 text-violet-500 flex items-center justify-center shrink-0">
                 <Package size={14} />
               </span>
               {t("ops.trip.box_entries", { max: maxBoxes || "—" })}
@@ -934,7 +934,7 @@ export default function StepPickup({
                             <button
                               type="button"
                               onClick={addRow}
-                              className="w-full h-8 text-[10px] font-bold uppercase tracking-wide text-blue-700 bg-blue-50 hover:bg-blue-100 border border-blue-200 rounded-lg"
+                              className="w-full h-8 text-[10px] font-bold uppercase tracking-wide text-blue-600 bg-blue-50 hover:bg-blue-50 border border-blue-200 rounded-lg"
                             >
                               <Plus size={12} className="inline mr-1" /> {t("ops.trip.add_box")}
                             </button>
@@ -1020,25 +1020,25 @@ export default function StepPickup({
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-slate-100">
           <StepKpiCard
             icon={Box}
-            tone="bg-amber-50 text-amber-600"
+            tone="bg-amber-50/70 text-amber-500"
             label={t("common.boxes")}
             value={`${totals.boxes} / ${maxBoxes || "—"}`}
           />
           <StepKpiCard
             icon={Bird}
-            tone="bg-sky-50 text-sky-600"
+            tone="bg-sky-50/70 text-sky-500"
             label={t("common.birds")}
             value={String(totals.totalBirds)}
           />
           <StepKpiCard
             icon={Scale}
-            tone="bg-emerald-50 text-emerald-600"
+            tone="bg-emerald-50/70 text-emerald-500"
             label={t("ops.trip.dc_wt")}
             value={`${totals.dcWeight.toFixed(2)} Kg`}
           />
           <StepKpiCard
             icon={Gauge}
-            tone="bg-purple-50 text-purple-600"
+            tone="bg-purple-50/70 text-purple-500"
             label={t("ops.trip.avg_wt")}
             value={totals.avgWeight > 0 ? `${totals.avgWeight} Kg` : "—"}
           />

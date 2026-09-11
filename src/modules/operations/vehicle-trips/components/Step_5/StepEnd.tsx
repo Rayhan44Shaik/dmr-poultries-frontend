@@ -660,7 +660,7 @@ export default function StepEnd({
           <div className="flex items-center justify-between border-b border-slate-100 pb-2.5 gap-3">
             <div className="flex flex-wrap items-center gap-2 min-w-0">
               <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
-                <Receipt size={18} className="text-orange-600" />
+                <Receipt size={18} className="text-orange-500" />
                 {t("ops.trip.title.expenses")}
               </h3>
               <TripNoBadge tripNo={trip.tripNo} />
@@ -688,32 +688,32 @@ export default function StepEnd({
               {
                 label: t("ops.trip.date_time"),
                 value: submittedTimeDisplay || "—",
-                tone: "border-sky-200/80 bg-sky-50/50 text-slate-900",
+                tone: "border-sky-100 bg-sky-50/40 text-slate-700",
               },
               {
                 label: t("operations.vehicle_no"),
                 value: trip.vehicleNo || "—",
-                tone: "border-indigo-200/80 bg-indigo-50/50 text-indigo-800",
+                tone: "border-indigo-100 bg-indigo-50/40 text-indigo-600",
               },
               {
                 label: t("ops.trip.field_advance_given"),
                 value: formatInr(Number(trip.advanceAmount || 0)),
-                tone: "border-emerald-200/80 bg-emerald-50/50 text-emerald-800",
+                tone: "border-emerald-100 bg-emerald-50/40 text-emerald-600",
               },
               {
                 label: t("operations.total_expenses"),
                 value: formatInr(totalAllExpenses),
-                tone: "border-red-200/80 bg-red-50/50 text-red-700",
+                tone: "border-rose-100 bg-rose-50/40 text-rose-600",
               },
               {
                 label: t("ops.trip.total_diesel"),
                 value: formatInr(totalDieselAmount),
-                tone: "border-blue-200/80 bg-blue-50/50 text-blue-700",
+                tone: "border-blue-100 bg-blue-50/40 text-blue-600",
               },
               {
                 label: t("ops.trip.field_total_all"),
                 value: formatInr(totalAllExpenses + totalDieselAmount),
-                tone: "border-slate-300 bg-slate-50 text-slate-900",
+                tone: "border-slate-200 bg-slate-50/60 text-slate-700",
               },
             ].map((f) => (
               <div
@@ -757,7 +757,7 @@ export default function StepEnd({
           <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
             <div className="flex flex-wrap items-center gap-2 min-w-0">
               <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
-                <Receipt size={18} className="text-orange-600" />
+                <Receipt size={18} className="text-orange-500" />
                 {t("ops.trip.title.expenses")}
               </h3>
               <TripNoBadge tripNo={trip.tripNo} />
@@ -779,32 +779,32 @@ export default function StepEnd({
               {
                 label: t("ops.trip.date_time"),
                 value: submittedTimeDisplay || t("ops.trip.time_pending_short"),
-                tone: "border-sky-200/80 bg-sky-50/50 text-slate-900",
+                tone: "border-sky-100 bg-sky-50/40 text-slate-700",
               },
               {
                 label: t("operations.vehicle_no"),
                 value: trip.vehicleNo || "—",
-                tone: "border-indigo-200/80 bg-indigo-50/50 text-indigo-800",
+                tone: "border-indigo-100 bg-indigo-50/40 text-indigo-600",
               },
               {
                 label: t("ops.trip.field_advance_given"),
                 value: formatInr(Number(trip.advanceAmount || 0)),
-                tone: "border-emerald-200/80 bg-emerald-50/50 text-emerald-800",
+                tone: "border-emerald-100 bg-emerald-50/40 text-emerald-600",
               },
               {
                 label: t("operations.total_expenses"),
                 value: formatInr(totalAllExpenses),
-                tone: "border-red-200/80 bg-red-50/50 text-red-700",
+                tone: "border-rose-100 bg-rose-50/40 text-rose-600",
               },
               {
                 label: t("ops.trip.total_diesel"),
                 value: formatInr(totalDieselAmount),
-                tone: "border-blue-200/80 bg-blue-50/50 text-blue-700",
+                tone: "border-blue-100 bg-blue-50/40 text-blue-600",
               },
               {
                 label: t("ops.trip.field_total_all"),
                 value: formatInr(totalAllExpenses + totalDieselAmount),
-                tone: "border-slate-300 bg-slate-50 text-slate-900",
+                tone: "border-slate-200 bg-slate-50/60 text-slate-700",
               },
             ].map((f) => (
               <div

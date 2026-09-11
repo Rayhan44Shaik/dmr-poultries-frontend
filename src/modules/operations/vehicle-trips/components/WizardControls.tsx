@@ -66,7 +66,7 @@ export const StepKpiCard = React.memo(function StepKpiCard({
   title,
 }: {
   icon: React.ComponentType<{ size?: number | string; className?: string }>;
-  /** Icon chip tone, e.g. "bg-sky-50 text-sky-600". */
+  /** Icon chip tone, e.g. "bg-sky-50/70 text-sky-500". */
   tone: string;
   label: string;
   value: React.ReactNode;
@@ -220,7 +220,7 @@ export const SearchDropdown = React.memo(function SearchDropdown({
               !value ? "text-emerald-600 bg-emerald-50/70" : "text-slate-600"
             }`}
           >
-            <span className="w-3.5 shrink-0">{!value && <Check size={13} className="text-emerald-600" />}</span>
+            <span className="w-3.5 shrink-0">{!value && <Check size={13} className="text-emerald-500" />}</span>
             <span className="truncate">{placeholder}</span>
           </button>
 
@@ -240,7 +240,7 @@ export const SearchDropdown = React.memo(function SearchDropdown({
                     }`}
                   >
                     <span className="w-3.5 shrink-0">
-                      {isSelected && <Check size={13} className="text-emerald-600" />}
+                      {isSelected && <Check size={13} className="text-emerald-500" />}
                     </span>
                     <span className="truncate">{option.label}</span>
                   </button>
@@ -379,13 +379,13 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
               onClick={() => onChange(options.map((opt) => opt.value))}
               className={`w-full flex items-center gap-2 px-3 h-9 text-xs font-semibold text-left border-b border-slate-100 hover:bg-slate-50 transition ${
                 selectedValues.length === options.length && options.length > 0
-                  ? "text-blue-700 bg-blue-50/70"
+                  ? "text-blue-600 bg-blue-50/70"
                   : "text-slate-700"
               }`}
             >
               <span className="w-3.5 shrink-0">
                 {selectedValues.length === options.length && options.length > 0 && (
-                  <Check size={13} className="text-blue-600" />
+                  <Check size={13} className="text-blue-500" />
                 )}
               </span>
               <span className="truncate">{selectAllLabel}</span>
@@ -401,7 +401,7 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
             }`}
           >
             <span className="w-3.5 shrink-0">
-              {selectedValues.length === 0 && <Check size={13} className="text-emerald-600" />}
+              {selectedValues.length === 0 && <Check size={13} className="text-emerald-500" />}
             </span>
             <span className="truncate">{placeholder}</span>
           </button>
@@ -422,7 +422,7 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
                     }`}
                   >
                     <span className="w-3.5 shrink-0">
-                      {isSelected && <Check size={13} className="text-emerald-600" />}
+                      {isSelected && <Check size={13} className="text-emerald-500" />}
                     </span>
                     {renderOptionLabel ? (
                       renderOptionLabel(option)
