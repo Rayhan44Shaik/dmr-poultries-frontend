@@ -106,20 +106,19 @@ export default function ApprovalCalendar({ startDate, endDate }: ApprovalCalenda
   const total = items.reduce((sum, item) => sum + item.count, 0);
 
   return (
-    <div className="flex min-w-0 flex-1 items-center gap-2 text-xs text-slate-500" aria-label="Approval summary">
+    <div className="flex min-w-0 flex-1 items-center gap-2 overflow-x-auto whitespace-nowrap text-xs text-slate-500" aria-label="Approval summary">
       <CalendarDays size={15} className="shrink-0 text-slate-400" />
-      <span className="shrink-0 font-semibold text-slate-600">Needs attention:</span>
-      <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
+      <div className="flex shrink-0 items-center">
         {items.map((item, index) => (
-          <span key={item.label} className="whitespace-nowrap">
-            {index > 0 && <span className="mr-3 text-slate-300">•</span>}
-            <Link to={item.href} className="font-bold text-slate-700 hover:text-blue-600 hover:underline">
-              {item.count} {item.label.toLowerCase()}
+          <span key={item.label} className="flex items-center">
+            {index > 0 && <span className="mx-2 text-slate-300">•</span>}
+            <Link to={item.href} className="rounded-md px-1.5 py-1 font-bold text-slate-700 transition hover:bg-blue-50 hover:text-blue-700">
+              <span className="text-blue-600">{item.count}</span> {item.label}
             </Link>
           </span>
         ))}
       </div>
-      <span className={`ml-auto hidden shrink-0 font-bold sm:inline ${total ? "text-amber-600" : "text-emerald-600"}`}>
+      <span className={`ml-auto hidden shrink-0 border-l border-slate-200 pl-3 font-bold sm:inline ${total ? "text-amber-600" : "text-emerald-600"}`}>
         {total ? `${total} pending` : "All clear"}
       </span>
     </div>
