@@ -492,14 +492,6 @@ export const NAV_SECTIONS: NavSection[] = [
         tone: "lime",
         keywords: "farmer farm payment poultry",
       },
-      {
-        label: "New Payment Entry",
-        labelKey: "nav.newPaymentEntry",
-        path: "/accounts?tab=new-payments",
-        icon: CreditCard,
-        tone: "emerald",
-        keywords: "payment entry new",
-      },
     ],
   },
 
