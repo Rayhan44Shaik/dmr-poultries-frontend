@@ -53,13 +53,13 @@ export interface BrandRefreshButtonProps
 /**
  * The animated brand glyph.
  *
- *   • loading — the hen WALKS along a track: it strolls left → right, turns
- *     around at the far end, walks back, and turns again, looping. Two nested
- *     elements keep the motion clean: the outer one travels and handles the
- *     turn (scaleX flip), the inner one does the footstep bob. Combining both
- *     on one element would fight over `transform`.
- *   • at rest — hovering makes the hen do a short side-to-side dance, teasing
- *     the animation before you click.
+ *   • loading — the hen STRUTS along a track: sets off, pauses mid-way to
+ *     peck, carries on, turns at the far end, and struts back, looping. Three
+ *     nested layers compose the motion — travel + turn (scaleX flip), the
+ *     bouncy footstep bob, and the peck — because each animates `transform`
+ *     and they would overwrite each other on a single element.
+ *   • at rest — hovering makes the hen do a springy shimmy, teasing the
+ *     animation before you click.
  *
  * No rings, halos or orbits — the hen alone carries the motion.
  */
@@ -97,13 +97,23 @@ function BrandGlyph({ loading, compact }: { loading: boolean; compact: boolean }
               : "motion-safe:group-hover:animate-[var(--animate-brand-dance)]",
           )}
         >
-          <img
-            src={henLogo}
-            alt=""
-            aria-hidden="true"
-            draggable={false}
-            className="h-full w-full select-none object-contain"
-          />
+          {/* Innermost: the peck, timed to land in the walk's pauses. Each
+              layer owns one `transform` animation — they'd overwrite each
+              other if combined on a single element. */}
+          <span
+            className={cn(
+              "inline-flex h-full w-full items-center justify-center",
+              loading && "motion-safe:animate-[var(--animate-brand-peck)]",
+            )}
+          >
+            <img
+              src={henLogo}
+              alt=""
+              aria-hidden="true"
+              draggable={false}
+              className="h-full w-full select-none object-contain"
+            />
+          </span>
         </span>
       </span>
     </span>
