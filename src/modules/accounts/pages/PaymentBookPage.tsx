@@ -309,8 +309,8 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
               <DatePicker className="[&_input]:h-12 [&_input]:rounded-xl [&_input]:pr-10 [&_input]:text-base" id={`${dateId}-to`} placeholder="To date" openOnFocus={false} value={filters.to} onChange={v => changeFilter('to', v)} hideClear />
             </div>
           </div>
-          <MasterDropdown label="Payment Type" hideLabel className="min-w-0 flex-1 sm:flex-none sm:w-56 [&>button]:h-11 [&>button]:text-sm" value={filters.type} options={types} placeholder="All payment types" onChange={v => changeFilter('type', v)} searchable allowClear />
-          <MasterDropdown label="Payment Mode" hideLabel className="min-w-0 flex-1 sm:flex-none sm:w-52 [&>button]:h-11 [&>button]:text-sm" value={filters.mode} options={modes} placeholder="All payment modes" onChange={v => changeFilter('mode', v)} searchable allowClear />
+          <MasterDropdown label="Payment Type" hideLabel className="min-w-0 flex-1 sm:flex-none sm:w-56 [&>button]:h-11 [&>button]:text-sm" value={filters.type} options={types} placeholder="All payment types" onChange={v => changeFilter('type', v)} allowClear />
+          <MasterDropdown label="Payment Mode" hideLabel className="min-w-0 flex-1 sm:flex-none sm:w-52 [&>button]:h-11 [&>button]:text-sm" value={filters.mode} options={modes} placeholder="All payment modes" onChange={v => changeFilter('mode', v)} allowClear />
           <SearchInput value={filters.search} onChange={v => changeFilter('search', v)} onSearch={() => applyFilters()} aria-label="Search payments" placeholder="Payment no, payee, reference…" wrapperClassName="w-full min-w-0 sm:flex-1 sm:min-w-[260px]" />
         </div>
         <div className="mt-2 flex flex-wrap items-center justify-end gap-1.5 border-t border-slate-100 pt-2">
