@@ -1,5 +1,5 @@
 import React from "react";
-import { Check, Hash, Calendar, Truck, User, UserCog, Warehouse, Store, ShoppingBag, Bird, Scale, HeartPulse, ChevronUp, ChevronDown } from "lucide-react";
+import { Check, Hash, Calendar, Truck, User, UserCog, Warehouse, Store, ShoppingBag, Bird, Scale, HeartPulse, ChevronLeft, ChevronRight } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { formatTripListDay } from "../utils/formatTripListDay";
 import { useI18n } from "../../../../i18n";
@@ -29,23 +29,24 @@ interface Props {
 }
 
 /**
- * Two-chevron sort affordance. Both arrows are always rendered so the header
- * never changes width when the sort flips; the active direction is the one
- * shown in the brand green.
+ * Sort affordance: two side-by-side ticks (left = ascending, right =
+ * descending) rather than stacked up/down arrows. Both are always rendered so
+ * the header never changes width, and the active direction sits in a filled
+ * emerald badge so it reads clearly against the grey header.
  */
 function SortArrows({ active, dir }: { active: boolean; dir?: "asc" | "desc" }) {
+  const base =
+    "inline-flex h-[18px] w-[18px] items-center justify-center rounded-md transition-colors";
+  const on = "bg-emerald-600 text-white shadow-sm";
+  const off = "text-slate-400 group-hover/sort:text-slate-600";
   return (
-    <span className="inline-flex flex-col -space-y-1 shrink-0" aria-hidden="true">
-      <ChevronUp
-        size={9}
-        strokeWidth={3}
-        className={active && dir === "asc" ? "text-emerald-600" : "text-slate-300"}
-      />
-      <ChevronDown
-        size={9}
-        strokeWidth={3}
-        className={active && dir === "desc" ? "text-emerald-600" : "text-slate-300"}
-      />
+    <span className="inline-flex items-center gap-0.5 shrink-0" aria-hidden="true">
+      <span className={`${base} ${active && dir === "asc" ? on : off}`}>
+        <ChevronLeft size={13} strokeWidth={3.5} />
+      </span>
+      <span className={`${base} ${active && dir === "desc" ? on : off}`}>
+        <ChevronRight size={13} strokeWidth={3.5} />
+      </span>
     </span>
   );
 }
@@ -71,7 +72,7 @@ function TripMasterTable({
         onClick={() => onSortChange(key)}
         title={t("common.sort")}
         aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
-        className={`flex items-center gap-1.5 w-full uppercase tracking-wider font-bold text-[11px] transition-colors hover:text-emerald-700 ${
+        className={`group/sort flex items-center gap-2 w-full uppercase tracking-wider font-bold text-[11px] transition-colors hover:text-emerald-700 ${
           center ? "justify-center" : ""
         } ${active ? "text-emerald-700" : ""}`}
       >

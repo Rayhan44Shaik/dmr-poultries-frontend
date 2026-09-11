@@ -413,14 +413,12 @@ export default function MasterDropdown({
             }}
             className={`flex h-9 w-full shrink-0 items-center gap-2 px-3 text-left text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40 ${
               kind === "select" && option.value === value
-                // Selected row: solid emerald, not a pale tint — it was hard to
-                // spot which option was actually active.
-                ? "bg-emerald-600 font-semibold text-white"
+                // Selected row: soft blue tint, the original Salary Register
+                // treatment. A solid fill here read as harsh.
+                ? "bg-blue-50 text-blue-600"
                 : index === active
-                  // Keyboard/hover highlight: clearly visible but still second
-                  // to the selected row.
-                  ? "bg-emerald-50 text-emerald-800"
-                  : "text-slate-700 hover:bg-emerald-50/60"
+                  ? "bg-slate-50 text-slate-700"
+                  : "text-slate-700 hover:bg-slate-50"
             }`}
           >
             {option.icon && (
@@ -438,7 +436,7 @@ export default function MasterDropdown({
             type="button"
             onMouseDown={(event) => event.preventDefault()}
             onClick={commitCustom}
-            className="flex h-9 w-full shrink-0 items-center gap-2 px-3 text-left text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+            className="flex h-9 w-full shrink-0 items-center gap-2 px-3 text-left text-xs font-semibold text-blue-600 hover:bg-blue-50"
           >
             {t("masters.ui.use_value", { value: customValue })}
           </button>

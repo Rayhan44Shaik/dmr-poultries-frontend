@@ -2283,6 +2283,16 @@ const USER = {
   permissions: ["*"],
 };
 
+/** Mirrors the frontend `isOrderContainer`: a vehicle-less "[ORDER]" container. */
+function isOrderContainerRow(t) {
+  return (
+    t.deleted !== true &&
+    (t.vehicleId == null || t.vehicleId === 0) &&
+    !t.vehicleNo &&
+    String(t.remarks || "").includes("[ORDER]")
+  );
+}
+
 /** Sorts trip rows by a whitelisted column before pagination. */
 function sortTrips(rows, sortBy, sortDir) {
   if (!sortBy) return rows;
@@ -2455,7 +2465,14 @@ const server = http.createServer(async (req, res) => {
         200,
         paginate(
           sortTrips(
-            TRIPS.filter((t) => inRange(t.tripDate, q.get("fromDate"), q.get("toDate"))),
+            TRIPS.filter(
+              (t) =>
+                // Trip List shows REAL vehicle trips (TRP-*) only. The feed also
+                // carries vehicle-less Orders collection containers (ORD-*) that
+                // exist purely to hold a day's order plan; they are not trips.
+                !isOrderContainerRow(t) &&
+                inRange(t.tripDate, q.get("fromDate"), q.get("toDate"))
+            ),
             q.get("sortBy"),
             q.get("sortDir")
           ),
