@@ -351,12 +351,11 @@ function TripRecentTable({
                         ) : (() => {
                           // Part B: a Draft (in-progress) trip shows its first
                           // unsubmitted step as a clickable resume badge — never a
-                          // status dropdown. Part N: only Pending offers a manual
-                          // forward transition (→ Completed); deletion always goes
-                          // through the Delete button + 10s undo (Part O), so it is
-                          // never offered here. Completed stays Completed.
+                          // status dropdown. Step 5 submit moves Draft→Pending
+                          // automatically; Completed is never offered here.
+                          // Deletion always goes through Delete + 10s undo.
                           const validOptions = getValidStatusOptions(trip.status).filter(
-                            (s) => s !== "Deleted"
+                            (s) => s !== "Deleted" && s !== "Completed"
                           );
                           const showDropdown =
                             !isDeleted &&
