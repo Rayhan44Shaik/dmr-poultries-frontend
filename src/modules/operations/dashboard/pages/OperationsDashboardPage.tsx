@@ -1,6 +1,6 @@
 // src/modules/operations/dashboard/pages/OperationsDashboardPage.tsx
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { addDays, subMonths } from "date-fns";
 import { useDashboardData } from "../hooks/useDashboardData";
@@ -11,7 +11,7 @@ import RecentTripsTable from "../components/RecentTripsTable";
 import ActiveCounts from "../components/ActiveCounts";
 import PendingCollectionsByShop from "../components/PendingCollectionsByShop";
 import PendingApprovalsPanel from "../components/PendingApprovalsPanel";
-import { Calendar, CalendarRange, ChevronDown, ArrowRightLeft, RefreshCw } from "lucide-react";
+import { Calendar, CalendarClock, CalendarDays, CalendarRange, ChevronDown, Layers, ArrowRightLeft, RefreshCw } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import { useI18n } from "../../../../i18n";
 import { kickApprovalSnapshot } from "../../../approvals/services/approvalSnapshot";
@@ -110,10 +110,10 @@ function RangeDatePicker({
 
   // ── Quick-range presets (segmented toggle) ────────────────────────────────
   const RANGE_PRESETS = [
-    { key: "7d", label: "7D", title: "Last 7 days", start: () => addDays(todayMidnight(), -6) },
-    { key: "15d", label: "15D", title: "Last 15 days", start: () => addDays(todayMidnight(), -14) },
-    { key: "1m", label: "1M", title: "Last month", start: () => addDays(subMonths(todayMidnight(), 1), 1) },
-    { key: "qtr", label: "QTR", title: "Last quarter (3 months)", start: () => addDays(subMonths(todayMidnight(), 3), 1) },
+    { key: "7d", label: "7D", word: "Last 7 days", Icon: CalendarDays, start: () => addDays(todayMidnight(), -6) },
+    { key: "15d", label: "15D", word: "Last 15 days", Icon: CalendarClock, start: () => addDays(todayMidnight(), -14) },
+    { key: "1m", label: "1M", word: "Last 1 month", Icon: CalendarRange, start: () => addDays(subMonths(todayMidnight(), 1), 1) },
+    { key: "qtr", label: "QTR", word: "Last quarter", Icon: Layers, start: () => addDays(subMonths(todayMidnight(), 3), 1) },
   ] as const;
 
   const activePreset = RANGE_PRESETS.find((preset) => {
@@ -129,6 +129,12 @@ function RangeDatePicker({
     onRangeChange(preset.start(), todayMidnight());
     setIsOpen(false);
   };
+
+  const activePresetIndex = RANGE_PRESETS.findIndex((p) => p.key === activePreset);
+  const activeWord =
+    activePreset != null
+      ? RANGE_PRESETS.find((p) => p.key === activePreset)?.word
+      : "Custom range";
 
   const slateCalendarIcon = <Calendar size={15} className="text-emerald-600" />;
 
@@ -187,32 +193,64 @@ function RangeDatePicker({
           className={`absolute right-0 z-50 w-[min(24rem,calc(100vw-2rem))] animate-scale-in rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-xl shadow-slate-900/10 backdrop-blur-xl ring-1 ring-emerald-500/10 ${dropdownPositionClass}`}
         >
           <div className="space-y-4">
-            {/* Quick-range segmented toggle */}
+            {/* Quick-range segmented toggle with a sliding indicator */}
             <div>
               <span className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
                 Quick range
               </span>
-              <div className="grid grid-cols-4 gap-1 rounded-xl bg-slate-100 p-1">
+              <div
+                role="tablist"
+                aria-label="Quick date range"
+                className="relative grid grid-cols-4 gap-1 rounded-xl bg-slate-100 p-1"
+              >
+                {/* Sliding emerald thumb (cell width + gap accounted for) */}
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-y-1 left-1 w-[calc((100%-1.25rem)/4)] rounded-lg bg-gradient-to-br from-emerald-500 to-emerald-600 shadow-sm shadow-emerald-600/30 ring-1 ring-emerald-600/20 transition-[transform,opacity] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+                  style={{
+                    ["--i" as string]: String(Math.max(activePresetIndex, 0)),
+                    transform: "translateX(calc(var(--i) * (100% + 0.25rem)))",
+                    opacity: activePresetIndex >= 0 ? 1 : 0,
+                  } as CSSProperties}
+                />
                 {RANGE_PRESETS.map((preset) => {
                   const active = activePreset === preset.key;
+                  const PresetIcon = preset.Icon;
                   return (
                     <button
                       key={preset.key}
                       type="button"
-                      title={preset.title}
+                      role="tab"
+                      title={preset.word}
                       onClick={() => applyPreset(preset)}
                       aria-pressed={active}
-                      className={`rounded-lg py-1.5 text-[12.5px] font-extrabold tracking-wide transition-all duration-150 active:scale-95 ${
+                      aria-selected={active}
+                      className={`relative z-10 flex items-center justify-center gap-1 rounded-lg py-2 text-[12px] font-extrabold tracking-wide transition-colors duration-200 active:scale-95 motion-reduce:transition-none ${
                         active
-                          ? "bg-emerald-600 text-white shadow-sm"
-                          : "text-slate-500 hover:bg-white hover:text-emerald-700"
+                          ? "text-white"
+                          : "text-slate-500 hover:bg-white/80 hover:text-emerald-700"
                       }`}
                     >
+                      <PresetIcon
+                        size={13}
+                        strokeWidth={2.4}
+                        className={active ? "text-white" : "text-slate-400"}
+                      />
                       {preset.label}
                     </button>
                   );
                 })}
               </div>
+              {/* Live description of the current selection */}
+              <p className="mt-2 flex items-center justify-center gap-1.5 text-[11.5px] font-semibold text-slate-500">
+                <span
+                  className={`h-1.5 w-1.5 rounded-full ${
+                    activePreset != null ? "bg-emerald-500" : "bg-slate-300"
+                  }`}
+                />
+                <span className="font-bold text-slate-600">{activeWord}</span>
+                {rangeLabel && <span className="tabular-nums text-slate-400">· {rangeLabel}</span>}
+              </p>
             </div>
 
             {/* Custom dates */}
