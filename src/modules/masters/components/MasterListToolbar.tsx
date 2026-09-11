@@ -92,6 +92,7 @@ export default function MasterListToolbar({
             onClick={onRefresh}
             loading={loading}
             disabled={saving}
+            size="lg"
           />
         )}
         <MasterDropdown
@@ -99,6 +100,7 @@ export default function MasterListToolbar({
           placeholder={t("common.export")}
           hideLabel
           className="w-28"
+          triggerClassName="!h-10"
           kind="action"
           value=""
           options={[
@@ -128,6 +130,7 @@ export default function MasterListToolbar({
           onClick={onAdd}
           loading={saving}
           disabled={loading || saving}
+          size="lg"
           icon={<Plus size={16} aria-hidden="true" />}
         >
           {addLabel}

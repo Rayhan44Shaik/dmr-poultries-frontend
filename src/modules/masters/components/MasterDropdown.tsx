@@ -34,6 +34,12 @@ interface MasterDropdownProps {
   hideLabel?: boolean;
   labelStyle?: "filter" | "field";
   className?: string;
+  /**
+   * Extra classes for the TRIGGER button itself (not the wrapper). Needed so a
+   * toolbar can align the dropdown's height with the buttons beside it — the
+   * trigger's own h-9 would otherwise win.
+   */
+  triggerClassName?: string;
   /** Action menus (Export) share the chrome, but use menu/menuitem semantics. */
   kind?: "select" | "action";
   /** Inline only for the month/year menus inside the calendar's own popup. */
@@ -60,6 +66,7 @@ export default function MasterDropdown({
   hideLabel = false,
   labelStyle = "filter",
   className = "",
+  triggerClassName = "",
   kind = "select",
   portal = true,
 }: MasterDropdownProps) {
@@ -442,7 +449,7 @@ export default function MasterDropdown({
           error
             ? "border-red-400 focus:border-red-500 focus:ring-red-100"
             : "border-slate-200 hover:border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
-        }`}
+        } ${triggerClassName}`}
       >
         <span
           className={`truncate ${kind === "select" && !value ? "text-slate-400" : "text-slate-700"}`}
