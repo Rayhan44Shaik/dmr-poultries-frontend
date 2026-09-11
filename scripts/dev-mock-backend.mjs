@@ -2215,6 +2215,14 @@ function applyExpensesStep(trip, body) {
     trip.expensesStepSubmitted = true;
     trip.expensesStepSubmittedAt = new Date().toISOString();
     trip.submittedAtTimestamp = trip.expensesStepSubmittedAt;
+    // Step 5 final submit moves the trip Draft → Pending (never Completed here).
+    if (trip.status === "Draft" || !trip.status) {
+      trip.status = "Pending";
+    }
+  }
+  // Honour explicit status from client payload on submit as well.
+  if (body.status === "Pending" && (trip.status === "Draft" || body.mode === "submit")) {
+    trip.status = "Pending";
   }
   return trip;
 }

@@ -57,21 +57,24 @@ test("Part B: first incomplete step is reported (0-based)", () => {
   );
 });
 
-test("Part M: status control map — forward only, no Pending -> Draft, deletion is not a transition", () => {
+test("Part M: status control map — Draft→Pending only; Completed not offered; no Pending→Draft", () => {
   assert.deepEqual(TRIP_STATUS_TRANSITIONS.Draft, ["Pending"]);
-  assert.deepEqual(TRIP_STATUS_TRANSITIONS.Pending, ["Completed"]);
+  // Completed is not a manual status option on Trip Entry.
+  assert.deepEqual(TRIP_STATUS_TRANSITIONS.Pending, []);
   assert.deepEqual(TRIP_STATUS_TRANSITIONS.Completed, []);
   assert.deepEqual(TRIP_STATUS_TRANSITIONS.Deleted, []);
   // "Deleted" is never a status-control target on any state — it is only
   // reachable through the dedicated Delete action + 10s undo.
   for (const from of ["Draft", "Pending", "Completed", "Deleted"] as const) {
     assert.equal(TRIP_STATUS_TRANSITIONS[from].includes("Deleted"), false);
+    assert.equal(TRIP_STATUS_TRANSITIONS[from].includes("Completed"), false);
   }
 });
 
 test("Part N: valid / invalid transitions", () => {
   assert.equal(isValidTripStatusTransition("Draft", "Pending"), true);
-  assert.equal(isValidTripStatusTransition("Pending", "Completed"), true);
+  // Completed is not offered from Pending on Trip Entry.
+  assert.equal(isValidTripStatusTransition("Pending", "Completed"), false);
 
   assert.equal(isValidTripStatusTransition("Pending", "Draft"), false);
   assert.equal(isValidTripStatusTransition("Completed", "Draft"), false);
@@ -83,6 +86,8 @@ test("Part N: valid / invalid transitions", () => {
   assert.equal(isValidTripStatusTransition("Deleted", "Pending"), false);
 
   assert.equal(getValidNextStatuses("Pending").includes("Draft"), false);
+  assert.equal(getValidNextStatuses("Pending").includes("Completed"), false);
+  assert.equal(getValidNextStatuses("Pending").length, 0);
   assert.equal(getValidNextStatuses("Completed").includes("Draft"), false);
   assert.equal(getValidNextStatuses("Completed").length, 0);
 });

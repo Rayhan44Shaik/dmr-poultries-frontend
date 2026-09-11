@@ -182,16 +182,17 @@ function TripRecentTable({
   };
 
   const getStepBadge = (trip: Trip) => {
+    // Completed may still exist on older sample rows — show label only (no status change option).
     if (trip.status === "Completed") {
       return { label: t("status.completed"), color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <CheckCircle size={12} />, resume: false };
     }
     if (trip.status === "Pending") {
       return { label: t("status.pending"), color: "bg-amber-50 text-amber-700 border-amber-200", icon: <Clock size={12} />, resume: false };
     }
-    // Defensive: a Draft whose wizard is actually complete (inconsistent
-    // legacy data) must not advertise a "pending" step to resume.
+    // Defensive: wizard fully submitted but status still Draft → treat as Pending
+    // (Step 5 submit should have moved it; never show Completed from Draft).
     if (isTripWizardComplete(trip)) {
-      return { label: t("status.completed"), color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <CheckCircle size={12} />, resume: false };
+      return { label: t("status.pending"), color: "bg-amber-50 text-amber-700 border-amber-200", icon: <Clock size={12} />, resume: false };
     }
     // A Draft trip always has Step 1 submitted (trips are created on Step 1
     // submit), so it is always mid-workflow: show ONLY which step is pending
@@ -205,25 +206,22 @@ function TripRecentTable({
     };
   };
 
-  // Status control — only forward lifecycle transitions (Draft→Pending,
-  // Pending→Completed). `Pending → Draft` never exists. Deletion is NOT a
-  // status change: it goes exclusively through the Delete action + 10s undo,
-  // so "Deleted" is never a value this handler receives.
+  // Status control: Draft→Pending happens automatically on Step 5 submit.
+  // Completed is NOT offered on Trip Entry. `Pending → Draft` never exists.
+  // Deletion goes exclusively through the Delete action + 10s undo.
   const handleStatusChange = (trip: Trip, newStatus: TripStatus) => {
+    if (newStatus === "Completed") return; // never offered / never accepted here
     if (!isValidTripStatusTransition(trip.status, newStatus)) {
       return; // Invalid transition - silently ignore (backend will also reject)
     }
-    if (newStatus === "Completed") {
-      const approver = getCurrentUser();
-      if (onStatusChange) onStatusChange(trip, "Completed", approver);
-    } else if (newStatus === "Pending") {
+    if (newStatus === "Pending") {
       if (onStatusChange) onStatusChange(trip, newStatus);
     }
   };
 
-  // Get valid next statuses for a trip based on current status
+  // Valid next statuses for Trip Entry — Completed is never in the list.
   const getValidStatusOptions = (currentStatus: TripStatus): TripStatus[] => {
-    return getValidNextStatuses(currentStatus);
+    return getValidNextStatuses(currentStatus).filter((s) => s !== "Completed");
   };
 
   return (

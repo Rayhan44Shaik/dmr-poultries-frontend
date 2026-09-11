@@ -1,7 +1,7 @@
 // src/modules/operations/vehicle-trips/components/Step_5/GeneralExpensesTable.tsx
 
 import React, { useRef } from "react";
-import { Clock, Lock, Truck, Wallet, UtensilsCrossed, Package, Coffee, Wrench, User, UserCheck, Users, MoreHorizontal } from "lucide-react";
+import { Lock, UtensilsCrossed, Package, Coffee, Wrench, User, UserCheck, Users, MoreHorizontal } from "lucide-react";
 import { TRIP_FIELD_DEFINITIONS } from "../../../../../shared/trip/definitions";
 import { useI18n } from "../../../../../i18n";
 
@@ -113,10 +113,6 @@ export default function GeneralExpensesTable({
     computedDistance > 0 && totalDieselLiters > 0
       ? (computedDistance / totalDieselLiters).toFixed(2)
       : null;
-  const vehicleNo = trip?.vehicleNo || sheetData.vehicleNo || "";
-  const advance = trip?.advanceAmount ?? sheetData.advance ?? "";
-  const timestamp = trip?.expensesStepSubmittedAt || sheetData.submittedAtTimestamp || t("ops.trip.captured_on_first_submit");
-
   /** Coloured icon chip for expense category labels. */
   const CatIcon = ({
     icon: Icon,
@@ -132,53 +128,7 @@ export default function GeneralExpensesTable({
 
   return (
     <div className="rounded-xl border border-slate-200 overflow-x-auto shadow-xs bg-white">
-      {/* Metadata row — colour logos for Date/Time, Vehicle, Advance */}
-      <div className="grid grid-cols-1 md:grid-cols-3 border-b border-slate-200 bg-gradient-to-r from-slate-50 via-white to-slate-50 text-xs">
-        <div className="py-3 px-3.5 flex items-center gap-2.5 border-b md:border-b-0 md:border-r border-slate-200">
-          <span className="h-8 w-8 rounded-lg bg-sky-100 text-sky-600 border border-sky-200/70 flex items-center justify-center shrink-0 shadow-sm">
-            <Clock size={15} />
-          </span>
-          <div className="min-w-0 flex flex-col gap-0.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-sky-700/80">
-              {t("ops.trip.date_time")}
-            </span>
-            <span className="font-semibold text-slate-900 truncate text-[12px]">
-              {timestamp}
-            </span>
-          </div>
-        </div>
-
-        <div className="py-3 px-3.5 flex items-center gap-2.5 border-b md:border-b-0 md:border-r border-slate-200">
-          <span className="h-8 w-8 rounded-lg bg-indigo-100 text-indigo-600 border border-indigo-200/70 flex items-center justify-center shrink-0 shadow-sm">
-            <Truck size={15} />
-          </span>
-          <div className="min-w-0 flex flex-col gap-0.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-700/80">
-              {t("operations.vehicle_no")}
-            </span>
-            <span className="font-bold text-indigo-700 uppercase truncate text-[12px] tracking-wide">
-              {vehicleNo || "--"}
-            </span>
-          </div>
-        </div>
-
-        <div className="py-3 px-3.5 flex items-center gap-2.5">
-          <span className="h-8 w-8 rounded-lg bg-emerald-100 text-emerald-600 border border-emerald-200/70 flex items-center justify-center shrink-0 shadow-sm">
-            <Wallet size={15} />
-          </span>
-          <div className="min-w-0 flex flex-col gap-0.5">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-700/80">
-              {t("operations.advance")}
-            </span>
-            <span className="font-bold text-emerald-700 text-[12px] tabular-nums">
-              {advance === "" || advance == null
-                ? "--"
-                : `₹ ${Number(advance).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`}
-            </span>
-          </div>
-        </div>
-      </div>
-
+      {/* Date / Vehicle / Advance removed from table top — shown as separate summary cards in StepEnd. */}
       <table className="sheet-joined-table w-full border-collapse">
         <tbody>
           <tr className="bg-gradient-to-r from-violet-50 via-slate-50 to-amber-50 text-[11px] font-bold text-slate-600 border-b border-slate-200">

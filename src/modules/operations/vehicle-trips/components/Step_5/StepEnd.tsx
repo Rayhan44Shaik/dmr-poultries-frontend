@@ -596,7 +596,21 @@ export default function StepEnd({
               </span>
             </div>
           </div>
-          {/* Summary cards removed — date/vehicle/advance already shown once in the expenses table header. */}
+          {/* Advance / Total expenses / Diesel — separate summary cards (not on table top). */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 pt-1">
+            <div className="bg-emerald-50/60 border border-emerald-200/80 p-3 rounded-xl">
+              <p className="text-[11px] text-emerald-700/80 font-semibold uppercase tracking-wide">{t("operations.advance")}</p>
+              <p className="text-sm font-bold text-emerald-700 mt-1 tabular-nums">₹{Number(trip.advanceAmount || 0).toFixed(2)}</p>
+            </div>
+            <div className="bg-red-50/60 border border-red-200/80 p-3 rounded-xl">
+              <p className="text-[11px] text-red-700/80 font-semibold uppercase tracking-wide">{t("operations.total_expenses")}</p>
+              <p className="text-sm font-bold text-red-600 mt-1 tabular-nums">₹{totalAllExpenses.toFixed(2)}</p>
+            </div>
+            <div className="bg-blue-50/60 border border-blue-200/80 p-3 rounded-xl">
+              <p className="text-[11px] text-blue-700/80 font-semibold uppercase tracking-wide">{t("ops.trip.total_diesel")}</p>
+              <p className="text-sm font-bold text-blue-600 mt-1 tabular-nums">₹{totalDieselAmount.toFixed(2)}</p>
+            </div>
+          </div>
           <GeneralExpensesTable
             sheetData={sheetData}
             handleChange={handleChange}
@@ -636,6 +650,22 @@ export default function StepEnd({
             </div>
             <div className="flex items-center gap-2">
               <span className="text-[11px] text-slate-700 font-medium bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200 whitespace-nowrap">{t("ops.trip.editable_view")}</span>
+            </div>
+          </div>
+
+          {/* Advance / Total expenses / Diesel — separate summary cards (not on table top). */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+            <div className="bg-emerald-50/60 border border-emerald-200/80 p-3 rounded-xl">
+              <p className="text-[11px] text-emerald-700/80 font-semibold uppercase tracking-wide">{t("operations.advance")}</p>
+              <p className="text-sm font-bold text-emerald-700 mt-1 tabular-nums">₹{Number(trip.advanceAmount || 0).toFixed(2)}</p>
+            </div>
+            <div className="bg-red-50/60 border border-red-200/80 p-3 rounded-xl">
+              <p className="text-[11px] text-red-700/80 font-semibold uppercase tracking-wide">{t("operations.total_expenses")}</p>
+              <p className="text-sm font-bold text-red-600 mt-1 tabular-nums">₹{totalAllExpenses.toFixed(2)}</p>
+            </div>
+            <div className="bg-blue-50/60 border border-blue-200/80 p-3 rounded-xl">
+              <p className="text-[11px] text-blue-700/80 font-semibold uppercase tracking-wide">{t("ops.trip.total_diesel")}</p>
+              <p className="text-sm font-bold text-blue-600 mt-1 tabular-nums">₹{totalDieselAmount.toFixed(2)}</p>
             </div>
           </div>
 
@@ -687,10 +717,9 @@ export default function StepEnd({
             />
           </div>
 
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 grid grid-cols-1 sm:grid-cols-3 gap-2 font-bold text-xs text-slate-900">
-            <div>{t("operations.total_expenses")}: <span className="text-red-600">₹{totalAllExpenses.toFixed(2)}</span></div>
-            <div>{t("ops.trip.total_diesel")}: <span className="text-blue-600">₹{totalDieselAmount.toFixed(2)}</span></div>
-            <div>{t("ops.trip.balance_remaining")}: <span className="text-emerald-600">₹{remainingBalance.toFixed(2)}</span></div>
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center justify-between gap-2 font-bold text-xs text-slate-900">
+            <span>{t("ops.trip.balance_remaining")}</span>
+            <span className="text-emerald-600 tabular-nums">₹{remainingBalance.toFixed(2)}</span>
           </div>
 
           <WizardStepNotice
