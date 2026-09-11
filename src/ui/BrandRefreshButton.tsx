@@ -4,22 +4,18 @@
  * =============================================================================
  * ONE refresh treatment for the whole application:
  *
- *   • Emerald light  — the same emerald the design system already uses for
- *     "safe, reversible, positive" actions (Excel / Import / focus rings), so
- *     refresh reads as part of the family instead of a new colour. A soft
- *     emerald→teal gradient with a ring at rest, deepening on hover, and
- *     lighting up further while refreshing.
+ *   • Round emerald  — a circular control rather than a rounded rectangle, so
+ *     it frames the hen like a badge and reads instantly as "refresh".
  *   • Brand logo     — the DMR hen replaces the generic RefreshCw glyph, so the
  *     control is unmistakably ours.
- *   • Logo animation — while `loading` the hen WALKS across the button: left
- *     → right, a turn at the far end, then back again, looping, with a
- *     footstep bob throughout. At rest, hovering makes it do a short dance.
- *     See `--animate-brand-*` in styles/tokens.css.
+ *   • Logo animation — while `loading` the hen DANCES inside the circle: a
+ *     springy shimmy with squash-and-stretch, punctuated by a peck. At rest it
+ *     wiggles on hover. See `--animate-brand-*` in styles/tokens.css.
  *
  * USAGE (identical everywhere — do not hand-roll a refresh button again):
  *
  *   <BrandRefreshButton loading={refreshing} onClick={reload} />
- *   <BrandRefreshButton loading={busy} onClick={reload} compact />   // icon only
+ *   <BrandRefreshButton loading={busy} onClick={reload} compact />   // smaller
  *
  * Built on the shared <Button variant="custom">, so height, padding, radius,
  * focus ring and the single-activation guard all come from the button system —
@@ -31,89 +27,64 @@
  *   The hen is decorative (`aria-hidden`), the accessible name is always a
  *   verb phrase ("Refresh data"), and the live state is announced via
  *   `aria-busy` rather than by swapping the label.
- *   Users with `prefers-reduced-motion` get the static logo — no hop, no pulse.
+ *   Users with `prefers-reduced-motion` get the static logo — no dance.
  * =============================================================================
  */
 
-import type { CSSProperties, ReactNode } from "react";
 import henLogo from "../assets/dmr-hen-cut-256.png";
 import { cn } from "../utils/cn";
 import { Button, type ButtonProps } from "./Button";
 
 export interface BrandRefreshButtonProps
   extends Omit<ButtonProps, "variant" | "icon" | "iconOnly" | "children"> {
-  /** Visible text. Defaults to "Refresh"; pass `null`/`compact` for icon-only. */
-  children?: ReactNode;
   /** Accessible name. Defaults to "Refresh data". */
   ariaLabel?: string;
-  /** Icon-only 32px treatment for dense toolbars and table headers. */
+  /** Smaller circle for dense toolbars and table headers. */
   compact?: boolean;
 }
 
 /**
- * The animated brand glyph.
+ * The animated brand glyph — the hen sitting inside the round button.
  *
- *   • loading — the hen STRUTS along a track: sets off, pauses mid-way to
- *     peck, carries on, turns at the far end, and struts back, looping. Three
- *     nested layers compose the motion — travel + turn (scaleX flip), the
- *     bouncy footstep bob, and the peck — because each animates `transform`
- *     and they would overwrite each other on a single element.
- *   • at rest — hovering makes the hen do a springy shimmy, teasing the
- *     animation before you click.
+ *   • loading — the hen DANCES on the spot: a springy shimmy, tilting side to
+ *     side with squash-and-stretch. Two nested layers, because the dance and
+ *     the peck each animate `transform` and would overwrite each other on a
+ *     single element.
+ *   • at rest — a gentle wiggle on hover, teasing the animation.
  *
- * No rings, halos or orbits — the hen alone carries the motion.
+ * No walking track: inside a circle the hen stays centred and dances in place.
  */
 function BrandGlyph({ loading, compact }: { loading: boolean; compact: boolean }) {
-  const size = compact ? 15 : 16;
-  // A short track: just enough travel to read as a walk, not enough to stretch
-  // the button. The hen stays visually part of the label, not a parade float.
-  const distance = compact ? 5 : 7;
+  const size = compact ? 17 : 20;
 
   return (
     <span
-      className="relative inline-flex shrink-0 items-center"
-      style={{ width: size + distance, height: size }}
+      className="relative inline-flex shrink-0 items-center justify-center"
+      style={{ width: size, height: size }}
     >
-      {/* Outer: travels left→right and flips to face the way it's heading. */}
+      {/* Dance layer: the shimmy while loading, a wiggle on hover at rest. */}
       <span
         className={cn(
-          "absolute left-0 top-0 inline-flex items-center justify-center",
-          loading && "motion-safe:animate-[var(--animate-brand-walk)]",
+          "inline-flex h-full w-full items-center justify-center",
+          loading
+            ? "motion-safe:animate-[var(--animate-brand-dance)]"
+            : "motion-safe:group-hover:animate-[var(--animate-brand-dance)]",
         )}
-        style={
-          {
-            width: size,
-            height: size,
-            "--walk-distance": `${distance}px`,
-          } as CSSProperties
-        }
       >
-        {/* Inner: the footstep bob / hover dance. */}
+        {/* Peck layer: a head-bob punctuating the dance. */}
         <span
           className={cn(
             "inline-flex h-full w-full items-center justify-center",
-            loading
-              ? "motion-safe:animate-[var(--animate-brand-step)]"
-              : "motion-safe:group-hover:animate-[var(--animate-brand-dance)]",
+            loading && "motion-safe:animate-[var(--animate-brand-peck)]",
           )}
         >
-          {/* Innermost: the peck, timed to land in the walk's pauses. Each
-              layer owns one `transform` animation — they'd overwrite each
-              other if combined on a single element. */}
-          <span
-            className={cn(
-              "inline-flex h-full w-full items-center justify-center",
-              loading && "motion-safe:animate-[var(--animate-brand-peck)]",
-            )}
-          >
-            <img
-              src={henLogo}
-              alt=""
-              aria-hidden="true"
-              draggable={false}
-              className="h-full w-full select-none object-contain"
-            />
-          </span>
+          <img
+            src={henLogo}
+            alt=""
+            aria-hidden="true"
+            draggable={false}
+            className="h-full w-full select-none object-contain"
+          />
         </span>
       </span>
     </span>
@@ -121,7 +92,6 @@ function BrandGlyph({ loading, compact }: { loading: boolean; compact: boolean }
 }
 
 export function BrandRefreshButton({
-  children,
   ariaLabel,
   compact = false,
   loading = false,
@@ -129,50 +99,42 @@ export function BrandRefreshButton({
   size,
   ...rest
 }: BrandRefreshButtonProps) {
-  const label = children === undefined ? "Refresh" : children;
-  const iconOnly = compact || !label;
   const name = ariaLabel ?? "Refresh data";
 
   return (
     <Button
       {...rest}
-      // `loading` is handled here (the brand glyph IS the loading indicator),
+      // `loading` is handled here (the dancing hen IS the loading indicator),
       // so the generic spinner is suppressed and only the guard is kept.
       loading={false}
       aria-busy={loading || undefined}
       disabled={rest.disabled || loading}
       variant="custom"
-      // Compact by default: "sm" (h-8) keeps the control small and neat next
-      // to the autosave pill. Callers can still pass an explicit size.
-      size={compact ? "xs" : (size ?? "sm")}
-      iconOnly={iconOnly}
-      aria-label={iconOnly ? name : ariaLabel}
-      title={iconOnly ? name : rest.title}
+      // Always icon-only: the hen alone fills the circle, so there is no room
+      // for a text label. The accessible name carries the meaning instead.
+      iconOnly
+      size={compact ? "sm" : (size ?? "md")}
+      aria-label={name}
+      title={rest.title ?? "Refresh"}
       className={cn(
         "group",
-        // --- Emerald "light" ------------------------------------------------
-        // A soft emerald→teal gradient rather than a flat tint: enough depth to
-        // feel deliberate, while staying clearly secondary to the solid emerald
-        // Save button beside it.
+        // --- Round emerald control ------------------------------------------
+        // A circle rather than the usual rounded rectangle: it frames the hen
+        // like a badge and reads instantly as "the refresh control".
+        "!rounded-full",
         "border border-emerald-300/80 bg-gradient-to-b from-emerald-50 to-teal-100/80",
         "text-emerald-800 shadow-xs",
         "hover:border-emerald-400 hover:from-emerald-100 hover:to-teal-200/80",
-        "hover:text-emerald-900",
         "active:from-emerald-200 active:to-teal-200",
         "disabled:border-emerald-100 disabled:from-emerald-50/50 disabled:to-emerald-50/50",
-        "disabled:text-emerald-400 disabled:shadow-none",
-        // While refreshing the surface tints a touch deeper, so the whole
-        // control — not just the glyph — reads as busy.
+        "disabled:shadow-none",
+        // While refreshing the ring tints deeper, so the control reads as busy
+        // even at a glance.
         loading && "border-emerald-400 from-emerald-100 to-teal-200/90",
-        // Tighter gap than the button default: the hen's walking track already
-        // carries its own trailing space, so the stock gap looks like a gap.
-        !iconOnly && "gap-1 pl-2 pr-2.5",
         className,
       )}
       icon={<BrandGlyph loading={loading} compact={compact} />}
-    >
-      {iconOnly ? undefined : label}
-    </Button>
+    />
   );
 }
 
