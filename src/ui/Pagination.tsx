@@ -44,6 +44,7 @@ import { useContext, useEffect, useRef, type KeyboardEvent as ReactKeyboardEvent
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { I18nContext } from "../i18n/context";
 import { cn } from "../utils/cn";
+import MasterDropdown from "../modules/masters/components/MasterDropdown";
 import {
   clampPage,
   computeTotalPages,
@@ -52,12 +53,10 @@ import {
 } from "../shared/ui/paginationStyles";
 import {
   PAGINATION_PAGE_SIZE_OPTIONS,
-  uiFocusRing,
   uiPaginationBarClass,
   uiPaginationEllipsisClass,
   uiPaginationNavButtonClass,
   uiPaginationPageButtonClass,
-  uiPaginationSizeSelectClass,
   uiPaginationSummaryClass,
 } from "../shared/ui/uiTokens";
 
@@ -148,25 +147,21 @@ export function Pagination({
       ) : null}
 
       {onPageSizeChange ? (
-        <label className="mr-1 flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
-          <span className="hidden sm:inline">{t("common.rows", "Rows")}</span>
-          <select
-            value={pageSize}
-            disabled={disabled}
-            onChange={(event) => {
-              const next = Number(event.target.value);
+        <div className="mr-1 flex items-center gap-1.5">
+          <span className="hidden text-[11px] font-medium text-slate-500 sm:inline">{t("common.rows", "Rows")}</span>
+          <MasterDropdown
+            label={t("common.rows_per_page", "Rows per page")}
+            hideLabel
+            value={String(pageSize)}
+            options={PAGINATION_PAGE_SIZE_OPTIONS.map(size => ({ value: String(size), label: String(size) }))}
+            onChange={value => {
+              const next = Number(value);
               if (Number.isFinite(next) && next !== pageSize) onPageSizeChange(next);
             }}
-            className={cn(uiPaginationSizeSelectClass, uiFocusRing)}
-            aria-label={t("common.rows_per_page", "Rows per page")}
-          >
-            {PAGINATION_PAGE_SIZE_OPTIONS.map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </select>
-        </label>
+            disabled={disabled}
+            className="w-[76px] [&>button]:h-8 [&>button]:rounded-lg [&>button]:px-2 [&>button]:text-[11px]"
+          />
+        </div>
       ) : null}
 
       <nav
