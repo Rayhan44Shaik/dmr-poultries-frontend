@@ -1,6 +1,7 @@
 // src/modules/fleet-operations/pages/FleetPages.tsx
 
 import React, { lazy, Suspense, useEffect, useMemo, useState } from "react";
+import { retryableImport } from "../../../routes/lazyWithRetry";
 import { useLocation, useNavigate } from "react-router-dom";
 
 import {
@@ -21,12 +22,12 @@ import FleetTabSkeleton from "../components/common/FleetTabSkeleton";
  */
 
 const tabComponents: Record<VisibleFleetTab, React.LazyExoticComponent<React.ComponentType<{ embedded?: boolean; active?: boolean }>>> = {
-  entry: lazy(() => import("./MaintenanceEntryPage")),
-  history: lazy(() => import("./MaintenanceHistoryPage")),
-  permits: lazy(() => import("./DocumentsExpiryPage")),
-  emi: lazy(() => import("./EmiLoansPage")),
-  analytics: lazy(() => import("./VehicleAnalyticsPage")),
-  fastag: lazy(() => import("./FastagDashboardPage")),
+  entry: lazy(retryableImport(() => import("./MaintenanceEntryPage"))),
+  history: lazy(retryableImport(() => import("./MaintenanceHistoryPage"))),
+  permits: lazy(retryableImport(() => import("./DocumentsExpiryPage"))),
+  emi: lazy(retryableImport(() => import("./EmiLoansPage"))),
+  analytics: lazy(retryableImport(() => import("./VehicleAnalyticsPage"))),
+  fastag: lazy(retryableImport(() => import("./FastagDashboardPage"))),
 };
 
 function FleetPages() {

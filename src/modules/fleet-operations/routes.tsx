@@ -1,19 +1,20 @@
 import { lazy, Suspense } from 'react';
+import { retryableImport } from '../../routes/lazyWithRetry';
 import type { RouteObject } from 'react-router-dom';
 import LoadingSkeleton from './components/common/LoadingSkeleton';
 
 // Production Fleet routes + FASTAG static placeholder (no data fetch in that page).
-const MaintenanceEntryPage = lazy(() => import('./pages/MaintenanceEntryPage'));
-const MaintenanceHistoryPage = lazy(() => import('./pages/MaintenanceHistoryPage'));
-const DocumentsExpiryPage = lazy(() => import('./pages/DocumentsExpiryPage'));
-const FastagDashboardPage = lazy(() => import('./pages/FastagDashboardPage'));
-const EmiLoansPage = lazy(() => import('./pages/EmiLoansPage'));
-const VehicleAnalyticsPage = lazy(() => import('./pages/VehicleAnalyticsPage'));
+const MaintenanceEntryPage = lazy(retryableImport(() => import('./pages/MaintenanceEntryPage')));
+const MaintenanceHistoryPage = lazy(retryableImport(() => import('./pages/MaintenanceHistoryPage')));
+const DocumentsExpiryPage = lazy(retryableImport(() => import('./pages/DocumentsExpiryPage')));
+const FastagDashboardPage = lazy(retryableImport(() => import('./pages/FastagDashboardPage')));
+const EmiLoansPage = lazy(retryableImport(() => import('./pages/EmiLoansPage')));
+const VehicleAnalyticsPage = lazy(retryableImport(() => import('./pages/VehicleAnalyticsPage')));
 
 // DEFERRED / FUTURE WORK — page files preserved; not registered in active routes:
-// const FleetDashboardPage = lazy(() => import('./pages/FleetDashboardPage'));
-// const VehicleReportsPage = lazy(() => import('./pages/VehicleReportsPage'));
-// const VehicleExpenseReportPage = lazy(() => import('./pages/VehicleExpenseReportPage'));
+// const FleetDashboardPage = lazy(retryableImport(() => import('./pages/FleetDashboardPage')));
+// const VehicleReportsPage = lazy(retryableImport(() => import('./pages/VehicleReportsPage')));
+// const VehicleExpenseReportPage = lazy(retryableImport(() => import('./pages/VehicleExpenseReportPage')));
 
 // Wrap with Suspense – now accepts any component type
 const withSuspense = (Component: React.ComponentType<any>) => (
