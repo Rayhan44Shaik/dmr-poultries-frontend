@@ -4,8 +4,10 @@
  * =============================================================================
  * ONE refresh treatment for the whole application:
  *
- *   • Emerald pill   — a soft rounded-full capsule holding the hen and the
- *     word "Refresh".
+ *   • Orange pill    — a soft rounded-full capsule holding the hen and the
+ *     word "Refresh". Deliberately orange rather than the app's usual emerald,
+ *     so refresh is distinguishable at a glance from Save / Export / Import.
+ *     Orange is otherwise unclaimed: rose is destructive, amber is warning.
  *   • Brand logo     — the DMR hen replaces the generic RefreshCw glyph, so the
  *     control is unmistakably ours.
  *   • Logo animation — the hen itself IS the animation: while `loading` it
@@ -124,19 +126,22 @@ export function BrandRefreshButton({
       title={iconOnly ? name : rest.title}
       className={cn(
         "group",
-        // --- Emerald pill ----------------------------------------------------
-        // Rounded-full so the hen and the label sit in one soft capsule.
+        // --- Orange pill -----------------------------------------------------
+        // Deliberately NOT emerald: the app is emerald throughout (Save, Excel,
+        // Import, focus rings), so refresh was disappearing into the palette.
+        // Orange is unclaimed — rose means destructive and amber means warning,
+        // so it stands out without colliding with an existing meaning.
         "!rounded-full",
-        "border border-emerald-300/80 bg-gradient-to-b from-emerald-50 to-teal-100/80",
-        "text-emerald-800 shadow-xs",
-        "hover:border-emerald-400 hover:from-emerald-100 hover:to-teal-200/80",
-        "hover:text-emerald-900",
-        "active:from-emerald-200 active:to-teal-200",
-        "disabled:border-emerald-100 disabled:from-emerald-50/50 disabled:to-emerald-50/50",
-        "disabled:text-emerald-400 disabled:shadow-none",
+        "border border-orange-300 bg-gradient-to-b from-orange-50 to-amber-100/80",
+        "text-orange-800 shadow-xs",
+        "hover:border-orange-400 hover:from-orange-100 hover:to-amber-200/80",
+        "hover:text-orange-900",
+        "active:from-orange-200 active:to-amber-200",
+        "disabled:border-orange-100 disabled:from-orange-50/50 disabled:to-orange-50/50",
+        "disabled:text-orange-400 disabled:shadow-none",
         // While refreshing the surface tints deeper, so the whole control reads
         // as busy, not just the hen.
-        loading && "border-emerald-400 from-emerald-100 to-teal-200/90",
+        loading && "border-orange-400 from-orange-100 to-amber-200/90",
         !iconOnly && "gap-1.5 pl-2 pr-3",
         className,
       )}
