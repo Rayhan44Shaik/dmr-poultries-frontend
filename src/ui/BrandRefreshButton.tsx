@@ -7,12 +7,15 @@
  *   • Emerald light  — the same emerald the design system already uses for
  *     "safe, reversible, positive" actions (Excel / Import / focus rings), so
  *     refresh reads as part of the family instead of a new colour. A soft
- *     emerald tint + ring at rest, deepening on hover.
+ *     emerald→teal gradient with a ring at rest, deepening on hover, and
+ *     lighting up further while refreshing.
  *   • Brand logo     — the DMR hen replaces the generic RefreshCw glyph, so the
  *     control is unmistakably ours.
- *   • Logo animation — while `loading`, the hen hops and an emerald halo
- *     breathes behind it (`--animate-brand-hop` / `--animate-brand-pulse` in
- *     styles/tokens.css). At rest the hen lifts gently on hover.
+ *   • Logo animation — while `loading`, four cues stack so the activity is
+ *     obvious at a glance: an expanding ripple, a breathing halo, a sweeping
+ *     orbit arc, and the hen hopping (crouch → launch → land squash).
+ *     See `--animate-brand-*` in styles/tokens.css. At rest the hen lifts and
+ *     tilts on hover.
  *
  * USAGE (identical everywhere — do not hand-roll a refresh button again):
  *
@@ -48,22 +51,42 @@ export interface BrandRefreshButtonProps
   compact?: boolean;
 }
 
-/** The animated brand glyph: hopping hen over a breathing emerald halo. */
+/**
+ * The animated brand glyph. While loading, FOUR cues stack so the activity is
+ * impossible to miss even though the glyph is only ~18px:
+ *   1. an expanding ripple ring,      2. a breathing emerald halo,
+ *   3. a sweeping emerald orbit arc,  4. the hen itself hopping.
+ * At rest the hen simply lifts on hover.
+ */
 function BrandGlyph({ loading, compact }: { loading: boolean; compact: boolean }) {
-  const box = compact ? "size-4" : "size-[18px]";
+  const box = compact ? "size-[18px]" : "size-[22px]";
   return (
-    <span className={cn("relative inline-flex items-center justify-center", box)}>
-      {/* Emerald halo — only rendered while loading so the resting state stays
-          quiet and the row keeps its usual visual weight. */}
+    <span className={cn("relative inline-flex shrink-0 items-center justify-center", box)}>
       {loading && (
-        <span
-          aria-hidden="true"
-          className={cn(
-            "absolute inset-0 rounded-full bg-emerald-400/35",
-            "motion-safe:animate-[var(--animate-brand-pulse)]",
-          )}
-        />
+        <>
+          {/* 1. Ripple — expands and fades outward, reads from a distance. */}
+          <span
+            aria-hidden="true"
+            className="absolute -inset-1 rounded-full border-2 border-emerald-500/60 motion-safe:animate-[var(--animate-brand-ripple)]"
+          />
+          {/* 2. Halo — soft breathing fill behind the hen. */}
+          <span
+            aria-hidden="true"
+            className="absolute -inset-0.5 rounded-full bg-emerald-400/45 blur-[1px] motion-safe:animate-[var(--animate-brand-pulse)]"
+          />
+          {/* 3. Orbit — a single emerald arc sweeping around the glyph. The
+                 transparent sides turn the ring into a chasing arc. */}
+          <span
+            aria-hidden="true"
+            className={cn(
+              "absolute -inset-1 rounded-full border-2",
+              "border-emerald-600 border-r-transparent border-b-transparent",
+              "motion-safe:animate-[var(--animate-brand-orbit)]",
+            )}
+          />
+        </>
       )}
+      {/* 4. The hen — hero of the animation, hopping on the spot. */}
       <img
         src={henLogo}
         alt=""
@@ -71,10 +94,9 @@ function BrandGlyph({ loading, compact }: { loading: boolean; compact: boolean }
         draggable={false}
         className={cn(
           "relative h-full w-full select-none object-contain",
-          // Hops while refreshing; a gentle lift on hover at rest.
           loading
-            ? "motion-safe:animate-[var(--animate-brand-hop)]"
-            : "transition-transform duration-150 group-hover:-translate-y-px",
+            ? "motion-safe:animate-[var(--animate-brand-hop)] drop-shadow-[0_1px_2px_rgb(5_150_105_/_0.45)]"
+            : "transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:rotate-3 group-active:translate-y-0",
         )}
       />
     </span>
@@ -108,13 +130,23 @@ export function BrandRefreshButton({
       aria-label={iconOnly ? name : ariaLabel}
       title={iconOnly ? name : rest.title}
       className={cn(
-        "group",
-        // Emerald "light": soft tinted surface + ring, deepening on hover.
-        "border border-emerald-200 bg-emerald-50/70 text-emerald-700 shadow-xs",
-        "hover:bg-emerald-100 hover:border-emerald-300 hover:text-emerald-800",
-        "active:bg-emerald-200/70",
-        "disabled:border-emerald-100 disabled:bg-emerald-50/50 disabled:text-emerald-400",
-        !compact && "px-3",
+        "group relative overflow-hidden",
+        // --- Emerald "light" ------------------------------------------------
+        // A gradient from emerald into teal rather than a flat tint: it gives
+        // the control depth, keeps it clearly secondary to the solid emerald
+        // Save button, and stays legible on both white and slate-50 surfaces.
+        "border border-emerald-300/80 bg-gradient-to-b from-emerald-50 to-teal-100/80",
+        "font-semibold text-emerald-800 shadow-sm ring-1 ring-emerald-500/10",
+        "transition-all duration-200",
+        "hover:border-emerald-400 hover:from-emerald-100 hover:to-teal-200/80",
+        "hover:text-emerald-900 hover:shadow-md hover:ring-emerald-500/25",
+        "active:from-emerald-200 active:to-teal-200 active:shadow-sm",
+        "disabled:border-emerald-100 disabled:from-emerald-50/50 disabled:to-emerald-50/50",
+        "disabled:text-emerald-400 disabled:shadow-none",
+        // While refreshing the surface itself lights up, so the whole control
+        // — not just the 22px glyph — signals that work is in flight.
+        loading && "border-emerald-400 from-emerald-100 to-teal-200/90 ring-2 ring-emerald-400/30",
+        !compact && "px-3.5",
         className,
       )}
       icon={<BrandGlyph loading={loading} compact={compact} />}
