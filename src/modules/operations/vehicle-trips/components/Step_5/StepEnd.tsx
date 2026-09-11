@@ -88,7 +88,10 @@ interface Props {
   submitStartStep?: (data: Partial<Trip>) => boolean | Promise<boolean>;
   editable?: boolean;
   canEdit?: boolean;
+  /** Bottom Cancel → leave wizard / Create New Trip. */
   onCancel?: () => void;
+  /** Close while editing → locked submitted view. */
+  onExitEdit?: () => void;
   clearForm?: () => void;
 }
 
@@ -98,15 +101,20 @@ export default function StepEnd({
   submitExpensesStep,
   saveEndProgress,
   submitStartStep,
-  editable: _editable = false,
+  editable = false,
   canEdit = true,
   onCancel,
+  onExitEdit,
   clearForm,
 }: Props) {
   const { t } = useI18n();
   // ─── State ─────────────────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLocalEditing, setIsLocalEditing] = useState(false);
+  // Parent `editable` (Recent Edit / step edit) opens the form immediately.
+  const [isLocalEditing, setIsLocalEditing] = useState(Boolean(editable));
+  useEffect(() => {
+    if (editable) setIsLocalEditing(true);
+  }, [editable, trip.id]);
   const [errorMsg, setErrorMsg] = useState("");
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" | "info" } | null>(null);
   const [confirmation, setConfirmation] = useState<{
@@ -612,21 +620,26 @@ export default function StepEnd({
     }
   };
 
-  const handleCloseView = () => {
-    if (isLocalEditing) {
-      setIsLocalEditing(false);
-      setToast({ message: t("ops.trip.edit_cancelled"), type: "info" });
-      // Discard the in-progress edits of this SUBMITTED step: the parent
-      // reverts the working copy to the last saved trip and remounts Step 5.
-      onCancel?.();
+  /** Close (while editing submitted) → locked submitted view. */
+  const handleExitToLocked = () => {
+    setIsLocalEditing(false);
+    setToast({ message: t("ops.trip.edit_cancelled"), type: "info" });
+    if (onExitEdit) {
+      onExitEdit();
       return;
     }
-    // Cancel active wizard — discard unsaved Step 5 only.
-    if (clearForm) {
-      clearForm();
-      return;
-    }
+    // Fallback discard without leaving the trip.
     onCancel?.();
+  };
+
+  /** Bottom Cancel → leave wizard / Create New Trip. */
+  const handleCloseView = () => {
+    setIsLocalEditing(false);
+    if (onCancel) {
+      onCancel();
+      return;
+    }
+    clearForm?.();
   };
 
   // ─── Render ──────────────────────────────────────────────────────
@@ -665,7 +678,7 @@ export default function StepEnd({
                 </button>
               )}
               {/* Close only when used as the Trip Entry wizard (not Recent view embed). */}
-              {canEdit && clearForm ? <StepCloseButton onClose={clearForm} /> : null}
+              {canEdit ? <StepCloseButton onClose={clearForm || onCancel} /> : null}
               <span className="bg-emerald-50 border border-emerald-200 text-emerald-700 px-2.5 py-1 rounded-full text-[11px] font-semibold whitespace-nowrap">
                 {t("ops.trip.submitted_locked")}
               </span>
@@ -752,6 +765,10 @@ export default function StepEnd({
               <TripNoBadge tripNo={trip.tripNo} />
             </div>
             <div className="flex items-center gap-2">
+              {/* Close → locked submitted view (when already submitted). */}
+              {isSubmitted ? (
+                <StepCloseButton onClose={handleExitToLocked} />
+              ) : null}
               <span className="text-[11px] text-slate-700 font-medium bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200 whitespace-nowrap">{t("ops.trip.editable_view")}</span>
             </div>
           </div>

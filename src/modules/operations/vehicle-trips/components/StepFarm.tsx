@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { Clock, MapPin, Gauge, Store, Ticket, MessageSquare, Loader2, Scale, Pencil, Layers } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { StepCloseButton, WizardActionBar, WizardStepNotice } from "./WizardStepUI";
@@ -26,7 +26,10 @@ interface Props {
   birdTypes: any[];
   editable?: boolean;
   canEdit?: boolean;
+  /** Bottom Cancel → leave wizard / Create New Trip. */
   onCancel?: () => void;
+  /** Header Close while editing → locked submitted view. */
+  onExitEdit?: () => void;
   /** Close the whole Trip Entry editor (no data change). */
   clearForm?: () => void;
   showNotification?: (message: string, type?: "info" | "success" | "error" | "warning") => void;
@@ -48,12 +51,16 @@ export default function StepFarm({
   editable = false,
   canEdit = false,
   onCancel,
+  onExitEdit,
   clearForm,
   showNotification,
 }: Props) {
   const { t } = useI18n();
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLocalEditing, setIsLocalEditing] = useState(false);
+  const [isLocalEditing, setIsLocalEditing] = useState(Boolean(editable));
+  useEffect(() => {
+    if (editable) setIsLocalEditing(true);
+  }, [editable, trip.id]);
   const [destMeterError, setDestMeterError] = useState<string | null>(null);
   const [isFetchingLocation, setIsFetchingLocation] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" } | null>(null);
@@ -224,7 +231,7 @@ export default function StepFarm({
                 <Pencil size={14} />
               </button>
             )}
-            <StepCloseButton onClose={clearForm} />
+            <StepCloseButton onClose={clearForm || onCancel} />
             <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
               {t("ops.trip.submitted_locked")}
             </span>
@@ -526,23 +533,36 @@ export default function StepFarm({
           notice={toast ? { type: toast.type === "warning" ? "info" : toast.type, message: toast.message } : null}
           dirty={hasUnsavedChanges}
         />
-        <WizardActionBar
-          onCancel={() => {
-            // Cancel = discard unsaved edits. The parent reverts the working
-            // copy to the last saved trip and remounts this step, so exiting
-            // local-edit mode here is enough; we must still call onCancel so a
-            // pencil-edit of a SUBMITTED step drops the in-progress changes
-            // (e.g. a re-picked Bird Type) instead of leaving them in state.
-            setIsLocalEditing(false);
-            onCancel?.();
-          }}
-          onSave={saveFarmProgress ? handleSaveProgress : undefined}
-          onSubmit={handleSubmit}
-          busy={isSubmitting}
-          saveDisabled={!hasUnsavedChanges}
-          submitDisabled={!!destMeterError}
-          submitLabel={trip.farmStepSubmitted ? "ops.trip.update_farm_details" : "ops.trip.submit_farm_details"}
-        />
+        <div className="flex items-center justify-between gap-2 flex-wrap">
+          {/* Close while editing submitted step → locked view (not full exit). */}
+          {trip.farmStepSubmitted && (editable || isLocalEditing) ? (
+            <button
+              type="button"
+              onClick={() => {
+                setIsLocalEditing(false);
+                onExitEdit?.();
+              }}
+              className="h-10 px-4 rounded-xl border border-slate-200 bg-white text-slate-600 text-[13px] font-semibold hover:bg-slate-50"
+            >
+              {t("common.close")}
+            </button>
+          ) : (
+            <span />
+          )}
+          <WizardActionBar
+            onCancel={() => {
+              // Cancel → leave wizard entirely (Create New Trip).
+              setIsLocalEditing(false);
+              onCancel?.();
+            }}
+            onSave={saveFarmProgress ? handleSaveProgress : undefined}
+            onSubmit={handleSubmit}
+            busy={isSubmitting}
+            saveDisabled={!hasUnsavedChanges}
+            submitDisabled={!!destMeterError}
+            submitLabel={trip.farmStepSubmitted ? "ops.trip.update_farm_details" : "ops.trip.submit_farm_details"}
+          />
+        </div>
       </div>
     </>
   );

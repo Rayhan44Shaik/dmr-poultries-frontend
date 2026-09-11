@@ -24,7 +24,10 @@ interface Props {
   readOnly?: boolean;
   editable?: boolean;
   canEdit?: boolean;
+  /** Bottom Cancel → leave wizard / Create New Trip. */
   onCancel?: () => void;
+  /** Close while editing → locked submitted view. */
+  onExitEdit?: () => void;
   boxDetails?: BoxDetail[];
   persistedDeliveries?: ShopDelivery[];
 }
@@ -42,14 +45,18 @@ export default function StepDeliveries({
   readOnly: _readOnly = false,
   editable = false,
   canEdit = true,
-  onCancel: _onCancel,
+  onCancel,
+  onExitEdit,
   boxDetails = [],
   persistedDeliveries,
 }: Props) {
   const { t } = useI18n();
 
-  // Step-level edit mode
-  const [isStepEditing, setIsStepEditing] = useState(false);
+  // Step-level edit mode (parent `editable` opens edit immediately)
+  const [isStepEditing, setIsStepEditing] = useState(Boolean(editable));
+  React.useEffect(() => {
+    if (editable) setIsStepEditing(true);
+  }, [editable, trip.id]);
 
   // Shop-level edit mode
   const [editingShopId, setEditingShopId] = useState<string | number | null>(null);
@@ -78,17 +85,29 @@ export default function StepDeliveries({
   };
 
   const handleCancelStepEdit = () => {
-    // Lightweight: exit step-edit / shop-edit mode only. This runs as part of
-    // the normal per-shop save flow (Step_4 index.closeForm() calls
-    // onCancelEdit after every successful shop save), so it MUST NOT discard
-    // `rows` — a per-shop save writes straight to the parent working copy and
-    // is persisted by "Save Progress" / Submit. Unsaved shop-form input is
-    // discarded by the shop form's own Cancel (form-local state).
-    setIsStepEditing(false);
+    // Lightweight: exit shop-form only (called after per-shop save). Must NOT
+    // discard rows or leave the trip wizard.
     setEditingShopId(null);
   };
 
+  /** Close while editing a submitted step → locked submitted view. */
+  const handleExitToLocked = () => {
+    setIsStepEditing(false);
+    setEditingShopId(null);
+    if (onExitEdit) {
+      onExitEdit();
+      return;
+    }
+  };
+
+  /** Bottom Cancel / leave wizard → Create New Trip landing. */
   const handleCancelWizard = () => {
+    setIsStepEditing(false);
+    setEditingShopId(null);
+    if (onCancel) {
+      onCancel();
+      return;
+    }
     clearForm();
   };
 
@@ -146,10 +165,16 @@ export default function StepDeliveries({
                 <Lock size={12} className="text-slate-500" /> {t("ops.trip.submitted_locked")}
               </span>
             </div>
-          ) : trip.deliveryStepSubmitted || editingShopId ? (
-            <span className="text-xs text-blue-700 font-semibold bg-blue-50 px-3 py-1 rounded-full border border-blue-200 whitespace-nowrap">
-              {editingShopId ? t("ops.trip.editing_shop_details") : t("ops.trip.step_unlocked")}
-            </span>
+          ) : trip.deliveryStepSubmitted || editingShopId || isStepEditing ? (
+            <div className="flex items-center gap-2">
+              {/* Close → back to locked submitted (not full exit). */}
+              {trip.deliveryStepSubmitted ? (
+                <StepCloseButton onClose={handleExitToLocked} />
+              ) : null}
+              <span className="text-xs text-blue-700 font-semibold bg-blue-50 px-3 py-1 rounded-full border border-blue-200 whitespace-nowrap">
+                {editingShopId ? t("ops.trip.editing_shop_details") : t("ops.trip.step_unlocked")}
+              </span>
+            </div>
           ) : null}
         </div>
       </div>

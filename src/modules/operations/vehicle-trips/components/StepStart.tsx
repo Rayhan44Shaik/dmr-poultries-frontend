@@ -53,7 +53,10 @@ interface Props {
   employeeOptions: EmployeeOption[];
   editable?: boolean;
   canEdit?: boolean;
+  /** Bottom Cancel → leave wizard / Create New Trip. */
   onCancel?: () => void;
+  /** Header Close while editing a submitted step → back to locked view. */
+  onExitEdit?: () => void;
   clearForm?: () => void;
   headerLoading?: boolean;
   subscribeHeaderSaveStatus: (listener: () => void) => () => void;
@@ -546,6 +549,7 @@ function StepStart({
   editable = false,
   canEdit = false,
   onCancel,
+  onExitEdit,
   clearForm,
   headerLoading = false,
   subscribeHeaderSaveStatus: _subscribeHeaderSaveStatus,
@@ -554,7 +558,10 @@ function StepStart({
   const { t } = useI18n();
   const [form, setForm] = useState<Step1FormState>(() => tripToForm(loadSnapshot));
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isLocalEditing, setIsLocalEditing] = useState(false);
+  const [isLocalEditing, setIsLocalEditing] = useState(Boolean(editable));
+  useEffect(() => {
+    if (editable) setIsLocalEditing(true);
+  }, [editable, tripId]);
   const [showErrors, setShowErrors] = useState(false);
   const [notice, setNotice] = useState<WizardNoticeState>(null);
   const [latestMeter, setLatestMeter] = useState<{
@@ -745,18 +752,26 @@ function StepStart({
     event.preventDefault();
   }, []);
 
+  /** Bottom Cancel → always leave wizard (Create New Trip). */
   const handleCancelEdit = useCallback(() => {
-    if (!startStepSubmitted && clearForm) {
-      // Brand-new trip, nothing persisted → close the editor.
-      clearForm();
+    setIsLocalEditing(false);
+    if (onCancel) {
+      onCancel();
       return;
     }
-    // Editing a submitted Step 1: discard unsaved edits. The parent reverts the
-    // working copy to the last saved trip and remounts this step (the local
-    // `form` re-hydrates from the restored snapshot).
+    clearForm?.();
+  }, [onCancel, clearForm]);
+
+  /** Header Close while editing submitted step → locked submitted view. */
+  const handleExitToLocked = useCallback(() => {
     setIsLocalEditing(false);
+    if (onExitEdit) {
+      onExitEdit();
+      return;
+    }
+    // Fallback: discard local edits only.
     onCancel?.();
-  }, [startStepSubmitted, clearForm, onCancel]);
+  }, [onExitEdit, onCancel]);
 
   const inputsLocked = headerLoading || isSubmitting;
   const submitLabel = startStepSubmitted
@@ -834,7 +849,7 @@ function StepStart({
                 <Pencil size={14} />
               </button>
             )}
-            <StepCloseButton onClose={clearForm} />
+            <StepCloseButton onClose={clearForm || onCancel} />
             <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
               {t("ops.trip.submitted_locked")}
             </span>
@@ -943,9 +958,15 @@ function StepStart({
             {/* Part E: no top-right X in first-submit / Edit mode — the bottom
                 action bar Cancel is the only cancel affordance. */}
             {((editable && startStepSubmitted) || isLocalEditing) && (
-              <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
-                {t("ops.trip.editable_view")}
-              </span>
+              <>
+                {/* Close → exit edit, stay on locked submitted view */}
+                {startStepSubmitted ? (
+                  <StepCloseButton onClose={handleExitToLocked} />
+                ) : null}
+                <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
+                  {t("ops.trip.editable_view")}
+                </span>
+              </>
             )}
           </div>
         </div>
@@ -1037,6 +1058,7 @@ function areStepStartPropsEqual(prev: Props, next: Props): boolean {
     prev.submitStartStep === next.submitStartStep &&
     prev.hasUnsavedChanges === next.hasUnsavedChanges &&
     prev.onCancel === next.onCancel &&
+    prev.onExitEdit === next.onExitEdit &&
     prev.clearForm === next.clearForm &&
     prev.subscribeHeaderSaveStatus === next.subscribeHeaderSaveStatus &&
     prev.getHeaderSaveStatus === next.getHeaderSaveStatus &&
