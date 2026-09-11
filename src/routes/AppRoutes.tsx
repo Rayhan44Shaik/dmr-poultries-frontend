@@ -1,14 +1,10 @@
 import React, { Suspense } from "react";
-import { Routes, Route } from "react-router-dom";
+import { Navigate, Routes, Route } from "react-router-dom";
 import { useI18n } from "../i18n";
-
-// Auth — eager: the "/" route must paint as fast as possible.
-import LoginPage from "../modules/auth/LoginPage";
 
 /* ------------------------------------------------------------------ */
 /* Route-level code splitting                                          */
-/* Every page other than the login screen is a separate chunk, so the  */
-/* first paint (login) loads a tiny module graph and heavy pages are   */
+/* Each application page is a separate chunk, so heavy pages are       */
 /* fetched only when they are actually navigated to. The dashboard     */
 /* shell (sidebar/header) is also deferred: it is part of the lazy     */
 /* route chunk, so the login page never pulls in the app shell or any  */
@@ -52,7 +48,6 @@ const pages = {
   staff: React.lazy(lazyShell(() => import("../modules/staff/pages/StaffPages"))),
   reports: React.lazy(lazyShell(() => import("../modules/reports/pages/ReportsDashboardPage"))),
   settings: React.lazy(lazyShell(() => import("../modules/settings/pages/SettingsPage"))),
-  supervisorMobile: React.lazy(() => import("../modules/supervisor-mobile/pages/SupervisorMobilePage")),
 };
 
 function PageLoading() {
@@ -85,15 +80,14 @@ function NotFoundPage() {
 function AppRoutes() {
   return (
     <Routes>
-      {/* Auth - No Layout */}
-      <Route path="/" element={<LoginPage />} />
+      <Route path="/" element={<Navigate to="/dashboard" replace />} />
 
       {/* ============ SUPERVISOR MOBILE — Trip Entry Steps 1–5 only ============ */}
       <Route
         path="/mobile"
         element={
           <Suspense fallback={<PageLoading />}>
-            <pages.supervisorMobile />
+            <Navigate to="/operations" replace />
           </Suspense>
         }
       />
@@ -101,7 +95,7 @@ function AppRoutes() {
         path="/mobile/trips"
         element={
           <Suspense fallback={<PageLoading />}>
-            <pages.supervisorMobile />
+            <Navigate to="/operations" replace />
           </Suspense>
         }
       />

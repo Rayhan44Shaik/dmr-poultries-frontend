@@ -8,14 +8,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { LucideIcon } from "lucide-react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import {
   Bell,
   Check,
   ChevronDown,
   ChevronRight,
   Clock3,
-  LogOut,
   Menu,
   Moon,
   Plus,
@@ -28,7 +27,6 @@ import {
 } from "lucide-react";
 import { QUICK_ACTIONS, resolveRoute } from "../../routes/navigation";
 import { useTheme } from "../../providers/ThemeProvider";
-import { useAuth } from "../../providers/authContext";
 import { useI18n } from "../../i18n";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { getPendingCollectionSnapshot, subscribePendingCollectionSnapshot } from "../../modules/operations/collections/services/collectionSnapshot";
@@ -140,9 +138,7 @@ function IconButton({
 /* ------------------------------------------------------------------ */
 function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
   const location = useLocation();
-  const navigate = useNavigate();
   const { theme, toggleTheme } = useTheme();
-  const { logout } = useAuth();
   const { language, t } = useI18n();
 
   const route = useMemo(() => resolveRoute(location.pathname + location.search), [location.pathname, location.search]);
@@ -265,10 +261,6 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
   const title = route.page?.labelKey ? t(route.page.labelKey) : (route.page?.label ?? route.section?.label ?? "");
   const sectionLabel = route.section?.labelKey ? t(route.section.labelKey) : route.section?.label;
 
-  const handleSignOut = () => {
-    logout();
-    navigate("/");
-  };
 
   return (
     <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-2 border-b border-slate-200/80 bg-white/85 px-4 backdrop-blur-md sm:gap-3 sm:px-6 dark:border-slate-800 dark:bg-slate-900/85">
@@ -276,7 +268,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
       <button
         type="button"
         onClick={onMenuClick}
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors lg:hidden ${
           menuOpen
             ? "bg-slate-200/80 text-slate-900 dark:bg-slate-700/80 dark:text-white"
             : "text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
@@ -496,16 +488,6 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
             >
               <Settings size={15} /> {t("header.settings")}
             </Link>
-            <button
-              type="button"
-              onClick={() => {
-                close();
-                handleSignOut();
-              }}
-              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium text-rose-600 transition-colors hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
-            >
-              <LogOut size={15} /> {t("header.signOut")}
-            </button>
           </div>
         )}
       </Dropdown>

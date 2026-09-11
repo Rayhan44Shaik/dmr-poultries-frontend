@@ -9,15 +9,12 @@ import {
   handleApiError,
 } from "../../services/tripHeaderApiService";
 import type { Trip } from "../../types/trip";
-<<<<<<< HEAD
-=======
 import {
   isMeterInvalid,
   collectDieselMeterSlots,
   findMeterChainIssues,
   findLaterBillsBelow,
 } from "../../utils/meterValidation";
->>>>>>> 8e0ca012cdb27892d607b222770a0b7ccde23bf4
 import { GpsAddressText } from "../GpsAddressText";
 import { BillPreviewLink } from "./BillPreviewLink";
 import { usePendingDelete } from "../../../../../hooks/usePendingDelete";
@@ -107,10 +104,7 @@ export default function DieselExpensesTable({
   const [isFetchingGPS, setIsFetchingGPS] = useState<{ [key: number]: boolean }>({});
   const [busyRow, setBusyRow] = useState<number | null>(null);
   const [editingRow, setEditingRow] = useState<number | null>(null);
-<<<<<<< HEAD
-=======
   const [, setIsEditingSubmitted] = useState(false);
->>>>>>> 8e0ca012cdb27892d607b222770a0b7ccde23bf4
   const [draftData, setDraftData] = useState<Record<string, any>>({});
   const [rowIndices, setRowIndices] = useState<number[]>([1]);
   const [draftClientKey, setDraftClientKey] = useState<string>(() =>

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useAuth } from '../../../providers/authContext';
 import { VEHICLES_CHANGED_EVENT } from '../../masters/vehicles/services/vehicleService';
 import { hasPendingEmiRead, invalidateEmiRead, loadEmiSnapshot, type EmiSnapshot } from '../services/emiService';
 import { computeKpis, getEmiToday, msUntilNextEmiDay } from '../services/emiModel';
@@ -22,8 +21,7 @@ interface State {
  * There is no mutation, storage fallback, interval polling or automatic retry.
  */
 export function useEmiData(active = true) {
-  const { user } = useAuth();
-  const scope = user ?? null;
+  const scope = null;
   const [state, setState] = useState<State>({ scope, snapshot: null, phase: 'loading', error: null, notice: 'idle', noticeId: 0 });
   const mounted = useRef(false);
   const loadGen = useRef(0);

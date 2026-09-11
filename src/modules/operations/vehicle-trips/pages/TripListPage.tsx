@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import TripFilters from "../components/TripFilters";
 import TripKPICards from "../components/TripKPICards";
 import TripMasterTable from "../components/TripMasterTable";
-import TripViewModal from "../components/TripViewModal";
+import { TripHistoryViewModal } from "../components/TripViewModal";
 import {
   paginationBarClass,
   paginationNavBtnClass,
@@ -30,10 +30,6 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [totalTrips, setTotalTrips] = useState(0);
-<<<<<<< HEAD
-=======
-  const [, setIsLoading] = useState(false);
->>>>>>> 8e0ca012cdb27892d607b222770a0b7ccde23bf4
   const [search, setSearch] = useState("");
   const [vehicle, setVehicle] = useState("All Vehicles");
   const [supervisor, setSupervisor] = useState("All Supervisors");
@@ -79,10 +75,6 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     setCurrentPage(1);
   };
 
-<<<<<<< HEAD
-=======
-
->>>>>>> 8e0ca012cdb27892d607b222770a0b7ccde23bf4
   const [viewOpen, setViewOpen] = useState(false);
   const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
 
@@ -310,7 +302,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         )}
       </div>
 
-      <TripViewModal
+      <TripHistoryViewModal
         open={viewOpen}
         trip={selectedTrip}
         shops={shops}

@@ -47,6 +47,8 @@ interface Props {
    * completed trips / Step 1 otherwise. Farm Payment passes 1 (Step 2 —
    * Farm details) because the farm is what a payment reviewer needs first. */
   initialStep?: number;
+  /** Delivery communication state belongs to Trip History, not Recent Activity. */
+  showCommunicationStatus?: boolean;
 }
 
 /** No-op helpers so locked step components stay read-only in Recent view. */
@@ -162,7 +164,15 @@ function Step5View({ trip }: { trip: Trip }) {
 
 
 
-function TripViewModal({ open, trip, onClose, shops, birdTypes, initialStep }: Props) {
+function TripViewModal({
+  open,
+  trip,
+  onClose,
+  shops,
+  birdTypes,
+  initialStep,
+  showCommunicationStatus = true,
+}: Props) {
   const { t } = useI18n();
   // Completed trips open on Step 4 (Shop Deliveries); incomplete on Step 1.
   // A caller-provided initialStep wins (e.g. Farm Payment opens Step 2).
@@ -180,8 +190,8 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, initialStep }: P
     setViewStepIndex(initialViewStep(trip));
   }
 
-  const emailState = useTripDeliveryEmails(trip, shops);
-  const whatsappState = useTripDeliveryWhatsApps(trip, shops);
+  const emailState = useTripDeliveryEmails(trip, shops, { enabled: showCommunicationStatus });
+  const whatsappState = useTripDeliveryWhatsApps(trip, shops, { enabled: showCommunicationStatus });
 
   // ─── Early return – ensures trip is never null after this ─────
   if (!open || !trip) return null;
@@ -294,7 +304,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, initialStep }: P
           {isCompleted && (
             <div className="px-6 md:px-8 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-slate-100/50">
               <div className="flex items-center gap-3 flex-wrap">
-                {emailCounts.total > 0 && (
+                {showCommunicationStatus && emailCounts.total > 0 && (
                   <span className="inline-flex items-center gap-1.5 text-xs font-medium text-sky-500" role="status" aria-live="polite">
                     <Mail size={12} className="text-sky-500" />
                     {emailState.isBulkSending ? (
@@ -310,7 +320,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, initialStep }: P
                     )}
                   </span>
                 )}
-                {whatsappCounts.total > 0 && (
+                {showCommunicationStatus && whatsappCounts.total > 0 && (
                   <span className="inline-flex items-center gap-1.5 text-xs font-medium text-green-500" role="status" aria-live="polite">
                     <WhatsAppIcon size={12} className="text-green-500" />
                     {whatsappState.isBulkSending ? (
@@ -329,7 +339,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, initialStep }: P
               </div>
 
               <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
-                {emailCounts.total > 0 && (
+                {showCommunicationStatus && emailCounts.total > 0 && (
                   <button
                     type="button"
                     onClick={() => void emailState.sendAll()}
@@ -345,7 +355,7 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, initialStep }: P
                     {emailState.isBulkSending ? `${t("ops.trip.sending")}...` : t("ops.trip.send_all_email")}
                   </button>
                 )}
-                {whatsappCounts.total > 0 && (
+                {showCommunicationStatus && whatsappCounts.total > 0 && (
                   <button
                     type="button"
                     onClick={() => void whatsappState.sendAll()}
@@ -425,6 +435,16 @@ function TripViewModal({ open, trip, onClose, shops, birdTypes, initialStep }: P
       </div>
     </div>
   );
+}
+
+/** Recent Activity view: read-only Trip steps without communication counters. */
+export function RecentTripViewModal(props: Props) {
+  return <TripViewModal {...props} showCommunicationStatus={false} />;
+}
+
+/** Trip History/List view: includes email and WhatsApp delivery counters/actions. */
+export function TripHistoryViewModal(props: Props) {
+  return <TripViewModal {...props} showCommunicationStatus />;
 }
 
 export default React.memo(TripViewModal);

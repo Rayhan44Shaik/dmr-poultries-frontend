@@ -6,7 +6,7 @@ import { FileText, Plus } from "lucide-react";
 
 // --- Components ---
 import TripRecentTable from "../components/TripRecentTable";
-import TripViewModal from "../components/TripViewModal";
+import { RecentTripViewModal } from "../components/TripViewModal";
 import TripWizardStepper from "../components/TripWizardStepper";
 import { WizardStepNotice } from "../components/WizardStepUI";
 import StepStart from "../components/StepStart";
@@ -727,7 +727,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
         onStatusChange={handleStatusChange}
       />
 
-      <TripViewModal
+      <RecentTripViewModal
         key={viewTrip?.id ?? "closed"}
         trip={viewTrip}
         open={viewOpen}

@@ -101,7 +101,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   }, [open, pathname, search]);
 
   const navContent = (
-    <nav className="max-h-[min(60vh,460px)] overflow-y-auto px-3 py-4 scrollbar-none">
+    <nav className="max-h-[min(60vh,460px)] overflow-y-auto px-3 py-4 scrollbar-none lg:max-h-none">
       {NAV_SECTIONS.map((section) => {
         const SectionIcon = section.icon;
         return (
@@ -135,6 +135,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
                   <li key={child.label}>
                     <Link
                       to={child.path}
+                      onClick={onClose}
                       aria-current={active ? "page" : undefined}
                       className={`group relative flex items-center gap-2.5 rounded-lg py-2 pl-3.5 pr-3 text-[13.5px] transition-colors duration-150 ${
                         active
@@ -162,19 +163,32 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
     </nav>
   );
 
-  if (!open) return null;
-
   return (
     <>
-      {/* Invisible click-catcher: clicking anywhere outside the popup closes it. */}
-      <div className="fixed inset-0 z-40" onClick={onClose} aria-hidden="true" />
+      {/* Persistent desktop navigation. */}
+      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[260px] flex-col border-r border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:flex">
+        <div className="flex h-16 shrink-0 items-center border-b border-slate-200/80 px-4 dark:border-slate-800">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <BrandMark size="xs" variant="plain" />
+            <span className="truncate text-[13px] font-bold tracking-tight text-slate-900 dark:text-white">
+              DMR Poultries
+            </span>
+          </div>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">{navContent}</div>
+      </aside>
 
-      {/* Small navigation popup — anchored just below the menu button. */}
-      <div
-        role="dialog"
-        aria-modal="true"
-        className="fixed left-3 top-[72px] z-50 w-[300px] max-w-[calc(100vw-24px)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-pop animate-slide-down dark:border-slate-800 dark:bg-slate-900 sm:left-4"
-      >
+      {open && (
+        <>
+          {/* Mobile click-catcher: clicking outside closes the popup. */}
+          <div className="fixed inset-0 z-40 lg:hidden" onClick={onClose} aria-hidden="true" />
+
+          {/* Small-screen navigation popup. */}
+          <div
+            role="dialog"
+            aria-modal="true"
+            className="fixed left-3 top-[72px] z-50 w-[300px] max-w-[calc(100vw-24px)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-pop animate-slide-down dark:border-slate-800 dark:bg-slate-900 sm:left-4 lg:hidden"
+          >
         {/* Compact brand row */}
         <div className="flex h-12 shrink-0 items-center justify-between border-b border-slate-200/80 pl-4 pr-1.5 dark:border-slate-800">
           <div className="flex min-w-0 items-center gap-2.5">
@@ -194,8 +208,10 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
         </div>
 
         {/* Scrollable nav (capped height keeps the popup small) */}
-        {navContent}
-      </div>
+            {navContent}
+          </div>
+        </>
+      )}
     </>
   );
 }

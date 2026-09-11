@@ -27,7 +27,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
   }, [location.pathname, location.search]);
 
   return (
-    <div className="h-screen overflow-hidden bg-slate-100/80 dark:bg-slate-950">
+    <div className="h-screen overflow-hidden bg-slate-100/80 dark:bg-slate-950 lg:pl-[260px]">
       <div className="flex h-full min-w-0 flex-col">
         <Header
           onMenuClick={() => setNavOpen(true)}

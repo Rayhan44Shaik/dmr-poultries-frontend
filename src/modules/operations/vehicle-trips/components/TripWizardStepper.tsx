@@ -74,7 +74,7 @@ export default function TripWizardStepper({
           ${isClickable ? "cursor-pointer active:scale-95" : "cursor-default"}
           ${
             isActive
-              ? "bg-gradient-to-r from-emerald-400 to-teal-400 text-white border-transparent shadow-md shadow-emerald-400/25 scale-105"
+              ? "bg-gradient-to-r from-emerald-600 to-green-700 text-white border-emerald-700 shadow-md shadow-emerald-600/25 scale-105"
               : isLocked
                 ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-80"
                 : isCompleted
@@ -88,7 +88,7 @@ export default function TripWizardStepper({
           transition-all duration-300
           ${
             isActive
-              ? "bg-white/25 text-white"
+              ? "bg-white/20 text-white ring-1 ring-white/30"
               : isLocked
                 ? "bg-slate-200 text-slate-400"
                 : isCompleted
@@ -111,7 +111,7 @@ export default function TripWizardStepper({
             {isCompleted && (
               <span
                 className={`hidden md:inline text-[9px] font-semibold ${
-                  isActive ? "text-emerald-50/90" : "text-emerald-500"
+                  isActive ? "text-emerald-50" : "text-emerald-500"
                 }`}
               >
                 {t("ops.trip.submitted")}

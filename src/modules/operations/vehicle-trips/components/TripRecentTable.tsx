@@ -267,19 +267,14 @@ function TripRecentTable({
                 return (
                   <button
                     key={tab}
-<<<<<<< HEAD
-                    onClick={() => { setStatusFilter(tab); setCurrentPage(1); }}
-                    className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${isActive ? activeClass : "bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-200/50"}`}
-=======
                     type="button"
-                    onClick={() => setStatusFilter(tab)}
+                    onClick={() => { setStatusFilter(tab); setCurrentPage(1); }}
                     aria-pressed={isActive}
                     className={`inline-flex items-center px-5 py-1.5 text-xs font-semibold rounded-md transition-all ${
                       isActive
                         ? activeClass
                         : "bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-200/50"
                     }`}
->>>>>>> 8e0ca012cdb27892d607b222770a0b7ccde23bf4
                   >
                     {label}
                   </button>
@@ -291,11 +286,7 @@ function TripRecentTable({
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
             <div className="relative flex-1 sm:flex-none">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-<<<<<<< HEAD
-              <input type="text" placeholder={t("ops.trip.search_trips_short")} value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} className="w-full sm:w-64 pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-xl bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all" />
-=======
-              <input type="text" placeholder={t("ops.trip.search_trips_short")} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full sm:w-64 pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-xl bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-400/20 outline-none transition-all" />
->>>>>>> 8e0ca012cdb27892d607b222770a0b7ccde23bf4
+              <input type="text" placeholder={t("ops.trip.search_trips_short")} value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} className="w-full sm:w-64 pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-xl bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-400/20 outline-none transition-all" />
             </div>
 
             <div className="h-5 w-px bg-slate-200 hidden sm:block" />
@@ -342,10 +333,6 @@ function TripRecentTable({
                 paginatedTrips.map((trip) => {
                   const isSelected = trip.id === selectedTripId;
                   const isDeleted = trip.deleted === true;
-<<<<<<< HEAD
-=======
-
->>>>>>> 8e0ca012cdb27892d607b222770a0b7ccde23bf4
                   return (
                     <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-all duration-150 group ${isDeleted ? "bg-rose-50/40 hover:bg-rose-50/70 border-l-4 border-l-rose-400" : isSelected ? "bg-blue-50/80 shadow-inner border-l-4 border-l-blue-600" : "hover:bg-slate-50/80"}`}>
                       <td className="px-4 py-3 font-bold text-emerald-500 text-xs">
