@@ -403,14 +403,11 @@ export default function StepEnd({
       }
     });
     let requiredMinMeter = openingMeter;
-    let requiredMinLabel = t("ops.trip.start_meter_label", { meter: openingMeter });
     if (actualDestMeter > requiredMinMeter) {
       requiredMinMeter = actualDestMeter;
-      requiredMinLabel = t("ops.trip.dest_meter_label", { meter: actualDestMeter });
     }
     if (highestDieselMeter > requiredMinMeter) {
       requiredMinMeter = highestDieselMeter;
-      requiredMinLabel = t("ops.trip.diesel_entry_label", { meter: highestDieselMeter });
     }
     if (requiredMinMeter > 0 && endMeterNum <= requiredMinMeter) {
       setErrorMsg(t("ops.trip.meter_must_greater_than", { meter: requiredMinMeter }));

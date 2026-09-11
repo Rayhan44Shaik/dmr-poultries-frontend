@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, type Dispatch, type SetStateAction } from "react";
+import { useState, useRef, useCallback, useEffect, type Dispatch, type SetStateAction } from "react";
 import type { Trip, ShopDelivery, BoxDetail, TripStatus } from "../../../../shared/trip/types";
 import {
   handleApiError,
@@ -28,16 +28,18 @@ export function useTripEntry(
   onTripsChanged?: () => void
 ) {
   const notifyRef = useRef(showNotification);
-  notifyRef.current = showNotification;
   const onTripsChangedRef = useRef(onTripsChanged);
-  onTripsChangedRef.current = onTripsChanged;
 
   const emptyTrip = createEmptyTrip;
 
   const [trip, setTrip] = useState<Trip>(emptyTrip);
   const [savedTrip, setSavedTrip] = useState<Trip>(emptyTrip);
   const tripRef = useRef(trip);
-  tripRef.current = trip;
+  useEffect(() => {
+    notifyRef.current = showNotification;
+    onTripsChangedRef.current = onTripsChanged;
+    tripRef.current = trip;
+  }, [onTripsChanged, showNotification, trip]);
 
   const [isEditing, setIsEditing] = useState(false);
   const [endStepSubmitted, setEndStepSubmitted] = useState<boolean>(false);
@@ -330,6 +332,8 @@ export function useTripEntry(
     _persistToStorage: boolean = false,
     _silent: boolean = false
   ) => {
+    void _persistToStorage;
+    void _silent;
     const current = tripRef.current;
     const totals = calculatePickupTotals(rows);
     const updatedTrip: Trip = {
@@ -431,6 +435,7 @@ export function useTripEntry(
   };
 
   const updateDeliveries = (rows: ShopDelivery[], _persistToStorage: boolean = false) => {
+    void _persistToStorage;
     const updatedTrip = applyDeliveryMetrics(tripRef.current, rows);
 
     // Wizard edits stay in React state until Submit.
@@ -482,7 +487,9 @@ export function useTripEntry(
       return true;
     } catch (error) {
       console.error("Unable to submit end details:", error);
-      throw new Error(handleApiError(error));
+      const wrapped = new Error(handleApiError(error));
+      (wrapped as Error & { cause?: unknown }).cause = error;
+      throw wrapped;
     } finally {
       setHeaderLoading(false);
     }

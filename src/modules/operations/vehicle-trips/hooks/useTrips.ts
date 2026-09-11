@@ -1,6 +1,6 @@
 // src/modules/operations/vehicle-trips/hooks/useTrips.ts
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import type { Trip } from "../types/trip";
 import type { TripStatus } from "../../../../shared/trip";
 import { apiPut } from "../../../../api";
@@ -16,22 +16,20 @@ export default function useTrips(
   showNotification?: NotificationFn,
   options?: { includeDeleted?: boolean }
 ) {
-  const notifyRef = useRef(showNotification);
-  notifyRef.current = showNotification;
   const notify = useCallback(
     (message: string, type?: "success" | "error" | "info") =>
       // A caller-supplied notifier still wins. The fallback used to be a
       // blocking window.alert; it now uses the global notification store,
       // which is always mounted (NotificationHost in App), so this hook still
       // surfaces a real, dismissible toast when used outside a provider.
-      notifyRef.current
-        ? notifyRef.current(message, type)
+      showNotification
+        ? showNotification(message, type)
         : type === "error"
           ? globalNotify.error(message)
           : type === "success"
             ? globalNotify.success(message)
             : globalNotify.info(message),
-    []
+    [showNotification]
   );
 
   const [search, setSearch] = useState("");
@@ -54,12 +52,14 @@ export default function useTrips(
     try {
       setTrips(await listTrips({ includeDeleted }));
     } catch {
-      notifyRef.current?.(translate("ops.trip.unable_load_trips"), "error");
+      notify(translate("ops.trip.unable_load_trips"), "error");
     }
-  }, [includeDeleted]);
+  }, [includeDeleted, notify]);
 
   useEffect(() => {
-    void refreshTrips();
+    let cancelled = false;
+    queueMicrotask(() => { if (!cancelled) void refreshTrips(); });
+    return () => { cancelled = true; };
   }, [refreshTrips]);
 
   const resetFilters = () => {

@@ -16,7 +16,6 @@ import {
   getTripStepLockMask,
   getTripWizardCompletedMask,
   isTripEnded,
-  isTripStepLocked,
   isTripWizardComplete,
   validateDeliveriesStep,
   validateFarmStep,

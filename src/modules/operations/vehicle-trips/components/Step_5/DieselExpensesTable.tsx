@@ -9,7 +9,6 @@ import {
   handleApiError,
 } from "../../services/tripHeaderApiService";
 import type { Trip } from "../../types/trip";
-import { meterMustBeGreaterThan } from "../../utils/meterValidation";
 import { GpsAddressText } from "../GpsAddressText";
 import { usePendingDelete } from "../../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../../components/common/PendingDeleteNotification";
@@ -63,7 +62,6 @@ export default function DieselExpensesTable({
   const [isFetchingGPS, setIsFetchingGPS] = useState<{ [key: number]: boolean }>({});
   const [busyRow, setBusyRow] = useState<number | null>(null);
   const [editingRow, setEditingRow] = useState<number | null>(null);
-  const [isEditingSubmitted, setIsEditingSubmitted] = useState(false);
   const [draftData, setDraftData] = useState<Record<string, any>>({});
   const [rowIndices, setRowIndices] = useState<number[]>([1]);
   const [draftClientKey, setDraftClientKey] = useState<string>(() =>
@@ -131,7 +129,6 @@ export default function DieselExpensesTable({
   };
 
   const startEdit = (num: number) => {
-    const submitted = !!sheetData[`dieselSubmitted${num}`];
     const newDraft: Record<string, any> = {};
     const fields = [
       "dieselLtr",
@@ -151,13 +148,11 @@ export default function DieselExpensesTable({
       newDraft[`${f}${num}`] = sheetData[`${f}${num}`] ?? "";
     });
     setDraftData(newDraft);
-    setIsEditingSubmitted(submitted);
     setEditingRow(num);
   };
 
   const cancelEdit = () => {
     setDraftData({});
-    setIsEditingSubmitted(false);
     setEditingRow(null);
   };
 

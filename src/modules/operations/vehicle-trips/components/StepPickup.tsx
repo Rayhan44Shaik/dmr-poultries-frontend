@@ -46,7 +46,7 @@ function formatAvg(birds: number, weight: number, stored?: number | null) {
   return avg == null ? "—" : String(avg);
 }
 
-function photosFromTrip(trip: Trip): PickupPhoto[] {
+function photosFromTrip(trip: Pick<Trip, "id" | "dcPhotoKey" | "dcPhotoKey2" | "dcPhotoMime" | "dcPhotoMime2" | "dcPhotoData" | "dcPhotoData2">): PickupPhoto[] {
   const out: PickupPhoto[] = [];
   if (trip.dcPhotoData && trip.dcPhotoData.startsWith("data:image/")) {
     out.push({
@@ -135,9 +135,7 @@ function ConfirmationModal({
 
 export default function StepPickup({
   trip,
-  setTrip: _setTrip,
   updateTrip,
-  updateBoxDetails: _updateBoxDetails,
   submitPickupStep,
   savePickupProgress,
   editable = false,
@@ -170,11 +168,29 @@ export default function StepPickup({
   }, [trip.vehicleNo, trip.vehicleBoxCapacity]);
 
   const [photos, setPhotos] = useState<PickupPhoto[]>(() => photosFromTrip(trip));
+  const persistedPhotos = useMemo(() => photosFromTrip({
+    id: trip.id,
+    dcPhotoKey: trip.dcPhotoKey,
+    dcPhotoKey2: trip.dcPhotoKey2,
+    dcPhotoMime: trip.dcPhotoMime,
+    dcPhotoMime2: trip.dcPhotoMime2,
+    dcPhotoData: trip.dcPhotoData,
+    dcPhotoData2: trip.dcPhotoData2,
+  }), [
+    trip.id,
+    trip.dcPhotoKey,
+    trip.dcPhotoKey2,
+    trip.dcPhotoMime,
+    trip.dcPhotoMime2,
+    trip.dcPhotoData,
+    trip.dcPhotoData2,
+  ]);
+  const persistedBoxDetails = trip.boxDetails;
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   // Which DC-photo slot (0 or 1) the picker was opened for.
   const slotIndexRef = useRef(0);
-  const savedPhotosRef = useRef<PickupPhoto[]>(photosFromTrip(trip));
+  const [savedPhotoKeys, setSavedPhotoKeys] = useState(() => photosFromTrip(trip).map((photo) => photo.key));
 
   // ─── Toast state ────────────────────────────────────────────────────
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
@@ -227,27 +243,35 @@ export default function StepPickup({
   });
 
   const hasUnsavedChanges = useMemo(() => {
-    const currentBoxes = rows.map(({ uid, ...rest }) => rest);
+    const currentBoxes = rows.map((row) => {
+      return Object.fromEntries(Object.entries(row).filter(([key]) => key !== "uid")) as BoxDetail;
+    });
     const savedBoxes = trip.boxDetails || [];
     return JSON.stringify(currentBoxes) !== JSON.stringify(savedBoxes) ||
-      JSON.stringify(photos.map((p) => p.key)) !== JSON.stringify(savedPhotosRef.current.map((p) => p.key));
-  }, [rows, trip.boxDetails, photos]);
+      JSON.stringify(photos.map((p) => p.key)) !== JSON.stringify(savedPhotoKeys);
+  }, [rows, trip.boxDetails, photos, savedPhotoKeys]);
 
   useEffect(() => {
-    setPhotos(photosFromTrip(trip));
-    savedPhotosRef.current = photosFromTrip(trip);
-  }, [trip.id, trip.dcPhotoKey, trip.dcPhotoKey2, trip.dcPhotoData, trip.dcPhotoData2]);
+    let cancelled = false;
+    const nextPhotos = persistedPhotos;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setPhotos(nextPhotos);
+      setSavedPhotoKeys(nextPhotos.map((photo) => photo.key));
+    });
+    return () => { cancelled = true; };
+  }, [persistedPhotos]);
 
   useEffect(() => {
-    const details = trip.boxDetails || [];
-    if (details.length > 0) {
-      setRows(details.map((d) => ({ ...d, uid: generateUid() })));
-    } else {
-      setRows([makeRow(1)]);
-    }
-    // Fresh trip → no pending removals from a previous trip's edit session.
-    setRemovedBoxNos([]);
-  }, [trip.id, isLocalEditing, trip.boxDetails?.length]);
+    const details = persistedBoxDetails || [];
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (cancelled) return;
+      setRows(details.length > 0 ? details.map((d) => ({ ...d, uid: generateUid() })) : [makeRow(1)]);
+      setRemovedBoxNos([]);
+    });
+    return () => { cancelled = true; };
+  }, [trip.id, isLocalEditing, persistedBoxDetails]);
 
   const totals = useMemo(() => calculatePickupTotals(rows), [rows]);
 
@@ -302,7 +326,9 @@ export default function StepPickup({
     if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
   };
 
-  const getBoxDetails = (): BoxDetail[] => rows.map(({ uid, ...rest }) => rest);
+  const getBoxDetails = (): BoxDetail[] => rows.map((row) => {
+    return Object.fromEntries(Object.entries(row).filter(([key]) => key !== "uid")) as BoxDetail;
+  });
 
   const isLastRowComplete = useMemo(() => {
     if (rows.length === 0) return true;
@@ -451,7 +477,7 @@ export default function StepPickup({
       ? { message: t("ops.trip.progress_saved"), type: "success" }
       : { message: t("ops.trip.failed_save_pickup"), type: "error" });
     if (success) {
-      savedPhotosRef.current = photos;
+      setSavedPhotoKeys(photos.map((photo) => photo.key));
       setRemovedBoxNos([]);
     }
     setIsSaving(false);

@@ -56,7 +56,7 @@ function TripRecentTable({
   const [tripToDelete, setTripToDelete] = useState<Trip | null>(null);
   const pendingDeletesRef = useRef<Map<number, { trip: Trip; reason: string }>>(new Map());
   const onDeleteRef = useRef(onDelete);
-  onDeleteRef.current = onDelete;
+  useEffect(() => { onDeleteRef.current = onDelete; }, [onDelete]);
 
   const { requestDelete, cancel, isPending, pendingItems } = usePendingDelete<number>(async (id) => {
     const pending = pendingDeletesRef.current.get(id);
@@ -90,21 +90,16 @@ function TripRecentTable({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const filterBySearch = (trips: Trip[]) => {
-    if (!searchTerm.trim()) return trips;
-    const lower = searchTerm.toLowerCase();
-    return trips.filter((t) =>
-      t.tripNo.toLowerCase().includes(lower) ||
-      t.tripDate.includes(lower) ||
-      t.vehicleNo.toLowerCase().includes(lower) ||
-      t.driverName.toLowerCase().includes(lower) ||
-      t.supervisorName.toLowerCase().includes(lower) ||
-      t.sourceFarm.toLowerCase().includes(lower)
-    );
-  };
-
   const sortedTrips = useMemo(() => {
-    const filtered = filterBySearch(safeTrips);
+    const lower = searchTerm.trim().toLowerCase();
+    const filtered = lower ? safeTrips.filter((trip) =>
+      trip.tripNo.toLowerCase().includes(lower) ||
+      trip.tripDate.includes(lower) ||
+      trip.vehicleNo.toLowerCase().includes(lower) ||
+      trip.driverName.toLowerCase().includes(lower) ||
+      trip.supervisorName.toLowerCase().includes(lower) ||
+      trip.sourceFarm.toLowerCase().includes(lower)
+    ) : safeTrips;
     return [...filtered].sort((a, b) => {
       if (a.tripDate !== b.tripDate) return a.tripDate < b.tripDate ? 1 : -1;
       return b.id - a.id;
@@ -115,18 +110,11 @@ function TripRecentTable({
   const allPending = sortedTrips.filter((t) => !t.deleted && t.status === "Pending");
   const allDeleted = sortedTrips.filter((t) => t.deleted === true || t.status === "Deleted");
 
-  let filteredTrips: Trip[] = [];
-  if (statusFilter === "Draft") filteredTrips = allDraft;
-  else if (statusFilter === "Pending") filteredTrips = allPending;
-  else filteredTrips = allDeleted;
+  const filteredTrips = statusFilter === "Draft" ? allDraft : statusFilter === "Pending" ? allPending : allDeleted;
 
   const totalPages = Math.ceil(filteredTrips.length / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
   const paginatedTrips = filteredTrips.slice(startIndex, startIndex + pageSize);
-
-  useEffect(() => {
-    setCurrentPage(1);
-  }, [statusFilter, searchTerm]);
 
   const selectedTrip = safeTrips.find((t) => t.id === selectedTripId) || null;
 
@@ -255,7 +243,7 @@ function TripRecentTable({
                 return (
                   <button
                     key={tab}
-                    onClick={() => setStatusFilter(tab)}
+                    onClick={() => { setStatusFilter(tab); setCurrentPage(1); }}
                     className={`px-3 py-1.5 text-xs font-semibold rounded-md transition-all ${isActive ? activeClass : "bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-200/50"}`}
                   >
                     {(() => { const k = "status." + tab.toLowerCase(); const label = t(k); return label === k ? tab : label; })()}
@@ -268,7 +256,7 @@ function TripRecentTable({
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
             <div className="relative flex-1 sm:flex-none">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <input type="text" placeholder={t("ops.trip.search_trips_short")} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full sm:w-64 pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-xl bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all" />
+              <input type="text" placeholder={t("ops.trip.search_trips_short")} value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} className="w-full sm:w-64 pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-xl bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 outline-none transition-all" />
             </div>
 
             <div className="h-5 w-px bg-slate-200 hidden sm:block" />
@@ -315,8 +303,6 @@ function TripRecentTable({
                 paginatedTrips.map((trip) => {
                   const isSelected = trip.id === selectedTripId;
                   const isDeleted = trip.deleted === true;
-                  const isApproved = trip.status === "Completed";
-
                   return (
                     <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-all duration-150 group ${isDeleted ? "bg-rose-50/40 hover:bg-rose-50/70 border-l-4 border-l-rose-400" : isSelected ? "bg-blue-50/80 shadow-inner border-l-4 border-l-blue-600" : "hover:bg-slate-50/80"}`}>
                       <td className="px-4 py-3 font-bold text-emerald-700 text-xs">

@@ -547,8 +547,6 @@ function StepStart({
   onCancel,
   clearForm,
   headerLoading = false,
-  subscribeHeaderSaveStatus: _subscribeHeaderSaveStatus,
-  getHeaderSaveStatus: _getHeaderSaveStatus,
 }: Props) {
   const { t } = useI18n();
   const [form, setForm] = useState<Step1FormState>(() => tripToForm(loadSnapshot));
@@ -564,18 +562,18 @@ function StepStart({
 
   const loadedTripIdRef = useRef(tripId);
   const formRef = useRef(form);
-  formRef.current = form;
+  useEffect(() => { formRef.current = form; }, [form]);
   const submitLockRef = useRef(false);
 
   // Opening-meter reference: the vehicle's latest recorded reading. Used for
   // field-level validation only — the backend remains the authority on submit.
   useEffect(() => {
-    if (!form.vehicleId) {
-      setLatestMeter(null);
-      return;
-    }
     let cancelled = false;
-    setLatestMeter(null);
+    if (!form.vehicleId) {
+      queueMicrotask(() => { if (!cancelled) setLatestMeter(null); });
+      return () => { cancelled = true; };
+    }
+    queueMicrotask(() => { if (!cancelled) setLatestMeter(null); });
     // Part L: when editing, the backend excludes this trip's own start/end
     // meter from the lookup. The client-side guard below stays as defence in
     // depth (same rule, both sides) in case a stale row slips through.
