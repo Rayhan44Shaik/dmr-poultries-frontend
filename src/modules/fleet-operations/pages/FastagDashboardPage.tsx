@@ -59,7 +59,7 @@ export default memo(FastagDashboardPage);
 */
 
 import { memo } from 'react';
-import { Construction } from 'lucide-react';
+import { Construction, Sparkles, Wrench } from 'lucide-react';
 import { useI18n } from '../../../i18n';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 
@@ -73,21 +73,49 @@ const FastagDashboardPage = ({ embedded = false }: FastagDashboardPageProps) => 
   return (
     <ErrorBoundary>
       <div
-        className={`w-full flex items-center justify-center ${
-          embedded ? 'min-h-[60vh]' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50 min-h-screen'
+        className={`flex w-full items-center justify-center overflow-hidden ${
+          embedded ? 'min-h-[60vh] bg-slate-50/60' : 'min-h-screen bg-slate-50 px-4 py-6 md:px-8 md:py-8'
         }`}
       >
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-12 text-center max-w-lg w-full mx-4">
-          <div className="w-14 h-14 bg-slate-50 text-slate-600 rounded-2xl flex items-center justify-center mx-auto mb-4 border border-slate-200">
-            <Construction className="w-7 h-7" aria-hidden />
+        <div
+          role="status"
+          aria-live="polite"
+          className="relative mx-4 w-full max-w-2xl overflow-hidden rounded-[2rem] border border-slate-200/80 bg-white px-6 py-10 text-center shadow-[0_24px_70px_-28px_rgba(15,23,42,0.28)] sm:px-12 sm:py-14"
+        >
+          {/* Calm ambient glow — decorative only, never affects layout. */}
+          <div aria-hidden="true" className="pointer-events-none absolute -left-20 -top-24 h-64 w-64 rounded-full bg-emerald-100/60 blur-3xl" />
+          <div aria-hidden="true" className="pointer-events-none absolute -bottom-28 -right-20 h-72 w-72 rounded-full bg-indigo-100/60 blur-3xl" />
+
+          <div className="relative mx-auto mb-7 flex h-28 w-28 items-center justify-center">
+            <span aria-hidden="true" className="absolute inset-0 rounded-full border border-emerald-200/70 animate-[ping_2.8s_ease-out_infinite]" />
+            <span aria-hidden="true" className="absolute inset-2 rounded-full border border-dashed border-indigo-200 animate-[spin_12s_linear_infinite]" />
+            <span className="relative flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-emerald-50 to-indigo-50 text-emerald-600 shadow-inner ring-1 ring-inset ring-white">
+              <Construction className="h-10 w-10 animate-[bounce_2.4s_ease-in-out_infinite]" strokeWidth={1.8} aria-hidden="true" />
+            </span>
+            <Sparkles className="absolute right-0 top-1 h-5 w-5 animate-pulse text-indigo-400" aria-hidden="true" />
+            <Wrench className="absolute bottom-1 left-0 h-5 w-5 animate-[pulse_2s_ease-in-out_infinite] text-emerald-400" aria-hidden="true" />
           </div>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-slate-400 mb-2">FASTAG</p>
-          <h2 className="text-xl font-bold text-slate-800 mb-1">{t('fleet.fastag.management_title')}</h2>
-          <p className="text-sm font-semibold text-amber-700 mb-3">{t('fleet.fastag.under_construction')}</p>
-          <p className="text-sm text-slate-500 leading-relaxed">
+
+          <p className="relative mb-3 text-[11px] font-bold uppercase tracking-[0.24em] text-emerald-600">FASTAG</p>
+          <h1 className="relative text-2xl font-extrabold tracking-tight text-slate-900 sm:text-3xl">{t('fleet.fastag.management_title')}</h1>
+          <div className="relative mx-auto mt-4 inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-4 py-2 text-xs font-bold uppercase tracking-[0.14em] text-amber-700">
+            <span className="h-2 w-2 animate-pulse rounded-full bg-amber-500" aria-hidden="true" />
+            {t('fleet.fastag.under_construction')}
+          </div>
+          <p className="relative mx-auto mt-5 max-w-md text-sm leading-7 text-slate-500 sm:text-base">
             {t('fleet.fastag.coming_soon_desc')}
           </p>
-          <p className="mt-4 text-xs font-semibold uppercase tracking-wide text-slate-400">{t('coming_soon')}</p>
+
+          <div className="relative mx-auto mt-8 max-w-sm">
+            <div className="mb-2 flex items-center justify-between text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+              <span>Building the experience</span>
+              <span className="text-emerald-600">Coming soon</span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-slate-100 ring-1 ring-inset ring-slate-200/70">
+              <div className="h-full w-2/5 rounded-full bg-gradient-to-r from-emerald-400 via-emerald-500 to-indigo-500 animate-[pulse_2s_ease-in-out_infinite]" />
+            </div>
+          </div>
+          <p className="relative mt-6 text-xs font-semibold text-slate-400">{t('coming_soon')}</p>
         </div>
       </div>
     </ErrorBoundary>
