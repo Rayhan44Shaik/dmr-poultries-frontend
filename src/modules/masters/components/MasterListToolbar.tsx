@@ -1,7 +1,7 @@
 import { useId, type ReactNode } from "react";
 import { FileSpreadsheet, FileText, Plus } from "lucide-react";
 import { useI18n } from "../../../i18n";
-import { Button, ImportButton, SearchInput } from "../../../ui";
+import { BrandRefreshButton, Button, ImportButton, SearchInput } from "../../../ui";
 import MasterDropdown from "./MasterDropdown";
 
 interface MasterListToolbarProps {
@@ -87,7 +87,13 @@ export default function MasterListToolbar({
         role="group"
         aria-label={t("masters.ui.actions")}
       >
-        {onRefresh && <Button onClick={onRefresh} disabled={loading || saving}>Refresh</Button>}
+        {onRefresh && (
+          <BrandRefreshButton
+            onClick={onRefresh}
+            loading={loading}
+            disabled={saving}
+          />
+        )}
         <MasterDropdown
           label={t("common.export")}
           placeholder={t("common.export")}
