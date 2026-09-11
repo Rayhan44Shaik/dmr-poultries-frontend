@@ -514,3 +514,58 @@
 @media print {
   .ds-no-print { display: none !important; }
 }
+
+/* =============================================================================
+ * BRAND CURSOR
+ * -----------------------------------------------------------------------------
+ * The DMR hen replaces the default arrow across the application.
+ *
+ * Scope: this only ever applies inside the app's own pages. A web page cannot
+ * change the operating-system cursor, so anywhere outside the browser tab —
+ * the desktop, other applications, browser chrome — the user keeps their
+ * normal pointer automatically. Nothing here needs to opt out of that.
+ *
+ * Fallbacks matter: every rule ends with a standard keyword (`auto`,
+ * `pointer`, `text`…). If the image fails to load, or the file is missing in a
+ * given deployment, the browser silently falls back to the native cursor
+ * instead of leaving the user with no pointer at all.
+ *
+ * The `4 4` numbers are the HOTSPOT — the active click point within the 32x32
+ * image, near the hen's head. Without it the browser assumes 0 0, and clicks
+ * land offset from where the user is aiming.
+ * ===========================================================================*/
+@layer base {
+  html,
+  body {
+    cursor: url("/cursor-hen-32.png") 4 4, auto;
+  }
+
+  /* Interactive elements keep a MEANINGFUL cursor. Replacing every state with
+     the hen would destroy the affordances users rely on — you could no longer
+     tell a button from a text field, or see that a control is disabled. So the
+     brand cursor is the resting/default pointer only, and functional cursors
+     win wherever they carry information. */
+  a[href],
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary,
+  label[for],
+  select:not(:disabled),
+  .cursor-pointer {
+    cursor: url("/cursor-hen-32.png") 4 4, pointer;
+  }
+
+  /* Text entry, disabled controls and resize handles keep their native cursor
+     entirely: these communicate state and capability, not branding. */
+  input:not([type="button"]):not([type="submit"]):not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  [contenteditable="true"] {
+    cursor: text;
+  }
+
+  :disabled,
+  [aria-disabled="true"],
+  .cursor-not-allowed {
+    cursor: not-allowed;
+  }
+}
