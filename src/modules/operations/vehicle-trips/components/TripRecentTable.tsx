@@ -331,11 +331,11 @@ function TripRecentTable({
 
             <div className="flex items-center gap-1">
               <button onClick={handleEditClick} disabled={!canEdit} className={`group h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canEdit ? "bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-500 border border-emerald-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`} title={t("ops.trip.edit_selected_trip")}>
-                <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-brand-dance)]"><Pencil size={13} /></span>
+                <span className={`inline-flex ${canEdit ? "motion-safe:group-hover:animate-[var(--animate-action-edit)]" : ""}`}><Pencil size={13} /></span>
                 <span className="hidden md:inline">{t("common.edit")}</span>
               </button>
               <button onClick={openDeleteModal} disabled={!canDelete} className={`group h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canDelete ? "bg-rose-50/70 hover:bg-rose-50/80 text-rose-500 border border-rose-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`} title={t("ops.trip.delete_selected_trip")}>
-                <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-brand-dance)]"><Trash2 size={13} /></span>
+                <span className={`inline-flex ${canDelete ? "motion-safe:group-hover:animate-[var(--animate-action-delete)]" : ""}`}><Trash2 size={13} /></span>
                 <span className="hidden md:inline">{t("common.delete")}</span>
               </button>
               <BrandRefreshButton onClick={() => onRefresh()} />
@@ -444,7 +444,7 @@ function TripRecentTable({
                         })()}
                       </td>
                       <td className="text-center px-4 py-3">
-                        <button onClick={(e) => { e.stopPropagation(); onView(trip); }} className="h-8 w-8 rounded-xl bg-blue-50/70 hover:bg-blue-500 text-blue-500 hover:text-white flex items-center justify-center mx-auto transition-all shadow-sm active:scale-95 group-hover:border-blue-100" title={t("ops.trip.view_trip_details")}><Eye size={14} /></button>
+                        <button onClick={(e) => { e.stopPropagation(); onView(trip); }} className="group h-8 w-8 rounded-xl bg-violet-50 hover:bg-violet-500 text-violet-600 hover:text-white flex items-center justify-center mx-auto transition-all shadow-sm active:scale-95" title={t("ops.trip.view_trip_details")}><span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]"><Eye size={14} /></span></button>
                       </td>
                     </tr>
                   );

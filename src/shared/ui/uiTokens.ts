@@ -120,6 +120,9 @@ const buttonVariants = {
     "bg-emerald-600 text-white shadow-xs hover:bg-emerald-700 active:bg-emerald-800",
   /** Informational. */
   info: "border border-sky-200 bg-white text-sky-700 hover:bg-sky-50 hover:border-sky-300 active:bg-sky-100",
+  /** "View / inspect" action — light violet outline, so it sits beside PDF
+   *  (rose) and Excel (emerald) as a quiet, non-primary look-and-inspect. */
+  view: "border border-violet-200 bg-white text-violet-600 hover:bg-violet-50 hover:border-violet-300 active:bg-violet-100",
 } as const;
 
 export type ButtonVariant = keyof typeof buttonVariants;
@@ -141,6 +144,7 @@ export const uiSecondaryButtonClass = uiButton("secondary", "md");
 export const uiOutlineButtonClass = uiButton("outline", "md");
 export const uiGhostButtonClass = uiButton("ghost", "md");
 export const uiDestructiveButtonClass = uiButton("destructive", "md");
+export const uiViewButtonClass = uiButton("view", "md");
 
 /**
  * Toolbar-height button. Toolbar rows mix a 40px search/filter control with

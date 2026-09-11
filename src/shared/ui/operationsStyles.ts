@@ -86,6 +86,7 @@ export {
   uiExportButtonClass as opsExportButtonClass,
   uiResetButtonClass as opsResetButtonClass,
   uiRefreshButtonClass as opsRefreshButtonClass,
+  uiViewButtonClass as opsViewButtonClass,
 } from "./uiTokens";
 
 /**
