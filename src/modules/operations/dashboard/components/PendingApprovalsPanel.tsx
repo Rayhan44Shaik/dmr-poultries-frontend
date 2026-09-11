@@ -147,7 +147,7 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
                     sits at page top, where an upward bubble would clip). */}
                 <span
                   role="tooltip"
-                  className={`pointer-events-none absolute top-[calc(100%+6px)] z-50 w-max max-w-[230px] rounded-lg bg-slate-900 px-3 py-2 text-left text-[11.5px] font-medium leading-snug text-white opacity-0 shadow-xl shadow-slate-900/25 transition-all duration-150 group-hover/tile:opacity-100 group-focus-visible/tile:opacity-100 motion-reduce:transition-none ${stat.tipClass}`}
+                  className={`pointer-events-none absolute top-[calc(100%+6px)] z-50 w-max max-w-[230px] rounded-lg bg-slate-900 px-3 py-2 text-left text-[11.5px] font-medium leading-snug text-white opacity-0 shadow-xl shadow-slate-900/25 transition-opacity duration-75 ease-out delay-0 group-hover/tile:opacity-100 group-focus-visible/tile:opacity-100 motion-reduce:transition-none ${stat.tipClass}`}
                 >
                   <span className="flex items-start gap-1.5">
                     <span className={`mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full ${stat.dot}`} />
