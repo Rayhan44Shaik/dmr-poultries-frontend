@@ -318,7 +318,7 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
             <Button size="lg" icon={<Search size={16} className={filterAction === 'search' ? 'animate-pulse' : undefined} />} onClick={applyFilters} disabled={invalidRange}>Search</Button>
             <Button variant="secondary" size="lg" icon={<RotateCcw size={15} className={filterAction === 'clear' ? 'animate-spin' : undefined} />} aria-label="Clear filters" title="Clear filters" onClick={clearFilters}>Clear</Button>
             <Button variant="custom" size="lg" iconOnly aria-label="Refresh" title="Refresh records" className={uiActionToneClass.refresh} disabled={spinning} onClick={handleRefresh}>
-              <RefreshCw size={16} strokeWidth={2} aria-hidden="true" className={spinning ? 'animate-spin' : undefined} />
+              <RefreshCw size={16} strokeWidth={2} aria-hidden="true" className={`transition-transform duration-500 hover:rotate-180 ${spinning ? 'animate-[spin_0.6s_ease-in-out_1]' : ''}`} />
             </Button>
             <Button size="lg" icon={<Plus size={16} />} onClick={() => setIsNewModalOpen(true)}>New Payment</Button>
           </div>
