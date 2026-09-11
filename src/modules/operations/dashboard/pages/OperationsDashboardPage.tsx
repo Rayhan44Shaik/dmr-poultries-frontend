@@ -106,7 +106,7 @@ function RangeDatePicker({
         <button
           type="button"
           onClick={toggleCalendar}
-          className="h-9 px-3.5 rounded-xl border border-slate-200/80 bg-white shadow-sm flex items-center gap-2 text-xs font-bold text-slate-700 hover:border-blue-500/50 hover:bg-slate-50/80 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all active:scale-[0.98]"
+          className="h-9 px-3.5 rounded-xl border border-slate-200/80 bg-slate-50/70 flex items-center gap-2 text-xs font-bold text-slate-700 hover:border-blue-500/50 hover:bg-slate-100/80 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all active:scale-[0.98]"
         >
           <Calendar size={14} className="text-blue-600" />
           <span>
@@ -211,14 +211,15 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   if (!isRangeSelected) {
     return (
       <div className={`min-w-0 space-y-4 ${embedded ? "" : "p-4 sm:p-5 lg:p-6"}`}>
-        <PendingApprovalsPanel />
-        <div className="flex justify-end">
-          <RangeDatePicker
-            startDate={startDate}
-            endDate={endDate}
-            onRangeChange={handleRangeChange}
-          />
-        </div>
+        <PendingApprovalsPanel
+          actions={
+            <RangeDatePicker
+              startDate={startDate}
+              endDate={endDate}
+              onRangeChange={handleRangeChange}
+            />
+          }
+        />
         <div className="flex items-center justify-center h-96 bg-white rounded-2xl border border-slate-200/80 shadow-sm p-8">
           <div className="text-center max-w-sm">
             <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4 border border-blue-100 shadow-sm animate-bounce">
@@ -237,7 +238,15 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   if (isLoading) {
     return (
       <div className={`min-w-0 space-y-5 ${embedded ? "" : "p-4 sm:p-5 lg:p-6"}`}>
-        <PendingApprovalsPanel />
+        <PendingApprovalsPanel
+          actions={
+            <RangeDatePicker
+              startDate={startDate}
+              endDate={endDate}
+              onRangeChange={handleRangeChange}
+            />
+          }
+        />
         <div className="w-full flex flex-col items-center justify-center py-24 space-y-4 bg-white rounded-2xl border border-slate-200/80 shadow-sm">
         <div className="relative w-12 h-12">
           <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
@@ -254,14 +263,15 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   if (error) {
     return (
       <div className={`min-w-0 space-y-4 ${embedded ? "" : "p-4 sm:p-5 lg:p-6"}`}>
-        <PendingApprovalsPanel />
-        <div className="flex justify-end">
-          <RangeDatePicker
-            startDate={startDate}
-            endDate={endDate}
-            onRangeChange={handleRangeChange}
-          />
-        </div>
+        <PendingApprovalsPanel
+          actions={
+            <RangeDatePicker
+              startDate={startDate}
+              endDate={endDate}
+              onRangeChange={handleRangeChange}
+            />
+          }
+        />
         <div className="flex flex-col items-center justify-center py-24 space-y-4 bg-white rounded-2xl border border-slate-200/80 shadow-sm px-6">
           <p className="text-sm font-semibold text-red-700 text-center">{error}</p>
           <button
@@ -278,17 +288,16 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
 
   return (
     <div className={`min-w-0 space-y-5 ${embedded ? "" : "p-4 sm:p-5 lg:p-6"}`}>
-      {/* Live pending-approval KPI tiles. */}
-      <PendingApprovalsPanel />
-
-      {/* Date-range filter, in its own bar. */}
-      <div className="flex flex-wrap items-center justify-end gap-2 rounded-xl border border-slate-200/80 bg-white px-3 py-2 shadow-sm">
-        <RangeDatePicker
-          startDate={startDate}
-          endDate={endDate}
-          onRangeChange={handleRangeChange}
-        />
-      </div>
+      {/* Pending-approval KPIs and date-range filter on one slim row. */}
+      <PendingApprovalsPanel
+        actions={
+          <RangeDatePicker
+            startDate={startDate}
+            endDate={endDate}
+            onRangeChange={handleRangeChange}
+          />
+        }
+      />
 
       <div className="relative z-10">
         <KPICards current={data} previous={previousData} rangeDays={rangeDays} />
