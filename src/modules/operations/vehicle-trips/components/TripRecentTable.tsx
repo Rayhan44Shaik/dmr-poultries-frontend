@@ -2,18 +2,19 @@
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Eye, Pencil, RefreshCw, History, Trash2, Clock, AlertCircle, Search, FileText, CheckCircle } from "lucide-react";
+import { Eye, Pencil, History, Trash2, Clock, AlertCircle, Search, FileText, CheckCircle } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { canEditItem, canDeleteItem } from "../../../../utils/dateUtils";
 import { formatTripRecentDateWithDay } from "../utils/formatTripListDay";
 import TripPagination from "./TripPagination";
-import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
 import { getNextIncompleteTripStep, isTripWizardComplete, isValidTripStatusTransition, getValidNextStatuses, type TripStatus } from "../../../../shared/trip";
 import { useI18n } from "../../../../i18n";
 import { notify as globalNotify } from "../../../../ui/notifications/notificationStore";
 import { uniqueTripsById } from "../services/tripHeaderApiService";
+import { BrandRefreshButton } from "../../../../ui";
+import { isOrderContainer } from "../../orders/ordersUtils";
 
 interface Props {
   trips?: Trip[];
@@ -36,7 +37,14 @@ function TripRecentTable({
   onStatusChange,
 }: Props) {
   const { t } = useI18n();
-  const safeTrips = uniqueTripsById(Array.isArray(trips) ? trips : []);
+  // Recent Trips lists REAL vehicle trips (TRP-*) only. The trips feed also
+  // carries Orders collection containers (ORD-*): rows with no vehicle that
+  // exist purely to hold a day's order plan. They are not trips, so they must
+  // never appear here. Filtered by isOrderContainer rather than by matching the
+  // "ORD-" prefix, so the rule stays tied to the actual data shape.
+  const safeTrips = uniqueTripsById(
+    (Array.isArray(trips) ? trips : []).filter((t) => !isOrderContainer(t)),
+  );
 
   /** Translate, but never surface a raw i18n key: returns "" when the key is missing. */
   const tSafe = (key: string, params?: Record<string, string | number>) => {
@@ -51,7 +59,7 @@ function TripRecentTable({
   const [selectedTripId, setSelectedTripId] = useState<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<"Draft" | "Pending" | "Deleted">(initialStatus);
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
+  const [pageSize, setPageSize] = useState(10);
 
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteReason, setDeleteReason] = useState("");
@@ -92,6 +100,69 @@ function TripRecentTable({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+<<<<<<< HEAD
+=======
+  /** Effective list status: Step 5 fully submitted must never stay under Draft. */
+  const listStatus = (t: Trip): "Draft" | "Pending" | "Completed" | "Deleted" => {
+    if (t.deleted === true || t.status === "Deleted") return "Deleted";
+    if (t.status === "Completed") return "Completed";
+    // Wizard done (end/expenses submitted) OR explicit Pending → Pending tab
+    if (t.status === "Pending" || isTripWizardComplete(t)) return "Pending";
+    return "Draft";
+  };
+
+  const getStepBadge = (trip: Trip) => {
+    // Completed may still exist on older sample rows — show label only (no status change option).
+    if (trip.status === "Completed") {
+      return { label: t("status.completed"), color: "bg-emerald-50 text-emerald-700 border-emerald-200", icon: <CheckCircle size={12} />, resume: false };
+    }
+    if (trip.status === "Pending") {
+      return { label: t("status.pending"), color: "bg-orange-50 text-orange-700 border-orange-200", icon: <Clock size={12} />, resume: false };
+    }
+    // Defensive: wizard fully submitted but status still Draft → treat as Pending
+    // (Step 5 submit should have moved it; never show Completed from Draft).
+    if (isTripWizardComplete(trip)) {
+      return { label: t("status.pending"), color: "bg-orange-50 text-orange-700 border-orange-200", icon: <Clock size={12} />, resume: false };
+    }
+    // A Draft trip always has Step 1 submitted (trips are created on Step 1
+    // submit), so it is always mid-workflow: show ONLY which step is pending
+    // next — no step name / farm detail.
+    const nextStep = getNextIncompleteTripStep(trip);
+    return {
+      label: t("ops.trip.step_label", { step: nextStep + 1 }),
+      color: "bg-blue-50 text-blue-700 border-blue-200",
+      icon: <FileText size={12} />,
+      resume: true,
+    };
+  };
+
+  const filterBySearch = (trips: Trip[]) => {
+    if (!searchTerm.trim()) return trips;
+    const lower = searchTerm.toLowerCase();
+    // Collapse whitespace so "step1" and "step 1" both match "Step 1".
+    const squashed = lower.replace(/\s+/g, "");
+    return trips.filter((t) => {
+      // The status column renders a STEP BADGE, so the badge's own label is
+      // what has to be searchable ("Step 1"). Matching only the raw status
+      // field would never find the text the user can actually see.
+      const badge = getStepBadge(t).label.toLowerCase();
+      return (
+        t.tripNo.toLowerCase().includes(lower) ||
+        t.tripDate.includes(lower) ||
+        t.vehicleNo.toLowerCase().includes(lower) ||
+        t.driverName.toLowerCase().includes(lower) ||
+        t.supervisorName.toLowerCase().includes(lower) ||
+        t.sourceFarm.toLowerCase().includes(lower) ||
+        badge.includes(lower) ||
+        badge.replace(/\s+/g, "").includes(squashed) ||
+        // Also match the underlying status word (draft / pending / completed /
+        // deleted) even when the badge is showing a step instead.
+        listStatus(t).toLowerCase().includes(lower)
+      );
+    });
+  };
+
+>>>>>>> 7f2979f92ebf0943fe9b337d1f20b7bf6e3022c7
   const sortedTrips = useMemo(() => {
     const lower = searchTerm.trim().toLowerCase();
     const filtered = lower ? safeTrips.filter((trip) =>
@@ -107,15 +178,6 @@ function TripRecentTable({
       return b.id - a.id;
     });
   }, [safeTrips, searchTerm]);
-
-  /** Effective list status: Step 5 fully submitted must never stay under Draft. */
-  const listStatus = (t: Trip): "Draft" | "Pending" | "Completed" | "Deleted" => {
-    if (t.deleted === true || t.status === "Deleted") return "Deleted";
-    if (t.status === "Completed") return "Completed";
-    // Wizard done (end/expenses submitted) OR explicit Pending → Pending tab
-    if (t.status === "Pending" || isTripWizardComplete(t)) return "Pending";
-    return "Draft";
-  };
 
   const allDraft = sortedTrips.filter((t) => listStatus(t) === "Draft");
   // Pending tab: only Pending trips. Completed leaves this list (Trip List / accounts).
@@ -181,31 +243,6 @@ function TripRecentTable({
     setShowDeleteModal(false);
     setTripToDelete(null);
     setDeleteReason("");
-  };
-
-  const getStepBadge = (trip: Trip) => {
-    // Completed may still exist on older sample rows — show label only (no status change option).
-    if (trip.status === "Completed") {
-      return { label: t("status.completed"), color: "bg-emerald-50/70 text-emerald-500 border-emerald-100", icon: <CheckCircle size={12} />, resume: false };
-    }
-    if (trip.status === "Pending") {
-      return { label: t("status.pending"), color: "bg-amber-50/70 text-amber-500 border-amber-100", icon: <Clock size={12} />, resume: false };
-    }
-    // Defensive: wizard fully submitted but status still Draft → treat as Pending
-    // (Step 5 submit should have moved it; never show Completed from Draft).
-    if (isTripWizardComplete(trip)) {
-      return { label: t("status.pending"), color: "bg-amber-50/70 text-amber-500 border-amber-100", icon: <Clock size={12} />, resume: false };
-    }
-    // A Draft trip always has Step 1 submitted (trips are created on Step 1
-    // submit), so it is always mid-workflow: show ONLY which step is pending
-    // next — no step name / farm detail.
-    const nextStep = getNextIncompleteTripStep(trip);
-    return {
-      label: t("ops.trip.step_label", { step: nextStep + 1 }),
-      color: "bg-emerald-50/70 text-emerald-500 border-emerald-100",
-      icon: <FileText size={12} />,
-      resume: true,
-    };
   };
 
   // Status control:
@@ -304,9 +341,7 @@ function TripRecentTable({
                 <Trash2 size={13} />
                 <span className="hidden md:inline">{t("common.delete")}</span>
               </button>
-              <button onClick={() => onRefresh()} className="h-8 w-8 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 text-slate-600 flex items-center justify-center transition-all shadow-sm active:scale-95 hover:border-slate-300" title={t("common.refresh")}>
-                <RefreshCw size={13} className="text-slate-600 transition-transform active:rotate-180" />
-              </button>
+              <BrandRefreshButton onClick={() => onRefresh()} />
             </div>
           </div>
         </div>
@@ -338,9 +373,9 @@ function TripRecentTable({
                   const isSelected = trip.id === selectedTripId;
                   const isDeleted = trip.deleted === true;
                   return (
-                    <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-all duration-150 group ${isDeleted ? "bg-rose-50/40 hover:bg-rose-50/70 border-l-4 border-l-rose-400" : isSelected ? "bg-blue-50/80 shadow-inner border-l-4 border-l-blue-600" : "hover:bg-slate-50/80"}`}>
-                      <td className="px-4 py-3 font-bold text-emerald-500 text-xs">
-                        <span className={`bg-emerald-50/70 px-2 py-1 rounded-md border border-emerald-100/80 ${isDeleted ? "opacity-60 line-through" : ""}`}>{trip.tripNo}</span>
+                    <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-all duration-150 group ${isDeleted ? "bg-red-50/50 hover:bg-red-50/80 border-l-4 border-l-red-400" : isSelected ? "bg-blue-100 shadow-inner border-l-4 border-l-blue-600 ring-1 ring-inset ring-blue-300" : "hover:bg-slate-50/80"}`}>
+                      <td className={`px-4 py-3 font-bold text-emerald-500 text-xs whitespace-nowrap ${isDeleted ? "opacity-60 line-through" : ""}`}>
+                        {trip.tripNo}
                       </td>
                       <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">{formatTripRecentDateWithDay(trip.tripDate)}</td>
                       <td className="px-4 py-3 text-xs font-medium text-slate-700">{trip.vehicleNo}</td>
@@ -353,7 +388,7 @@ function TripRecentTable({
                       <td className="px-4 py-3 text-center text-xs font-bold text-rose-500">{trip.totalMortality}</td>
                       <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                         {isDeleted ? (
-                          <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm bg-rose-50/80 text-rose-500 border border-rose-200/80"><AlertCircle size={12} /> {t("status.deleted")}</span>
+                          <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm bg-red-50 text-red-700 border border-red-200"><AlertCircle size={12} /> {t("status.deleted")}</span>
                         ) : (() => {
                           // Draft: resume badge. Pending: dropdown to move → Completed
                           // (then leaves Pending tab). Deletion = Delete + 10s undo.
@@ -375,13 +410,13 @@ function TripRecentTable({
                                 <select
                                   value="Pending"
                                   onChange={(e) => handleStatusChange(trip, e.target.value as TripStatus)}
-                                  className="w-full appearance-none rounded-xl px-3 py-1.5 text-xs font-bold border transition-all shadow-sm cursor-pointer pr-8 focus:outline-none focus:ring-2 focus:ring-offset-1 text-amber-500 border-amber-100 bg-amber-50/80 focus:ring-amber-500"
+                                  className="w-full appearance-none rounded-xl px-3 py-1.5 text-xs font-bold border transition-all shadow-sm cursor-pointer pr-8 focus:outline-none focus:ring-2 focus:ring-offset-1 text-orange-700 border-orange-200 bg-orange-50 focus:ring-orange-500"
                                   title={tSafe("ops.trip.move_to_completed") || "Move to Completed"}
                                 >
-                                  <option value="Pending" className="font-semibold bg-white text-amber-500">
+                                  <option value="Pending" className="font-semibold bg-white text-orange-700">
                                     ⏳ {tSafe("status.pending") || "Pending"}
                                   </option>
-                                  <option value="Completed" className="font-semibold bg-white text-emerald-500">
+                                  <option value="Completed" className="font-semibold bg-white text-emerald-700">
                                     ✅ {tSafe("status.completed") || "Completed"}
                                   </option>
                                 </select>
@@ -421,11 +456,20 @@ function TripRecentTable({
           </table>
         </div>
 
-        {shouldShowPagination(filteredTrips.length) && (
+        {/* Show the footer whenever the tab has rows — not only past the
+            10-row threshold. The bar also hosts rows-per-page, which must stay
+            reachable on small tabs (Pending/Deleted hold well under 10 rows,
+            and shouldShowPagination() was hiding the control there entirely). */}
+        {filteredTrips.length > 0 && (
           <TripPagination
             currentPage={currentPage}
             totalPages={Math.max(totalPages, 1)}
             onPageChange={setCurrentPage}
+            pageSize={pageSize}
+            onPageSizeChange={(next) => {
+              setPageSize(next);
+              setCurrentPage(1); // a new page size invalidates the current page
+            }}
           />
         )}
       </div>

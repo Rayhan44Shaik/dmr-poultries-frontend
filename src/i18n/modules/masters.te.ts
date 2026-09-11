@@ -1,6 +1,7 @@
 export default {
   'masters.ui.search_options': 'వెతకండి...',
   'masters.ui.no_matches': 'సరిపోలినవి లేవు',
+  'masters.ui.use_value': '{value} వాడండి',
   'masters.ui.required_fields': 'తప్పనిసరి వివరాలు',
   'masters.ui.clear_search': 'శోధన తొలగించండి',
   'masters.ui.actions': 'మాస్టర్ చర్యలు',

@@ -52,6 +52,7 @@ import {
   pageWindow,
 } from "../shared/ui/paginationStyles";
 import {
+  MAX_CUSTOM_PAGE_SIZE,
   PAGINATION_PAGE_SIZE_OPTIONS,
   uiPaginationBarClass,
   uiPaginationEllipsisClass,
@@ -148,18 +149,30 @@ export function Pagination({
 
       {onPageSizeChange ? (
         <div className="mr-1 flex items-center gap-1.5">
-          <span className="hidden text-[11px] font-medium text-slate-500 sm:inline">{t("common.rows", "Rows")}</span>
+          <span className="hidden text-xs font-semibold text-slate-600 sm:inline">{t("common.rows_per_page", "Rows per page")}</span>
           <MasterDropdown
             label={t("common.rows_per_page", "Rows per page")}
             hideLabel
             value={String(pageSize)}
             options={PAGINATION_PAGE_SIZE_OPTIONS.map(size => ({ value: String(size), label: String(size) }))}
+            // Same interaction as the Salary Register's Department / Employee
+            // pickers: type to filter, and commit an arbitrary count that is
+            // not one of the presets.
+            searchable
+            allowCustomValue
+            validateCustom={raw => {
+              // Whole numbers only, and capped: a huge page size would render
+              // thousands of rows and lock the browser up.
+              if (!/^\d+$/.test(raw)) return null;
+              const n = Number(raw);
+              return n >= 1 && n <= MAX_CUSTOM_PAGE_SIZE ? String(n) : null;
+            }}
             onChange={value => {
               const next = Number(value);
               if (Number.isFinite(next) && next !== pageSize) onPageSizeChange(next);
             }}
             disabled={disabled}
-            className="w-[76px] [&>button]:h-8 [&>button]:rounded-lg [&>button]:px-2 [&>button]:text-[11px]"
+            className="w-[86px] [&>button]:h-8 [&>button]:rounded-lg [&>button]:px-2 [&>button]:text-xs"
           />
         </div>
       ) : null}

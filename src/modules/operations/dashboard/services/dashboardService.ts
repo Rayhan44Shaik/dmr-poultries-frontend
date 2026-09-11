@@ -19,6 +19,26 @@ export type OperationsDashboardApiResponse = {
   todaysTrips?: number;
   weeklyTrips?: number;
   monthlyTrips?: number;
+  /** Optional panel/chart series. Passed through when the API supplies them. */
+  totalExpenses?: number;
+  tripExpense?: number;
+  trendData?: { date: string; trips: number; weight: number; mortality: number }[];
+  topShops?: { shopName: string; amount: number }[];
+  collectionsByMode?: { name: string; value: number }[];
+  expensesByCategory?: { name: string; value: number }[];
+  mortalityData?: { date: string; mortality: number }[];
+  recentTrips?: unknown[];
+  pendingCollectionsByShop?: { shopName: string; pendingAmount: number }[];
+  activeVehicles?: number;
+  activeDrivers?: number;
+  activeHelpers?: number;
+  totalShops?: number;
+  totalFarms?: number;
+  usedVehicles?: number;
+  usedDrivers?: number;
+  usedHelpers?: number;
+  usedShops?: number;
+  usedFarms?: number;
 };
 
 /** UI shape used by Operations Dashboard components. */
@@ -77,30 +97,31 @@ export function mapDashboardResponse(
     totalCollections,
     pendingCollections,
     // Expenses card uses totalExpenses + fuel breakdown
-    totalExpenses: fuelExpenses,
+    totalExpenses: raw?.totalExpenses != null ? toNumber(raw.totalExpenses) : fuelExpenses,
     fuelExpense: fuelExpenses,
-    tripExpense: 0,
+    tripExpense: toNumber(raw?.tripExpense),
     todaysTrips: toNumber(raw?.todaysTrips),
     weeklyTrips: toNumber(raw?.weeklyTrips),
     monthlyTrips: toNumber(raw?.monthlyTrips),
-    // Chart/table sections stay empty until those APIs are wired
-    trendData: [],
-    topShops: [],
-    collectionsByMode: [],
-    expensesByCategory: [],
-    mortalityData: [],
-    recentTrips: [],
-    activeVehicles: 0,
-    activeDrivers: 0,
-    activeHelpers: 0,
-    totalShops: 0,
-    totalFarms: 0,
-    pendingCollectionsByShop: [],
-    usedVehicles: 0,
-    usedDrivers: 0,
-    usedHelpers: 0,
-    usedShops: 0,
-    usedFarms: 0,
+    // Chart/table sections render whatever the API supplies; a backend that
+    // returns only KPIs still yields the previous empty-panel behaviour.
+    trendData: raw?.trendData ?? [],
+    topShops: raw?.topShops ?? [],
+    collectionsByMode: raw?.collectionsByMode ?? [],
+    expensesByCategory: raw?.expensesByCategory ?? [],
+    mortalityData: raw?.mortalityData ?? [],
+    recentTrips: raw?.recentTrips ?? [],
+    activeVehicles: toNumber(raw?.activeVehicles),
+    activeDrivers: toNumber(raw?.activeDrivers),
+    activeHelpers: toNumber(raw?.activeHelpers),
+    totalShops: toNumber(raw?.totalShops),
+    totalFarms: toNumber(raw?.totalFarms),
+    pendingCollectionsByShop: raw?.pendingCollectionsByShop ?? [],
+    usedVehicles: toNumber(raw?.usedVehicles),
+    usedDrivers: toNumber(raw?.usedDrivers),
+    usedHelpers: toNumber(raw?.usedHelpers),
+    usedShops: toNumber(raw?.usedShops),
+    usedFarms: toNumber(raw?.usedFarms),
   };
 }
 

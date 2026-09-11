@@ -44,8 +44,10 @@
 import { createEmptyTrip, type ShopDelivery, type Trip } from "../../../shared/trip";
 import type { Shop } from "../../masters/shops/types/shop";
 
-/** Master switch: `true` = run the Orders page on bundled sample data. */
-export const ORDERS_SAMPLE_DATA_ENABLED = true;
+/** Master switch: `true` = run the Orders page on bundled sample data.
+ *  Set to `false` so the page reads the live /api/trips contract (the shared
+ *  quarter dataset supplies the `[ORDER]` collection containers). */
+export const ORDERS_SAMPLE_DATA_ENABLED = false;
 
 // ─── Sample masters ──────────────────────────────────────────────────────────
 

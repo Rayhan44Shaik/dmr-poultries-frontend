@@ -8,8 +8,8 @@ interface Props {
 function TripStatusBadge({ status }: Props) {
   const { t } = useI18n();
   const styles = {
-    Pending: "bg-yellow-100 text-yellow-700",
-    Completed: "bg-green-50/80 text-green-500",
+    Pending: "bg-orange-50 text-orange-700 border border-orange-200",
+    Completed: "bg-emerald-50 text-emerald-700 border border-emerald-200",
   };
 
   return (

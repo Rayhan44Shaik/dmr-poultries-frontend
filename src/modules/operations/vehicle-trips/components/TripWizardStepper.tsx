@@ -70,16 +70,20 @@ export default function TripWizardStepper({
         const pillClasses = `
           inline-flex items-center gap-1.5 rounded-full border px-2.5 md:px-3 py-1.5 text-[11px] font-bold whitespace-nowrap shrink-0
           transition-all duration-300 ease-out
-          focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/40
+          focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40
           ${isClickable ? "cursor-pointer active:scale-95" : "cursor-default"}
           ${
             isActive
+<<<<<<< HEAD
               ? "bg-gradient-to-r from-emerald-600 to-green-700 text-white border-emerald-700 shadow-md shadow-emerald-600/25 scale-105"
+=======
+              ? "bg-emerald-600 text-white border-transparent shadow-sm shadow-emerald-600/25 scale-105"
+>>>>>>> 7f2979f92ebf0943fe9b337d1f20b7bf6e3022c7
               : isLocked
                 ? "bg-slate-100 text-slate-400 border-slate-200 cursor-not-allowed opacity-80"
                 : isCompleted
-                  ? "bg-emerald-50/70 text-emerald-500 border-emerald-100 hover:bg-emerald-50/80"
-                  : "bg-white text-slate-500 border-slate-200 hover:border-emerald-100 hover:text-emerald-500"
+                  ? "bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100"
+                  : "bg-white text-slate-500 border-slate-200 hover:border-emerald-200 hover:text-emerald-600"
           }
         `.trim();
 
@@ -92,7 +96,7 @@ export default function TripWizardStepper({
               : isLocked
                 ? "bg-slate-200 text-slate-400"
                 : isCompleted
-                  ? "bg-emerald-500 text-white"
+                  ? "bg-emerald-600 text-white"
                   : "bg-slate-100 text-slate-500"
           }
         `;
@@ -111,7 +115,11 @@ export default function TripWizardStepper({
             {isCompleted && (
               <span
                 className={`hidden md:inline text-[9px] font-semibold ${
+<<<<<<< HEAD
                   isActive ? "text-emerald-50" : "text-emerald-500"
+=======
+                  isActive ? "text-emerald-50/90" : "text-emerald-600"
+>>>>>>> 7f2979f92ebf0943fe9b337d1f20b7bf6e3022c7
                 }`}
               >
                 {t("ops.trip.submitted")}
@@ -159,7 +167,7 @@ export default function TripWizardStepper({
               <div
                 aria-hidden
                 className={`h-[2px] flex-1 min-w-3 rounded-full transition-colors duration-500 ${
-                  stepStatus[index] ? "bg-emerald-400/70" : "bg-slate-200"
+                  stepStatus[index] ? "bg-emerald-300" : "bg-slate-200"
                 }`}
               />
             )}

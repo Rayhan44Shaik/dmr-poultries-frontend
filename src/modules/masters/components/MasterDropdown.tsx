@@ -28,12 +28,27 @@ interface MasterDropdownProps {
   placeholder?: string;
   searchable?: boolean;
   allowClear?: boolean;
+  /**
+   * Let the user COMMIT the search text as the value when it matches no option
+   * (press Enter, or click the "Use <text>" row). Used by rows-per-page so an
+   * operator can type an arbitrary count instead of picking a preset.
+   * Requires `searchable`. `validateCustom` gates what may be committed.
+   */
+  allowCustomValue?: boolean;
+  /** Returns the value to commit, or null to reject it. */
+  validateCustom?: (raw: string) => string | null;
   disabled?: boolean;
   required?: boolean;
   error?: string;
   hideLabel?: boolean;
   labelStyle?: "filter" | "field";
   className?: string;
+  /**
+   * Extra classes for the TRIGGER button itself (not the wrapper). Needed so a
+   * toolbar can align the dropdown's height with the buttons beside it — the
+   * trigger's own h-9 would otherwise win.
+   */
+  triggerClassName?: string;
   /** Action menus (Export) share the chrome, but use menu/menuitem semantics. */
   kind?: "select" | "action";
   /** Inline only for the month/year menus inside the calendar's own popup. */
@@ -54,12 +69,15 @@ export default function MasterDropdown({
   placeholder = label,
   searchable = false,
   allowClear = false,
+  allowCustomValue = false,
+  validateCustom,
   disabled = false,
   required = false,
   error,
   hideLabel = false,
   labelStyle = "filter",
   className = "",
+  triggerClassName = "",
   kind = "select",
   portal = true,
 }: MasterDropdownProps) {
@@ -135,6 +153,25 @@ export default function MasterDropdown({
   const pick = (option: MasterDropdownOption) => {
     if (disabled || option.disabled) return;
     onChange(option.value);
+    close(true);
+  };
+
+  /**
+   * The typed text, if it is a legal custom value. `null` when custom entry is
+   * off, the box is empty, the text already matches an option, or the caller's
+   * validator rejects it.
+   */
+  const customValue = (() => {
+    if (!allowCustomValue || !searchable) return null;
+    const raw = query.trim();
+    if (!raw) return null;
+    if (items.some((o) => o.label.toLocaleLowerCase() === raw.toLocaleLowerCase())) return null;
+    return validateCustom ? validateCustom(raw) : raw;
+  })();
+
+  const commitCustom = () => {
+    if (disabled || customValue == null) return;
+    onChange(customValue);
     close(true);
   };
 
@@ -280,6 +317,8 @@ export default function MasterDropdown({
       event.preventDefault();
       if (!isOpen) show();
       else if (filtered[active]) pick(filtered[active]);
+      // Nothing highlighted but a valid typed value: commit it.
+      else if (customValue != null) commitCustom();
     } else if (
       !inSearch &&
       event.key.length === 1 &&
@@ -374,6 +413,8 @@ export default function MasterDropdown({
             }}
             className={`flex h-9 w-full shrink-0 items-center gap-2 px-3 text-left text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40 ${
               kind === "select" && option.value === value
+                // Selected row: soft blue tint, the original Salary Register
+                // treatment. A solid fill here read as harsh.
                 ? "bg-blue-50 text-blue-600"
                 : index === active
                   ? "bg-slate-50 text-slate-700"
@@ -390,7 +431,17 @@ export default function MasterDropdown({
             </span>
           </button>
         ))}
-        {noMatches && (
+        {noMatches && customValue != null && (
+          <button
+            type="button"
+            onMouseDown={(event) => event.preventDefault()}
+            onClick={commitCustom}
+            className="flex h-9 w-full shrink-0 items-center gap-2 px-3 text-left text-xs font-semibold text-blue-600 hover:bg-blue-50"
+          >
+            {t("masters.ui.use_value", { value: customValue })}
+          </button>
+        )}
+        {noMatches && customValue == null && (
           <div
             role="status"
             className="flex h-9 items-center px-3 text-xs text-slate-400"
@@ -442,7 +493,7 @@ export default function MasterDropdown({
           error
             ? "border-red-400 focus:border-red-500 focus:ring-red-100"
             : "border-slate-200 hover:border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
-        }`}
+        } ${triggerClassName}`}
       >
         <span
           className={`truncate ${kind === "select" && !value ? "text-slate-400" : "text-slate-700"}`}

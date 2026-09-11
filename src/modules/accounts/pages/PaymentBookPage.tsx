@@ -42,7 +42,10 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   const [approving, setApproving] = useState(false);
   const [approvalError, setApprovalError] = useState('');
   const approvingRef = useRef(false);
-  const [demo, setDemo] = useState(import.meta.env.DEV);
+  // Default to the live API in every environment so the page shows the same
+  // dataset as the rest of the app; the bundled examples remain available as
+  // an explicit fallback when the payments endpoint is unreachable.
+  const [demo, setDemo] = useState(false);
   // Sample rows are state, not a one-shot constant: the preview is writable (see
   // `persistSample`) so create/edit/approve/delete can be exercised without a
   // server. Nothing written here ever reaches a payment endpoint.
