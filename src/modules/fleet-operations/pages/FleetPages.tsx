@@ -65,7 +65,7 @@ function FleetPages() {
           if (!visitedTabs.has(tab) && tab !== activeTab) return null;
           const isActive = tab === activeTab;
           return (
-            <div key={tab} hidden={!isActive} aria-hidden={!isActive}>
+            <div key={tab} hidden={!isActive} aria-hidden={!isActive} className={isActive ? "animate-page-pop" : undefined}>
               <Suspense fallback={<FleetTabSkeleton />}>
                 <Component embedded={true} active={tab === "emi" ? isActive : undefined} />
               </Suspense>

@@ -100,7 +100,7 @@ function RangeDatePicker({
       ? "bottom-[calc(100%+8px)] mb-1"
       : "top-[calc(100%+8px)] mt-1";
 
-  const slateCalendarIcon = <Calendar size={14} className="text-slate-400" />;
+  const slateCalendarIcon = <Calendar size={15} className="text-emerald-600" />;
 
   return (
     <div className={`relative ${className}`} ref={containerRef}>
@@ -108,9 +108,9 @@ function RangeDatePicker({
         <button
           type="button"
           onClick={toggleCalendar}
-          className="h-11 px-5 rounded-xl border border-slate-200/80 bg-slate-50/70 flex items-center gap-2.5 text-sm font-bold text-slate-700 hover:border-blue-500/50 hover:bg-slate-100/80 focus:outline-none focus:ring-4 focus:ring-blue-500/10 transition-all active:scale-[0.98]"
+          className="h-11 px-5 rounded-xl border border-slate-200/80 bg-slate-50/70 flex items-center gap-2.5 text-sm font-bold text-slate-700 hover:border-emerald-500/50 hover:bg-slate-100/80 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 transition-all active:scale-[0.98]"
         >
-          <Calendar size={18} className="text-blue-600" />
+          <Calendar size={18} className="text-emerald-600" />
           <span>
             {startDate && endDate
               ? `${formatDate(startDate)} – ${formatDate(endDate)}`
@@ -121,7 +121,7 @@ function RangeDatePicker({
 
       {isOpen && (
         <div
-          className={`absolute right-0 z-50 w-[min(24rem,calc(100vw-2rem))] rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-xl shadow-slate-900/5 backdrop-blur-xl border-t-blue-500 border-t-2 ${dropdownPositionClass}`}
+          className={`absolute right-0 z-50 w-[min(24rem,calc(100vw-2rem))] rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-xl shadow-slate-900/5 backdrop-blur-xl border-t-emerald-500 border-t-2 ${dropdownPositionClass}`}
         >
           <div className="space-y-4">
             {/* Stacked full-width fields: the shared DatePicker reserves right
@@ -164,7 +164,7 @@ function RangeDatePicker({
                   onRangeChange(weekAgo, today);
                   setIsOpen(false);
                 }}
-                className="rounded-lg bg-blue-50 px-4 py-2 text-[13px] font-bold text-blue-700 transition-colors hover:bg-blue-100"
+                className="rounded-lg bg-emerald-50 px-4 py-2 text-[13px] font-bold text-emerald-700 transition-colors hover:bg-emerald-100"
               >
                 {t("ops.dashboard.last_7_days")}
               </button>
@@ -246,7 +246,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
         disabled={refreshing}
         title="Refresh all data"
         aria-label="Refresh all data"
-        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200/80 bg-slate-50/70 text-slate-600 transition-all hover:border-blue-500/50 hover:bg-slate-100/80 hover:text-blue-600 focus:outline-none focus:ring-4 focus:ring-blue-500/10 active:scale-[0.96] disabled:opacity-60"
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200/80 bg-slate-50/70 text-slate-600 transition-all hover:border-emerald-500/50 hover:bg-slate-100/80 hover:text-emerald-600 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 active:scale-[0.96] disabled:opacity-60"
       >
         <RefreshCw size={18} className={refreshing ? "animate-spin" : ""} />
       </button>
