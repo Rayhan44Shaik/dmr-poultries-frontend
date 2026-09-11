@@ -111,10 +111,8 @@ function TripMasterTable({ trips, selectedRowId, onRowClick, startIndex = 0 }: P
                     <td className="px-4 py-3 text-center text-xs text-slate-500 font-medium w-10">
                       {isSelected ? <Check size={15} className="text-blue-500 inline" /> : serialNo}
                     </td>
-                    <td className="px-4 py-3 text-xs whitespace-nowrap">
-                      <span className="bg-emerald-100 px-2 py-1 rounded-md border border-emerald-300 text-emerald-700 font-bold">
-                        {trip.tripNo}
-                      </span>
+                    <td className="px-4 py-3 font-bold text-emerald-500 text-xs whitespace-nowrap">
+                      {trip.tripNo}
                     </td>
                     <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(trip.tripDate)}</td>
                     <td className="px-4 py-3 text-xs font-medium text-slate-700 whitespace-nowrap">{trip.vehicleNo}</td>
