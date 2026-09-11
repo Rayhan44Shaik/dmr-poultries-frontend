@@ -203,13 +203,15 @@ for (const plan of DEPT_PLAN) {
   for (let i = 0; i < plan.count; i += 1) {
     empSeq += 1;
     const r = rng(2000 + empSeq);
-    const name = `${EMP_FIRST[(empSeq * 3) % EMP_FIRST.length]} ${
-      EMP_LAST[(empSeq * 5) % EMP_LAST.length]
+    // Clean, unique full name — the employee number lives in `employeeNo`
+    // (and `id`), never appended to the display name.
+    const name = `${EMP_FIRST[(empSeq - 1) % EMP_FIRST.length]} ${
+      EMP_LAST[Math.floor((empSeq - 1) / EMP_FIRST.length) % EMP_LAST.length]
     }`;
     EMPLOYEES.push({
       id: empSeq,
       employeeNo: empSeq,
-      employeeName: `${name} ${String(empSeq).padStart(3, "0")}`,
+      employeeName: name,
       department: plan.department,
       role: plan.role,
       phoneNumber: String(9880000000 + empSeq * 173),

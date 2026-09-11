@@ -508,6 +508,7 @@ export default {
   'ops.trip.mortality_birds': 'మరణాలు (పక్షులు)',
   'ops.trip.mortality_weight': 'మరణాల బరువు',
   'ops.trip.mortality_weight_kg': 'మరణాల బరువు (కేజీ)',
+  'ops.trip.mortality_short': 'మర',
   'ops.trip.new_row_added': 'కొత్త వరుస జోడించబడింది.',
   'ops.trip.no_active_trip': 'ఇప్పుడు ఏ ట్రిప్ ఓపెన్ లేదు. కొత్త ట్రిప్ మొదలుపెట్టండి.',
   'ops.trip.no_active_bird_types': 'ఇతర యాక్టివ్ పక్షి రకాలు లేవు.',

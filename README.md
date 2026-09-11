@@ -9,6 +9,33 @@ npm install
 npm run dev
 ```
 
+### Demo / sample data (no database required)
+
+The repo ships a deterministic in-memory sample API so **every page of every
+module** renders fully populated in a hosted preview — no PostgreSQL needed.
+
+```bash
+# Terminal 1 — full-quarter sample API on port 4000 (the Vite proxy target)
+npm run mock:backend          # scripts/quarter-sample-data.mjs
+
+# Terminal 2 — frontend, auto-logged-in as the demo Owner
+VITE_DEMO_MODE=1 npm run dev -- --host 0.0.0.0
+```
+
+- `npm run mock:backend` serves a complete **Q3 2026** quarter (200 shops, 150
+  employees, 10 farms, 24 vehicles, ~640 trips, ~6,000 delivery lines, ~4,900
+  collections, plus banks, market rates, permits, EMI schedules, salaries,
+  leaves, duty roster, payments and farm payments). `GET /api/quarter-summary`
+  returns the full row-count manifest. Writes return `200 {ok:true}` so UI
+  flows complete, but the dataset stays immutable and byte-identical on restart.
+- `npm run mock:trips` serves the older, trip-wizard-focused sample
+  (`scripts/dev-mock-backend.mjs`) with in-memory wizard save/submit support.
+- `VITE_DEMO_MODE=1` (or adding `?demo=1` to the URL) skips the login gate.
+  Auth is also stubbed by the sample API, so any credentials work too.
+
+Full module-by-module verification steps live in
+[`docs/QUARTER_SAMPLE_DATA_TESTING_GUIDE.md`](./docs/QUARTER_SAMPLE_DATA_TESTING_GUIDE.md).
+
 ### Masters
 
 Shops, Farms, Vehicles, Employees, Banks and Bird Types share consistent
@@ -99,19 +126,18 @@ To review **Vehicles → EMI** without connecting a real database:
 
 ```bash
 # Terminal 1: opt-in, in-memory demo API (never writes to PostgreSQL)
-npm run mock:backend
+npm run mock:backend          # full-quarter sample (12 financed EMI vehicles)
 
 # Terminal 2: same-origin API calls through Vite's existing /api proxy
-VITE_API_BASE_URL=/api npm run dev -- --host 0.0.0.0
+VITE_DEMO_MODE=1 VITE_API_BASE_URL=/api npm run dev -- --host 0.0.0.0
 ```
 
 Open `/fleet?tab=emi` in the frontend preview. The demo includes **12 fictional
-vehicles** (3 completed schedules and 9 pending), different purchase amounts,
-12–60 installments, a new schedule, a nearly finished schedule and a month-end
-EMI day. Dates move with the current month. Search, status filters, sorting,
-pagination and Refresh work with these samples. The Status dropdown follows
-the Salary Register's Department styling, with all three vehicle totals beside
-it on one line. Narrow screens scroll the toolbar without clipping the menu.
+vehicles** with different purchase amounts and 12–60 installments, plus active,
+overdue and paid schedules. Search, status filters, sorting, pagination and
+Refresh work with these samples. The Status dropdown follows the Salary
+Register's Department styling, with all three vehicle totals beside it on one
+line. Narrow screens scroll the toolbar without clipping the menu.
 
 The page labels demo responses **Sample data · Preview only** in English/Telugu.
 Completion still follows the current due-date calculation, not payment receipts.
