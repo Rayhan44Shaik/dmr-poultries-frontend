@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Link } from "react-router-dom";
+import { addDays, subMonths } from "date-fns";
 import { useDashboardData } from "../hooks/useDashboardData";
 import KPICards from "../components/KPICards";
 import TrendChart from "../components/TrendChart";
@@ -26,6 +27,13 @@ const getPreviousWeekRange = () => {
   const prevSunday = new Date(prevMonday);
   prevSunday.setDate(prevMonday.getDate() + 6);
   return { startDate: prevMonday, endDate: prevSunday };
+};
+
+// -------- Helper: today at local midnight (quick-range anchor) --------
+const todayMidnight = (): Date => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
 };
 
 // -------- Helper: Format Date to YYYY-MM-DD safely --------
@@ -100,6 +108,28 @@ function RangeDatePicker({
       ? "bottom-[calc(100%+8px)] mb-1"
       : "top-[calc(100%+8px)] mt-1";
 
+  // ── Quick-range presets (segmented toggle) ────────────────────────────────
+  const RANGE_PRESETS = [
+    { key: "7d", label: "7D", title: "Last 7 days", start: () => addDays(todayMidnight(), -6) },
+    { key: "15d", label: "15D", title: "Last 15 days", start: () => addDays(todayMidnight(), -14) },
+    { key: "1m", label: "1M", title: "Last month", start: () => addDays(subMonths(todayMidnight(), 1), 1) },
+    { key: "qtr", label: "QTR", title: "Last quarter (3 months)", start: () => addDays(subMonths(todayMidnight(), 3), 1) },
+  ] as const;
+
+  const activePreset = RANGE_PRESETS.find((preset) => {
+    if (!startDate || !endDate) return false;
+    const expected = preset.start();
+    return (
+      toInputDateString(startDate) === toInputDateString(expected) &&
+      toInputDateString(endDate) === toInputDateString(todayMidnight())
+    );
+  })?.key;
+
+  const applyPreset = (preset: (typeof RANGE_PRESETS)[number]) => {
+    onRangeChange(preset.start(), todayMidnight());
+    setIsOpen(false);
+  };
+
   const slateCalendarIcon = <Calendar size={15} className="text-emerald-600" />;
 
   const rangeLabel =
@@ -135,7 +165,15 @@ function RangeDatePicker({
         </span>
         {rangeDays != null && (
           <span className="ml-0.5 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-extrabold tabular-nums text-emerald-700 ring-1 ring-inset ring-emerald-100">
-            {rangeDays}d
+            {activePreset === "7d"
+              ? "7D"
+              : activePreset === "15d"
+                ? "15D"
+                : activePreset === "1m"
+                  ? "1M"
+                  : activePreset === "qtr"
+                    ? "QTR"
+                    : `${rangeDays}d`}
           </span>
         )}
         <ChevronDown
@@ -149,6 +187,43 @@ function RangeDatePicker({
           className={`absolute right-0 z-50 w-[min(24rem,calc(100vw-2rem))] animate-scale-in rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-xl shadow-slate-900/10 backdrop-blur-xl ring-1 ring-emerald-500/10 ${dropdownPositionClass}`}
         >
           <div className="space-y-4">
+            {/* Quick-range segmented toggle */}
+            <div>
+              <span className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                Quick range
+              </span>
+              <div className="grid grid-cols-4 gap-1 rounded-xl bg-slate-100 p-1">
+                {RANGE_PRESETS.map((preset) => {
+                  const active = activePreset === preset.key;
+                  return (
+                    <button
+                      key={preset.key}
+                      type="button"
+                      title={preset.title}
+                      onClick={() => applyPreset(preset)}
+                      aria-pressed={active}
+                      className={`rounded-lg py-1.5 text-[12.5px] font-extrabold tracking-wide transition-all duration-150 active:scale-95 ${
+                        active
+                          ? "bg-emerald-600 text-white shadow-sm"
+                          : "text-slate-500 hover:bg-white hover:text-emerald-700"
+                      }`}
+                    >
+                      {preset.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Custom dates */}
+            <div className="flex items-center gap-2">
+              <span className="h-px flex-1 bg-slate-100" />
+              <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                or pick custom dates
+              </span>
+              <span className="h-px flex-1 bg-slate-100" />
+            </div>
+
             {/* Stacked full-width fields: the shared DatePicker reserves right
                 space for its clear/calendar icons, so two narrow columns clip
                 the DD/MM/YYYY value. */}
@@ -179,32 +254,13 @@ function RangeDatePicker({
               </div>
             </div>
 
-            <div className="flex gap-2 whitespace-nowrap border-t border-slate-100 pt-4">
+            <div className="flex justify-end border-t border-slate-100 pt-3.5">
               <button
                 type="button"
-                onClick={() => {
-                  const today = new Date();
-                  const weekAgo = new Date(today);
-                  weekAgo.setDate(today.getDate() - 6);
-                  onRangeChange(weekAgo, today);
-                  setIsOpen(false);
-                }}
-                className="flex-1 rounded-lg bg-emerald-600 px-4 py-2 text-[13px] font-bold text-white shadow-sm transition-colors hover:bg-emerald-700"
+                onClick={() => setIsOpen(false)}
+                className="rounded-lg bg-emerald-600 px-5 py-2 text-[13px] font-bold text-white shadow-sm transition-colors hover:bg-emerald-700 active:scale-[0.98]"
               >
-                {t("ops.dashboard.last_7_days")}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const today = new Date();
-                  const monthAgo = new Date(today);
-                  monthAgo.setDate(today.getDate() - 30);
-                  onRangeChange(monthAgo, today);
-                  setIsOpen(false);
-                }}
-                className="flex-1 rounded-lg border border-slate-200 bg-white px-4 py-2 text-[13px] font-bold text-slate-600 transition-colors hover:bg-slate-50"
-              >
-                {t("ops.dashboard.last_30_days")}
+                Done
               </button>
             </div>
           </div>
