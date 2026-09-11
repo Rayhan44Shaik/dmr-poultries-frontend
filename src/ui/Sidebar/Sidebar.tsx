@@ -1,9 +1,9 @@
 // src/ui/Sidebar/Sidebar.tsx
-// Small floating navigation popup: opens via the header menu button (all
-// viewports) as a compact dropdown below it, and closes when the user
-// clicks outside the popup, presses Escape, or navigates to another route.
+// Fast hide/show navigation drawer: hidden by default on every viewport,
+// opened by the header menu button, and closed by the X button, outside click,
+// Escape, or navigation.
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { X } from "lucide-react";
 import { NAV_SECTIONS, NAV_TONE_CLASS, type NavChild } from "../../routes/navigation";
@@ -45,14 +45,39 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   const search = location.search;
   const { t } = useI18n();
   const pendingApprovals = usePendingApprovals();
+  const [rendered, setRendered] = useState(open);
+  const [shown, setShown] = useState(false);
 
-  // Close the popup on route change.
+  // Keep the drawer mounted briefly after close so the slide-out stays visible.
+  useEffect(() => {
+    let frame = 0;
+    let nextFrame = 0;
+    let timer = 0;
+
+    if (open) {
+      frame = requestAnimationFrame(() => {
+        setRendered(true);
+        nextFrame = requestAnimationFrame(() => setShown(true));
+      });
+    } else {
+      frame = requestAnimationFrame(() => setShown(false));
+      timer = window.setTimeout(() => setRendered(false), 150);
+    }
+
+    return () => {
+      cancelAnimationFrame(frame);
+      cancelAnimationFrame(nextFrame);
+      window.clearTimeout(timer);
+    };
+  }, [open]);
+
+  // Close the drawer on route change.
   useEffect(() => {
     onClose();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pathname, search]);
 
-  // Close the popup on Escape.
+  // Close the drawer on Escape.
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -98,7 +123,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
         }
       });
     };
-    // Multiple attempts to cover paint + popup animation + fonts
+    // Multiple attempts to cover paint + drawer animation + fonts
     const raf = requestAnimationFrame(() => {
       doScroll();
       const t1 = window.setTimeout(doScroll, 120);
@@ -120,7 +145,7 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
   }, [open, pathname, search]);
 
   const navContent = (
-    <nav className="max-h-[calc(100vh-5rem)] overflow-y-auto px-3 py-4 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent lg:max-h-none">
+    <nav className="h-full overflow-y-auto px-3 py-4 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent">
       {NAV_SECTIONS.map((section) => {
         const SectionIcon = section.icon;
         return (
@@ -191,34 +216,27 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
     </nav>
   );
 
-  return (
+  return rendered ? (
     <>
-      {/* Persistent desktop navigation. */}
-      <aside className="fixed inset-y-0 left-0 z-40 hidden w-[260px] flex-col border-r border-slate-200 bg-white shadow-sm dark:border-slate-800 dark:bg-slate-900 lg:flex">
-        <div className="flex h-16 shrink-0 items-center border-b border-slate-200/80 px-4 dark:border-slate-800">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <BrandMark size="xs" variant="plain" />
-            <span className="truncate text-[13px] font-bold tracking-tight text-slate-900 dark:text-white">
-              DMR Poultries
-            </span>
-          </div>
-        </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">{navContent}</div>
-      </aside>
+      {/* Click-catcher for fast close on every screen size. */}
+      <div
+        className={`fixed inset-0 z-40 bg-slate-950/10 backdrop-blur-[1px] transition-opacity duration-150 ${
+          shown ? "opacity-100" : "opacity-0"
+        }`}
+        onClick={onClose}
+        aria-hidden="true"
+      />
 
-      {open && (
-        <>
-          {/* Mobile click-catcher: clicking outside closes the popup. */}
-          <div className="fixed inset-0 z-40 lg:hidden" onClick={onClose} aria-hidden="true" />
-
-          {/* Small-screen navigation popup. */}
-          <div
-            role="dialog"
-            aria-modal="true"
-            className="fixed left-3 top-[72px] z-50 w-[300px] max-w-[calc(100vw-24px)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-pop animate-slide-down dark:border-slate-800 dark:bg-slate-900 sm:left-4 lg:hidden"
-          >
-        {/* Compact brand row */}
-        <div className="flex h-12 shrink-0 items-center justify-between border-b border-slate-200/80 pl-4 pr-1.5 dark:border-slate-800">
+      {/* Flexible navigation drawer: hidden initially, quick slide in/out. */}
+      <aside
+        role="dialog"
+        aria-modal="true"
+        aria-label={t("header.openMenu")}
+        className={`fixed inset-y-0 left-0 z-50 flex w-[300px] max-w-[calc(100vw-24px)] flex-col overflow-hidden border-r border-slate-200 bg-white shadow-pop transition-transform duration-150 ease-out dark:border-slate-800 dark:bg-slate-900 sm:w-[320px] lg:w-[280px] ${
+          shown ? "translate-x-0" : "-translate-x-full"
+        }`}
+      >
+        <div className="flex h-16 shrink-0 items-center justify-between border-b border-slate-200/80 pl-4 pr-2 dark:border-slate-800">
           <div className="flex min-w-0 items-center gap-2.5">
             <BrandMark size="xs" variant="plain" />
             <span className="truncate text-[13px] font-bold tracking-tight text-slate-900 dark:text-white">
@@ -228,18 +246,15 @@ export default function Sidebar({ open, onClose }: SidebarProps) {
           <button
             type="button"
             onClick={onClose}
-            className="shrink-0 rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
+            className="shrink-0 rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 dark:hover:bg-slate-800 dark:hover:text-slate-200"
             aria-label={t("header.closeMenu")}
           >
-            <X size={16} />
+            <X size={18} />
           </button>
         </div>
 
-        {/* Scrollable nav (capped height keeps the popup small) */}
-            {navContent}
-          </div>
-        </>
-      )}
+        <div className="min-h-0 flex-1 overflow-y-auto">{navContent}</div>
+      </aside>
     </>
-  );
+  ) : null;
 }

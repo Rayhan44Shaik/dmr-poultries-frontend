@@ -1,6 +1,7 @@
 // src/layouts/DashboardLayout/DashboardLayout.tsx
-// Application shell: floating navigation popup (open via the menu button,
-// close by clicking outside or Escape) + header + command palette.
+// Application shell: fast hide/show navigation drawer (open via the menu
+// button on every viewport, close by clicking outside or Escape) + header +
+// command palette.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useLocation } from "react-router-dom";
@@ -17,8 +18,8 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
   const location = useLocation();
   const mainRef = useRef<HTMLElement>(null);
 
-  // The navigation popup is closed by default; the header menu button
-  // opens it. Clicking outside the popup (or pressing Escape) closes it.
+  // Hidden by default. The header menu button toggles the fast drawer open/closed
+  // on both desktop and mobile; outside click / Escape also close it.
   const [navOpen, setNavOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
 
@@ -28,10 +29,10 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
   }, [location.pathname, location.search]);
 
   return (
-    <div className="h-screen overflow-hidden bg-slate-100/80 dark:bg-slate-950 lg:pl-[260px]">
+    <div className="h-screen overflow-hidden bg-slate-100/80 dark:bg-slate-950">
       <div className="flex h-full min-w-0 flex-col">
         <Header
-          onMenuClick={() => setNavOpen(true)}
+          onMenuClick={() => setNavOpen((open) => !open)}
           menuOpen={navOpen}
           onOpenCommand={() => setCommandOpen(true)}
         />

@@ -136,47 +136,45 @@ function TripRecentTable({
     };
   };
 
-  const filterBySearch = (trips: Trip[]) => {
-    if (!searchTerm.trim()) return trips;
-    const lower = searchTerm.toLowerCase();
-    // Collapse whitespace so "step1" and "step 1" both match "Step 1".
-    const squashed = lower.replace(/\s+/g, "");
-    return trips.filter((t) => {
-      // The status column renders a STEP BADGE, so the badge's own label is
-      // what has to be searchable ("Step 1"). Matching only the raw status
-      // field would never find the text the user can actually see.
-      const badge = getStepBadge(t).label.toLowerCase();
-      return (
-        t.tripNo.toLowerCase().includes(lower) ||
-        t.tripDate.includes(lower) ||
-        t.vehicleNo.toLowerCase().includes(lower) ||
-        t.driverName.toLowerCase().includes(lower) ||
-        t.supervisorName.toLowerCase().includes(lower) ||
-        t.sourceFarm.toLowerCase().includes(lower) ||
-        badge.includes(lower) ||
-        badge.replace(/\s+/g, "").includes(squashed) ||
-        // Also match the underlying status word (draft / pending / completed /
-        // deleted) even when the badge is showing a step instead.
-        listStatus(t).toLowerCase().includes(lower)
-      );
-    });
-  };
-
   const sortedTrips = useMemo(() => {
     const lower = searchTerm.trim().toLowerCase();
-    const filtered = lower ? safeTrips.filter((trip) =>
-      trip.tripNo.toLowerCase().includes(lower) ||
-      trip.tripDate.includes(lower) ||
-      trip.vehicleNo.toLowerCase().includes(lower) ||
-      trip.driverName.toLowerCase().includes(lower) ||
-      trip.supervisorName.toLowerCase().includes(lower) ||
-      trip.sourceFarm.toLowerCase().includes(lower)
-    ) : safeTrips;
+    const squashed = lower.replace(/\s+/g, "");
+
+    const filtered = !lower
+      ? safeTrips
+      : safeTrips.filter((trip) => {
+          const effectiveStatus = listStatus(trip);
+          const statusKey = `status.${effectiveStatus.toLowerCase()}`;
+          const translatedStatus = t(statusKey);
+          const statusLabel = translatedStatus === statusKey ? effectiveStatus : translatedStatus;
+          const nextStep = effectiveStatus === "Draft" ? getNextIncompleteTripStep(trip) + 1 : null;
+          const stepLabel = nextStep ? t("ops.trip.step_label", { step: nextStep }) : "";
+          const searchValues = [
+            trip.tripNo,
+            trip.tripDate,
+            trip.vehicleNo,
+            trip.driverName,
+            trip.supervisorName,
+            trip.sourceFarm,
+            trip.status,
+            effectiveStatus,
+            statusLabel,
+            stepLabel,
+            nextStep ? `Step ${nextStep}` : "",
+            nextStep ? `Step${nextStep}` : "",
+          ];
+
+          return searchValues.some((value) => {
+            const text = String(value ?? "").toLowerCase();
+            return text.includes(lower) || text.replace(/\s+/g, "").includes(squashed);
+          });
+        });
+
     return [...filtered].sort((a, b) => {
       if (a.tripDate !== b.tripDate) return a.tripDate < b.tripDate ? 1 : -1;
       return b.id - a.id;
     });
-  }, [safeTrips, searchTerm]);
+  }, [safeTrips, searchTerm, t]);
 
   const allDraft = sortedTrips.filter((t) => listStatus(t) === "Draft");
   // Pending tab: only Pending trips. Completed leaves this list (Trip List / accounts).

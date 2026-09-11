@@ -75,9 +75,9 @@ function CommunicationIcon({
   const isSending = status === "sending" || sending;
 
   const isWhatsApp = channel === "whatsapp";
-  const pendingIconColor = isWhatsApp ? "text-green-500" : "text-slate-400";
-  const pendingBgColor = isWhatsApp ? "bg-green-50/70 hover:bg-green-50/80" : "bg-slate-100 hover:bg-slate-200";
-  const pendingBorderColor = isWhatsApp ? "border-green-100" : "border-slate-200";
+  const pendingIconColor = isWhatsApp ? "text-[#25D366]" : "text-sky-500";
+  const pendingBgColor = isWhatsApp ? "bg-[#25D366]/10 hover:bg-[#25D366]/15" : "bg-sky-50/70 hover:bg-sky-50/80";
+  const pendingBorderColor = isWhatsApp ? "border-[#25D366]/25" : "border-sky-100";
 
   let iconColor = pendingIconColor;
   let bgColor = pendingBgColor;

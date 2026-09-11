@@ -1,14 +1,13 @@
 // src/modules/operations/vehicle-trips/components/TripViewModal.tsx
-// Read-only Trip View for Recent / Trip List.
+// Shared read-only Trip View shell. Recent and History use dedicated wrappers.
 // Steps 1–5 embed the same locked Trip Entry components (shared fonts/layout).
-// Email/WhatsApp bulk actions stay in the modal header for completed trips.
+// Email/WhatsApp bulk actions are enabled only by the Trip History wrapper.
 
 import React, { useState } from "react";
 import {
   FileText,
   Mail,
   ShieldCheck,
-  Send,
   Loader2,
   UserCheck,
   FileDown,
@@ -321,8 +320,8 @@ function TripViewModal({
                   </span>
                 )}
                 {showCommunicationStatus && whatsappCounts.total > 0 && (
-                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-green-500" role="status" aria-live="polite">
-                    <WhatsAppIcon size={12} className="text-green-500" />
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-[#128C7E]" role="status" aria-live="polite">
+                    <WhatsAppIcon size={12} className="text-[#25D366]" />
                     {whatsappState.isBulkSending ? (
                       <>
                         {t("ops.trip.sending")}... {whatsappState.bulkProgress?.sent ?? whatsappCounts.sent} / {whatsappState.bulkProgress?.total ?? whatsappCounts.total}
@@ -344,13 +343,13 @@ function TripViewModal({
                     type="button"
                     onClick={() => void emailState.sendAll()}
                     disabled={emailState.isBulkSending}
-                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-400 to-teal-400 hover:from-emerald-500 hover:to-teal-500 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-emerald-400/20 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-sky-400/25 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                     title={t("ops.trip.send_email_all")}
                   >
                     {emailState.isBulkSending ? (
                       <Loader2 size={14} className="animate-spin" />
                     ) : (
-                      <Send size={14} />
+                      <Mail size={14} />
                     )}
                     {emailState.isBulkSending ? `${t("ops.trip.sending")}...` : t("ops.trip.send_all_email")}
                   </button>
@@ -360,7 +359,7 @@ function TripViewModal({
                     type="button"
                     onClick={() => void whatsappState.sendAll()}
                     disabled={whatsappState.isBulkSending}
-                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-green-400 to-emerald-400 hover:from-green-500 hover:to-emerald-500 px-4 py-2 text-xs font-semibold text-white shadow-md shadow-green-400/20 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-[#25D366] to-[#128C7E] hover:from-[#1ebe5d] hover:to-[#0f7a6d] px-4 py-2 text-xs font-semibold text-white shadow-md shadow-[#25D366]/25 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                     title={t("ops.trip.send_whatsapp_all")}
                   >
                     {whatsappState.isBulkSending ? (
@@ -447,4 +446,4 @@ export function TripHistoryViewModal(props: Props) {
   return <TripViewModal {...props} showCommunicationStatus />;
 }
 
-export default React.memo(TripViewModal);
+export default React.memo(TripHistoryViewModal);

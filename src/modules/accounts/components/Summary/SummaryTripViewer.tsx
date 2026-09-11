@@ -1,12 +1,12 @@
 // src/modules/accounts/components/Summary/SummaryTripViewer.tsx
 // Fast, stable viewer for "No. of Trips" — shows trips one-by-one with sidebar + side buttons.
-// Reuses the exact TripViewModal (trip-history) view so visuals stay identical.
+// Reuses the dedicated Trip History modal so Recent Trip stays independent.
 // Same backdrop as trip history (bg-black/40, no blur), deterministic, no duplicate requests.
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, X, Truck, Calendar } from 'lucide-react';
 import type { Trip } from '../../../operations/vehicle-trips/types/trip';
-import TripViewModal from '../../../operations/vehicle-trips/components/TripViewModal';
+import { TripHistoryViewModal } from '../../../operations/vehicle-trips/components/TripViewModal';
 import { useShops } from '../../../masters/shops/hooks/useShops';
 import { useBirdTypes } from '../../../masters/bird-types/hooks/useBirdTypes';
 
@@ -31,7 +31,14 @@ function SummaryTripViewer({ open, trips, groupLabel, onClose }: Props) {
   const [idx, setIdx] = useState(0);
 
   useEffect(() => {
-    if (open) setIdx(0);
+    if (!open) return;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) setIdx(0);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [open, groupKey]);
 
   const total = trips.length;
@@ -105,7 +112,7 @@ function SummaryTripViewer({ open, trips, groupLabel, onClose }: Props) {
   return (
     <>
       {/* Reuse exact trip-history view — same backdrop bg-black/40, no blur */}
-      <TripViewModal open={open} trip={currentTrip} shops={shops} birdTypes={birdTypes} onClose={onClose} />
+      <TripHistoryViewModal open={open} trip={currentTrip} shops={shops} birdTypes={birdTypes} onClose={onClose} />
 
       {/* Prominent top-center badge: Trip 10 of 20 — shows X of Y and ordinal 10th */}
       <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[80] hidden sm:flex pointer-events-none">

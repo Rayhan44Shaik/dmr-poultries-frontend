@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import TripFilters from "../components/TripFilters";
 import TripKPICards from "../components/TripKPICards";
 import TripMasterTable, { type TripSortKey } from "../components/TripMasterTable";
-import TripViewModal from "../components/TripViewModal";
+import { TripHistoryViewModal } from "../components/TripViewModal";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import { Pagination } from "../../../../ui";
 import { PAGINATION_DEFAULT_PAGE_SIZE } from "../../../../shared/ui/uiTokens";
@@ -34,7 +34,7 @@ function TripViewModalWithMasters({
   const { shops } = useShops();
   const { birdTypes } = useBirdTypes();
   return (
-    <TripViewModal open trip={trip} shops={shops} birdTypes={birdTypes} onClose={onClose} />
+    <TripHistoryViewModal open trip={trip} shops={shops} birdTypes={birdTypes} onClose={onClose} />
   );
 }
 

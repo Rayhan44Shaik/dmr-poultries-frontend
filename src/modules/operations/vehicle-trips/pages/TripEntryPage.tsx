@@ -7,7 +7,6 @@ import { FileText, Plus } from "lucide-react";
 // --- Components ---
 import TripRecentTable from "../components/TripRecentTable";
 import { RecentTripViewModal } from "../components/TripViewModal";
-import PendingApprovalsPanel from "../../dashboard/components/PendingApprovalsPanel";
 import TripWizardStepper from "../components/TripWizardStepper";
 import { WizardStepNotice } from "../components/WizardStepUI";
 import StepStart from "../components/StepStart";
@@ -294,7 +293,14 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   useEffect(() => {
     if (!isEditing && !trip.startStepSubmitted) return;
     if (!trip.deliveries) return;
-    setRows(trip.deliveries);
+    let cancelled = false;
+    const deliveries = trip.deliveries;
+    queueMicrotask(() => {
+      if (!cancelled) setRows(deliveries);
+    });
+    return () => {
+      cancelled = true;
+    };
   }, [trip.deliveries, isEditing, trip.startStepSubmitted]);
 
   useEffect(() => {
@@ -657,9 +663,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
   const content = (
     <div className="space-y-6">
-      {/* Live pending-approval tiles (trips, rates, bills, payments). */}
-      <PendingApprovalsPanel />
-
       <div className="bg-white rounded-3xl p-6 md:p-8 border border-slate-200/80 shadow-xl shadow-slate-100/70 space-y-6">
         {entryScreen === "prompt" ? (
           <div className="flex flex-col items-center justify-center text-center py-16 space-y-6">
