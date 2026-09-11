@@ -5,8 +5,7 @@ import { useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, Building2, Eye, EyeOff, Lock, ShieldCheck, Truck, User } from "lucide-react";
 import BrandMark from "../../ui/BrandMark";
-import { useAuth } from "../../providers/AuthProvider";
-import { getCurrentUser } from "../settings/services";
+import { useAuth } from "../../providers/authContext";
 
 const inputClass =
   "w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-10 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
@@ -16,19 +15,20 @@ export default function LoginPage() {
   const { login } = useAuth();
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
-  const handleSignIn = (e: FormEvent) => {
+  const handleSignIn = async (e: FormEvent) => {
     e.preventDefault();
     setBusy(true);
-    // Local sign-in: register the current user profile and enter the app.
-    window.setTimeout(() => {
-      try {
-        login(getCurrentUser());
-      } catch {
-        /* auth context unavailable — proceed anyway */
-      }
+    setError("");
+    try {
+      await login(username, password);
       navigate("/dashboard");
-    }, 450);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Sign in failed.");
+    } finally { setBusy(false); }
   };
 
   return (
@@ -91,7 +91,7 @@ export default function LoginPage() {
                 <label className="mb-1 block text-xs font-semibold text-slate-600">Username</label>
                 <div className="relative">
                   <User size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input type="text" defaultValue="rubullaadmin" className={inputClass} placeholder="Enter your username" />
+                  <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required className={inputClass} placeholder="Enter your username" />
                 </div>
               </div>
               <div>
@@ -100,7 +100,10 @@ export default function LoginPage() {
                   <Lock size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
                     type={showPassword ? "text" : "password"}
-                    defaultValue="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    autoComplete="current-password"
+                    required
                     className={inputClass}
                     placeholder="Enter your password"
                   />
@@ -114,6 +117,8 @@ export default function LoginPage() {
                   </button>
                 </div>
               </div>
+
+              {error && <p role="alert" className="text-xs font-medium text-rose-600">{error}</p>}
 
               <div className="flex items-center justify-between text-xs">
                 <label className="flex items-center gap-2 font-medium text-slate-500">

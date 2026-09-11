@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useAuth } from '../../../providers/AuthProvider';
+import { useAuth } from '../../../providers/authContext';
 import { VEHICLES_CHANGED_EVENT } from '../../masters/vehicles/services/vehicleService';
 import { hasPendingEmiRead, invalidateEmiRead, loadEmiSnapshot, type EmiSnapshot } from '../services/emiService';
 import { computeKpis, getEmiToday, msUntilNextEmiDay } from '../services/emiModel';

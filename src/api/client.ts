@@ -45,7 +45,12 @@ apiClient.interceptors.request.use(
 
     return config;
   },
-  (error) => Promise.reject(toApiError(error))
+  (error) => {
+    if (error?.response?.status === 401 && !String(error?.config?.url ?? "").includes("/auth/login")) {
+      window.dispatchEvent(new Event("dmr:auth-expired"));
+    }
+    return Promise.reject(toApiError(error));
+  }
 );
 
 /** Response interceptor — normalize success logging and error shape */

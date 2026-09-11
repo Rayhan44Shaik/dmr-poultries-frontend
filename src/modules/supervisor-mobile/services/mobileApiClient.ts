@@ -23,15 +23,24 @@ function assertSecureMobileEndpoint(): void {
 let accessToken: string | null = null;
 
 export class MobileApiError extends Error {
+  readonly code: string;
+  readonly status: number;
+  readonly retryable: boolean;
+  readonly details?: unknown;
+
   constructor(
     message: string,
-    public readonly code: string,
-    public readonly status: number,
-    public readonly retryable: boolean,
-    public readonly details?: unknown
+    code: string,
+    status: number,
+    retryable: boolean,
+    details?: unknown
   ) {
     super(message);
     this.name = "MobileApiError";
+    this.code = code;
+    this.status = status;
+    this.retryable = retryable;
+    this.details = details;
   }
 }
 

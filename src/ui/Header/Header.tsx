@@ -28,7 +28,7 @@ import {
 } from "lucide-react";
 import { QUICK_ACTIONS, resolveRoute } from "../../routes/navigation";
 import { useTheme } from "../../providers/ThemeProvider";
-import { useAuth } from "../../providers/AuthProvider";
+import { useAuth } from "../../providers/authContext";
 import { useI18n } from "../../i18n";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { getPendingCollectionSnapshot, subscribePendingCollectionSnapshot } from "../../modules/operations/collections/services/collectionSnapshot";

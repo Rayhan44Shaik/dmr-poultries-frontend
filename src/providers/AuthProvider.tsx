@@ -1,45 +1,41 @@
-import { createContext, useContext, useState, type ReactNode } from 'react';
-
-interface AuthContextType {
-  isAuthenticated: boolean;
-  user: unknown | null;
-  login: (userData: unknown) => void;
-  logout: () => void;
-}
-
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { currentUserRequest, loginRequest, logoutRequest, type AuthenticatedUser } from '../modules/auth/authApi';
+import { AuthContext } from './authContext';
 
 interface AuthProviderProps {
   children: ReactNode;
 }
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
-  const [user, setUser] = useState<unknown | null>(() => {
-    const stored = localStorage.getItem('dmr_auth_user');
-    return stored ? JSON.parse(stored) : null;
-  });
+  const [user, setUser] = useState<AuthenticatedUser | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    currentUserRequest().then((value) => { if (active) setUser(value); }).catch(() => undefined)
+      .finally(() => { if (active) setLoading(false); });
+    const expired = () => setUser(null);
+    window.addEventListener('dmr:auth-expired', expired);
+    return () => { active = false; window.removeEventListener('dmr:auth-expired', expired); };
+  }, []);
 
   const isAuthenticated = !!user;
 
-  const login = (userData: unknown) => {
-    setUser(userData);
-    localStorage.setItem('dmr_auth_user', JSON.stringify(userData));
-  };
+  const login = useCallback(async (username: string, password: string) => {
+    const session = await loginRequest(username, password);
+    setUser(session.user);
+  }, []);
 
-  const logout = () => {
-    setUser(null);
-    localStorage.removeItem('dmr_auth_user');
-  };
+  const logout = useCallback(async () => {
+    try { await logoutRequest(); } finally { setUser(null); }
+  }, []);
+
+  const value = useMemo(() => ({ isAuthenticated, loading, user, login, logout }), [isAuthenticated, loading, login, logout, user]);
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, user, login, logout }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
 };
 
-export const useAuth = () => {
-  const context = useContext(AuthContext);
-  if (!context) throw new Error('useAuth must be used within AuthProvider');
-  return context;
-};
