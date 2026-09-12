@@ -202,6 +202,8 @@ export default {
   // Operational Trends chart
   'ops.dashboard.trend.average': 'సగటు',
   'ops.dashboard.trend.birds': 'పక్షులు',
+  'ops.dashboard.trend.back_to_calendar': 'క్యాలెండర్ పరిధికి తిరిగి',
+  'ops.dashboard.trend.completed_of': '{total} లో {done}',
   'ops.dashboard.trend.bucket_by': 'వర్గీకరణ',
   'ops.dashboard.trend.delivered_weight': 'డెలివరీ బరువు',
   'ops.dashboard.trend.empty': 'ఈ విండోలో పూర్తయిన ట్రిప్పులు లేవు',

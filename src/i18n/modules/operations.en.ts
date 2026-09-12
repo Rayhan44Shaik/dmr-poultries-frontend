@@ -202,6 +202,8 @@ export default {
   // Operational Trends chart
   'ops.dashboard.trend.average': 'Avg',
   'ops.dashboard.trend.birds': 'Birds',
+  'ops.dashboard.trend.back_to_calendar': 'Back to the calendar range',
+  'ops.dashboard.trend.completed_of': '{done} of {total}',
   'ops.dashboard.trend.bucket_by': 'Group by',
   'ops.dashboard.trend.delivered_weight': 'Delivered weight',
   'ops.dashboard.trend.empty': 'No completed trips in this window',

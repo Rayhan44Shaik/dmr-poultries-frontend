@@ -100,15 +100,20 @@ segments stack to exactly the farm weight — one bar carries all four weight
 numbers at once. **Share of farm** re-reads the same data as a 100% stack, so a
 quiet bucket and a heavy one can be compared by shape.
 
-**Bucketing** — the header carries a `Today · Week · Month` switcher, and each
+**Window** — the header carries a `Today · Week · Month` switcher, and each
 option shows its own trip count, so the numbers people ask for first *are* the
-control. Picking one re-buckets the calendar's own window by day, week or
-month — the calendar always supplies the range. Which chip is lit follows the
-calendar's length (about a week reads by day, about a month by week, a quarter
-by month); that default is derived, never remembered, so a reload or a hard
-refresh lands on the calendar's view. Each chip carries its own accent — Today
-sky, Week violet, Month teal — and the reading mode below the plot is
-emerald for the weight split, indigo for the share of farm.
+control. Picking one moves the whole card — bars *and* the totals underneath —
+to today, the last seven days or this calendar month; the chip's count is then
+the number the card is totalling. Until a chip is tapped the card reads the
+global calendar's range, and that default is derived rather than remembered, so
+a reload or a hard refresh lands on the calendar's window. Tapping the lit chip
+lets go of it (back to the calendar), and the caption under the title always
+says which dates are being totalled — plus, when a chip counts trips the card
+cannot weigh yet, "22 of 54 trips".
+
+Today and a week read day by day; a month reads week by week. Each chip carries
+its own accent — Today sky, Week violet, Month teal — and the reading mode below
+the plot is emerald for the weight split, indigo for the share of farm.
 
 **Reading it** — the footer is also the legend: trips, farm weight, delivered
 weight, mortality and weight loss, each with its share of the farm weight or its
