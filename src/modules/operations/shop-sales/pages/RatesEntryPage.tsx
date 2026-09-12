@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useRef, useState, type ComponentProps } from "react";
 import useCompletedTrips from "../hooks/useCompletedTrips";
 import CompletedTripsFilters from "../components/CompletedTripsFilters";
 import CompletedTripsTable from "../components/CompletedTripsTable";
@@ -15,6 +15,14 @@ import {
   formatRateEntryDay,
 } from "../utils/rateEntryDisplay";
 import { formatVehicleNumber } from "../../../../utils/format";
+import { useShops } from "../../../masters/shops/hooks/useShops";
+
+type EnterRateModalProps = ComponentProps<typeof EnterRateModal>;
+
+function EnterRateModalWithShopMaster(props: EnterRateModalProps) {
+  const { shops, loading } = useShops();
+  return <EnterRateModal {...props} shops={shops} shopsLoading={loading} />;
+}
 
 type Props = {
   embedded?: boolean;
@@ -227,15 +235,17 @@ export default function RatesEntryPage({ embedded = false }: Props) {
         </CompletedTripsTable>
       )}
 
-      <EnterRateModal
-        open={modalOpen}
-        trip={selectedTrip}
-        onClose={closeRateEntry}
-        onSave={saveTrip}
-        onSaveAndLock={saveAndLockTrip}
-        isSaving={isSaving}
-        loadError={loadError}
-      />
+      {modalOpen && (
+        <EnterRateModalWithShopMaster
+          open={modalOpen}
+          trip={selectedTrip}
+          onClose={closeRateEntry}
+          onSave={saveTrip}
+          onSaveAndLock={saveAndLockTrip}
+          isSaving={isSaving}
+          loadError={loadError}
+        />
+      )}
     </div>
   );
 

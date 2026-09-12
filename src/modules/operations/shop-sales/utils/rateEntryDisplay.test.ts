@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import type { Trip } from "../../vehicle-trips/types/trip";
-import { formatRateEntryDay, matchesRateEntrySearch } from "./rateEntryDisplay";
+import { displayRateEntryShopName, formatRateEntryDay, matchesRateEntrySearch } from "./rateEntryDisplay";
 
 const trip = {
   id: 1,
@@ -18,6 +18,11 @@ const trip = {
 test("Rate Entry formats Day like Trip List and localizes it in Telugu", () => {
   assert.equal(formatRateEntryDay(trip.tripDate, "en"), "Fri, 11 Sep 2026");
   assert.equal(formatRateEntryDay(trip.tripDate, "te"), "శుక్ర, 11 సెప్టెం 2026");
+});
+
+test("Rate Entry shop display removes trailing delivery codes in English and Telugu", () => {
+  assert.equal(displayRateEntryShopName("Prasanna Poultry Traders 018", "en"), "Prasanna Poultry Traders");
+  assert.equal(displayRateEntryShopName("Prasanna Poultry Traders 018", "te"), "ప్రసన్న పౌల్ట్రీ ట్రేడర్స్");
 });
 
 test("Rate Entry search matches any visible table value", () => {

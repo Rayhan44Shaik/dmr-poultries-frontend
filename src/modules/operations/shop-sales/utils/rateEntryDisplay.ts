@@ -2,6 +2,7 @@ import type { Language } from "../../../../i18n";
 import type { Trip } from "../../vehicle-trips/types/trip";
 import { formatTripListDay } from "../../vehicle-trips/utils/formatTripListDay";
 import { localizeTripViewText } from "../../vehicle-trips/utils/tripViewLocalization";
+import { cleanDeliveryShopName } from "../../vehicle-trips/utils/shopDisplayName";
 import { formatVehicleNumber } from "../../../../utils/format";
 
 const WEEKDAYS_SHORT_TE = ["ఆది", "సోమ", "మంగళ", "బుధ", "గురు", "శుక్ర", "శని"] as const;
@@ -54,10 +55,14 @@ export function displayRateEntryName(value: string | null | undefined, language:
   return language === "te" ? localizeTripViewText(raw, language) : raw;
 }
 
+export function cleanRateEntryShopName(value: string | null | undefined): string {
+  return cleanDeliveryShopName(value) || String(value ?? "").trim();
+}
+
 export function displayRateEntryShopName(value: string | null | undefined, language: Language): string {
-  const raw = String(value ?? "").trim();
+  const raw = cleanRateEntryShopName(value);
   if (!raw) return "—";
-  return language === "te" ? localizeTripViewText(raw, language, { cleanShopCode: true }) : raw;
+  return language === "te" ? localizeTripViewText(raw, language) : raw;
 }
 
 function normalizeSearchValue(value: unknown): string {

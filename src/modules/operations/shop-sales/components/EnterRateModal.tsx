@@ -12,25 +12,25 @@ import {
   Lock,
   Save,
   RotateCcw,
+  Users,
+  FileText,
 } from "lucide-react";
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
+import type { Shop } from "../../../masters/shops/types/shop";
 import { useI18n } from "../../../../i18n";
 import { formatVehicleNumber } from "../../../../utils/format";
 import {
+  cleanRateEntryShopName,
+  displayRateEntryName,
   displayRateEntryShopName,
   formatRateEntryTripDate,
   formatRateEntryWeekday,
 } from "../utils/rateEntryDisplay";
 import RateEntryMarketMasterTables from "./RateEntryMarketMasterTables";
 import type { RateEntryMarketRateMasterDto } from "../utils/rateEntryMarketMaster";
-import {
-  paginationBarClass,
-  paginationNavBtnClass,
-  paginationPageBtnClass,
-  shouldShowPagination,
-} from "../../../../shared/ui/paginationStyles";
+import { Pagination } from "../../../../ui/Pagination";
 
-const SHOPS_PER_PAGE = 7;
+const DEFAULT_SHOPS_PAGE_SIZE = 10;
 
 function isValidSellingRate(rate: number | null | undefined): boolean {
   return rate != null && Number.isFinite(rate) && rate >= 50 && rate <= 300;
@@ -39,6 +39,29 @@ function isValidSellingRate(rate: number | null | undefined): boolean {
 function normalizeRate(rate: number | null | undefined): number | null {
   if (rate == null || !Number.isFinite(rate) || rate === 0) return null;
   return rate;
+}
+
+type ShopMasterLookup = {
+  byId: Map<number, Shop>;
+  byName: Map<string, Shop>;
+};
+
+function shopLookupKey(value: string | null | undefined): string {
+  return cleanRateEntryShopName(value)
+    .toLocaleLowerCase()
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function resolveShopMaster(
+  delivery: Trip["deliveries"][number],
+  lookup: ShopMasterLookup,
+): Shop | null {
+  if (delivery.shopId > 0) {
+    const byId = lookup.byId.get(delivery.shopId);
+    if (byId) return byId;
+  }
+  return lookup.byName.get(shopLookupKey(delivery.shopName)) ?? null;
 }
 
 function suggestedMarketRate(
@@ -61,6 +84,8 @@ interface Props {
   onSaveAndLock: (deliveries: Trip["deliveries"]) => Promise<boolean> | boolean | void;
   isSaving?: boolean;
   loadError?: string | null;
+  shops?: Shop[];
+  shopsLoading?: boolean;
 }
 
 export default function EnterRateModal({
@@ -71,6 +96,8 @@ export default function EnterRateModal({
   onSaveAndLock,
   isSaving = false,
   loadError,
+  shops = [],
+  shopsLoading = false,
 }: Props) {
   const { t, language } = useI18n();
   const [deliveries, setDeliveries] = useState<Trip["deliveries"]>([]);
@@ -80,6 +107,7 @@ export default function EnterRateModal({
   const [lockError, setLockError] = useState<string | null>(null);
   const [lockAttempted, setLockAttempted] = useState(false);
   const [shopPage, setShopPage] = useState(1);
+  const [shopPageSize, setShopPageSize] = useState(DEFAULT_SHOPS_PAGE_SIZE);
 
   const saving = isSaving || busy;
   const rateLocked = trip?.rateCompleted === true;
@@ -128,6 +156,17 @@ export default function EnterRateModal({
     [deliveries]
   );
 
+  const shopMasterLookup = useMemo<ShopMasterLookup>(() => {
+    const byId = new Map<number, Shop>();
+    const byName = new Map<string, Shop>();
+    shops.forEach((shop) => {
+      if (shop.id > 0) byId.set(shop.id, shop);
+      const key = shopLookupKey(shop.shopName);
+      if (key) byName.set(key, shop);
+    });
+    return { byId, byName };
+  }, [shops]);
+
   const marketMaster = useMemo(() => {
     return (trip as Trip & { marketRateMaster?: RateEntryMarketRateMasterDto | null } | null)
       ?.marketRateMaster;
@@ -144,19 +183,14 @@ export default function EnterRateModal({
     return deliveries.some((row, i) => normalizeRate(row.rate) !== normalizeRate(trip.deliveries[i]?.rate));
   }, [deliveries, trip]);
 
-  const rateStats = useMemo(() => {
-    const validRates = deliveries.filter((row) => isValidSellingRate(normalizeRate(row.rate))).length;
-    const marketAvailable = deliveries.filter((row) => suggestedMarketRate(row, tripDateVenRate) != null).length;
-    return {
-      marketAvailable,
-      validRates,
-      missingRates: Math.max(0, deliveries.length - validRates),
-      canApplyMarket: deliveries.some((row) => {
+  const canApplyMarketRates = useMemo(
+    () =>
+      deliveries.some((row) => {
         const currentRate = normalizeRate(row.rate);
         return !isValidSellingRate(currentRate) && suggestedMarketRate(row, tripDateVenRate) != null;
       }),
-    };
-  }, [deliveries, tripDateVenRate]);
+    [deliveries, tripDateVenRate]
+  );
 
   const applyMarketRate = (index: number, rate: number) => {
     if (saving || rateLocked) return;
@@ -184,14 +218,14 @@ export default function EnterRateModal({
     setLockError(null);
   };
 
-  const shopPageCount = Math.max(1, Math.ceil(deliveries.length / SHOPS_PER_PAGE));
+  const shopPageCount = Math.max(1, Math.ceil(deliveries.length / shopPageSize));
   const pagedDeliveries = useMemo(() => {
-    const start = (shopPage - 1) * SHOPS_PER_PAGE;
-    return deliveries.slice(start, start + SHOPS_PER_PAGE).map((row, i) => ({
+    const start = (shopPage - 1) * shopPageSize;
+    return deliveries.slice(start, start + shopPageSize).map((row, i) => ({
       row,
       index: start + i,
     }));
-  }, [deliveries, shopPage]);
+  }, [deliveries, shopPage, shopPageSize]);
 
   useEffect(() => {
     if (shopPage <= shopPageCount) return;
@@ -225,7 +259,7 @@ export default function EnterRateModal({
       if (!canLock) {
         const firstMissing = deliveries.findIndex((row) => !isValidSellingRate(normalizeRate(row.rate)));
         if (firstMissing >= 0) {
-          setShopPage(Math.floor(firstMissing / SHOPS_PER_PAGE) + 1);
+          setShopPage(Math.floor(firstMissing / shopPageSize) + 1);
         }
         return;
       }
@@ -358,48 +392,6 @@ export default function EnterRateModal({
             />
           </div>
 
-          <div className="shrink-0 border-b border-amber-100 bg-gradient-to-r from-orange-50 via-amber-50 to-emerald-50 px-5 py-3">
-            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-              <div className="min-w-0">
-                <p className="text-sm font-bold text-slate-800">{t("ops.rate.modal.market_guidance")}</p>
-                <p className="mt-0.5 text-xs font-medium text-slate-600">{t("ops.rate.modal.market_guidance_desc")}</p>
-              </div>
-              <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4 lg:min-w-[560px]">
-                <div className="rounded-xl border border-orange-200 bg-white/80 px-3 py-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-orange-700">{t("ops.rate.modal.trip_market_rate")}</p>
-                  <p className="mt-0.5 text-sm font-bold text-orange-800">
-                    {isValidSellingRate(tripDateVenRate) ? `₹ ${Number(tripDateVenRate).toFixed(2)}` : "—"}
-                  </p>
-                </div>
-                <div className="rounded-xl border border-sky-200 bg-white/80 px-3 py-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-sky-700">{t("ops.rate.modal.market_available")}</p>
-                  <p className="mt-0.5 text-sm font-bold text-sky-800">{rateStats.marketAvailable}/{deliveries.length}</p>
-                </div>
-                <div className="rounded-xl border border-emerald-200 bg-white/80 px-3 py-2">
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">{t("ops.rate.modal.rates_entered")}</p>
-                  <p className="mt-0.5 text-sm font-bold text-emerald-800">{rateStats.validRates}/{deliveries.length}</p>
-                </div>
-                <div className={`rounded-xl border px-3 py-2 ${canLock ? "border-emerald-300 bg-emerald-100/90" : "border-amber-300 bg-amber-100/90"}`}>
-                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">
-                    {canLock ? t("ops.rate.modal.ready_to_lock") : t("ops.rate.modal.need_rates")}
-                  </p>
-                  <p className="mt-0.5 text-sm font-bold text-slate-800">{rateStats.missingRates}</p>
-                </div>
-              </div>
-              {!rateLocked && (
-                <button
-                  type="button"
-                  onClick={applyMarketRates}
-                  disabled={saving || !rateStats.canApplyMarket}
-                  className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border border-orange-300 bg-orange-500 px-4 text-xs font-bold text-white shadow-sm transition-[color,background-color,border-color,box-shadow,transform] duration-150 hover:bg-orange-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  <IndianRupee size={14} />
-                  {t("ops.rate.modal.apply_market_rates")}
-                </button>
-              )}
-            </div>
-          </div>
-
           {(loadError || lockError) && (
             <div className="px-5 py-2 border-b border-red-200 bg-red-50 flex items-center gap-2 shrink-0">
               <AlertCircle size={14} className="text-red-600" />
@@ -427,6 +419,9 @@ export default function EnterRateModal({
                     const isValid = isValidSellingRate(rate);
                     const amount = isValid ? Number((delivery.weight * (rate as number)).toFixed(2)) : 0;
                     const marketRateValue = suggestedMarketRate(delivery, tripDateVenRate);
+                    const masterShop = resolveShopMaster(delivery, shopMasterLookup);
+                    const association = masterShop?.associationType?.trim() ?? "";
+                    const paperRate = Number(masterShop?.paperRate ?? 0);
                     const belowMin = rate != null && rate < 50;
                     const aboveMax = rate != null && rate > 300;
                     const missingForLock = lockAttempted && !isValid;
@@ -437,7 +432,28 @@ export default function EnterRateModal({
                         className={`border-b border-slate-100 ${missingForLock ? "bg-red-50" : ""}`}
                       >
                         <td className="px-2 py-2.5 text-center text-xs text-slate-500">{index + 1}</td>
-                        <td className="px-2 py-2.5 text-xs font-medium text-slate-800">{displayRateEntryShopName(delivery.shopName, language)}</td>
+                        <td className="px-2 py-2.5 text-xs text-slate-800 min-w-[260px]">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="font-bold text-slate-900">{displayRateEntryShopName(delivery.shopName, language)}</span>
+                            {association && (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700">
+                                <Users size={11} />
+                                {t("ops.rate.modal.association_short")}: {displayRateEntryName(association, language)}
+                              </span>
+                            )}
+                            {Number.isFinite(paperRate) && paperRate > 0 && (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-orange-700">
+                                <FileText size={11} />
+                                {t("ops.rate.modal.paper_short")}: {paperRate}
+                              </span>
+                            )}
+                            {!masterShop && shopsLoading && (
+                              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                                {t("ops.rate.modal.shop_master_loading")}
+                              </span>
+                            )}
+                          </div>
+                        </td>
                         <td className="px-2 py-2.5 text-center text-xs font-semibold text-emerald-600">
                           {delivery.birds.toLocaleString()}
                         </td>
@@ -506,117 +522,137 @@ export default function EnterRateModal({
               </table>
             </div>
 
-            {shouldShowPagination(deliveries.length) && (
-              <div className={paginationBarClass}>
-                <button
-                  type="button"
-                  disabled={shopPage <= 1}
-                  onClick={() => setShopPage((p) => Math.max(1, p - 1))}
-                  className={paginationNavBtnClass}
-                >
-                  {t("common.previous")}
-                </button>
-                <span className={paginationPageBtnClass(true)}>
-                  {shopPage}
-                </span>
-                <button
-                  type="button"
-                  disabled={shopPage >= shopPageCount}
-                  onClick={() => setShopPage((p) => Math.min(shopPageCount, p + 1))}
-                  className={paginationNavBtnClass}
-                >
-                  {t("common.next")}
-                </button>
-              </div>
+            {deliveries.length > 0 && (
+              <Pagination
+                page={shopPage}
+                pageSize={shopPageSize}
+                totalItems={deliveries.length}
+                onPageChange={setShopPage}
+                onPageSizeChange={(nextPageSize) => {
+                  setShopPageSize(nextPageSize);
+                  setShopPage(1);
+                }}
+                disabled={saving}
+                ariaLabel={t("ops.rate.modal.shop_rates_pagination")}
+                className="mt-2 rounded-xl border border-slate-200 bg-white px-3 py-2"
+              />
             )}
           </div>
 
-          <div className="bg-white border-t border-slate-200 px-5 py-3 shrink-0">
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 mb-3">
-              <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 flex items-center gap-2">
-                <Store size={16} className="text-slate-500" />
-                <div>
-                  <p className="text-[9px] text-slate-500 uppercase">{t("ops.trip.shops")}</p>
-                  <p className="text-base font-bold text-slate-800">{deliveries.length}</p>
+          <div className="bg-slate-50/95 border-t border-slate-200 px-5 py-3 shrink-0">
+            <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 flex items-center gap-2">
+                  <Store size={16} className="text-slate-500" />
+                  <div>
+                    <p className="text-[9px] text-slate-500 uppercase">{t("ops.trip.shops")}</p>
+                    <p className="text-base font-bold text-slate-800">{deliveries.length}</p>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 flex items-center gap-2">
+                  <Package size={16} className="text-slate-500" />
+                  <div>
+                    <p className="text-[9px] text-slate-500 uppercase">{t("common.birds")}</p>
+                    <p className="text-base font-bold text-slate-800">{totalBirds.toLocaleString()}</p>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 flex items-center gap-2">
+                  <Scale size={16} className="text-orange-500" />
+                  <div>
+                    <p className="text-[9px] text-slate-500 uppercase">{t("ops.rate.modal.total_weight")}</p>
+                    <p className="text-base font-bold text-orange-500">{totalWeight.toFixed(2)} {t("common.kg")}</p>
+                  </div>
+                </div>
+                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 flex items-center gap-2">
+                  <IndianRupee size={16} className="text-emerald-700" />
+                  <div>
+                    <p className="text-[9px] text-emerald-700 uppercase">{t("ops.rate.modal.grand_amount")}</p>
+                    <p className="text-base font-bold text-emerald-700">₹ {formatInr(grandAmount)}</p>
+                  </div>
                 </div>
               </div>
-              <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 flex items-center gap-2">
-                <Package size={16} className="text-slate-500" />
-                <div>
-                  <p className="text-[9px] text-slate-500 uppercase">{t("common.birds")}</p>
-                  <p className="text-base font-bold text-slate-800">{totalBirds.toLocaleString()}</p>
-                </div>
-              </div>
-              <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 flex items-center gap-2">
-                <Scale size={16} className="text-orange-500" />
-                <div>
-                  <p className="text-[9px] text-slate-500 uppercase">{t("ops.rate.modal.total_weight")}</p>
-                  <p className="text-base font-bold text-orange-500">{totalWeight.toFixed(2)} {t("common.kg")}</p>
-                </div>
-              </div>
-              <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 flex items-center gap-2">
-                <IndianRupee size={16} className="text-emerald-700" />
-                <div>
-                  <p className="text-[9px] text-emerald-700 uppercase">{t("ops.rate.modal.grand_amount")}</p>
-                  <p className="text-base font-bold text-emerald-700">₹ {formatInr(grandAmount)}</p>
-                </div>
-              </div>
-            </div>
 
-            {!rateLocked && (
-              <div className="flex items-center justify-between gap-3">
-                <button
-                  onClick={resetRates}
-                  disabled={saving}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-sky-300 text-sm font-medium text-sky-700 hover:bg-sky-50 disabled:opacity-50"
-                >
-                  <RotateCcw size={14} />
-                  {t("ops.rate.modal.reset_rates")}
-                </button>
-                <div className="flex items-center gap-2">
+              {rateLocked ? (
+                <div className="mt-3 flex justify-end">
                   <button
+                    type="button"
                     onClick={onClose}
-                    className="px-4 py-2 rounded-lg border border-slate-300 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                    className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
                   >
-                    {t("common.cancel")}
-                  </button>
-                  <button
-                    onClick={() => confirmSave("save")}
-                    disabled={saving || !isDirty || hasInvalidEnteredRate}
-                    className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border text-sm font-medium disabled:opacity-50 ${
-                      isDirty
-                        ? "border-amber-400 bg-amber-50 text-amber-800 ring-2 ring-amber-200"
-                        : "border-emerald-300 bg-emerald-50 text-emerald-800"
-                    }`}
-                    title={t("ops.rate.modal.save_progress")}
-                  >
-                    <Save size={14} />
-                    {saving ? t("ops.rate.modal.saving") : t("ops.rate.modal.save_progress")}
-                  </button>
-                  <button
-                    onClick={() => {
-                      if (saving) return;
-                      setLockAttempted(true);
-                      if (!canLock) {
-                        const firstMissing = deliveries.findIndex(
-                          (row) => !isValidSellingRate(normalizeRate(row.rate))
-                        );
-                        if (firstMissing >= 0) {
-                          setShopPage(Math.floor(firstMissing / SHOPS_PER_PAGE) + 1);
-                        }
-                        return;
-                      }
-                      setShowConfirm(true);
-                    }}
-                    disabled={saving}
-                    className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold disabled:opacity-50"
-                  >
-                    <Lock size={14} className="text-orange-300" />
-                    {saving ? t("ops.rate.modal.locking") : t("ops.rate.modal.lock_submit")}
+                    {t("common.close")}
                   </button>
                 </div>
-              </div>
-            )}
+              ) : (
+                <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={resetRates}
+                      disabled={saving}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-sky-300 bg-white text-sm font-semibold text-sky-700 transition-colors hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <RotateCcw size={14} />
+                      {t("ops.rate.modal.reset_rates")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={applyMarketRates}
+                      disabled={saving || !canApplyMarketRates}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-orange-300 bg-orange-50 text-sm font-semibold text-orange-700 transition-[color,background-color,border-color,box-shadow,transform] duration-150 hover:border-orange-400 hover:bg-orange-100 hover:text-orange-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <IndianRupee size={14} />
+                      {t("ops.rate.modal.apply_market_rates")}
+                    </button>
+                  </div>
+
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    <button
+                      type="button"
+                      onClick={onClose}
+                      className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+                    >
+                      {t("common.cancel")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => confirmSave("save")}
+                      disabled={saving || !isDirty || hasInvalidEnteredRate}
+                      className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border text-sm font-semibold transition-[color,background-color,border-color,box-shadow,transform] duration-150 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
+                        isDirty
+                          ? "border-amber-400 bg-amber-50 text-amber-800 ring-2 ring-amber-200 hover:bg-amber-100"
+                          : "border-emerald-300 bg-emerald-50 text-emerald-800"
+                      }`}
+                      title={t("ops.rate.modal.save_progress")}
+                    >
+                      <Save size={14} />
+                      {saving ? t("ops.rate.modal.saving") : t("ops.rate.modal.save_progress")}
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (saving) return;
+                        setLockAttempted(true);
+                        if (!canLock) {
+                          const firstMissing = deliveries.findIndex(
+                            (row) => !isValidSellingRate(normalizeRate(row.rate))
+                          );
+                          if (firstMissing >= 0) {
+                            setShopPage(Math.floor(firstMissing / shopPageSize) + 1);
+                          }
+                          return;
+                        }
+                        setShowConfirm(true);
+                      }}
+                      disabled={saving}
+                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-bold shadow-sm transition-[color,background-color,box-shadow,transform] duration-150 hover:bg-emerald-700 hover:shadow-md active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      <Lock size={14} className="text-orange-200" />
+                      {saving ? t("ops.rate.modal.locking") : t("ops.rate.modal.lock_submit")}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
