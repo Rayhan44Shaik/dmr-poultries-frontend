@@ -109,6 +109,10 @@ export default function RatesEntryPage({ embedded = false }: Props) {
   };
 
   const handleRefresh = () => {
+    // Refresh should always return Rate Entry to the clean, unfiltered view.
+    setDraftFilter({ ...EMPTY_RATE_FILTER });
+    resetFilters();
+    setSelectedRowId(null);
     void loadTrips().then((ok) => {
       if (ok) showNotification(t("notification.data_refreshed"), "success");
     });
