@@ -1148,7 +1148,6 @@ export default function UnLoadingTable({
           <TripTimestampDisplay
             value={topKpiTotals.lastCaptureTime === "—" ? "" : formatTripViewStamp(topKpiTotals.lastCaptureTime, language)}
             empty="—"
-            className="border-indigo-100 bg-indigo-50/70"
           />
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">

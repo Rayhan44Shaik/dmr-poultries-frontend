@@ -8,8 +8,8 @@ type TripTimestampDisplayProps = {
 
 /**
  * Compact, reusable one-line timestamp presentation for Trip view cards.
- * Keeps full date + time visible in a smaller, neat chip without changing
- * surrounding KPI/card widths.
+ * Shows the full date + time as plain text — no inner box/chip — so the KPI
+ * card stays clean while the value remains readable and perfectly fitted.
  */
 export function TripTimestampDisplay({ value, empty = "—", className }: TripTimestampDisplayProps) {
   const text = String(value ?? "").trim();
@@ -21,7 +21,7 @@ export function TripTimestampDisplay({ value, empty = "—", className }: TripTi
     <span
       title={text}
       className={cn(
-        "inline-flex max-w-full min-w-0 items-center rounded-lg border border-sky-100 bg-sky-50/70 px-2 py-1 text-[11px] font-bold leading-none tracking-[-0.015em] text-slate-800 tabular-nums whitespace-nowrap",
+        "inline-block max-w-full min-w-0 text-[12px] font-extrabold leading-snug tracking-[-0.025em] text-slate-900 tabular-nums whitespace-nowrap",
         className,
       )}
     >

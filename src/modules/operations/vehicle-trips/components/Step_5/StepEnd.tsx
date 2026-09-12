@@ -699,7 +699,7 @@ export default function StepEnd({
               {
                 label: t("ops.trip.captured_time"),
                 value: submittedTimeDisplay ? (
-                  <TripTimestampDisplay value={submittedTimeDisplay} className="border-sky-100 bg-white/70" />
+                  <TripTimestampDisplay value={submittedTimeDisplay} />
                 ) : "—",
                 tone: "border-sky-100 bg-sky-50/40 text-slate-700",
                 wide: true,
@@ -793,7 +793,7 @@ export default function StepEnd({
               {
                 label: t("ops.trip.captured_time"),
                 value: submittedTimeDisplay ? (
-                  <TripTimestampDisplay value={submittedTimeDisplay} className="border-sky-100 bg-white/70" />
+                  <TripTimestampDisplay value={submittedTimeDisplay} />
                 ) : t("ops.trip.time_pending_short"),
                 tone: "border-sky-100 bg-sky-50/40 text-slate-700",
                 wide: true,
