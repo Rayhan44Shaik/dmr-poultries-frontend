@@ -241,12 +241,20 @@ function fallbackTeluguToken(token: string): string {
     .join("");
 }
 
+function lookupTeluguWord(part: string): string | undefined {
+  return (
+    WORD_TE[part] ??
+    WORD_TE[part.toLocaleLowerCase()] ??
+    WORD_TE[part.charAt(0).toLocaleUpperCase() + part.slice(1).toLocaleLowerCase()]
+  );
+}
+
 function localizeWords(value: string): string {
   return value
     .split(/(\s+|[-–—,./()])/)
     .map((part) => {
       if (!part || /^\s+$/.test(part) || /^[-–—,./()]$/.test(part) || /^\d+$/.test(part)) return part;
-      return WORD_TE[part] ?? fallbackTeluguToken(part);
+      return lookupTeluguWord(part) ?? fallbackTeluguToken(part);
     })
     .join("")
     .replace(/\s+/g, " ")

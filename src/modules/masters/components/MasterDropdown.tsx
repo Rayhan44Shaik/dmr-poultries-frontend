@@ -110,12 +110,14 @@ export default function MasterDropdown({
   }, [options, allowClear, placeholder]);
   const filtered = useMemo(() => {
     const keyword = query.trim().toLocaleLowerCase();
-    return items.filter(
-      (option) =>
-        (allowClear && option.value === "") ||
-        !keyword ||
-        option.label.toLocaleLowerCase().includes(keyword),
-    );
+    return items.filter((option) => {
+      if (allowClear && option.value === "") return true;
+      if (!keyword) return true;
+      return (
+        option.label.toLocaleLowerCase().includes(keyword) ||
+        option.value.toLocaleLowerCase().includes(keyword)
+      );
+    });
   }, [items, query, allowClear]);
   const noMatches = !filtered.some(
     (option) => !(allowClear && option.value === ""),

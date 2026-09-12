@@ -9,9 +9,12 @@ import TripKPICards from "../../vehicle-trips/components/TripKPICards";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
 import { opsPageClass, opsEmptyStateClass } from "../../../../shared/ui/operationsStyles";
-import { formatTripListDay } from "../../vehicle-trips/utils/formatTripListDay";
-import { formatVehicleNumber } from "../../../../utils/format";
 import { useI18n } from "../../../../i18n";
+import {
+  displayRateEntryName,
+  formatRateEntryDay,
+} from "../utils/rateEntryDisplay";
+import { formatVehicleNumber } from "../../../../utils/format";
 
 type Props = {
   embedded?: boolean;
@@ -19,7 +22,7 @@ type Props = {
 
 export default function RatesEntryPage({ embedded = false }: Props) {
   void embedded;
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const { showNotification } = useSafeNotification();
   const exportBusyRef = useRef<"pdf" | "excel" | null>(null);
 
@@ -55,7 +58,7 @@ export default function RatesEntryPage({ embedded = false }: Props) {
   const hasFilters =
     filter.fromDate !== "" ||
     filter.toDate !== "" ||
-    filter.tripNo !== "" ||
+    filter.search !== "" ||
     filter.vehicle !== "" ||
     filter.supervisor !== "";
 
@@ -68,7 +71,7 @@ export default function RatesEntryPage({ embedded = false }: Props) {
 
   const handleResetFilters = () => {
     resetFilters();
-    showNotification("Filters have been reset.", "info");
+    showNotification(t("ops.rate.filters_reset"), "info");
   };
 
   const handleRefresh = () => {
@@ -82,25 +85,34 @@ export default function RatesEntryPage({ embedded = false }: Props) {
     exportBusyRef.current = "pdf";
     try {
       if (filteredTrips.length === 0) {
-        showNotification("No data to export.", "error");
+        showNotification(t("ops.rate.no_data_export"), "error");
         return;
       }
-      const headers = ["Trip No", "Day", "Vehicle", "Supervisor", "Source Farm", "Shops", "Birds", "Weight (KG)"];
+      const headers = [
+        t("operations.trip_no"),
+        t("ops.rate.col.day"),
+        t("common.vehicle"),
+        t("common.supervisor"),
+        t("ops.trip.source_farm"),
+        t("ops.trip.shops"),
+        t("common.birds"),
+        t("ops.trip.weight_kg"),
+      ];
       const rows = filteredTrips.map((trip) => [
         trip.tripNo,
-        formatTripListDay(trip.tripDate),
+        formatRateEntryDay(trip.tripDate, language),
         formatVehicleNumber(trip.vehicleNo),
-        trip.supervisorName,
-        trip.sourceFarm,
+        displayRateEntryName(trip.supervisorName, language),
+        displayRateEntryName(trip.sourceFarm, language),
         trip.totalShops.toString(),
         trip.totalBirds.toString(),
         trip.totalWeight.toFixed(2),
       ]);
       const filename = `Rates_${new Date().toISOString().split("T")[0]}`;
-      exportToPDF("Rates Entry Report", headers, rows, filename);
-      showNotification("PDF exported successfully!", "success");
+      exportToPDF(t("ops.rate.report_title"), headers, rows, filename);
+      showNotification(t("ops.rate.pdf_success"), "success");
     } catch {
-      showNotification("Unable to export Rate Entry PDF.", "error");
+      showNotification(t("ops.rate.pdf_error"), "error");
     } finally {
       exportBusyRef.current = null;
     }
@@ -111,25 +123,34 @@ export default function RatesEntryPage({ embedded = false }: Props) {
     exportBusyRef.current = "excel";
     try {
       if (filteredTrips.length === 0) {
-        showNotification("No data to export.", "error");
+        showNotification(t("ops.rate.no_data_export"), "error");
         return;
       }
-      const headers = ["Trip No", "Day", "Vehicle", "Supervisor", "Source Farm", "Shops", "Birds", "Weight (KG)"];
+      const headers = [
+        t("operations.trip_no"),
+        t("ops.rate.col.day"),
+        t("common.vehicle"),
+        t("common.supervisor"),
+        t("ops.trip.source_farm"),
+        t("ops.trip.shops"),
+        t("common.birds"),
+        t("ops.trip.weight_kg"),
+      ];
       const rows = filteredTrips.map((trip) => [
         trip.tripNo,
-        formatTripListDay(trip.tripDate),
+        formatRateEntryDay(trip.tripDate, language),
         formatVehicleNumber(trip.vehicleNo),
-        trip.supervisorName,
-        trip.sourceFarm,
+        displayRateEntryName(trip.supervisorName, language),
+        displayRateEntryName(trip.sourceFarm, language),
         trip.totalShops,
         trip.totalBirds,
         trip.totalWeight,
       ]);
       const filename = `Rates_${new Date().toISOString().split("T")[0]}`;
-      exportToExcel("Rates Entry Report", headers, rows, filename);
-      showNotification("Excel exported successfully!", "success");
+      exportToExcel(t("ops.rate.report_title"), headers, rows, filename);
+      showNotification(t("ops.rate.excel_success"), "success");
     } catch {
-      showNotification("Unable to export Rate Entry Excel.", "error");
+      showNotification(t("ops.rate.excel_error"), "error");
     } finally {
       exportBusyRef.current = null;
     }
@@ -140,14 +161,14 @@ export default function RatesEntryPage({ embedded = false }: Props) {
       <CompletedTripsFilters
         fromDate={filter.fromDate}
         toDate={filter.toDate}
-        tripNo={filter.tripNo}
+        search={filter.search}
         vehicle={filter.vehicle}
         supervisor={filter.supervisor}
         vehicleList={vehicleList}
         supervisorList={supervisorList}
         setFromDate={(value) => setFilter({ fromDate: value })}
         setToDate={(value) => setFilter({ toDate: value })}
-        setTripNo={(value) => setFilter({ tripNo: value })}
+        setSearch={(value) => setFilter({ search: value })}
         setVehicle={(value) => setFilter({ vehicle: value })}
         setSupervisor={(value) => setFilter({ supervisor: value })}
         onSearch={() => setCurrentPage(1)}
@@ -178,7 +199,7 @@ export default function RatesEntryPage({ embedded = false }: Props) {
 
       {filteredTrips.length === 0 && !loadError ? (
         <div className={opsEmptyStateClass}>
-          No completed trips awaiting rate entry.
+          {t("ops.rate.no_trips")}
         </div>
       ) : (
         <CompletedTripsTable

@@ -5,6 +5,9 @@ import { handleApiError } from "../../../../api";
 import { isCanceledError } from "../../../../api/errors";
 import { computeTotalPages } from "../../../../shared/ui/paginationStyles";
 import { PAGINATION_DEFAULT_PAGE_SIZE } from "../../../../shared/ui/uiTokens";
+import { useI18n } from "../../../../i18n";
+import { formatVehicleNumber } from "../../../../utils/format";
+import { displayRateEntryName, matchesRateEntrySearch } from "../utils/rateEntryDisplay";
 import { dropLockedTripFromList, excludeKnownLockedTrips } from "./rateEntryLockList";
 
 export type RateEntrySortKey =
@@ -20,7 +23,7 @@ export type RateEntrySortKey =
 type RateEntryFilter = {
   fromDate: string;
   toDate: string;
-  tripNo: string;
+  search: string;
   vehicle: string;
   supervisor: string;
 };
@@ -28,7 +31,7 @@ type RateEntryFilter = {
 const EMPTY_FILTER: RateEntryFilter = {
   fromDate: "",
   toDate: "",
-  tripNo: "",
+  search: "",
   vehicle: "",
   supervisor: "",
 };
@@ -52,7 +55,7 @@ function sortNumber(value: unknown): number {
   return Number.isFinite(numeric) ? numeric : 0;
 }
 
-function compareTrips(a: Trip, b: Trip, key: RateEntrySortKey): number {
+function compareTrips(a: Trip, b: Trip, key: RateEntrySortKey, language: "en" | "te"): number {
   switch (key) {
     case "totalShops":
     case "totalBirds":
@@ -60,17 +63,20 @@ function compareTrips(a: Trip, b: Trip, key: RateEntrySortKey): number {
       return sortNumber(a[key]) - sortNumber(b[key]);
     case "tripDate":
       return sortText(a.tripDate).localeCompare(sortText(b.tripDate));
-    case "tripNo":
     case "vehicleNo":
+      return sortText(formatVehicleNumber(a.vehicleNo)).localeCompare(sortText(formatVehicleNumber(b.vehicleNo)), undefined, { numeric: true });
     case "supervisorName":
     case "sourceFarm":
-      return sortText(a[key]).localeCompare(sortText(b[key]), undefined, { numeric: true });
+      return sortText(displayRateEntryName(a[key], language)).localeCompare(sortText(displayRateEntryName(b[key], language)), undefined, { numeric: true });
+    case "tripNo":
+      return sortText(a.tripNo).localeCompare(sortText(b.tripNo), undefined, { numeric: true });
     default:
       return 0;
   }
 }
 
 export default function useCompletedTrips() {
+  const { language } = useI18n();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
@@ -144,10 +150,10 @@ export default function useCompletedTrips() {
       .filter((trip) => {
         const fromOk = !filter.fromDate || trip.tripDate >= filter.fromDate;
         const toOk = !filter.toDate || trip.tripDate <= filter.toDate;
-        const tripOk = !filter.tripNo || trip.tripNo.toLowerCase().includes(filter.tripNo.toLowerCase());
+        const searchOk = matchesRateEntrySearch(trip, filter.search, language);
         const vehicleOk = !filter.vehicle || trip.vehicleNo === filter.vehicle;
         const supervisorOk = !filter.supervisor || trip.supervisorName === filter.supervisor;
-        return fromOk && toOk && tripOk && vehicleOk && supervisorOk;
+        return fromOk && toOk && searchOk && vehicleOk && supervisorOk;
       })
       .map((trip) => ({
         ...trip,
@@ -157,10 +163,10 @@ export default function useCompletedTrips() {
     if (!sortBy) return rows;
     const direction = sortDir === "asc" ? 1 : -1;
     return [...rows].sort((a, b) => {
-      const primary = compareTrips(a, b, sortBy) * direction;
+      const primary = compareTrips(a, b, sortBy, language) * direction;
       return primary || b.id - a.id;
     });
-  }, [trips, filter, sortBy, sortDir]);
+  }, [trips, filter, sortBy, sortDir, language]);
 
   const totalPages = computeTotalPages(filteredTrips.length, pageSize);
 
@@ -177,12 +183,18 @@ export default function useCompletedTrips() {
   }, [filteredTrips, currentPage, pageSize, totalPages]);
 
   const vehicleList = useMemo(
-    () => [...new Set(trips.map((trip) => trip.vehicleNo).filter(Boolean))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
+    () =>
+      [...new Set(trips.map((trip) => trip.vehicleNo).filter(Boolean))]
+        .sort((a, b) => formatVehicleNumber(a).localeCompare(formatVehicleNumber(b), undefined, { numeric: true }))
+        .map((vehicleNo) => ({ value: vehicleNo, label: formatVehicleNumber(vehicleNo) })),
     [trips]
   );
   const supervisorList = useMemo(
-    () => [...new Set(trips.map((trip) => trip.supervisorName).filter(Boolean))].sort((a, b) => a.localeCompare(b, undefined, { numeric: true })),
-    [trips]
+    () =>
+      [...new Set(trips.map((trip) => trip.supervisorName).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+        .map((name) => ({ value: name, label: displayRateEntryName(name, language) })),
+    [trips, language]
   );
 
   const setPageSize = useCallback((nextPageSize: number) => {

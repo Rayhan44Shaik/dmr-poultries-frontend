@@ -1,6 +1,7 @@
 import React from "react";
-import { Search, FileText, FileSpreadsheet, Calendar, Truck, UserCog, Hash, RotateCcw } from "lucide-react";
+import { Search, FileText, FileSpreadsheet, Calendar, Truck, UserCog, RotateCcw } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
+import { useI18n } from "../../../../i18n";
 import {
   opsFilterCardClass,
   opsFilterLabelClass,
@@ -18,14 +19,14 @@ import MasterDropdown, { type MasterDropdownOption } from "../../../masters/comp
 interface Props {
   fromDate: string;
   toDate: string;
-  tripNo: string;
+  search: string;
   vehicle: string;
   supervisor: string;
   vehicleList: readonly (string | MasterDropdownOption)[];
   supervisorList: readonly (string | MasterDropdownOption)[];
   setFromDate: (value: string) => void;
   setToDate: (value: string) => void;
-  setTripNo: (value: string) => void;
+  setSearch: (value: string) => void;
   setVehicle: (value: string) => void;
   setSupervisor: (value: string) => void;
   onSearch: () => void;
@@ -48,14 +49,14 @@ function withoutSentinel(
 function CompletedTripsFilters({
   fromDate,
   toDate,
-  tripNo,
+  search,
   vehicle,
   supervisor,
   vehicleList,
   supervisorList,
   setFromDate,
   setToDate,
-  setTripNo,
+  setSearch,
   setVehicle,
   setSupervisor,
   onSearch,
@@ -67,6 +68,7 @@ function CompletedTripsFilters({
   onExportPDF,
   onExportExcel,
 }: Props) {
+  const { t } = useI18n();
   const enableExports = hasFilters && pendingTrips > 0;
   const vehicleOptions = withoutSentinel(vehicleList || [], "All Vehicles");
   const supervisorOptions = withoutSentinel(supervisorList || [], "All Supervisors");
@@ -77,12 +79,12 @@ function CompletedTripsFilters({
         <div>
           <label className={opsFilterLabelClass}>
             <Calendar size={13} className="text-emerald-500 flex-shrink-0" />
-            <span>From Date</span>
+            <span>{t("ops.rate.from_date")}</span>
           </label>
           <DatePicker
             value={fromDate}
             onChange={setFromDate}
-            placeholder="Select date"
+            placeholder={t("placeholder.enter_date")}
             className="w-full text-xs font-medium"
           />
         </div>
@@ -90,12 +92,12 @@ function CompletedTripsFilters({
         <div>
           <label className={opsFilterLabelClass}>
             <Calendar size={13} className="text-emerald-500 flex-shrink-0" />
-            <span>To Date</span>
+            <span>{t("ops.rate.to_date")}</span>
           </label>
           <DatePicker
             value={toDate}
             onChange={setToDate}
-            placeholder="Select date"
+            placeholder={t("placeholder.enter_date")}
             className="w-full text-xs font-medium"
           />
         </div>
@@ -103,15 +105,15 @@ function CompletedTripsFilters({
         <div>
           <label className={opsFilterLabelClass}>
             <Truck size={13} className="text-emerald-500 flex-shrink-0" />
-            <span>Vehicle</span>
+            <span>{t("common.vehicle")}</span>
           </label>
           <MasterDropdown
             hideLabel
-            label="Vehicle"
+            label={t("common.vehicle")}
             value={vehicle}
             options={vehicleOptions}
             onChange={setVehicle}
-            placeholder="All Vehicles"
+            placeholder={t("ops.trip.all_vehicles")}
             searchable
             allowClear
             className="w-full"
@@ -121,15 +123,15 @@ function CompletedTripsFilters({
         <div>
           <label className={opsFilterLabelClass}>
             <UserCog size={13} className="text-emerald-500 flex-shrink-0" />
-            <span>Supervisor</span>
+            <span>{t("common.supervisor")}</span>
           </label>
           <MasterDropdown
             hideLabel
-            label="Supervisor"
+            label={t("common.supervisor")}
             value={supervisor}
             options={supervisorOptions}
             onChange={setSupervisor}
-            placeholder="All Supervisors"
+            placeholder={t("ops.trip.all_supervisors")}
             searchable
             allowClear
             className="w-full"
@@ -138,15 +140,15 @@ function CompletedTripsFilters({
 
         <div>
           <label className={opsFilterLabelClass}>
-            <Hash size={13} className="text-slate-400 flex-shrink-0" />
-            <span>Trip No</span>
+            <Search size={13} className="text-slate-400 flex-shrink-0" />
+            <span>{t("ops.rate.search_label")}</span>
           </label>
           <div className="relative">
             <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
-              value={tripNo}
-              onChange={(event) => setTripNo(event.target.value)}
-              placeholder="Trip Number..."
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={t("ops.rate.search_placeholder")}
               className={`${opsInputClass} pl-10`}
             />
           </div>
@@ -155,32 +157,36 @@ function CompletedTripsFilters({
 
       <div className="flex items-center justify-between flex-wrap gap-4 pt-1">
         <div className="text-xs font-semibold text-slate-600">
-          Pending Trips : <span className="font-bold text-orange-600">{pendingTrips}</span>
+          {t("ops.rate.pending_trips")} : <span className="font-bold text-orange-600">{pendingTrips}</span>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
-          <button type="button" onClick={onSearch} className={`group relative ${opsPrimaryButtonClass}`} aria-label="Search rate entries">
+          <button type="button" onClick={onSearch} className={`group relative ${opsPrimaryButtonClass}`} aria-label={t("ops.rate.search_tooltip")}>
             <span className={`inline-flex ${uiActionIconMotionClass.search}`}><Search size={15} /></span>
-            Search
-            <ActionTooltip label="Search" />
+            {t("common.search")}
+            <ActionTooltip label={t("ops.rate.search_tooltip")} />
           </button>
-          <button type="button" onClick={onReset} className={`group relative ${opsSecondaryButtonClass}`} aria-label="Reset rate entry filters">
+          <button type="button" onClick={onReset} className={`group relative ${opsSecondaryButtonClass}`} aria-label={t("ops.rate.reset_tooltip")}>
             <span className={`inline-flex ${uiActionIconMotionClass.reset}`}><RotateCcw size={14} /></span>
-            Reset
-            <ActionTooltip label="Reset" />
+            {t("common.reset")}
+            <ActionTooltip label={t("ops.rate.reset_tooltip")} />
           </button>
-          {onRefresh && <BrandRefreshButton onClick={onRefresh} loading={refreshing} />}
+          {onRefresh && (
+            <BrandRefreshButton onClick={onRefresh} loading={refreshing} ariaLabel={t("common.refresh")}>
+              {t("common.refresh")}
+            </BrandRefreshButton>
+          )}
           {onExportPDF && (
-            <button type="button" onClick={onExportPDF} disabled={!enableExports} className={`group relative ${opsPdfButtonClass}`} aria-label="Export rate entries PDF">
+            <button type="button" onClick={onExportPDF} disabled={!enableExports} className={`group relative ${opsPdfButtonClass}`} aria-label={t("ops.rate.export_pdf")}>
               <span className={`inline-flex ${enableExports ? uiActionIconMotionClass.pdf : ""}`}><FileText size={15} /></span>
               PDF
-              <ActionTooltip label="Export PDF" />
+              <ActionTooltip label={t("ops.rate.export_pdf")} />
             </button>
           )}
           {onExportExcel && (
-            <button type="button" onClick={onExportExcel} disabled={!enableExports} className={`group relative ${opsExcelButtonClass}`} aria-label="Export rate entries Excel">
+            <button type="button" onClick={onExportExcel} disabled={!enableExports} className={`group relative ${opsExcelButtonClass}`} aria-label={t("ops.rate.export_excel")}>
               <span className={`inline-flex ${enableExports ? uiActionIconMotionClass.excel : ""}`}><FileSpreadsheet size={15} /></span>
               Excel
-              <ActionTooltip label="Export Excel" />
+              <ActionTooltip label={t("ops.rate.export_excel")} />
             </button>
           )}
         </div>

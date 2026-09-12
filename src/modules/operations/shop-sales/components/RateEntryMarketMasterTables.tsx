@@ -1,3 +1,4 @@
+import { useI18n } from "../../../../i18n";
 import {
   sizeCategoryHeaders,
   sizeColumnLabel,
@@ -37,10 +38,12 @@ export default function RateEntryMarketMasterTables({
   loadError,
   loading,
 }: Props) {
+  const { t } = useI18n();
+
   if (loading) {
     return (
       <div className="px-5 py-2.5 border-b bg-slate-50 text-xs text-slate-600">
-        Loading Market Rate Master…
+        {t("ops.rate.market.loading")}
       </div>
     );
   }
@@ -48,7 +51,7 @@ export default function RateEntryMarketMasterTables({
   if (loadError) {
     return (
       <div className="px-5 py-2.5 border-b border-red-200 bg-red-50 text-xs font-medium text-red-700">
-        Market Rate Master could not be loaded. {loadError}
+        {t("ops.rate.market.error")} {loadError}
       </div>
     );
   }
@@ -56,7 +59,7 @@ export default function RateEntryMarketMasterTables({
   if (!master) {
     return (
       <div className="px-5 py-2.5 border-b bg-slate-50 text-xs text-slate-500">
-        Market Rate Master reference is unavailable for this trip.
+        {t("ops.rate.market.unavailable")}
       </div>
     );
   }

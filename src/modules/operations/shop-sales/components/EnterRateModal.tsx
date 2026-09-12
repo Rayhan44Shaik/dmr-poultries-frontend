@@ -14,6 +14,13 @@ import {
   RotateCcw,
 } from "lucide-react";
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
+import { useI18n } from "../../../../i18n";
+import { formatVehicleNumber } from "../../../../utils/format";
+import {
+  displayRateEntryShopName,
+  formatRateEntryTripDate,
+  formatRateEntryWeekday,
+} from "../utils/rateEntryDisplay";
 import RateEntryMarketMasterTables from "./RateEntryMarketMasterTables";
 import type { RateEntryMarketRateMasterDto } from "../utils/rateEntryMarketMaster";
 import {
@@ -32,19 +39,6 @@ function isValidSellingRate(rate: number | null | undefined): boolean {
 function normalizeRate(rate: number | null | undefined): number | null {
   if (rate == null || !Number.isFinite(rate) || rate === 0) return null;
   return rate;
-}
-
-function formatTripDateDisplay(iso: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
-  if (!m) return iso;
-  return `${m[3]}-${m[2]}-${m[1]}`;
-}
-
-function weekdayName(iso: string): string {
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
-  if (!m) return "—";
-  const d = new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3]));
-  return d.toLocaleDateString("en-IN", { weekday: "long" });
 }
 
 function formatInr(n: number): string {
@@ -70,6 +64,7 @@ export default function EnterRateModal({
   isSaving = false,
   loadError,
 }: Props) {
+  const { t, language } = useI18n();
   const [deliveries, setDeliveries] = useState<Trip["deliveries"]>([]);
   const [showSuccessToast, setShowSuccessToast] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
@@ -150,7 +145,9 @@ export default function EnterRateModal({
   }, [deliveries, shopPage]);
 
   useEffect(() => {
-    if (shopPage > shopPageCount) setShopPage(shopPageCount);
+    if (shopPage <= shopPageCount) return;
+    const timer = window.setTimeout(() => setShopPage(shopPageCount), 0);
+    return () => window.clearTimeout(timer);
   }, [shopPage, shopPageCount]);
 
   const resetRates = () => {
@@ -169,7 +166,7 @@ export default function EnterRateModal({
     if (saving) return;
     if (mode === "save") {
       if (hasInvalidEnteredRate) {
-        setLockError("Entered rates must be between ₹50 and ₹300. Blank shops can still be saved.");
+        setLockError(t("ops.rate.modal.rate_range_error"));
         return;
       }
       if (!isDirty) return;
@@ -221,8 +218,8 @@ export default function EnterRateModal({
                 <CheckCircle2 size={28} />
               </div>
               <div className="text-center">
-                <h3 className="text-base font-bold text-slate-800">Rates Saved Successfully!</h3>
-                <p className="text-xs text-slate-500 mt-0.5">Saved to the server. Refresh will keep these rates.</p>
+                <h3 className="text-base font-bold text-slate-800">{t("ops.rate.modal.saved_title")}</h3>
+                <p className="text-xs text-slate-500 mt-0.5">{t("ops.rate.modal.saved_desc")}</p>
               </div>
             </div>
           </div>
@@ -236,11 +233,8 @@ export default function EnterRateModal({
                   <AlertCircle size={20} />
                 </div>
                 <div className="flex-1">
-                  <h3 className="text-lg font-bold text-slate-800">Locking this trip</h3>
-                  <p className="text-sm text-slate-600 mt-1">
-                    After <span className="font-semibold">LOCK &amp; SUBMIT</span>, rates cannot be edited in Rate Entry.
-                    This trip will leave the pending list and move to Shop Sales.
-                  </p>
+                  <h3 className="text-lg font-bold text-slate-800">{t("ops.rate.modal.locking_title")}</h3>
+                  <p className="text-sm text-slate-600 mt-1">{t("ops.rate.modal.locking_desc")}</p>
                 </div>
               </div>
               <div className="mt-6 flex justify-end gap-3">
@@ -248,14 +242,14 @@ export default function EnterRateModal({
                   onClick={() => setShowConfirm(false)}
                   className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50"
                 >
-                  Cancel
+                  {t("common.cancel")}
                 </button>
                 <button
                   onClick={() => confirmSave("lock")}
                   disabled={saving}
                   className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-sm font-medium text-white"
                 >
-                  {saving ? "Locking..." : "Lock — cannot edit"}
+                  {saving ? t("ops.rate.modal.locking") : t("ops.rate.modal.lock_cannot_edit")}
                 </button>
               </div>
             </div>
@@ -265,12 +259,12 @@ export default function EnterRateModal({
         <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[94vh] flex flex-col relative overflow-hidden">
           <div className="bg-white border-b border-slate-200 px-5 py-3 flex items-start justify-between shrink-0">
             <h2 className="text-xl font-bold text-slate-900">
-              {rateLocked ? "Rates (Read-Only)" : "Enter Selling Rates"}
+              {rateLocked ? t("ops.rate.modal.title_readonly") : t("ops.rate.modal.title_enter")}
             </h2>
             <button
               onClick={onClose}
               className="h-8 w-8 rounded-full hover:bg-slate-100 flex items-center justify-center"
-              aria-label="Close"
+              aria-label={t("common.close")}
             >
               <X size={18} className="text-slate-600" />
             </button>
@@ -279,7 +273,7 @@ export default function EnterRateModal({
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 px-5 py-3 shrink-0">
             <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-white px-3 py-2.5">
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-slate-500">Trip Number</p>
+                <p className="text-[10px] uppercase tracking-wider text-slate-500">{t("ops.rate.modal.trip_number")}</p>
                 <p className="text-sm font-bold text-emerald-700">{trip.tripNo}</p>
               </div>
             </div>
@@ -288,8 +282,8 @@ export default function EnterRateModal({
                 <Truck size={18} className="text-sky-700" />
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-slate-500">Vehicle No</p>
-                <p className="text-sm font-bold text-slate-800">{trip.vehicleNo}</p>
+                <p className="text-[10px] uppercase tracking-wider text-slate-500">{t("ops.rate.modal.vehicle_no")}</p>
+                <p className="text-sm font-bold text-slate-800">{formatVehicleNumber(trip.vehicleNo)}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2.5">
@@ -297,14 +291,14 @@ export default function EnterRateModal({
                 <CalendarDays size={18} className="text-emerald-700" />
               </div>
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-slate-500">Trip Date</p>
-                <p className="text-sm font-bold text-slate-800">{formatTripDateDisplay(trip.tripDate)}</p>
+                <p className="text-[10px] uppercase tracking-wider text-slate-500">{t("ops.rate.modal.trip_date")}</p>
+                <p className="text-sm font-bold text-slate-800">{formatRateEntryTripDate(trip.tripDate)}</p>
               </div>
             </div>
             <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
               <div>
-                <p className="text-[10px] uppercase tracking-wider text-slate-500">Day</p>
-                <p className="text-sm font-bold text-slate-800">{weekdayName(trip.tripDate)}</p>
+                <p className="text-[10px] uppercase tracking-wider text-slate-500">{t("ops.rate.modal.day")}</p>
+                <p className="text-sm font-bold text-slate-800">{formatRateEntryWeekday(trip.tripDate, language)}</p>
               </div>
             </div>
           </div>
@@ -329,13 +323,13 @@ export default function EnterRateModal({
               <table className="min-w-full text-sm">
                 <thead className="sticky top-0 bg-white z-10">
                   <tr className="text-slate-500 border-b border-slate-200">
-                    <th className="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider">S.No</th>
-                    <th className="px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wider">Shop Name</th>
-                    <th className="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider">Birds</th>
-                    <th className="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider">Weight (KG)</th>
-                    <th className="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider">Market Rate (₹/KG)</th>
-                    <th className="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider">Rate (₹/KG)</th>
-                    <th className="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider">Amount (₹)</th>
+                    <th className="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider">{t("ops.rate.modal.s_no")}</th>
+                    <th className="px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wider">{t("ops.rate.modal.shop_name")}</th>
+                    <th className="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider">{t("common.birds")}</th>
+                    <th className="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider">{t("ops.trip.weight_kg")}</th>
+                    <th className="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider">{t("ops.rate.modal.market_rate")}</th>
+                    <th className="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider">{t("ops.rate.modal.rate")}</th>
+                    <th className="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider">{t("ops.rate.modal.amount")}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -356,7 +350,7 @@ export default function EnterRateModal({
                         className={`border-b border-slate-100 ${missingForLock ? "bg-red-50" : ""}`}
                       >
                         <td className="px-2 py-2.5 text-center text-xs text-slate-500">{index + 1}</td>
-                        <td className="px-2 py-2.5 text-xs font-medium text-slate-800">{delivery.shopName}</td>
+                        <td className="px-2 py-2.5 text-xs font-medium text-slate-800">{displayRateEntryShopName(delivery.shopName, language)}</td>
                         <td className="px-2 py-2.5 text-center text-xs font-semibold text-emerald-600">
                           {delivery.birds.toLocaleString()}
                         </td>
@@ -394,8 +388,8 @@ export default function EnterRateModal({
                                       : "border-red-500 bg-red-50 text-red-700"
                                 }`}
                               />
-                              {belowMin && <p className="text-[10px] text-red-500 mt-0.5">⚠ Min ₹50</p>}
-                              {aboveMax && <p className="text-[10px] text-red-500 mt-0.5">⚠ Max ₹300</p>}
+                              {belowMin && <p className="text-[10px] text-red-500 mt-0.5">⚠ {t("ops.rate.modal.min_rate")}</p>}
+                              {aboveMax && <p className="text-[10px] text-red-500 mt-0.5">⚠ {t("ops.rate.modal.max_rate")}</p>}
                             </div>
                           )}
                         </td>
@@ -417,7 +411,7 @@ export default function EnterRateModal({
                   onClick={() => setShopPage((p) => Math.max(1, p - 1))}
                   className={paginationNavBtnClass}
                 >
-                  Previous
+                  {t("common.previous")}
                 </button>
                 <span className={paginationPageBtnClass(true)}>
                   {shopPage}
@@ -428,7 +422,7 @@ export default function EnterRateModal({
                   onClick={() => setShopPage((p) => Math.min(shopPageCount, p + 1))}
                   className={paginationNavBtnClass}
                 >
-                  Next
+                  {t("common.next")}
                 </button>
               </div>
             )}
@@ -439,28 +433,28 @@ export default function EnterRateModal({
               <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 flex items-center gap-2">
                 <Store size={16} className="text-slate-500" />
                 <div>
-                  <p className="text-[9px] text-slate-500 uppercase">Shops</p>
+                  <p className="text-[9px] text-slate-500 uppercase">{t("ops.trip.shops")}</p>
                   <p className="text-base font-bold text-slate-800">{deliveries.length}</p>
                 </div>
               </div>
               <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 flex items-center gap-2">
                 <Package size={16} className="text-slate-500" />
                 <div>
-                  <p className="text-[9px] text-slate-500 uppercase">Birds</p>
+                  <p className="text-[9px] text-slate-500 uppercase">{t("common.birds")}</p>
                   <p className="text-base font-bold text-slate-800">{totalBirds.toLocaleString()}</p>
                 </div>
               </div>
               <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 flex items-center gap-2">
                 <Scale size={16} className="text-orange-500" />
                 <div>
-                  <p className="text-[9px] text-slate-500 uppercase">Total Weight (KG)</p>
-                  <p className="text-base font-bold text-orange-500">{totalWeight.toFixed(2)} KG</p>
+                  <p className="text-[9px] text-slate-500 uppercase">{t("ops.rate.modal.total_weight")}</p>
+                  <p className="text-base font-bold text-orange-500">{totalWeight.toFixed(2)} {t("common.kg")}</p>
                 </div>
               </div>
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 flex items-center gap-2">
                 <IndianRupee size={16} className="text-emerald-700" />
                 <div>
-                  <p className="text-[9px] text-emerald-700 uppercase">Grand Amount (₹)</p>
+                  <p className="text-[9px] text-emerald-700 uppercase">{t("ops.rate.modal.grand_amount")}</p>
                   <p className="text-base font-bold text-emerald-700">₹ {formatInr(grandAmount)}</p>
                 </div>
               </div>
@@ -474,14 +468,14 @@ export default function EnterRateModal({
                   className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-sky-300 text-sm font-medium text-sky-700 hover:bg-sky-50 disabled:opacity-50"
                 >
                   <RotateCcw size={14} />
-                  Reset
+                  {t("ops.rate.modal.reset_rates")}
                 </button>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={onClose}
                     className="px-4 py-2 rounded-lg border border-slate-300 text-sm font-medium text-slate-600 hover:bg-slate-50"
                   >
-                    Cancel
+                    {t("common.cancel")}
                   </button>
                   <button
                     onClick={() => confirmSave("save")}
@@ -491,10 +485,10 @@ export default function EnterRateModal({
                         ? "border-amber-400 bg-amber-50 text-amber-800 ring-2 ring-amber-200"
                         : "border-emerald-300 bg-emerald-50 text-emerald-800"
                     }`}
-                    title="Save entered rates without locking. Blank shops are allowed."
+                    title={t("ops.rate.modal.save_progress")}
                   >
                     <Save size={14} />
-                    {saving ? "Saving..." : "Save Progress"}
+                    {saving ? t("ops.rate.modal.saving") : t("ops.rate.modal.save_progress")}
                   </button>
                   <button
                     onClick={() => {
@@ -515,7 +509,7 @@ export default function EnterRateModal({
                     className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white text-sm font-semibold disabled:opacity-50"
                   >
                     <Lock size={14} className="text-orange-300" />
-                    {saving ? "Locking..." : "LOCK & SUBMIT"}
+                    {saving ? t("ops.rate.modal.locking") : t("ops.rate.modal.lock_submit")}
                   </button>
                 </div>
               </div>
