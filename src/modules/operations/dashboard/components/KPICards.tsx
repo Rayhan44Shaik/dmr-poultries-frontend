@@ -206,6 +206,7 @@ const KPICard = memo(function KPICard({
   const comparison = compare(value, prevValue, config.upIsGood);
   const baseline = prevValue > 0;
   const days = rangeDays && rangeDays > 0 ? rangeDays : 7;
+  const periodLabel = `${days}d`;
   const rangeLabel = t("ops.dashboard.vs_prev", { days });
 
   let badgeClasses =
@@ -239,6 +240,8 @@ const KPICard = memo(function KPICard({
     changeText = "—";
     badgeTitle = t("ops.dashboard.kpi_no_baseline", { days });
   }
+  /* The badge keeps just the period ("7d"); the full "vs prev 7d" sentence is
+     in the tooltip so the top-right corner stays small. */
 
   const numberSizeClass = "text-[27px]";
 
@@ -247,18 +250,26 @@ const KPICard = memo(function KPICard({
   // Left content – vertically centered
   const leftContent = (
     <div className="flex flex-col justify-center flex-1 min-w-0">
-      <div className="flex items-center gap-1.5">
-        <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${config.bg}`} />
-        <p
-          className="text-xs font-medium text-slate-500 truncate whitespace-nowrap"
-          title={t(kpiCardLabel(label))}
-        >
-          {t(kpiCardLabel(label))}
-        </p>
+      {/* Top row: the name on the left, the comparison pinned top-right. */}
+      <div className="flex items-start justify-between gap-1.5">
+        <span className="flex min-w-0 items-center gap-1.5">
+          <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${config.bg}`} />
+          <p
+            className="text-xs font-medium text-slate-500 truncate whitespace-nowrap"
+            title={t(kpiCardLabel(label))}
+          >
+            {t(kpiCardLabel(label))}
+          </p>
+        </span>
+        <span className={badgeClasses} title={`${badgeTitle} · ${rangeLabel}`}>
+          {iconElement}
+          {changeText}
+          <span className="font-medium text-slate-400">{periodLabel}</span>
+        </span>
       </div>
 
       <h2
-        className={`mt-0.5 ${numberSizeClass} font-bold leading-none tracking-tight ${config.text}`}
+        className={`mt-1 ${numberSizeClass} font-bold leading-none tracking-tight ${config.text}`}
       >
         {displayMain}
         {displaySuffix && (
@@ -268,23 +279,17 @@ const KPICard = memo(function KPICard({
         )}
       </h2>
 
-      {/* One line: the change, what it is measured against, and the figure
-          itself — the badge tooltip carries the same pair in full. */}
-      <div className="mt-1 flex min-w-0 items-center gap-1.5">
-        <span className={badgeClasses} title={badgeTitle}>
-          {iconElement}
-          {changeText}
-          <span className="font-medium text-slate-400">{rangeLabel}</span>
-        </span>
-        {baseline ? (
-          <span
-            className="truncate text-[10px] font-medium text-slate-400"
-            title={t("ops.dashboard.kpi_prev_value", { value: formatWithUnit(prevValue, unit) })}
-          >
-            {t("ops.dashboard.kpi_prev_value", { value: formatWithUnit(prevValue, unit) })}
-          </span>
-        ) : null}
-      </div>
+      {/* What it is measured against — the number, not just the ratio. */}
+      {baseline ? (
+        <p
+          className="mt-1 truncate text-[10px] font-medium text-slate-400"
+          title={`${rangeLabel} ${t("ops.dashboard.kpi_prev_value", {
+            value: formatWithUnit(prevValue, unit),
+          })}`}
+        >
+          {t("ops.dashboard.kpi_prev_value", { value: formatWithUnit(prevValue, unit) })}
+        </p>
+      ) : null}
     </div>
   );
 

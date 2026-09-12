@@ -96,9 +96,10 @@ quarter). The comparison is honest in all three cases:
 - no prior window (or a zero baseline) says "—" rather than a meaningless
   0.0%, with the reason in the tooltip.
 
-Every card prints the change and what it is measured against on ONE line
-("▲ 10.2% vs prev 7d  was ₹31.61 L"), truncating rather than wrapping when the
-grid is tight, and hovering gives both figures for the period.
+Each card pins the change to its **top-right corner** ("▲ 10.2% 7d"), with the
+period following the calendar — 7d, 15d, 30d, whatever the range is — and the
+baseline figure underneath the number ("was ₹31.61 L"). Hovering the badge gives
+the full sentence, both figures included.
 
 ### Operational Trends (dashboard)
 
