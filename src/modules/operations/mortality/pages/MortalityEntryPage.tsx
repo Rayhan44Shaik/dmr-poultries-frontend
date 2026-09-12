@@ -21,8 +21,6 @@ import LossKpiCards from "../components/LossKpiCards";
 import TripLossTable from "../components/TripLossTable";
 import AppliedFiltersIndicator from "../components/AppliedFiltersIndicator";
 import { useTripLossAnalysis } from "../hooks/useTripLossAnalysis";
-import { useMortalitySeries } from "../hooks/useMortalitySeries";
-import TripAnalysisPanel from "../components/analysis/TripAnalysisPanel";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { opsPageClass } from "../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../i18n";
@@ -47,11 +45,6 @@ export default function MortalityEntryPage() {
       "success"
     );
   }, [analysis, showNotification, t]);
-
-  // Charts follow the APPLIED filters, so they always describe the same trip
-  // set as the table and the KPI cards. `analysis.reloadToken` is bumped by
-  // Refresh, so both the table and the charts reload together.
-  const charts = useMortalitySeries(analysis.appliedFilters, analysis.reloadToken);
 
   // Refresh: reload completed trips, preserving the current page.
   const handleRefresh = useCallback(async () => {
@@ -104,17 +97,6 @@ export default function MortalityEntryPage() {
           </p>
           <LossKpiCards kpis={analysis.kpis} loading={analysis.loading} />
         </section>
-      )}
-
-      {/* ── 2b. TRIP ANALYSIS CHARTS — the same five details, over time ── */}
-      {!analysis.error && (
-        <TripAnalysisPanel
-          series={charts.series}
-          riskPoints={charts.riskPoints}
-          loading={charts.loading}
-          error={charts.error}
-          filtered={analysis.kpisVisible}
-        />
       )}
 
       {/* ── 3. COMPLETED TRIPS — always visible ───────────────────── */}

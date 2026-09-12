@@ -330,8 +330,6 @@ export function useTripLossAnalysis() {
     error,
     retry: refresh,
     refresh,
-    /** Bumped by Refresh/Retry so sibling queries (charts) can reload too. */
-    reloadToken,
     /** Filter state — bound to the controls. */
     filters,
     setFilters,
