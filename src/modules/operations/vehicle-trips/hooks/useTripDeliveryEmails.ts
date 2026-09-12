@@ -20,6 +20,13 @@ export type EmailCounts = {
   total: number;
 };
 
+export type DeliveryEmailSendResult = {
+  success: boolean;
+  status: DeliveryEmailStatusValue;
+  message: string;
+  sendCount?: number;
+};
+
 type Options = {
   /** When true, statuses are only loaded for completed trips (default). */
   enabled?: boolean;
@@ -40,6 +47,7 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
   const [localStatus, setLocalStatus] = useState<Record<number, DeliveryEmailStatusValue>>({});
   const [busyIds, setBusyIds] = useState<Set<number>>(new Set());
   const [localErrors, setLocalErrors] = useState<Record<number, string>>({});
+  const [localSendCounts, setLocalSendCounts] = useState<Record<number, number>>({});
   const [isBulkSending, setIsBulkSending] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ sent: number; total: number } | null>(null);
   const bulkRunRef = useRef(0);
@@ -61,6 +69,7 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
       setRows([]);
       setLocalStatus({});
       setLocalErrors({});
+      setLocalSendCounts({});
       setBusyIds(new Set());
       setBulkProgress(null);
       return;
@@ -112,9 +121,9 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
   const sendCountFor = useCallback(
     (deliveryId: number): number => {
       const row = rows.find((r) => r.deliveryId === deliveryId);
-      return row?.sendCount ?? 0;
+      return Math.max(row?.sendCount ?? 0, localSendCounts[deliveryId] ?? 0);
     },
-    [rows]
+    [rows, localSendCounts]
   );
 
   const counts: EmailCounts = useMemo(() => {
@@ -145,10 +154,24 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
 
   /** Send a single shop's delivery email (no-op while that shop is sending). */
   const sendOne = useCallback(
-    async (delivery: ShopDelivery): Promise<void> => {
-      if (!trip || !completed) return;
-      if (busyIds.has(delivery.id) || isBulkSending) return;
+    async (delivery: ShopDelivery): Promise<DeliveryEmailSendResult> => {
+      if (!trip || !completed) {
+        return {
+          success: false,
+          status: "failed",
+          message: translate("ops.trip.unable_send_email"),
+        };
+      }
+      if (busyIds.has(delivery.id) || isBulkSending) {
+        return {
+          success: false,
+          status: "sending",
+          message: translate("ops.trip.sending_email"),
+        };
+      }
       const row = rows.find((r) => r.deliveryId === delivery.id);
+      const currentCount = Math.max(row?.sendCount ?? 0, localSendCounts[delivery.id] ?? 0);
+      let outcome: DeliveryEmailSendResult;
       setBusy(delivery.id, true);
       setLocalStatus((prev) => ({ ...prev, [delivery.id]: "sending" as const }));
       setLocalErrors((prev) => {
@@ -163,29 +186,44 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
           shopEmail: row?.shopEmail ?? null,
         });
         if (result.status === "sent") {
+          const nextCount = Math.max(currentCount + 1, Number(result.sendCount) || 0);
           setLocalStatus((prev) => ({ ...prev, [delivery.id]: "sent" as const }));
-          // Backend returns authoritative sendCount; refresh will sync it
+          setLocalSendCounts((prev) => ({
+            ...prev,
+            [delivery.id]: Math.max(prev[delivery.id] ?? 0, nextCount),
+          }));
+          outcome = {
+            success: true,
+            status: "sent",
+            message: translate("ops.trip.email_sent_toast"),
+            sendCount: nextCount,
+          };
         } else {
+          const message = userFacingDeliveryEmailError(result.message);
           setLocalStatus((prev) => ({ ...prev, [delivery.id]: "failed" as const }));
           setLocalErrors((prev) => ({
             ...prev,
-            [delivery.id]: userFacingDeliveryEmailError(result.message),
+            [delivery.id]: message,
           }));
+          outcome = { success: false, status: "failed", message };
         }
       } catch (err) {
+        const message = userFacingDeliveryEmailError(
+          err instanceof Error ? err.message : translate("ops.trip.unable_send_email")
+        );
         setLocalStatus((prev) => ({ ...prev, [delivery.id]: "failed" as const }));
         setLocalErrors((prev) => ({
           ...prev,
-          [delivery.id]: userFacingDeliveryEmailError(
-            err instanceof Error ? err.message : translate("ops.trip.unable_send_email")
-          ),
+          [delivery.id]: message,
         }));
+        outcome = { success: false, status: "failed", message };
       } finally {
         setBusy(delivery.id, false);
         await refresh();
       }
+      return outcome;
     },
-    [trip, completed, busyIds, isBulkSending, rows, setBusy, refresh]
+    [trip, completed, busyIds, isBulkSending, rows, localSendCounts, setBusy, refresh]
   );
 
   /**
@@ -227,9 +265,14 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
           shopEmail: row?.shopEmail ?? null,
         });
         if (result.status === "sent") {
+          const currentCount = Math.max(row?.sendCount ?? 0, localSendCounts[delivery.id] ?? 0);
+          const nextCount = Math.max(currentCount + 1, Number(result.sendCount) || 0);
           succeeded = true;
           setLocalStatus((prev) => ({ ...prev, [delivery.id]: "sent" as const }));
-          // Backend returns authoritative sendCount; refresh will sync it
+          setLocalSendCounts((prev) => ({
+            ...prev,
+            [delivery.id]: Math.max(prev[delivery.id] ?? 0, nextCount),
+          }));
         } else {
           setLocalStatus((prev) => ({ ...prev, [delivery.id]: "failed" as const }));
           setLocalErrors((prev) => ({
@@ -254,7 +297,7 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
     setIsBulkSending(false);
     setBulkProgress(null);
     await refresh();
-  }, [trip, completed, isBulkSending, effectiveStatus, rows, refresh]);
+  }, [trip, completed, isBulkSending, effectiveStatus, rows, localSendCounts, refresh]);
 
   return {
     rows,

@@ -3,18 +3,19 @@
 // Steps 1–5 embed the same locked Trip Entry components (shared fonts/layout).
 // Email/WhatsApp bulk actions are enabled only by the Trip History wrapper.
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   FileText,
   Mail,
   ShieldCheck,
   AlertCircle,
+  CheckCircle2,
   Loader2,
   UserCheck,
   FileDown,
 } from "lucide-react";
 import { WhatsAppIcon } from "../../../../ui/WhatsAppIcon";
-import type { Trip } from "../types/trip";
+import type { Trip, ShopDelivery } from "../types/trip";
 import type { Shop } from "../../../masters/shops/types/shop";
 import type { BirdType } from "../../../masters/bird-types/types/birdType";
 import {
@@ -50,6 +51,15 @@ interface Props {
   /** Delivery communication state belongs to Trip History, not Recent Activity. */
   showCommunicationStatus?: boolean;
 }
+
+type CommunicationFeedback = {
+  id: number;
+  channel: "mail" | "whatsapp";
+  type: "success" | "error";
+  shopName: string;
+  message: string;
+  count?: number;
+};
 
 /** No-op helpers so locked step components stay read-only in Recent view. */
 const noop = () => {};
@@ -122,6 +132,8 @@ function Step4View({
   showCommunicationStatus,
   emailState,
   whatsappState,
+  onSendOneEmail,
+  onSendOneWhatsApp,
 }: {
   trip: Trip;
   shops: Shop[];
@@ -129,6 +141,8 @@ function Step4View({
   showCommunicationStatus: boolean;
   emailState: ReturnType<typeof useTripDeliveryEmails>;
   whatsappState: ReturnType<typeof useTripDeliveryWhatsApps>;
+  onSendOneEmail: (delivery: ShopDelivery) => void;
+  onSendOneWhatsApp: (delivery: ShopDelivery) => void;
 }) {
   const viewTrip: Trip = { ...trip, deliveryStepSubmitted: true };
   const deliveries = Array.isArray(trip.deliveries) ? trip.deliveries : [];
@@ -152,13 +166,13 @@ function Step4View({
       emailIsBulkSending={emailState.isBulkSending}
       emailSendCountFor={emailState.sendCountFor}
       emailFailureReasonFor={emailState.failureReasonFor}
-      onSendOneEmail={(delivery) => void emailState.sendOne(delivery)}
+      onSendOneEmail={onSendOneEmail}
       whatsappEffectiveStatus={whatsappState.effectiveStatus}
       whatsappBusyIds={whatsappState.busyIds}
       whatsappIsBulkSending={whatsappState.isBulkSending}
       whatsappSendCountFor={whatsappState.sendCountFor}
       whatsappFailureReasonFor={whatsappState.failureReasonFor}
-      onSendOneWhatsApp={(delivery) => void whatsappState.sendOne(delivery)}
+      onSendOneWhatsApp={onSendOneWhatsApp}
     />
   );
 }
@@ -212,6 +226,13 @@ function TripViewModal({
 
   const emailState = useTripDeliveryEmails(trip, shops, { enabled: showCommunicationStatus });
   const whatsappState = useTripDeliveryWhatsApps(trip, shops, { enabled: showCommunicationStatus });
+  const [communicationFeedback, setCommunicationFeedback] = useState<CommunicationFeedback | null>(null);
+
+  useEffect(() => {
+    if (!communicationFeedback) return;
+    const timeoutId = window.setTimeout(() => setCommunicationFeedback(null), 5000);
+    return () => window.clearTimeout(timeoutId);
+  }, [communicationFeedback]);
 
   // ─── Early return – ensures trip is never null after this ─────
   if (!open || !trip) return null;
@@ -249,25 +270,31 @@ function TripViewModal({
     await generateTripReportPDF(trip, emailInfo);
   };
 
-  const firstEmailFailure = showCommunicationStatus
-    ? (trip.deliveries || []).reduce<string | null>((message, delivery) => {
-        if (message) return message;
-        const reason = emailState.failureReasonFor(delivery.id);
-        if (!reason) return null;
-        const shopName = cleanDeliveryShopName(delivery.shopName) || delivery.shopName || t("ops.trip.shops");
-        return `${shopName}: ${reason}`;
-      }, null)
-    : null;
+  const showFeedback = (next: Omit<CommunicationFeedback, "id">) => {
+    setCommunicationFeedback({ ...next, id: Date.now() });
+  };
 
-  const firstWhatsAppFailure = showCommunicationStatus
-    ? (trip.deliveries || []).reduce<string | null>((message, delivery) => {
-        if (message) return message;
-        const reason = whatsappState.failureReasonFor(delivery.id);
-        if (!reason) return null;
-        const shopName = cleanDeliveryShopName(delivery.shopName) || delivery.shopName || t("ops.trip.shops");
-        return `${shopName}: ${reason}`;
-      }, null)
-    : null;
+  const handleSendOneEmail = async (delivery: ShopDelivery) => {
+    const result = await emailState.sendOne(delivery);
+    showFeedback({
+      channel: "mail",
+      type: result.success ? "success" : "error",
+      shopName: cleanDeliveryShopName(delivery.shopName) || delivery.shopName || t("ops.trip.shops"),
+      message: result.message,
+      count: result.sendCount,
+    });
+  };
+
+  const handleSendOneWhatsApp = async (delivery: ShopDelivery) => {
+    const result = await whatsappState.sendOne(delivery);
+    showFeedback({
+      channel: "whatsapp",
+      type: result.success ? "success" : "error",
+      shopName: cleanDeliveryShopName(delivery.shopName) || delivery.shopName || t("ops.trip.shops"),
+      message: result.message,
+      count: result.sendCount,
+    });
+  };
 
   /** Each step embeds the locked Trip Entry component (same layout + fonts). */
   const emptyStep = (
@@ -296,6 +323,8 @@ function TripViewModal({
                 showCommunicationStatus={showCommunicationStatus}
                 emailState={emailState}
                 whatsappState={whatsappState}
+                onSendOneEmail={handleSendOneEmail}
+                onSendOneWhatsApp={handleSendOneWhatsApp}
               />
             )
           : emptyStep;
@@ -325,18 +354,6 @@ function TripViewModal({
                   <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight truncate">
                     {trip.tripNo || t("ops.trip.trip_details")}
                   </h2>
-                  {firstEmailFailure && (
-                    <span className="inline-flex max-w-full sm:max-w-[360px] items-center gap-1 rounded-full border border-red-100 bg-red-50/90 px-2.5 py-0.5 text-[10px] font-semibold text-red-600" title={firstEmailFailure} role="alert">
-                      <AlertCircle size={11} className="shrink-0" />
-                      <span className="truncate">{t("ops.trip.email")}: {firstEmailFailure}</span>
-                    </span>
-                  )}
-                  {firstWhatsAppFailure && (
-                    <span className="inline-flex max-w-full sm:max-w-[360px] items-center gap-1 rounded-full border border-red-100 bg-red-50/90 px-2.5 py-0.5 text-[10px] font-semibold text-red-600" title={firstWhatsAppFailure} role="alert">
-                      <AlertCircle size={11} className="shrink-0" />
-                      <span className="truncate">{t("ops.trip.whatsapp")}: {firstWhatsAppFailure}</span>
-                    </span>
-                  )}
                 </div>
                 <div className="flex items-center gap-2 flex-wrap mt-1.5">
                   {isCompleted ? (
@@ -475,6 +492,65 @@ function TripViewModal({
           </button>
         </div>
       </div>
+
+      {communicationFeedback && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 pointer-events-none">
+          <style>{`@keyframes trip-communication-feedback-timer { from { transform: scaleX(1); } to { transform: scaleX(0); } }`}</style>
+          <div
+            key={communicationFeedback.id}
+            className={`w-full max-w-sm overflow-hidden rounded-3xl border bg-white shadow-2xl animate-fade-in pointer-events-auto ${
+              communicationFeedback.type === "success" ? "border-emerald-100" : "border-red-100"
+            }`}
+            role={communicationFeedback.type === "success" ? "status" : "alert"}
+            aria-live="polite"
+          >
+            <div className="p-5 text-center">
+              <div
+                className={`mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full ${
+                  communicationFeedback.type === "success"
+                    ? communicationFeedback.channel === "whatsapp"
+                      ? "bg-[#25D366]/10 text-[#25D366]"
+                      : "bg-emerald-50 text-emerald-500"
+                    : "bg-red-50 text-red-500"
+                }`}
+              >
+                {communicationFeedback.type === "success" ? (
+                  communicationFeedback.channel === "whatsapp" ? <WhatsAppIcon size={22} /> : <CheckCircle2 size={22} />
+                ) : (
+                  <AlertCircle size={22} />
+                )}
+              </div>
+              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                {communicationFeedback.channel === "whatsapp" ? t("ops.trip.whatsapp") : t("ops.trip.email")}
+              </p>
+              <p className="mt-1 text-sm font-bold text-slate-800">
+                {communicationFeedback.message}
+              </p>
+              <p className="mt-1 text-xs font-medium text-slate-500 truncate" title={communicationFeedback.shopName}>
+                {communicationFeedback.shopName}
+              </p>
+              {communicationFeedback.type === "success" && communicationFeedback.count ? (
+                <p className="mt-2 text-xs font-semibold text-emerald-600">
+                  {t("common.sent")} · {communicationFeedback.count}
+                </p>
+              ) : null}
+              <p className="mt-3 text-[10px] font-semibold text-slate-400">Closes in 5 sec</p>
+            </div>
+            <div className="h-1 bg-slate-100">
+              <div
+                className={`h-full origin-left ${
+                  communicationFeedback.type === "success"
+                    ? communicationFeedback.channel === "whatsapp"
+                      ? "bg-[#25D366]"
+                      : "bg-emerald-500"
+                    : "bg-red-500"
+                }`}
+                style={{ animation: "trip-communication-feedback-timer 5s linear forwards" }}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

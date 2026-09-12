@@ -22,6 +22,13 @@ export type WhatsAppCounts = {
   total: number;
 };
 
+export type DeliveryWhatsAppSendResult = {
+  success: boolean;
+  status: DeliveryWhatsAppStatusValue;
+  message: string;
+  sendCount?: number;
+};
+
 type Options = {
   /** When true, statuses are only loaded for completed trips (default). */
   enabled?: boolean;
@@ -43,6 +50,7 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
   const [localStatus, setLocalStatus] = useState<Record<number, DeliveryWhatsAppStatusValue>>({});
   const [busyIds, setBusyIds] = useState<Set<number>>(new Set());
   const [localErrors, setLocalErrors] = useState<Record<number, string>>({});
+  const [localSendCounts, setLocalSendCounts] = useState<Record<number, number>>({});
   const [isBulkSending, setIsBulkSending] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ sent: number; total: number } | null>(null);
   const bulkRunRef = useRef(0);
@@ -64,6 +72,7 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
       setRows([]);
       setLocalStatus({});
       setLocalErrors({});
+      setLocalSendCounts({});
       setBusyIds(new Set());
       setBulkProgress(null);
       return;
@@ -115,9 +124,9 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
   const sendCountFor = useCallback(
     (deliveryId: number): number => {
       const row = rows.find((r) => r.deliveryId === deliveryId);
-      return row?.sendCount ?? 0;
+      return Math.max(row?.sendCount ?? 0, localSendCounts[deliveryId] ?? 0);
     },
-    [rows]
+    [rows, localSendCounts]
   );
 
   const counts: WhatsAppCounts = useMemo(() => {
@@ -148,18 +157,33 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
 
   /** Send a single shop's delivery WhatsApp (no-op while that shop is sending). */
   const sendOne = useCallback(
-    async (delivery: ShopDelivery): Promise<void> => {
-      if (!trip || !completed) return;
+    async (delivery: ShopDelivery): Promise<DeliveryWhatsAppSendResult> => {
+      if (!trip || !completed) {
+        return {
+          success: false,
+          status: "failed",
+          message: translate("ops.trip.unable_send_whatsapp"),
+        };
+      }
       if (!WHATSAPP_BACKEND_ENABLED) {
-        // WhatsApp backend is disabled - show user-friendly message
+        const message = userFacingDeliveryWhatsAppError("WhatsApp integration is not configured yet.");
+        setLocalStatus((prev) => ({ ...prev, [delivery.id]: "failed" as const }));
         setLocalErrors((prev) => ({
           ...prev,
-          [delivery.id]: "WhatsApp integration is not configured yet.",
+          [delivery.id]: message,
         }));
-        return;
+        return { success: false, status: "failed", message };
       }
-      if (busyIds.has(delivery.id) || isBulkSending) return;
+      if (busyIds.has(delivery.id) || isBulkSending) {
+        return {
+          success: false,
+          status: "sending",
+          message: translate("ops.trip.sending_whatsapp"),
+        };
+      }
       const row = rows.find((r) => r.deliveryId === delivery.id);
+      const currentCount = Math.max(row?.sendCount ?? 0, localSendCounts[delivery.id] ?? 0);
+      let outcome: DeliveryWhatsAppSendResult;
       setBusy(delivery.id, true);
       setLocalStatus((prev) => ({ ...prev, [delivery.id]: "sending" as const }));
       setLocalErrors((prev) => {
@@ -174,29 +198,44 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
           shopWhatsApp: row?.shopWhatsApp ?? null,
         });
         if (result.status === "sent") {
+          const nextCount = Math.max(currentCount + 1, Number(result.sendCount) || 0);
           setLocalStatus((prev) => ({ ...prev, [delivery.id]: "sent" as const }));
-          // Backend returns authoritative sendCount; refresh will sync it
+          setLocalSendCounts((prev) => ({
+            ...prev,
+            [delivery.id]: Math.max(prev[delivery.id] ?? 0, nextCount),
+          }));
+          outcome = {
+            success: true,
+            status: "sent",
+            message: translate("ops.trip.whatsapp_sent_toast"),
+            sendCount: nextCount,
+          };
         } else {
+          const message = userFacingDeliveryWhatsAppError(result.message);
           setLocalStatus((prev) => ({ ...prev, [delivery.id]: "failed" as const }));
           setLocalErrors((prev) => ({
             ...prev,
-            [delivery.id]: userFacingDeliveryWhatsAppError(result.message),
+            [delivery.id]: message,
           }));
+          outcome = { success: false, status: "failed", message };
         }
       } catch (err) {
+        const message = userFacingDeliveryWhatsAppError(
+          err instanceof Error ? err.message : translate("ops.trip.unable_send_whatsapp")
+        );
         setLocalStatus((prev) => ({ ...prev, [delivery.id]: "failed" as const }));
         setLocalErrors((prev) => ({
           ...prev,
-          [delivery.id]: userFacingDeliveryWhatsAppError(
-            err instanceof Error ? err.message : translate("ops.trip.unable_send_whatsapp")
-          ),
+          [delivery.id]: message,
         }));
+        outcome = { success: false, status: "failed", message };
       } finally {
         setBusy(delivery.id, false);
         await refresh();
       }
+      return outcome;
     },
-    [trip, completed, busyIds, isBulkSending, rows, setBusy, refresh]
+    [trip, completed, busyIds, isBulkSending, rows, localSendCounts, setBusy, refresh]
   );
 
   /**
@@ -210,9 +249,10 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
       const deliveries = trip.deliveries ?? [];
       const eligible = deliveries.filter((d) => effectiveStatus(d.id) !== "sent");
       for (const delivery of eligible) {
+        setLocalStatus((prev) => ({ ...prev, [delivery.id]: "failed" as const }));
         setLocalErrors((prev) => ({
           ...prev,
-          [delivery.id]: "WhatsApp integration is not configured yet.",
+          [delivery.id]: userFacingDeliveryWhatsAppError("WhatsApp integration is not configured yet."),
         }));
       }
       return;
@@ -250,9 +290,14 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
           shopWhatsApp: row?.shopWhatsApp ?? null,
         });
         if (result.status === "sent") {
+          const currentCount = Math.max(row?.sendCount ?? 0, localSendCounts[delivery.id] ?? 0);
+          const nextCount = Math.max(currentCount + 1, Number(result.sendCount) || 0);
           succeeded = true;
           setLocalStatus((prev) => ({ ...prev, [delivery.id]: "sent" as const }));
-          // Backend returns authoritative sendCount; refresh will sync it
+          setLocalSendCounts((prev) => ({
+            ...prev,
+            [delivery.id]: Math.max(prev[delivery.id] ?? 0, nextCount),
+          }));
         } else {
           setLocalStatus((prev) => ({ ...prev, [delivery.id]: "failed" as const }));
           setLocalErrors((prev) => ({
@@ -277,7 +322,7 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
     setIsBulkSending(false);
     setBulkProgress(null);
     await refresh();
-  }, [trip, completed, isBulkSending, effectiveStatus, rows, refresh]);
+  }, [trip, completed, isBulkSending, effectiveStatus, rows, localSendCounts, refresh]);
 
   return {
     rows,
