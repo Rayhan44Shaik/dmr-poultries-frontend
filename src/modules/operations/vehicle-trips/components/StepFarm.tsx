@@ -14,6 +14,8 @@ import { isMeterInvalid, meterMustBeGreaterThan } from "../utils/meterValidation
 import { translateValidationMessage } from "../utils/translateValidation";
 import { captureGpsQuiet } from "../utils/captureGps";
 import { useI18n } from "../../../../i18n";
+import { ActionTooltip } from "../../../../ui/ActionTooltip";
+import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 
 interface Props {
   trip: Trip;
@@ -211,11 +213,11 @@ export default function StepFarm({
     const destMeterLabel =
       trip.destMeter == null || Number(trip.destMeter) === 0
         ? t("ops.trip.not_entered")
-        : `${trip.destMeter} KM`;
+        : `${trip.destMeter} ${t("common.km")}`;
     const avgWeightLabel =
       trip.avgBirdWeight == null || Number(trip.avgBirdWeight) === 0
         ? t("ops.trip.not_entered")
-        : `${Number(trip.avgBirdWeight).toFixed(2)} kg`;
+        : `${Number(trip.avgBirdWeight).toFixed(2)} ${t("common.kg")}`;
     return (
       <div className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
@@ -233,10 +235,11 @@ export default function StepFarm({
               <button
                 type="button"
                 onClick={() => setIsLocalEditing(true)}
-                className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95"
-                title={t("ops.trip.edit_step")}
+                className="group relative bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95"
+                aria-label={t("ops.trip.edit_step")}
               >
-                <Pencil size={14} />
+                <Pencil size={14} className={uiActionIconMotionClass.edit} />
+                <ActionTooltip label={t("ops.trip.edit_step")} />
               </button>
             )}
             <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
@@ -483,7 +486,7 @@ export default function StepFarm({
               </div>
             ) : (
               <p className="text-[11px] text-slate-400 mt-1">
-                {t("ops.trip.start_meter")}: <span className="font-semibold text-slate-600">{trip.openingMeter ?? t("ops.trip.not_entered")} KM</span>
+                {t("ops.trip.start_meter")}: <span className="font-semibold text-slate-600">{trip.openingMeter ?? t("ops.trip.not_entered")} {t("common.km")}</span>
               </p>
             )}
           </div>

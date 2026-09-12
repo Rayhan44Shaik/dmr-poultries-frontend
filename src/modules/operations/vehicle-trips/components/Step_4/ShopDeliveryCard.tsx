@@ -1,13 +1,33 @@
-import { Box, Users, Scale, Clock, Pencil, FileText, Package, AlertCircle } from "lucide-react";
+import { Box, Users, Scale, Clock, Pencil, FileText, Package, AlertCircle, Mail, Loader2 } from "lucide-react";
 import type { ShopDelivery } from "../../types/trip";
 import type { ShopDeliveryWithExtra } from "./useShopDeliveryForm";
 import { useI18n } from "../../../../../i18n";
+import { cleanDeliveryShopName } from "../../utils/shopDisplayName";
+import { WhatsAppIcon } from "../../../../../ui/WhatsAppIcon";
+import { ActionTooltip } from "../../../../../ui/ActionTooltip";
+import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
+import { formatTripViewStamp } from "../../utils/tripViewLocalization";
+import type { DeliveryEmailStatusValue } from "../../services/deliveryEmailService";
+import type { DeliveryWhatsAppStatusValue } from "../../services/deliveryWhatsAppService";
 
 interface Props {
   row: ShopDeliveryWithExtra;
   readOnly: boolean;
   onEdit: (row: ShopDelivery) => void;
   onPDF: (row: ShopDeliveryWithExtra) => void;
+  communicationEnabled?: boolean;
+  emailStatus?: DeliveryEmailStatusValue;
+  emailSending?: boolean;
+  emailSendCount?: number;
+  emailDisabled?: boolean;
+  emailFailureReason?: string | null;
+  onSendEmail?: (row: ShopDelivery) => void;
+  whatsappStatus?: DeliveryWhatsAppStatusValue;
+  whatsappSending?: boolean;
+  whatsappSendCount?: number;
+  whatsappDisabled?: boolean;
+  whatsappFailureReason?: string | null;
+  onSendWhatsApp?: (row: ShopDelivery) => void;
 }
 
 /** Soft, low-eye-strain tints for box-number chips in the card. */
@@ -20,8 +40,84 @@ const BOX_CHIP_PALETTE = [
   "bg-rose-50/70 text-rose-500 border-rose-100",
 ];
 
-export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props) {
-  const { t } = useI18n();
+function DeliveryCommunicationButton({
+  channel,
+  status = "pending",
+  sending = false,
+  sendCount = 0,
+  disabled = false,
+  title,
+  onClick,
+}: {
+  channel: "mail" | "whatsapp";
+  status?: DeliveryEmailStatusValue | DeliveryWhatsAppStatusValue;
+  sending?: boolean;
+  sendCount?: number;
+  disabled?: boolean;
+  title: string;
+  onClick: () => void;
+}) {
+  const isWhatsApp = channel === "whatsapp";
+  const Icon = isWhatsApp ? WhatsAppIcon : Mail;
+  const isSending = sending || status === "sending";
+  const isFailed = status === "failed" && !isSending;
+  const visibleCount = status === "sent" ? Math.max(1, Number(sendCount) || 0) : Math.max(0, Number(sendCount) || 0);
+
+  const className = isFailed
+    ? "bg-red-50/90 hover:bg-red-100 text-red-600 border-red-200"
+    : isWhatsApp
+      ? "bg-[#25D366]/10 hover:bg-[#25D366]/15 text-[#25D366] border-[#25D366]/25"
+      : "bg-red-50/90 hover:bg-red-100 text-red-500 border-red-100";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || isSending}
+      className={`group relative p-1.5 rounded-lg border transition-colors flex items-center justify-center active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${className} ${
+        isSending ? "motion-safe:animate-pulse" : ""
+      }`}
+      aria-label={title}
+    >
+      {isSending ? (
+        <Loader2 size={13} className="animate-spin stroke-[2.5]" />
+      ) : (
+        <span className={`inline-flex ${isWhatsApp ? uiActionIconMotionClass.whatsapp : uiActionIconMotionClass.mail}`}>
+          <Icon size={13} className="stroke-[2]" />
+        </span>
+      )}
+      {visibleCount > 0 && (
+        <span className={`absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-extrabold leading-none text-white ring-2 ring-white ${
+          isWhatsApp ? "bg-[#25D366]" : "bg-red-500"
+        }`}>
+          {visibleCount > 9 ? "9+" : visibleCount}
+        </span>
+      )}
+      <ActionTooltip label={title} />
+    </button>
+  );
+}
+
+export default function ShopDeliveryCard({
+  row,
+  readOnly,
+  onEdit,
+  onPDF,
+  communicationEnabled = false,
+  emailStatus = "pending",
+  emailSending = false,
+  emailSendCount = 0,
+  emailDisabled = false,
+  emailFailureReason,
+  onSendEmail,
+  whatsappStatus = "pending",
+  whatsappSending = false,
+  whatsappSendCount = 0,
+  whatsappDisabled = false,
+  whatsappFailureReason,
+  onSendWhatsApp,
+}: Props) {
+  const { t, language } = useI18n();
   const isWeightMode = row.deliveryMode === "weight";
   const selectedBoxes = row.selectedBoxIds || [];
   const manyBoxes = selectedBoxes.length > 30;
@@ -31,9 +127,11 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
     if (value == null || value === "" || (typeof value === "number" && Number.isNaN(value))) return t("ops.trip.not_entered");
     return String(value);
   };
+  const displayShopName = cleanDeliveryShopName(row.shopName) || t("ops.trip.not_entered");
+  const capturedTime = row.autoCaptureTime ? formatTripViewStamp(row.autoCaptureTime, language) : "—";
 
   return (
-    <div className="group relative overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm hover:shadow-md transition-all duration-200 flex flex-col">
+    <div className="relative rounded-xl border border-slate-200/80 bg-white shadow-sm hover:shadow-md transition-all duration-200 flex flex-col">
       <div className="p-3 flex flex-col gap-2.5 flex-1">
         {/* Header — mode tile + shop name vertically centred on the logo */}
         <div className="flex items-center justify-between gap-2">
@@ -48,27 +146,53 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
             >
               {isWeightMode ? <Scale size={15} /> : <Box size={15} />}
             </div>
-            <p className="font-bold text-slate-800 text-[13px] truncate leading-tight" title={row.shopName}>
-              {row.shopName || t("ops.trip.not_entered")}
+            <p className="font-bold text-slate-800 text-[13px] truncate leading-tight" title={displayShopName}>
+              {displayShopName}
             </p>
           </div>
 
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-3 shrink-0">
+            {communicationEnabled && onSendEmail && (
+              <DeliveryCommunicationButton
+                channel="mail"
+                status={emailStatus}
+                sending={emailSending}
+                sendCount={emailSendCount}
+                disabled={emailDisabled}
+                title={emailFailureReason || t("ops.trip.send_email")}
+                onClick={() => onSendEmail(row)}
+              />
+            )}
+            {communicationEnabled && onSendWhatsApp && (
+              <DeliveryCommunicationButton
+                channel="whatsapp"
+                status={whatsappStatus}
+                sending={whatsappSending}
+                sendCount={whatsappSendCount}
+                disabled={whatsappDisabled}
+                title={whatsappFailureReason || t("ops.trip.send_whatsapp")}
+                onClick={() => onSendWhatsApp(row)}
+              />
+            )}
             {!readOnly && (
               <button
+                type="button"
                 onClick={() => onEdit(row)}
-                className="p-1.5 rounded-lg bg-slate-50 hover:bg-blue-50/70 text-slate-500 hover:text-blue-500 border border-slate-200/60 transition-colors flex items-center justify-center"
-                title={t("ops.trip.edit_shop_delivery")}
+                className="group relative p-1.5 rounded-lg bg-slate-50 hover:bg-blue-50/70 text-slate-500 hover:text-blue-500 border border-slate-200/60 transition-colors flex items-center justify-center"
+                aria-label={t("ops.trip.edit_shop_delivery")}
               >
-                <Pencil size={13} className="stroke-[2]" />
+                <span className={`inline-flex ${uiActionIconMotionClass.edit}`}><Pencil size={13} className="stroke-[2]" /></span>
+                <ActionTooltip label={t("ops.trip.edit_shop_delivery")} />
               </button>
             )}
             <button
+              type="button"
               onClick={() => onPDF(row)}
-              className="p-1.5 rounded-lg bg-slate-50 hover:bg-rose-50/70 text-slate-500 hover:text-rose-500 border border-slate-200/60 transition-colors flex items-center justify-center"
-              title={t("ops.trip.download_pdf")}
+              className="group relative p-1.5 rounded-lg bg-slate-50 hover:bg-rose-50/70 text-slate-500 hover:text-rose-500 border border-slate-200/60 transition-colors flex items-center justify-center"
+              aria-label={t("ops.trip.download_pdf")}
             >
-              <FileText size={13} className="stroke-[2]" />
+              <span className={`inline-flex ${uiActionIconMotionClass.pdf}`}><FileText size={13} className="stroke-[2]" /></span>
+              <ActionTooltip label={t("ops.trip.download_pdf")} />
             </button>
           </div>
         </div>
@@ -92,7 +216,7 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
               <Scale size={10} className="text-emerald-500 stroke-[2]" /> {t("common.weight")}
             </span>
             <span className="text-[13px] font-bold text-slate-800">
-              {row.weight ? `${Number(row.weight).toFixed(2)} kg` : t("ops.trip.not_entered")}
+              {row.weight ? `${Number(row.weight).toFixed(2)} ${t("common.kg")}` : t("ops.trip.not_entered")}
             </span>
           </div>
         </div>
@@ -101,7 +225,7 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
           <div className="flex items-center justify-between px-2 py-1 bg-rose-50/50 rounded-md border border-rose-100/70 text-[10px]">
             <span className="text-rose-400 font-semibold">{t("operations.mortality_count")}</span>
             <span className="text-rose-500 font-bold">
-              {mortalityCount} {t("common.birds")} · {mortKg ? Number(mortKg).toFixed(2) : "0.00"} kg
+              {mortalityCount} {t("common.birds")} · {mortKg ? Number(mortKg).toFixed(2) : "0.00"} {t("common.kg")}
             </span>
           </div>
         )}
@@ -156,11 +280,13 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
               </span>
             ) : null}
           </div>
-          <div className="flex items-center gap-1 shrink-0 text-slate-600">
+          <div className="ml-auto flex shrink-0 items-center justify-end gap-1 text-slate-600" title={capturedTime}>
             <span className="h-4 w-4 rounded bg-indigo-50/70 text-indigo-500 flex items-center justify-center shrink-0">
               <Clock size={11} className="stroke-[2]" />
             </span>
-            <span>{t("ops.trip.captured")} {row.autoCaptureTime || "—"}</span>
+            <span className="whitespace-nowrap text-[10px] font-semibold leading-none tabular-nums">
+              {capturedTime}
+            </span>
           </div>
         </div>
       </div>

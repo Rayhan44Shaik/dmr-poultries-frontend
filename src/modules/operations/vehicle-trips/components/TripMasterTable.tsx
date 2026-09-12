@@ -1,5 +1,5 @@
 import React from "react";
-import { Check, Hash, Calendar, Truck, User, UserCog, Warehouse, ShoppingBag, Bird, Scale, HeartPulse, ChevronUp, ChevronDown } from "lucide-react";
+import { Check, Hash, Calendar, Truck, User, UserCog, Warehouse, ShoppingBag, Bird, Scale, HeartPulse, ArrowUp, ArrowDown } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { formatTripListDay } from "../utils/formatTripListDay";
 import { formatVehicleNumber } from "../../../../utils/format";
@@ -29,20 +29,18 @@ interface Props {
 }
 
 /**
- * Sort affordance: two stacked up/down chevrons (up = ascending, down =
- * descending) instead of side-by-side left/right ticks. Both are always
- * rendered so the header never changes width, and the active direction sits in
- * a filled emerald badge so it reads clearly against the grey header.
+ * Sort affordance: compact side-by-side up/down arrows beside the label, like
+ * the reference header. Both arrows always render so every header keeps the
+ * same width; only the active direction turns emerald.
  */
 function SortArrows({ active, dir }: { active: boolean; dir?: "asc" | "desc" }) {
-  const base =
-    "inline-flex h-[11px] w-[14px] items-center justify-center rounded-sm transition-colors";
-  const on = "bg-emerald-600 text-white shadow-sm";
+  const base = "h-3 w-3 shrink-0 transition-colors";
+  const on = "text-emerald-600";
   const off = "text-slate-400 group-hover/sort:text-slate-600";
   return (
-    <span className="inline-flex flex-col items-center shrink-0" aria-hidden="true">
-      <ChevronUp size={12} strokeWidth={3.5} className={`${base} ${active && dir === "asc" ? on : off}`} />
-      <ChevronDown size={12} strokeWidth={3.5} className={`${base} ${active && dir === "desc" ? on : off}`} />
+    <span className="inline-flex items-center gap-0.5 shrink-0" aria-hidden="true">
+      <ArrowUp size={12} strokeWidth={2.7} className={`${base} ${active && dir === "asc" ? on : off}`} />
+      <ArrowDown size={12} strokeWidth={2.7} className={`${base} ${active && dir === "desc" ? on : off}`} />
     </span>
   );
 }
@@ -160,7 +158,7 @@ function TripMasterTable({
                   <tr
                     key={trip.id}
                     onClick={() => onRowClick(trip)}
-                    className={`cursor-pointer transition-all duration-150 ${
+                    className={`cursor-pointer transition-colors duration-150 ${
                       isSelected
                         ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200"
                         : `hover:bg-slate-50/60 ${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"}`

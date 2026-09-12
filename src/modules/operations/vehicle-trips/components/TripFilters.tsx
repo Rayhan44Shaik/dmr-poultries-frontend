@@ -13,7 +13,8 @@ import {
 } from "../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../i18n";
 import { BrandRefreshButton } from "../../../../ui";
-import MasterDropdown from "../../../masters/components/MasterDropdown";
+import { ActionTooltip } from "../../../../ui/ActionTooltip";
+import MasterDropdown, { type MasterDropdownOption } from "../../../masters/components/MasterDropdown";
 
 interface Props {
   fromDate: string;
@@ -30,9 +31,9 @@ interface Props {
   setSearch: (v: string) => void;
   onSearch: () => void;
   onReset: () => void;
-  vehicles?: string[];
-  supervisors?: string[];
-  farms?: string[];
+  vehicles?: readonly (string | MasterDropdownOption)[];
+  supervisors?: readonly (string | MasterDropdownOption)[];
+  farms?: readonly (string | MasterDropdownOption)[];
   onExportPDF?: () => void;
   onRefresh?: () => void;
   onExportExcel?: () => void;
@@ -70,12 +71,16 @@ function TripFilters({
   viewButtonRef,
 }: Props) {
   const { t } = useI18n();
-  // Plain string lists; MasterDropdown accepts string[] directly. The
-  // "All ..." sentinels are represented as an empty value so the dropdown
+  // Option lists may be either legacy strings or id-backed dropdown options.
+  // The "All ..." sentinels are represented as an empty value so the dropdown
   // shows its placeholder and the clear affordance behaves correctly.
-  const vehicleOptions = (vehicles || []).filter((v) => v !== "All Vehicles");
-  const supervisorOptions = (supervisors || []).filter((v) => v !== "All Supervisors");
-  const farmOptions = (farms || []).filter((v) => v !== "All Sources");
+  const withoutSentinel = (
+    options: readonly (string | MasterDropdownOption)[],
+    sentinel: string
+  ) => options.filter((option) => (typeof option === "string" ? option !== sentinel : option.value !== sentinel));
+  const vehicleOptions = withoutSentinel(vehicles || [], "All Vehicles");
+  const supervisorOptions = withoutSentinel(supervisors || [], "All Supervisors");
+  const farmOptions = withoutSentinel(farms || [], "All Sources");
 
   return (
     <div className={opsFilterCardClass}>
@@ -182,32 +187,39 @@ function TripFilters({
           {showViewButton && onViewSelected && (
             <button
               ref={viewButtonRef}
+              type="button"
               onClick={onViewSelected}
-              className={`group ${opsViewButtonClass}`}
+              className={`group relative ${opsViewButtonClass}`}
+              aria-label={t("ops.trip.view_selected")}
             >
               <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]"><Eye size={15} /></span>
               {t("ops.trip.view_selected")}
+              <ActionTooltip label={t("ops.trip.view_selected")} />
             </button>
           )}
-          <button onClick={onSearch} className={`group ${opsPrimaryButtonClass}`}>
+          <button type="button" onClick={onSearch} className={`group relative ${opsPrimaryButtonClass}`} aria-label={t("common.search")}>
             <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-search)]"><Search size={15} /></span>
             {t("common.search")}
+            <ActionTooltip label={t("common.search")} />
           </button>
-          <button onClick={onReset} className={`group ${opsSecondaryButtonClass}`}>
+          <button type="button" onClick={onReset} className={`group relative ${opsSecondaryButtonClass}`} aria-label={t("common.reset")}>
             <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>
             {t("common.reset")}
+            <ActionTooltip label={t("common.reset")} />
           </button>
           {onRefresh && <BrandRefreshButton onClick={onRefresh} />}
           {onExportPDF && (
-            <button onClick={onExportPDF} disabled={!hasFilters} className={`group ${opsPdfButtonClass}`}>
+            <button type="button" onClick={onExportPDF} disabled={!hasFilters} className={`group relative ${opsPdfButtonClass}`} aria-label={t("reports.export_pdf") || "PDF"}>
               <span className={`inline-flex ${hasFilters ? "motion-safe:group-hover:animate-[var(--animate-action-pdf)]" : ""}`}><FileText size={15} /></span>
               PDF
+              <ActionTooltip label={t("reports.export_pdf") || "PDF"} />
             </button>
           )}
           {onExportExcel && (
-            <button onClick={onExportExcel} disabled={!hasFilters} className={`group ${opsExcelButtonClass}`}>
+            <button type="button" onClick={onExportExcel} disabled={!hasFilters} className={`group relative ${opsExcelButtonClass}`} aria-label={t("reports.export_excel") || "Excel"}>
               <span className={`inline-flex ${hasFilters ? "motion-safe:group-hover:animate-[var(--animate-action-excel)]" : ""}`}><FileSpreadsheet size={15} /></span>
               Excel
+              <ActionTooltip label={t("reports.export_excel") || "Excel"} />
             </button>
           )}
         </div>

@@ -2,7 +2,39 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Trip } from "../../vehicle-trips/types/trip";
 import { completedTripService } from "../services/completedTripService";
 import { handleApiError } from "../../../../api";
+import { isCanceledError } from "../../../../api/errors";
+import { computeTotalPages } from "../../../../shared/ui/paginationStyles";
+import { PAGINATION_DEFAULT_PAGE_SIZE } from "../../../../shared/ui/uiTokens";
+import { useI18n } from "../../../../i18n";
+import { formatVehicleNumber } from "../../../../utils/format";
+import { displayRateEntryName, matchesRateEntrySearch } from "../utils/rateEntryDisplay";
 import { dropLockedTripFromList, excludeKnownLockedTrips } from "./rateEntryLockList";
+
+export type RateEntrySortKey =
+  | "tripNo"
+  | "tripDate"
+  | "vehicleNo"
+  | "supervisorName"
+  | "sourceFarm"
+  | "totalShops"
+  | "totalBirds"
+  | "totalWeight";
+
+type RateEntryFilter = {
+  fromDate: string;
+  toDate: string;
+  search: string;
+  vehicle: string;
+  supervisor: string;
+};
+
+const EMPTY_FILTER: RateEntryFilter = {
+  fromDate: "",
+  toDate: "",
+  search: "",
+  vehicle: "",
+  supervisor: "",
+};
 
 // Helper to compute aggregates from deliveries
 function computeTripAggregates(trip: Trip) {
@@ -14,80 +46,199 @@ function computeTripAggregates(trip: Trip) {
   };
 }
 
+function sortText(value: unknown): string {
+  return String(value ?? "").trim().toLocaleLowerCase();
+}
+
+function sortNumber(value: unknown): number {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
+function compareTrips(a: Trip, b: Trip, key: RateEntrySortKey, language: "en" | "te"): number {
+  switch (key) {
+    case "totalShops":
+    case "totalBirds":
+    case "totalWeight":
+      return sortNumber(a[key]) - sortNumber(b[key]);
+    case "tripDate":
+      return sortText(a.tripDate).localeCompare(sortText(b.tripDate));
+    case "vehicleNo":
+      return sortText(formatVehicleNumber(a.vehicleNo)).localeCompare(sortText(formatVehicleNumber(b.vehicleNo)), undefined, { numeric: true });
+    case "supervisorName":
+    case "sourceFarm":
+      return sortText(displayRateEntryName(a[key], language)).localeCompare(sortText(displayRateEntryName(b[key], language)), undefined, { numeric: true });
+    case "tripNo":
+      return sortText(a.tripNo).localeCompare(sortText(b.tripNo), undefined, { numeric: true });
+    default:
+      return 0;
+  }
+}
+
 export default function useCompletedTrips() {
+  const { language } = useI18n();
   const [trips, setTrips] = useState<Trip[]>([]);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSizeState] = useState(PAGINATION_DEFAULT_PAGE_SIZE);
+  const [sortBy, setSortBy] = useState<RateEntrySortKey | null>(null);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const loadSeqRef = useRef(0);
+  const loadAbortRef = useRef<AbortController | null>(null);
+  const modalLoadSeqRef = useRef(0);
+  const modalAbortRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
+  const saveInFlightRef = useRef(false);
   const lockInFlightRef = useRef(false);
   const locallyLockedTripIdsRef = useRef<Set<number>>(new Set());
-  const pageSize = 10;
-  const [filter, setFilter] = useState({
-    fromDate: "",
-    toDate: "",
-    tripNo: "",
-    vehicle: "",
-    supervisor: "",
-  });
+  const [filter, setFilterState] = useState<RateEntryFilter>(EMPTY_FILTER);
 
-  const loadTrips = useCallback(async () => {
+  const loadTrips = useCallback(async (): Promise<boolean> => {
+    const requestSeq = loadSeqRef.current + 1;
+    loadSeqRef.current = requestSeq;
+    loadAbortRef.current?.abort();
+    const controller = new AbortController();
+    loadAbortRef.current = controller;
+    setIsLoading(true);
     try {
-      const data = await completedTripService.getCompletedTrips();
+      const data = await completedTripService.getCompletedTrips({ signal: controller.signal });
+      if (!mountedRef.current || controller.signal.aborted || requestSeq !== loadSeqRef.current) return false;
       setTrips(excludeKnownLockedTrips(data, locallyLockedTripIdsRef.current));
       setLoadError(null);
+      return true;
     } catch (error) {
+      if (isCanceledError(error) || !mountedRef.current || requestSeq !== loadSeqRef.current) return false;
       console.error("Failed to load Rate Entry trips from the backend", error);
       setLoadError(handleApiError(error));
+      return false;
+    } finally {
+      if (requestSeq === loadSeqRef.current) {
+        loadAbortRef.current = null;
+        if (mountedRef.current) setIsLoading(false);
+      }
     }
   }, []);
 
   useEffect(() => {
-    // Load Rate Entry trips from the backend on mount. The async fetch's
-    // setState runs after the awaited response (not synchronously in the
-    // effect), which is the standard data-loading idiom.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    void loadTrips();
+    mountedRef.current = true;
+    let cancelled = false;
+    queueMicrotask(() => {
+      if (!cancelled) void loadTrips();
+    });
+    return () => {
+      cancelled = true;
+      mountedRef.current = false;
+      loadSeqRef.current += 1;
+      modalLoadSeqRef.current += 1;
+      loadAbortRef.current?.abort();
+      modalAbortRef.current?.abort();
+    };
   }, [loadTrips]);
 
-  // Filter and enrich trips with aggregates
+  const setFilter = useCallback((next: Partial<RateEntryFilter>) => {
+    setFilterState((prev) => ({ ...prev, ...next }));
+    setCurrentPage(1);
+  }, []);
+
+  // Filter, enrich, and sort trips with aggregates.
   const filteredTrips = useMemo(() => {
-    return trips
+    const rows = trips
       .filter((trip) => {
         const fromOk = !filter.fromDate || trip.tripDate >= filter.fromDate;
         const toOk = !filter.toDate || trip.tripDate <= filter.toDate;
-        const tripOk = !filter.tripNo || trip.tripNo.toLowerCase().includes(filter.tripNo.toLowerCase());
+        const searchOk = matchesRateEntrySearch(trip, filter.search, language);
         const vehicleOk = !filter.vehicle || trip.vehicleNo === filter.vehicle;
         const supervisorOk = !filter.supervisor || trip.supervisorName === filter.supervisor;
-        return fromOk && toOk && tripOk && vehicleOk && supervisorOk;
+        return fromOk && toOk && searchOk && vehicleOk && supervisorOk;
       })
       .map((trip) => ({
         ...trip,
         ...computeTripAggregates(trip), // ensures totalShops, totalBirds, totalWeight exist
       }));
-  }, [trips, filter]);
 
-  const totalPages = Math.ceil(filteredTrips.length / pageSize);
+    if (!sortBy) return rows;
+    const direction = sortDir === "asc" ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      const primary = compareTrips(a, b, sortBy, language) * direction;
+      return primary || b.id - a.id;
+    });
+  }, [trips, filter, sortBy, sortDir, language]);
+
+  const totalPages = computeTotalPages(filteredTrips.length, pageSize);
+
+  useEffect(() => {
+    if (currentPage <= totalPages) return;
+    const timer = window.setTimeout(() => setCurrentPage(totalPages), 0);
+    return () => window.clearTimeout(timer);
+  }, [currentPage, totalPages]);
+
   const paginatedTrips = useMemo(() => {
-    const start = (currentPage - 1) * pageSize;
+    const safePage = Math.min(currentPage, totalPages);
+    const start = (safePage - 1) * pageSize;
     return filteredTrips.slice(start, start + pageSize);
-  }, [filteredTrips, currentPage]);
+  }, [filteredTrips, currentPage, pageSize, totalPages]);
 
-  const vehicleList = [...new Set(trips.map((x) => x.vehicleNo))];
-  const supervisorList = [...new Set(trips.map((x) => x.supervisorName))];
+  const vehicleList = useMemo(
+    () =>
+      [...new Set(trips.map((trip) => trip.vehicleNo).filter(Boolean))]
+        .sort((a, b) => formatVehicleNumber(a).localeCompare(formatVehicleNumber(b), undefined, { numeric: true }))
+        .map((vehicleNo) => ({ value: vehicleNo, label: formatVehicleNumber(vehicleNo) })),
+    [trips]
+  );
+  const supervisorList = useMemo(
+    () =>
+      [...new Set(trips.map((trip) => trip.supervisorName).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, undefined, { numeric: true }))
+        .map((name) => ({ value: name, label: displayRateEntryName(name, language) })),
+    [trips, language]
+  );
+
+  const setPageSize = useCallback((nextPageSize: number) => {
+    setPageSizeState(nextPageSize);
+    setCurrentPage(1);
+  }, []);
+
+  /** First click sorts ascending; second flips descending; third clears sort. */
+  const handleSortChange = useCallback((key: RateEntrySortKey) => {
+    setCurrentPage(1);
+    if (sortBy === key) {
+      if (sortDir === "asc") {
+        setSortDir("desc");
+      } else {
+        setSortBy(null);
+        setSortDir("asc");
+      }
+    } else {
+      setSortBy(key);
+      setSortDir("asc");
+    }
+  }, [sortBy, sortDir]);
 
   // Fetch the full Rate Entry detail (shop-wise deliveries + market
   // reference) from GET /operations/rate-entry/:tripId before opening the
   // modal — the backend is the authority for delivery rows.
   const openRateEntry = useCallback(async (trip: Trip) => {
+    const requestSeq = modalLoadSeqRef.current + 1;
+    modalLoadSeqRef.current = requestSeq;
+    modalAbortRef.current?.abort();
+    const controller = new AbortController();
+    modalAbortRef.current = controller;
+    setLoadError(null);
     try {
-      const full = await completedTripService.getTrip(trip.id);
+      const full = await completedTripService.getTrip(trip.id, { signal: controller.signal });
+      if (!mountedRef.current || controller.signal.aborted || requestSeq !== modalLoadSeqRef.current) return;
       setSelectedTrip(full);
       setModalOpen(true);
     } catch (error) {
+      if (isCanceledError(error) || !mountedRef.current || requestSeq !== modalLoadSeqRef.current) return;
       console.error(`Failed to load trip ${trip.id} for Rate Entry`, error);
       setLoadError(handleApiError(error));
+    } finally {
+      if (requestSeq === modalLoadSeqRef.current) modalAbortRef.current = null;
     }
   }, []);
 
@@ -96,29 +247,35 @@ export default function useCompletedTrips() {
   }, [openRateEntry]);
 
   const closeRateEntry = useCallback(() => {
+    modalLoadSeqRef.current += 1;
+    modalAbortRef.current?.abort();
     setSelectedTrip(null);
     setModalOpen(false);
     setLoadError(null);
     setIsSaving(false);
+    saveInFlightRef.current = false;
   }, []);
 
   /** Save only (no lock) — PUT /operations/rate-entry/:tripId. */
   const saveTrip = useCallback(
     async (deliveries: Trip["deliveries"]): Promise<boolean> => {
-      if (!selectedTrip || isSaving) return false;
+      if (!selectedTrip || isSaving || saveInFlightRef.current) return false;
+      const tripId = selectedTrip.id;
+      saveInFlightRef.current = true;
       setIsSaving(true);
       try {
-        await completedTripService.saveOnly(selectedTrip.id, deliveries);
-        const full = await completedTripService.getTrip(selectedTrip.id);
-        setSelectedTrip(full);
+        await completedTripService.saveOnly(tripId, deliveries);
+        const full = await completedTripService.getTrip(tripId);
+        if (mountedRef.current) setSelectedTrip(full);
         await loadTrips();
         return true;
       } catch (error) {
-        console.error(`Failed to save rates for trip ${selectedTrip.id}`, error);
-        setLoadError(handleApiError(error));
+        console.error(`Failed to save rates for trip ${tripId}`, error);
+        if (mountedRef.current) setLoadError(handleApiError(error));
         return false;
       } finally {
-        setIsSaving(false);
+        saveInFlightRef.current = false;
+        if (mountedRef.current) setIsSaving(false);
       }
     },
     [selectedTrip, isSaving, loadTrips]
@@ -151,7 +308,9 @@ export default function useCompletedTrips() {
   );
 
   const resetFilters = useCallback(() => {
-    setFilter({ fromDate: "", toDate: "", tripNo: "", vehicle: "", supervisor: "" });
+    setFilterState(EMPTY_FILTER);
+    setSortBy(null);
+    setSortDir("asc");
     setCurrentPage(1);
   }, []);
 
@@ -160,8 +319,13 @@ export default function useCompletedTrips() {
     filteredTrips,
     paginatedTrips,
     currentPage,
+    pageSize,
     totalPages,
     setCurrentPage,
+    setPageSize,
+    sortBy,
+    sortDir,
+    handleSortChange,
     filter,
     setFilter,
     resetFilters,
@@ -174,7 +338,9 @@ export default function useCompletedTrips() {
     closeRateEntry,
     saveTrip,
     saveAndLockTrip,
+    loadTrips,
     loadError,
+    isLoading,
     isSaving,
   };
 }

@@ -9,3 +9,4 @@ export {
   translateStatus,
   type Language,
 } from './index.tsx';
+export { ScopedI18nProvider } from './ScopedI18nProvider';

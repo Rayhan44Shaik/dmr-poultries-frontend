@@ -1,5 +1,7 @@
 import { Check, CircleAlert, CircleX, Loader2, Save, Send, X } from "lucide-react";
 import { useI18n } from "../../../../i18n";
+import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
+import { ActionTooltip } from "../../../../ui/ActionTooltip";
 export { TripNoBadge } from "./TripNoBadge";
 
 /**
@@ -23,15 +25,15 @@ export function StepCloseButton({
       type="button"
       onClick={onClose}
       aria-label={t("common.close")}
-      title={t("common.close")}
-      className={`bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 shadow-sm active:scale-95 origin-center transition-colors ${
+      className={`group relative bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 shadow-sm active:scale-95 origin-center transition-colors ${
         animated ? "animate-scale-in" : ""
       }`}
     >
       <X
         size={14}
-        className={animated ? "transition-transform duration-200 ease-out hover:rotate-90" : undefined}
+        className={animated ? uiActionIconMotionClass.close : undefined}
       />
+      <ActionTooltip label={t("common.close")} />
     </button>
   );
 }

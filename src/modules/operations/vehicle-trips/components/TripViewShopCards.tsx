@@ -25,7 +25,10 @@ import type { Shop } from "../../../masters/shops/types/shop";
 import type { DeliveryEmailStatusValue } from "../services/deliveryEmailService";
 import type { DeliveryWhatsAppStatusValue } from "../services/deliveryWhatsAppService";
 import { useI18n } from "../../../../i18n";
-import { uiSearchInputWithClearClass } from "../../../../shared/ui/uiTokens";
+import { uiActionIconMotionClass, uiSearchInputWithClearClass } from "../../../../shared/ui/uiTokens";
+import { ActionTooltip } from "../../../../ui/ActionTooltip";
+import { cleanDeliveryShopName } from "../utils/shopDisplayName";
+import { formatTripViewStamp } from "../utils/tripViewLocalization";
 
 export type TripViewShopCardsProps = {
   trip: Trip;
@@ -75,9 +78,9 @@ function CommunicationIcon({
   const isSending = status === "sending" || sending;
 
   const isWhatsApp = channel === "whatsapp";
-  const pendingIconColor = isWhatsApp ? "text-green-500" : "text-slate-400";
-  const pendingBgColor = isWhatsApp ? "bg-green-50/70 hover:bg-green-50/80" : "bg-slate-100 hover:bg-slate-200";
-  const pendingBorderColor = isWhatsApp ? "border-green-100" : "border-slate-200";
+  const pendingIconColor = isWhatsApp ? "text-[#25D366]" : "text-red-500";
+  const pendingBgColor = isWhatsApp ? "bg-[#25D366]/10 hover:bg-[#25D366]/15" : "bg-red-50/80 hover:bg-red-100";
+  const pendingBorderColor = isWhatsApp ? "border-[#25D366]/25" : "border-red-100";
 
   let iconColor = pendingIconColor;
   let bgColor = pendingBgColor;
@@ -115,31 +118,33 @@ function CommunicationIcon({
         type="button"
         onClick={onClick}
         disabled={disabled || isSending}
-        className={`relative inline-flex items-center justify-center w-9 h-9 rounded-xl border ${borderColor} ${bgColor} ${iconColor} transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
-        title={tooltip}
+        className={`group relative inline-flex items-center justify-center w-9 h-9 rounded-xl border ${borderColor} ${bgColor} ${iconColor} transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
         aria-label={ariaLabel}
       >
         {isSending ? (
           <Loader2 size={16} className="animate-spin" />
         ) : (
-          <Icon size={16} />
+          <span className={`inline-flex ${isWhatsApp ? uiActionIconMotionClass.whatsapp : uiActionIconMotionClass.mail}`}>
+            <Icon size={16} />
+          </span>
         )}
         {isSent && sendCount > 0 && (
           <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-500 text-white text-[10px] font-bold leading-none px-1 border-2 border-white">
             {sendCount > 9 ? "9+" : sendCount}
           </span>
         )}
+        <ActionTooltip label={tooltip} />
       </button>
       {isFailed && onRetry && (
         <button
           type="button"
           onClick={onRetry}
           disabled={disabled}
-          className="inline-flex items-center gap-1.5 rounded-xl border border-amber-100 bg-amber-50/70 px-2.5 py-1.5 text-[11px] font-semibold text-amber-500 hover:bg-amber-50/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-          title={t("ops.trip.retry")}
+          className="group relative inline-flex items-center gap-1.5 rounded-xl border border-amber-100 bg-amber-50/70 px-2.5 py-1.5 text-[11px] font-semibold text-amber-500 hover:bg-amber-50/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           aria-label={t("ops.trip.retry")}
         >
-          <RotateCw size={12} />
+          <RotateCw size={12} className={uiActionIconMotionClass.reset} />
+          <ActionTooltip label={t("ops.trip.retry")} />
         </button>
       )}
     </div>
@@ -181,7 +186,7 @@ export function TripViewShopCards({
   failureReasonFor,
   whatsappFailureReasonFor,
 }: TripViewShopCardsProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const deliveries = useMemo(
     () => (Array.isArray(trip.deliveries) ? trip.deliveries : []),
     [trip.deliveries]
@@ -240,9 +245,10 @@ export function TripViewShopCards({
               type="button"
               onClick={() => setSearch("")}
               aria-label={t("ops.trip.clear_search")}
-              className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
+              className="group absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
             >
-              <X size={13} />
+              <X size={13} className={uiActionIconMotionClass.close} />
+              <ActionTooltip label={t("ops.trip.clear_search")} />
             </button>
           )}
         </div>
@@ -274,6 +280,8 @@ export function TripViewShopCards({
                 : [];
             const mortalityCount = delivery.mortality ?? 0;
             const mortKg = delivery.mortKg ?? 0;
+            const displayShopName = cleanDeliveryShopName(delivery.shopName) || t("ops.trip.not_entered");
+            const capturedTime = delivery.autoCaptureTime ? formatTripViewStamp(delivery.autoCaptureTime, language) : "—";
 
             return (
               <div
@@ -283,15 +291,15 @@ export function TripViewShopCards({
                 {/* Header: Shop name, email, delivery mode badge */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="text-sm font-bold text-slate-800 truncate" title={delivery.shopName}>
-                      {delivery.shopName || t("ops.trip.not_entered")}
+                    <p className="text-sm font-bold text-slate-800 truncate" title={displayShopName}>
+                      {displayShopName}
                     </p>
                     <p className="text-xs text-slate-500 truncate mt-0.5">
                       {shopEmailFor(delivery)}
                     </p>
                     {shopWhatsAppFor && (
                       <p className="text-xs text-slate-500 truncate mt-0.5">
-                        WhatsApp: {shopWhatsAppFor(delivery)}
+                        {t("ops.trip.whatsapp")}: {shopWhatsAppFor(delivery)}
                       </p>
                     )}
                   </div>
@@ -359,12 +367,14 @@ export function TripViewShopCards({
                 )}
 
                 {/* Capture info + bird type */}
-                <div className="flex items-center justify-between text-[11px] text-slate-400 font-medium pt-0.5">
-                  <div className="flex items-center gap-1">
+                <div className="flex items-center justify-between gap-3 text-[11px] text-slate-400 font-medium pt-0.5">
+                  <div className="flex min-w-0 items-center gap-1 text-slate-600" title={capturedTime}>
                     <span className="h-4 w-4 rounded bg-indigo-50/70 text-indigo-500 flex items-center justify-center shrink-0">
                       <Clock size={12} />
                     </span>
-                    <span>{t("ops.trip.captured")} {delivery.autoCaptureTime || "—"}</span>
+                    <span className="whitespace-nowrap text-[10px] font-semibold leading-none tabular-nums">
+                      {capturedTime}
+                    </span>
                   </div>
                   {delivery.birdType ? (
                     <span className="px-2 py-0.5 bg-sky-50/70 text-sky-500 font-semibold rounded-md text-[10px] border border-sky-100">
@@ -378,20 +388,20 @@ export function TripViewShopCards({
                   <p className="text-[11px] text-red-500 px-1 truncate" title={failedReason}>{failedReason}</p>
                 )}
                 {whatsappFailedReason && (
-                  <p className="text-[11px] text-red-500 px-1 truncate" title={whatsappFailedReason}>WhatsApp: {whatsappFailedReason}</p>
+                  <p className="text-[11px] text-red-500 px-1 truncate" title={whatsappFailedReason}>{t("ops.trip.whatsapp")}: {whatsappFailedReason}</p>
                 )}
 
                 {/* Communication Controls - Icon only */}
-                <div className="flex items-center gap-2 border-t border-slate-100 pt-2.5">
+                <div className="flex items-center gap-3 border-t border-slate-100 pt-2.5">
                   {/* PDF */}
                   <button
                     type="button"
                     onClick={() => onDownloadPdf(delivery)}
-                    className="inline-flex items-center justify-center w-9 h-9 rounded-xl border border-red-100 bg-red-50/70 hover:bg-red-50/80 text-red-500 transition-colors active:scale-95"
-                    title={t("ops.trip.create_pdf_title")}
+                    className="group relative inline-flex items-center justify-center w-9 h-9 rounded-xl border border-red-100 bg-red-50/70 hover:bg-red-50/80 text-red-500 transition-colors active:scale-95"
                     aria-label={t("ops.trip.create_pdf")}
                   >
-                    <FileDown size={15} />
+                    <span className={`inline-flex ${uiActionIconMotionClass.pdf}`}><FileDown size={15} /></span>
+                    <ActionTooltip label={t("ops.trip.create_pdf_title")} />
                   </button>
 
                   {/* Email */}
