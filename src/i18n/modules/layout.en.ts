@@ -8,6 +8,7 @@ export default {
   'header.documentsExpiring': '{count} documents expiring within 30 days',
   'header.quickActions': 'Quick actions',
   'header.role': 'Role',
+  'header.toggleNav': 'Toggle navigation',
   'header.openMenu': 'Open navigation menu',
   'header.closeMenu': 'Close menu',
   'header.signOut': 'Sign out',

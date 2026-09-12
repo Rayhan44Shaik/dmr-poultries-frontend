@@ -347,6 +347,25 @@ export default function Sidebar({ open, onClose, mode, onModeChange }: SidebarPr
       </aside>
 
       {/* ------------------------------------------------------------------ */}
+      {/* Hidden-panel handle — the visible way back.                        */}
+      {/* When the panel is collapsed to zero the aside itself cannot be      */}
+      {/* clicked (it is inert and pointer-events-none), so a small handle     */}
+      {/* stays pinned under the header. The header menu button does the same */}
+      {/* job; this one exists so recovery is obvious.                        */}
+      {/* ------------------------------------------------------------------ */}
+      {mode === "hidden" && (
+        <button
+          type="button"
+          onClick={() => onModeChange("expanded")}
+          title={`${t("sidebar.showSidebar")} (⌘/Ctrl + B)`}
+          aria-label={t("sidebar.showSidebar")}
+          className="fixed left-3 top-[76px] z-40 hidden h-10 w-10 animate-fade-in items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-lg transition-colors hover:border-slate-300 hover:text-emerald-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:text-emerald-400 lg:flex"
+        >
+          <PanelLeftOpen size={18} />
+        </button>
+      )}
+
+      {/* ------------------------------------------------------------------ */}
       {/* Small-screen navigation popup                                      */}
       {/* ------------------------------------------------------------------ */}
       {open && (

@@ -336,16 +336,19 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
 
   return (
     <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-2 border-b border-slate-200/80 bg-white/85 px-4 backdrop-blur-md sm:gap-3 sm:px-6 dark:border-slate-800 dark:bg-slate-900/85">
-      {/* Menu (all viewports) — opens the small navigation popup */}
+      {/* Menu — every viewport, because it is the way back to a collapsed or
+          hidden sidebar. Below `lg` it opens the floating popup; from `lg` up
+          it steps the persistent panel (see DashboardLayout), so it must never
+          be hidden on desktop. */}
       <button
         type="button"
         onClick={onMenuClick}
-        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors lg:hidden ${
+        className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg transition-colors ${
           menuOpen
             ? "bg-slate-200/80 text-slate-900 dark:bg-slate-700/80 dark:text-white"
             : "text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
         }`}
-        aria-label={t("header.openMenu")}
+        aria-label={t("header.toggleNav")}
         aria-expanded={menuOpen}
       >
         <Menu size={20} />

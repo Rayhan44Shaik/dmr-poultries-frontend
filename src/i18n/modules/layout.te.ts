@@ -8,6 +8,7 @@ export default {
   'header.documentsExpiring': '{count} పత్రాల గడువు 30 రోజుల్లో ముగుస్తుంది',
   'header.quickActions': 'త్వరిత చర్యలు',
   'header.role': 'రోల్',
+  'header.toggleNav': 'నావిగేషన్‌ను టోగుల్ చేయండి',
   'header.openMenu': 'నావిగేషన్ మెనూ తెరవండి',
   'header.closeMenu': 'మెనూ మూసివేయండి',
   'header.signOut': 'లాగ్ అవుట్',
