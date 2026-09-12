@@ -83,11 +83,13 @@ function ChartTooltip({
   label,
   previous,
   t,
+  locale,
 }: {
   point: OperationalBucket;
   label: string;
   previous: OperationalBucket | null;
   t: (key: string, vars?: Record<string, string | number>) => string;
+  locale: string;
 }) {
   const tripsDelta = signed(point.trips, previous?.trips);
   const farmDelta = signed(point.farmWeight, previous?.farmWeight);
@@ -95,44 +97,39 @@ function ChartTooltip({
   return (
     <div className="min-w-[236px] rounded-xl border border-slate-200 bg-white/95 px-3 py-2.5 shadow-xl shadow-slate-900/10 backdrop-blur-sm">
       <p className="mb-2 border-b border-slate-100 pb-1.5 text-[11px] font-black uppercase tracking-wider text-slate-500">
-        {formatBucketLong(label)}
+        {formatBucketLong(label, locale)}
       </p>
 
       <div className="space-y-1.5">
-        <Row color={COLOR.trips} label={t("ops.dashboard.trips")} value={plain(point.trips)} delta={tripsDelta} />
+        <Row color={COLOR.trips} label={t("ops.dashboard.trips")} value={plain(point.trips, 0, locale)} delta={tripsDelta} />
         <Row
           color={COLOR.farmWeight}
           label={t("ops.dashboard.trend.farm_weight")}
-          value={`${plain(point.farmWeight, 2)} kg`}
+          value={`${plain(point.farmWeight, 2, locale)} kg`}
           delta={farmDelta}
         />
         <Row
           color={COLOR.delivered}
           label={t("ops.dashboard.trend.delivered_weight")}
-          value={`${plain(point.deliveredWeight, 2)} kg`}
+          value={`${plain(point.deliveredWeight, 2, locale)} kg`}
           delta={`${point.deliveredPct.toFixed(2)}%`}
-        />
-        <Row
-          color={COLOR.mortality}
-          label={t("ops.dashboard.trend.mortality_weight")}
-          value={`${plain(point.mortalityWeight, 2)} kg`}
-          delta={`${point.mortalityPct.toFixed(2)}%`}
         />
         <Row
           color={COLOR.weightLoss}
           label={t("ops.dashboard.trend.weight_loss")}
-          value={`${plain(point.weightLoss, 2)} kg`}
+          value={`${plain(point.weightLoss, 2, locale)} kg`}
           delta={`${point.weightLossPct.toFixed(2)}%`}
         />
 
+        {/* Birds, not weights: picked up at the farm and handed to the shops. */}
         <div className="mt-1.5 space-y-1 border-t border-slate-100 pt-1.5 text-slate-400">
+          <Row label={t("ops.dashboard.trend.birds_picked_up")} value={plain(point.farmBirds, 0, locale)} />
+          <Row label={t("ops.dashboard.trend.birds_delivered")} value={plain(point.deliveredBirds, 0, locale)} />
           <Row
             label={t("ops.dashboard.mortality_birds")}
-            value={plain(point.mortalityCount)}
+            value={plain(point.mortalityCount, 0, locale)}
             delta={`${point.mortalityBirdPct.toFixed(2)}%`}
           />
-          <Row label={t("ops.dashboard.trend.per_trip")} value={`${point.birdsPerTrip.toFixed(1)} ${t("ops.dashboard.trend.birds").toLowerCase()}`} />
-          <Row label={t("ops.dashboard.trend.kg_per_trip")} value={`${plain(point.kgPerTrip, 1)} kg`} />
         </div>
       </div>
     </div>
@@ -187,7 +184,8 @@ export default function OperationalTrendsChart({
   error = null,
   onRetry,
 }: OperationalTrendsChartProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const locale = language === "te" ? "te-IN" : "en-IN";
 
   const rows = trends?.rows;
 
@@ -272,7 +270,7 @@ export default function OperationalTrendsChart({
             <CartesianGrid stroke="#eef2f7" strokeDasharray="4 8" vertical={false} />
             <XAxis
               dataKey="date"
-              tickFormatter={formatBucket}
+              tickFormatter={(value: string) => formatBucket(value, locale)}
               tick={{ fontSize: 10, fill: "#94a3b8" }}
               tickLine={false}
               axisLine={{ stroke: "#e2e8f0" }}
@@ -281,7 +279,7 @@ export default function OperationalTrendsChart({
             />
             <YAxis
               yAxisId="weight"
-              tickFormatter={tickKg}
+              tickFormatter={(value: number) => tickKg(value, locale)}
               tick={{ fontSize: 10, fill: "#94a3b8" }}
               tickLine={false}
               axisLine={false}
@@ -306,6 +304,7 @@ export default function OperationalTrendsChart({
                     label={String(label ?? point.date)}
                     previous={previous.get(point.sortKey) ?? null}
                     t={t}
+                    locale={locale}
                   />
                 );
               }}
@@ -323,6 +322,8 @@ export default function OperationalTrendsChart({
               animationDuration={620}
               animationEasing="ease-out"
             />
+            {/* Kept so the bar still adds up to the farm weight; the card
+                reports mortality as birds, not kilos. */}
             <Bar
               yAxisId="weight"
               dataKey="mortalityWeight"
@@ -387,34 +388,25 @@ export default function OperationalTrendsChart({
 
       {/* ── Footer: the whole period, in numbers ──────────────────────── */}
       <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 sm:grid-cols-3 xl:grid-cols-5">
-        <Stat
-          label={t("ops.dashboard.trips")}
-          value={plain(totals.trips)}
-          hint={`${plain(totals.avgTrips, 1)} / ${t("ops.dashboard.trend.per_bucket").toLowerCase()}`}
-          color={COLOR.trips}
-        />
+        <Stat label={t("ops.dashboard.trips")} value={plain(totals.trips, 0, locale)} color={COLOR.trips} />
         <Stat
           label={t("ops.dashboard.trend.farm_weight")}
-          value={compactKg(totals.farmWeight)}
-          hint={`${compactKg(totals.avgFarmWeight)} / ${t("ops.dashboard.trend.per_bucket").toLowerCase()}`}
+          value={compactKg(totals.farmWeight, locale)}
           color={COLOR.farmWeight}
         />
         <Stat
           label={t("ops.dashboard.trend.delivered_weight")}
-          value={compactKg(totals.deliveredWeight)}
-          hint={`${totals.deliveredPct.toFixed(2)}% ${t("ops.dashboard.trend.of_farm")}`}
+          value={compactKg(totals.deliveredWeight, locale)}
           color={COLOR.delivered}
         />
         <Stat
-          label={t("ops.dashboard.trend.mortality_weight")}
-          value={compactKg(totals.mortalityWeight)}
-          hint={`${totals.mortalityPct.toFixed(2)}% · ${plain(totals.mortalityCount)} ${t("ops.dashboard.trend.birds").toLowerCase()}`}
+          label={t("ops.dashboard.mortality_birds")}
+          value={plain(totals.mortalityCount, 0, locale)}
           color={COLOR.mortality}
         />
         <Stat
           label={t("ops.dashboard.trend.weight_loss")}
-          value={compactKg(totals.weightLoss)}
-          hint={`${totals.weightLossPct.toFixed(2)}% ${t("ops.dashboard.trend.of_farm")}`}
+          value={compactKg(totals.weightLoss, locale)}
           color={COLOR.weightLoss}
         />
       </div>
@@ -428,28 +420,17 @@ export default function OperationalTrendsChart({
   );
 }
 
-function Stat({
-  label,
-  value,
-  hint,
-  color,
-}: {
-  label: string;
-  value: string;
-  hint: string;
-  color: string;
-}) {
+function Stat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
     <div
-      className="min-w-0 rounded-xl px-2.5 py-1.5 ring-1 ring-inset ring-slate-100"
+      className="min-w-0 rounded-xl px-2.5 py-2 ring-1 ring-inset ring-slate-100"
       style={{ backgroundColor: `${color}0f` }}
     >
       <span className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">
         <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
         <span className="truncate">{label}</span>
       </span>
-      <span className="block truncate text-[14px] font-black tabular-nums text-slate-800">{value}</span>
-      <span className="block truncate text-[10.5px] font-semibold text-slate-400">{hint}</span>
+      <span className="mt-0.5 block truncate text-[15px] font-black tabular-nums text-slate-800">{value}</span>
     </div>
   );
 }

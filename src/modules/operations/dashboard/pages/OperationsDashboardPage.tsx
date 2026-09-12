@@ -20,12 +20,12 @@ import { kickApprovalSnapshot } from "../../../approvals/services/approvalSnapsh
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 
 // -------- Helper: render a sample-dataset YYYY-MM-DD as "12 Sep 2026" --------
-const formatSampleDate = (value: string): string => {
+const formatSampleDate = (value: string, locale = "en-IN"): string => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
   const date = new Date(`${value}T00:00:00`);
   return Number.isNaN(date.getTime())
     ? value
-    : date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+    : date.toLocaleDateString(locale, { day: "2-digit", month: "short", year: "numeric" });
 };
 
 // -------- Helper: get previous Monday–Sunday --------
@@ -414,11 +414,11 @@ const GRANULARITY_BY_VIEW: Record<TrendPreset, Granularity> = {
 };
 
 /** "6 Sep – 12 Sep 2026", or a single day when the window is one day. */
-const windowLabel = (from: string, to: string): string => {
+const windowLabel = (from: string, to: string, locale = "en-IN"): string => {
   if (!from || !to) return "";
-  if (from === to) return formatSampleDate(from);
-  const start = formatSampleDate(from);
-  const end = formatSampleDate(to);
+  if (from === to) return formatSampleDate(from, locale);
+  const start = formatSampleDate(from, locale);
+  const end = formatSampleDate(to, locale);
   return from.slice(0, 4) === to.slice(0, 4)
     ? `${start.replace(/\s*\d{4}$/, "")} – ${end}`
     : `${start} – ${end}`;
@@ -504,7 +504,8 @@ function TrendViewSwitcher({
 
 // -------- Main Dashboard View Page --------
 function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
-  const { t } = useI18n();
+  const { t, language: uiLanguage } = useI18n();
+  const trendLocale = uiLanguage === "te" ? "te-IN" : "en-IN";
   const { showNotification } = useSafeNotification();
   const initialRange = getPreviousWeekRange();
   const [startDate, setStartDate] = useState<Date | undefined>(initialRange.startDate);
@@ -584,19 +585,36 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
     const preset = windowForView(view);
     return preset.from === calendarFrom && preset.to === calendarTo;
   });
-  const calendarIsMonthToDate =
-    !!calendarTo && calendarTo === counterToday && !!calendarFrom && calendarFrom >= counterMonthFrom;
+  /* A calendar that merely SPANS a day, a week or a month lights that chip too,
+     even when its dates are not exactly the preset's — if the page is showing a
+     week, this card reads a week. The card still totals the calendar's own
+     dates until a chip is actually tapped. */
   const activeTrendView: TrendView =
     trendView ??
     calendarMatchesPreset ??
-    (calendarIsMonthToDate ? "month" : null);
+    (rangeDays === 1
+      ? "today"
+      : rangeDays === 7
+        ? "week"
+        : rangeDays != null && rangeDays >= 28 && rangeDays <= 31
+          ? "month"
+          : null);
 
   // Anything the calendar picked by hand is its own option, so this card can
   // read it too. It carries no count: the presets count trips, while this one
   // is whatever range the calendar holds.
   const trendViewsWithCalendar: TrendViewOption[] = calendarMatchesPreset
     ? trendViews
-    : [...trendViews, { key: null, label: t("ops.dashboard.trend.custom"), count: null }];
+    : [
+        ...trendViews,
+        {
+          key: null,
+          label: t("ops.dashboard.trend.custom"),
+          /* While the card is reading the calendar, it already holds the
+             count for that range — no second request needed. */
+          count: activeTrendView === null ? trendsQuery.trends?.totalTrips ?? null : null,
+        },
+      ];
 
   const handleRangeChange = (s: Date | undefined, e: Date | undefined) => {
     setStartDate(s);
@@ -755,7 +773,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
                   A chip counts every trip in its window; the card can only
                   total the completed ones, so say so when the two differ. */}
               <p className="mt-0.5 text-[10.5px] font-semibold text-slate-400">
-                {windowLabel(trendWindow.from, trendWindow.to)}
+                {windowLabel(trendWindow.from, trendWindow.to, trendLocale)}
               </p>
             </div>
             <TrendViewSwitcher

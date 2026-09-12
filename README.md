@@ -92,7 +92,7 @@ card, and the weight story of the completed trips in the window it is reading:
 | Trips | Indigo line with a soft gradient area, right axis |
 | Farm weight | The height of the stacked bar (kg) |
 | Delivered weight | Emerald segment |
-| Mortality weight | Rose segment |
+| Mortality weight | Rose segment — kept so the bar still adds up to the farm weight |
 | Weight loss | Amber segment |
 
 `farm = delivered + mortality + loss` holds for every trip, so the three
@@ -112,27 +112,29 @@ trips still in transit have no weights yet and are left out of both. The
 counters come from one fetch of the shortest range covering today, the week and
 the month.
 
-Until a chip is tapped the card reads the global calendar, and the chip the
-calendar is already showing is lit — a 7D calendar lights Week, a month-to-date
-range lights Month, anything else lights Custom. That default is derived rather
-than remembered, so a reload or a hard refresh lands on the calendar's window,
-and tapping the lit chip hands it back. The caption under the title always names
-the dates being totalled. Each chip carries its own accent — Today sky, Week
-violet, Month teal, Custom slate.
+Until a chip is tapped the card reads the global calendar, and the chip that
+fits it is lit — a one-day calendar lights Today, a seven-day one lights Week, a
+month-long one lights Month, and anything else lights Custom, which carries the
+calendar's own trip count. That default is derived rather than remembered, so a
+reload or a hard refresh lands on the calendar's window, and tapping the lit
+chip hands it back. The caption under the title always names the dates being
+totalled. Each chip carries its own accent — Today sky, Week violet, Month teal,
+Custom slate.
 
 **Reading it** — the plot stays in kilos, so there is no second reading to
-switch to, and the footer doubles as the legend: trips, farm weight, delivered
-weight, mortality and weight loss, each with its share of the farm weight or its
-per-bucket average, so the percentages are one glance away without a toggle.
-Hover any bucket for every weight with its share, birds lost
-and its share of the load, kg and birds per trip, and the ▲▼ change against the
-previous bucket.
+switch to, and the footer is five plain numbers that double as the legend:
+trips, farm weight, delivered weight, birds lost and weight loss. The tooltip
+carries the detail — every weight with its share of the farm weight, the birds
+picked up at the farm, the birds delivered, the birds lost with their share of
+the load, and the ▲▼ change against the previous bucket.
 
-Rows come from the completed-trips analysis endpoint — the same one the Weight
-Loss / Mortality page reads — so the two can never disagree, and nothing is
-re-derived beyond summing the server's numbers into buckets
-(`utils/trendSeries.ts`, exercised without a browser). The card **title itself**
-is the link to that page, so there is no second "view details" affordance.
+Mortality is reported in birds, not kilos: the rose band stays in the bar only
+because the segments must add up to the farm weight, but no figure in the card
+is a mortality weight any more.
+
+The whole card is localised — Telugu reads Telugu labels, month and weekday
+names, and lakh figures (`5.20 లక్షల kg`), with only units (kg, %) and numbers
+left as they are.
 
 ### Masters
 

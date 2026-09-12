@@ -16,52 +16,70 @@ const num = (value: unknown): number => {
 /* ------------------------------------------------------------------ */
 
 /** 7499.65 → "7,500" (no unit — callers decide). */
-export const plain = (value: number, digits = 0): string =>
-  num(value).toLocaleString("en-IN", { minimumFractionDigits: digits, maximumFractionDigits: digits });
+export const plain = (value: number, digits = 0, locale = "en-IN"): string =>
+  num(value).toLocaleString(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits });
 
-/** 7499.65 → "7,500 kg"; 516245 → "5.16 L kg". */
-export const compactKg = (value: number): string => {
+/** 7499.65 → "7,500 kg"; 516245 → "5.16 L kg" ("5.16 లక్షల kg" in Telugu). */
+export const compactKg = (value: number, locale = "en-IN"): string => {
   const v = num(value);
-  if (Math.abs(v) >= 100_000) return `${(v / 100_000).toFixed(2)} L kg`;
-  return `${plain(Math.round(v))} kg`;
+  if (Math.abs(v) >= 100_000) {
+    const lakh = locale.startsWith("te") ? "లక్షల" : "L";
+    return `${(v / 100_000).toFixed(2)} ${lakh} kg`;
+  }
+  return `${plain(Math.round(v), 0, locale)} kg`;
 };
 
 /** Axis ticks only: 0 / 2.5k / 5k / 7.5k. */
-export const tickKg = (value: number): string => {
+export const tickKg = (value: number, locale = "en-IN"): string => {
   const v = num(value);
   if (Math.abs(v) >= 1000) return `${(v / 1000).toFixed(v % 1000 === 0 ? 0 : 1)}k`;
-  return plain(Math.round(v));
+  return plain(Math.round(v), 0, locale);
 };
 
-const monthName = (monthIndex: number): string =>
-  new Date(2026, monthIndex, 1).toLocaleDateString("en-IN", { month: "short" });
+const monthName = (monthIndex: number, locale = "en-IN"): string =>
+  new Date(2026, monthIndex, 1).toLocaleDateString(locale, { month: "short" });
 
-/** "2026-08-10" → "10 Aug"; "2026-W33" → "W33"; "2026-9" → "Sep 2026". */
-export function formatBucket(raw: string): string {
+/** "2026-08-10" → "10 Aug"; "2026-W33" → "W33" ("వా33"); "2026-9" → "Sep 2026". */
+export function formatBucket(raw: string, locale = "en-IN"): string {
   if (!raw) return "";
-  if (raw.includes("W")) return raw.slice(raw.indexOf("W"));
+  if (raw.includes("W")) {
+    const week = raw.slice(raw.indexOf("W"));
+    return locale.startsWith("te") ? `వా${week.slice(1)}` : week;
+  }
   if (/^\d{4}-\d{1,2}$/.test(raw)) {
     const [year, month] = raw.split("-").map(Number);
-    return `${monthName(month - 1)} ${year}`;
+    return `${monthName(month - 1, locale)} ${year}`;
   }
   const date = new Date(`${raw}T12:00:00`);
   if (Number.isNaN(date.getTime())) return raw;
-  return date.toLocaleDateString("en-IN", { day: "2-digit", month: "short" }).replace(",", "");
+  return date.toLocaleDateString(locale, { day: "2-digit", month: "short" }).replace(",", "");
 }
 
-/** Long form for the tooltip title: "Mon, 10 Aug 2026". */
-export function formatBucketLong(raw: string): string {
+/** Long form for the tooltip title: "Mon, 10 Aug 2026" — localised. */
+export function formatBucketLong(raw: string, locale = "en-IN"): string {
+  const telugu = locale.startsWith("te");
   if (raw.includes("W")) {
     const week = raw.slice(raw.indexOf("W") + 1);
-    return `${raw.slice(0, 4)} · week ${Number(week)}`;
+    return `${raw.slice(0, 4)} · ${telugu ? "వారం" : "week"} ${Number(week)}`;
   }
   if (/^\d{4}-\d{1,2}$/.test(raw)) {
     const [year, month] = raw.split("-").map(Number);
-    return new Date(year, month - 1, 1).toLocaleDateString("en-IN", { month: "long", year: "numeric" });
+    return new Date(year, month - 1, 1).toLocaleDateString(locale, { month: "long", year: "numeric" });
   }
   const date = new Date(`${raw}T12:00:00`);
   if (Number.isNaN(date.getTime())) return raw;
-  return date.toLocaleDateString("en-IN", {
+  if (telugu) {
+    // "సోమ, 07 సెప్టెం 2026" — weekday first, as Telugu reads it.
+    const parts = new Intl.DateTimeFormat(locale, {
+      weekday: "short",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    }).formatToParts(date);
+    const part = (type: string) => parts.find((piece) => piece.type === type)?.value ?? "";
+    return `${part("weekday")}, ${part("day")} ${part("month")} ${part("year")}`;
+  }
+  return date.toLocaleDateString(locale, {
     weekday: "short",
     day: "2-digit",
     month: "short",
