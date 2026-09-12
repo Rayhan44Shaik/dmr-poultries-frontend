@@ -249,7 +249,7 @@ export default function ShopDeliveryCard({
 
         {/* Footer — mortality + bird type take the old "time" slot (left),
             captured time moves to the right */}
-        <div className="flex items-center justify-between gap-2 pt-1 mt-auto text-[10px] font-medium border-t border-slate-100">
+        <div className="flex flex-wrap items-center justify-between gap-2 pt-1 mt-auto text-[10px] font-medium border-t border-slate-100">
           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             {mortalityCount > 0 && (
               <span
@@ -266,11 +266,13 @@ export default function ShopDeliveryCard({
               </span>
             ) : null}
           </div>
-          <div className="flex items-center gap-1 shrink-0 text-slate-600">
+          <div className="ml-auto flex items-center justify-end gap-1 min-w-0 max-w-full text-slate-600">
             <span className="h-4 w-4 rounded bg-indigo-50/70 text-indigo-500 flex items-center justify-center shrink-0">
               <Clock size={11} className="stroke-[2]" />
             </span>
-            <span>{t("ops.trip.captured")} {row.autoCaptureTime || "—"}</span>
+            <span className="whitespace-normal break-words text-right leading-tight">
+              {t("ops.trip.captured")} {row.autoCaptureTime || "—"}
+            </span>
           </div>
         </div>
       </div>

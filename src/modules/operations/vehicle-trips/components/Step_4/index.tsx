@@ -1124,25 +1124,25 @@ export default function UnLoadingTable({
 
       {/* ─── TOP KPI SUMMARY — same font as StepKpiCard (all steps) ─── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">
-          <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
+        <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs text-center">
+          <span className="text-xs uppercase font-semibold text-slate-400 flex items-center justify-center gap-1.5 mb-1.5">
             <span className="h-5 w-5 rounded-md bg-indigo-50/70 text-indigo-500 flex items-center justify-center shrink-0">
               <Clock size={12} />
             </span>
-            <span className="truncate">{t("ops.trip.captured_time")}</span>
+            <span>{t("ops.trip.captured_time")}</span>
           </span>
-          <span className="block text-sm font-bold text-slate-800 truncate" title={topKpiTotals.lastCaptureTime}>
+          <span className="block text-sm font-bold text-slate-800 whitespace-normal break-words leading-snug" title={topKpiTotals.lastCaptureTime}>
             {topKpiTotals.lastCaptureTime}
           </span>
         </div>
-        <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">
-          <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
+        <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs text-center">
+          <span className="text-xs uppercase font-semibold text-slate-400 flex items-center justify-center gap-1.5 mb-1.5">
             <span className="h-5 w-5 rounded-md bg-blue-50/70 text-blue-500 flex items-center justify-center shrink-0">
               <Building2 size={12} />
             </span>
             <span className="truncate">{t("ops.trip.shops")}</span>
           </span>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center justify-center gap-3">
             <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-500" title={t("ops.trip.box_mode")}>
               <Box size={13} className="text-blue-500" /> {boxModeCount}
             </span>
@@ -1150,48 +1150,48 @@ export default function UnLoadingTable({
             <span className="inline-flex items-center gap-1 text-xs font-semibold text-purple-500" title={t("ops.trip.weight_mode")}>
               <Scale size={13} className="text-purple-500" /> {weightModeCount}
             </span>
-            <span className="text-sm font-bold text-slate-800 ml-auto">{boxModeCount + weightModeCount}</span>
+            <span className="text-sm font-bold text-slate-800">{boxModeCount + weightModeCount}</span>
           </div>
         </div>
-        <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">
-          <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
+        <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs text-center">
+          <span className="text-xs uppercase font-semibold text-slate-400 flex items-center justify-center gap-1.5 mb-1.5">
             <span className="h-5 w-5 rounded-md bg-emerald-50/70 text-emerald-500 flex items-center justify-center shrink-0">
               <Users size={12} />
             </span>
             <span className="truncate">{t("common.birds")}</span>
           </span>
-          <span className="block text-sm font-bold text-slate-800">{topKpiTotals.birds || "—"}</span>
+          <span className="block text-sm font-bold text-slate-800 text-center">{topKpiTotals.birds || "—"}</span>
         </div>
-        <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">
-          <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
+        <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs text-center">
+          <span className="text-xs uppercase font-semibold text-slate-400 flex items-center justify-center gap-1.5 mb-1.5">
             <span className="h-5 w-5 rounded-md bg-emerald-50/70 text-emerald-500 flex items-center justify-center shrink-0">
               <Scale size={12} />
             </span>
             <span className="truncate">{t("ops.trip.weight_kg")}</span>
           </span>
-          <span className="block text-sm font-bold text-slate-800">
+          <span className="block text-sm font-bold text-slate-800 text-center">
             {topKpiTotals.weight ? topKpiTotals.weight.toFixed(2) : "—"}
           </span>
         </div>
-        <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">
-          <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
+        <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs text-center">
+          <span className="text-xs uppercase font-semibold text-slate-400 flex items-center justify-center gap-1.5 mb-1.5">
             <span className="h-5 w-5 rounded-md bg-rose-50/70 text-rose-500 flex items-center justify-center shrink-0">
               <AlertCircle size={12} />
             </span>
             <span className="truncate">{t("operations.mortality_count")}</span>
           </span>
-          <span className="block text-sm font-bold text-slate-800">
+          <span className="block text-sm font-bold text-slate-800 text-center">
             {topKpiTotals.mortality > 0 ? `${topKpiTotals.mortality} ${t("common.birds")}` : "—"}
           </span>
         </div>
-        <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">
-          <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
+        <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs text-center">
+          <span className="text-xs uppercase font-semibold text-slate-400 flex items-center justify-center gap-1.5 mb-1.5">
             <span className="h-5 w-5 rounded-md bg-rose-50/70 text-rose-500 flex items-center justify-center shrink-0">
               <Scale size={12} />
             </span>
             <span className="truncate">{t("ops.trip.mortality_weight")}</span>
           </span>
-          <span className="block text-sm font-bold text-slate-800">
+          <span className="block text-sm font-bold text-slate-800 text-center">
             {topKpiTotals.mortKg > 0 ? `${topKpiTotals.mortKg.toFixed(2)} kg` : "—"}
           </span>
         </div>
