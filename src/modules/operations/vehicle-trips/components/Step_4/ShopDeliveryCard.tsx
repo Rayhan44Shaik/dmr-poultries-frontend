@@ -7,7 +7,6 @@ import { WhatsAppIcon } from "../../../../../ui/WhatsAppIcon";
 import { ActionTooltip } from "../../../../../ui/ActionTooltip";
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 import { formatTripViewStamp } from "../../utils/tripViewLocalization";
-import { TripTimestampDisplay } from "../TripTimestampDisplay";
 import type { DeliveryEmailStatusValue } from "../../services/deliveryEmailService";
 import type { DeliveryWhatsAppStatusValue } from "../../services/deliveryWhatsAppService";
 
@@ -129,6 +128,7 @@ export default function ShopDeliveryCard({
     return String(value);
   };
   const displayShopName = cleanDeliveryShopName(row.shopName) || t("ops.trip.not_entered");
+  const capturedTime = row.autoCaptureTime ? formatTripViewStamp(row.autoCaptureTime, language) : "—";
 
   return (
     <div className="relative rounded-xl border border-slate-200/80 bg-white shadow-sm hover:shadow-md transition-all duration-200 flex flex-col">
@@ -280,18 +280,13 @@ export default function ShopDeliveryCard({
               </span>
             ) : null}
           </div>
-          <div className="flex min-w-0 flex-1 items-center justify-end gap-1 text-slate-600">
+          <div className="ml-auto flex shrink-0 items-center justify-end gap-1 text-slate-600" title={capturedTime}>
             <span className="h-4 w-4 rounded bg-indigo-50/70 text-indigo-500 flex items-center justify-center shrink-0">
               <Clock size={11} className="stroke-[2]" />
             </span>
-            <span className="text-[9px] font-bold uppercase tracking-wide text-slate-400 whitespace-nowrap">
-              {t("ops.trip.captured_at")}
+            <span className="whitespace-nowrap text-[10px] font-semibold leading-none tabular-nums">
+              {capturedTime}
             </span>
-            <TripTimestampDisplay
-              value={row.autoCaptureTime ? formatTripViewStamp(row.autoCaptureTime, language) : ""}
-              empty="—"
-              className="border-indigo-100 bg-indigo-50/70 px-1.5 py-0.5 text-[9px]"
-            />
           </div>
         </div>
       </div>

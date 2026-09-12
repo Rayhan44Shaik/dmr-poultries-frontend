@@ -29,7 +29,6 @@ import { uiActionIconMotionClass, uiSearchInputWithClearClass } from "../../../.
 import { ActionTooltip } from "../../../../ui/ActionTooltip";
 import { cleanDeliveryShopName } from "../utils/shopDisplayName";
 import { formatTripViewStamp } from "../utils/tripViewLocalization";
-import { TripTimestampDisplay } from "./TripTimestampDisplay";
 
 export type TripViewShopCardsProps = {
   trip: Trip;
@@ -282,6 +281,7 @@ export function TripViewShopCards({
             const mortalityCount = delivery.mortality ?? 0;
             const mortKg = delivery.mortKg ?? 0;
             const displayShopName = cleanDeliveryShopName(delivery.shopName) || t("ops.trip.not_entered");
+            const capturedTime = delivery.autoCaptureTime ? formatTripViewStamp(delivery.autoCaptureTime, language) : "—";
 
             return (
               <div
@@ -368,18 +368,13 @@ export function TripViewShopCards({
 
                 {/* Capture info + bird type */}
                 <div className="flex items-center justify-between gap-3 text-[11px] text-slate-400 font-medium pt-0.5">
-                  <div className="flex items-center gap-1 min-w-0">
+                  <div className="flex min-w-0 items-center gap-1 text-slate-600" title={capturedTime}>
                     <span className="h-4 w-4 rounded bg-indigo-50/70 text-indigo-500 flex items-center justify-center shrink-0">
                       <Clock size={12} />
                     </span>
-                    <span className="text-[10px] font-bold uppercase tracking-wide text-slate-400 whitespace-nowrap">
-                      {t("ops.trip.captured_at")}
+                    <span className="whitespace-nowrap text-[10px] font-semibold leading-none tabular-nums">
+                      {capturedTime}
                     </span>
-                    <TripTimestampDisplay
-                      value={delivery.autoCaptureTime ? formatTripViewStamp(delivery.autoCaptureTime, language) : ""}
-                      empty="—"
-                      className="border-indigo-100 bg-indigo-50/70 px-1.5 py-0.5 text-[9px]"
-                    />
                   </div>
                   {delivery.birdType ? (
                     <span className="px-2 py-0.5 bg-sky-50/70 text-sky-500 font-semibold rounded-md text-[10px] border border-sky-100">
