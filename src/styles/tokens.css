@@ -406,7 +406,8 @@
 
   /* Action-icon motions — one SEMANTIC animation per action type, so each
    * glyph "acts out" its meaning on hover instead of sharing the brand dance:
-   *   search → sweep · reset → spin · edit → write · delete → dump the bin.
+   *   search → sweep · reset → spin · edit → write · delete → dump the bin ·
+   *   PDF → paper flutter · mail → send flick · WhatsApp → chat pulse.
    * Applied to toolbar / row-action glyphs (Trip List + Trip Entry). */
   --animate-action-search: action-search 1.1s ease-in-out infinite;
   --animate-action-reset: action-reset 0.7s linear infinite;
@@ -414,6 +415,8 @@
   --animate-action-delete: action-delete 1s ease-in-out infinite;
   --animate-action-view: action-view 1.1s ease-in-out infinite;
   --animate-action-pdf: action-pdf 1.2s ease-in-out infinite;
+  --animate-action-mail: action-mail 1.05s ease-in-out infinite;
+  --animate-action-whatsapp: action-whatsapp 1s ease-in-out infinite;
   --animate-action-excel: action-excel 0.9s ease-in-out infinite;
 
   /* Magnifier sweeps side to side with a slight tilt, as if scanning a line. */
@@ -466,6 +469,23 @@
     25%      { transform: rotate(-8deg) scaleX(0.9); }
     50%      { transform: rotate(0deg) scaleX(1); }
     75%      { transform: rotate(8deg) scaleX(0.9); }
+  }
+
+  /* Mail: the envelope gives a small send flick, then settles. */
+  @keyframes action-mail {
+    0%, 100% { transform: translateX(0) translateY(0) rotate(0deg); }
+    25%      { transform: translateX(2px) translateY(-2px) rotate(-7deg); }
+    50%      { transform: translateX(0) translateY(0) rotate(0deg) scaleX(1.08); }
+    75%      { transform: translateX(1px) translateY(-1px) rotate(6deg); }
+  }
+
+  /* WhatsApp: a friendly chat pulse with a light bounce, matching the brand
+   * logo without turning it into a generic phone/call motion. */
+  @keyframes action-whatsapp {
+    0%, 100% { transform: translateY(0) rotate(0deg) scale(1); }
+    20%      { transform: translateY(-2px) rotate(-5deg) scale(1.08); }
+    45%      { transform: translateY(0) rotate(0deg) scale(0.96); }
+    70%      { transform: translateY(-1.5px) rotate(5deg) scale(1.06); }
   }
 
   /* Excel: the grid bobs like a cursor tapping cells — a crisp calculating

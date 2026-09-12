@@ -268,6 +268,21 @@ export const uiRefreshIconButtonClass = `${actionIconBase} ${uiActionToneClass.r
 export const actionIconSize = 16;
 export const actionIconSizeCompact = 14;
 
+/** Semantic hover motion for action glyphs. Wrap the icon in an inline-flex span
+ * inside a `group` button/link so PDF, Mail, WhatsApp, Edit, Delete, etc. keep
+ * the same animation language everywhere. */
+export const uiActionIconMotionClass = {
+  search: "motion-safe:group-hover:animate-[var(--animate-action-search)]",
+  reset: "motion-safe:group-hover:animate-[var(--animate-action-reset)]",
+  edit: "motion-safe:group-hover:animate-[var(--animate-action-edit)]",
+  delete: "motion-safe:group-hover:animate-[var(--animate-action-delete)]",
+  view: "motion-safe:group-hover:animate-[var(--animate-action-view)]",
+  pdf: "motion-safe:group-hover:animate-[var(--animate-action-pdf)]",
+  mail: "motion-safe:group-hover:animate-[var(--animate-action-mail)]",
+  whatsapp: "motion-safe:group-hover:animate-[var(--animate-action-whatsapp)]",
+  excel: "motion-safe:group-hover:animate-[var(--animate-action-excel)]",
+} as const;
+
 /* ---------------------------------------------------------------------------
  * 3. FORM CONTROLS
  * ------------------------------------------------------------------------- */

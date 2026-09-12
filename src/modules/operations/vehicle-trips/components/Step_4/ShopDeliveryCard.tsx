@@ -4,6 +4,7 @@ import type { ShopDeliveryWithExtra } from "./useShopDeliveryForm";
 import { useI18n } from "../../../../../i18n";
 import { cleanDeliveryShopName } from "../../utils/shopDisplayName";
 import { WhatsAppIcon } from "../../../../../ui/WhatsAppIcon";
+import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 import type { DeliveryEmailStatusValue } from "../../services/deliveryEmailService";
 import type { DeliveryWhatsAppStatusValue } from "../../services/deliveryWhatsAppService";
 
@@ -71,13 +72,19 @@ function DeliveryCommunicationButton({
       type="button"
       onClick={onClick}
       disabled={disabled || isSending}
-      className={`relative p-1.5 rounded-lg border transition-colors flex items-center justify-center active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${className} ${
+      className={`group relative p-1.5 rounded-lg border transition-colors flex items-center justify-center active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${className} ${
         isSending ? "motion-safe:animate-pulse" : ""
       }`}
       title={title}
       aria-label={title}
     >
-      {isSending ? <Loader2 size={13} className="animate-spin stroke-[2.5]" /> : <Icon size={13} className="stroke-[2]" />}
+      {isSending ? (
+        <Loader2 size={13} className="animate-spin stroke-[2.5]" />
+      ) : (
+        <span className={`inline-flex ${isWhatsApp ? uiActionIconMotionClass.whatsapp : uiActionIconMotionClass.mail}`}>
+          <Icon size={13} className="stroke-[2]" />
+        </span>
+      )}
       {visibleCount > 0 && (
         <span className={`absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-extrabold leading-none text-white ring-2 ring-white ${
           isWhatsApp ? "bg-[#25D366]" : "bg-red-500"
@@ -121,7 +128,7 @@ export default function ShopDeliveryCard({
   const displayShopName = cleanDeliveryShopName(row.shopName) || t("ops.trip.not_entered");
 
   return (
-    <div className="group relative overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm hover:shadow-md transition-all duration-200 flex flex-col">
+    <div className="relative overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm hover:shadow-md transition-all duration-200 flex flex-col">
       <div className="p-3 flex flex-col gap-2.5 flex-1">
         {/* Header — mode tile + shop name vertically centred on the logo */}
         <div className="flex items-center justify-between gap-2">
@@ -141,7 +148,7 @@ export default function ShopDeliveryCard({
             </p>
           </div>
 
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex items-center gap-3 shrink-0">
             {communicationEnabled && onSendEmail && (
               <DeliveryCommunicationButton
                 channel="mail"
@@ -167,18 +174,18 @@ export default function ShopDeliveryCard({
             {!readOnly && (
               <button
                 onClick={() => onEdit(row)}
-                className="p-1.5 rounded-lg bg-slate-50 hover:bg-blue-50/70 text-slate-500 hover:text-blue-500 border border-slate-200/60 transition-colors flex items-center justify-center"
+                className="group p-1.5 rounded-lg bg-slate-50 hover:bg-blue-50/70 text-slate-500 hover:text-blue-500 border border-slate-200/60 transition-colors flex items-center justify-center"
                 title={t("ops.trip.edit_shop_delivery")}
               >
-                <Pencil size={13} className="stroke-[2]" />
+                <span className={`inline-flex ${uiActionIconMotionClass.edit}`}><Pencil size={13} className="stroke-[2]" /></span>
               </button>
             )}
             <button
               onClick={() => onPDF(row)}
-              className="p-1.5 rounded-lg bg-slate-50 hover:bg-rose-50/70 text-slate-500 hover:text-rose-500 border border-slate-200/60 transition-colors flex items-center justify-center"
+              className="group p-1.5 rounded-lg bg-slate-50 hover:bg-rose-50/70 text-slate-500 hover:text-rose-500 border border-slate-200/60 transition-colors flex items-center justify-center"
               title={t("ops.trip.download_pdf")}
             >
-              <FileText size={13} className="stroke-[2]" />
+              <span className={`inline-flex ${uiActionIconMotionClass.pdf}`}><FileText size={13} className="stroke-[2]" /></span>
             </button>
           </div>
         </div>

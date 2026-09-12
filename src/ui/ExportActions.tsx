@@ -48,7 +48,7 @@ import {
 } from "lucide-react";
 import { cn } from "../utils/cn";
 import { Button, type ButtonProps } from "./Button";
-import { actionIconSize, uiActionToneClass } from "../shared/ui/uiTokens";
+import { actionIconSize, uiActionIconMotionClass, uiActionToneClass } from "../shared/ui/uiTokens";
 
 export interface ActionButtonProps extends Omit<ButtonProps, "variant" | "icon" | "size"> {
   /** Visible text. Omit for an icon-only button (then `ariaLabel` is required). */
@@ -91,6 +91,7 @@ function SemanticAction({
       aria-label={iconOnly ? label : ariaLabel}
       title={iconOnly ? label : rest.title}
       className={cn(
+        "group",
         uiActionToneClass[tone],
         // Slightly tighter padding than a generic lg button: action buttons
         // carry a short label plus an icon and must not dominate the row.
@@ -114,7 +115,7 @@ export function PdfButton(props: ActionButtonProps) {
       {...props}
       tone="pdf"
       defaultLabel="Download PDF"
-      glyph={glyph(<FileText size={actionIconSize} strokeWidth={2} aria-hidden="true" />)}
+      glyph={glyph(<span className={`inline-flex ${uiActionIconMotionClass.pdf}`}><FileText size={actionIconSize} strokeWidth={2} aria-hidden="true" /></span>)}
     />
   );
 }
@@ -125,7 +126,7 @@ export function ExcelButton(props: ActionButtonProps) {
       {...props}
       tone="excel"
       defaultLabel="Download Excel"
-      glyph={glyph(<FileSpreadsheet size={actionIconSize} strokeWidth={2} aria-hidden="true" />)}
+      glyph={glyph(<span className={`inline-flex ${uiActionIconMotionClass.excel}`}><FileSpreadsheet size={actionIconSize} strokeWidth={2} aria-hidden="true" /></span>)}
     />
   );
 }

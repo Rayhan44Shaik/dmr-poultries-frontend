@@ -25,7 +25,7 @@ import type { Shop } from "../../../masters/shops/types/shop";
 import type { DeliveryEmailStatusValue } from "../services/deliveryEmailService";
 import type { DeliveryWhatsAppStatusValue } from "../services/deliveryWhatsAppService";
 import { useI18n } from "../../../../i18n";
-import { uiSearchInputWithClearClass } from "../../../../shared/ui/uiTokens";
+import { uiActionIconMotionClass, uiSearchInputWithClearClass } from "../../../../shared/ui/uiTokens";
 import { cleanDeliveryShopName } from "../utils/shopDisplayName";
 
 export type TripViewShopCardsProps = {
@@ -116,14 +116,16 @@ function CommunicationIcon({
         type="button"
         onClick={onClick}
         disabled={disabled || isSending}
-        className={`relative inline-flex items-center justify-center w-9 h-9 rounded-xl border ${borderColor} ${bgColor} ${iconColor} transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
+        className={`group relative inline-flex items-center justify-center w-9 h-9 rounded-xl border ${borderColor} ${bgColor} ${iconColor} transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
         title={tooltip}
         aria-label={ariaLabel}
       >
         {isSending ? (
           <Loader2 size={16} className="animate-spin" />
         ) : (
-          <Icon size={16} />
+          <span className={`inline-flex ${isWhatsApp ? uiActionIconMotionClass.whatsapp : uiActionIconMotionClass.mail}`}>
+            <Icon size={16} />
+          </span>
         )}
         {isSent && sendCount > 0 && (
           <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-500 text-white text-[10px] font-bold leading-none px-1 border-2 border-white">
@@ -389,11 +391,11 @@ export function TripViewShopCards({
                   <button
                     type="button"
                     onClick={() => onDownloadPdf(delivery)}
-                    className="inline-flex items-center justify-center w-9 h-9 rounded-xl border border-red-100 bg-red-50/70 hover:bg-red-50/80 text-red-500 transition-colors active:scale-95"
+                    className="group inline-flex items-center justify-center w-9 h-9 rounded-xl border border-red-100 bg-red-50/70 hover:bg-red-50/80 text-red-500 transition-colors active:scale-95"
                     title={t("ops.trip.create_pdf_title")}
                     aria-label={t("ops.trip.create_pdf")}
                   >
-                    <FileDown size={15} />
+                    <span className={`inline-flex ${uiActionIconMotionClass.pdf}`}><FileDown size={15} /></span>
                   </button>
 
                   {/* Email */}

@@ -25,6 +25,7 @@ import type { DeliveryEmailStatusValue } from "../../services/deliveryEmailServi
 import type { DeliveryWhatsAppStatusValue } from "../../services/deliveryWhatsAppService";
 import { WizardActionBar, WizardStepNotice } from "../WizardStepUI";
 import { useI18n } from "../../../../../i18n";
+import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 
 interface Props {
   rows: ShopDelivery[];
@@ -1094,19 +1095,19 @@ export default function UnLoadingTable({
         <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
           <button
             onClick={handleDownloadShopsPDF}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-50/70 hover:bg-blue-50/70 border border-blue-100 text-blue-500 text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
+            className="group inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-50/70 hover:bg-blue-50/70 border border-blue-100 text-blue-500 text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
             title={t("ops.trip.shops_pdf_title")}
           >
-            <FileText size={15} className="text-blue-500" />
+            <span className={`inline-flex ${uiActionIconMotionClass.pdf}`}><FileText size={15} className="text-blue-500" /></span>
             <span>{t("ops.trip.shops")} ({pendingShopsCount})</span>
           </button>
 
           <button
             onClick={handleDownloadBoxesPDF}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50/70 hover:bg-emerald-50/70 border border-emerald-100 text-emerald-500 text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
+            className="group inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50/70 hover:bg-emerald-50/70 border border-emerald-100 text-emerald-500 text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
             title={t("ops.trip.boxes_pdf_title")}
           >
-            <Box size={15} className="text-emerald-500" />
+            <span className={`inline-flex ${uiActionIconMotionClass.pdf}`}><Box size={15} className="text-emerald-500" /></span>
             <span>{t("ops.trip.boxes")} ({remainingBoxesCount})</span>
           </button>
 

@@ -28,6 +28,7 @@ import { generateTripReportPDF, type TripReportEmailInfo } from "../utils/genera
 import { useTripDeliveryEmails } from "../hooks/useTripDeliveryEmails";
 import { useTripDeliveryWhatsApps } from "../hooks/useTripDeliveryWhatsApps";
 import { cleanDeliveryShopName } from "../utils/shopDisplayName";
+import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import { useI18n } from "../../../../i18n";
 import StepStart from "./StepStart";
 import StepFarm from "./StepFarm";
@@ -424,13 +425,13 @@ function TripViewModal({
                     type="button"
                     onClick={() => void emailState.sendAll()}
                     disabled={emailState.isBulkSending}
-                    className="inline-flex items-center gap-2.5 rounded-xl border border-red-100 bg-red-50/90 hover:bg-red-100 px-4 py-2 text-xs font-semibold text-red-600 shadow-sm shadow-red-100/60 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="group inline-flex items-center gap-2.5 rounded-xl border border-red-100 bg-red-50/90 hover:bg-red-100 px-4 py-2 text-xs font-semibold text-red-600 shadow-sm shadow-red-100/60 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                     title={t("ops.trip.send_email_all")}
                   >
                     {emailState.isBulkSending ? (
                       <Loader2 size={14} className="animate-spin" />
                     ) : (
-                      <Mail size={14} />
+                      <span className={`inline-flex ${uiActionIconMotionClass.mail}`}><Mail size={14} /></span>
                     )}
                     {emailState.isBulkSending ? `${t("ops.trip.sending")}...` : t("ops.trip.send_all_email")}
                   </button>
@@ -440,13 +441,13 @@ function TripViewModal({
                     type="button"
                     onClick={() => void whatsappState.sendAll()}
                     disabled={whatsappState.isBulkSending}
-                    className="inline-flex items-center gap-2.5 rounded-xl border border-[#25D366] bg-[#25D366] hover:bg-[#1ebe5d] px-4 py-2 text-xs font-semibold text-white shadow-md shadow-[#25D366]/25 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="group inline-flex items-center gap-2.5 rounded-xl border border-[#25D366]/25 bg-[#25D366]/10 hover:bg-[#25D366]/15 px-4 py-2 text-xs font-semibold text-[#128C7E] shadow-sm shadow-[#25D366]/10 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                     title={t("ops.trip.send_whatsapp_all")}
                   >
                     {whatsappState.isBulkSending ? (
                       <Loader2 size={14} className="animate-spin" />
                     ) : (
-                      <WhatsAppIcon size={14} />
+                      <span className={`inline-flex ${uiActionIconMotionClass.whatsapp}`}><WhatsAppIcon size={14} /></span>
                     )}
                     {whatsappState.isBulkSending ? `${t("ops.trip.sending")}...` : t("ops.trip.send_all_whatsapp")}
                   </button>
@@ -454,11 +455,11 @@ function TripViewModal({
                 <button
                   type="button"
                   onClick={() => void downloadTripReport()}
-                  className="inline-flex items-center justify-center rounded-xl border border-red-100 bg-red-50/70 hover:bg-red-50/80 p-2 text-red-500 shadow-sm transition-all active:scale-95"
+                  className="group inline-flex items-center justify-center rounded-xl border border-red-100 bg-red-50/70 hover:bg-red-50/80 p-2 text-red-500 shadow-sm transition-all active:scale-95"
                   title={t("ops.trip.create_pdf_title")}
                   aria-label={t("ops.trip.create_pdf")}
                 >
-                  <FileDown size={16} />
+                  <span className={`inline-flex ${uiActionIconMotionClass.pdf}`}><FileDown size={16} /></span>
                 </button>
               </div>
             </div>
