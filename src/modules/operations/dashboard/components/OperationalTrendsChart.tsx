@@ -1,24 +1,27 @@
 // src/modules/operations/dashboard/components/OperationalTrendsChart.tsx
 // OPERATIONAL TRENDS — the dashboard's main analytical chart.
 //
-// Three questions, one plot:
-//   • How many trips ran?               → bars, left axis (counts)
-//   • How much bird reached the shops?  → gradient area, right axis (kg)
-//   • What did each trip cost us?       → mortality per trip, left axis (birds/trip)
+// What it shows, all in one plot:
+//   • Trips            → indigo line, right axis
+//   • Farm weight      → the height of the stacked bar (kg)
+//   • Delivered weight → emerald segment of that bar
+//   • Mortality        → rose segment of that bar
+//   • Weight loss      → amber segment of that bar
 //
-// Trips and mortality-per-trip are both counts per day, so they honestly share
-// the left axis; weight lives on the right one. That keeps the plot to two axes
-// instead of the three overlapping ones the old chart needed, while every true
-// number — trips, kilograms, birds, birds/trip, kg/trip and the change against
-// the previous bucket — is spelled out in the tooltip.
+// Because farm weight = delivered + mortality + loss holds for every trip, the
+// three segments stack to exactly the farm weight — one bar carries all four
+// weight numbers at once. The second mode re-reads the same data as a 100%
+// stack so a quiet week and a heavy one can be compared by shape.
 //
-// Extras that make it readable rather than merely decorated: a dashed average
-// line, a 3-bucket moving average of weight, legend chips that toggle a series
-// off, daily/weekly/monthly bucketing and a totals footer.
+// The range comes from the dashboard's global calendar; the default bucket
+// (day / week / month) follows that range's length and resets whenever the
+// calendar moves, so a reload always lands on the calendar's own view. Trips,
+// farm weight, delivered weight, mortality and weight loss are all summed from
+// the completed-trips API — the same endpoint the Weight Loss / Mortality page
+// reads — so the two can never disagree.
 
 import { useMemo, useState } from "react";
 import {
-  Area,
   Bar,
   CartesianGrid,
   ComposedChart,
@@ -30,55 +33,51 @@ import {
   YAxis,
 } from "recharts";
 import { useI18n } from "../../../../i18n";
+import type { OperationalTrends } from "../services/operationalTrends";
 import {
-  aggregate,
+  aggregateOperational,
   compactKg,
   formatBucket,
   formatBucketLong,
   plain,
   previousBySortKey,
-  summarise,
+  summariseOperational,
   tickKg,
-  type Bucket,
   type Granularity,
-  type TrendPoint,
+  type OperationalBucket,
 } from "../utils/trendSeries";
 
 interface OperationalTrendsChartProps {
-  data: TrendPoint[];
-  /** Bucket chosen on mount; the page keys the chart by range width. */
-  initialGranularity?: Granularity;
+  trends: OperationalTrends | null;
+  /** Bucket implied by the global calendar; the chart resets to it when it moves. */
+  defaultGranularity: Granularity;
+  loading?: boolean;
+  error?: string | null;
+  onRetry?: () => void;
 }
 
-type SeriesKey = "trips" | "weight" | "mortality";
+type Mode = "weight" | "share";
 
-interface SeriesMeta {
-  key: SeriesKey;
-  labelKey: string;
-  color: string;
-  /** Legend/tooltip wording for what the series means. */
-  hintKey: string;
-}
+const COLOR = {
+  trips: "#6366f1",
+  farmWeight: "#0ea5e9",
+  delivered: "#10b981",
+  mortality: "#f43f5e",
+  weightLoss: "#f59e0b",
+} as const;
 
-const SERIES: SeriesMeta[] = [
-  { key: "trips", labelKey: "ops.dashboard.trips", color: "#6366f1", hintKey: "ops.dashboard.trend.hint_trips" },
-  { key: "weight", labelKey: "ops.dashboard.sales_kg", color: "#10b981", hintKey: "ops.dashboard.trend.hint_weight" },
-  {
-    key: "mortality",
-    labelKey: "ops.dashboard.trend.mortality_per_trip",
-    color: "#f43f5e",
-    hintKey: "ops.dashboard.trend.hint_mortality",
-  },
-];
+const GRANULARITIES: Granularity[] = ["daily", "weekly", "monthly"];
+const SHARE_TICKS = [0, 25, 50, 75, 100];
+
+const signed = (current: number, earlier: number | undefined): string | null => {
+  if (earlier == null || earlier === 0) return null;
+  const change = ((current - earlier) / earlier) * 100;
+  return `${change > 0 ? "+" : ""}${change.toFixed(1)}%`;
+};
 
 /* ------------------------------------------------------------------ */
 /*  Tooltip                                                            */
 /* ------------------------------------------------------------------ */
-
-const pctOf = (current: number, earlier: number | undefined): string | null => {
-  if (earlier == null || earlier === 0) return null;
-  return `${((current - earlier) / earlier) * 100 > 0 ? "+" : ""}${(((current - earlier) / earlier) * 100).toFixed(1)}%`;
-};
 
 function ChartTooltip({
   point,
@@ -86,35 +85,54 @@ function ChartTooltip({
   previous,
   t,
 }: {
-  point: Bucket;
+  point: OperationalBucket;
   label: string;
-  previous: Bucket | null;
+  previous: OperationalBucket | null;
   t: (key: string, vars?: Record<string, string | number>) => string;
 }) {
-  const tripsDelta = pctOf(point.trips, previous?.trips);
-  const weightDelta = pctOf(point.weight, previous?.weight);
+  const tripsDelta = signed(point.trips, previous?.trips);
+  const farmDelta = signed(point.farmWeight, previous?.farmWeight);
 
   return (
-    <div className="min-w-[218px] rounded-xl border border-slate-200 bg-white/95 px-3 py-2.5 shadow-xl shadow-slate-900/10 backdrop-blur-sm">
+    <div className="min-w-[236px] rounded-xl border border-slate-200 bg-white/95 px-3 py-2.5 shadow-xl shadow-slate-900/10 backdrop-blur-sm">
       <p className="mb-2 border-b border-slate-100 pb-1.5 text-[11px] font-black uppercase tracking-wider text-slate-500">
         {formatBucketLong(label)}
       </p>
 
       <div className="space-y-1.5">
-        <Row color="#6366f1" label={t("ops.dashboard.trips")} value={plain(point.trips)} delta={tripsDelta} />
+        <Row color={COLOR.trips} label={t("ops.dashboard.trips")} value={plain(point.trips)} delta={tripsDelta} />
         <Row
-          color="#10b981"
-          label={t("ops.dashboard.sales_kg")}
-          value={`${plain(point.weight, 2)} kg`}
-          delta={weightDelta}
+          color={COLOR.farmWeight}
+          label={t("ops.dashboard.trend.farm_weight")}
+          value={`${plain(point.farmWeight, 2)} kg`}
+          delta={farmDelta}
         />
-        <Row color="#f43f5e" label={t("ops.dashboard.mortality_birds")} value={plain(point.mortality)} />
+        <Row
+          color={COLOR.delivered}
+          label={t("ops.dashboard.trend.delivered_weight")}
+          value={`${plain(point.deliveredWeight, 2)} kg`}
+          delta={`${point.deliveredPct.toFixed(2)}%`}
+        />
+        <Row
+          color={COLOR.mortality}
+          label={t("ops.dashboard.trend.mortality_weight")}
+          value={`${plain(point.mortalityWeight, 2)} kg`}
+          delta={`${point.mortalityPct.toFixed(2)}%`}
+        />
+        <Row
+          color={COLOR.weightLoss}
+          label={t("ops.dashboard.trend.weight_loss")}
+          value={`${plain(point.weightLoss, 2)} kg`}
+          delta={`${point.weightLossPct.toFixed(2)}%`}
+        />
 
-        <div className="mt-1.5 space-y-1 border-t border-slate-100 pt-1.5">
+        <div className="mt-1.5 space-y-1 border-t border-slate-100 pt-1.5 text-slate-400">
           <Row
-            label={t("ops.dashboard.trend.per_trip")}
-            value={`${point.birdsPerTrip.toFixed(1)} ${t("ops.dashboard.trend.birds").toLowerCase()}`}
+            label={t("ops.dashboard.mortality_birds")}
+            value={plain(point.mortalityCount)}
+            delta={`${point.mortalityBirdPct.toFixed(2)}%`}
           />
+          <Row label={t("ops.dashboard.trend.per_trip")} value={`${point.birdsPerTrip.toFixed(1)} ${t("ops.dashboard.trend.birds").toLowerCase()}`} />
           <Row label={t("ops.dashboard.trend.kg_per_trip")} value={`${plain(point.kgPerTrip, 1)} kg`} />
         </div>
       </div>
@@ -127,24 +145,31 @@ function Row({
   label,
   value,
   delta,
+  muted,
 }: {
   color?: string;
   label: string;
   value: string;
   delta?: string | null;
+  muted?: boolean;
 }) {
-  const up = delta ? delta.startsWith("+") : false;
+  const arrow = delta && /^[+-]/.test(delta);
+  const up = delta?.startsWith("+");
   return (
     <div className="flex items-baseline justify-between gap-4 text-[12px]">
-      <span className="flex items-center gap-1.5 text-slate-500">
+      <span className={`flex items-center gap-1.5 ${muted ? "text-slate-400" : "text-slate-500"}`}>
         {color ? <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} /> : null}
         {label}
       </span>
       <span className="flex items-baseline gap-1.5">
-        <span className="font-bold tabular-nums text-slate-800">{value}</span>
+        <span className={`font-bold tabular-nums ${muted ? "text-slate-500" : "text-slate-800"}`}>{value}</span>
         {delta ? (
-          <span className={`text-[10.5px] font-bold tabular-nums ${up ? "text-emerald-600" : "text-rose-500"}`}>
-            {up ? "▲" : "▼"} {delta.replace(/^[+-]/, "")}
+          <span
+            className={`text-[10.5px] font-bold tabular-nums ${
+              arrow ? (up ? "text-emerald-600" : "text-rose-500") : "text-slate-400"
+            }`}
+          >
+            {arrow ? `${up ? "▲" : "▼"} ${delta.replace(/^[+-]/, "")}` : delta}
           </span>
         ) : null}
       </span>
@@ -157,44 +182,95 @@ function Row({
 /* ------------------------------------------------------------------ */
 
 export default function OperationalTrendsChart({
-  data,
-  initialGranularity = "daily",
+  trends,
+  defaultGranularity,
+  loading = false,
+  error = null,
+  onRetry,
 }: OperationalTrendsChartProps) {
   const { t } = useI18n();
-  const [granularity, setGranularity] = useState<Granularity>(initialGranularity);
-  const [hiddenSeries, setHiddenSeries] = useState<SeriesKey[]>([]);
+  const [granularity, setGranularity] = useState<Granularity>(defaultGranularity);
+  const [mode, setMode] = useState<Mode>("weight");
 
-  const buckets = useMemo(() => aggregate(data ?? [], granularity), [data, granularity]);
+  // The calendar is the source of truth: when its range changes, fall back to
+  // the bucket that range implies (so a reload always opens on the calendar's
+  // own view instead of a remembered toggle). Adjusting state during render —
+  // rather than in an effect — keeps it in the same pass as the new prop.
+  const [lastDefault, setLastDefault] = useState<Granularity>(defaultGranularity);
+  if (defaultGranularity !== lastDefault) {
+    setLastDefault(defaultGranularity);
+    setGranularity(defaultGranularity);
+  }
+
+  const rows = trends?.rows;
+
+  const buckets = useMemo(
+    () => aggregateOperational(rows ?? [], granularity),
+    [rows, granularity]
+  );
   const previous = useMemo(() => previousBySortKey(buckets), [buckets]);
-  const totals = useMemo(() => summarise(buckets), [buckets]);
+  const totals = useMemo(() => summariseOperational(buckets), [buckets]);
 
-  const isHidden = (key: SeriesKey) => hiddenSeries.includes(key);
-  const toggleSeries = (key: SeriesKey) =>
-    setHiddenSeries((current) =>
-      current.includes(key) ? current.filter((item) => item !== key) : [...current, key]
+  // Share mode must not clip: a bucket that gained weight pushes delivered +
+  // mortality above 100%, and a shrinking bucket puts the loss below zero.
+  const shareDomain = useMemo<[number, number] | [number, "auto"]>(() => {
+    if (mode !== "share") return [0, "auto"];
+    const tops = buckets.map((b) => b.deliveredPct + b.mortalityPct + Math.max(b.weightLossPct, 0));
+    const lows = buckets.map((b) => Math.min(0, b.weightLossPct));
+    return [Math.min(...lows, 0) * 1.4, Math.max(...tops, 100) * 1.005];
+  }, [mode, buckets]);
+
+  // Weight mode: a bucket that gained weight clamps to a zero-height segment so
+  // the stack still equals the farm weight (the true value stays in the tooltip).
+  const data = useMemo(() => {
+    if (mode !== "weight") return buckets;
+    return buckets.map((bucket) => ({ ...bucket, lossBar: Math.max(bucket.weightLoss, 0) }));
+  }, [mode, buckets]);
+
+  if (loading && !trends) {
+    return (
+      <div className="flex h-[330px] w-full items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-slate-200 border-t-emerald-500" />
+      </div>
     );
+  }
+
+  if (error && !trends) {
+    return (
+      <div className="flex h-[330px] w-full flex-col items-center justify-center gap-3 text-center">
+        <p className="text-[13px] font-semibold text-slate-600">{error}</p>
+        {onRetry ? (
+          <button
+            type="button"
+            onClick={onRetry}
+            className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-bold text-slate-600 shadow-sm transition-colors hover:border-emerald-300 hover:text-emerald-600"
+          >
+            {t("common.retry")}
+          </button>
+        ) : null}
+      </div>
+    );
+  }
 
   if (buckets.length === 0) {
     return (
-      <div className="flex h-[290px] w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 text-center">
+      <div className="flex h-[330px] w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 text-center">
         <p className="text-sm font-semibold text-slate-500">{t("ops.dashboard.trend.empty")}</p>
         <p className="text-[11.5px] text-slate-400">{t("ops.dashboard.trend.empty_hint")}</p>
       </div>
     );
   }
 
-  const showMovingAverage = buckets.length >= 5 && !isHidden("weight");
-
   return (
     <div className="w-full">
-      {/* ── Controls: bucketing on the left, series toggles on the right ── */}
+      {/* ── Controls: bucketing on the left, reading mode on the right ── */}
       <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
         <div
           role="tablist"
           aria-label={t("ops.dashboard.trend.bucket_by")}
           className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5"
         >
-          {(["daily", "weekly", "monthly"] as Granularity[]).map((value) => {
+          {GRANULARITIES.map((value) => {
             const active = granularity === value;
             return (
               <button
@@ -219,48 +295,40 @@ export default function OperationalTrendsChart({
           })}
         </div>
 
-        <div className="flex flex-wrap items-center gap-1">
-          {SERIES.map((series) => {
-            const off = isHidden(series.key);
-            return (
-              <button
-                key={series.key}
-                type="button"
-                onClick={() => toggleSeries(series.key)}
-                aria-pressed={!off}
-                title={t(series.hintKey)}
-                className={`flex items-center gap-1.5 rounded-full border px-2 py-1 text-[11px] font-bold transition-colors ${
-                  off
-                    ? "border-slate-200 bg-white text-slate-300"
-                    : "border-slate-200 bg-slate-50 text-slate-600 hover:border-slate-300"
-                }`}
-              >
-                <span
-                  className="h-2 w-2 rounded-full transition-opacity"
-                  style={{ backgroundColor: series.color, opacity: off ? 0.25 : 1 }}
-                />
-                {t(series.labelKey)}
-              </button>
-            );
-          })}
+        <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+          {(["weight", "share"] as Mode[]).map((value) => (
+            <button
+              key={value}
+              type="button"
+              onClick={() => setMode(value)}
+              aria-pressed={mode === value}
+              className={`rounded-[6px] px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide transition-colors ${
+                mode === value ? "bg-white text-slate-800 shadow-sm" : "text-slate-400 hover:text-slate-600"
+              }`}
+            >
+              {t(value === "weight" ? "ops.dashboard.trend.mode_weight" : "ops.dashboard.trend.mode_share")}
+            </button>
+          ))}
         </div>
       </div>
 
-      {/* ── Plot ─────────────────────────────────────────────────────── */}
-      <div className="h-[268px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={buckets} margin={{ top: 8, right: 4, bottom: 0, left: -12 }}>
-            <defs>
-              <linearGradient id="trendWeightFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#10b981" stopOpacity={0.35} />
-                <stop offset="100%" stopColor="#10b981" stopOpacity={0.02} />
-              </linearGradient>
-              <linearGradient id="trendTripsFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#6366f1" stopOpacity={0.95} />
-                <stop offset="100%" stopColor="#6366f1" stopOpacity={0.45} />
-              </linearGradient>
-            </defs>
+      {/* ── Legend ──────────────────────────────────────────────────── */}
+      <div className="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-slate-500">
+        <LegendDot color={COLOR.trips} label={t("ops.dashboard.trips")} shape="line" />
+        <LegendDot color={COLOR.delivered} label={t("ops.dashboard.trend.delivered_weight")} />
+        <LegendDot color={COLOR.mortality} label={t("ops.dashboard.trend.mortality_weight")} />
+        <LegendDot color={COLOR.weightLoss} label={t("ops.dashboard.trend.weight_loss")} />
+        <span className="text-slate-400">
+          {mode === "weight"
+            ? t("ops.dashboard.trend.mode_weight_hint")
+            : t("ops.dashboard.trend.mode_share_hint")}
+        </span>
+      </div>
 
+      {/* ── Plot ─────────────────────────────────────────────────────── */}
+      <div className="h-[250px] w-full">
+        <ResponsiveContainer width="100%" height="100%">
+          <ComposedChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: -8 }}>
             <CartesianGrid stroke="#f1f5f9" vertical={false} />
             <XAxis
               dataKey="date"
@@ -272,25 +340,27 @@ export default function OperationalTrendsChart({
               minTickGap={12}
             />
             <YAxis
-              yAxisId="counts"
+              yAxisId="weight"
+              tickFormatter={(value: number) => (mode === "share" ? `${Math.round(value)}%` : tickKg(value))}
+              domain={shareDomain}
+              ticks={mode === "share" ? SHARE_TICKS : undefined}
               tick={{ fontSize: 10, fill: "#94a3b8" }}
               tickLine={false}
               axisLine={false}
-              width={34}
-              allowDecimals={false}
+              width={48}
             />
             <YAxis
-              yAxisId="kg"
+              yAxisId="trips"
               orientation="right"
-              tickFormatter={tickKg}
-              tick={{ fontSize: 10, fill: "#10b981" }}
+              allowDecimals={false}
+              tick={{ fontSize: 10, fill: "#6366f1" }}
               tickLine={false}
               axisLine={false}
-              width={46}
+              width={34}
             />
             <Tooltip
               content={({ active, payload, label }) => {
-                const point = (payload?.[0]?.payload ?? null) as Bucket | null;
+                const point = (payload?.[0]?.payload ?? null) as OperationalBucket | null;
                 if (!active || !point) return null;
                 return (
                   <ChartTooltip
@@ -304,109 +374,160 @@ export default function OperationalTrendsChart({
               cursor={{ fill: "rgba(148,163,184,0.08)" }}
             />
 
-            {!isHidden("weight") && (
-              <ReferenceLine
-                yAxisId="kg"
-                y={totals.avgWeight}
-                stroke="#94a3b8"
-                strokeDasharray="4 4"
-                strokeWidth={1}
-                label={{
-                  value: `${t("ops.dashboard.trend.average")} ${tickKg(totals.avgWeight)}`,
-                  position: "insideTopRight",
-                  style: { fontSize: 9.5, fill: "#94a3b8", fontWeight: 700 },
-                }}
-              />
+            {mode === "weight" ? (
+              <>
+                {/* Segments sum to the farm weight — the bar's height IS it. */}
+                <Bar
+                  yAxisId="weight"
+                  dataKey="deliveredWeight"
+                  stackId="wt"
+                  name={t("ops.dashboard.trend.delivered_weight")}
+                  fill={COLOR.delivered}
+                  maxBarSize={30}
+                  isAnimationActive={false}
+                />
+                <Bar
+                  yAxisId="weight"
+                  dataKey="mortalityWeight"
+                  stackId="wt"
+                  name={t("ops.dashboard.trend.mortality_weight")}
+                  fill={COLOR.mortality}
+                  maxBarSize={30}
+                  isAnimationActive={false}
+                />
+                <Bar
+                  yAxisId="weight"
+                  dataKey="lossBar"
+                  stackId="wt"
+                  name={t("ops.dashboard.trend.weight_loss")}
+                  fill={COLOR.weightLoss}
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={30}
+                  isAnimationActive={false}
+                />
+                <ReferenceLine
+                  yAxisId="weight"
+                  y={totals.avgFarmWeight}
+                  stroke={COLOR.farmWeight}
+                  strokeDasharray="4 4"
+                  strokeOpacity={0.7}
+                  strokeWidth={1}
+                  label={{
+                    value: `${t("ops.dashboard.trend.average")} ${tickKg(totals.avgFarmWeight)}`,
+                    position: "insideTopRight",
+                    style: { fontSize: 9.5, fill: "#0ea5e9", fontWeight: 700 },
+                  }}
+                />
+              </>
+            ) : (
+              <>
+                <Bar
+                  yAxisId="weight"
+                  dataKey="deliveredPct"
+                  stackId="share"
+                  name={t("ops.dashboard.trend.delivered_weight")}
+                  fill={COLOR.delivered}
+                  maxBarSize={34}
+                  isAnimationActive={false}
+                />
+                <Bar
+                  yAxisId="weight"
+                  dataKey="mortalityPct"
+                  stackId="share"
+                  name={t("ops.dashboard.trend.mortality_weight")}
+                  fill={COLOR.mortality}
+                  maxBarSize={34}
+                  isAnimationActive={false}
+                />
+                <Bar
+                  yAxisId="weight"
+                  dataKey="weightLossPct"
+                  stackId="share"
+                  name={t("ops.dashboard.trend.weight_loss")}
+                  fill={COLOR.weightLoss}
+                  radius={[4, 4, 0, 0]}
+                  maxBarSize={34}
+                  isAnimationActive={false}
+                />
+              </>
             )}
 
-            {!isHidden("weight") && (
-              <Area
-                yAxisId="kg"
-                type="monotone"
-                dataKey="weight"
-                name={t("ops.dashboard.sales_kg")}
-                stroke="#10b981"
-                strokeWidth={2.4}
-                fill="url(#trendWeightFill)"
-                dot={false}
-                activeDot={{ r: 4, strokeWidth: 0 }}
-                isAnimationActive={false}
-              />
-            )}
-
-            {!isHidden("trips") && (
-              <Bar
-                yAxisId="counts"
-                dataKey="trips"
-                name={t("ops.dashboard.trips")}
-                fill="url(#trendTripsFill)"
-                radius={[4, 4, 0, 0]}
-                maxBarSize={26}
-                isAnimationActive={false}
-              />
-            )}
-
-            {showMovingAverage && (
-              <Line
-                yAxisId="kg"
-                type="monotone"
-                dataKey="movingAvg"
-                name={t("ops.dashboard.trend.moving_average")}
-                stroke="#059669"
-                strokeWidth={1.6}
-                strokeDasharray="5 4"
-                dot={false}
-                activeDot={false}
-                isAnimationActive={false}
-              />
-            )}
-
-            {!isHidden("mortality") && (
-              <Line
-                yAxisId="counts"
-                type="monotone"
-                dataKey="birdsPerTrip"
-                name={t("ops.dashboard.trend.mortality_per_trip")}
-                stroke="#f43f5e"
-                strokeWidth={2}
-                strokeDasharray="3 3"
-                dot={{ r: 2.4, fill: "#f43f5e", strokeWidth: 0 }}
-                activeDot={{ r: 4 }}
-                isAnimationActive={false}
-              />
-            )}
+            <Line
+              yAxisId="trips"
+              type="monotone"
+              dataKey="trips"
+              name={t("ops.dashboard.trips")}
+              stroke={COLOR.trips}
+              strokeWidth={2}
+              dot={{ r: 2.6, fill: COLOR.trips, strokeWidth: 0 }}
+              activeDot={{ r: 4.5 }}
+              isAnimationActive={false}
+            />
           </ComposedChart>
         </ResponsiveContainer>
       </div>
 
-      {/* ── Footer: the period in numbers ─────────────────────────────── */}
-      <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 sm:grid-cols-4">
+      {/* ── Footer: the whole period, in numbers ──────────────────────── */}
+      <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 sm:grid-cols-3 xl:grid-cols-5">
         <Stat
           label={t("ops.dashboard.trips")}
           value={plain(totals.trips)}
           hint={`${plain(totals.avgTrips, 1)} / ${t("ops.dashboard.trend.per_bucket").toLowerCase()}`}
-          color="#6366f1"
+          color={COLOR.trips}
         />
         <Stat
-          label={t("ops.dashboard.sales_kg")}
-          value={compactKg(totals.weight)}
-          hint={`${compactKg(totals.avgWeight)} / ${t("ops.dashboard.trend.per_bucket").toLowerCase()}`}
-          color="#10b981"
+          label={t("ops.dashboard.trend.farm_weight")}
+          value={compactKg(totals.farmWeight)}
+          hint={`${compactKg(totals.avgFarmWeight)} / ${t("ops.dashboard.trend.per_bucket").toLowerCase()}`}
+          color={COLOR.farmWeight}
         />
         <Stat
-          label={t("ops.dashboard.mortality_birds")}
-          value={plain(totals.mortality)}
-          hint={`${totals.birdsPerTrip.toFixed(1)} ${t("ops.dashboard.trend.per_trip_unit")}`}
-          color="#f43f5e"
+          label={t("ops.dashboard.trend.delivered_weight")}
+          value={compactKg(totals.deliveredWeight)}
+          hint={`${totals.deliveredPct.toFixed(2)}% ${t("ops.dashboard.trend.of_farm")}`}
+          color={COLOR.delivered}
         />
         <Stat
-          label={t("ops.dashboard.trend.busiest_bucket")}
-          value={totals.busiest ? plain(totals.busiest.trips) : "—"}
-          hint={totals.busiest ? formatBucket(totals.busiest.date) : ""}
-          color="#0ea5e9"
+          label={t("ops.dashboard.trend.mortality_weight")}
+          value={compactKg(totals.mortalityWeight)}
+          hint={`${totals.mortalityPct.toFixed(2)}% · ${plain(totals.mortalityCount)} ${t("ops.dashboard.trend.birds").toLowerCase()}`}
+          color={COLOR.mortality}
+        />
+        <Stat
+          label={t("ops.dashboard.trend.weight_loss")}
+          value={compactKg(totals.weightLoss)}
+          hint={`${totals.weightLossPct.toFixed(2)}% ${t("ops.dashboard.trend.of_farm")}`}
+          color={COLOR.weightLoss}
         />
       </div>
+
+      {trends?.truncated ? (
+        <p className="mt-2 text-[10.5px] font-medium text-slate-400">
+          {t("ops.dashboard.trend.truncated", { count: trends.countedTrips })}
+        </p>
+      ) : null}
     </div>
+  );
+}
+
+function LegendDot({
+  color,
+  label,
+  shape = "square",
+}: {
+  color: string;
+  label: string;
+  shape?: "square" | "line";
+}) {
+  return (
+    <span className="flex items-center gap-1.5">
+      {shape === "line" ? (
+        <span className="h-[3px] w-4 rounded-full" style={{ backgroundColor: color }} />
+      ) : (
+        <span className="h-2 w-2 rounded-sm" style={{ backgroundColor: color }} />
+      )}
+      {label}
+    </span>
   );
 }
 

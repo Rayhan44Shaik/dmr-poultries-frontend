@@ -4,40 +4,7 @@
 // Pure data, no JSX: the chart component stays fast-refresh friendly and the
 // maths can be exercised without a browser.
 
-export interface TrendPoint {
-  date: string;
-  trips: number;
-  weight: number;
-  mortality?: number;
-}
-
 export type Granularity = "daily" | "weekly" | "monthly";
-
-export interface Bucket {
-  /** Bucket key — also the X-axis category ("2026-08-10", "2026-W33", "2026-8"). */
-  date: string;
-  trips: number;
-  weight: number;
-  mortality: number;
-  /** Derived: birds lost per trip (the line on the counts axis). */
-  birdsPerTrip: number;
-  /** Derived: kilograms delivered per trip. */
-  kgPerTrip: number;
-  /** 3-bucket trailing average of weight; null for the first two buckets. */
-  movingAvg: number | null;
-  /** Ordering key (sorts week/month keys chronologically). */
-  sortKey: string;
-}
-
-export interface TrendSummary {
-  trips: number;
-  weight: number;
-  mortality: number;
-  avgTrips: number;
-  avgWeight: number;
-  birdsPerTrip: number;
-  busiest: Bucket | null;
-}
 
 const num = (value: unknown): number => {
   const parsed = Number(value);
@@ -66,13 +33,10 @@ export const tickKg = (value: number): string => {
   return plain(Math.round(v));
 };
 
-/** +12.5% / -4.0% — used for the tooltip's change arrows. */
-export const pct = (value: number): string => `${value > 0 ? "+" : ""}${value.toFixed(1)}%`;
-
 const monthName = (monthIndex: number): string =>
   new Date(2026, monthIndex, 1).toLocaleDateString("en-IN", { month: "short" });
 
-/** "2026-08-10" → "10 Aug"; "2026-W33" → "W33"; "2026-8" → "Aug 2026". */
+/** "2026-08-10" → "10 Aug"; "2026-W33" → "W33"; "2026-9" → "Sep 2026". */
 export function formatBucket(raw: string): string {
   if (!raw) return "";
   if (raw.includes("W")) return raw.slice(raw.indexOf("W"));
@@ -130,68 +94,176 @@ export function bucketOf(dateStr: string, granularity: Granularity): { key: stri
   return { key, sortKey: key };
 }
 
-/** Sum the daily rows into day / week / month buckets, oldest first. */
-export function aggregate(data: TrendPoint[], granularity: Granularity): Bucket[] {
-  const groups = new Map<string, { trips: number; weight: number; mortality: number; sortKey: string }>();
-
-  for (const point of data) {
-    const { key, sortKey } = bucketOf(point.date, granularity);
-    const current = groups.get(key) ?? { trips: 0, weight: 0, mortality: 0, sortKey };
-    current.trips += num(point.trips);
-    current.weight += num(point.weight);
-    current.mortality += num(point.mortality);
-    groups.set(key, current);
-  }
-
-  const buckets: Bucket[] = [...groups.entries()]
-    .sort((a, b) => a[1].sortKey.localeCompare(b[1].sortKey))
-    .map(([key, value]) => ({
-      date: key,
-      trips: value.trips,
-      weight: value.weight,
-      mortality: value.mortality,
-      birdsPerTrip: value.trips > 0 ? value.mortality / value.trips : 0,
-      kgPerTrip: value.trips > 0 ? value.weight / value.trips : 0,
-      movingAvg: null,
-      sortKey: value.sortKey,
-    }));
-
-  // 3-bucket trailing average of weight — smooths a spiky daily series so the
-  // direction of travel reads without a statistics lesson.
+/** sortKey → the bucket before it; powers the tooltip's change arrows. */
+export function previousBySortKey<T extends { sortKey: string }>(buckets: T[]): Map<string, T> {
+  const map = new Map<string, T>();
   buckets.forEach((bucket, index) => {
-    if (index < 2) return;
-    const window = buckets.slice(index - 2, index + 1);
-    bucket.movingAvg = window.reduce((sum, item) => sum + item.weight, 0) / window.length;
+    if (index > 0) map.set(bucket.sortKey, buckets[index - 1]);
   });
-
-  return buckets;
+  return map;
 }
 
-/** Footer numbers for the whole (bucketed) period. */
-export function summarise(buckets: Bucket[]): TrendSummary {
-  const trips = buckets.reduce((sum, b) => sum + b.trips, 0);
-  const weight = buckets.reduce((sum, b) => sum + b.weight, 0);
-  const mortality = buckets.reduce((sum, b) => sum + b.mortality, 0);
+/* ------------------------------------------------------------------ */
+/*  Operational buckets — farm / delivered / mortality / loss          */
+/* ------------------------------------------------------------------ */
+
+/** The fields the Operational Trends chart needs from one completed trip. */
+export interface OperationalRow {
+  tripDate: string;
+  farmBirds: number;
+  farmWeight: number;
+  deliveredBirds: number;
+  deliveredWeight: number;
+  mortalityCount: number;
+  mortalityWeight: number;
+  weightLoss: number;
+}
+
+export interface OperationalBucket {
+  /** Bucket key — "2026-09-12", "2026-W37" or "2026-9". */
+  date: string;
+  sortKey: string;
+  trips: number;
+  farmBirds: number;
+  farmWeight: number;
+  deliveredBirds: number;
+  deliveredWeight: number;
+  mortalityCount: number;
+  mortalityWeight: number;
+  weightLoss: number;
+  /** Shares of the farm weight, in percent. */
+  deliveredPct: number;
+  mortalityPct: number;
+  weightLossPct: number;
+  /** Mortality as a share of the birds loaded, in percent. */
+  mortalityBirdPct: number;
+  kgPerTrip: number;
+  birdsPerTrip: number;
+}
+
+export interface OperationalSummary {
+  trips: number;
+  farmWeight: number;
+  deliveredWeight: number;
+  mortalityWeight: number;
+  mortalityCount: number;
+  weightLoss: number;
+  avgTrips: number;
+  avgFarmWeight: number;
+  /** Percentages over the whole period. */
+  deliveredPct: number;
+  mortalityPct: number;
+  weightLossPct: number;
+  busiest: OperationalBucket | null;
+}
+
+const share = (part: number, whole: number): number => (whole > 0 ? (part / whole) * 100 : 0);
+
+/** Bucket completed trips into day / week / month rows, oldest first. */
+export function aggregateOperational(rows: OperationalRow[], granularity: Granularity): OperationalBucket[] {
+  type Acc = {
+    trips: number;
+    farmBirds: number;
+    farmWeight: number;
+    deliveredBirds: number;
+    deliveredWeight: number;
+    mortalityCount: number;
+    mortalityWeight: number;
+    weightLoss: number;
+    sortKey: string;
+  };
+  const groups = new Map<string, Acc>();
+
+  for (const row of rows) {
+    const { key, sortKey } = bucketOf(String(row.tripDate).slice(0, 10), granularity);
+    const acc =
+      groups.get(key) ??
+      {
+        trips: 0,
+        farmBirds: 0,
+        farmWeight: 0,
+        deliveredBirds: 0,
+        deliveredWeight: 0,
+        mortalityCount: 0,
+        mortalityWeight: 0,
+        weightLoss: 0,
+        sortKey,
+      };
+    acc.trips += 1;
+    acc.farmBirds += num(row.farmBirds);
+    acc.farmWeight += num(row.farmWeight);
+    acc.deliveredBirds += num(row.deliveredBirds);
+    acc.deliveredWeight += num(row.deliveredWeight);
+    acc.mortalityCount += num(row.mortalityCount);
+    acc.mortalityWeight += num(row.mortalityWeight);
+    acc.weightLoss += num(row.weightLoss);
+    groups.set(key, acc);
+  }
+
+  return [...groups.entries()]
+    .sort((a, b) => a[1].sortKey.localeCompare(b[1].sortKey))
+    .map(([key, acc]) => ({
+      date: key,
+      sortKey: acc.sortKey,
+      trips: acc.trips,
+      farmBirds: acc.farmBirds,
+      farmWeight: acc.farmWeight,
+      deliveredBirds: acc.deliveredBirds,
+      deliveredWeight: acc.deliveredWeight,
+      mortalityCount: acc.mortalityCount,
+      mortalityWeight: acc.mortalityWeight,
+      weightLoss: acc.weightLoss,
+      deliveredPct: share(acc.deliveredWeight, acc.farmWeight),
+      mortalityPct: share(acc.mortalityWeight, acc.farmWeight),
+      weightLossPct: share(acc.weightLoss, acc.farmWeight),
+      mortalityBirdPct: share(acc.mortalityCount, acc.farmBirds),
+      kgPerTrip: acc.trips > 0 ? acc.farmWeight / acc.trips : 0,
+      birdsPerTrip: acc.trips > 0 ? acc.mortalityCount / acc.trips : 0,
+    }));
+}
+
+/** Period totals for the footer. */
+export function summariseOperational(buckets: OperationalBucket[]): OperationalSummary {
+  const totals = buckets.reduce(
+    (acc, b) => ({
+      trips: acc.trips + b.trips,
+      farmBirds: acc.farmBirds + b.farmBirds,
+      farmWeight: acc.farmWeight + b.farmWeight,
+      deliveredWeight: acc.deliveredWeight + b.deliveredWeight,
+      mortalityCount: acc.mortalityCount + b.mortalityCount,
+      mortalityWeight: acc.mortalityWeight + b.mortalityWeight,
+      weightLoss: acc.weightLoss + b.weightLoss,
+    }),
+    { trips: 0, farmBirds: 0, farmWeight: 0, deliveredWeight: 0, mortalityCount: 0, mortalityWeight: 0, weightLoss: 0 }
+  );
   const days = buckets.length || 1;
   return {
-    trips,
-    weight,
-    mortality,
-    avgTrips: trips / days,
-    avgWeight: weight / days,
-    birdsPerTrip: trips > 0 ? mortality / trips : 0,
-    busiest: buckets.reduce<Bucket | null>(
+    trips: totals.trips,
+    farmWeight: totals.farmWeight,
+    deliveredWeight: totals.deliveredWeight,
+    mortalityWeight: totals.mortalityWeight,
+    mortalityCount: totals.mortalityCount,
+    weightLoss: totals.weightLoss,
+    avgTrips: totals.trips / days,
+    avgFarmWeight: totals.farmWeight / days,
+    deliveredPct: share(totals.deliveredWeight, totals.farmWeight),
+    mortalityPct: share(totals.mortalityWeight, totals.farmWeight),
+    weightLossPct: share(totals.weightLoss, totals.farmWeight),
+    busiest: buckets.reduce<OperationalBucket | null>(
       (best, bucket) => (best === null || bucket.trips > best.trips ? bucket : best),
       null
     ),
   };
 }
 
-/** sortKey → the bucket before it; powers the tooltip's change arrows. */
-export function previousBySortKey(buckets: Bucket[]): Map<string, Bucket> {
-  const map = new Map<string, Bucket>();
-  buckets.forEach((bucket, index) => {
-    if (index > 0) map.set(bucket.sortKey, buckets[index - 1]);
-  });
-  return map;
+/**
+ * Granularity that matches the global calendar: a week-long range reads best
+ * day by day, a month week by week and a quarter month by month. This is the
+ * DEFAULT only — the chip row lets the reader override it.
+ */
+export function granularityForRange(days: number | undefined): Granularity {
+  if (!days || !Number.isFinite(days) || days <= 0) return "weekly";
+  if (days <= 21) return "daily";
+  if (days <= 70) return "weekly";
+  return "monthly";
 }

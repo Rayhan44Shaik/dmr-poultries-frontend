@@ -6,6 +6,8 @@ import { addDays, subMonths } from "date-fns";
 import { useDashboardData } from "../hooks/useDashboardData";
 import KPICards from "../components/KPICards";
 import OperationalTrendsChart from "../components/OperationalTrendsChart";
+import { useOperationalTrends } from "../hooks/useOperationalTrends";
+import { granularityForRange } from "../utils/trendSeries";
 import CollectionsPie from "../components/CollectionsPie";
 import RecentTripsTable from "../components/RecentTripsTable";
 import ActiveCounts from "../components/ActiveCounts";
@@ -386,6 +388,16 @@ function RangeDatePicker({
   );
 }
 
+/** Small "Today 9" chip — the trip counts under the chart heading. */
+function TripCountPill({ label, value }: { label: string; value: number }) {
+  return (
+    <span className="inline-flex items-baseline gap-1 rounded-full border border-slate-100 bg-slate-50 px-2 py-0.5 text-[10.5px] font-bold text-slate-500">
+      {label}
+      <span className="text-[11.5px] font-black tabular-nums text-slate-800">{value}</span>
+    </span>
+  );
+}
+
 // -------- Main Dashboard View Page --------
 function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   const { t } = useI18n();
@@ -405,6 +417,15 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   const rangeDays = isRangeSelected
     ? Math.ceil((endDate!.getTime() - startDate!.getTime()) / (1000 * 60 * 60 * 24)) + 1
     : undefined;
+
+  // The chart reads the SAME calendar window as the KPI cards, and its default
+  // bucket follows that window's length — so a reload always opens on the
+  // calendar's own view rather than a remembered toggle.
+  const trendsQuery = useOperationalTrends(
+    toInputDateString(startDate) || undefined,
+    toInputDateString(endDate) || undefined
+  );
+  const defaultGranularity = granularityForRange(rangeDays);
 
   const handleRangeChange = (s: Date | undefined, e: Date | undefined) => {
     setStartDate(s);
@@ -542,17 +563,30 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0">
           <div className="flex items-start justify-between gap-3">
-            <div>
+            <div className="min-w-0">
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.time_series")}</span>
               <h3 className="text-sm font-black text-slate-800 mt-0.5">{t("ops.dashboard.operational_trends")}</h3>
+              {/* Trip counts for the three windows people ask about first. */}
+              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                <TripCountPill label={t("ops.dashboard.trend.today")} value={data?.todaysTrips ?? 0} />
+                <TripCountPill label={t("ops.dashboard.trend.week")} value={data?.weeklyTrips ?? 0} />
+                <TripCountPill label={t("ops.dashboard.trend.month")} value={data?.monthlyTrips ?? 0} />
+              </div>
             </div>
-            <Link to="/operations?tab=vehicle-trips" className="shrink-0 text-[11px] font-bold text-blue-600 hover:underline">View details →</Link>
+            <Link
+              to="/operations?tab=mortality"
+              className="shrink-0 text-[11px] font-bold text-blue-600 hover:underline"
+            >
+              {t("ops.dashboard.trend.view_mortality")} →
+            </Link>
           </div>
           <div className="w-full overflow-hidden">
             <OperationalTrendsChart
-              data={data?.trendData || []}
-              initialGranularity={(data?.trendData.length ?? 0) > 31 ? "weekly" : "daily"}
-              key={(data?.trendData.length ?? 0) > 31 ? "trend-weekly" : "trend-daily"}
+              trends={trendsQuery.trends}
+              defaultGranularity={defaultGranularity}
+              loading={trendsQuery.loading}
+              error={trendsQuery.error}
+              onRetry={trendsQuery.refetch}
             />
           </div>
         </div>

@@ -85,29 +85,42 @@ only run on hover / keyboard focus, never on the active row, and the global
 ### Operational Trends (dashboard)
 
 Operations → **Overview** leads with the Operational Trends chart (the first
-card). It answers three questions in one plot:
+card). It is the weight story of the completed trips in the range the global
+calendar is showing:
 
 | Series | Encoding |
 |---|---|
-| Trips | Indigo bars, left axis |
-| Sales weight (kg) | Emerald gradient area, right axis, with a dashed 3-bucket moving average and an average reference line |
-| Mortality per trip | Rose dashed line, left axis (both left-axis series are counts per bucket, so they share a scale honestly) |
+| Trips | Indigo line, right axis |
+| Farm weight | The height of the stacked bar (kg) |
+| Delivered weight | Emerald segment |
+| Mortality weight | Rose segment |
+| Weight loss | Amber segment |
 
-Group by day / week / month, click a legend chip to drop a series, and hover any
-bucket for the full picture: trips, kilograms, birds, birds per trip, kg per
-trip and the change against the previous bucket. The footer keeps the period in
-numbers — totals, per-bucket averages and the busiest bucket. Bucketing,
-formatting and the derived series live in
-`modules/operations/dashboard/utils/trendSeries.ts`, so the maths can be
-exercised without a browser.
+`farm = delivered + mortality + loss` holds for every trip, so the three
+segments stack to exactly the farm weight — one bar carries all four weight
+numbers at once. **Share of farm** re-reads the same data as a 100% stack, so a
+quiet week and a heavy one can be compared by shape.
 
-The pending-approval strip above it gained a **Collections** tile
-(Trips → Rate entries → Collections → Maintenance → Payments → Documents). It
-counts only rows whose status is `Pending Approval`, fetched with a single
-filtered `GET /operations/collection-entry?status=Pending Approval` rather than
-downloading the register — the shell poller runs every 90 seconds, so it has to
-stay cheap. The same count is included in the bell total, the one-time sign-in
-alert and the Collection Entry sidebar badge.
+- **Range:** the chart reads the same window as the KPI cards — moving the
+  calendar refetches it, and the default bucket follows the range (≤21 days →
+  daily, ≤70 → weekly, beyond that → monthly). Because the default is derived
+  and never persisted, a reload or hard refresh always opens on the calendar's
+  own view; the chip row still lets the reader switch daily / weekly / monthly.
+- **Counts:** today's, this week's and this month's trip totals sit under the
+  heading, and the footer keeps the whole period in numbers — trips, farm
+  weight, delivered weight, mortality and weight loss, each with its share or
+  per-bucket average.
+- **Tooltip:** hover any bucket for trips, farm / delivered / mortality / loss
+  weight with each one's share of the farm weight, birds lost and its share of
+  the load, kg and birds per trip, and the ▲▼ change against the previous
+  bucket.
+- **Source of truth:** rows come from the completed-trips analysis endpoint —
+  the same one the Weight Loss / Mortality page reads — so the two can never
+  disagree, and nothing is re-derived beyond summing the server's numbers into
+  buckets (`utils/trendSeries.ts`, exercised without a browser).
+
+"Mortality & weight loss →" in the card header opens that page for the detail
+behind the bars.
 
 ### Masters
 
