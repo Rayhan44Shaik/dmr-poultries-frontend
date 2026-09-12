@@ -1,13 +1,13 @@
 // src/modules/operations/dashboard/pages/OperationsDashboardPage.tsx
 
-import { useState, useRef, useEffect, useMemo, type CSSProperties } from "react";
+import { useState, useRef, useEffect, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { addDays, subMonths } from "date-fns";
 import { useDashboardData } from "../hooks/useDashboardData";
 import KPICards from "../components/KPICards";
 import OperationalTrendsChart from "../components/OperationalTrendsChart";
 import { useOperationalTrends } from "../hooks/useOperationalTrends";
-import { granularityForRange } from "../utils/trendSeries";
+import { granularityForRange, type Granularity } from "../utils/trendSeries";
 import CollectionsPie from "../components/CollectionsPie";
 import RecentTripsTable from "../components/RecentTripsTable";
 import ActiveCounts from "../components/ActiveCounts";
@@ -54,15 +54,6 @@ const toInputDateString = (date: Date | undefined): string => {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
-};
-
-// -------- Helper: inclusive day count between two YYYY-MM-DD strings --------
-const daysBetween = (from: string, to: string): number | undefined => {
-  if (!from || !to) return undefined;
-  const start = new Date(`${from}T00:00:00`).getTime();
-  const end = new Date(`${to}T00:00:00`).getTime();
-  if (!Number.isFinite(start) || !Number.isFinite(end)) return undefined;
-  return Math.round((end - start) / 86_400_000) + 1;
 };
 
 // -------- Helper: Parse YYYY-MM-DD string to Date object safely --------
@@ -397,9 +388,28 @@ function RangeDatePicker({
   );
 }
 
-/** Which window the Operational Trends chart is reading. `range` follows the
- *  global calendar; the others are quick windows of their own. */
-type TrendView = "range" | "today" | "week" | "month";
+/** How the Operational Trends chart buckets the calendar's window. The labels
+ *  are the trip counters people ask for first — the count rides along. */
+type TrendView = "today" | "week" | "month";
+
+const GRANULARITY_BY_VIEW: Record<TrendView, Granularity> = {
+  today: "daily",
+  week: "weekly",
+  month: "monthly",
+};
+
+const VIEW_BY_GRANULARITY: Record<Granularity, TrendView> = {
+  daily: "today",
+  weekly: "week",
+  monthly: "month",
+};
+
+/** One accent per chip — today reads sky, week violet, month teal. */
+const VIEW_ACCENT: Record<TrendView, { active: string; count: string }> = {
+  today: { active: "bg-sky-50 text-sky-700 ring-sky-200", count: "text-sky-700" },
+  week: { active: "bg-violet-50 text-violet-700 ring-violet-200", count: "text-violet-700" },
+  month: { active: "bg-teal-50 text-teal-700 ring-teal-200", count: "text-teal-700" },
+};
 
 interface TrendViewOption {
   key: TrendView;
@@ -410,7 +420,7 @@ interface TrendViewOption {
 /**
  * Segmented switcher sitting in the card header. Each option carries its trip
  * count, so the numbers people ask for first are also the control: pick one and
- * the chart redraws for that window.
+ * the chart re-buckets the calendar's window by day, week or month.
  */
 function TrendViewSwitcher({
   views,
@@ -427,10 +437,11 @@ function TrendViewSwitcher({
     <div
       role="tablist"
       aria-label={label}
-      className="inline-flex shrink-0 rounded-lg border border-slate-200 bg-slate-50 p-0.5"
+      className="inline-flex shrink-0 gap-0.5 rounded-lg border border-slate-200 bg-slate-50/80 p-0.5"
     >
       {views.map((view) => {
         const selected = view.key === active;
+        const accent = VIEW_ACCENT[view.key];
         return (
           <button
             key={view.key}
@@ -438,14 +449,14 @@ function TrendViewSwitcher({
             role="tab"
             aria-selected={selected}
             onClick={() => onChange(view.key)}
-            className={`flex items-baseline gap-1.5 rounded-[6px] px-2.5 py-1 text-[10.5px] font-extrabold uppercase tracking-wide transition-colors ${
-              selected ? "bg-white text-slate-800 shadow-sm" : "text-slate-400 hover:text-slate-600"
+            className={`flex items-baseline gap-1.5 rounded-[6px] px-2.5 py-1 text-[10.5px] font-extrabold uppercase tracking-wide ring-1 ring-inset transition-all duration-150 ${
+              selected ? `${accent.active} shadow-sm` : "text-slate-400 ring-transparent hover:text-slate-600"
             }`}
           >
             {view.label}
             <span
               className={`text-[11.5px] font-black tabular-nums ${
-                selected ? "text-slate-900" : "text-slate-500"
+                selected ? accent.count : "text-slate-500"
               }`}
             >
               {view.count}
@@ -477,28 +488,24 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
     ? Math.ceil((endDate!.getTime() - startDate!.getTime()) / (1000 * 60 * 60 * 24)) + 1
     : undefined;
 
-  // The chart reads the SAME calendar window as the KPI cards by default, and
-  // its bucket follows that window's length — so a reload always opens on the
-  // calendar's own view. The header chips can override the window (today /
-  // last 7 days / last 30 days) without touching the global calendar.
-  const [trendView, setTrendView] = useState<TrendView>("range");
+  // The chart reads the SAME calendar window as the KPI cards, and its bucket
+  // follows that window's length — so a reload or a hard refresh always opens
+  // on the calendar's own view. The header chips override the bucket only, and
+  // hand it back to the calendar as soon as the calendar moves.
+  const [trendView, setTrendView] = useState<TrendView | null>(null);
   const calendarFrom = toInputDateString(startDate);
   const calendarTo = toInputDateString(endDate);
 
-  const trendRange = useMemo(() => {
-    const today = toInputDateString(todayMidnight());
-    if (trendView === "today") return { from: today, to: today };
-    if (trendView === "week") {
-      return { from: toInputDateString(addDays(todayMidnight(), -6)), to: today };
-    }
-    if (trendView === "month") {
-      return { from: toInputDateString(addDays(todayMidnight(), -29)), to: today };
-    }
-    return { from: calendarFrom, to: calendarTo };
-  }, [trendView, calendarFrom, calendarTo]);
+  const calendarKey = `${calendarFrom}:${calendarTo}`;
+  const [lastCalendarKey, setLastCalendarKey] = useState(calendarKey);
+  if (calendarKey !== lastCalendarKey) {
+    setLastCalendarKey(calendarKey);
+    setTrendView(null);
+  }
 
-  const trendsQuery = useOperationalTrends(trendRange.from || undefined, trendRange.to || undefined);
-  const defaultGranularity = granularityForRange(daysBetween(trendRange.from, trendRange.to));
+  const trendsQuery = useOperationalTrends(calendarFrom || undefined, calendarTo || undefined);
+  const defaultGranularity = granularityForRange(rangeDays);
+  const trendGranularity: Granularity = trendView ? GRANULARITY_BY_VIEW[trendView] : defaultGranularity;
 
   const handleRangeChange = (s: Date | undefined, e: Date | undefined) => {
     setStartDate(s);
@@ -524,7 +531,6 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   // Trip counts ride along with the switcher, so the numbers and the control
   // are the same thing.
   const trendViews: TrendViewOption[] = [
-    { key: "range", label: t("ops.dashboard.trend.range"), count: data?.totalTrips ?? 0 },
     { key: "today", label: t("ops.dashboard.trend.today"), count: data?.todaysTrips ?? 0 },
     { key: "week", label: t("ops.dashboard.trend.week"), count: data?.weeklyTrips ?? 0 },
     { key: "month", label: t("ops.dashboard.trend.month"), count: data?.monthlyTrips ?? 0 },
@@ -646,9 +652,6 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
         <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0">
           <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
             <div className="min-w-0">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
-                {t("ops.dashboard.trend.eyebrow")}
-              </span>
               {/* The title is the way through to the detail page — no second link. */}
               <Link
                 to="/operations?tab=mortality"
@@ -667,19 +670,15 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
             </div>
             <TrendViewSwitcher
               views={trendViews}
-              active={trendView}
+              active={VIEW_BY_GRANULARITY[trendGranularity]}
               onChange={setTrendView}
               label={t("ops.dashboard.trend.bucket_by")}
             />
           </div>
           <div className="w-full overflow-hidden">
             <OperationalTrendsChart
-              /* Remount when the window changes so the bucket resets to the
-                 default the new window implies (daily for a week, weekly for a
-                 month), while a plain reload still lands on the calendar. */
-              key={`${trendView}:${trendRange.from}:${trendRange.to}`}
               trends={trendsQuery.trends}
-              defaultGranularity={defaultGranularity}
+              granularity={trendGranularity}
               loading={trendsQuery.loading}
               error={trendsQuery.error}
               onRetry={trendsQuery.refetch}

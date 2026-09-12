@@ -84,9 +84,8 @@ only run on hover / keyboard focus, never on the active row, and the global
 
 ### Operational Trends (dashboard)
 
-Operations → **Overview** leads with **Trips & weight movement** (eyebrow:
-"Farm to shop") — the first card, and the weight story of the completed trips
-in the window it is reading:
+Operations → **Overview** leads with **Trips & weight movement** — the first
+card, and the weight story of the completed trips in the window it is reading:
 
 | Series | Encoding |
 |---|---|
@@ -101,13 +100,15 @@ segments stack to exactly the farm weight — one bar carries all four weight
 numbers at once. **Share of farm** re-reads the same data as a 100% stack, so a
 quiet bucket and a heavy one can be compared by shape.
 
-**Range** — the header carries a `Range · Today · Week · Month` switcher, and
-each option shows its own trip count, so the numbers people ask for first *are*
-the control. `Range` follows the global calendar (the default, and what a reload
-or hard refresh lands on); the others show today, the last 7 days or the last 30
-days without touching the calendar. The bucket follows the window: a week reads
-daily, a month reads weekly, a quarter reads monthly — the small
-Daily / Weekly / Monthly chips still override it.
+**Bucketing** — the header carries a `Today · Week · Month` switcher, and each
+option shows its own trip count, so the numbers people ask for first *are* the
+control. Picking one re-buckets the calendar's own window by day, week or
+month — the calendar always supplies the range. Which chip is lit follows the
+calendar's length (about a week reads by day, about a month by week, a quarter
+by month); that default is derived, never remembered, so a reload or a hard
+refresh lands on the calendar's view. Each chip carries its own accent — Today
+sky, Week violet, Month teal — and the reading mode below the plot is
+emerald for the weight split, indigo for the share of farm.
 
 **Reading it** — the footer is also the legend: trips, farm weight, delivered
 weight, mortality and weight loss, each with its share of the farm weight or its

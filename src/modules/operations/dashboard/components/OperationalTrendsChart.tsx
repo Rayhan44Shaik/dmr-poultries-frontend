@@ -13,9 +13,10 @@
 // weight numbers at once. The second mode re-reads the same data as a 100%
 // stack so a quiet week and a heavy one can be compared by shape.
 //
-// The range comes from the dashboard's global calendar; the default bucket
-// (day / week / month) follows that range's length and resets whenever the
-// calendar moves, so a reload always lands on the calendar's own view. Trips,
+// The range comes from the dashboard's global calendar; the bucket (per day /
+// week / month) is chosen by the Today / Week / Month chips in the card header
+// and defaults to whatever the calendar's own length implies, so a reload
+// always lands on the calendar's view. Trips,
 // farm weight, delivered weight, mortality and weight loss are all summed from
 // the completed-trips API — the same endpoint the Weight Loss / Mortality page
 // reads — so the two can never disagree.
@@ -50,8 +51,8 @@ import {
 
 interface OperationalTrendsChartProps {
   trends: OperationalTrends | null;
-  /** Bucket implied by the global calendar; the chart resets to it when it moves. */
-  defaultGranularity: Granularity;
+  /** Bucket to draw: today (per day), week or month. Owned by the header chips. */
+  granularity: Granularity;
   loading?: boolean;
   error?: string | null;
   onRetry?: () => void;
@@ -67,8 +68,19 @@ const COLOR = {
   weightLoss: "#f59e0b",
 } as const;
 
-const GRANULARITIES: Granularity[] = ["daily", "weekly", "monthly"];
 const SHARE_TICKS = [0, 25, 50, 75, 100];
+
+/** Each reading mode carries its own accent, so the toggle reads at a glance. */
+const MODE_ACCENT: Record<Mode, { active: string; idle: string }> = {
+  weight: {
+    active: "bg-emerald-50 text-emerald-700 ring-emerald-200",
+    idle: "text-slate-400 hover:text-emerald-600",
+  },
+  share: {
+    active: "bg-indigo-50 text-indigo-700 ring-indigo-200",
+    idle: "text-slate-400 hover:text-indigo-600",
+  },
+};
 
 const signed = (current: number, earlier: number | undefined): string | null => {
   if (earlier == null || earlier === 0) return null;
@@ -184,24 +196,13 @@ function Row({
 
 export default function OperationalTrendsChart({
   trends,
-  defaultGranularity,
+  granularity,
   loading = false,
   error = null,
   onRetry,
 }: OperationalTrendsChartProps) {
   const { t } = useI18n();
-  const [granularity, setGranularity] = useState<Granularity>(defaultGranularity);
   const [mode, setMode] = useState<Mode>("weight");
-
-  // The calendar is the source of truth: when its range changes, fall back to
-  // the bucket that range implies (so a reload always opens on the calendar's
-  // own view instead of a remembered toggle). Adjusting state during render —
-  // rather than in an effect — keeps it in the same pass as the new prop.
-  const [lastDefault, setLastDefault] = useState<Granularity>(defaultGranularity);
-  if (defaultGranularity !== lastDefault) {
-    setLastDefault(defaultGranularity);
-    setGranularity(defaultGranularity);
-  }
 
   const rows = trends?.rows;
 
@@ -264,64 +265,30 @@ export default function OperationalTrendsChart({
 
   return (
     <div className="w-full">
-      {/* ── Controls: bucketing on the left, reading mode on the right ── */}
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-        <div
-          role="tablist"
-          aria-label={t("ops.dashboard.trend.bucket_by")}
-          className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5"
-        >
-          {GRANULARITIES.map((value) => {
-            const active = granularity === value;
+      {/* ── Controls: only the reading mode lives with the plot ────────── */}
+      <div className="mb-2.5 flex items-center justify-end">
+        <div className="inline-flex gap-0.5 rounded-lg border border-slate-200 bg-slate-50/80 p-0.5">
+          {(["weight", "share"] as Mode[]).map((value) => {
+            const accent = MODE_ACCENT[value];
             return (
-              <button
-                key={value}
-                type="button"
-                role="tab"
-                aria-selected={active}
-                onClick={() => setGranularity(value)}
-                className={`rounded-[6px] px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide transition-colors ${
-                  active ? "bg-white text-slate-800 shadow-sm" : "text-slate-400 hover:text-slate-600"
-                }`}
-              >
-                {t(
-                  value === "daily"
-                    ? "ops.dashboard.daily"
-                    : value === "weekly"
-                      ? "ops.dashboard.weekly"
-                      : "ops.dashboard.monthly"
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        <div className="flex items-center gap-2">
-          <span className="hidden text-[11px] font-medium text-slate-400 lg:block">
-            {mode === "weight"
-              ? t("ops.dashboard.trend.mode_weight_hint")
-              : t("ops.dashboard.trend.mode_share_hint")}
-          </span>
-          <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
-            {(["weight", "share"] as Mode[]).map((value) => (
               <button
                 key={value}
                 type="button"
                 onClick={() => setMode(value)}
                 aria-pressed={mode === value}
-                className={`rounded-[6px] px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide transition-colors ${
-                  mode === value ? "bg-white text-slate-800 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                className={`rounded-[6px] px-2.5 py-1 text-[10.5px] font-extrabold uppercase tracking-wide ring-1 ring-inset transition-all duration-150 ${
+                  mode === value ? `${accent.active} shadow-sm` : `${accent.idle} ring-transparent`
                 }`}
               >
                 {t(value === "weight" ? "ops.dashboard.trend.mode_weight" : "ops.dashboard.trend.mode_share")}
               </button>
-            ))}
-          </div>
+            );
+          })}
         </div>
       </div>
 
       {/* ── Plot ─────────────────────────────────────────────────────── */}
-      <div className="h-[250px] w-full">
+      <div className="h-[268px] w-full">
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 10, right: 2, bottom: 0, left: -8 }}>
             <defs>
@@ -342,9 +309,13 @@ export default function OperationalTrendsChart({
                 <stop offset="0%" stopColor={COLOR.weightLoss} stopOpacity={1} />
                 <stop offset="100%" stopColor={COLOR.weightLoss} stopOpacity={0.78} />
               </linearGradient>
+              {/* A touch of depth so the trips line floats over the bars. */}
+              <filter id="ot-line-shadow" x="-20%" y="-20%" width="140%" height="160%">
+                <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor={COLOR.trips} floodOpacity={0.3} />
+              </filter>
             </defs>
 
-            <CartesianGrid stroke="#f1f5f9" vertical={false} />
+            <CartesianGrid stroke="#eef2f7" strokeDasharray="4 8" vertical={false} />
             <XAxis
               dataKey="date"
               tickFormatter={formatBucket}
@@ -386,7 +357,7 @@ export default function OperationalTrendsChart({
                   />
                 );
               }}
-              cursor={{ fill: "rgba(148,163,184,0.08)" }}
+              cursor={{ fill: "rgba(99,102,241,0.05)", radius: 6 }}
             />
 
             {mode === "weight" ? (
@@ -399,7 +370,8 @@ export default function OperationalTrendsChart({
                   name={t("ops.dashboard.trend.delivered_weight")}
                   fill="url(#ot-delivered)"
                   maxBarSize={30}
-                  isAnimationActive={false}
+                  animationDuration={620}
+                  animationEasing="ease-out"
                 />
                 <Bar
                   yAxisId="weight"
@@ -408,7 +380,8 @@ export default function OperationalTrendsChart({
                   name={t("ops.dashboard.trend.mortality_weight")}
                   fill="url(#ot-mortality)"
                   maxBarSize={30}
-                  isAnimationActive={false}
+                  animationDuration={620}
+                  animationEasing="ease-out"
                 />
                 <Bar
                   yAxisId="weight"
@@ -418,7 +391,8 @@ export default function OperationalTrendsChart({
                   fill="url(#ot-loss)"
                   radius={[4, 4, 0, 0]}
                   maxBarSize={30}
-                  isAnimationActive={false}
+                  animationDuration={620}
+                  animationEasing="ease-out"
                 />
                 <ReferenceLine
                   yAxisId="weight"
@@ -443,7 +417,8 @@ export default function OperationalTrendsChart({
                   name={t("ops.dashboard.trend.delivered_weight")}
                   fill="url(#ot-delivered)"
                   maxBarSize={34}
-                  isAnimationActive={false}
+                  animationDuration={620}
+                  animationEasing="ease-out"
                 />
                 <Bar
                   yAxisId="weight"
@@ -452,7 +427,8 @@ export default function OperationalTrendsChart({
                   name={t("ops.dashboard.trend.mortality_weight")}
                   fill="url(#ot-mortality)"
                   maxBarSize={34}
-                  isAnimationActive={false}
+                  animationDuration={620}
+                  animationEasing="ease-out"
                 />
                 <Bar
                   yAxisId="weight"
@@ -462,7 +438,8 @@ export default function OperationalTrendsChart({
                   fill="url(#ot-loss)"
                   radius={[4, 4, 0, 0]}
                   maxBarSize={34}
-                  isAnimationActive={false}
+                  animationDuration={620}
+                  animationEasing="ease-out"
                 />
               </>
             )}
@@ -473,7 +450,8 @@ export default function OperationalTrendsChart({
               dataKey="trips"
               stroke="none"
               fill="url(#ot-trips-area)"
-              isAnimationActive={false}
+              animationDuration={820}
+              animationEasing="ease-out"
             />
             <Line
               yAxisId="trips"
@@ -482,9 +460,12 @@ export default function OperationalTrendsChart({
               name={t("ops.dashboard.trips")}
               stroke={COLOR.trips}
               strokeWidth={2.2}
+              strokeLinecap="round"
+              filter="url(#ot-line-shadow)"
               dot={{ r: 2.6, fill: COLOR.trips, strokeWidth: 0 }}
               activeDot={{ r: 4.5, strokeWidth: 2, stroke: "#fff" }}
-              isAnimationActive={false}
+              animationDuration={820}
+              animationEasing="ease-out"
             />
           </ComposedChart>
         </ResponsiveContainer>
@@ -545,7 +526,10 @@ function Stat({
   color: string;
 }) {
   return (
-    <div className="min-w-0 rounded-lg bg-slate-50/80 px-2.5 py-1.5">
+    <div
+      className="min-w-0 rounded-xl px-2.5 py-1.5 ring-1 ring-inset ring-slate-100"
+      style={{ backgroundColor: `${color}0f` }}
+    >
       <span className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">
         <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
         <span className="truncate">{label}</span>
