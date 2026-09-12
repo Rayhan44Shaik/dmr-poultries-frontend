@@ -286,7 +286,7 @@ const KPICard = memo(function KPICard({
         <span className="flex min-w-0 items-center gap-1.5">
           <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${config.bg}`} />
           <p
-            className="truncate whitespace-nowrap text-[11px] font-semibold text-slate-500"
+            className="line-clamp-2 text-[11px] font-semibold leading-tight text-slate-500"
             title={t(kpiCardLabel(label))}
           >
             {t(kpiCardShortLabel(label))}
@@ -438,7 +438,7 @@ export default function KPICards({
   );
 
   return (
-    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
       {finalCards.map((card) => (
         <KPICard key={card.label} {...card} />
       ))}

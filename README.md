@@ -104,9 +104,10 @@ period following the calendar — 7d, 15d, 30d, whatever the range is — and th
 baseline figure underneath the number ("was ₹31.61 L"). Hovering the badge gives
 the full sentence, both figures included.
 
-Card names are kept short enough to sit beside the badge without truncating —
-Trips, Birds, Total Wt (Kg), Total Amt, Total Coll, Pending Coll, Total Exp —
-with the full name in the tooltip.
+Card names read in full — Trips, Birds, Total Weight (Kg), Total Amount, Total
+Collections, Pending Collections, Total Expenses — and the row goes four across
+so nothing is ever cut off; a name that still will not fit wraps to a second
+line instead of being trimmed.
 
 ### Operational Trends (dashboard)
 
@@ -149,7 +150,9 @@ accent per option — Today sky, Week violet, Month teal, Custom slate, all in a
 light wash rather than a solid fill — each with its own icon and its trip count
 set into the pill.
 
-**Reading it** — the plot stays in kilos, so there is no second reading to
+**Reading it** — the five footer tiles carry a hint of their series colour, lift
+on hover and count up to their new figures when the window changes (respecting
+prefers-reduced-motion). The plot stays in kilos, so there is no second reading to
 switch to, and the footer is five plain numbers that double as the legend:
 trips, farm weight, delivered weight, birds lost and weight loss. The tooltip
 carries the detail — every weight with its share of the farm weight, the birds

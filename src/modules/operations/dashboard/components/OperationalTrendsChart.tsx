@@ -21,7 +21,7 @@
 // the completed-trips API — the same endpoint the Weight Loss / Mortality page
 // reads — so the two can never disagree.
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Area,
   Bar,
@@ -171,6 +171,42 @@ function Row({
       </span>
     </div>
   );
+}
+
+/**
+ * Eases a figure from its old value to the new one, so switching windows reads
+ * as movement instead of a jump. Honours prefers-reduced-motion by finishing on
+ * the first frame (a zero-length animation).
+ */
+function useAnimatedNumber(value: number, duration = 520): number {
+  const [shown, setShown] = useState(value);
+  const shownRef = useRef(value);
+
+  useEffect(() => {
+    const from = shownRef.current;
+    if (from === value) return;
+
+    const reduced =
+      typeof window !== "undefined" &&
+      !!window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    const ms = reduced ? 0 : duration;
+    let frame = 0;
+    const start = performance.now();
+
+    const step = (now: number) => {
+      const progress = Math.min(1, (now - start) / ms);
+      const eased = 1 - (1 - progress) ** 3;
+      const next = progress >= 1 ? value : from + (value - from) * eased;
+      shownRef.current = next;
+      setShown(next);
+      if (progress < 1) frame = requestAnimationFrame(step);
+    };
+
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [value, duration]);
+
+  return shown;
 }
 
 /**
@@ -431,25 +467,34 @@ export default function OperationalTrendsChart({
 
       {/* ── Footer: the whole period, in numbers ──────────────────────── */}
       <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-3 sm:grid-cols-3 xl:grid-cols-5">
-        <Stat label={t("ops.dashboard.trips")} value={plain(totals.trips, 0, locale)} color={COLOR.trips} />
+        <Stat
+          label={t("ops.dashboard.trips")}
+          value={totals.trips}
+          format={(value) => plain(Math.round(value), 0, locale)}
+          color={COLOR.trips}
+        />
         <Stat
           label={t("ops.dashboard.trend.farm_weight")}
-          value={compactKg(totals.farmWeight, locale)}
+          value={totals.farmWeight}
+          format={(value) => compactKg(value, locale)}
           color={COLOR.farmWeight}
         />
         <Stat
           label={t("ops.dashboard.trend.delivered_weight")}
-          value={compactKg(totals.deliveredWeight, locale)}
+          value={totals.deliveredWeight}
+          format={(value) => compactKg(value, locale)}
           color={COLOR.delivered}
         />
         <Stat
           label={t("ops.dashboard.mortality_birds")}
-          value={plain(totals.mortalityCount, 0, locale)}
+          value={totals.mortalityCount}
+          format={(value) => plain(Math.round(value), 0, locale)}
           color={COLOR.mortality}
         />
         <Stat
           label={t("ops.dashboard.trend.weight_loss")}
-          value={compactKg(totals.weightLoss, locale)}
+          value={totals.weightLoss}
+          format={(value) => compactKg(value, locale)}
           color={COLOR.weightLoss}
         />
       </div>
@@ -463,17 +508,33 @@ export default function OperationalTrendsChart({
   );
 }
 
-function Stat({ label, value, color }: { label: string; value: string; color: string }) {
+function Stat({
+  label,
+  value,
+  format,
+  color,
+}: {
+  label: string;
+  value: number;
+  format: (value: number) => string;
+  color: string;
+}) {
+  const shown = useAnimatedNumber(value);
   return (
     <div
-      className="min-w-0 rounded-xl px-2.5 py-2 ring-1 ring-inset ring-slate-100"
+      className="group min-w-0 cursor-default rounded-xl px-2.5 py-2 ring-1 ring-inset ring-slate-100 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
       style={{ backgroundColor: `${color}0f` }}
     >
       <span className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">
-        <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: color }} />
+        <span
+          className="h-1.5 w-1.5 shrink-0 rounded-full transition-transform duration-200 group-hover:scale-150"
+          style={{ backgroundColor: color }}
+        />
         <span className="truncate">{label}</span>
       </span>
-      <span className="mt-0.5 block truncate text-[15px] font-black tabular-nums text-slate-800">{value}</span>
+      <span className="mt-0.5 block truncate text-[15px] font-black tabular-nums text-slate-800">
+        {format(shown)}
+      </span>
     </div>
   );
 }
