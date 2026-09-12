@@ -19,6 +19,7 @@ import type { AssignmentSheetRow } from "../../../orders/ordersUtils";
 import { pendingBoxesFromRows, shopIdsFromRows } from "./remainingBoxes";
 import { computeDeliveryKpiTotals } from "./deliveryKpis";
 import { formatIstStamp } from "../../services/tripHeaderApiService";
+import { formatTripViewStamp } from "../../utils/tripViewLocalization";
 import type { DeliveriesBalanceError } from "../../../../../shared/trip/validation";
 import type { ShopDelivery, BoxDetail, Trip } from "../../types/trip";
 import type { DeliveryEmailStatusValue } from "../../services/deliveryEmailService";
@@ -26,6 +27,8 @@ import type { DeliveryWhatsAppStatusValue } from "../../services/deliveryWhatsAp
 import { WizardActionBar, WizardStepNotice } from "../WizardStepUI";
 import { useI18n } from "../../../../../i18n";
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
+import { ActionTooltip } from "../../../../../ui/ActionTooltip";
+import { TripTimestampDisplay } from "../TripTimestampDisplay";
 
 interface Props {
   rows: ShopDelivery[];
@@ -252,11 +255,11 @@ function DeliveryBalanceErrorPanel({
           <button
             type="button"
             onClick={onClose}
-            className="-m-1 rounded-md p-1 text-red-400 transition-colors hover:bg-red-50/80 hover:text-red-500"
+            className="group relative -m-1 rounded-md p-1 text-red-400 transition-colors hover:bg-red-50/80 hover:text-red-500"
             aria-label={t("common.close")}
-            title={t("common.close")}
           >
-            <X size={15} />
+            <X size={15} className={uiActionIconMotionClass.close} />
+            <ActionTooltip label={t("common.close")} />
           </button>
         )}
       </div>
@@ -277,12 +280,12 @@ function DeliveryBalanceErrorPanel({
       {error.weight && (
         <div className="text-xs text-red-500 space-y-0.5">
           <p className="font-semibold">{t("common.weight")}</p>
-          <p className="pl-3">{t("ops.trip.farm")}: <span className="font-bold">{error.weight.farm.toFixed(2)} kg</span></p>
-          <p className="pl-3">{t("ops.trip.delivered")}: <span className="font-bold">{error.weight.delivered.toFixed(2)} kg</span></p>
-          <p className="pl-3">{t("operations.mortality_count")}: <span className="font-bold">{error.weight.mortalityWeight.toFixed(2)} kg</span></p>
-          <p className="pl-3">{t("ops.trip.loss")}: <span className="font-bold">{error.weight.loss.toFixed(2)} kg</span></p>
+          <p className="pl-3">{t("ops.trip.farm")}: <span className="font-bold">{error.weight.farm.toFixed(2)} {t("common.kg")}</span></p>
+          <p className="pl-3">{t("ops.trip.delivered")}: <span className="font-bold">{error.weight.delivered.toFixed(2)} {t("common.kg")}</span></p>
+          <p className="pl-3">{t("operations.mortality_count")}: <span className="font-bold">{error.weight.mortalityWeight.toFixed(2)} {t("common.kg")}</span></p>
+          <p className="pl-3">{t("ops.trip.loss")}: <span className="font-bold">{error.weight.loss.toFixed(2)} {t("common.kg")}</span></p>
           <p className="pl-3">
-            {t("ops.trip.expected")}: <span className="font-bold">{error.weight.expected.toFixed(2)} kg</span>
+            {t("ops.trip.expected")}: <span className="font-bold">{error.weight.expected.toFixed(2)} {t("common.kg")}</span>
           </p>
           <p className="pl-3 text-red-500">
             {t("ops.trip.farm_must_equal", { farm: error.weight.farm.toFixed(2), expected: error.weight.expected.toFixed(2) })}
@@ -335,7 +338,7 @@ export default function UnLoadingTable({
   whatsappFailureReasonFor,
   onSendOneWhatsApp,
 }: Props) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const safeRows = rows ?? [];
   const safeShops = shops ?? [];
   const safeBirdTypes = birdTypes ?? [];
@@ -1082,10 +1085,13 @@ export default function UnLoadingTable({
             />
             {searchTerm && (
               <button
+                type="button"
                 onClick={clearSearch}
-                className="absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600"
+                aria-label={t("ops.trip.clear_search")}
+                className="group absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600"
               >
-                <X size={13} />
+                <X size={13} className={uiActionIconMotionClass.close} />
+                <ActionTooltip label={t("ops.trip.clear_search")} />
               </button>
             )}
           </div>
@@ -1094,30 +1100,37 @@ export default function UnLoadingTable({
         {/* Right Side Header Actions */}
         <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
           <button
+            type="button"
             onClick={handleDownloadShopsPDF}
-            className="group inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-50/70 hover:bg-blue-50/70 border border-blue-100 text-blue-500 text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
-            title={t("ops.trip.shops_pdf_title")}
+            className="group relative inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-blue-50/70 hover:bg-blue-50/70 border border-blue-100 text-blue-500 text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
+            aria-label={t("ops.trip.shops_pdf_title")}
           >
             <span className={`inline-flex ${uiActionIconMotionClass.pdf}`}><FileText size={15} className="text-blue-500" /></span>
             <span>{t("ops.trip.shops")} ({pendingShopsCount})</span>
+            <ActionTooltip label={t("ops.trip.shops_pdf_title")} side="bottom" />
           </button>
 
           <button
+            type="button"
             onClick={handleDownloadBoxesPDF}
-            className="group inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50/70 hover:bg-emerald-50/70 border border-emerald-100 text-emerald-500 text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
-            title={t("ops.trip.boxes_pdf_title")}
+            className="group relative inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-emerald-50/70 hover:bg-emerald-50/70 border border-emerald-100 text-emerald-500 text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
+            aria-label={t("ops.trip.boxes_pdf_title")}
           >
             <span className={`inline-flex ${uiActionIconMotionClass.pdf}`}><Box size={15} className="text-emerald-500" /></span>
             <span>{t("ops.trip.boxes")} ({remainingBoxesCount})</span>
+            <ActionTooltip label={t("ops.trip.boxes_pdf_title")} side="bottom" />
           </button>
 
           {!readOnly && !showForm && (
             <button
+              type="button"
               onClick={openAddForm}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
+              className="group relative inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500 hover:bg-emerald-600 text-white text-xs font-semibold rounded-full shadow-xs transition-all active:scale-95"
+              aria-label={t("ops.trip.add_shop")}
             >
               <Plus size={15} className="text-emerald-100" />
               <span>{t("ops.trip.add_shop")}</span>
+              <ActionTooltip label={t("ops.trip.add_shop")} side="bottom" />
             </button>
           )}
         </div>
@@ -1125,16 +1138,18 @@ export default function UnLoadingTable({
 
       {/* ─── TOP KPI SUMMARY — same font as StepKpiCard (all steps) ─── */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">
+        <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs col-span-2 sm:col-span-1">
           <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
             <span className="h-5 w-5 rounded-md bg-indigo-50/70 text-indigo-500 flex items-center justify-center shrink-0">
               <Clock size={12} />
             </span>
             <span className="truncate">{t("ops.trip.captured_time")}</span>
           </span>
-          <span className="block text-sm font-bold text-slate-800 truncate" title={topKpiTotals.lastCaptureTime}>
-            {topKpiTotals.lastCaptureTime}
-          </span>
+          <TripTimestampDisplay
+            value={topKpiTotals.lastCaptureTime === "—" ? "" : formatTripViewStamp(topKpiTotals.lastCaptureTime, language)}
+            empty="—"
+            className="border-indigo-100 bg-indigo-50/70 px-1.5 py-0.5 text-[10px]"
+          />
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">
           <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
@@ -1193,7 +1208,7 @@ export default function UnLoadingTable({
             <span className="truncate">{t("ops.trip.mortality_weight")}</span>
           </span>
           <span className="block text-sm font-bold text-slate-800">
-            {topKpiTotals.mortKg > 0 ? `${topKpiTotals.mortKg.toFixed(2)} kg` : "—"}
+            {topKpiTotals.mortKg > 0 ? `${topKpiTotals.mortKg.toFixed(2)} ${t("common.kg")}` : "—"}
           </span>
         </div>
       </div>

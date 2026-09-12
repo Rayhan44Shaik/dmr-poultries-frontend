@@ -280,6 +280,7 @@ export const uiActionIconMotionClass = {
   pdf: "motion-safe:group-hover:animate-[var(--animate-action-pdf)]",
   mail: "motion-safe:group-hover:animate-[var(--animate-action-mail)]",
   whatsapp: "motion-safe:group-hover:animate-[var(--animate-action-whatsapp)]",
+  close: "motion-safe:group-hover:animate-[var(--animate-action-close)]",
   excel: "motion-safe:group-hover:animate-[var(--animate-action-excel)]",
 } as const;
 

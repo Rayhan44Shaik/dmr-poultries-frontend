@@ -15,7 +15,10 @@ import {
 } from "../../../../shared/trip/definitions";
 import { useI18n } from "../../../../i18n";
 import { compressImageFile } from "../../../../utils/compressImage";
-import { formatIstStamp } from "../services/tripHeaderApiService";
+import { ActionTooltip } from "../../../../ui/ActionTooltip";
+import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
+import { formatTripViewStamp } from "../utils/tripViewLocalization";
+import { TripTimestampDisplay } from "./TripTimestampDisplay";
 
 interface Props {
   trip: Trip;
@@ -149,7 +152,7 @@ export default function StepPickup({
   onExitEdit,
   clearForm,
 }: Props) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [isSubmitting, setIsSubmitting] = useState(false);
   /** Same-tick double-submit guard. */
   const submitLockRef = useRef(false);
@@ -363,8 +366,8 @@ export default function StepPickup({
   // first submit no time is shown, just the "auto-captured on submit" note.
   const officialPickupTime = trip.pickupStepSubmitted
     ? trip.pickupStepSubmittedAt
-      ? formatIstStamp(trip.pickupStepSubmittedAt)
-      : trip.pickupLoadTime || ""
+      ? formatTripViewStamp(trip.pickupStepSubmittedAt, language)
+      : formatTripViewStamp(trip.pickupLoadTime, language) || ""
     : "";
 
   const uploadBusyRef = useRef(false);
@@ -608,10 +611,11 @@ export default function StepPickup({
               <button
                 type="button"
                 onClick={() => setIsLocalEditing(true)}
-                className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95"
-                title={t("ops.trip.edit_step")}
+                className="group relative bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95"
+                aria-label={t("ops.trip.edit_step")}
               >
-                <Pencil size={14} />
+                <Pencil size={14} className={uiActionIconMotionClass.edit} />
+                <ActionTooltip label={t("ops.trip.edit_step")} />
               </button>
             )}
             <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
@@ -625,14 +629,17 @@ export default function StepPickup({
           <StepKpiCard
             icon={Clock}
             tone="bg-blue-50/70 text-blue-500"
-            label={t("ops.trip.time")}
-            value={officialPickupTime || "--"}
+            label={t("ops.trip.date_time")}
+            value={<TripTimestampDisplay value={officialPickupTime} empty="--" />}
+            title={officialPickupTime || undefined}
+            cardClass="col-span-2 sm:col-span-1"
+            valueClass="overflow-visible whitespace-normal text-[11px] leading-none"
           />
           <StepKpiCard
             icon={Scale}
             tone="bg-emerald-50/70 text-emerald-500"
             label={t("ops.trip.dc_wt")}
-            value={trip.dcWeight ? `${Number(trip.dcWeight).toFixed(2)} Kg` : t("ops.trip.not_entered")}
+            value={trip.dcWeight ? `${Number(trip.dcWeight).toFixed(2)} ${t("common.kg")}` : t("ops.trip.not_entered")}
           />
           <StepKpiCard
             icon={Bird}
@@ -650,7 +657,7 @@ export default function StepPickup({
             icon={Gauge}
             tone="bg-purple-50/70 text-purple-500"
             label={t("ops.trip.avg_wt")}
-            value={trip.avgWeight ? `${trip.avgWeight} Kg` : "—"}
+            value={trip.avgWeight ? `${trip.avgWeight} ${t("common.kg")}` : "—"}
           />
         </div>
 
@@ -726,23 +733,25 @@ export default function StepPickup({
           <div className="flex items-center gap-2 flex-wrap">
             {photos.length > 0 && (
               <button
+                type="button"
                 onClick={downloadImage}
                 disabled={busyAction !== null}
                 aria-label={t("ops.trip.download_image")}
-                className="flex items-center justify-center p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg shadow-xs transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
-                title={t("ops.trip.download_image")}
+                className="group relative flex items-center justify-center p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg shadow-xs transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
               >
-                <Download size={16} className={busyAction === "image" ? "animate-pulse" : ""} />
+                <Download size={16} className={busyAction === "image" ? "animate-pulse" : uiActionIconMotionClass.view} />
+                <ActionTooltip label={t("ops.trip.download_image")} />
               </button>
             )}
             <button
+              type="button"
               onClick={generatePDF}
               disabled={busyAction !== null}
               aria-label={t("ops.trip.download_pdf")}
-              className="flex items-center justify-center p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-xs transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
-              title={t("ops.trip.download_pdf")}
+              className="group relative flex items-center justify-center p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-xs transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
             >
-              <FileText size={16} className={busyAction === "pdf" ? "animate-pulse" : ""} />
+              <FileText size={16} className={busyAction === "pdf" ? "animate-pulse" : uiActionIconMotionClass.pdf} />
+              <ActionTooltip label={t("ops.trip.download_pdf")} />
             </button>
           </div>
         </div>
@@ -851,11 +860,11 @@ export default function StepPickup({
         </div>
 
         {/* Official time capture — set once at submit, cannot be edited */}
-        <div className="flex items-center gap-2 text-xs text-slate-600 font-medium">
+        <div className="flex items-center gap-2 text-xs text-slate-600 font-medium overflow-x-auto">
           <span className="h-5 w-5 rounded-md bg-blue-50/80 text-blue-500 flex items-center justify-center shrink-0"><Clock size={ 14 } /></span>
           {officialPickupTime ? (
             <>
-              <span className="font-semibold text-slate-700">{officialPickupTime}</span>
+              <TripTimestampDisplay value={officialPickupTime} className="px-1.5 py-0.5 text-[10px]" />
               <span
                 className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400 bg-slate-100 border border-slate-200 rounded-full px-2 py-0.5"
                 title={t("ops.trip.time_locked_hint")}
@@ -1065,13 +1074,13 @@ export default function StepPickup({
             icon={Scale}
             tone="bg-emerald-50/70 text-emerald-500"
             label={t("ops.trip.dc_wt")}
-            value={`${totals.dcWeight.toFixed(2)} Kg`}
+            value={`${totals.dcWeight.toFixed(2)} ${t("common.kg")}`}
           />
           <StepKpiCard
             icon={Gauge}
             tone="bg-purple-50/70 text-purple-500"
             label={t("ops.trip.avg_wt")}
-            value={totals.avgWeight > 0 ? `${totals.avgWeight} Kg` : "—"}
+            value={totals.avgWeight > 0 ? `${totals.avgWeight} ${t("common.kg")}` : "—"}
           />
         </div>
 

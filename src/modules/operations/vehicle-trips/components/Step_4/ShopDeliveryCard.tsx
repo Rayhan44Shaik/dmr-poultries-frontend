@@ -4,7 +4,10 @@ import type { ShopDeliveryWithExtra } from "./useShopDeliveryForm";
 import { useI18n } from "../../../../../i18n";
 import { cleanDeliveryShopName } from "../../utils/shopDisplayName";
 import { WhatsAppIcon } from "../../../../../ui/WhatsAppIcon";
+import { ActionTooltip } from "../../../../../ui/ActionTooltip";
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
+import { formatTripViewStamp } from "../../utils/tripViewLocalization";
+import { TripTimestampDisplay } from "../TripTimestampDisplay";
 import type { DeliveryEmailStatusValue } from "../../services/deliveryEmailService";
 import type { DeliveryWhatsAppStatusValue } from "../../services/deliveryWhatsAppService";
 
@@ -75,7 +78,6 @@ function DeliveryCommunicationButton({
       className={`group relative p-1.5 rounded-lg border transition-colors flex items-center justify-center active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${className} ${
         isSending ? "motion-safe:animate-pulse" : ""
       }`}
-      title={title}
       aria-label={title}
     >
       {isSending ? (
@@ -92,6 +94,7 @@ function DeliveryCommunicationButton({
           {visibleCount > 9 ? "9+" : visibleCount}
         </span>
       )}
+      <ActionTooltip label={title} />
     </button>
   );
 }
@@ -115,7 +118,7 @@ export default function ShopDeliveryCard({
   whatsappFailureReason,
   onSendWhatsApp,
 }: Props) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const isWeightMode = row.deliveryMode === "weight";
   const selectedBoxes = row.selectedBoxIds || [];
   const manyBoxes = selectedBoxes.length > 30;
@@ -128,7 +131,7 @@ export default function ShopDeliveryCard({
   const displayShopName = cleanDeliveryShopName(row.shopName) || t("ops.trip.not_entered");
 
   return (
-    <div className="relative overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm hover:shadow-md transition-all duration-200 flex flex-col">
+    <div className="relative rounded-xl border border-slate-200/80 bg-white shadow-sm hover:shadow-md transition-all duration-200 flex flex-col">
       <div className="p-3 flex flex-col gap-2.5 flex-1">
         {/* Header — mode tile + shop name vertically centred on the logo */}
         <div className="flex items-center justify-between gap-2">
@@ -173,19 +176,23 @@ export default function ShopDeliveryCard({
             )}
             {!readOnly && (
               <button
+                type="button"
                 onClick={() => onEdit(row)}
-                className="group p-1.5 rounded-lg bg-slate-50 hover:bg-blue-50/70 text-slate-500 hover:text-blue-500 border border-slate-200/60 transition-colors flex items-center justify-center"
-                title={t("ops.trip.edit_shop_delivery")}
+                className="group relative p-1.5 rounded-lg bg-slate-50 hover:bg-blue-50/70 text-slate-500 hover:text-blue-500 border border-slate-200/60 transition-colors flex items-center justify-center"
+                aria-label={t("ops.trip.edit_shop_delivery")}
               >
                 <span className={`inline-flex ${uiActionIconMotionClass.edit}`}><Pencil size={13} className="stroke-[2]" /></span>
+                <ActionTooltip label={t("ops.trip.edit_shop_delivery")} />
               </button>
             )}
             <button
+              type="button"
               onClick={() => onPDF(row)}
-              className="group p-1.5 rounded-lg bg-slate-50 hover:bg-rose-50/70 text-slate-500 hover:text-rose-500 border border-slate-200/60 transition-colors flex items-center justify-center"
-              title={t("ops.trip.download_pdf")}
+              className="group relative p-1.5 rounded-lg bg-slate-50 hover:bg-rose-50/70 text-slate-500 hover:text-rose-500 border border-slate-200/60 transition-colors flex items-center justify-center"
+              aria-label={t("ops.trip.download_pdf")}
             >
               <span className={`inline-flex ${uiActionIconMotionClass.pdf}`}><FileText size={13} className="stroke-[2]" /></span>
+              <ActionTooltip label={t("ops.trip.download_pdf")} />
             </button>
           </div>
         </div>
@@ -209,7 +216,7 @@ export default function ShopDeliveryCard({
               <Scale size={10} className="text-emerald-500 stroke-[2]" /> {t("common.weight")}
             </span>
             <span className="text-[13px] font-bold text-slate-800">
-              {row.weight ? `${Number(row.weight).toFixed(2)} kg` : t("ops.trip.not_entered")}
+              {row.weight ? `${Number(row.weight).toFixed(2)} ${t("common.kg")}` : t("ops.trip.not_entered")}
             </span>
           </div>
         </div>
@@ -218,7 +225,7 @@ export default function ShopDeliveryCard({
           <div className="flex items-center justify-between px-2 py-1 bg-rose-50/50 rounded-md border border-rose-100/70 text-[10px]">
             <span className="text-rose-400 font-semibold">{t("operations.mortality_count")}</span>
             <span className="text-rose-500 font-bold">
-              {mortalityCount} {t("common.birds")} · {mortKg ? Number(mortKg).toFixed(2) : "0.00"} kg
+              {mortalityCount} {t("common.birds")} · {mortKg ? Number(mortKg).toFixed(2) : "0.00"} {t("common.kg")}
             </span>
           </div>
         )}
@@ -273,11 +280,18 @@ export default function ShopDeliveryCard({
               </span>
             ) : null}
           </div>
-          <div className="flex items-center gap-1 shrink-0 text-slate-600">
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-1 text-slate-600">
             <span className="h-4 w-4 rounded bg-indigo-50/70 text-indigo-500 flex items-center justify-center shrink-0">
               <Clock size={11} className="stroke-[2]" />
             </span>
-            <span>{t("ops.trip.captured")} {row.autoCaptureTime || "—"}</span>
+            <span className="text-[9px] font-bold uppercase tracking-wide text-slate-400 whitespace-nowrap">
+              {t("ops.trip.captured_at")}
+            </span>
+            <TripTimestampDisplay
+              value={row.autoCaptureTime ? formatTripViewStamp(row.autoCaptureTime, language) : ""}
+              empty="—"
+              className="border-indigo-100 bg-indigo-50/70 px-1.5 py-0.5 text-[9px]"
+            />
           </div>
         </div>
       </div>

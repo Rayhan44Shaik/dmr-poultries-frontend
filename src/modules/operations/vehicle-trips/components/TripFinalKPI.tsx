@@ -1,6 +1,5 @@
 // src/modules/operations/vehicle-trips/components/TripFinalKPI.tsx
 
-import { useMemo } from "react";
 import type { Trip, ShopDelivery } from "../types/trip";
 import {
   calculateDeliveryDisplayTotals,
@@ -33,8 +32,8 @@ function kpiNumber(value: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function formatKg(value: number | null): string {
-  return value == null ? "—" : `${value.toFixed(2)} Kg`;
+function formatKg(value: number | null, unit: string): string {
+  return value == null ? "—" : `${value.toFixed(2)} ${unit}`;
 }
 
 function formatCount(value: number | null, suffix = ""): string {
@@ -42,8 +41,8 @@ function formatCount(value: number | null, suffix = ""): string {
   return suffix ? `${value}${suffix}` : String(value);
 }
 
-function formatKm(value: number | null): string {
-  return value == null ? "—" : `${value.toFixed(2)} KM`;
+function formatKm(value: number | null, unit: string): string {
+  return value == null ? "—" : `${value.toFixed(2)} ${unit}`;
 }
 
 export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
@@ -52,32 +51,28 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
     return null;
   }
 
-  const t = trip as any;
+  const tripRecord = trip as Trip & Record<string, unknown>;
   const pickupSubmitted = Boolean(trip.pickupStepSubmitted);
   const farmSubmitted = Boolean(trip.farmStepSubmitted);
   const deliverySubmitted = Boolean(trip.deliveryStepSubmitted);
-  const expensesSubmitted = Boolean(t.expensesStepSubmitted || t.endStepSubmitted);
+  const expensesSubmitted = Boolean(tripRecord.expensesStepSubmitted || tripRecord.endStepSubmitted);
 
   const persistedDeliveries = deliverySubmitted
     ? (Array.isArray(deliveries) && deliveries.length ? deliveries : trip.deliveries || [])
     : [];
 
-  const deliveryTotals = useMemo(
-    () =>
-      deliverySubmitted
-        ? calculateDeliveryDisplayTotals(trip, persistedDeliveries)
-        : { totalBirds: 0, totalWeight: 0, totalMortality: 0, totalMortalityKg: 0 },
-    [deliverySubmitted, persistedDeliveries, trip]
-  );
+  const deliveryTotals = deliverySubmitted
+    ? calculateDeliveryDisplayTotals(trip, persistedDeliveries)
+    : { totalBirds: 0, totalWeight: 0, totalMortality: 0, totalMortalityKg: 0 };
 
   const mortalityWeight = deliveryTotals.totalMortalityKg;
 
   // ─── Weight Loss ──────────────────────────────────────────────────
-  const weightLoss = useMemo(() => {
+  const weightLoss = (() => {
     const dcWeight = trip.dcWeight || 0;
     const totalOut = deliveryTotals.totalWeight + mortalityWeight;
     return Math.max(0, dcWeight - totalOut);
-  }, [deliveryTotals.totalWeight, mortalityWeight, trip.dcWeight]);
+  })();
 
   // ─── Distances (For Display) ────────────────────────────────────────
   const {
@@ -87,41 +82,41 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
   } = calculateTripDistances(trip);
 
   // ─── Synchronized Mileage (Odometer Logic) ──────────────────────────
-  const mileage = useMemo(() => {
+  const mileage = (() => {
     const startMeter = Number(trip.openingMeter || 0);
-    const endMeter = Number(t.endMeter ?? t.closingMeter ?? 0);
+    const endMeter = Number(tripRecord.endMeter ?? tripRecord.closingMeter ?? 0);
     const odometerDistanceCovered = (startMeter > 0 && endMeter > startMeter) ? endMeter - startMeter : 0;
-    
-    const totalDieselLiters = sumFlattenedDieselLitres(t);
-    const backendMileage = t.mileageKmL;
+
+    const totalDieselLiters = sumFlattenedDieselLitres(tripRecord);
+    const backendMileage = tripRecord.mileageKmL;
 
     if (backendMileage != null && Number.isFinite(Number(backendMileage)) && Number(backendMileage) > 0) {
       return Number(backendMileage);
     }
-    
+
     return odometerDistanceCovered > 0 && totalDieselLiters > 0
       ? odometerDistanceCovered / totalDieselLiters
       : 0;
-  }, [trip, t]);
+  })();
 
   // ─── Synchronized Expenses ──────────────────────────────────────────
-  const totalExpenses = useMemo(() => {
+  const totalExpenses = (() => {
     // 1:1 match with StepEnd.tsx expense calculation logic
     const computedExpenses =
-      Number(t.meals || 0) +
-      Number(t.loading || 0) +
-      Number(t.mealsTiffin || 0) +
-      Number(t.vehicleMaintenance || 0) +
-      Number(t.othersRC || 0) +
-      Number(t.others1Amt || 0) +
-      Number(t.others2Amt || 0) +
-      Number(t.others3Amt || 0) +
-      Number(t.others4Amt || 0) +
-      Number(t.others5Amt || 0);
+      Number(tripRecord.meals || 0) +
+      Number(tripRecord.loading || 0) +
+      Number(tripRecord.mealsTiffin || 0) +
+      Number(tripRecord.vehicleMaintenance || 0) +
+      Number(tripRecord.othersRC || 0) +
+      Number(tripRecord.others1Amt || 0) +
+      Number(tripRecord.others2Amt || 0) +
+      Number(tripRecord.others3Amt || 0) +
+      Number(tripRecord.others4Amt || 0) +
+      Number(tripRecord.others5Amt || 0);
 
     // Fallback to backend saved totalExpenses if computed is 0
-    return computedExpenses > 0 ? computedExpenses : Number(t.totalExpenses || 0);
-  }, [t]);
+    return computedExpenses > 0 ? computedExpenses : Number(tripRecord.totalExpenses || 0);
+  })();
 
   const dcWeight = pickupSubmitted ? kpiNumber(trip.dcWeight) : null;
   const totalBirds = pickupSubmitted ? kpiNumber(trip.totalBirds) : null;
@@ -146,7 +141,7 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
   const row1Cards = [
     {
       label: translate("ops.trip.kpi_dc_weight"),
-      value: formatKg(dcWeight),
+      value: formatKg(dcWeight, translate("common.kg")),
       sub: translate("ops.trip.load_from_farm"),
       bg: "bg-blue-50/70",
       icon: <Weight size={18} className="text-blue-500" />,
@@ -160,7 +155,7 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
     },
     {
       label: translate("ops.trip.kpi_delivery_weight"),
-      value: formatKg(deliveryWeight),
+      value: formatKg(deliveryWeight, translate("common.kg")),
       sub: deliverySubmitted ? translate("ops.trip.shop_deliveries_count", { count: persistedDeliveries.length }) : translate("ops.trip.not_submitted"),
       bg: "bg-slate-50",
       icon: <ShoppingBag size={18} className="text-slate-700" />,
@@ -175,13 +170,13 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
     {
       label: translate("operations.total_mortality"),
       value: mortalityCount == null ? "—" : `${mortalityCount} ${translate("common.birds")}`,
-      sub: mortalityKg == null ? translate("ops.trip.not_submitted") : `${mortalityKg.toFixed(2)} Kg ${translate("ops.trip.total")}`,
+      sub: mortalityKg == null ? translate("ops.trip.not_submitted") : `${mortalityKg.toFixed(2)} ${translate("common.kg")} ${translate("common.total")}`,
       bg: "bg-red-50/70",
       icon: <HeartPulse size={18} className="text-red-500" />,
     },
     {
       label: translate("ops.trip.kpi_weight_loss"),
-      value: formatKg(weightLossValue),
+      value: formatKg(weightLossValue, translate("common.kg")),
       sub: translate("ops.trip.dc_del_mort"),
       bg: "bg-amber-50/70",
       icon: <TrendingDown size={18} className="text-amber-500" />,
@@ -191,21 +186,21 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
   const row2Cards = [
     {
       label: translate("ops.trip.kpi_pickup_dist"),
-      value: formatKm(pickupDistValue),
+      value: formatKm(pickupDistValue, translate("common.km")),
       sub: translate("ops.trip.start_to_farm"),
       bg: "bg-indigo-50/50",
       icon: <MapPin size={18} className="text-indigo-500" />,
     },
     {
       label: translate("ops.trip.kpi_delivery_dist"),
-      value: formatKm(deliveryDistValue),
+      value: formatKm(deliveryDistValue, translate("common.km")),
       sub: translate("ops.trip.farm_to_last_drop"),
       bg: "bg-indigo-50/50",
       icon: <Map size={18} className="text-indigo-500" />,
     },
     {
       label: translate("ops.trip.kpi_total_distance"),
-      value: formatKm(totalDistValue),
+      value: formatKm(totalDistValue, translate("common.km")),
       sub: translate("ops.trip.full_trip_total"),
       bg: "bg-indigo-50/70",
       icon: <Route size={18} className="text-indigo-500" />,
@@ -216,7 +211,7 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
       sub:
         pickupTollsValue == null && deliveryTollsValue == null
           ? translate("ops.trip.not_submitted")
-          : `P: ${pickupTollsValue ?? 0} • D: ${deliveryTollsValue ?? 0}`,
+          : `${translate("ops.trip.pickup")}: ${pickupTollsValue ?? 0} • ${translate("ops.trip.delivered")}: ${deliveryTollsValue ?? 0}`,
       bg: "bg-violet-50/70",
       icon: <Ticket size={18} className="text-violet-500" />,
     },

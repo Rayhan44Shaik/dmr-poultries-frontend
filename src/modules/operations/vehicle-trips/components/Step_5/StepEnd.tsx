@@ -12,8 +12,12 @@ import { TripNoBadge } from "../TripNoBadge";
 import GeneralExpensesTable from "./GeneralExpensesTable";
 import DieselExpensesTable from "./DieselExpensesTable";
 import { useI18n } from "../../../../../i18n";
+import { ActionTooltip } from "../../../../../ui/ActionTooltip";
+import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 import { useStep5DurableDraft } from "../../hooks/useStep5DurableDraft";
 import { performStep5Save } from "../../services/tripHeaderApiService";
+import { formatTripViewStamp } from "../../utils/tripViewLocalization";
+import { TripTimestampDisplay } from "../TripTimestampDisplay";
 import type { Step5DraftFields } from "../../../../../shared/trip/step5DraftStore";
 
 // ─── ConfirmationModal ────────────────────────────────────────────
@@ -107,7 +111,7 @@ export default function StepEnd({
   onExitEdit,
   clearForm,
 }: Props) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   // ─── State ─────────────────────────────────────────────────────────
   const [isSubmitting, setIsSubmitting] = useState(false);
   /** Same-tick double-submit guard for final expenses submit. */
@@ -386,11 +390,12 @@ export default function StepEnd({
       maximumFractionDigits: 2,
     })}`;
 
-  const submittedTimeDisplay =
+  const submittedTimeValue =
     sheetData.submittedAtTimestamp ||
     (trip as any).expensesStepSubmittedAt ||
     (trip as any).submittedAtTimestamp ||
     "";
+  const submittedTimeDisplay = submittedTimeValue ? formatTripViewStamp(submittedTimeValue, language) : "";
 
   const highestDieselMeter = dieselIndices.reduce((max, idx) => {
     const val = Number(sheetData[`dieselMeter${idx}`] || 0);
@@ -676,10 +681,11 @@ export default function StepEnd({
                 <button
                   type="button"
                   onClick={() => setIsLocalEditing(true)}
-                  className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95"
-                  title={t("ops.trip.edit_step")}
+                  className="group relative bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95"
+                  aria-label={t("ops.trip.edit_step")}
                 >
-                  <Pencil size={14} />
+                  <Pencil size={14} className={uiActionIconMotionClass.edit} />
+                  <ActionTooltip label={t("ops.trip.edit_step")} />
                 </button>
               )}
               <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
@@ -692,8 +698,11 @@ export default function StepEnd({
             {[
               {
                 label: t("ops.trip.date_time"),
-                value: submittedTimeDisplay || "—",
+                value: submittedTimeDisplay ? (
+                  <TripTimestampDisplay value={submittedTimeDisplay} className="border-sky-100 bg-white/70 px-1.5 py-0.5 text-[10px]" />
+                ) : "—",
                 tone: "border-sky-100 bg-sky-50/40 text-slate-700",
+                wide: true,
               },
               {
                 label: t("operations.vehicle_no"),
@@ -723,10 +732,10 @@ export default function StepEnd({
             ].map((f) => (
               <div
                 key={f.label}
-                className={`rounded-xl border px-3 py-2.5 min-w-0 shadow-sm ${f.tone}`}
+                className={`rounded-xl border px-3 py-2.5 min-w-0 shadow-sm ${f.wide ? "col-span-2 sm:col-span-1" : ""} ${f.tone}`}
               >
                 <p className="text-xs uppercase font-semibold text-slate-400 tracking-wide truncate">{f.label}</p>
-                <p className="text-sm font-bold text-slate-800 mt-1 tabular-nums truncate leading-snug">{f.value}</p>
+                <p className={`${f.wide ? "overflow-visible whitespace-normal text-[11px] leading-none" : "truncate text-sm"} font-bold text-slate-800 mt-1 tabular-nums`}>{f.value}</p>
               </div>
             ))}
           </div>
@@ -783,8 +792,11 @@ export default function StepEnd({
             {[
               {
                 label: t("ops.trip.date_time"),
-                value: submittedTimeDisplay || t("ops.trip.time_pending_short"),
+                value: submittedTimeDisplay ? (
+                  <TripTimestampDisplay value={submittedTimeDisplay} className="border-sky-100 bg-white/70 px-1.5 py-0.5 text-[10px]" />
+                ) : t("ops.trip.time_pending_short"),
                 tone: "border-sky-100 bg-sky-50/40 text-slate-700",
+                wide: true,
               },
               {
                 label: t("operations.vehicle_no"),
@@ -814,10 +826,10 @@ export default function StepEnd({
             ].map((f) => (
               <div
                 key={f.label}
-                className={`rounded-xl border px-3 py-2.5 min-w-0 shadow-sm ${f.tone}`}
+                className={`rounded-xl border px-3 py-2.5 min-w-0 shadow-sm ${f.wide ? "col-span-2 sm:col-span-1" : ""} ${f.tone}`}
               >
                 <p className="text-xs uppercase font-semibold text-slate-400 tracking-wide truncate">{f.label}</p>
-                <p className="text-sm font-bold text-slate-800 mt-1 tabular-nums truncate leading-snug">{f.value}</p>
+                <p className={`${f.wide ? "overflow-visible whitespace-normal text-[11px] leading-none" : "truncate text-sm"} font-bold text-slate-800 mt-1 tabular-nums`}>{f.value}</p>
               </div>
             ))}
           </div>

@@ -2,6 +2,8 @@ import React, { useCallback } from "react";
 import { Pencil, X } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { useI18n } from "../../../../i18n";
+import { ActionTooltip } from "../../../../ui/ActionTooltip";
+import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 
 interface Props {
   open: boolean;
@@ -35,10 +37,13 @@ function TripEditModal({ open, trip, onClose, onEdit }: Props) {
             </div>
           </div>
           <button
+            type="button"
             onClick={onClose}
-            className="h-10 w-10 rounded-full hover:bg-slate-100 flex items-center justify-center"
+            className="group relative h-10 w-10 rounded-full hover:bg-slate-100 flex items-center justify-center"
+            aria-label={t("common.close")}
           >
-            <X size={20} />
+            <X size={20} className={uiActionIconMotionClass.close} />
+            <ActionTooltip label={t("common.close")} side="bottom" />
           </button>
         </div>
         <div className="px-6 py-6 space-y-5">
@@ -65,14 +70,24 @@ function TripEditModal({ open, trip, onClose, onEdit }: Props) {
           </div>
         </div>
         <div className="flex justify-end gap-3 px-6 py-5 border-t">
-          <button onClick={onClose} className="h-10 px-5 rounded-xl border inline-flex items-center justify-center shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="group relative h-10 px-5 rounded-xl border inline-flex items-center justify-center shrink-0"
+            aria-label={t("common.cancel")}
+          >
             {t("common.cancel")}
+            <ActionTooltip label={t("common.cancel")} />
           </button>
           <button
+            type="button"
             onClick={handleEdit}
-            className="h-10 px-5 rounded-xl bg-green-500 hover:bg-green-800 text-white inline-flex items-center justify-center shrink-0"
+            className="group relative h-10 px-5 rounded-xl bg-green-500 hover:bg-green-800 text-white inline-flex items-center gap-2 justify-center shrink-0"
+            aria-label={t("ops.trip.edit_trip")}
           >
+            <Pencil size={14} className={uiActionIconMotionClass.edit} />
             {t("ops.trip.edit_trip")}
+            <ActionTooltip label={t("ops.trip.edit_trip")} />
           </button>
         </div>
       </div>

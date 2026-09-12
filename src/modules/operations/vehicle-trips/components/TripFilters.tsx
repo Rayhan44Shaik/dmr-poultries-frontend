@@ -13,6 +13,7 @@ import {
 } from "../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../i18n";
 import { BrandRefreshButton } from "../../../../ui";
+import { ActionTooltip } from "../../../../ui/ActionTooltip";
 import MasterDropdown from "../../../masters/components/MasterDropdown";
 
 interface Props {
@@ -182,32 +183,39 @@ function TripFilters({
           {showViewButton && onViewSelected && (
             <button
               ref={viewButtonRef}
+              type="button"
               onClick={onViewSelected}
-              className={`group ${opsViewButtonClass}`}
+              className={`group relative ${opsViewButtonClass}`}
+              aria-label={t("ops.trip.view_selected")}
             >
               <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]"><Eye size={15} /></span>
               {t("ops.trip.view_selected")}
+              <ActionTooltip label={t("ops.trip.view_selected")} />
             </button>
           )}
-          <button onClick={onSearch} className={`group ${opsPrimaryButtonClass}`}>
+          <button type="button" onClick={onSearch} className={`group relative ${opsPrimaryButtonClass}`} aria-label={t("common.search")}>
             <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-search)]"><Search size={15} /></span>
             {t("common.search")}
+            <ActionTooltip label={t("common.search")} />
           </button>
-          <button onClick={onReset} className={`group ${opsSecondaryButtonClass}`}>
+          <button type="button" onClick={onReset} className={`group relative ${opsSecondaryButtonClass}`} aria-label={t("common.reset")}>
             <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>
             {t("common.reset")}
+            <ActionTooltip label={t("common.reset")} />
           </button>
           {onRefresh && <BrandRefreshButton onClick={onRefresh} />}
           {onExportPDF && (
-            <button onClick={onExportPDF} disabled={!hasFilters} className={`group ${opsPdfButtonClass}`}>
+            <button type="button" onClick={onExportPDF} disabled={!hasFilters} className={`group relative ${opsPdfButtonClass}`} aria-label={t("reports.export_pdf") || "PDF"}>
               <span className={`inline-flex ${hasFilters ? "motion-safe:group-hover:animate-[var(--animate-action-pdf)]" : ""}`}><FileText size={15} /></span>
               PDF
+              <ActionTooltip label={t("reports.export_pdf") || "PDF"} />
             </button>
           )}
           {onExportExcel && (
-            <button onClick={onExportExcel} disabled={!hasFilters} className={`group ${opsExcelButtonClass}`}>
+            <button type="button" onClick={onExportExcel} disabled={!hasFilters} className={`group relative ${opsExcelButtonClass}`} aria-label={t("reports.export_excel") || "Excel"}>
               <span className={`inline-flex ${hasFilters ? "motion-safe:group-hover:animate-[var(--animate-action-excel)]" : ""}`}><FileSpreadsheet size={15} /></span>
               Excel
+              <ActionTooltip label={t("reports.export_excel") || "Excel"} />
             </button>
           )}
         </div>

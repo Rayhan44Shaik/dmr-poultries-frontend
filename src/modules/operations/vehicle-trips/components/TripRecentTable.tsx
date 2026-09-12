@@ -2,7 +2,7 @@
 
 import React, { useState, useRef, useEffect, useMemo } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Eye, Pencil, History, Trash2, Clock, AlertCircle, Search, FileText, CheckCircle } from "lucide-react";
+import { Eye, Pencil, History, Trash2, Clock, AlertCircle, Search, FileText, CheckCircle, X } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { canEditItem, canDeleteItem } from "../../../../utils/dateUtils";
 import { formatTripListDay } from "../utils/formatTripListDay";
@@ -15,6 +15,8 @@ import { useI18n } from "../../../../i18n";
 import { notify as globalNotify } from "../../../../ui/notifications/notificationStore";
 import { uniqueTripsById } from "../services/tripHeaderApiService";
 import { BrandRefreshButton } from "../../../../ui";
+import { ActionTooltip } from "../../../../ui/ActionTooltip";
+import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import { isOrderContainer } from "../../orders/ordersUtils";
 
 interface Props {
@@ -330,13 +332,15 @@ function TripRecentTable({
             <div className="h-5 w-px bg-slate-200 hidden sm:block" />
 
             <div className="flex items-center gap-1">
-              <button onClick={handleEditClick} disabled={!canEdit} className={`group h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canEdit ? "bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-500 border border-emerald-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`} title={t("ops.trip.edit_selected_trip")}>
-                <span className={`inline-flex ${canEdit ? "motion-safe:group-hover:animate-[var(--animate-action-edit)]" : ""}`}><Pencil size={13} /></span>
+              <button type="button" onClick={handleEditClick} disabled={!canEdit} className={`group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canEdit ? "bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-500 border border-emerald-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`} aria-label={t("ops.trip.edit_selected_trip")}>
+                <span className={`inline-flex ${canEdit ? uiActionIconMotionClass.edit : ""}`}><Pencil size={13} /></span>
                 <span className="hidden md:inline">{t("common.edit")}</span>
+                <ActionTooltip label={t("ops.trip.edit_selected_trip")} />
               </button>
-              <button onClick={openDeleteModal} disabled={!canDelete} className={`group h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canDelete ? "bg-rose-50/70 hover:bg-rose-50/80 text-rose-500 border border-rose-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`} title={t("ops.trip.delete_selected_trip")}>
-                <span className={`inline-flex ${canDelete ? "motion-safe:group-hover:animate-[var(--animate-action-delete)]" : ""}`}><Trash2 size={13} /></span>
+              <button type="button" onClick={openDeleteModal} disabled={!canDelete} className={`group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canDelete ? "bg-rose-50/70 hover:bg-rose-50/80 text-rose-500 border border-rose-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`} aria-label={t("ops.trip.delete_selected_trip")}>
+                <span className={`inline-flex ${canDelete ? uiActionIconMotionClass.delete : ""}`}><Trash2 size={13} /></span>
                 <span className="hidden md:inline">{t("common.delete")}</span>
+                <ActionTooltip label={t("ops.trip.delete_selected_trip")} />
               </button>
               <BrandRefreshButton onClick={() => onRefresh()} />
             </div>
@@ -370,7 +374,7 @@ function TripRecentTable({
                   const isSelected = trip.id === selectedTripId;
                   const isDeleted = trip.deleted === true;
                   return (
-                    <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-all duration-150 group ${isDeleted ? "bg-red-50/50 hover:bg-red-50/80 border-l-4 border-l-red-400" : isSelected ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200" : "hover:bg-slate-50/80"}`}>
+                    <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-all duration-150 ${isDeleted ? "bg-red-50/50 hover:bg-red-50/80 border-l-4 border-l-red-400" : isSelected ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200" : "hover:bg-slate-50/80"}`}>
                       <td className={`px-4 py-3 font-bold text-emerald-500 text-xs whitespace-nowrap ${isDeleted ? "opacity-60 line-through" : ""}`}>
                         {trip.tripNo}
                       </td>
@@ -443,7 +447,7 @@ function TripRecentTable({
                         })()}
                       </td>
                       <td className="text-center px-4 py-3">
-                        <button onClick={(e) => { e.stopPropagation(); onView(trip); }} className="group h-8 w-8 rounded-xl bg-violet-50 hover:bg-violet-500 text-violet-600 hover:text-white flex items-center justify-center mx-auto transition-all shadow-sm active:scale-95" title={t("ops.trip.view_trip_details")}><span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]"><Eye size={14} /></span></button>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); onView(trip); }} className="group relative h-8 w-8 rounded-xl bg-violet-50 hover:bg-violet-500 text-violet-600 hover:text-white flex items-center justify-center mx-auto transition-all shadow-sm active:scale-95" aria-label={t("ops.trip.view_trip_details")}><span className={`inline-flex ${uiActionIconMotionClass.view}`}><Eye size={14} /></span><ActionTooltip label={t("ops.trip.view_trip_details")} /></button>
                       </td>
                     </tr>
                   );
@@ -486,15 +490,15 @@ function TripRecentTable({
             <div className="flex items-start gap-3">
               <div className="h-10 w-10 rounded-xl bg-rose-50/70 border border-rose-100 flex items-center justify-center text-rose-500"><Trash2 size={20} /></div>
               <div className="flex-1"><h3 className="text-lg font-bold text-slate-800">{t("ops.trip.delete_trip")}</h3><p className="text-sm text-slate-500 mt-1">{t("ops.trip.delete_trip_about", { no: tripToDelete?.tripNo ?? "" })}</p></div>
-              <button onClick={cancelDelete} className="h-8 w-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400"><svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+              <button type="button" onClick={cancelDelete} className="group relative h-8 w-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-rose-500" aria-label={t("common.close")}><X size={18} className={uiActionIconMotionClass.close} /><ActionTooltip label={t("common.close")} /></button>
             </div>
             <div className="mt-4">
               <label htmlFor="deleteReason" className="block text-sm font-medium text-slate-700">{t("ops.trip.reason")} <span className="text-rose-500">*</span></label>
               <textarea id="deleteReason" rows={3} value={deleteReason} onChange={(e) => setDeleteReason(e.target.value)} placeholder={t("ops.trip.delete_reason_placeholder")} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2 text-sm text-slate-700 focus:border-rose-500 focus:ring-2 focus:ring-rose-400/20 outline-none" />
             </div>
             <div className="mt-6 flex justify-end gap-3">
-              <button onClick={cancelDelete} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all">{t("common.cancel")}</button>
-              <button onClick={confirmDelete} className="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-sm font-medium text-white transition-all shadow-sm active:scale-95">{t("ops.trip.confirm_delete")}</button>
+              <button type="button" onClick={cancelDelete} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all">{t("common.cancel")}</button>
+              <button type="button" onClick={confirmDelete} className="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-sm font-medium text-white transition-all shadow-sm active:scale-95">{t("ops.trip.confirm_delete")}</button>
             </div>
           </div>
         </div>

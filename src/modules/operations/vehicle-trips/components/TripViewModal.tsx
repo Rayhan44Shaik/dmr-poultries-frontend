@@ -3,7 +3,7 @@
 // Steps 1–5 embed the same locked Trip Entry components (shared fonts/layout).
 // Email/WhatsApp bulk actions are enabled only by the Trip History wrapper.
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import {
   FileText,
   Mail,
@@ -13,6 +13,8 @@ import {
   Loader2,
   UserCheck,
   FileDown,
+  Languages,
+  X,
 } from "lucide-react";
 import { WhatsAppIcon } from "../../../../ui/WhatsAppIcon";
 import type { Trip, ShopDelivery } from "../types/trip";
@@ -28,8 +30,10 @@ import { generateTripReportPDF, type TripReportEmailInfo } from "../utils/genera
 import { useTripDeliveryEmails } from "../hooks/useTripDeliveryEmails";
 import { useTripDeliveryWhatsApps } from "../hooks/useTripDeliveryWhatsApps";
 import { cleanDeliveryShopName } from "../utils/shopDisplayName";
+import { localizeBirdTypesForView, localizeShopsForView, localizeTripForView, localizeTripViewText } from "../utils/tripViewLocalization";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
-import { useI18n } from "../../../../i18n";
+import { ScopedI18nProvider, useI18n } from "../../../../i18n";
+import { ActionTooltip } from "../../../../ui/ActionTooltip";
 import StepStart from "./StepStart";
 import StepFarm from "./StepFarm";
 import StepPickup from "./StepPickup";
@@ -145,6 +149,7 @@ function Step4View({
   onSendOneEmail: (delivery: ShopDelivery) => void;
   onSendOneWhatsApp: (delivery: ShopDelivery) => void;
 }) {
+  const { t, language } = useI18n();
   const viewTrip: Trip = { ...trip, deliveryStepSubmitted: true };
   const deliveries = Array.isArray(trip.deliveries) ? trip.deliveries : [];
   return (
@@ -166,13 +171,19 @@ function Step4View({
       emailBusyIds={emailState.busyIds}
       emailIsBulkSending={emailState.isBulkSending}
       emailSendCountFor={emailState.sendCountFor}
-      emailFailureReasonFor={emailState.failureReasonFor}
+      emailFailureReasonFor={(deliveryId) => {
+        const reason = emailState.failureReasonFor(deliveryId);
+        return language === "te" && reason ? t("ops.trip.unable_send_email") : reason;
+      }}
       onSendOneEmail={onSendOneEmail}
       whatsappEffectiveStatus={whatsappState.effectiveStatus}
       whatsappBusyIds={whatsappState.busyIds}
       whatsappIsBulkSending={whatsappState.isBulkSending}
       whatsappSendCountFor={whatsappState.sendCountFor}
-      whatsappFailureReasonFor={whatsappState.failureReasonFor}
+      whatsappFailureReasonFor={(deliveryId) => {
+        const reason = whatsappState.failureReasonFor(deliveryId);
+        return language === "te" && reason ? t("ops.trip.unable_send_whatsapp") : reason;
+      }}
       onSendOneWhatsApp={onSendOneWhatsApp}
     />
   );
@@ -208,7 +219,7 @@ function TripViewModal({
   initialStep,
   showCommunicationStatus = true,
 }: Props) {
-  const { t } = useI18n();
+  const { t, language, toggleLanguage } = useI18n();
   // Completed trips open on Step 4 (Shop Deliveries); incomplete on Step 1.
   // A caller-provided initialStep wins (e.g. Farm Payment opens Step 2).
   const initialViewStep = (trip: Trip | null) => {
@@ -217,6 +228,19 @@ function TripViewModal({
   };
   const [viewStepIndex, setViewStepIndex] = useState(() => initialViewStep(trip));
   const [lastTripId, setLastTripId] = useState<number | null>(trip?.id ?? null);
+  const displayTrip = useMemo(() => (trip ? localizeTripForView(trip, language) : null), [trip, language]);
+  const displayShops = useMemo(() => localizeShopsForView(shops, language), [shops, language]);
+  const displayBirdTypes = useMemo(() => localizeBirdTypesForView(birdTypes, language), [birdTypes, language]);
+  const localizedStepLabels = useMemo(
+    () => [
+      t("ops.trip.step.start"),
+      t("ops.trip.step.farm"),
+      t("ops.trip.step.pickup"),
+      t("ops.trip.step.deliveries"),
+      t("ops.trip.step.expenses"),
+    ],
+    [t]
+  );
 
   // Reset the selected step when a different trip is opened (render-phase
   // adjustment — the official "adjust state when props change" pattern).
@@ -238,6 +262,11 @@ function TripViewModal({
   // ─── Early return – ensures trip is never null after this ─────
   if (!open || !trip) return null;
 
+  const viewTrip = displayTrip ?? trip;
+  const statusKey = `status.${String(trip.status || "pending").toLowerCase().replace(/\s+/g, "_")}`;
+  const translatedStatus = t(statusKey);
+  const viewStatus = language === "te" && translatedStatus !== statusKey ? translatedStatus : trip.status;
+  const popupLanguageLabel = language === "te" ? "ఇంగ్లీష్" : t("settings.telugu");
   const isCompleted = trip.status === "Completed" && isTripWizardComplete(trip);
 
   // ─── STEP STATE FLAGS (backend submitted flags only) ───
@@ -276,23 +305,27 @@ function TripViewModal({
   };
 
   const handleSendOneEmail = async (delivery: ShopDelivery) => {
-    const result = await emailState.sendOne(delivery);
+    const sourceDelivery = trip.deliveries?.find((item) => item.id === delivery.id) ?? delivery;
+    const result = await emailState.sendOne(sourceDelivery);
+    const fallbackMessage = result.status === "sending" ? t("ops.trip.sending_email") : t("ops.trip.unable_send_email");
     showFeedback({
       channel: "mail",
       type: result.success ? "success" : "error",
-      shopName: cleanDeliveryShopName(delivery.shopName) || delivery.shopName || t("ops.trip.shops"),
-      message: result.message,
+      shopName: localizeTripViewText(sourceDelivery.shopName, language, { cleanShopCode: true }) || t("ops.trip.shops"),
+      message: result.success ? t("ops.trip.email_sent_toast") : language === "te" ? fallbackMessage : result.message,
       count: result.sendCount,
     });
   };
 
   const handleSendOneWhatsApp = async (delivery: ShopDelivery) => {
-    const result = await whatsappState.sendOne(delivery);
+    const sourceDelivery = trip.deliveries?.find((item) => item.id === delivery.id) ?? delivery;
+    const result = await whatsappState.sendOne(sourceDelivery);
+    const fallbackMessage = result.status === "sending" ? t("ops.trip.sending_whatsapp") : t("ops.trip.unable_send_whatsapp");
     showFeedback({
       channel: "whatsapp",
       type: result.success ? "success" : "error",
-      shopName: cleanDeliveryShopName(delivery.shopName) || delivery.shopName || t("ops.trip.shops"),
-      message: result.message,
+      shopName: localizeTripViewText(sourceDelivery.shopName, language, { cleanShopCode: true }) || t("ops.trip.shops"),
+      message: result.success ? t("ops.trip.whatsapp_sent_toast") : language === "te" ? fallbackMessage : result.message,
       count: result.sendCount,
     });
   };
@@ -307,20 +340,20 @@ function TripViewModal({
   const renderStepContent = () => {
     switch (safeViewStepIndex) {
       case 0:
-        return isStartCompleted ? <Step1View trip={trip} /> : emptyStep;
+        return isStartCompleted ? <Step1View trip={viewTrip} /> : emptyStep;
       case 1:
         return trip.farmStepSubmitted
-          ? <Step2View trip={trip} birdTypes={birdTypes} />
+          ? <Step2View trip={viewTrip} birdTypes={displayBirdTypes} />
           : emptyStep;
       case 2:
-        return trip.pickupStepSubmitted ? <Step3View trip={trip} /> : emptyStep;
+        return trip.pickupStepSubmitted ? <Step3View trip={viewTrip} /> : emptyStep;
       case 3:
         return isDeliveryCompleted
           ? (
               <Step4View
-                trip={trip}
-                shops={shops}
-                birdTypes={birdTypes}
+                trip={viewTrip}
+                shops={displayShops}
+                birdTypes={displayBirdTypes}
                 showCommunicationStatus={showCommunicationStatus}
                 emailState={emailState}
                 whatsappState={whatsappState}
@@ -330,7 +363,7 @@ function TripViewModal({
             )
           : emptyStep;
       case 4:
-        return isEndCompleted ? <Step5View trip={trip} /> : emptyStep;
+        return isEndCompleted ? <Step5View trip={viewTrip} /> : emptyStep;
       default:
         return null;
     }
@@ -353,7 +386,7 @@ function TripViewModal({
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap min-w-0">
                   <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight truncate">
-                    {trip.tripNo || t("ops.trip.trip_details")}
+                    {viewTrip.tripNo || t("ops.trip.trip_details")}
                   </h2>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap mt-1.5">
@@ -363,7 +396,7 @@ function TripViewModal({
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1 rounded-full bg-amber-50/80 text-amber-500 border border-amber-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0">
-                      {trip.status || t("status.pending")}
+                      {viewStatus || t("status.pending")}
                     </span>
                   )}
                   <span className="text-xs font-medium text-slate-400">{t("ops.trip.read_only_overview")}</span>
@@ -372,12 +405,35 @@ function TripViewModal({
             </div>
 
             <div className="flex items-center gap-2 flex-wrap justify-end shrink-0 w-full sm:w-auto">
-              {isCompleted && trip.approvedBy && (
+              {isCompleted && viewTrip.approvedBy && (
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 border border-slate-200 shadow-sm shrink-0">
                   <UserCheck size={12} className="text-emerald-500" />
-                  {t("ops.trip.approved_by")}: {trip.approvedBy}
+                  {t("ops.trip.approved_by")}: {viewTrip.approvedBy}
                 </span>
               )}
+              <button
+                type="button"
+                onClick={toggleLanguage}
+                className="group relative inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-3 py-1.5 text-xs font-bold text-emerald-700 shadow-sm shadow-emerald-100/60 transition-all hover:-translate-y-0.5 hover:bg-emerald-50 active:scale-95"
+                aria-label={t("ops.trip.popup_language_toggle")}
+              >
+                <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]">
+                  <Languages size={13} />
+                </span>
+                {popupLanguageLabel}
+                <ActionTooltip label={t("ops.trip.popup_language_tooltip")} side="bottom" />
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="group relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:-translate-y-0.5 hover:border-red-100 hover:bg-red-50 hover:text-red-500 active:scale-95"
+                aria-label={t("ops.trip.close_view")}
+              >
+                <span className={`inline-flex ${uiActionIconMotionClass.close}`}>
+                  <X size={16} />
+                </span>
+                <ActionTooltip label={t("ops.trip.close_view")} side="bottom" />
+              </button>
             </div>
           </div>
 
@@ -425,8 +481,8 @@ function TripViewModal({
                     type="button"
                     onClick={() => void emailState.sendAll()}
                     disabled={emailState.isBulkSending}
-                    className="group inline-flex items-center gap-2.5 rounded-xl border border-red-100 bg-red-50/90 hover:bg-red-100 px-4 py-2 text-xs font-semibold text-red-600 shadow-sm shadow-red-100/60 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
-                    title={t("ops.trip.send_email_all")}
+                    className="group relative inline-flex items-center gap-2.5 rounded-xl border border-red-100 bg-red-50/90 hover:bg-red-100 px-4 py-2 text-xs font-semibold text-red-600 shadow-sm shadow-red-100/60 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                    aria-label={t("ops.trip.send_email_all")}
                   >
                     {emailState.isBulkSending ? (
                       <Loader2 size={14} className="animate-spin" />
@@ -434,6 +490,7 @@ function TripViewModal({
                       <span className={`inline-flex ${uiActionIconMotionClass.mail}`}><Mail size={14} /></span>
                     )}
                     {emailState.isBulkSending ? `${t("ops.trip.sending")}...` : t("ops.trip.send_all_email")}
+                    <ActionTooltip label={t("ops.trip.send_email_all")} side="bottom" />
                   </button>
                 )}
                 {showCommunicationStatus && whatsappCounts.total > 0 && (
@@ -441,8 +498,8 @@ function TripViewModal({
                     type="button"
                     onClick={() => void whatsappState.sendAll()}
                     disabled={whatsappState.isBulkSending}
-                    className="group inline-flex items-center gap-2.5 rounded-xl border border-[#25D366]/25 bg-[#25D366]/10 hover:bg-[#25D366]/15 px-4 py-2 text-xs font-semibold text-[#128C7E] shadow-sm shadow-[#25D366]/10 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
-                    title={t("ops.trip.send_whatsapp_all")}
+                    className="group relative inline-flex items-center gap-2.5 rounded-xl border border-[#25D366]/25 bg-[#25D366]/10 hover:bg-[#25D366]/15 px-4 py-2 text-xs font-semibold text-[#128C7E] shadow-sm shadow-[#25D366]/10 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                    aria-label={t("ops.trip.send_whatsapp_all")}
                   >
                     {whatsappState.isBulkSending ? (
                       <Loader2 size={14} className="animate-spin" />
@@ -450,16 +507,17 @@ function TripViewModal({
                       <span className={`inline-flex ${uiActionIconMotionClass.whatsapp}`}><WhatsAppIcon size={14} /></span>
                     )}
                     {whatsappState.isBulkSending ? `${t("ops.trip.sending")}...` : t("ops.trip.send_all_whatsapp")}
+                    <ActionTooltip label={t("ops.trip.send_whatsapp_all")} side="bottom" />
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={() => void downloadTripReport()}
-                  className="group inline-flex items-center justify-center rounded-xl border border-red-100 bg-red-50/70 hover:bg-red-50/80 p-2 text-red-500 shadow-sm transition-all active:scale-95"
-                  title={t("ops.trip.create_pdf_title")}
+                  className="group relative inline-flex items-center justify-center rounded-xl border border-red-100 bg-red-50/70 hover:bg-red-50/80 p-2 text-red-500 shadow-sm transition-all active:scale-95"
                   aria-label={t("ops.trip.create_pdf")}
                 >
                   <span className={`inline-flex ${uiActionIconMotionClass.pdf}`}><FileDown size={16} /></span>
+                  <ActionTooltip label={t("ops.trip.create_pdf_title")} side="bottom" />
                 </button>
               </div>
             </div>
@@ -469,7 +527,7 @@ function TripViewModal({
         {/* ─── Body ─────────────────────────────────────────────────── */}
         <div className="py-6 md:py-8 px-4 md:px-8 overflow-y-auto space-y-5 flex-1">
           <TripWizardStepper
-            steps={TRIP_STEP_LABELS}
+            steps={localizedStepLabels}
             currentStep={safeViewStepIndex}
             completedMask={completedMask}
             lockedSteps={lockedSteps}
@@ -483,13 +541,22 @@ function TripViewModal({
           <div key={`${trip.id}-step-${safeViewStepIndex}`} className="animate-fade-in-up">
             {renderStepContent()}
           </div>
-          <TripFinalKPI trip={trip} deliveries={trip.deliveries} />
+          <TripFinalKPI trip={viewTrip} deliveries={viewTrip.deliveries} />
         </div>
 
         {/* ─── Footer ───────────────────────────────────────────────── */}
         <div className="px-6 md:px-8 py-5 border-t border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 flex items-center justify-end gap-3">
-          <button onClick={onClose} className="inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-all active:scale-95">
+          <button
+            type="button"
+            onClick={onClose}
+            className="group relative inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-all active:scale-95"
+            aria-label={t("ops.trip.close_view")}
+          >
+            <span className={`inline-flex ${uiActionIconMotionClass.close}`}>
+              <X size={15} />
+            </span>
             {t("common.close")}
+            <ActionTooltip label={t("ops.trip.close_view")} side="top" />
           </button>
         </div>
       </div>
@@ -535,7 +602,9 @@ function TripViewModal({
                   {t("common.sent")} · {communicationFeedback.count}
                 </p>
               ) : null}
-              <p className="mt-3 text-[10px] font-semibold text-slate-400">Closes in 5 sec</p>
+              <p className="mt-3 text-[10px] font-semibold text-slate-400">
+                {t("ops.trip.closes_in_seconds", { seconds: 5 })}
+              </p>
             </div>
             <div className="h-1 bg-slate-100">
               <div
@@ -556,14 +625,23 @@ function TripViewModal({
   );
 }
 
+function ScopedTripViewModal(props: Props) {
+  const { language } = useI18n();
+  return (
+    <ScopedI18nProvider initialLanguage={language}>
+      <TripViewModal {...props} />
+    </ScopedI18nProvider>
+  );
+}
+
 /** Recent Activity view: read-only Trip steps without communication counters. */
 export function RecentTripViewModal(props: Props) {
-  return <TripViewModal {...props} showCommunicationStatus={false} />;
+  return <ScopedTripViewModal {...props} showCommunicationStatus={false} />;
 }
 
 /** Trip History/List view: includes email and WhatsApp delivery counters/actions. */
 export function TripHistoryViewModal(props: Props) {
-  return <TripViewModal {...props} showCommunicationStatus />;
+  return <ScopedTripViewModal {...props} showCommunicationStatus />;
 }
 
 export default React.memo(TripHistoryViewModal);
