@@ -435,16 +435,16 @@ const windowLabel = (from: string, to: string, locale = "en-IN"): string => {
     : `${start} – ${end}`;
 };
 
-/** One solid accent per chip — today reads sky, week violet, month teal. */
+/** One soft accent per chip — today reads sky, week violet, month teal. */
 const VIEW_ACCENT: Record<TrendPreset, { active: string; icon: typeof CalendarDays }> = {
-  today: { active: "bg-sky-500 text-white shadow-sky-500/25", icon: CalendarDays },
-  week: { active: "bg-violet-500 text-white shadow-violet-500/25", icon: CalendarRange },
-  month: { active: "bg-teal-500 text-white shadow-teal-500/25", icon: Calendar },
+  today: { active: "bg-sky-50 text-sky-700 ring-sky-200", icon: CalendarDays },
+  week: { active: "bg-violet-50 text-violet-700 ring-violet-200", icon: CalendarRange },
+  month: { active: "bg-teal-50 text-teal-700 ring-teal-200", icon: Calendar },
 };
 
 /** The calendar's own range reads slate — it is the default, not a preset. */
 const CALENDAR_ACCENT = {
-  active: "bg-slate-700 text-white shadow-slate-700/25",
+  active: "bg-slate-100 text-slate-700 ring-slate-200",
   icon: SlidersHorizontal,
 };
 
@@ -498,24 +498,22 @@ function TrendViewSwitcher({
             /* Tapping the lit chip lets go of the window: back to the calendar. */
             title={selected ? calendarTitle : undefined}
             onClick={() => onChange(selected ? null : view.key)}
-            className={`group flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold tracking-tight transition-all duration-200 active:scale-[0.97] ${
-              selected
-                ? `${accent.active} shadow-[0_2px_10px_-3px] ring-1 ring-inset ring-white/20`
-                : "text-slate-500 hover:bg-white hover:text-slate-700"
+            className={`group flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold tracking-tight ring-1 ring-inset transition-all duration-200 active:scale-[0.97] ${
+              selected ? `${accent.active} shadow-sm` : "text-slate-500 ring-transparent hover:bg-white hover:text-slate-700"
             }`}
           >
             <Icon
               size={13}
               strokeWidth={2.4}
               className={
-                selected ? "text-white/90" : "text-slate-400 transition-colors group-hover:text-slate-500"
+                selected ? "opacity-70" : "text-slate-400 transition-colors group-hover:text-slate-500"
               }
             />
             <span className="whitespace-nowrap">{view.label}</span>
             {view.count == null ? null : (
               <span
                 className={`rounded-full px-1.5 py-px text-[10.5px] font-black tabular-nums ${
-                  selected ? "bg-white/20 text-white" : "bg-slate-200/70 text-slate-600"
+                  selected ? "bg-white/80" : "bg-slate-200/70 text-slate-600"
                 }`}
               >
                 {view.count}

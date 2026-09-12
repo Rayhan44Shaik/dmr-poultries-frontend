@@ -173,6 +173,48 @@ function Row({
   );
 }
 
+/**
+ * The average marker's caption, on its own plate: a rounded white chip hung
+ * just above the dashed line at the right-hand edge, so it can never print
+ * across a bar or the axis.
+ */
+function AverageLabel({
+  viewBox,
+  text,
+}: {
+  viewBox?: { x?: number; y?: number; width?: number };
+  text: string;
+}) {
+  const width = 64;
+  const height = 16;
+  if (!viewBox?.width) return null;
+  const x = (viewBox.x ?? 0) + viewBox.width - width;
+  const y = (viewBox.y ?? 0) - height - 2;
+  return (
+    <g>
+      <rect
+        x={x}
+        y={y}
+        width={width}
+        height={height}
+        rx={8}
+        fill="#ffffff"
+        fillOpacity={0.92}
+        stroke="#bae6fd"
+      />
+      <text
+        x={x + width / 2}
+        y={y + height / 2}
+        textAnchor="middle"
+        dominantBaseline="central"
+        style={{ fontSize: 9.5, fill: "#0369a1", fontWeight: 700 }}
+      >
+        {text}
+      </text>
+    </g>
+  );
+}
+
 /* ------------------------------------------------------------------ */
 /*  Chart                                                              */
 /* ------------------------------------------------------------------ */
@@ -352,11 +394,12 @@ export default function OperationalTrendsChart({
               strokeDasharray="4 4"
               strokeOpacity={0.7}
               strokeWidth={1}
-              label={{
-                value: `${t("ops.dashboard.trend.average")} ${tickKg(totals.avgFarmWeight)}`,
-                position: "insideTopRight",
-                style: { fontSize: 9.5, fill: "#0ea5e9", fontWeight: 700 },
-              }}
+              /* Its own little plate, so the average never prints over a bar. */
+              label={
+                <AverageLabel
+                  text={`${t("ops.dashboard.trend.average")} ${tickKg(totals.avgFarmWeight, locale)}`}
+                />
+              }
             />
 
             <Area
