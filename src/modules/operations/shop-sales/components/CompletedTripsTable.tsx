@@ -175,12 +175,12 @@ function CompletedTripsTable({
                     onClick={() => onRowClick?.(trip)}
                     className={`${onRowClick ? "cursor-pointer" : ""} border-t transition-colors duration-150 ${
                       isSelected
-                        ? "bg-orange-100/80 border-l-4 border-l-orange-400 ring-1 ring-inset ring-orange-300"
+                        ? "bg-orange-50/80 border-l-4 border-l-orange-200 ring-1 ring-inset ring-orange-100"
                         : `${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"} hover:bg-slate-50/60`
                     }`}
                   >
                     <td className="px-4 py-3 text-center text-xs text-slate-500 font-medium w-10">
-                      {isSelected ? <Check size={15} className="inline text-orange-600" /> : serialNo}
+                      {isSelected ? <Check size={15} className="inline text-orange-500" /> : serialNo}
                     </td>
                     <td className="px-4 py-3 font-bold text-emerald-500 text-xs whitespace-nowrap">{trip.tripNo}</td>
                     <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">{formatRateEntryDay(trip.tripDate, language)}</td>

@@ -18,6 +18,22 @@ import { useShops } from "../../../masters/shops/hooks/useShops";
 
 type EnterRateModalProps = ComponentProps<typeof EnterRateModal>;
 
+type RateEntryFilterState = {
+  fromDate: string;
+  toDate: string;
+  search: string;
+  vehicle: string;
+  supervisor: string;
+};
+
+const EMPTY_RATE_FILTER: RateEntryFilterState = {
+  fromDate: "",
+  toDate: "",
+  search: "",
+  vehicle: "",
+  supervisor: "",
+};
+
 function EnterRateModalWithShopMaster(props: EnterRateModalProps) {
   const { shops, loading } = useShops();
   return <EnterRateModal {...props} shops={shops} shopsLoading={loading} />;
@@ -63,6 +79,8 @@ export default function RatesEntryPage({ embedded = false }: Props) {
     isSaving,
   } = useCompletedTrips();
 
+  const [draftFilter, setDraftFilter] = useState<RateEntryFilterState>(EMPTY_RATE_FILTER);
+
   const hasFilters =
     filter.fromDate !== "" ||
     filter.toDate !== "" ||
@@ -73,8 +91,20 @@ export default function RatesEntryPage({ embedded = false }: Props) {
   const safeCurrentPage = Math.min(currentPage, Math.max(totalPages, 1));
   const startIndex = (safeCurrentPage - 1) * pageSize;
 
+  const handleApplyFilters = () => {
+    const nextFilter = {
+      ...draftFilter,
+      search: draftFilter.search.trim(),
+    };
+    setDraftFilter(nextFilter);
+    setFilter(nextFilter);
+    setSelectedRowId(null);
+  };
+
   const handleResetFilters = () => {
+    setDraftFilter({ ...EMPTY_RATE_FILTER });
     resetFilters();
+    setSelectedRowId(null);
     showNotification(t("ops.rate.filters_reset"), "info");
   };
 
@@ -163,19 +193,19 @@ export default function RatesEntryPage({ embedded = false }: Props) {
   const content = (
     <div className={opsPageClass}>
       <CompletedTripsFilters
-        fromDate={filter.fromDate}
-        toDate={filter.toDate}
-        search={filter.search}
-        vehicle={filter.vehicle}
-        supervisor={filter.supervisor}
+        fromDate={draftFilter.fromDate}
+        toDate={draftFilter.toDate}
+        search={draftFilter.search}
+        vehicle={draftFilter.vehicle}
+        supervisor={draftFilter.supervisor}
         vehicleList={vehicleList}
         supervisorList={supervisorList}
-        setFromDate={(value) => setFilter({ fromDate: value })}
-        setToDate={(value) => setFilter({ toDate: value })}
-        setSearch={(value) => setFilter({ search: value })}
-        setVehicle={(value) => setFilter({ vehicle: value })}
-        setSupervisor={(value) => setFilter({ supervisor: value })}
-        onSearch={() => setCurrentPage(1)}
+        setFromDate={(value) => setDraftFilter((current) => ({ ...current, fromDate: value }))}
+        setToDate={(value) => setDraftFilter((current) => ({ ...current, toDate: value }))}
+        setSearch={(value) => setDraftFilter((current) => ({ ...current, search: value }))}
+        setVehicle={(value) => setDraftFilter((current) => ({ ...current, vehicle: value }))}
+        setSupervisor={(value) => setDraftFilter((current) => ({ ...current, supervisor: value }))}
+        onSearch={handleApplyFilters}
         onReset={handleResetFilters}
         onRefresh={handleRefresh}
         refreshing={isLoading}

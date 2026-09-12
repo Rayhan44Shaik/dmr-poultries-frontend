@@ -148,8 +148,14 @@ function CompletedTripsFilters({
           <div className="relative">
             <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
+              type="search"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key !== "Enter") return;
+                event.preventDefault();
+                onSearch();
+              }}
               placeholder={t("ops.rate.search_placeholder")}
               className={`${opsInputClass} pl-10`}
             />
