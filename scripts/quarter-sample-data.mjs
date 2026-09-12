@@ -2190,6 +2190,24 @@ function rateEntryTrip(t, withDeliveries) {
   };
 }
 
+/**
+ * Applies the frontend's `{ rates: [{ deliveryId, rate }] }` payload onto a
+ * trip's shop-wise deliveries and recomputes each line amount. Used by both the
+ * Save-Only (PUT) and Save & Lock (POST /lock) rate-entry endpoints.
+ */
+function applyDeliveryRates(trip, rates) {
+  const byId = new Map(
+    (Array.isArray(rates) ? rates : []).map((r) => [Number(r.deliveryId), Number(r.rate)]),
+  );
+  for (const d of trip.deliveries) {
+    const rate = byId.get(d.id);
+    if (Number.isFinite(rate)) {
+      d.rate = rate;
+      d.amount = round((d.weight ?? 0) * rate, 2);
+    }
+  }
+}
+
 function pendingCollections() {
   return SHOPS.map((s) => {
     const last = COLLECTIONS.filter((c) => c.shopId === s.id && c.status === "Approved")
@@ -2557,12 +2575,38 @@ const server = http.createServer(async (req, res) => {
     if (p === "/api/operations/vehicle-trips/list") return send(200, TRIPS);
 
     if (p === "/api/operations/rate-entry") {
-      const rows = TRIPS.filter((t) => t.deliveryStepSubmitted && !t.deleted);
+      // Eligible = deliveries submitted, trip finalized (not Draft), not
+      // deleted, and NOT yet rate-locked. Once a trip is Save & Locked it
+      // leaves this list for good — only un-rated / un-locked trips remain.
+      const rows = TRIPS.filter(
+        (t) =>
+          !t.deleted &&
+          !t.rateLockedAt &&
+          t.deliveryStepSubmitted &&
+          t.status !== "Draft",
+      );
       return send(200, rows.map((t) => rateEntryTrip(t, false)));
+    }
+    if (m(/^\/api\/operations\/rate-entry\/(\d+)\/lock$/) && method === "POST") {
+      const trip = TRIP_BY_ID.get(Number(m(/^\/api\/operations\/rate-entry\/(\d+)\/lock$/)[1]));
+      if (!trip) return send(404, { error: "not_found" });
+      const body = await readBody(req);
+      applyDeliveryRates(trip, body?.rates);
+      trip.rateLockedAt = new Date().toISOString();
+      trip.rateLockedBy = body?.lockedBy ?? "web-user";
+      trip.rateCompleted = true;
+      trip.ratesEntered = trip.deliveries.filter((d) => d.rate != null).length;
+      return send(200, rateEntryTrip(trip, true));
     }
     if (m(/^\/api\/operations\/rate-entry\/(\d+)$/)) {
       const trip = TRIP_BY_ID.get(Number(m(/^\/api\/operations\/rate-entry\/(\d+)$/)[1]));
-      return trip ? send(200, rateEntryTrip(trip, true)) : send(404, { error: "not_found" });
+      if (!trip) return send(404, { error: "not_found" });
+      if (method === "PUT") {
+        // Save-Only (draft): apply rates, do NOT lock.
+        const body = await readBody(req);
+        applyDeliveryRates(trip, body?.rates);
+      }
+      return send(200, rateEntryTrip(trip, true));
     }
 
     if (p === "/api/operations/shop-sales") {

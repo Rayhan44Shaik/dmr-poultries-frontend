@@ -52,7 +52,7 @@ export function useLeaveManagement(showNotification?: NotificationFn) {
   const [filters, setFilters] = useState<LeaveFilters>(DEFAULT_FILTERS);
   const [list, setList] = useState<LeaveListResult>({ items: [], total: 0, page: 1, limit: 100, totalPages: 0 });
   const [page, setPage] = useState(1);
-  const pageSize = 25;
+  const [pageSize, setPageSize] = useState(25);
   const [report, setReport] = useState<LeaveReport>({ month: DEFAULT_FILTERS.month, items: [] });
   const [loading, setLoading] = useState(true);
   const [reportLoading, setReportLoading] = useState(false);
@@ -87,7 +87,7 @@ export function useLeaveManagement(showNotification?: NotificationFn) {
       page,
       limit: pageSize,
     });
-  }, [filters.status, filters.month, filters.department, filters.employeeId, filters.leaveType, filters.search, page]);
+  }, [filters.status, filters.month, filters.department, filters.employeeId, filters.leaveType, filters.search, page, pageSize]);
 
   const fetchReport = useCallback(async () => {
     return getLeaveReport({
@@ -313,6 +313,7 @@ export function useLeaveManagement(showNotification?: NotificationFn) {
     total: list.total,
     totalPages: list.totalPages,
     setPage,
+    setPageSize,
   };
 }
 

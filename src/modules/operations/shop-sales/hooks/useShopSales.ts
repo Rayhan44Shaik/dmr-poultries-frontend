@@ -28,7 +28,7 @@ function useShopSales() {
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<ShopSaleFilter>({ ...DEFAULT_FILTER });
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
+  const [pageSize, setPageSize] = useState(10);
 
   const refreshSales = useCallback(async (options?: { silent?: boolean }) => {
     if (!options?.silent) setIsLoading(true);
@@ -138,6 +138,8 @@ function useShopSales() {
     shopNames,
     currentPage,
     setCurrentPage,
+    pageSize,
+    setPageSize,
     totalPages,
     resetFilters,
     refreshSales,

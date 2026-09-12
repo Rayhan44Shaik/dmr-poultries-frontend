@@ -8,6 +8,7 @@ import { FuelEntryForm } from "../components/FuelEntryForm";
 import { FuelBillTable } from "../components/FuelBillTable";
 import { FuelViewModal } from "../components/FuelViewModal";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
+import { PageSizeSelect } from "../../../../shared/ui/PageSizeSelect";
 import {
   paginationBarClass,
   paginationNavBtnClass,
@@ -81,6 +82,8 @@ function FuelExpensesPage() {
     paginatedData,
     currentPage,
     setCurrentPage,
+    pageSize,
+    setPageSize,
     totalPages,
     fromDate,
     setFromDate,
@@ -546,6 +549,15 @@ function FuelExpensesPage() {
 
         {shouldShowPagination(totalCount) && (
           <div className={paginationBarClass}>
+            <div className="mr-auto flex items-center gap-1.5">
+              <PageSizeSelect
+                value={pageSize}
+                onChange={(size) => {
+                  setPageSize(size);
+                  setCurrentPage(1);
+                }}
+              />
+            </div>
             <button
               disabled={currentPage === 1}
               onClick={() => setCurrentPage((p) => p - 1)}

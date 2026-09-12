@@ -317,8 +317,9 @@ function OrdersDeliveryDetailView({
 
   // ── Pagination (existing global component; 10 rows per page; resets to
   //    page 1 whenever the search / status filter changes) ─────────────────
-  const totalPages = Math.max(1, Math.ceil(listedRows.length / PAGE_SIZE));
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
+  const totalPages = Math.max(1, Math.ceil(listedRows.length / pageSize));
   const [lastKey, setLastKey] = useState(
     `${query}|${statusFilter}|${listedRows.length}`
   );
@@ -328,10 +329,10 @@ function OrdersDeliveryDetailView({
   }
   const safePage = Math.min(page, totalPages);
   const pageRows = listedRows.slice(
-    (safePage - 1) * PAGE_SIZE,
-    safePage * PAGE_SIZE
+    (safePage - 1) * pageSize,
+    safePage * pageSize
   );
-  const startIndex = listedRows.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE;
+  const startIndex = listedRows.length === 0 ? 0 : (safePage - 1) * pageSize;
 
   // ── Totals over ALL matched rows (listed + unlisted) — ordered sums
   //    ordered, delivered sums delivered (NOT LISTED rows have no ordered
@@ -364,7 +365,7 @@ function OrdersDeliveryDetailView({
   const notListedCount = breakdown.filter((b) => b.status === "not_listed").length;
   const notDeliveredCount = breakdown.filter((b) => b.status === "not_delivered").length;
   const report = buildDeliveryReportSummary(progress, breakdown);
-  const shopPage = pageRange(listedRows.length, safePage, PAGE_SIZE);
+  const shopPage = pageRange(listedRows.length, safePage, pageSize);
 
   const status = progress?.status ?? "Assigned";
   const statusLabel =
@@ -633,6 +634,11 @@ function OrdersDeliveryDetailView({
                       totalPages={totalPages}
                       onPageChange={setPage}
                       hidePageInfo
+                      pageSize={pageSize}
+                      onPageSizeChange={(size) => {
+                        setPageSize(size);
+                        setPage(1);
+                      }}
                     />
                   ) : null}
                 </div>

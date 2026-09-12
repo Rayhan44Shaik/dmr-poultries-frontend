@@ -352,7 +352,7 @@ export default function UnLoadingTable({
   const safeBoxDetails = boxDetailsRef.current.length > 0 ? boxDetailsRef.current : (boxDetails ?? []);
 
   const [currentPage, setCurrentPage] = useState<number>(1);
-  const itemsPerPage = 9;
+  const [itemsPerPage, setItemsPerPage] = useState<number>(9);
   const [showForm, setShowForm] = useState<boolean>(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [autoCaptureTime, setAutoCaptureTime] = useState<string>("");
@@ -1022,12 +1022,12 @@ export default function UnLoadingTable({
     });
   }, [safeRows, searchTerm]);
 
-  const totalPages = useMemo<number>(() => Math.ceil(displayRows.length / itemsPerPage), [displayRows.length]);
+  const totalPages = useMemo<number>(() => Math.ceil(displayRows.length / itemsPerPage), [displayRows.length, itemsPerPage]);
 
   const currentRows = useMemo<ShopDelivery[]>(() => {
     const startIndex = (currentPage - 1) * itemsPerPage;
     return displayRows.slice(startIndex, startIndex + itemsPerPage);
-  }, [displayRows, currentPage]);
+  }, [displayRows, currentPage, itemsPerPage]);
 
   useEffect(() => {
     if (currentPage > totalPages && totalPages > 0) setCurrentPage(1);
@@ -1318,6 +1318,11 @@ export default function UnLoadingTable({
             currentPage={currentPage}
             totalPages={Math.max(totalPages, 1)}
             onPageChange={setCurrentPage}
+            pageSize={itemsPerPage}
+            onPageSizeChange={(size) => {
+              setItemsPerPage(size);
+              setCurrentPage(1);
+            }}
           />
           )}
         </>

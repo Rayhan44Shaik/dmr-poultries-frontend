@@ -4,6 +4,7 @@
 // Email/WhatsApp bulk actions are enabled only by the Trip History wrapper.
 
 import React, { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   FileText,
   Mail,
@@ -372,9 +373,14 @@ function TripViewModal({
   const emailCounts = emailState.counts;
   const whatsappCounts = whatsappState.counts;
 
-  return (
-    <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50 p-4 overflow-y-auto animate-fade-in">
-      <div className="bg-white rounded-3xl shadow-2xl border border-slate-100 w-full max-w-7xl max-h-[92vh] overflow-hidden flex flex-col">
+  // Rendered through a portal to <body> so the `fixed inset-0` overlay covers
+  // the real viewport. An ancestor (the page's `animate-page-pop` wrapper) has a
+  // persistent `transform` with `animation-fill-mode: both`, which turns it into
+  // the containing block for `position: fixed` and would otherwise shrink the
+  // "full-screen" view down to that container's bounds.
+  return createPortal(
+    <div className="fixed inset-0 bg-black/40 z-50 animate-fade-in">
+      <div className="bg-white w-full h-full overflow-hidden flex flex-col">
         {/* ─── Header ─────────────────────────────────────────────── */}
         <div className="border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/80">
           {/* Top row: Trip identity + status */}
@@ -621,7 +627,8 @@ function TripViewModal({
           </div>
         </div>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }
 

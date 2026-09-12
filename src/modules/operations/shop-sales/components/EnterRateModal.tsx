@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   X,
   Truck,
@@ -268,7 +269,12 @@ export default function EnterRateModal({
 
   if (!open || !trip) return null;
 
-  return (
+  // Rendered through a portal to <body> so the `fixed inset-0` overlay covers
+  // the real viewport. An ancestor (the page's `animate-page-pop` wrapper) has a
+  // persistent `transform` with `animation-fill-mode: both`, which turns it into
+  // the containing block for `position: fixed` and would otherwise shrink the
+  // "full-screen" modal down to that container's bounds.
+  return createPortal(
     <>
       <style>{`
         .no-spinner::-webkit-inner-spin-button,
@@ -276,7 +282,7 @@ export default function EnterRateModal({
         .no-spinner { -moz-appearance: textfield; }
       `}</style>
 
-      <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-3 overflow-y-auto">
+      <div className="fixed inset-0 z-50 bg-black/40">
         {showSuccessToast && (
           <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/20">
             <div className="bg-white rounded-2xl shadow-2xl border border-emerald-100 p-6 flex flex-col items-center gap-3">
@@ -322,7 +328,7 @@ export default function EnterRateModal({
           </div>
         )}
 
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-6xl max-h-[94vh] flex flex-col relative overflow-hidden">
+        <div className="bg-white w-full h-full flex flex-col relative overflow-hidden">
           <div className="bg-white border-b border-slate-200 px-5 py-3 flex items-start justify-between shrink-0">
             <h2 className="text-xl font-bold text-slate-900">
               {rateLocked ? t("ops.rate.modal.title_readonly") : t("ops.rate.modal.title_enter")}
@@ -639,6 +645,7 @@ export default function EnterRateModal({
           </div>
         </div>
       </div>
-    </>
+    </>,
+    document.body,
   );
 }

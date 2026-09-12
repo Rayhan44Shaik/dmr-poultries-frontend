@@ -52,6 +52,7 @@ const VehiclePerformanceTable = ({ stats, statusById }: VehiclePerformanceTableP
   const [sortKey, setSortKey] = useState<SortKey>('totalExpense');
   const [sortDir, setSortDir] = useState<SortDir>('desc');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
 
   const sorted = useMemo(() => {
     const getter = SORT_GETTER[sortKey];
@@ -66,11 +67,11 @@ const VehiclePerformanceTable = ({ stats, statusById }: VehiclePerformanceTableP
     });
   }, [stats, sortKey, sortDir]);
 
-  const totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(sorted.length / pageSize));
   const safePage = Math.min(page, totalPages);
   const paged = useMemo(
-    () => sorted.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE),
-    [sorted, safePage]
+    () => sorted.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [sorted, safePage, pageSize]
   );
 
   const toggleSort = (key: SortKey) => {
@@ -176,8 +177,13 @@ const VehiclePerformanceTable = ({ stats, statusById }: VehiclePerformanceTableP
           currentPage={safePage}
           totalPages={totalPages}
           onPageChange={setPage}
-          itemsPerPage={PAGE_SIZE}
+          itemsPerPage={pageSize}
           totalItems={sorted.length}
+          pageSize={pageSize}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
         />
       </div>
     </div>

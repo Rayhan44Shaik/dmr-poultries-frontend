@@ -1,6 +1,7 @@
 import { memo, useMemo } from 'react';
 import { useI18n } from '../../../../i18n';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { PageSizeSelect } from '../../../../shared/ui/PageSizeSelect';
 import {
   uiPaginationNavButtonClass,
   uiPaginationPageButtonClass,
@@ -23,9 +24,11 @@ interface Props {
   pageSize: number;
   ready: boolean;
   onChange: (page: number) => void;
+  /** Pass to show the global rows-per-page control. */
+  onPageSizeChange?: (pageSize: number) => void;
 }
 
-function EmiPagination({ page, totalPages, totalItems, pageSize, ready, onChange }: Props) {
+function EmiPagination({ page, totalPages, totalItems, pageSize, ready, onChange, onPageSizeChange }: Props) {
   const { t } = useI18n();
   const pageCount = Math.max(1, totalPages);
   const currentPage = Math.max(1, Math.min(page, pageCount));
@@ -49,6 +52,9 @@ function EmiPagination({ page, totalPages, totalItems, pageSize, ready, onChange
       <p className={`${uiPaginationSummaryClass} mr-0`} aria-live="polite">
         {ready ? t('fleet.emi.showing_rows', { from, to, total: totalItems }) : '—'}
       </p>
+      {onPageSizeChange && (
+        <PageSizeSelect value={pageSize} onChange={onPageSizeChange} disabled={!ready} />
+      )}
       <nav aria-label={t('fleet.emi.pagination_label')} className="flex items-center justify-end gap-1.5">
         <button type="button" aria-label={t('common.previous')} disabled={!canNavigate || currentPage === 1} onClick={() => choosePage(currentPage - 1)} className={navButtonClass}>
           <ChevronLeft size={14} aria-hidden="true" className="sm:hidden" />
