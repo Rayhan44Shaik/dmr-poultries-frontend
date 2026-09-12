@@ -21,7 +21,7 @@ export function TripTimestampDisplay({ value, empty = "—", className }: TripTi
     <span
       title={text}
       className={cn(
-        "inline-flex max-w-full items-center rounded-lg border border-sky-100 bg-sky-50/70 px-1.5 py-0.5 text-[10px] font-bold leading-none tracking-tight text-slate-800 tabular-nums whitespace-nowrap",
+        "inline-flex max-w-full min-w-0 items-center rounded-lg border border-sky-100 bg-sky-50/70 px-2 py-1 text-[11px] font-bold leading-none tracking-[-0.015em] text-slate-800 tabular-nums whitespace-nowrap",
         className,
       )}
     >

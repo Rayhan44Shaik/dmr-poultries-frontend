@@ -625,14 +625,14 @@ export default function StepPickup({
         </div>
 
         {/* Same StepKpiCard font/layout as steps 1–2 / 4–5 (time first) */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 pt-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-[minmax(210px,1.25fr)_repeat(4,minmax(0,1fr))] gap-3 pt-2">
           <StepKpiCard
             icon={Clock}
             tone="bg-blue-50/70 text-blue-500"
             label={t("ops.trip.captured_time")}
-            value={<TripTimestampDisplay value={officialPickupTime} empty="--" className="px-2 py-1" />}
+            value={<TripTimestampDisplay value={officialPickupTime} empty="--" />}
             title={officialPickupTime || undefined}
-            cardClass="col-span-2 sm:col-span-2 md:col-span-2"
+            cardClass="col-span-2 sm:col-span-1"
             valueClass="overflow-visible whitespace-normal text-[11px] leading-none"
           />
           <StepKpiCard
@@ -864,7 +864,7 @@ export default function StepPickup({
           <span className="h-5 w-5 rounded-md bg-blue-50/80 text-blue-500 flex items-center justify-center shrink-0"><Clock size={ 14 } /></span>
           {officialPickupTime ? (
             <>
-              <TripTimestampDisplay value={officialPickupTime} className="px-1.5 py-0.5 text-[10px]" />
+              <TripTimestampDisplay value={officialPickupTime} />
               <span
                 className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400 bg-slate-100 border border-slate-200 rounded-full px-2 py-0.5"
                 title={t("ops.trip.time_locked_hint")}

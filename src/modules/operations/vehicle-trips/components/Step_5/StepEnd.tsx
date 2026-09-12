@@ -694,12 +694,12 @@ export default function StepEnd({
             </div>
           </div>
           {/* Equal-size field boxes with clean margins (not KPI tiles) */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-[minmax(210px,1.25fr)_repeat(5,minmax(0,1fr))] gap-2.5">
             {[
               {
                 label: t("ops.trip.captured_time"),
                 value: submittedTimeDisplay ? (
-                  <TripTimestampDisplay value={submittedTimeDisplay} className="border-sky-100 bg-white/70 px-2 py-1 text-[10px]" />
+                  <TripTimestampDisplay value={submittedTimeDisplay} className="border-sky-100 bg-white/70" />
                 ) : "—",
                 tone: "border-sky-100 bg-sky-50/40 text-slate-700",
                 wide: true,
@@ -732,7 +732,7 @@ export default function StepEnd({
             ].map((f) => (
               <div
                 key={f.label}
-                className={`rounded-xl border px-3 py-2.5 min-w-0 shadow-sm ${f.wide ? "col-span-2 sm:col-span-2 lg:col-span-2" : ""} ${f.tone}`}
+                className={`rounded-xl border px-3 py-2.5 min-w-0 shadow-sm ${f.wide ? "col-span-2 sm:col-span-1" : ""} ${f.tone}`}
               >
                 <p className="text-xs uppercase font-semibold text-slate-400 tracking-wide truncate">{f.label}</p>
                 <p className={`${f.wide ? "overflow-visible whitespace-normal text-[11px] leading-none" : "truncate text-sm"} font-bold text-slate-800 mt-1 tabular-nums`}>{f.value}</p>
@@ -788,12 +788,12 @@ export default function StepEnd({
           </div>
 
           {/* Equal-size field boxes with clean margins (live totals while editing) */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-[minmax(210px,1.25fr)_repeat(5,minmax(0,1fr))] gap-2.5">
             {[
               {
                 label: t("ops.trip.captured_time"),
                 value: submittedTimeDisplay ? (
-                  <TripTimestampDisplay value={submittedTimeDisplay} className="border-sky-100 bg-white/70 px-2 py-1 text-[10px]" />
+                  <TripTimestampDisplay value={submittedTimeDisplay} className="border-sky-100 bg-white/70" />
                 ) : t("ops.trip.time_pending_short"),
                 tone: "border-sky-100 bg-sky-50/40 text-slate-700",
                 wide: true,
@@ -826,7 +826,7 @@ export default function StepEnd({
             ].map((f) => (
               <div
                 key={f.label}
-                className={`rounded-xl border px-3 py-2.5 min-w-0 shadow-sm ${f.wide ? "col-span-2 sm:col-span-2 lg:col-span-2" : ""} ${f.tone}`}
+                className={`rounded-xl border px-3 py-2.5 min-w-0 shadow-sm ${f.wide ? "col-span-2 sm:col-span-1" : ""} ${f.tone}`}
               >
                 <p className="text-xs uppercase font-semibold text-slate-400 tracking-wide truncate">{f.label}</p>
                 <p className={`${f.wide ? "overflow-visible whitespace-normal text-[11px] leading-none" : "truncate text-sm"} font-bold text-slate-800 mt-1 tabular-nums`}>{f.value}</p>
