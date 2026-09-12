@@ -41,6 +41,14 @@ function normalizeRate(rate: number | null | undefined): number | null {
   return rate;
 }
 
+function suggestedMarketRate(
+  row: Trip["deliveries"][number],
+  tripDateFallback: number | null,
+): number | null {
+  const candidate = row.marketRate?.masterRate != null ? Number(row.marketRate.masterRate) : tripDateFallback;
+  return isValidSellingRate(candidate) ? Number(candidate) : null;
+}
+
 function formatInr(n: number): string {
   return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
@@ -74,6 +82,7 @@ export default function EnterRateModal({
   const [shopPage, setShopPage] = useState(1);
 
   const saving = isSaving || busy;
+  const rateLocked = trip?.rateCompleted === true;
 
   useEffect(() => {
     if (!trip) return;
@@ -134,6 +143,46 @@ export default function EnterRateModal({
     if (!trip) return false;
     return deliveries.some((row, i) => normalizeRate(row.rate) !== normalizeRate(trip.deliveries[i]?.rate));
   }, [deliveries, trip]);
+
+  const rateStats = useMemo(() => {
+    const validRates = deliveries.filter((row) => isValidSellingRate(normalizeRate(row.rate))).length;
+    const marketAvailable = deliveries.filter((row) => suggestedMarketRate(row, tripDateVenRate) != null).length;
+    return {
+      marketAvailable,
+      validRates,
+      missingRates: Math.max(0, deliveries.length - validRates),
+      canApplyMarket: deliveries.some((row) => {
+        const currentRate = normalizeRate(row.rate);
+        return !isValidSellingRate(currentRate) && suggestedMarketRate(row, tripDateVenRate) != null;
+      }),
+    };
+  }, [deliveries, tripDateVenRate]);
+
+  const applyMarketRate = (index: number, rate: number) => {
+    if (saving || rateLocked) return;
+    setLockError(null);
+    setDeliveries((prev) =>
+      prev.map((row, rowIndex) => (rowIndex === index ? { ...row, rate } : row))
+    );
+  };
+
+  const applyMarketRates = () => {
+    if (saving || rateLocked) return;
+    let changed = false;
+    const nextDeliveries = deliveries.map((row) => {
+      const marketRate = suggestedMarketRate(row, tripDateVenRate);
+      const currentRate = normalizeRate(row.rate);
+      if (marketRate == null || isValidSellingRate(currentRate)) return row;
+      changed = true;
+      return { ...row, rate: marketRate };
+    });
+    if (!changed) {
+      setLockError(t("ops.rate.modal.no_market_rates"));
+      return;
+    }
+    setDeliveries(nextDeliveries);
+    setLockError(null);
+  };
 
   const shopPageCount = Math.max(1, Math.ceil(deliveries.length / SHOPS_PER_PAGE));
   const pagedDeliveries = useMemo(() => {
@@ -199,8 +248,6 @@ export default function EnterRateModal({
   };
 
   if (!open || !trip) return null;
-
-  const rateLocked = trip.rateCompleted === true;
 
   return (
     <>
@@ -311,6 +358,48 @@ export default function EnterRateModal({
             />
           </div>
 
+          <div className="shrink-0 border-b border-amber-100 bg-gradient-to-r from-orange-50 via-amber-50 to-emerald-50 px-5 py-3">
+            <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-slate-800">{t("ops.rate.modal.market_guidance")}</p>
+                <p className="mt-0.5 text-xs font-medium text-slate-600">{t("ops.rate.modal.market_guidance_desc")}</p>
+              </div>
+              <div className="grid grid-cols-2 gap-2 text-xs sm:grid-cols-4 lg:min-w-[560px]">
+                <div className="rounded-xl border border-orange-200 bg-white/80 px-3 py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-orange-700">{t("ops.rate.modal.trip_market_rate")}</p>
+                  <p className="mt-0.5 text-sm font-bold text-orange-800">
+                    {isValidSellingRate(tripDateVenRate) ? `₹ ${Number(tripDateVenRate).toFixed(2)}` : "—"}
+                  </p>
+                </div>
+                <div className="rounded-xl border border-sky-200 bg-white/80 px-3 py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-sky-700">{t("ops.rate.modal.market_available")}</p>
+                  <p className="mt-0.5 text-sm font-bold text-sky-800">{rateStats.marketAvailable}/{deliveries.length}</p>
+                </div>
+                <div className="rounded-xl border border-emerald-200 bg-white/80 px-3 py-2">
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-emerald-700">{t("ops.rate.modal.rates_entered")}</p>
+                  <p className="mt-0.5 text-sm font-bold text-emerald-800">{rateStats.validRates}/{deliveries.length}</p>
+                </div>
+                <div className={`rounded-xl border px-3 py-2 ${canLock ? "border-emerald-300 bg-emerald-100/90" : "border-amber-300 bg-amber-100/90"}`}>
+                  <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-600">
+                    {canLock ? t("ops.rate.modal.ready_to_lock") : t("ops.rate.modal.need_rates")}
+                  </p>
+                  <p className="mt-0.5 text-sm font-bold text-slate-800">{rateStats.missingRates}</p>
+                </div>
+              </div>
+              {!rateLocked && (
+                <button
+                  type="button"
+                  onClick={applyMarketRates}
+                  disabled={saving || !rateStats.canApplyMarket}
+                  className="inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-full border border-orange-300 bg-orange-500 px-4 text-xs font-bold text-white shadow-sm transition-[color,background-color,border-color,box-shadow,transform] duration-150 hover:bg-orange-600 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <IndianRupee size={14} />
+                  {t("ops.rate.modal.apply_market_rates")}
+                </button>
+              )}
+            </div>
+          </div>
+
           {(loadError || lockError) && (
             <div className="px-5 py-2 border-b border-red-200 bg-red-50 flex items-center gap-2 shrink-0">
               <AlertCircle size={14} className="text-red-600" />
@@ -337,9 +426,7 @@ export default function EnterRateModal({
                     const rate = normalizeRate(delivery.rate);
                     const isValid = isValidSellingRate(rate);
                     const amount = isValid ? Number((delivery.weight * (rate as number)).toFixed(2)) : 0;
-                    const market = delivery.marketRate;
-                    const marketRateValue =
-                      market?.masterRate != null ? Number(market.masterRate) : tripDateVenRate;
+                    const marketRateValue = suggestedMarketRate(delivery, tripDateVenRate);
                     const belowMin = rate != null && rate < 50;
                     const aboveMax = rate != null && rate > 300;
                     const missingForLock = lockAttempted && !isValid;
@@ -358,7 +445,23 @@ export default function EnterRateModal({
                           {delivery.weight.toFixed(2)}
                         </td>
                         <td className="px-2 py-2.5 text-center text-xs font-semibold text-sky-600">
-                          {marketRateValue != null ? Number(marketRateValue).toFixed(2) : "—"}
+                          {marketRateValue != null ? (
+                            <span className="inline-flex items-center overflow-hidden rounded-full border border-sky-200 bg-sky-50 text-sky-700 shadow-xs">
+                              <span className="px-2 py-1 tabular-nums">₹ {Number(marketRateValue).toFixed(2)}</span>
+                              {!rateLocked && (
+                                <button
+                                  type="button"
+                                  onClick={() => applyMarketRate(index, marketRateValue)}
+                                  disabled={saving}
+                                  className="border-l border-sky-200 bg-white/80 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700 transition-colors hover:bg-emerald-50 hover:text-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  {t("ops.rate.modal.use_market")}
+                                </button>
+                              )}
+                            </span>
+                          ) : (
+                            "—"
+                          )}
                         </td>
                         <td className="px-2 py-2">
                           {rateLocked ? (

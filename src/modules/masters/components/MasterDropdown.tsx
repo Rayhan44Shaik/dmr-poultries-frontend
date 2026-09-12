@@ -338,7 +338,9 @@ export default function MasterDropdown({
       if (!isOpen) show();
       const index = items.findIndex(
         (option) =>
-          !option.disabled && option.label.toLocaleLowerCase().startsWith(text),
+          !option.disabled &&
+          (option.label.toLocaleLowerCase().startsWith(text) ||
+            option.value.toLocaleLowerCase().startsWith(text)),
       );
       if (index >= 0) setActive(index);
     }
@@ -372,7 +374,8 @@ export default function MasterDropdown({
                   (option) =>
                     (allowClear && option.value === "") ||
                     !keyword ||
-                    option.label.toLocaleLowerCase().includes(keyword),
+                    option.label.toLocaleLowerCase().includes(keyword) ||
+                    option.value.toLocaleLowerCase().includes(keyword),
                 );
                 setActive(
                   matches.findIndex(
@@ -415,12 +418,12 @@ export default function MasterDropdown({
             }}
             className={`flex h-9 w-full shrink-0 items-center gap-2 px-3 text-left text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40 ${
               kind === "select" && option.value === value
-                // Selected row: soft blue tint, the original Salary Register
-                // treatment. A solid fill here read as harsh.
-                ? "bg-blue-50 text-blue-600"
+                // Selected row: brighter brand fill so a chosen Vehicle /
+                // Supervisor is immediately visible in dense Operations filters.
+                ? "bg-emerald-500 text-white"
                 : index === active
-                  ? "bg-slate-50 text-slate-700"
-                  : "text-slate-700 hover:bg-slate-50"
+                  ? "bg-emerald-50 text-emerald-800"
+                  : "text-slate-700 hover:bg-emerald-50 hover:text-emerald-800"
             }`}
           >
             {option.icon && (

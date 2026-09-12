@@ -117,6 +117,7 @@ function CompletedTripsFilters({
             searchable
             allowClear
             className="w-full"
+            triggerClassName="h-10 rounded-lg border-slate-300 text-[13px]"
           />
         </div>
 
@@ -135,6 +136,7 @@ function CompletedTripsFilters({
             searchable
             allowClear
             className="w-full"
+            triggerClassName="h-10 rounded-lg border-slate-300 text-[13px]"
           />
         </div>
 

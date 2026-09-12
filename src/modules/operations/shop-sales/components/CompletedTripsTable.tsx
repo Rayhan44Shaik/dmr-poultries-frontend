@@ -14,6 +14,7 @@ import {
   Settings,
   ArrowUp,
   ArrowDown,
+  Check,
 } from "lucide-react";
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
 import { formatVehicleNumber } from "../../../../utils/format";
@@ -36,6 +37,8 @@ interface Props {
   onEnterRate: (trip: Trip) => void;
   onModifyRate: (trip: Trip) => void;
   children?: ReactNode;
+  selectedRowId?: number | null;
+  onRowClick?: (trip: Trip) => void;
   startIndex?: number;
   sortBy?: RateEntrySortKey | null;
   sortDir?: "asc" | "desc";
@@ -60,6 +63,8 @@ function CompletedTripsTable({
   onEnterRate,
   onModifyRate,
   children,
+  selectedRowId = null,
+  onRowClick,
   startIndex = 0,
   sortBy = null,
   sortDir = "asc",
@@ -162,13 +167,21 @@ function CompletedTripsTable({
                 const canModify = isLocked && isWithin10Days(trip.createdAt || "");
                 const isReadOnly = isLocked && !canModify;
                 const serialNo = startIndex + index + 1;
+                const isSelected = trip.id === selectedRowId;
 
                 return (
                   <tr
                     key={trip.id}
-                    className={`${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"} border-t transition-colors duration-150 hover:bg-slate-50/60`}
+                    onClick={() => onRowClick?.(trip)}
+                    className={`${onRowClick ? "cursor-pointer" : ""} border-t transition-colors duration-150 ${
+                      isSelected
+                        ? "bg-orange-100/80 border-l-4 border-l-orange-400 ring-1 ring-inset ring-orange-300"
+                        : `${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"} hover:bg-slate-50/60`
+                    }`}
                   >
-                    <td className="px-4 py-3 text-center text-xs text-slate-500 font-medium w-10">{serialNo}</td>
+                    <td className="px-4 py-3 text-center text-xs text-slate-500 font-medium w-10">
+                      {isSelected ? <Check size={15} className="inline text-orange-600" /> : serialNo}
+                    </td>
                     <td className="px-4 py-3 font-bold text-emerald-500 text-xs whitespace-nowrap">{trip.tripNo}</td>
                     <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">{formatRateEntryDay(trip.tripDate, language)}</td>
                     <td className="px-4 py-3 text-xs font-medium text-slate-700 whitespace-nowrap">{formatVehicleNumber(trip.vehicleNo)}</td>
@@ -182,7 +195,10 @@ function CompletedTripsTable({
                         // Enter Rates – always enabled for un-locked trips
                         <button
                           type="button"
-                          onClick={() => onEnterRate(trip)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onEnterRate(trip);
+                          }}
                           className="group relative inline-flex items-center gap-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 text-xs font-semibold transition-[color,background-color,border-color,box-shadow,transform] duration-150 shadow-sm active:scale-95"
                           aria-label={`${t("ops.rate.enter_tooltip")} ${trip.tripNo}`}
                         >
@@ -191,10 +207,13 @@ function CompletedTripsTable({
                           <ActionTooltip label={t("ops.rate.enter_tooltip")} />
                         </button>
                       ) : canModify ? (
-                        // Modify Rates – within 10 days
+                        // Rates – editable within 10 days
                         <button
                           type="button"
-                          onClick={() => onModifyRate(trip)}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            onModifyRate(trip);
+                          }}
                           className="group relative inline-flex items-center gap-1.5 rounded-xl border border-orange-200 bg-orange-50 text-orange-700 hover:border-orange-300 hover:bg-orange-100 hover:text-orange-800 px-3 py-1.5 text-xs font-semibold transition-[color,background-color,border-color,box-shadow,transform] duration-150 shadow-sm active:scale-95"
                           aria-label={`${t("ops.rate.modify_tooltip")} ${trip.tripNo}`}
                         >

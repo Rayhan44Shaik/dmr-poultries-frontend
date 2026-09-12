@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import useCompletedTrips from "../hooks/useCompletedTrips";
 import CompletedTripsFilters from "../components/CompletedTripsFilters";
 import CompletedTripsTable from "../components/CompletedTripsTable";
@@ -25,6 +25,7 @@ export default function RatesEntryPage({ embedded = false }: Props) {
   const { t, language } = useI18n();
   const { showNotification } = useSafeNotification();
   const exportBusyRef = useRef<"pdf" | "excel" | null>(null);
+  const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
 
   const {
     filteredTrips,
@@ -207,6 +208,8 @@ export default function RatesEntryPage({ embedded = false }: Props) {
           onEnterRate={openRateEntry}
           onModifyRate={openModifyRate}
           startIndex={startIndex}
+          selectedRowId={selectedRowId}
+          onRowClick={(trip) => setSelectedRowId((current) => (current === trip.id ? null : trip.id))}
           sortBy={sortBy}
           sortDir={sortDir}
           onSortChange={handleSortChange}
