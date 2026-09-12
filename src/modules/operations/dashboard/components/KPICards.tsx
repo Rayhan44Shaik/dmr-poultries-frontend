@@ -278,69 +278,58 @@ const KPICard = memo(function KPICard({
 
   const showBreakdown = label === "Total Expenses" && breakdown;
 
-  // Left content – vertically centered
-  const leftContent = (
-    <div className="flex flex-col justify-center flex-1 min-w-0">
-      {/* Top row: the name on the left, the comparison pinned top-right. */}
-      <div className="flex items-start justify-between gap-1.5">
-        <span className="flex min-w-0 items-center gap-1.5">
-          <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${config.bg}`} />
-          <p
-            className="line-clamp-2 text-[11px] font-semibold leading-tight text-slate-500"
-            title={t(kpiCardLabel(label))}
-          >
-            {t(kpiCardShortLabel(label))}
-          </p>
-        </span>
-        <span className={badgeClasses} title={`${badgeTitle} · ${rangeLabel}`}>
-          {iconElement}
-          {changeText}
-          <span className="font-medium text-slate-400">{periodLabel}</span>
-        </span>
-      </div>
-
-      <h2
-        className={`mt-1 ${numberSizeClass} font-bold leading-none tracking-tight ${config.text}`}
-      >
-        {displayMain}
-        {displaySuffix && (
-          <span className="ml-0.5 text-xs font-medium text-slate-400">
-            {displaySuffix}
-          </span>
-        )}
-      </h2>
-
-      {/* What it is measured against — the number, not just the ratio. */}
-      {baseline ? (
-        <p
-          className="mt-1 truncate text-[10px] font-medium text-slate-400"
-          title={`${rangeLabel} ${t("ops.dashboard.kpi_prev_value", {
-            value: formatWithUnit(prevValue, unit),
-          })}`}
-        >
-          {t("ops.dashboard.kpi_prev_value", { value: formatWithUnit(prevValue, unit) })}
-        </p>
-      ) : null}
-    </div>
-  );
-
-  // Card content – smaller icon
+  /* Stacked card: the change sits directly above the logo in the top-right, and
+     the words live below it — figure first, then its name, then the baseline. */
   const cardContent = (
     <div className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
       <div className="absolute inset-0 bg-gradient-to-br from-white via-white to-slate-50 opacity-80" />
 
-      <div className="relative flex items-center gap-3">
-        {leftContent}
+      <div className="relative flex flex-col gap-2.5">
+        <div className="flex flex-col items-end gap-2">
+          <span className={badgeClasses} title={`${badgeTitle} · ${rangeLabel}`}>
+            {iconElement}
+            {changeText}
+            <span className="font-medium text-slate-400">{periodLabel}</span>
+          </span>
 
-        <div
-          className={`
-            ${config.bg}
-            h-9 w-9 rounded-xl shadow-md
-            flex items-center justify-center flex-shrink-0
-            transition-transform duration-300 group-hover:scale-110
-          `}
-        >
-          <Icon className="text-white" size={18} />
+          <div
+            className={`${config.bg} flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl shadow-md transition-transform duration-300 group-hover:scale-110`}
+          >
+            <Icon className="text-white" size={19} />
+          </div>
+        </div>
+
+        <div className="min-w-0">
+          <h2
+            className={`${numberSizeClass} font-bold leading-none tracking-tight ${config.text}`}
+          >
+            {displayMain}
+            {displaySuffix && (
+              <span className="ml-0.5 text-xs font-medium text-slate-400">
+                {displaySuffix}
+              </span>
+            )}
+          </h2>
+
+          <p
+            className="mt-1 flex items-center gap-1.5 text-[11px] font-semibold text-slate-500"
+            title={t(kpiCardLabel(label))}
+          >
+            <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${config.bg}`} />
+            <span className="truncate">{t(kpiCardShortLabel(label))}</span>
+          </p>
+
+          {/* What it is measured against — the number, not just the ratio. */}
+          {baseline ? (
+            <p
+              className="mt-0.5 truncate text-[10px] font-medium text-slate-400"
+              title={`${rangeLabel} ${t("ops.dashboard.kpi_prev_value", {
+                value: formatWithUnit(prevValue, unit),
+              })}`}
+            >
+              {t("ops.dashboard.kpi_prev_value", { value: formatWithUnit(prevValue, unit) })}
+            </p>
+          ) : null}
         </div>
       </div>
     </div>
