@@ -185,6 +185,26 @@ const kpiCardLabel = (label: CardLabel): string => {
   }
 };
 
+/** What fits on the card next to the badge; the full name is the tooltip. */
+const kpiCardShortLabel = (label: CardLabel): string => {
+  switch (label) {
+    case "Total Trips":
+      return "ops.dashboard.kpi_short_trips";
+    case "Total Birds":
+      return "ops.dashboard.kpi_short_birds";
+    case "Total Weight (KG)":
+      return "ops.dashboard.kpi_short_weight";
+    case "Total Sales Amount":
+      return "ops.dashboard.kpi_short_sales";
+    case "Total Collections":
+      return "ops.dashboard.kpi_short_collections";
+    case "Pending Collections":
+      return "ops.dashboard.kpi_short_pending";
+    case "Total Expenses":
+      return "ops.dashboard.kpi_short_expenses";
+  }
+};
+
 const KPICard = memo(function KPICard({
   label,
   value,
@@ -266,10 +286,10 @@ const KPICard = memo(function KPICard({
         <span className="flex min-w-0 items-center gap-1.5">
           <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${config.bg}`} />
           <p
-            className="text-xs font-medium text-slate-500 truncate whitespace-nowrap"
+            className="truncate whitespace-nowrap text-[11px] font-semibold text-slate-500"
             title={t(kpiCardLabel(label))}
           >
-            {t(kpiCardLabel(label))}
+            {t(kpiCardShortLabel(label))}
           </p>
         </span>
         <span className={badgeClasses} title={`${badgeTitle} · ${rangeLabel}`}>

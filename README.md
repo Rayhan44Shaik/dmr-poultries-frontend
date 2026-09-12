@@ -104,6 +104,10 @@ period following the calendar — 7d, 15d, 30d, whatever the range is — and th
 baseline figure underneath the number ("was ₹31.61 L"). Hovering the badge gives
 the full sentence, both figures included.
 
+Card names are kept short enough to sit beside the badge without truncating —
+Trips, Birds, Total Wt (Kg), Total Amt, Total Coll, Pending Coll, Total Exp —
+with the full name in the tooltip.
+
 ### Operational Trends (dashboard)
 
 Operations → **Overview** leads with **Trips & weight movement** — the first
