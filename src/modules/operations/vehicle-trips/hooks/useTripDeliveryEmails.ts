@@ -27,6 +27,8 @@ export type DeliveryEmailSendResult = {
   sendCount?: number;
 };
 
+const FAILURE_HIGHLIGHT_MS = 60_000;
+
 type Options = {
   /** When true, statuses are only loaded for completed trips (default). */
   enabled?: boolean;
@@ -51,8 +53,44 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
   const [isBulkSending, setIsBulkSending] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ sent: number; total: number } | null>(null);
   const bulkRunRef = useRef(0);
+  const failureResetTimersRef = useRef<Record<number, number>>({});
 
   const tripId = trip?.id ?? 0;
+
+  const clearFailureReset = useCallback((deliveryId: number) => {
+    const timeoutId = failureResetTimersRef.current[deliveryId];
+    if (timeoutId != null) {
+      window.clearTimeout(timeoutId);
+      delete failureResetTimersRef.current[deliveryId];
+    }
+  }, []);
+
+  const clearAllFailureResets = useCallback(() => {
+    Object.values(failureResetTimersRef.current).forEach((timeoutId) => window.clearTimeout(timeoutId));
+    failureResetTimersRef.current = {};
+  }, []);
+
+  const scheduleFailureReset = useCallback(
+    (deliveryId: number) => {
+      clearFailureReset(deliveryId);
+      failureResetTimersRef.current[deliveryId] = window.setTimeout(() => {
+        setLocalStatus((prev) => {
+          if (prev[deliveryId] !== "failed") return prev;
+          return { ...prev, [deliveryId]: "pending" as const };
+        });
+        setLocalErrors((prev) => {
+          if (!(deliveryId in prev)) return prev;
+          const next = { ...prev };
+          delete next[deliveryId];
+          return next;
+        });
+        delete failureResetTimersRef.current[deliveryId];
+      }, FAILURE_HIGHLIGHT_MS);
+    },
+    [clearFailureReset]
+  );
+
+  useEffect(() => () => clearAllFailureResets(), [clearAllFailureResets]);
 
   const refresh = useCallback(async () => {
     if (!completed || !tripId) return;
@@ -66,6 +104,7 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
 
   useEffect(() => {
     if (!completed) {
+      clearAllFailureResets();
       setRows([]);
       setLocalStatus({});
       setLocalErrors({});
@@ -81,7 +120,7 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
     return () => {
       cancelled = true;
     };
-  }, [completed, refresh]);
+  }, [completed, refresh, clearAllFailureResets]);
 
   const effectiveStatus = useCallback(
     (deliveryId: number): DeliveryEmailStatusValue => {
@@ -109,13 +148,15 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
 
   const failureReasonFor = useCallback(
     (deliveryId: number): string | null => {
+      const localStatusOverride = localStatus[deliveryId];
+      if (localStatusOverride && localStatusOverride !== "failed") return null;
       const local = localErrors[deliveryId];
       if (local) return local;
       const row = rows.find((r) => r.deliveryId === deliveryId);
       if (!row || row.status !== "failed") return null;
       return userFacingDeliveryEmailError(row.failureReason);
     },
-    [localErrors, rows]
+    [localStatus, localErrors, rows]
   );
 
   const sendCountFor = useCallback(
@@ -172,6 +213,7 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
       const row = rows.find((r) => r.deliveryId === delivery.id);
       const currentCount = Math.max(row?.sendCount ?? 0, localSendCounts[delivery.id] ?? 0);
       let outcome: DeliveryEmailSendResult;
+      clearFailureReset(delivery.id);
       setBusy(delivery.id, true);
       setLocalStatus((prev) => ({ ...prev, [delivery.id]: "sending" as const }));
       setLocalErrors((prev) => {
@@ -205,6 +247,7 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
             ...prev,
             [delivery.id]: message,
           }));
+          scheduleFailureReset(delivery.id);
           outcome = { success: false, status: "failed", message };
         }
       } catch (err) {
@@ -216,6 +259,7 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
           ...prev,
           [delivery.id]: message,
         }));
+        scheduleFailureReset(delivery.id);
         outcome = { success: false, status: "failed", message };
       } finally {
         setBusy(delivery.id, false);
@@ -223,7 +267,7 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
       }
       return outcome;
     },
-    [trip, completed, busyIds, isBulkSending, rows, localSendCounts, setBusy, refresh]
+    [trip, completed, busyIds, isBulkSending, rows, localSendCounts, setBusy, refresh, clearFailureReset, scheduleFailureReset]
   );
 
   /**
@@ -251,6 +295,7 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
         continue;
       }
       const row = rows.find((r) => r.deliveryId === delivery.id);
+      clearFailureReset(delivery.id);
       setLocalStatus((prev) => ({ ...prev, [delivery.id]: "sending" as const }));
       setLocalErrors((prev) => {
         const next = { ...prev };
@@ -279,6 +324,7 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
             ...prev,
             [delivery.id]: userFacingDeliveryEmailError(result.message),
           }));
+          scheduleFailureReset(delivery.id);
         }
       } catch (err) {
         setLocalStatus((prev) => ({ ...prev, [delivery.id]: "failed" as const }));
@@ -288,6 +334,7 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
             err instanceof Error ? err.message : translate("ops.trip.unable_send_email")
           ),
         }));
+        scheduleFailureReset(delivery.id);
       } finally {
         if (succeeded) sentCount += 1;
         setBulkProgress({ sent: sentCount, total: eligible.length });
@@ -297,7 +344,7 @@ export function useTripDeliveryEmails(trip: Trip | null, shops: Shop[] = [], opt
     setIsBulkSending(false);
     setBulkProgress(null);
     await refresh();
-  }, [trip, completed, isBulkSending, effectiveStatus, rows, localSendCounts, refresh]);
+  }, [trip, completed, isBulkSending, effectiveStatus, rows, localSendCounts, refresh, clearFailureReset, scheduleFailureReset]);
 
   return {
     rows,

@@ -13,6 +13,7 @@ import { userFacingDeliveryWhatsAppError } from "../services/deliveryWhatsAppErr
 import { translate } from "../../../../i18n";
 
 const WHATSAPP_BACKEND_ENABLED = import.meta.env.VITE_WHATSAPP_BACKEND_ENABLED === "true";
+const FAILURE_HIGHLIGHT_MS = 60_000;
 
 export type WhatsAppCounts = {
   sent: number;
@@ -54,8 +55,44 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
   const [isBulkSending, setIsBulkSending] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ sent: number; total: number } | null>(null);
   const bulkRunRef = useRef(0);
+  const failureResetTimersRef = useRef<Record<number, number>>({});
 
   const tripId = trip?.id ?? 0;
+
+  const clearFailureReset = useCallback((deliveryId: number) => {
+    const timeoutId = failureResetTimersRef.current[deliveryId];
+    if (timeoutId != null) {
+      window.clearTimeout(timeoutId);
+      delete failureResetTimersRef.current[deliveryId];
+    }
+  }, []);
+
+  const clearAllFailureResets = useCallback(() => {
+    Object.values(failureResetTimersRef.current).forEach((timeoutId) => window.clearTimeout(timeoutId));
+    failureResetTimersRef.current = {};
+  }, []);
+
+  const scheduleFailureReset = useCallback(
+    (deliveryId: number) => {
+      clearFailureReset(deliveryId);
+      failureResetTimersRef.current[deliveryId] = window.setTimeout(() => {
+        setLocalStatus((prev) => {
+          if (prev[deliveryId] !== "failed") return prev;
+          return { ...prev, [deliveryId]: "pending" as const };
+        });
+        setLocalErrors((prev) => {
+          if (!(deliveryId in prev)) return prev;
+          const next = { ...prev };
+          delete next[deliveryId];
+          return next;
+        });
+        delete failureResetTimersRef.current[deliveryId];
+      }, FAILURE_HIGHLIGHT_MS);
+    },
+    [clearFailureReset]
+  );
+
+  useEffect(() => () => clearAllFailureResets(), [clearAllFailureResets]);
 
   const refresh = useCallback(async () => {
     if (!whatsappEnabled || !tripId) return;
@@ -69,6 +106,7 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
 
   useEffect(() => {
     if (!whatsappEnabled) {
+      clearAllFailureResets();
       setRows([]);
       setLocalStatus({});
       setLocalErrors({});
@@ -84,7 +122,7 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
     return () => {
       cancelled = true;
     };
-  }, [whatsappEnabled, refresh]);
+  }, [whatsappEnabled, refresh, clearAllFailureResets]);
 
   const effectiveStatus = useCallback(
     (deliveryId: number): DeliveryWhatsAppStatusValue => {
@@ -112,13 +150,15 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
 
   const failureReasonFor = useCallback(
     (deliveryId: number): string | null => {
+      const localStatusOverride = localStatus[deliveryId];
+      if (localStatusOverride && localStatusOverride !== "failed") return null;
       const local = localErrors[deliveryId];
       if (local) return local;
       const row = rows.find((r) => r.deliveryId === deliveryId);
       if (!row || row.status !== "failed") return null;
       return userFacingDeliveryWhatsAppError(row.failureReason);
     },
-    [localErrors, rows]
+    [localStatus, localErrors, rows]
   );
 
   const sendCountFor = useCallback(
@@ -172,6 +212,7 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
           ...prev,
           [delivery.id]: message,
         }));
+        scheduleFailureReset(delivery.id);
         return { success: false, status: "failed", message };
       }
       if (busyIds.has(delivery.id) || isBulkSending) {
@@ -184,6 +225,7 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
       const row = rows.find((r) => r.deliveryId === delivery.id);
       const currentCount = Math.max(row?.sendCount ?? 0, localSendCounts[delivery.id] ?? 0);
       let outcome: DeliveryWhatsAppSendResult;
+      clearFailureReset(delivery.id);
       setBusy(delivery.id, true);
       setLocalStatus((prev) => ({ ...prev, [delivery.id]: "sending" as const }));
       setLocalErrors((prev) => {
@@ -217,6 +259,7 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
             ...prev,
             [delivery.id]: message,
           }));
+          scheduleFailureReset(delivery.id);
           outcome = { success: false, status: "failed", message };
         }
       } catch (err) {
@@ -228,6 +271,7 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
           ...prev,
           [delivery.id]: message,
         }));
+        scheduleFailureReset(delivery.id);
         outcome = { success: false, status: "failed", message };
       } finally {
         setBusy(delivery.id, false);
@@ -235,7 +279,7 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
       }
       return outcome;
     },
-    [trip, completed, busyIds, isBulkSending, rows, localSendCounts, setBusy, refresh]
+    [trip, completed, busyIds, isBulkSending, rows, localSendCounts, setBusy, refresh, clearFailureReset, scheduleFailureReset]
   );
 
   /**
@@ -254,6 +298,7 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
           ...prev,
           [delivery.id]: userFacingDeliveryWhatsAppError("WhatsApp integration is not configured yet."),
         }));
+        scheduleFailureReset(delivery.id);
       }
       return;
     }
@@ -276,6 +321,7 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
         continue;
       }
       const row = rows.find((r) => r.deliveryId === delivery.id);
+      clearFailureReset(delivery.id);
       setLocalStatus((prev) => ({ ...prev, [delivery.id]: "sending" as const }));
       setLocalErrors((prev) => {
         const next = { ...prev };
@@ -304,6 +350,7 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
             ...prev,
             [delivery.id]: userFacingDeliveryWhatsAppError(result.message),
           }));
+          scheduleFailureReset(delivery.id);
         }
       } catch (err) {
         setLocalStatus((prev) => ({ ...prev, [delivery.id]: "failed" as const }));
@@ -313,6 +360,7 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
             err instanceof Error ? err.message : translate("ops.trip.unable_send_whatsapp")
           ),
         }));
+        scheduleFailureReset(delivery.id);
       } finally {
         if (succeeded) sentCount += 1;
         setBulkProgress({ sent: sentCount, total: eligible.length });
@@ -322,7 +370,7 @@ export function useTripDeliveryWhatsApps(trip: Trip | null, shops: Shop[] = [], 
     setIsBulkSending(false);
     setBulkProgress(null);
     await refresh();
-  }, [trip, completed, isBulkSending, effectiveStatus, rows, localSendCounts, refresh]);
+  }, [trip, completed, isBulkSending, effectiveStatus, rows, localSendCounts, refresh, clearFailureReset, scheduleFailureReset]);
 
   return {
     rows,
