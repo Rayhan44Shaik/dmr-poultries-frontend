@@ -31,6 +31,8 @@ function navApprovalBadge(path: string, approvals: ReturnType<typeof usePendingA
       return approvals.maintenance.count;
     case "/operations?tab=rate-entry":
       return approvals.rateEntries.count;
+    case "/operations?tab=collection":
+      return approvals.collections.count;
     case "/accounts?tab=paid-payments":
       return approvals.payments.count;
     default:

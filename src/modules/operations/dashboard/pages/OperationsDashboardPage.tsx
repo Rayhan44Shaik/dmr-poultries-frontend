@@ -5,7 +5,7 @@ import { Link } from "react-router-dom";
 import { addDays, subMonths } from "date-fns";
 import { useDashboardData } from "../hooks/useDashboardData";
 import KPICards from "../components/KPICards";
-import TrendChart from "../components/TrendChart";
+import OperationalTrendsChart from "../components/OperationalTrendsChart";
 import CollectionsPie from "../components/CollectionsPie";
 import RecentTripsTable from "../components/RecentTripsTable";
 import ActiveCounts from "../components/ActiveCounts";
@@ -549,7 +549,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
             <Link to="/operations?tab=vehicle-trips" className="shrink-0 text-[11px] font-bold text-blue-600 hover:underline">View details →</Link>
           </div>
           <div className="w-full overflow-hidden">
-            <TrendChart
+            <OperationalTrendsChart
               data={data?.trendData || []}
               initialGranularity={(data?.trendData.length ?? 0) > 31 ? "weekly" : "daily"}
               key={(data?.trendData.length ?? 0) > 31 ? "trend-weekly" : "trend-daily"}

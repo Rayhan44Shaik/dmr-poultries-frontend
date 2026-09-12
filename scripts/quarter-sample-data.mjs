@@ -2581,7 +2581,17 @@ const server = http.createServer(async (req, res) => {
     }
 
     if (p === "/api/operations/collection-entry") {
-      const rows = COLLECTIONS.filter((c) => inRange(c.collectionDate, q.get("fromDate"), q.get("toDate")));
+      // `status` lets the app shell count only the rows waiting for approval
+      // instead of downloading the whole register (Pending Approval is ~22 of
+      // ~4.7k rows). Backends that ignore the filter are still handled: the
+      // caller re-checks the status itself.
+      const status = (q.get("status") || "").trim().toLowerCase();
+      const rows = COLLECTIONS.filter(
+        (c) =>
+          c.deleted !== true &&
+          inRange(c.collectionDate, q.get("fromDate"), q.get("toDate")) &&
+          (!status || String(c.status || "").toLowerCase() === status)
+      );
       return send(200, q.get("page") ? paginate(rows, q) : rows);
     }
     if (p === "/api/operations/collection-entry/report") return send(200, collectionReport(q));

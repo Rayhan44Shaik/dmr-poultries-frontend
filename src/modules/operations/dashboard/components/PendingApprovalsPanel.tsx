@@ -15,6 +15,7 @@ import {
   FileWarning,
   ReceiptText,
   Truck,
+  Wallet,
   Wrench,
 } from "lucide-react";
 import { usePendingApprovals } from "../../../approvals/hooks/usePendingApprovals";
@@ -34,6 +35,8 @@ const preloaders: Record<string, () => void> = {
   trips: () =>
     preloadOnce("ops", () => import("../../../operations/pages/OperationsPages")),
   rates: () =>
+    preloadOnce("ops", () => import("../../../operations/pages/OperationsPages")),
+  collections: () =>
     preloadOnce("ops", () => import("../../../operations/pages/OperationsPages")),
   maintenance: () => {
     preloadOnce("fleet", () => import("../../../fleet-operations/pages/FleetPages"));
@@ -110,6 +113,19 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
       dot: "bg-indigo-500",
     },
     {
+      key: "collections",
+      label: "Collections",
+      href: "/operations?tab=collection",
+      icon: Wallet,
+      count: q.collections.count,
+      tip: "Collections entered by staff and waiting for your approval",
+      tipClass: "left-0 sm:left-1/2 sm:-translate-x-1/2",
+      arrowClass: "left-4 sm:left-1/2 sm:-translate-x-1/2",
+      chip: "bg-amber-100 text-amber-600",
+      hover: "hover:bg-amber-50",
+      dot: "bg-amber-500",
+    },
+    {
       key: "maintenance",
       label: "Maintenance",
       href: "/fleet?tab=entry&view=pending",
@@ -164,7 +180,7 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
     >
       {loading ? (
         <div className="flex items-center gap-4 px-1">
-          {[0, 1, 2, 3, 4].map((i) => (
+          {[0, 1, 2, 3, 4, 5].map((i) => (
             <div key={i} className="h-8 w-24 animate-pulse rounded-md bg-slate-100" />
           ))}
         </div>

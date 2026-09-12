@@ -82,6 +82,33 @@ the keyframes in the `--animate-nav-*` family of `styles/tokens.css`. Motions
 only run on hover / keyboard focus, never on the active row, and the global
 `prefers-reduced-motion` rule disables them.
 
+### Operational Trends (dashboard)
+
+Operations → **Overview** leads with the Operational Trends chart (the first
+card). It answers three questions in one plot:
+
+| Series | Encoding |
+|---|---|
+| Trips | Indigo bars, left axis |
+| Sales weight (kg) | Emerald gradient area, right axis, with a dashed 3-bucket moving average and an average reference line |
+| Mortality per trip | Rose dashed line, left axis (both left-axis series are counts per bucket, so they share a scale honestly) |
+
+Group by day / week / month, click a legend chip to drop a series, and hover any
+bucket for the full picture: trips, kilograms, birds, birds per trip, kg per
+trip and the change against the previous bucket. The footer keeps the period in
+numbers — totals, per-bucket averages and the busiest bucket. Bucketing,
+formatting and the derived series live in
+`modules/operations/dashboard/utils/trendSeries.ts`, so the maths can be
+exercised without a browser.
+
+The pending-approval strip above it gained a **Collections** tile
+(Trips → Rate entries → Collections → Maintenance → Payments → Documents). It
+counts only rows whose status is `Pending Approval`, fetched with a single
+filtered `GET /operations/collection-entry?status=Pending Approval` rather than
+downloading the register — the shell poller runs every 90 seconds, so it has to
+stay cheap. The same count is included in the bell total, the one-time sign-in
+alert and the Collection Entry sidebar badge.
+
 ### Masters
 
 Shops, Farms, Vehicles, Employees, Banks and Bird Types share consistent
