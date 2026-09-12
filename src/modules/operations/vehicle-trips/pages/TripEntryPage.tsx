@@ -128,6 +128,9 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
    *  together with `trip.id === 0` and re-open the trip we just closed — the
    *  "closes for a fraction, then comes back to the same step" bug. */
   const suppressUrlResumeRef = useRef<number | null>(null);
+  const viewLoadSeqRef = useRef(0);
+  const openExistingTripBusyRef = useRef(false);
+  const resourceLoadSeqRef = useRef(0);
 
   /** Set tripId in URL so refresh can resume the active wizard. */
   const setTripIdInUrl = useCallback((tripId: number) => {
@@ -207,12 +210,18 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   );
 
   const handleView = (selectedTrip: Trip) => {
+    const requestSeq = viewLoadSeqRef.current + 1;
+    viewLoadSeqRef.current = requestSeq;
     setViewTrip(selectedTrip);
     setViewOpen(true);
     void loadTripById(selectedTrip.id)
-      .then((loaded) => setViewTrip(loaded))
+      .then((loaded) => {
+        if (requestSeq === viewLoadSeqRef.current) setViewTrip(loaded);
+      })
       .catch(() => {
-        showNotification(t("ops.trip.refresh_failed_using_cached"), "info");
+        if (requestSeq === viewLoadSeqRef.current) {
+          showNotification(t("ops.trip.refresh_failed_using_cached"), "info");
+        }
       });
   };
 
@@ -222,26 +231,32 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     message: string,
     editSubmittedStep: number | null
   ) => {
-    setEntryScreen("form");
-    setIsEditing(true);
-    setEditingSubmittedStep(editSubmittedStep);
-    showNotification(message, "success");
+    if (openExistingTripBusyRef.current) return;
+    openExistingTripBusyRef.current = true;
+    try {
+      setEntryScreen("form");
+      setIsEditing(true);
+      setEditingSubmittedStep(editSubmittedStep);
+      showNotification(message, "success");
 
-    // The backend is the source of truth for step completion. Load the full
-    // trip from the API and derive the step to open from THAT state, never
-    // from a possibly stale Recent Trips row or the URL.
-    const loaded = await loadTripFromApi(selectedTrip.id);
-    const authoritative = loaded ?? selectedTrip;
-    setRows(authoritative.deliveries || []);
+      // The backend is the source of truth for step completion. Load the full
+      // trip from the API and derive the step to open from THAT state, never
+      // from a possibly stale Recent Trips row or the URL.
+      const loaded = await loadTripFromApi(selectedTrip.id);
+      const authoritative = loaded ?? selectedTrip;
+      setRows(authoritative.deliveries || []);
 
-    let resolvedStep = targetStep;
-    if (editSubmittedStep == null) {
-      // Resume: reopen at the first incomplete step per authoritative state.
-      resolvedStep = getNextIncompleteTripStep(authoritative);
+      let resolvedStep = targetStep;
+      if (editSubmittedStep == null) {
+        // Resume: reopen at the first incomplete step per authoritative state.
+        resolvedStep = getNextIncompleteTripStep(authoritative);
+      }
+      // Authoritative per-step gating: a locked target falls back to the first
+      // incomplete step (never "trip exists = every step open").
+      setViewStepIndex(clampTripStepIndex(authoritative, resolvedStep));
+    } finally {
+      openExistingTripBusyRef.current = false;
     }
-    // Authoritative per-step gating: a locked target falls back to the first
-    // incomplete step (never "trip exists = every step open").
-    setViewStepIndex(clampTripStepIndex(authoritative, resolvedStep));
   };
 
   const handleResume = (selectedTrip: Trip) => {
@@ -274,8 +289,8 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   };
 
   const handleRefresh = async () => {
-    await refreshTrips();
-    showNotification(t("ops.trip.table_refreshed"), "success");
+    const ok = await refreshTrips();
+    if (ok) showNotification(t("ops.trip.table_refreshed"), "success");
   };
 
   const isInitialMount = useRef(true);
@@ -288,7 +303,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       }
       isInitialMount.current = false;
     }
-  }, []);
+  }, [setTrip, trip.tripDate]);
 
   useEffect(() => {
     if (!isEditing && !trip.startStepSubmitted) return;
@@ -302,20 +317,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       cancelled = true;
     };
   }, [trip.deliveries, isEditing, trip.startStepSubmitted]);
-
-  useEffect(() => {
-    refreshTrips();
-  }, [
-    trip.id,
-    trip.tripNo,
-    trip.status,
-    trip.startStepSubmitted,
-    trip.farmStepSubmitted,
-    trip.pickupStepSubmitted,
-    trip.deliveryStepSubmitted,
-    trip.endStepSubmitted,
-    refreshTrips,
-  ]);
 
   const clearForm = useCallback(() => {
     const urlTripId = Number(new URLSearchParams(location.search).get("tripId"));
@@ -422,11 +423,14 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const [employeeOpts, setEmployeeOpts] = useState<Array<{ id: number; employeeName: string; department: string }>>([]);
 
   useEffect(() => {
+    if (entryScreen !== "form") return;
     let cancelled = false;
+    const requestSeq = resourceLoadSeqRef.current + 1;
+    resourceLoadSeqRef.current = requestSeq;
     const tripId = trip.id > 0 ? trip.id : undefined;
     void fetchAvailableResources(tripId)
       .then((available) => {
-        if (cancelled) return;
+        if (cancelled || requestSeq !== resourceLoadSeqRef.current) return;
         setVehicleOpts(available.vehicles ?? []);
         setEmployeeOpts([
           ...(available.drivers ?? []),
@@ -436,7 +440,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
         ]);
       })
       .catch(() => {
-        if (!cancelled) {
+        if (!cancelled && requestSeq === resourceLoadSeqRef.current) {
           setVehicleOpts([]);
           setEmployeeOpts([]);
         }
@@ -444,26 +448,9 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
     return () => {
       cancelled = true;
     };
-  }, [trip.id, trip.startStepSubmitted, entryScreen]);
+  }, [trip.id, entryScreen]);
 
-  const step1LoadSnapshot = useMemo(
-    () => trip,
-    [
-      trip.id,
-      trip.startTime,
-      trip.startStepSubmitted,
-      trip.vehicleId,
-      trip.vehicleNo,
-      trip.driverId,
-      trip.driverName,
-      trip.supervisorId,
-      trip.supervisorName,
-      trip.helpers,
-      trip.loaders,
-      trip.openingMeter,
-      trip.advanceAmount,
-    ]
-  );
+  const step1LoadSnapshot = useMemo(() => trip, [trip]);
 
   // Clamp any requested step to the highest step that is legitimately
   // available. This runs regardless of how the step was requested (click,
@@ -739,6 +726,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
         trip={viewTrip}
         open={viewOpen}
         onClose={() => {
+          viewLoadSeqRef.current += 1;
           setViewOpen(false);
           setViewTrip(null);
         }}

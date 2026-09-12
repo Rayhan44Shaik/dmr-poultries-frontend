@@ -1,9 +1,10 @@
 // src/modules/operations/vehicle-trips/hooks/useTrips.ts
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { Trip } from "../types/trip";
 import type { TripStatus } from "../../../../shared/trip";
 import { apiPut } from "../../../../api";
+import { isCanceledError } from "../../../../api/errors";
 import { listTrips, changeTripStatus, deleteTripFromApi } from "../services/tripHeaderApiService";
 import { clearStep5Draft } from "../../../../shared/trip/step5DraftStore";
 import { sendTripDeliveryEmails } from "../services/deliveryEmailService";
@@ -47,20 +48,56 @@ export default function useTrips(
   const pageSize = 10;
 
   const includeDeleted = Boolean(options?.includeDeleted);
+  const refreshSeqRef = useRef(0);
+  const refreshAbortRef = useRef<AbortController | null>(null);
+  const mountedRef = useRef(true);
+  const operationLocksRef = useRef<Set<string>>(new Set());
 
-  const refreshTrips = useCallback(async () => {
+  useEffect(() => () => {
+    mountedRef.current = false;
+    refreshSeqRef.current += 1;
+    refreshAbortRef.current?.abort();
+  }, []);
+
+  const refreshTrips = useCallback(async (): Promise<boolean> => {
+    const requestSeq = refreshSeqRef.current + 1;
+    refreshSeqRef.current = requestSeq;
+    refreshAbortRef.current?.abort();
+    const controller = new AbortController();
+    refreshAbortRef.current = controller;
     try {
-      setTrips(await listTrips({ includeDeleted }));
-    } catch {
+      const nextTrips = await listTrips({ includeDeleted, signal: controller.signal });
+      if (!mountedRef.current || controller.signal.aborted || requestSeq !== refreshSeqRef.current) return false;
+      setTrips(nextTrips);
+      return true;
+    } catch (error) {
+      if (isCanceledError(error) || !mountedRef.current || requestSeq !== refreshSeqRef.current) return false;
       notify(translate("ops.trip.unable_load_trips"), "error");
+      return false;
+    } finally {
+      if (requestSeq === refreshSeqRef.current) refreshAbortRef.current = null;
     }
   }, [includeDeleted, notify]);
 
   useEffect(() => {
     let cancelled = false;
-    queueMicrotask(() => { if (!cancelled) void refreshTrips(); });
-    return () => { cancelled = true; };
+    queueMicrotask(() => {
+      if (!cancelled) void refreshTrips();
+    });
+    return () => {
+      cancelled = true;
+      refreshAbortRef.current?.abort();
+    };
   }, [refreshTrips]);
+
+  const acquireOperationLock = (key: string) => {
+    if (operationLocksRef.current.has(key)) return false;
+    operationLocksRef.current.add(key);
+    return true;
+  };
+  const releaseOperationLock = (key: string) => {
+    operationLocksRef.current.delete(key);
+  };
 
   const resetFilters = () => {
     setSearch("");
@@ -78,6 +115,8 @@ export default function useTrips(
   // Recent lifecycle is backend-authoritative and survives refresh — never
   // localStorage. `deleted` trips stay soft-deleted and never resurface.
   const deleteTrip = async (id: number, reason?: string) => {
+    const lockKey = `delete:${id}`;
+    if (!acquireOperationLock(lockKey)) return;
     try {
       await deleteTripFromApi(id, reason || translate("ops.trip.no_reason"));
       // Part K: a deleted trip's local Step 5 draft/queue is obsolete. Only this
@@ -88,6 +127,8 @@ export default function useTrips(
     } catch (err) {
       const msg = (err as { message?: string })?.message ?? translate("ops.trip.failed_delete_trip");
       notify(translate("ops.trip.failed_delete_trip_msg", { msg }), "error");
+    } finally {
+      releaseOperationLock(lockKey);
     }
   };
 
@@ -95,6 +136,8 @@ export default function useTrips(
   // parity; the wizard uses submitStep endpoints, but any caller that replaces
   // a trip object now writes to PostgreSQL, not localStorage.
   const updateTrip = async (trip: Trip) => {
+    const lockKey = `update:${trip.id}`;
+    if (!acquireOperationLock(lockKey)) return undefined;
     try {
       const { data } = await apiPut<Record<string, unknown>>(
         `/trips/${trip.id}`,
@@ -105,11 +148,15 @@ export default function useTrips(
       return data;
     } catch {
       notify(translate("ops.trip.failed_update_trip"), "error");
+    } finally {
+      releaseOperationLock(lockKey);
     }
   };
 
   // ✅ Updated: accept approvedBy parameter. Status transitions are validated and persisted by the backend API.
   const changeStatus = async (trip: Trip, status: TripStatus, approvedBy?: string) => {
+    const lockKey = `status:${trip.id}:${status}`;
+    if (!acquireOperationLock(lockKey)) return;
     try {
       const updated = await changeTripStatus(trip.id, status, approvedBy);
       await refreshTrips();
@@ -120,6 +167,8 @@ export default function useTrips(
     } catch (err) {
       const msg = (err as { message?: string })?.message ?? translate("ops.trip.failed_status_update");
       notify(translate("ops.trip.failed_status_update_msg", { msg }), "error");
+    } finally {
+      releaseOperationLock(lockKey);
     }
   };
 

@@ -542,12 +542,15 @@ export async function listTrips(options?: {
    *  rows to classify collection containers and assignment rows; the plain
    *  Recent Trips list does not and stays on the lighter summary payload. */
   full?: boolean;
+  /** Lets Recent/Entry cancel superseded list reads during fast refreshes. */
+  signal?: AbortSignal;
 }): Promise<Trip[]> {
   const params: Record<string, string> = {};
   if (options?.includeDeleted) params.includeDeleted = "true";
   if (options?.full) params.full = "true";
   const { data } = await apiGet<ApiTripRecord[]>(TRIPS_PATH, {
     params: Object.keys(params).length ? params : undefined,
+    signal: options?.signal,
   });
   return uniqueTripsById(data.map((trip) => mapApiTripToTrip(trip)));
 }
@@ -566,6 +569,8 @@ export interface TripListFilters {
   /** Column key to sort by; the API whitelists the accepted values. */
   sortBy?: string;
   sortDir?: "asc" | "desc";
+  /** Lets pages cancel superseded filter/search requests to avoid stale UI. */
+  signal?: AbortSignal;
 }
 
 export interface PaginatedTripListResult {
@@ -596,14 +601,16 @@ export async function listCompletedTrips(filters: TripListFilters = {}): Promise
         sortBy: filters.sortBy,
         sortDir: filters.sortDir,
       },
+      signal: filters.signal,
     }
   );
   
   // Handle both old format (array) and new paginated format
   if (Array.isArray(data)) {
+    const uniqueData = uniqueTripsById(data.map((trip) => mapApiTripToTrip(trip)));
     return {
-      data: data.map((trip) => mapApiTripToTrip(trip)),
-      meta: { total: data.length, page: 1, limit: data.length, totalPages: 1 },
+      data: uniqueData,
+      meta: { total: uniqueData.length, page: 1, limit: uniqueData.length, totalPages: 1 },
     };
   }
   
@@ -615,7 +622,7 @@ export async function listCompletedTrips(filters: TripListFilters = {}): Promise
     // New paginated format
     const records = data.data as unknown as ApiTripRecord[];
     return {
-      data: records.map((trip) => mapApiTripToTrip(trip)),
+      data: uniqueTripsById(records.map((trip) => mapApiTripToTrip(trip))),
       meta: data.meta,
     };
   }

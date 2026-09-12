@@ -14,7 +14,7 @@ import {
 import { useI18n } from "../../../../i18n";
 import { BrandRefreshButton } from "../../../../ui";
 import { ActionTooltip } from "../../../../ui/ActionTooltip";
-import MasterDropdown from "../../../masters/components/MasterDropdown";
+import MasterDropdown, { type MasterDropdownOption } from "../../../masters/components/MasterDropdown";
 
 interface Props {
   fromDate: string;
@@ -31,9 +31,9 @@ interface Props {
   setSearch: (v: string) => void;
   onSearch: () => void;
   onReset: () => void;
-  vehicles?: string[];
-  supervisors?: string[];
-  farms?: string[];
+  vehicles?: readonly (string | MasterDropdownOption)[];
+  supervisors?: readonly (string | MasterDropdownOption)[];
+  farms?: readonly (string | MasterDropdownOption)[];
   onExportPDF?: () => void;
   onRefresh?: () => void;
   onExportExcel?: () => void;
@@ -71,12 +71,16 @@ function TripFilters({
   viewButtonRef,
 }: Props) {
   const { t } = useI18n();
-  // Plain string lists; MasterDropdown accepts string[] directly. The
-  // "All ..." sentinels are represented as an empty value so the dropdown
+  // Option lists may be either legacy strings or id-backed dropdown options.
+  // The "All ..." sentinels are represented as an empty value so the dropdown
   // shows its placeholder and the clear affordance behaves correctly.
-  const vehicleOptions = (vehicles || []).filter((v) => v !== "All Vehicles");
-  const supervisorOptions = (supervisors || []).filter((v) => v !== "All Supervisors");
-  const farmOptions = (farms || []).filter((v) => v !== "All Sources");
+  const withoutSentinel = (
+    options: readonly (string | MasterDropdownOption)[],
+    sentinel: string
+  ) => options.filter((option) => (typeof option === "string" ? option !== sentinel : option.value !== sentinel));
+  const vehicleOptions = withoutSentinel(vehicles || [], "All Vehicles");
+  const supervisorOptions = withoutSentinel(supervisors || [], "All Supervisors");
+  const farmOptions = withoutSentinel(farms || [], "All Sources");
 
   return (
     <div className={opsFilterCardClass}>

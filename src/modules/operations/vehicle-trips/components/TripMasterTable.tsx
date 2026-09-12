@@ -158,7 +158,7 @@ function TripMasterTable({
                   <tr
                     key={trip.id}
                     onClick={() => onRowClick(trip)}
-                    className={`cursor-pointer transition-all duration-150 ${
+                    className={`cursor-pointer transition-colors duration-150 ${
                       isSelected
                         ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200"
                         : `hover:bg-slate-50/60 ${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"}`

@@ -1,6 +1,6 @@
 // src/modules/operations/vehicle-trips/components/TripRecentTable.tsx
 
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
 import { Eye, Pencil, History, Trash2, Clock, AlertCircle, Search, FileText, CheckCircle, X } from "lucide-react";
 import type { Trip } from "../types/trip";
@@ -45,8 +45,9 @@ function TripRecentTable({
   // exist purely to hold a day's order plan. They are not trips, so they must
   // never appear here. Filtered by isOrderContainer rather than by matching the
   // "ORD-" prefix, so the rule stays tied to the actual data shape.
-  const safeTrips = uniqueTripsById(
-    (Array.isArray(trips) ? trips : []).filter((t) => !isOrderContainer(t)),
+  const safeTrips = useMemo(
+    () => uniqueTripsById((Array.isArray(trips) ? trips : []).filter((trip) => !isOrderContainer(trip))),
+    [trips]
   );
 
   /** Translate, but never surface a raw i18n key: returns "" when the key is missing. */
@@ -105,13 +106,13 @@ function TripRecentTable({
 
 
   /** Effective list status: Step 5 fully submitted must never stay under Draft. */
-  const listStatus = (t: Trip): "Draft" | "Pending" | "Completed" | "Deleted" => {
+  const listStatus = useCallback((t: Trip): "Draft" | "Pending" | "Completed" | "Deleted" => {
     if (t.deleted === true || t.status === "Deleted") return "Deleted";
     if (t.status === "Completed") return "Completed";
     // Wizard done (end/expenses submitted) OR explicit Pending → Pending tab
     if (t.status === "Pending" || isTripWizardComplete(t)) return "Pending";
     return "Draft";
-  };
+  }, []);
 
   const getStepBadge = (trip: Trip) => {
     // Completed may still exist on older sample rows — show label only (no status change option).
@@ -176,21 +177,23 @@ function TripRecentTable({
       if (a.tripDate !== b.tripDate) return a.tripDate < b.tripDate ? 1 : -1;
       return b.id - a.id;
     });
-  }, [safeTrips, searchTerm, t]);
+  }, [safeTrips, searchTerm, t, listStatus]);
 
-  const allDraft = sortedTrips.filter((t) => listStatus(t) === "Draft");
-  // Pending tab: only Pending trips. Completed leaves this list (Trip List / accounts).
-  const allPending = sortedTrips.filter((t) => listStatus(t) === "Pending");
-  const allDeleted = sortedTrips.filter((t) => listStatus(t) === "Deleted");
+  const statusBuckets = useMemo(() => ({
+    draft: sortedTrips.filter((trip) => listStatus(trip) === "Draft"),
+    pending: sortedTrips.filter((trip) => listStatus(trip) === "Pending"),
+    deleted: sortedTrips.filter((trip) => listStatus(trip) === "Deleted"),
+  }), [sortedTrips, listStatus]);
 
   /** Count beside “Recent Trip Activity” follows the selected tab (Draft/Pending/Deleted). */
   const selectedTabCount =
-    statusFilter === "Draft" ? allDraft.length : statusFilter === "Pending" ? allPending.length : allDeleted.length;
+    statusFilter === "Draft" ? statusBuckets.draft.length : statusFilter === "Pending" ? statusBuckets.pending.length : statusBuckets.deleted.length;
 
-  const filteredTrips = statusFilter === "Draft" ? allDraft : statusFilter === "Pending" ? allPending : allDeleted;
+  const filteredTrips = statusFilter === "Draft" ? statusBuckets.draft : statusFilter === "Pending" ? statusBuckets.pending : statusBuckets.deleted;
 
   const totalPages = Math.ceil(filteredTrips.length / pageSize);
-  const startIndex = (currentPage - 1) * pageSize;
+  const safeCurrentPage = Math.min(currentPage, Math.max(totalPages, 1));
+  const startIndex = (safeCurrentPage - 1) * pageSize;
   const paginatedTrips = filteredTrips.slice(startIndex, startIndex + pageSize);
 
   const selectedTrip = safeTrips.find((t) => t.id === selectedTripId) || null;
@@ -374,7 +377,7 @@ function TripRecentTable({
                   const isSelected = trip.id === selectedTripId;
                   const isDeleted = trip.deleted === true;
                   return (
-                    <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-all duration-150 ${isDeleted ? "bg-red-50/50 hover:bg-red-50/80 border-l-4 border-l-red-400" : isSelected ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200" : "hover:bg-slate-50/80"}`}>
+                    <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-colors duration-150 ${isDeleted ? "bg-red-50/50 hover:bg-red-50/80 border-l-4 border-l-red-400" : isSelected ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200" : "hover:bg-slate-50/80"}`}>
                       <td className={`px-4 py-3 font-bold text-emerald-500 text-xs whitespace-nowrap ${isDeleted ? "opacity-60 line-through" : ""}`}>
                         {trip.tripNo}
                       </td>
@@ -463,7 +466,7 @@ function TripRecentTable({
             and shouldShowPagination() was hiding the control there entirely). */}
         {filteredTrips.length > 0 && (
           <TripPagination
-            currentPage={currentPage}
+            currentPage={safeCurrentPage}
             totalPages={Math.max(totalPages, 1)}
             onPageChange={setCurrentPage}
             pageSize={pageSize}
