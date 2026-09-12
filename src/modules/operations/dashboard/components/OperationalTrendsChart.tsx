@@ -10,8 +10,8 @@
 //
 // Because farm weight = delivered + mortality + loss holds for every trip, the
 // three segments stack to exactly the farm weight — one bar carries all four
-// weight numbers at once. The second mode re-reads the same data as a 100%
-// stack so a quiet week and a heavy one can be compared by shape.
+// weight numbers at once. The footer carries the shares, so the plot itself
+// stays in kilos and needs no mode toggle.
 //
 // The range comes from the dashboard's global calendar; the bucket (per day /
 // week / month) is chosen by the Today / Week / Month chips in the card header
@@ -21,7 +21,7 @@
 // the completed-trips API — the same endpoint the Weight Loss / Mortality page
 // reads — so the two can never disagree.
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   Area,
   Bar,
@@ -58,8 +58,6 @@ interface OperationalTrendsChartProps {
   onRetry?: () => void;
 }
 
-type Mode = "weight" | "share";
-
 const COLOR = {
   trips: "#6366f1",
   farmWeight: "#0ea5e9",
@@ -68,19 +66,7 @@ const COLOR = {
   weightLoss: "#f59e0b",
 } as const;
 
-const SHARE_TICKS = [0, 25, 50, 75, 100];
 
-/** Each reading mode carries its own accent, so the toggle reads at a glance. */
-const MODE_ACCENT: Record<Mode, { active: string; idle: string }> = {
-  weight: {
-    active: "bg-emerald-50 text-emerald-700 ring-emerald-200",
-    idle: "text-slate-400 hover:text-emerald-600",
-  },
-  share: {
-    active: "bg-indigo-50 text-indigo-700 ring-indigo-200",
-    idle: "text-slate-400 hover:text-indigo-600",
-  },
-};
 
 const signed = (current: number, earlier: number | undefined): string | null => {
   if (earlier == null || earlier === 0) return null;
@@ -202,7 +188,6 @@ export default function OperationalTrendsChart({
   onRetry,
 }: OperationalTrendsChartProps) {
   const { t } = useI18n();
-  const [mode, setMode] = useState<Mode>("weight");
 
   const rows = trends?.rows;
 
@@ -213,21 +198,12 @@ export default function OperationalTrendsChart({
   const previous = useMemo(() => previousBySortKey(buckets), [buckets]);
   const totals = useMemo(() => summariseOperational(buckets), [buckets]);
 
-  // Share mode must not clip: a bucket that gained weight pushes delivered +
-  // mortality above 100%, and a shrinking bucket puts the loss below zero.
-  const shareDomain = useMemo<[number, number] | [number, "auto"]>(() => {
-    if (mode !== "share") return [0, "auto"];
-    const tops = buckets.map((b) => b.deliveredPct + b.mortalityPct + Math.max(b.weightLossPct, 0));
-    const lows = buckets.map((b) => Math.min(0, b.weightLossPct));
-    return [Math.min(...lows, 0) * 1.4, Math.max(...tops, 100) * 1.005];
-  }, [mode, buckets]);
-
-  // Weight mode: a bucket that gained weight clamps to a zero-height segment so
-  // the stack still equals the farm weight (the true value stays in the tooltip).
-  const data = useMemo(() => {
-    if (mode !== "weight") return buckets;
-    return buckets.map((bucket) => ({ ...bucket, lossBar: Math.max(bucket.weightLoss, 0) }));
-  }, [mode, buckets]);
+  // A bucket that gained weight clamps to a zero-height segment so the stack
+  // still equals the farm weight (the true value stays in the tooltip).
+  const data = useMemo(
+    () => buckets.map((bucket) => ({ ...bucket, lossBar: Math.max(bucket.weightLoss, 0) })),
+    [buckets]
+  );
 
   if (loading && !trends) {
     return (
@@ -265,28 +241,6 @@ export default function OperationalTrendsChart({
 
   return (
     <div className="w-full">
-      {/* ── Controls: only the reading mode lives with the plot ────────── */}
-      <div className="mb-2.5 flex items-center justify-end">
-        <div className="inline-flex gap-0.5 rounded-lg border border-slate-200 bg-slate-50/80 p-0.5">
-          {(["weight", "share"] as Mode[]).map((value) => {
-            const accent = MODE_ACCENT[value];
-            return (
-              <button
-                key={value}
-                type="button"
-                onClick={() => setMode(value)}
-                aria-pressed={mode === value}
-                className={`rounded-[6px] px-2.5 py-1 text-[10.5px] font-extrabold uppercase tracking-wide ring-1 ring-inset transition-all duration-150 ${
-                  mode === value ? `${accent.active} shadow-sm` : `${accent.idle} ring-transparent`
-                }`}
-              >
-                {t(value === "weight" ? "ops.dashboard.trend.mode_weight" : "ops.dashboard.trend.mode_share")}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
       {/* ── Plot ─────────────────────────────────────────────────────── */}
       <div className="h-[268px] w-full">
         <ResponsiveContainer width="100%" height="100%">
@@ -327,9 +281,7 @@ export default function OperationalTrendsChart({
             />
             <YAxis
               yAxisId="weight"
-              tickFormatter={(value: number) => (mode === "share" ? `${Math.round(value)}%` : tickKg(value))}
-              domain={shareDomain}
-              ticks={mode === "share" ? SHARE_TICKS : undefined}
+              tickFormatter={tickKg}
               tick={{ fontSize: 10, fill: "#94a3b8" }}
               tickLine={false}
               axisLine={false}
@@ -360,89 +312,51 @@ export default function OperationalTrendsChart({
               cursor={{ fill: "rgba(99,102,241,0.05)", radius: 6 }}
             />
 
-            {mode === "weight" ? (
-              <>
-                {/* Segments sum to the farm weight — the bar's height IS it. */}
-                <Bar
-                  yAxisId="weight"
-                  dataKey="deliveredWeight"
-                  stackId="wt"
-                  name={t("ops.dashboard.trend.delivered_weight")}
-                  fill="url(#ot-delivered)"
-                  maxBarSize={30}
-                  animationDuration={620}
-                  animationEasing="ease-out"
-                />
-                <Bar
-                  yAxisId="weight"
-                  dataKey="mortalityWeight"
-                  stackId="wt"
-                  name={t("ops.dashboard.trend.mortality_weight")}
-                  fill="url(#ot-mortality)"
-                  maxBarSize={30}
-                  animationDuration={620}
-                  animationEasing="ease-out"
-                />
-                <Bar
-                  yAxisId="weight"
-                  dataKey="lossBar"
-                  stackId="wt"
-                  name={t("ops.dashboard.trend.weight_loss")}
-                  fill="url(#ot-loss)"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={30}
-                  animationDuration={620}
-                  animationEasing="ease-out"
-                />
-                <ReferenceLine
-                  yAxisId="weight"
-                  y={totals.avgFarmWeight}
-                  stroke={COLOR.farmWeight}
-                  strokeDasharray="4 4"
-                  strokeOpacity={0.7}
-                  strokeWidth={1}
-                  label={{
-                    value: `${t("ops.dashboard.trend.average")} ${tickKg(totals.avgFarmWeight)}`,
-                    position: "insideTopRight",
-                    style: { fontSize: 9.5, fill: "#0ea5e9", fontWeight: 700 },
-                  }}
-                />
-              </>
-            ) : (
-              <>
-                <Bar
-                  yAxisId="weight"
-                  dataKey="deliveredPct"
-                  stackId="share"
-                  name={t("ops.dashboard.trend.delivered_weight")}
-                  fill="url(#ot-delivered)"
-                  maxBarSize={34}
-                  animationDuration={620}
-                  animationEasing="ease-out"
-                />
-                <Bar
-                  yAxisId="weight"
-                  dataKey="mortalityPct"
-                  stackId="share"
-                  name={t("ops.dashboard.trend.mortality_weight")}
-                  fill="url(#ot-mortality)"
-                  maxBarSize={34}
-                  animationDuration={620}
-                  animationEasing="ease-out"
-                />
-                <Bar
-                  yAxisId="weight"
-                  dataKey="weightLossPct"
-                  stackId="share"
-                  name={t("ops.dashboard.trend.weight_loss")}
-                  fill="url(#ot-loss)"
-                  radius={[4, 4, 0, 0]}
-                  maxBarSize={34}
-                  animationDuration={620}
-                  animationEasing="ease-out"
-                />
-              </>
-            )}
+            {/* Segments sum to the farm weight — the bar's height IS it. */}
+            <Bar
+              yAxisId="weight"
+              dataKey="deliveredWeight"
+              stackId="wt"
+              name={t("ops.dashboard.trend.delivered_weight")}
+              fill="url(#ot-delivered)"
+              maxBarSize={30}
+              animationDuration={620}
+              animationEasing="ease-out"
+            />
+            <Bar
+              yAxisId="weight"
+              dataKey="mortalityWeight"
+              stackId="wt"
+              name={t("ops.dashboard.trend.mortality_weight")}
+              fill="url(#ot-mortality)"
+              maxBarSize={30}
+              animationDuration={620}
+              animationEasing="ease-out"
+            />
+            <Bar
+              yAxisId="weight"
+              dataKey="lossBar"
+              stackId="wt"
+              name={t("ops.dashboard.trend.weight_loss")}
+              fill="url(#ot-loss)"
+              radius={[6, 6, 0, 0]}
+              maxBarSize={30}
+              animationDuration={620}
+              animationEasing="ease-out"
+            />
+            <ReferenceLine
+              yAxisId="weight"
+              y={totals.avgFarmWeight}
+              stroke={COLOR.farmWeight}
+              strokeDasharray="4 4"
+              strokeOpacity={0.7}
+              strokeWidth={1}
+              label={{
+                value: `${t("ops.dashboard.trend.average")} ${tickKg(totals.avgFarmWeight)}`,
+                position: "insideTopRight",
+                style: { fontSize: 9.5, fill: "#0ea5e9", fontWeight: 700 },
+              }}
+            />
 
             <Area
               yAxisId="trips"

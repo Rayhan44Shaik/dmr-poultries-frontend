@@ -1,6 +1,6 @@
 // src/modules/operations/dashboard/pages/OperationsDashboardPage.tsx
 
-import { useState, useRef, useEffect, type CSSProperties } from "react";
+import { useState, useRef, useEffect, useMemo, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { addDays, startOfMonth, subMonths } from "date-fns";
 import { useDashboardData } from "../hooks/useDashboardData";
@@ -431,10 +431,18 @@ const VIEW_ACCENT: Record<TrendPreset, { active: string; count: string }> = {
   month: { active: "bg-teal-50 text-teal-700 ring-teal-200", count: "text-teal-700" },
 };
 
+/** The calendar's own range reads slate — it is the default, not a preset. */
+const CALENDAR_ACCENT = {
+  active: "bg-slate-100 text-slate-700 ring-slate-200",
+  count: "text-slate-700",
+};
+
 interface TrendViewOption {
-  key: TrendPreset;
+  /** `null` is the calendar's own range, offered whenever it is custom. */
+  key: TrendView;
   label: string;
-  count: number;
+  /** `null` when the option is a range rather than a counted window. */
+  count: number | null;
 }
 
 /**
@@ -463,7 +471,7 @@ function TrendViewSwitcher({
     >
       {views.map((view) => {
         const selected = view.key === active;
-        const accent = VIEW_ACCENT[view.key];
+        const accent = view.key ? VIEW_ACCENT[view.key] : CALENDAR_ACCENT;
         return (
           <button
             key={view.key}
@@ -478,13 +486,15 @@ function TrendViewSwitcher({
             }`}
           >
             {view.label}
-            <span
-              className={`text-[11.5px] font-black tabular-nums ${
-                selected ? accent.count : "text-slate-500"
-              }`}
-            >
-              {view.count}
-            </span>
+            {view.count == null ? null : (
+              <span
+                className={`text-[11.5px] font-black tabular-nums ${
+                  selected ? accent.count : "text-slate-500"
+                }`}
+              >
+                {view.count}
+              </span>
+            )}
           </button>
         );
       })}
@@ -512,12 +522,35 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
     ? Math.ceil((endDate!.getTime() - startDate!.getTime()) / (1000 * 60 * 60 * 24)) + 1
     : undefined;
 
+  /* Counters for the chips. They count the SAME completed trips the card can
+     weigh — a trip still in transit has no weights yet, so it cannot appear in
+     the chart and must not inflate the count beside it. One fetch of the
+     smallest window covering today, the week and the month supplies all three,
+     so every chip agrees with the totals underneath. */
+  const counterToday = toInputDateString(todayMidnight());
+  const counterWeekFrom = toInputDateString(addDays(todayMidnight(), -6));
+  const counterMonthFrom = toInputDateString(startOfMonth(todayMidnight()));
+  const countersQuery = useOperationalTrends(
+    (counterWeekFrom < counterMonthFrom ? counterWeekFrom : counterMonthFrom) || undefined,
+    counterToday || undefined
+  );
+
+  const trendCounts = useMemo(() => {
+    const rows = countersQuery.trends?.rows ?? [];
+    const day = (value: string) => String(value).slice(0, 10);
+    return {
+      today: rows.filter((row) => day(row.tripDate) === counterToday).length,
+      week: rows.filter((row) => day(row.tripDate) >= counterWeekFrom).length,
+      month: rows.filter((row) => day(row.tripDate) >= counterMonthFrom).length,
+    };
+  }, [countersQuery.trends, counterToday, counterWeekFrom, counterMonthFrom]);
+
   // Trip counts ride along with the switcher, so the numbers and the control
   // are the same thing.
   const trendViews: TrendViewOption[] = [
-    { key: "today", label: t("ops.dashboard.trend.today"), count: data?.todaysTrips ?? 0 },
-    { key: "week", label: t("ops.dashboard.trend.week"), count: data?.weeklyTrips ?? 0 },
-    { key: "month", label: t("ops.dashboard.trend.month"), count: data?.monthlyTrips ?? 0 },
+    { key: "today", label: t("ops.dashboard.trend.today"), count: trendCounts.today },
+    { key: "week", label: t("ops.dashboard.trend.week"), count: trendCounts.week },
+    { key: "month", label: t("ops.dashboard.trend.month"), count: trendCounts.month },
   ];
 
   // The card reads the SAME calendar window as the KPI cards until a chip is
@@ -545,20 +578,25 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
     ? GRANULARITY_BY_VIEW[trendView]
     : defaultGranularity;
 
-  // Every trip in the lit chip's window — the count printed on the chip.
-  const trendChipCount = trendView
-    ? trendViews.find((view) => view.key === trendView)?.count ?? null
-    : null;
-
-  // Light the chip the calendar happens to equal, so the card always shows
-  // which window it is reading.
+  // Light the chip the calendar is already showing, so the card and the
+  // calendar always agree: an exact match first, then any month-to-date range.
+  const calendarMatchesPreset = (["today", "week", "month"] as const).find((view) => {
+    const preset = windowForView(view);
+    return preset.from === calendarFrom && preset.to === calendarTo;
+  });
+  const calendarIsMonthToDate =
+    !!calendarTo && calendarTo === counterToday && !!calendarFrom && calendarFrom >= counterMonthFrom;
   const activeTrendView: TrendView =
     trendView ??
-    (["today", "week", "month"] as const).find((view) => {
-      const preset = windowForView(view);
-      return preset.from === calendarFrom && preset.to === calendarTo;
-    }) ??
-    null;
+    calendarMatchesPreset ??
+    (calendarIsMonthToDate ? "month" : null);
+
+  // Anything the calendar picked by hand is its own option, so this card can
+  // read it too. It carries no count: the presets count trips, while this one
+  // is whatever range the calendar holds.
+  const trendViewsWithCalendar: TrendViewOption[] = calendarMatchesPreset
+    ? trendViews
+    : [...trendViews, { key: null, label: t("ops.dashboard.trend.custom"), count: null }];
 
   const handleRangeChange = (s: Date | undefined, e: Date | undefined) => {
     setStartDate(s);
@@ -718,21 +756,10 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
                   total the completed ones, so say so when the two differ. */}
               <p className="mt-0.5 text-[10.5px] font-semibold text-slate-400">
                 {windowLabel(trendWindow.from, trendWindow.to)}
-                {trendChipCount != null && trendsQuery.trends &&
-                trendsQuery.trends.countedTrips !== trendChipCount ? (
-                  <>
-                    {" · "}
-                    {t("ops.dashboard.trend.completed_of", {
-                      done: trendsQuery.trends.countedTrips,
-                      total: trendChipCount,
-                    })}{" "}
-                    {t("ops.dashboard.trips").toLowerCase()}
-                  </>
-                ) : null}
               </p>
             </div>
             <TrendViewSwitcher
-              views={trendViews}
+              views={trendViewsWithCalendar}
               active={activeTrendView}
               onChange={setTrendView}
               label={t("ops.dashboard.trend.bucket_by")}

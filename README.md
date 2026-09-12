@@ -100,24 +100,31 @@ segments stack to exactly the farm weight — one bar carries all four weight
 numbers at once. **Share of farm** re-reads the same data as a 100% stack, so a
 quiet bucket and a heavy one can be compared by shape.
 
-**Window** — the header carries a `Today · Week · Month` switcher, and each
-option shows its own trip count, so the numbers people ask for first *are* the
-control. Picking one moves the whole card — bars *and* the totals underneath —
-to today, the last seven days or this calendar month; the chip's count is then
-the number the card is totalling. Until a chip is tapped the card reads the
-global calendar's range, and that default is derived rather than remembered, so
-a reload or a hard refresh lands on the calendar's window. Tapping the lit chip
-lets go of it (back to the calendar), and the caption under the title always
-says which dates are being totalled — plus, when a chip counts trips the card
-cannot weigh yet, "22 of 54 trips".
+**Window** — the header carries a `Today · Week · Month` switcher, plus a
+`Custom` option whenever the calendar holds a range of its own. Picking one
+moves the whole card — bars *and* the five totals underneath — to today, the
+last seven days or this calendar month. Today and a week read day by day; a
+month reads week by week.
 
-Today and a week read day by day; a month reads week by week. Each chip carries
-its own accent — Today sky, Week violet, Month teal — and the reading mode below
-the plot is emerald for the weight split, indigo for the share of farm.
+Each chip's number counts the **completed trips** in its window, which is
+exactly what the card weighs, so "Week 22" and "Trips 22" can never disagree —
+trips still in transit have no weights yet and are left out of both. The
+counters come from one fetch of the shortest range covering today, the week and
+the month.
 
-**Reading it** — the footer is also the legend: trips, farm weight, delivered
+Until a chip is tapped the card reads the global calendar, and the chip the
+calendar is already showing is lit — a 7D calendar lights Week, a month-to-date
+range lights Month, anything else lights Custom. That default is derived rather
+than remembered, so a reload or a hard refresh lands on the calendar's window,
+and tapping the lit chip hands it back. The caption under the title always names
+the dates being totalled. Each chip carries its own accent — Today sky, Week
+violet, Month teal, Custom slate.
+
+**Reading it** — the plot stays in kilos, so there is no second reading to
+switch to, and the footer doubles as the legend: trips, farm weight, delivered
 weight, mortality and weight loss, each with its share of the farm weight or its
-per-bucket average. Hover any bucket for every weight with its share, birds lost
+per-bucket average, so the percentages are one glance away without a toggle.
+Hover any bucket for every weight with its share, birds lost
 and its share of the load, kg and birds per trip, and the ▲▼ change against the
 previous bucket.
 
