@@ -99,11 +99,11 @@ quarter). The comparison is honest in all three cases:
 - no prior window (or a zero baseline) says "—" rather than a meaningless
   0.0%, with the reason in the tooltip.
 
-Each card stacks the same way, top to bottom: the **change badge sits directly
-above the logo** in the top-right corner ("▲ 10.2% 7d", the period following the
-calendar — 7d, 15d, 30d, whatever the range is), then the figure, then its name,
-then the baseline it is measured against ("was ₹31.61 L"). Hovering the badge
-gives the full sentence, both figures included.
+Every card is **one line**: logo, name, figure, then — hugging the right edge —
+the change ("▲ 10.2% 7d", the period following the calendar: 7d, 15d, 30d,
+whatever the range is) and the baseline ("was ₹31.61 L"). Nothing wraps; the
+name and baseline truncate instead, and hovering the badge gives the full
+sentence with both figures.
 
 Names are one word where one will do — Trips, Birds, Weight (Kg), Amount,
 Collections, Pending, Expenses — and the row goes four across so nothing is ever
