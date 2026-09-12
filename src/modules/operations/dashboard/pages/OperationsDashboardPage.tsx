@@ -1,21 +1,43 @@
 // src/modules/operations/dashboard/pages/OperationsDashboardPage.tsx
 
-import { useState, useRef, useEffect, type CSSProperties } from "react";
+import { useState, useRef, useEffect, useMemo, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
-import { addDays, subMonths } from "date-fns";
+import { addDays, startOfMonth, subMonths } from "date-fns";
 import { useDashboardData } from "../hooks/useDashboardData";
 import KPICards from "../components/KPICards";
-import TrendChart from "../components/TrendChart";
+import OperationalTrendsChart from "../components/OperationalTrendsChart";
+import { useOperationalTrends } from "../hooks/useOperationalTrends";
+import { granularityForRange, type Granularity } from "../utils/trendSeries";
 import CollectionsPie from "../components/CollectionsPie";
 import RecentTripsTable from "../components/RecentTripsTable";
 import ActiveCounts from "../components/ActiveCounts";
 import PendingCollectionsByShop from "../components/PendingCollectionsByShop";
 import PendingApprovalsPanel from "../components/PendingApprovalsPanel";
-import { Calendar, CalendarClock, CalendarDays, CalendarRange, ChevronDown, Layers, ArrowRightLeft, RefreshCw } from "lucide-react";
+import {
+  Calendar,
+  CalendarClock,
+  CalendarDays,
+  CalendarRange,
+  ChevronDown,
+  Layers,
+  ArrowRightLeft,
+  ArrowUpRight,
+  RefreshCw,
+  SlidersHorizontal,
+} from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import { useI18n } from "../../../../i18n";
 import { kickApprovalSnapshot } from "../../../approvals/services/approvalSnapshot";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
+
+// -------- Helper: render a sample-dataset YYYY-MM-DD as "12 Sep 2026" --------
+const formatSampleDate = (value: string, locale = "en-IN"): string => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleDateString(locale, { day: "2-digit", month: "short", year: "numeric" });
+};
 
 // -------- Helper: get previous Monday–Sunday --------
 const getPreviousWeekRange = () => {
@@ -377,9 +399,136 @@ function RangeDatePicker({
   );
 }
 
-// -------- Main Dashboard View Page --------
+/** The three quick windows the chips offer. */
+type TrendPreset = "today" | "week" | "month";
+
+/** The window the Operational Trends card reads. `null` means "follow the
+ *  global calendar" — that is the default, and it is never remembered. */
+type TrendView = TrendPreset | null;
+
+/** Today is one day, a week is the last seven days, a month is the calendar
+ *  month to date — the same windows the trip counters count, so the number on
+ *  a chip is the number the card then totals. */
+const windowForView = (view: TrendPreset): { from: string; to: string } => {
+  const today = todayMidnight();
+  const to = toInputDateString(today);
+  if (view === "today") return { from: to, to };
+  if (view === "week") return { from: toInputDateString(addDays(today, -6)), to };
+  return { from: toInputDateString(startOfMonth(today)), to };
+};
+
+/** A day-by-day reading for today and a week, a week-by-week one for a month. */
+const GRANULARITY_BY_VIEW: Record<TrendPreset, Granularity> = {
+  today: "daily",
+  week: "daily",
+  month: "weekly",
+};
+
+/** "6 Sep – 12 Sep 2026", or a single day when the window is one day. */
+const windowLabel = (from: string, to: string, locale = "en-IN"): string => {
+  if (!from || !to) return "";
+  if (from === to) return formatSampleDate(from, locale);
+  const start = formatSampleDate(from, locale);
+  const end = formatSampleDate(to, locale);
+  return from.slice(0, 4) === to.slice(0, 4)
+    ? `${start.replace(/\s*\d{4}$/, "")} – ${end}`
+    : `${start} – ${end}`;
+};
+
+/** One soft accent per chip — today reads sky, week violet, month teal. */
+const VIEW_ACCENT: Record<TrendPreset, { active: string; icon: typeof CalendarDays }> = {
+  today: { active: "bg-sky-50 text-sky-700 ring-sky-200", icon: CalendarDays },
+  week: { active: "bg-violet-50 text-violet-700 ring-violet-200", icon: CalendarRange },
+  month: { active: "bg-teal-50 text-teal-700 ring-teal-200", icon: Calendar },
+};
+
+/** The calendar's own range reads slate — it is the default, not a preset. */
+const CALENDAR_ACCENT = {
+  active: "bg-slate-100 text-slate-700 ring-slate-200",
+  icon: SlidersHorizontal,
+};
+
+/**
+ * Segmented switcher sitting in the card header. Each option carries its trip
+ * count, so the numbers people ask for first are also the control: pick one and
+ * the chart re-buckets the calendar's window by day, week or month.
+ */
+interface TrendViewOption {
+  /** `null` is the calendar's own range, offered whenever it is custom. */
+  key: TrendView;
+  label: string;
+  /** `null` when the option is a range rather than a counted window. */
+  count: number | null;
+}
+
+/**
+ * The card's range switcher — a proper segmented control: a rounded track, one
+ * solid accent per option, an icon that says which window it is, and the trip
+ * count set into the same pill.
+ */
+function TrendViewSwitcher({
+  views,
+  active,
+  onChange,
+  label,
+  calendarTitle,
+}: {
+  views: TrendViewOption[];
+  active: TrendView;
+  onChange: (next: TrendView) => void;
+  label: string;
+  calendarTitle: string;
+}) {
+  return (
+    <div
+      role="tablist"
+      aria-label={label}
+      className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200/80 bg-slate-50/70 p-1 shadow-sm"
+    >
+      {views.map((view) => {
+        const selected = view.key === active;
+        const accent = view.key ? VIEW_ACCENT[view.key] : CALENDAR_ACCENT;
+        const Icon = accent.icon;
+        return (
+          <button
+            key={view.label}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            /* Tapping the lit chip lets go of the window: back to the calendar. */
+            title={selected ? calendarTitle : undefined}
+            onClick={() => onChange(selected ? null : view.key)}
+            className={`group flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold tracking-tight ring-1 ring-inset transition-all duration-200 active:scale-[0.97] ${
+              selected ? `${accent.active} shadow-sm` : "text-slate-500 ring-transparent hover:bg-white hover:text-slate-700"
+            }`}
+          >
+            <Icon
+              size={13}
+              strokeWidth={2.4}
+              className={
+                selected ? "opacity-70" : "text-slate-400 transition-colors group-hover:text-slate-500"
+              }
+            />
+            <span className="whitespace-nowrap">{view.label}</span>
+            {view.count == null ? null : (
+              <span
+                className={`rounded-full px-1.5 py-px text-[10.5px] font-black tabular-nums ${
+                  selected ? "bg-white/80" : "bg-slate-200/70 text-slate-600"
+                }`}
+              >
+                {view.count}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
 function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
-  const { t } = useI18n();
+  const { t, language: uiLanguage } = useI18n();
+  const trendLocale = uiLanguage === "te" ? "te-IN" : "en-IN";
   const { showNotification } = useSafeNotification();
   const initialRange = getPreviousWeekRange();
   const [startDate, setStartDate] = useState<Date | undefined>(initialRange.startDate);
@@ -396,6 +545,99 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   const rangeDays = isRangeSelected
     ? Math.ceil((endDate!.getTime() - startDate!.getTime()) / (1000 * 60 * 60 * 24)) + 1
     : undefined;
+
+  /* Counters for the chips. They count the SAME completed trips the card can
+     weigh — a trip still in transit has no weights yet, so it cannot appear in
+     the chart and must not inflate the count beside it. One fetch of the
+     smallest window covering today, the week and the month supplies all three,
+     so every chip agrees with the totals underneath. */
+  const counterToday = toInputDateString(todayMidnight());
+  const counterWeekFrom = toInputDateString(addDays(todayMidnight(), -6));
+  const counterMonthFrom = toInputDateString(startOfMonth(todayMidnight()));
+  const countersQuery = useOperationalTrends(
+    (counterWeekFrom < counterMonthFrom ? counterWeekFrom : counterMonthFrom) || undefined,
+    counterToday || undefined
+  );
+
+  const trendCounts = useMemo(() => {
+    const rows = countersQuery.trends?.rows ?? [];
+    const day = (value: string) => String(value).slice(0, 10);
+    return {
+      today: rows.filter((row) => day(row.tripDate) === counterToday).length,
+      week: rows.filter((row) => day(row.tripDate) >= counterWeekFrom).length,
+      month: rows.filter((row) => day(row.tripDate) >= counterMonthFrom).length,
+    };
+  }, [countersQuery.trends, counterToday, counterWeekFrom, counterMonthFrom]);
+
+  // Trip counts ride along with the switcher, so the numbers and the control
+  // are the same thing.
+  const trendViews: TrendViewOption[] = [
+    { key: "today", label: t("ops.dashboard.trend.today"), count: trendCounts.today },
+    { key: "week", label: t("ops.dashboard.trend.week"), count: trendCounts.week },
+    { key: "month", label: t("ops.dashboard.trend.month"), count: trendCounts.month },
+  ];
+
+  // The card reads the SAME calendar window as the KPI cards until a chip is
+  // tapped; then the whole card — bars and the totals underneath — moves to
+  // today, the last seven days or this calendar month. The choice is never
+  // remembered, so a reload or a hard refresh lands on the calendar's window.
+  const [trendView, setTrendView] = useState<TrendView>(null);
+  const calendarFrom = toInputDateString(startDate);
+  const calendarTo = toInputDateString(endDate);
+
+  const calendarKey = `${calendarFrom}:${calendarTo}`;
+  const [lastCalendarKey, setLastCalendarKey] = useState(calendarKey);
+  if (calendarKey !== lastCalendarKey) {
+    setLastCalendarKey(calendarKey);
+    setTrendView(null);
+  }
+
+  const trendWindow: { from: string; to: string } = trendView
+    ? windowForView(trendView)
+    : { from: calendarFrom, to: calendarTo };
+
+  const trendsQuery = useOperationalTrends(trendWindow.from || undefined, trendWindow.to || undefined);
+  const defaultGranularity = granularityForRange(rangeDays);
+  const trendGranularity: Granularity = trendView
+    ? GRANULARITY_BY_VIEW[trendView]
+    : defaultGranularity;
+
+  // Light the chip the calendar is already showing, so the card and the
+  // calendar always agree: an exact match first, then any month-to-date range.
+  const calendarMatchesPreset = (["today", "week", "month"] as const).find((view) => {
+    const preset = windowForView(view);
+    return preset.from === calendarFrom && preset.to === calendarTo;
+  });
+  /* A calendar that merely SPANS a day, a week or a month lights that chip too,
+     even when its dates are not exactly the preset's — if the page is showing a
+     week, this card reads a week. The card still totals the calendar's own
+     dates until a chip is actually tapped. */
+  const activeTrendView: TrendView =
+    trendView ??
+    calendarMatchesPreset ??
+    (rangeDays === 1
+      ? "today"
+      : rangeDays === 7
+        ? "week"
+        : rangeDays != null && rangeDays >= 28 && rangeDays <= 31
+          ? "month"
+          : null);
+
+  // Anything the calendar picked by hand is its own option, so this card can
+  // read it too. It carries no count: the presets count trips, while this one
+  // is whatever range the calendar holds.
+  const trendViewsWithCalendar: TrendViewOption[] = calendarMatchesPreset
+    ? trendViews
+    : [
+        ...trendViews,
+        {
+          key: null,
+          label: t("ops.dashboard.trend.custom"),
+          /* While the card is reading the calendar, it already holds the
+             count for that range — no second request needed. */
+          count: activeTrendView === null ? trendsQuery.trends?.totalTrips ?? null : null,
+        },
+      ];
 
   const handleRangeChange = (s: Date | undefined, e: Date | undefined) => {
     setStartDate(s);
@@ -417,6 +659,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
       window.setTimeout(() => setRefreshing(false), 450);
     }
   };
+
 
   const rangePicker = (
     <RangeDatePicker
@@ -515,18 +758,45 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.time_series")}</span>
-              <h3 className="text-sm font-black text-slate-800 mt-0.5">{t("ops.dashboard.operational_trends")}</h3>
+          <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+            <div className="min-w-0">
+              {/* The title is the way through to the detail page — no second link. */}
+              <Link
+                to="/operations?tab=mortality"
+                title={t("ops.dashboard.trend.view_mortality")}
+                className="group/title mt-0.5 flex items-center gap-1.5"
+              >
+                <h3 className="text-sm font-black text-slate-800 transition-colors group-hover/title:text-emerald-600">
+                  {t("ops.dashboard.trend.title")}
+                </h3>
+                <ArrowUpRight
+                  size={13}
+                  strokeWidth={2.6}
+                  className="text-slate-300 transition-all duration-150 group-hover/title:-translate-y-[1px] group-hover/title:translate-x-[1px] group-hover/title:text-emerald-600"
+                />
+              </Link>
+              {/* Which window the card is totalling — it moves with the chips.
+                  A chip counts every trip in its window; the card can only
+                  total the completed ones, so say so when the two differ. */}
+              <p className="mt-0.5 text-[10.5px] font-semibold text-slate-400">
+                {windowLabel(trendWindow.from, trendWindow.to, trendLocale)}
+              </p>
             </div>
-            <Link to="/operations?tab=vehicle-trips" className="shrink-0 text-[11px] font-bold text-blue-600 hover:underline">View details →</Link>
+            <TrendViewSwitcher
+              views={trendViewsWithCalendar}
+              active={activeTrendView}
+              onChange={setTrendView}
+              label={t("ops.dashboard.trend.bucket_by")}
+              calendarTitle={t("ops.dashboard.trend.back_to_calendar")}
+            />
           </div>
           <div className="w-full overflow-hidden">
-            <TrendChart
-              data={data?.trendData || []}
-              initialGranularity={(data?.trendData.length ?? 0) > 31 ? "weekly" : "daily"}
-              key={(data?.trendData.length ?? 0) > 31 ? "trend-weekly" : "trend-daily"}
+            <OperationalTrendsChart
+              trends={trendsQuery.trends}
+              granularity={trendGranularity}
+              loading={trendsQuery.loading}
+              error={trendsQuery.error}
+              onRetry={trendsQuery.refetch}
             />
           </div>
         </div>

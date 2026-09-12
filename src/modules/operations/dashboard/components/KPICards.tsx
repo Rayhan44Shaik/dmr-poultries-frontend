@@ -2,6 +2,7 @@
 
 import { useMemo, memo } from "react";
 import {
+  Bird,
   Truck,
   ShoppingBag,
   IndianRupee,
@@ -16,6 +17,8 @@ import { useI18n } from "../../../../i18n";
 // ---------- Type Definitions ----------
 export interface DashboardMetrics {
   totalTrips?: number;
+  /** Birds loaded at the farm across the window. */
+  totalBirds?: number;
   totalSalesWeight?: number;
   totalSalesAmount?: number;
   totalCollections?: number;
@@ -27,7 +30,8 @@ export interface DashboardMetrics {
 
 export interface KPICardsProps {
   current: DashboardMetrics;
-  previous?: DashboardMetrics;
+  /** The equal-length window before the one on screen; `null` until it loads. */
+  previous?: DashboardMetrics | null;
   rangeDays?: number;
 }
 
@@ -69,8 +73,8 @@ const formatCurrency = (amount: unknown): { main: string; suffix: string } => {
 };
 
 const formatWeightNumber = (value: unknown): { main: string; suffix: string } => {
-  const num = safeNumber(value);
-  return formatLargeNumber(num);
+  // Kilos are whole numbers on a dashboard — nobody reads 27,744.23 kg.
+  return formatLargeNumber(Math.round(safeNumber(value)));
 };
 
 // ---------- Configuration ----------
@@ -79,35 +83,78 @@ const cardConfig = {
     bg: "bg-blue-500",
     text: "text-blue-600",
     icon: Truck,
+    upIsGood: true,
+  },
+  "Total Birds": {
+    bg: "bg-amber-500",
+    text: "text-amber-600",
+    icon: Bird,
+    upIsGood: true,
   },
   "Total Weight (KG)": {
     bg: "bg-green-500",
     text: "text-green-600",
     icon: ShoppingBag,
+    upIsGood: true,
   },
   "Total Sales Amount": {
     bg: "bg-violet-500",
     text: "text-violet-600",
     icon: IndianRupee,
+    upIsGood: true,
   },
   "Total Collections": {
     bg: "bg-orange-500",
     text: "text-orange-600",
     icon: Wallet,
+    upIsGood: true,
   },
   "Pending Collections": {
     bg: "bg-cyan-500",
     text: "text-cyan-600",
     icon: Hourglass,
+    // Outstanding dues going UP is not a win.
+    upIsGood: false,
   },
   "Total Expenses": {
     bg: "bg-pink-500",
     text: "text-pink-600",
     icon: ReceiptIndianRupee,
+    // Nor is spending more.
+    upIsGood: false,
   },
 } as const;
 
 type CardLabel = keyof typeof cardConfig;
+
+/** One comparison, three honest answers: a move, a flat line, or no baseline. */
+type Comparison =
+  | { kind: "move"; pct: number; good: boolean }
+  | { kind: "flat" }
+  | { kind: "no-baseline" };
+
+const compare = (value: number, previous: number, upIsGood: boolean): Comparison => {
+  if (!Number.isFinite(previous) || previous <= 0) return { kind: "no-baseline" };
+  const pct = ((value - previous) / previous) * 100;
+  if (Math.abs(pct) < 0.05) return { kind: "flat" };
+  return { kind: "move", pct, good: pct > 0 === upIsGood };
+};
+
+const formatPct = (pct: number): string =>
+  `${Math.abs(pct) < 0.1 ? "<0.1" : Math.abs(pct).toFixed(1)}%`;
+
+const formatWithUnit = (value: unknown, unit?: "KG" | "₹"): string => {
+  if (unit === "₹") {
+    const { main, suffix } = formatCurrency(value);
+    return `${main}${suffix ? ` ${suffix}` : ""}`;
+  }
+  if (unit === "KG") {
+    const { main, suffix } = formatWeightNumber(value);
+    return `${main}${suffix ? ` ${suffix}` : ""}`;
+  }
+  const { main, suffix } = formatLargeNumber(Math.round(safeNumber(value)));
+  return `${main}${suffix ? ` ${suffix}` : ""}`;
+};
 
 // ---------- Individual Card ----------
 interface KPICardProps {
@@ -123,6 +170,8 @@ const kpiCardLabel = (label: CardLabel): string => {
   switch (label) {
     case "Total Trips":
       return "ops.dashboard.kpi_total_trips";
+    case "Total Birds":
+      return "ops.dashboard.kpi_total_birds";
     case "Total Weight (KG)":
       return "ops.dashboard.kpi_total_weight";
     case "Total Sales Amount":
@@ -133,6 +182,26 @@ const kpiCardLabel = (label: CardLabel): string => {
       return "ops.dashboard.kpi_pending_collections";
     case "Total Expenses":
       return "ops.dashboard.kpi_total_expenses";
+  }
+};
+
+/** What fits on the card next to the badge; the full name is the tooltip. */
+const kpiCardShortLabel = (label: CardLabel): string => {
+  switch (label) {
+    case "Total Trips":
+      return "ops.dashboard.kpi_short_trips";
+    case "Total Birds":
+      return "ops.dashboard.kpi_short_birds";
+    case "Total Weight (KG)":
+      return "ops.dashboard.kpi_short_weight";
+    case "Total Sales Amount":
+      return "ops.dashboard.kpi_short_sales";
+    case "Total Collections":
+      return "ops.dashboard.kpi_short_collections";
+    case "Pending Collections":
+      return "ops.dashboard.kpi_short_pending";
+    case "Total Expenses":
+      return "ops.dashboard.kpi_short_expenses";
   }
 };
 
@@ -148,12 +217,8 @@ const KPICard = memo(function KPICard({
   const config = cardConfig[label];
   const Icon = config.icon;
 
-  const change = prevValue > 0 ? ((value - prevValue) / prevValue) * 100 : 0;
-  const isUp = change > 0;
-  const isDown = change < 0;
-
   let displayMain: string;
-  let displaySuffix: string = "";
+  let displaySuffix: string;
 
   if (unit === "₹") {
     const formatted = formatCurrency(value);
@@ -169,82 +234,97 @@ const KPICard = memo(function KPICard({
     displaySuffix = formatted.suffix;
   }
 
-  // Shortened comparison label
-  let rangeLabel = t("ops.dashboard.vs_7d");
-  if (rangeDays && rangeDays > 0) {
-    rangeLabel = `${t("ops.dashboard.vs")} ${rangeDays}d`;
-  }
+  const comparison = compare(value, prevValue, config.upIsGood);
+  const baseline = prevValue > 0;
+  const days = rangeDays && rangeDays > 0 ? rangeDays : 7;
+  const periodLabel = `${days}d`;
+  const rangeLabel = t("ops.dashboard.vs_prev", { days });
 
   let badgeClasses =
-    "mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ";
+    "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ";
   let iconElement: React.ReactNode = null;
+  let changeText: string;
+  let badgeTitle: string;
 
-  if (isUp) {
-    badgeClasses += "bg-green-50 text-green-600";
-    iconElement = <TrendingUp size={10} />;
-  } else if (isDown) {
-    badgeClasses += "bg-red-50 text-red-500";
-    iconElement = <TrendingDown size={10} />;
-  } else {
+  if (comparison.kind === "move") {
+    badgeClasses += comparison.good
+      ? "bg-emerald-50 text-emerald-700"
+      : "bg-rose-50 text-rose-600";
+    iconElement = comparison.pct > 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />;
+    changeText = formatPct(comparison.pct);
+    badgeTitle = t("ops.dashboard.kpi_compare_title", {
+      current: formatWithUnit(value, unit),
+      previous: formatWithUnit(prevValue, unit),
+      days,
+    });
+  } else if (comparison.kind === "flat") {
     badgeClasses += "bg-slate-100 text-slate-500";
-    iconElement = <span className="w-3" />;
+    changeText = t("ops.dashboard.kpi_no_change");
+    badgeTitle = t("ops.dashboard.kpi_compare_title", {
+      current: formatWithUnit(value, unit),
+      previous: formatWithUnit(prevValue, unit),
+      days,
+    });
+  } else {
+    // No prior window to measure against — say so instead of printing 0.0%.
+    badgeClasses += "bg-slate-100 text-slate-400";
+    changeText = "—";
+    badgeTitle = t("ops.dashboard.kpi_no_baseline", { days });
   }
+  /* The badge keeps just the period ("7d"); the full "vs prev 7d" sentence is
+     in the tooltip so the top-right corner stays small. */
 
-  // ✅ Uniform number size for all cards (no conditional)
-  const numberSizeClass = "text-2xl";
+  const numberSizeClass = "text-[24px]";
 
   const showBreakdown = label === "Total Expenses" && breakdown;
 
-  // Left content – vertically centered
-  const leftContent = (
-    <div className="flex flex-col justify-center flex-1 min-w-0">
-      <div className="flex items-center gap-1.5">
-        <span className={`h-1.5 w-1.5 rounded-full flex-shrink-0 ${config.bg}`} />
-        <p
-          className="text-xs font-medium text-slate-500 truncate whitespace-nowrap"
-          title={t(kpiCardLabel(label))}
-        >
-          {t(kpiCardLabel(label))}
-        </p>
-      </div>
-
-      <h2
-        className={`mt-0.5 ${numberSizeClass} font-bold leading-none tracking-tight ${config.text}`}
-      >
-        {displayMain}
-        {displaySuffix && (
-          <span className="ml-0.5 text-xs font-medium text-slate-400">
-            {displaySuffix}
-          </span>
-        )}
-      </h2>
-
-      <div className={badgeClasses}>
-        {iconElement}
-        {Math.abs(change).toFixed(1)}%
-        <span className="text-slate-400 font-medium">{rangeLabel}</span>
-      </div>
-    </div>
-  );
-
-  // Card content – smaller icon
+  /* One line, left to right: logo, name, figure, then — hugging the right
+     edge — the change and what it is measured against. Everything truncates
+     rather than wrapping, so the row never breaks. */
   const cardContent = (
-    <div className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-3.5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
+    <div className="group relative overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg">
       <div className="absolute inset-0 bg-gradient-to-br from-white via-white to-slate-50 opacity-80" />
 
-      <div className="relative flex items-center gap-3">
-        {leftContent}
-
+      <div className="relative flex items-center gap-2.5">
         <div
-          className={`
-            ${config.bg}
-            h-9 w-9 rounded-xl shadow-md
-            flex items-center justify-center flex-shrink-0
-            transition-transform duration-300 group-hover:scale-110
-          `}
+          className={`${config.bg} flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl shadow-md transition-transform duration-300 group-hover:scale-110`}
         >
           <Icon className="text-white" size={18} />
         </div>
+
+        <span
+          className="min-w-0 truncate text-[11px] font-semibold text-slate-500"
+          title={t(kpiCardLabel(label))}
+        >
+          {t(kpiCardShortLabel(label))}
+        </span>
+
+        <span
+          className={`${numberSizeClass} shrink-0 font-bold leading-none tracking-tight ${config.text}`}
+        >
+          {displayMain}
+          {displaySuffix && (
+            <span className="ml-0.5 text-xs font-medium text-slate-400">{displaySuffix}</span>
+          )}
+        </span>
+
+        <span className="ml-auto flex shrink-0 items-center gap-1.5">
+          <span className={badgeClasses} title={`${badgeTitle} · ${rangeLabel}`}>
+            {iconElement}
+            {changeText}
+            <span className="font-medium text-slate-400">{periodLabel}</span>
+          </span>
+          {baseline ? (
+            <span
+              className="hidden max-w-[92px] truncate text-[10px] font-medium text-slate-400 2xl:inline"
+              title={`${rangeLabel} ${t("ops.dashboard.kpi_prev_value", {
+                value: formatWithUnit(prevValue, unit),
+              })}`}
+            >
+              {t("ops.dashboard.kpi_prev_value", { value: formatWithUnit(prevValue, unit) })}
+            </span>
+          ) : null}
+        </span>
       </div>
     </div>
   );
@@ -294,6 +374,11 @@ export default function KPICards({
         prevValue: safeNumber(prev.totalTrips),
       },
       {
+        label: "Total Birds" as CardLabel,
+        value: safeNumber(current.totalBirds),
+        prevValue: safeNumber(prev.totalBirds),
+      },
+      {
         label: "Total Weight (KG)" as CardLabel,
         value: safeNumber(current.totalSalesWeight),
         prevValue: safeNumber(prev.totalSalesWeight),
@@ -336,7 +421,7 @@ export default function KPICards({
   );
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
       {finalCards.map((card) => (
         <KPICard key={card.label} {...card} />
       ))}

@@ -53,6 +53,8 @@ export function ApprovalAlertToaster() {
         parts.push(`${state.rateEntries.count} rate entr${state.rateEntries.count === 1 ? 'y' : 'ies'}`);
       if (state.payments.count > 0)
         parts.push(`${state.payments.count} payment${state.payments.count === 1 ? '' : 's'}`);
+      if (state.collections.count > 0)
+        parts.push(`${state.collections.count} collection${state.collections.count === 1 ? '' : 's'}`);
 
       showNotification(
         `🔔 ${state.total} item${state.total === 1 ? '' : 's'} pending approval: ${parts.join(', ')}. See the dashboard KPI strip or open the bell for details.`,

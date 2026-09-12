@@ -5,7 +5,8 @@
 // masters API (with legacy-key fallback when the local backend is offline).
 // -----------------------------------------------------------------------------
 
-import { apiTryGet } from "../../../api";
+import { apiClient, apiTryGet } from "../../../api";
+import { getQuarterSampleInfo, type SampleQuarter } from "../../../sample/quarterSample";
 import { tripService } from "../../operations/vehicle-trips/services/tripService";
 import { collectionService } from "../../operations/collections/services/collectionService";
 import { fuelExpenseService } from "../../operations/fuel-expenses/services/fuelExpenseService";
@@ -60,6 +61,94 @@ export interface DashboardData {
   fuelExpenses: FuelExpense[];
   mastersFromApi: boolean;
   demoActive: boolean;
+  /** Set only when the quarter sample API is the source of these rows. */
+  sampleQuarter: SampleQuarter | null;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Quarter sample API — trips + fuel for the Executive dashboard       */
+/* ------------------------------------------------------------------ */
+/** Trips/fuel are read this many days back; enough for every 7-day series. */
+const SAMPLE_WINDOW_DAYS = 30;
+const SAMPLE_ROW_LIMIT = 500;
+
+function isoDaysAgo(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() - days);
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function sampleWindow(): { fromDate: string; toDate: string; page: 1; limit: number } {
+  return {
+    fromDate: isoDaysAgo(SAMPLE_WINDOW_DAYS),
+    toDate: isoDaysAgo(0),
+    page: 1,
+    limit: SAMPLE_ROW_LIMIT,
+  };
+}
+
+/** GET /api/operations/trip-list — real vehicle trips for the last 30 days. */
+async function fetchSampleTrips(): Promise<Trip[]> {
+  try {
+    const { data } = await apiClient.get<{ data?: Trip[] } | Trip[]>("/operations/trip-list", {
+      params: sampleWindow(),
+      timeout: 10_000,
+    });
+    const rows = Array.isArray(data) ? data : (data?.data ?? []);
+    return Array.isArray(rows) ? rows : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Map the backend fuel contract onto the UI's FuelExpense shape. */
+function toFuelExpense(row: Record<string, unknown>): FuelExpense {
+  const status = String(row.status ?? "Approved");
+  return {
+    id: String(row.id ?? ""),
+    billNo: String(row.billNo ?? ""),
+    date: String(row.billDate ?? ""),
+    sourceType: row.sourceType === "MANUAL" ? "MANUAL" : "TRIP",
+    vehicleId: Number(row.vehicleId ?? 0),
+    vehicleNo: String(row.vehicleNo ?? ""),
+    driverId: Number(row.driverId ?? 0),
+    driverName: String(row.driverName ?? ""),
+    supervisorId: Number(row.supervisorId ?? 0),
+    supervisorName: String(row.supervisorName ?? ""),
+    tripId: row.tripId == null ? null : Number(row.tripId),
+    tripNo: row.tripNo == null ? null : String(row.tripNo),
+    meterReading: Number(row.currentMeter ?? 0),
+    amount: Number(row.amount ?? 0),
+    rate: Number(row.fuelRate ?? 0),
+    litres: Number(row.liters ?? 0),
+    petrolBunk: String(row.pumpName ?? ""),
+    remarks: row.remarks == null ? undefined : String(row.remarks),
+    status: status === "Pending" ? "Pending" : status === "Rejected" ? "Rejected" : "Approved",
+    createdDate: String(row.createdAt ?? row.billDate ?? ""),
+    createdBy: String(row.createdBy ?? ""),
+    approvedDate: row.approvedAt ? String(row.approvedAt) : undefined,
+    approvedBy: row.approvedBy ? String(row.approvedBy) : undefined,
+  };
+}
+
+/** GET /api/operations/fuel-expenses — the same window as the trips read. */
+async function fetchSampleFuel(): Promise<FuelExpense[]> {
+  try {
+    const { data } = await apiClient.get<{ data?: Record<string, unknown>[] } | Record<string, unknown>[]>(
+      "/operations/fuel-expenses",
+      { params: sampleWindow(), timeout: 10_000 }
+    );
+    const rows = Array.isArray(data) ? data : (data?.data ?? []);
+    return (Array.isArray(rows) ? rows : []).map(toFuelExpense);
+  } catch {
+    return [];
+  }
+}
+
+/** Backend rows win; anything only held locally is kept. */
+function mergeById<T extends { id: unknown }>(primary: T[], secondary: T[]): T[] {
+  const seen = new Set(primary.map((row) => String(row.id)));
+  return [...primary, ...secondary.filter((row) => !seen.has(String(row.id)))];
 }
 
 /* ------------------------------------------------------------------ */
@@ -200,6 +289,18 @@ export async function loadDashboardData(): Promise<DashboardData> {
     console.warn("Dashboard: unable to read operations data", error);
   }
 
+  // Trips and fuel live in localStorage services (the Trip Entry flow writes
+  // there), so with the quarter sample API running they would stay empty while
+  // every API-backed module is populated. When the sample server identifies
+  // itself, read the same window it generated and merge it in. Production is
+  // untouched: the probe resolves to null outside dev/preview.
+  const sampleQuarter = (await getQuarterSampleInfo())?.quarter ?? null;
+  if (sampleQuarter) {
+    const [apiTrips, apiFuel] = await Promise.all([fetchSampleTrips(), fetchSampleFuel()]);
+    trips = mergeById(apiTrips, trips);
+    fuelExpenses = mergeById(apiFuel, fuelExpenses);
+  }
+
   return {
     ...masters,
     trips,
@@ -208,6 +309,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
     shopSales,
     fuelExpenses,
     demoActive: isDemoDataActive(),
+    sampleQuarter,
   };
 }
 

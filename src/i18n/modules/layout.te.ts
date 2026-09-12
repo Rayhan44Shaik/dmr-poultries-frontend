@@ -1,4 +1,4 @@
-﻿export default {
+export default {
   // Header — notifications & menu
   'header.overdueCollections': '{count} కలెక్షన్లు గడువు దాటాయి',
   'header.overdueCollectionDesc': '{amount} కలెక్షన్ కోసం వేచి ఉంది',
@@ -8,6 +8,7 @@
   'header.documentsExpiring': '{count} పత్రాల గడువు 30 రోజుల్లో ముగుస్తుంది',
   'header.quickActions': 'త్వరిత చర్యలు',
   'header.role': 'రోల్',
+  'header.toggleNav': 'నావిగేషన్‌ను టోగుల్ చేయండి',
   'header.openMenu': 'నావిగేషన్ మెనూ తెరవండి',
   'header.closeMenu': 'మెనూ మూసివేయండి',
   'header.signOut': 'లాగ్ అవుట్',
@@ -18,6 +19,11 @@
   // Sidebar
   'sidebar.erpSystem': 'ERP మేనేజ్‌మెంట్ సిస్టమ్',
   'sidebar.comingSoon': 'త్వరలో',
+  // Sidebar width controls (expanded → icon rail → hidden)
+  'sidebar.collapseToIcons': 'ఐకాన్‌లకు కుదించు',
+  'sidebar.expandSidebar': 'సైడ్‌బార్‌ను విస్తరించు',
+  'sidebar.hideSidebar': 'సైడ్‌బార్‌ను దాచు',
+  'sidebar.showSidebar': 'సైడ్‌బార్‌ను చూపు',
 
   // Command palette
   'command.search': 'పేజీలు, చర్యలు, మాడ్యూల్స్ కోసం వెతకండి…',

@@ -12,29 +12,166 @@ npm run dev
 ### Demo / sample data (no database required)
 
 The repo ships a deterministic in-memory sample API so **every page of every
-module** renders fully populated in a hosted preview — no PostgreSQL needed.
+module** renders fully populated — no PostgreSQL needed. `npm run dev` starts it
+automatically next to Vite, so there is nothing else to run:
 
 ```bash
-# Terminal 1 — full-quarter sample API on port 4000 (the Vite proxy target)
-npm run mock:backend          # scripts/quarter-sample-data.mjs
-
-# Terminal 2 — frontend, auto-logged-in as the demo Owner
-VITE_DEMO_MODE=1 npm run dev -- --host 0.0.0.0
+npm install
+npm run dev          # sample API on :4000 + Vite on :5173, /api proxied
 ```
 
-- `npm run mock:backend` serves a complete **Q3 2026** quarter (200 shops, 150
-  employees, 10 farms, 24 vehicles, ~640 trips, ~6,000 delivery lines, ~4,900
+`npm run dev` is `concurrently` over two scripts:
+
+| Script | What it does |
+|---|---|
+| `npm run dev:sample-api` | `scripts/quarter-sample-data.mjs` on port 4000 (the Vite `/api` proxy target) |
+| `npm run dev:web` | Vite only — use this when you run the real backend instead |
+
+If something already listens on 4000 (the real backend, say), the sample server
+prints that and exits without failing the dev command.
+
+- The sample API serves a rolling **92-day quarter ending today** (200 shops, 150
+  employees, 10 farms, 24 vehicles, ~640 trips, ~7,700 delivery lines, ~4,700
   collections, plus banks, market rates, permits, EMI schedules, salaries,
-  leaves, duty roster, payments and farm payments). `GET /api/quarter-summary`
-  returns the full row-count manifest. Writes return `200 {ok:true}` so UI
-  flows complete, but the dataset stays immutable and byte-identical on restart.
-- `npm run mock:trips` serves the older, trip-wizard-focused sample
+  leaves, duty roster, payments and farm payments). Anchoring on today keeps the
+  today/this-week/this-month dashboard tiles populated; `SAMPLE_TODAY=YYYY-MM-DD`
+  pins the anchor when you need a byte-identical dataset.
+  `GET /api/quarter-summary` returns the row-count manifest. Writes return
+  `200 {ok:true}` so UI flows complete, but the dataset stays immutable and
+  byte-identical on restart.
+- `.env.development` sets `VITE_DEMO_MODE=1`, so `npm run dev` skips the login
+  gate and signs you in as the demo Owner. `VITE_DEMO_MODE` is only honoured when
+  `import.meta.env.DEV` is true, so a production build can never bypass auth —
+  drop the variable (or use `?demo=1` per URL) to exercise real login.
+- Pages can tell they are on sample data: `/api/quarter-summary` and the
+  `/api/operations/dashboard` payload carry `sample: true` plus the quarter
+  window. The Executive dashboard shows it as a sky quarter chip; the Operations
+  dashboard no longer prints a "Sample data" strip — the data speaks for itself.
+  Nothing is ever badged in a production build, because the probe is dev-only.
+- `npm run mock:backend` is kept as an alias for `dev:sample-api` (start just the
+  sample API); `npm run mock:trips` serves the older, trip-wizard-focused sample
   (`scripts/dev-mock-backend.mjs`) with in-memory wizard save/submit support.
-- `VITE_DEMO_MODE=1` (or adding `?demo=1` to the URL) skips the login gate.
-  Auth is also stubbed by the sample API, so any credentials work too.
+- Auth is stubbed by the sample API, so any credentials work too.
+- To work against the real backend instead, run it on port 4000 and start the
+  frontend alone with `npm run dev:web`.
 
 Full module-by-module verification steps live in
 [`docs/QUARTER_SAMPLE_DATA_TESTING_GUIDE.md`](./docs/QUARTER_SAMPLE_DATA_TESTING_GUIDE.md).
+
+### Navigation
+
+The sidebar is flexible, never a fixed panel. On `lg` screens and up it steps
+through three shapes, and the choice is remembered per browser (`dmr-sidebar-mode`):
+
+| Shape | Width | How to get there |
+|---|---|---|
+| Expanded | 260px | Default. Click ⤢ in the brand row, or the header menu button when collapsed |
+| Icon rail | 72px | Click ⤡ in the brand row (labels become hover tooltips, badges become dots) |
+| Hidden | 0 | Click ✕ while in the rail; the header menu button brings it back |
+
+⌘/Ctrl + B cycles the shapes; the content column animates its offset so pages
+reflow instead of jumping. Below `lg` the same entries live in the floating
+popup opened from the header menu button.
+
+Every nav glyph animates on hover with a motion written for its own name — the
+truck drives off and back (Trip Entry / Trip List / Driver Performance), the
+rupee flips (Rate Entry), the wrench tightens (Maintenance Entry), the page
+turns over (Permits & Documents / Shop Ledger), the fuel pump rocks, the hen
+flaps… One motion per meaning, keyed by path in `ui/Sidebar/navMotion.ts` with
+the keyframes in the `--animate-nav-*` family of `styles/tokens.css`. Motions
+only run on hover / keyboard focus, never on the active row, and the global
+`prefers-reduced-motion` rule disables them.
+
+### KPI cards
+
+Seven cards — trips, **birds**, weight, sales, collections, pending collections
+and expenses. Birds are not in the dashboard payload: they come from the
+completed-trip aggregates (one tiny `limit=1` request per window, since the
+endpoint's totals cover the whole filtered set), so the KPI row counts the
+birds loaded at the farm while the chart below weighs them. Each is measured against the **equal-length window immediately before
+the one on screen**, fetched separately from the same dashboard endpoint (so a
+7-day calendar compares with the 7 days before it, a quarter with the previous
+quarter). The comparison is honest in all three cases:
+
+- a real move shows the change with a ▲/▼ arrow, coloured by whether it is
+  actually good — **expenses and outstanding dues are green when they FALL**;
+- no movement says "No change";
+- no prior window (or a zero baseline) says "—" rather than a meaningless
+  0.0%, with the reason in the tooltip.
+
+Every card is **one line**: logo, name, figure, then — hugging the right edge —
+the change ("▲ 10.2% 7d", the period following the calendar: 7d, 15d, 30d,
+whatever the range is) and the baseline ("was ₹31.61 L"). Nothing wraps; the
+name and baseline truncate instead, and hovering the badge gives the full
+sentence with both figures.
+
+Names are one word where one will do — Trips, Birds, Weight (Kg), Amount,
+Collections, Pending, Expenses — and the row goes four across so nothing is ever
+cut.
+
+### Operational Trends (dashboard)
+
+Operations → **Overview** leads with **Trips & weight movement** — the first
+card, and the weight story of the completed trips in the window it is reading:
+
+| Series | Encoding |
+|---|---|
+| Trips | Indigo line with a soft gradient area, right axis |
+| Farm weight | The height of the stacked bar (kg) |
+| Delivered weight | Emerald segment |
+| Mortality weight | Rose segment — kept so the bar still adds up to the farm weight |
+| Weight loss | Amber segment |
+
+`farm = delivered + mortality + loss` holds for every trip, so the three
+segments stack to exactly the farm weight — one bar carries all four weight
+numbers at once. **Share of farm** re-reads the same data as a 100% stack, so a
+quiet bucket and a heavy one can be compared by shape.
+
+**Window** — the header carries a `Today · Week · Month` switcher, plus a
+`Custom` option whenever the calendar holds a range of its own. Picking one
+moves the whole card — bars *and* the five totals underneath — to today, the
+last seven days or this calendar month. Today and a week read day by day; a
+month reads week by week.
+
+Each chip's number counts the **completed trips** in its window, which is
+exactly what the card weighs, so "Week 22" and "Trips 22" can never disagree —
+trips still in transit have no weights yet and are left out of both. The
+counters come from one fetch of the shortest range covering today, the week and
+the month.
+
+Until a chip is tapped the card reads the global calendar, and the chip that
+fits it is lit — a one-day calendar lights Today, a seven-day one lights Week, a
+month-long one lights Month, and anything else lights Custom, which carries the
+calendar's own trip count. That default is derived rather than remembered, so a
+reload or a hard refresh lands on the calendar's window, and tapping the lit
+chip hands it back. The caption under the title always names the dates being
+totalled. The switcher is a rounded segmented control: one solid
+accent per option — Today sky, Week violet, Month teal, Custom slate, all in a
+light wash rather than a solid fill — each with its own icon and its trip count
+set into the pill.
+
+**Reading it** — the five footer tiles carry a hint of their series colour, lift
+on hover and count up to their new figures when the window changes (respecting
+prefers-reduced-motion). The plot stays in kilos, so there is no second reading to
+switch to, and the footer is five plain numbers that double as the legend:
+trips, farm weight, delivered weight, birds lost and weight loss. The tooltip
+carries the detail — every weight with its share of the farm weight, the birds
+picked up at the farm, the birds delivered, the birds lost with their share of
+the load, and the ▲▼ change against the previous bucket.
+
+Mortality is reported in birds, not kilos: the rose band stays in the bar only
+because the segments must add up to the farm weight, but no figure in the card
+is a mortality weight any more.
+
+Windows already fetched are remembered for the session, so flicking between the
+chips paints instantly and then refreshes quietly in the background — the request
+still goes out every time, it is just never waited on twice. The average marker's
+caption is drawn on its own rounded plate above the dashed line, so it never
+prints across a bar.
+
+The whole card is localised — Telugu reads Telugu labels, month and weekday
+names, and lakh figures (`5.20 లక్షల kg`), with only units (kg, %) and numbers
+left as they are.
 
 ### Masters
 
@@ -125,11 +262,11 @@ coordination does not replace server-side authorization or write idempotency.
 To review **Vehicles → EMI** without connecting a real database:
 
 ```bash
-# Terminal 1: opt-in, in-memory demo API (never writes to PostgreSQL)
-npm run mock:backend          # full-quarter sample (12 financed EMI vehicles)
+# One command: sample API + frontend (sample API never writes to PostgreSQL)
+npm run dev                   # full-quarter sample (12 financed EMI vehicles)
 
-# Terminal 2: same-origin API calls through Vite's existing /api proxy
-VITE_DEMO_MODE=1 VITE_API_BASE_URL=/api npm run dev -- --host 0.0.0.0
+# Already running the sample API? Just the frontend, through Vite's /api proxy:
+npm run dev:web
 ```
 
 Open `/fleet?tab=emi` in the frontend preview. The demo includes **12 fictional

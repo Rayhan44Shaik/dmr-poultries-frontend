@@ -9,6 +9,7 @@
 //   maintenance  Pending maintenance bills      → Fleet · Maintenance Entry
 //   rateEntries  Completed trips awaiting rates → Operations · Rate Entry
 //   payments     Draft payment requests          → Accounts · Payment Register
+//   collections  Cash/bank collections entered   → Operations · Collection Entry
 //
 // The Approval Center refreshes this store after every decision, so badges and
 // bell counts stay in sync app-wide.
@@ -21,6 +22,7 @@ import { fleetSharedGet } from '../../fleet-operations/services/fleetSessionCach
 import { listEligibleTrips } from '../../operations/shop-sales/services/rateEntryApiService';
 import { listPayments } from '../../accounts/services/paymentApiService';
 import { createDemoPayments } from '../../accounts/utils/paymentRegisterDemo';
+import { apiGet } from '../../../api';
 
 export interface ApprovalQueueItem {
   id: string;
@@ -48,6 +50,8 @@ export interface ApprovalSnapshot {
   maintenance: ApprovalQueue;
   rateEntries: ApprovalQueue;
   payments: ApprovalQueue;
+  /** Collections recorded by staff and waiting for the owner's approval. */
+  collections: ApprovalQueue;
   /** Expired fleet permits/documents (RC, insurance, fitness, permit, PUC). */
   documents: ApprovalQueue;
   total: number;
@@ -64,6 +68,7 @@ const INITIAL: ApprovalSnapshot = {
   maintenance: { ...EMPTY_QUEUE },
   rateEntries: { ...EMPTY_QUEUE },
   payments: { ...EMPTY_QUEUE },
+  collections: { ...EMPTY_QUEUE },
   documents: { ...EMPTY_QUEUE },
   total: 0,
 };
@@ -87,7 +92,11 @@ export function subscribeApprovalSnapshot(listener: () => void): () => void {
 function publish(next: Partial<ApprovalSnapshot>) {
   snapshot = { ...snapshot, ...next };
   snapshot.total =
-    snapshot.trips.count + snapshot.maintenance.count + snapshot.rateEntries.count + snapshot.payments.count;
+    snapshot.trips.count +
+    snapshot.maintenance.count +
+    snapshot.rateEntries.count +
+    snapshot.payments.count +
+    snapshot.collections.count;
   for (const listener of listeners) listener();
 }
 
@@ -95,6 +104,40 @@ const rowsOf = (payload: unknown): unknown[] =>
   Array.isArray(payload) ? payload : ((payload as { data?: unknown[] } | null)?.data ?? []);
 
 const cap = 6;
+
+const PENDING_APPROVAL_STATUS = 'pending approval';
+
+/**
+ * Collections waiting for the owner's sign-off.
+ *
+ * Deliberately NOT `collectionService`: that module downloads the whole
+ * register (collections + shop sales + shops) to fill page-level caches, which
+ * is far too heavy for a poller that runs in the app shell every 90 seconds.
+ * One filtered request is enough; `status` is re-checked here too, so a backend
+ * that ignores the query parameter still yields the right count.
+ */
+async function listPendingApprovalCollections(): Promise<
+  { id: number; collectionNo: string; shopName: string; amount: number; date: string }[]
+> {
+  const { data } = await apiGet<Record<string, unknown>[]>('/operations/collection-entry', {
+    params: { status: 'Pending Approval' },
+  });
+  const rows = Array.isArray(data) ? data : ((data as { data?: Record<string, unknown>[] })?.data ?? []);
+  return rows
+    .filter(
+      (row) =>
+        String(row.status ?? '').toLowerCase() === PENDING_APPROVAL_STATUS &&
+        row.deleted !== true &&
+        row.deletedAt == null
+    )
+    .map((row) => ({
+      id: Number(row.id) || 0,
+      collectionNo: String(row.collectionNo ?? row.collection_no ?? ''),
+      shopName: String(row.shopName ?? row.shop_name ?? ''),
+      amount: Number(row.amount ?? 0) || 0,
+      date: String(row.collectionDate ?? row.collection_date ?? ''),
+    }));
+}
 
 /**
  * Load every pending queue from its existing module service. Failures in one
@@ -116,9 +159,11 @@ export function refreshApprovalSnapshot(force = false): Promise<void> {
       listEligibleTrips().catch(() => []),
       demoPayments ? Promise.resolve(createDemoPayments()) : listPayments().catch(() => []),
       fleetSharedGet('permits:list', () => permitApi.list()).catch(() => []),
+      listPendingApprovalCollections(),
     ]);
 
-    const [tripsResult, maintenanceResult, rateResult, paymentsResult, documentsResult] = results;
+    const [tripsResult, maintenanceResult, rateResult, paymentsResult, documentsResult, collectionsResult] =
+      results;
 
     // Trips awaiting approval (Pending, excluding the [ORDER] container trips).
     let tripsQueue = snapshot.trips;
@@ -192,6 +237,22 @@ export function refreshApprovalSnapshot(force = false): Promise<void> {
       };
     }
 
+    // Collections entered by staff, still waiting for approval.
+    let collectionsQueue = snapshot.collections;
+    if (collectionsResult.status === 'fulfilled') {
+      collectionsQueue = {
+        count: collectionsResult.value.length,
+        value: collectionsResult.value.reduce((sum, entry) => sum + entry.amount, 0),
+        items: collectionsResult.value.slice(0, cap).map((entry) => ({
+          id: `col-${entry.id}`,
+          ref: entry.collectionNo || `COL #${entry.id}`,
+          sub: entry.shopName || 'Collection',
+          waitingFrom: entry.date ? `${entry.date}T00:00:00` : null,
+          amount: entry.amount,
+        })),
+      };
+    }
+
     // Expired fleet permits/documents (mirrors the Permits matrix threshold:
     // expiry strictly before today is "expired"; within 30 days is "expiring").
     let documentsQueue = snapshot.documents;
@@ -226,6 +287,7 @@ export function refreshApprovalSnapshot(force = false): Promise<void> {
       maintenance: maintenanceQueue,
       rateEntries: rateQueue,
       payments: paymentQueue,
+      collections: collectionsQueue,
       documents: documentsQueue,
     });
   })();
