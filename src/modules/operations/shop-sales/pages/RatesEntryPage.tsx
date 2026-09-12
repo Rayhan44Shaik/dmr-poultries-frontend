@@ -5,7 +5,6 @@ import CompletedTripsTable from "../components/CompletedTripsTable";
 import EnterRateModal from "../components/EnterRateModal";
 import { Pagination } from "../../../../ui/Pagination";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
-import TripKPICards from "../../vehicle-trips/components/TripKPICards";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
 import { opsPageClass, opsEmptyStateClass } from "../../../../shared/ui/operationsStyles";
@@ -71,10 +70,6 @@ export default function RatesEntryPage({ embedded = false }: Props) {
     filter.vehicle !== "" ||
     filter.supervisor !== "";
 
-  const totalTrips = filteredTrips.length;
-  const totalShops = filteredTrips.reduce((sum, trip) => sum + trip.totalShops, 0);
-  const totalBirds = filteredTrips.reduce((sum, trip) => sum + trip.totalBirds, 0);
-  const totalWeight = filteredTrips.reduce((sum, trip) => sum + trip.totalWeight, 0);
   const safeCurrentPage = Math.min(currentPage, Math.max(totalPages, 1));
   const startIndex = (safeCurrentPage - 1) * pageSize;
 
@@ -194,16 +189,6 @@ export default function RatesEntryPage({ embedded = false }: Props) {
         <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
           {loadError}
         </div>
-      )}
-
-      {hasFilters && (
-        <TripKPICards
-          totalTrips={totalTrips}
-          totalBirds={totalBirds}
-          totalWeight={totalWeight}
-          totalMortality={0}
-          totalShops={totalShops}
-        />
       )}
 
       {filteredTrips.length === 0 && !loadError ? (

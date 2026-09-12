@@ -4,8 +4,6 @@ import {
   Truck,
   CalendarDays,
   Store,
-  Package,
-  Scale,
   IndianRupee,
   CheckCircle2,
   AlertCircle,
@@ -128,19 +126,6 @@ export default function EnterRateModal({
     );
     /* eslint-enable react-hooks/set-state-in-effect */
   }, [trip]);
-
-  const totalBirds = useMemo(() => deliveries.reduce((sum, row) => sum + row.birds, 0), [deliveries]);
-  const totalWeight = useMemo(() => deliveries.reduce((sum, row) => sum + row.weight, 0), [deliveries]);
-  const grandAmount = useMemo(
-    () =>
-      deliveries.reduce((sum, row) => {
-        if (isValidSellingRate(row.rate)) {
-          return sum + Number((row.weight * (row.rate as number)).toFixed(2));
-        }
-        return sum;
-      }, 0),
-    [deliveries]
-  );
 
   const hasInvalidEnteredRate = useMemo(
     () =>
@@ -570,39 +555,8 @@ export default function EnterRateModal({
 
           <div className="bg-slate-50/95 border-t border-slate-200 px-5 py-3 shrink-0">
             <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-                <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 flex items-center gap-2">
-                  <Store size={16} className="text-slate-500" />
-                  <div>
-                    <p className="text-[9px] text-slate-500 uppercase">{t("ops.trip.shops")}</p>
-                    <p className="text-base font-bold text-slate-800">{deliveries.length}</p>
-                  </div>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 flex items-center gap-2">
-                  <Package size={16} className="text-slate-500" />
-                  <div>
-                    <p className="text-[9px] text-slate-500 uppercase">{t("common.birds")}</p>
-                    <p className="text-base font-bold text-slate-800">{totalBirds.toLocaleString()}</p>
-                  </div>
-                </div>
-                <div className="rounded-xl border border-slate-200 bg-white px-3 py-2 flex items-center gap-2">
-                  <Scale size={16} className="text-orange-500" />
-                  <div>
-                    <p className="text-[9px] text-slate-500 uppercase">{t("ops.rate.modal.total_weight")}</p>
-                    <p className="text-base font-bold text-orange-500">{totalWeight.toFixed(2)} {t("common.kg")}</p>
-                  </div>
-                </div>
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 flex items-center gap-2">
-                  <IndianRupee size={16} className="text-emerald-700" />
-                  <div>
-                    <p className="text-[9px] text-emerald-700 uppercase">{t("ops.rate.modal.grand_amount")}</p>
-                    <p className="text-base font-bold text-emerald-700">₹ {formatInr(grandAmount)}</p>
-                  </div>
-                </div>
-              </div>
-
               {rateLocked ? (
-                <div className="mt-3 flex justify-end">
+                <div className="flex justify-end">
                   <button
                     type="button"
                     onClick={onClose}
@@ -612,7 +566,7 @@ export default function EnterRateModal({
                   </button>
                 </div>
               ) : (
-                <div className="mt-3 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
                   <div className="flex flex-wrap items-center gap-2">
                     <button
                       type="button"
