@@ -82,6 +82,38 @@ the keyframes in the `--animate-nav-*` family of `styles/tokens.css`. Motions
 only run on hover / keyboard focus, never on the active row, and the global
 `prefers-reduced-motion` rule disables them.
 
+### Trip Analysis (Weight Loss / Mortality)
+
+Operations → **Weight Loss / Mortality** opens with a **Trip Analysis** section
+between the KPI cards and the completed-trips table. It reads the same
+completed trips as the table, so the charts, the KPIs and the rows can never
+disagree: one request (`GET /api/operations/mortality-analysis`, capped at
+2000 trips) feeds the buckets *and* the per-trip bubbles, and every number
+plotted is a sum of the server's own values — never recomputed on the client.
+
+| View | What it answers | How it reads |
+|---|---|---|
+| **Trend** | The five details over time | One chart: farm weight and delivered weight as bars, the trip count as a line on a second axis, and mortality + weight loss in the tooltip. Toggle to **Loss share** for a 100% stack — delivered / mortality / shrinkage per bucket |
+| **Weight flow** | Where every kilogram ends up | Waterfall: farm weight → mortality → weight loss → delivered. Mortality (~2.6%) and shrinkage (~0.15%) are invisible on a plain axis, so each deduction starts where the previous one ended |
+| **Trip risk** | Which trips to look at | One bubble per trip: X = weight loss %, Y = mortality %, size = farm weight. Average lines cut the field into quadrants, so high-mortality *and* high-shrinkage trips sit top-right. Worst 150 trips by combined risk are plotted |
+
+Two details worth knowing:
+
+- **Two scales, one chart.** A quarter of farm weight is ~5,20,000 kg while
+  shrinkage is ~770 kg, so the Trend chart offers absolute kilograms *or* a
+  share-of-farm view. Either way the tooltip lists all five metrics with both
+  the weight and its share, so nothing is hidden by the chosen scale.
+- **Charts follow the applied filters**, not the filter inputs — Search commits
+  them, exactly like the table. Reset restores the full quarter, and Refresh
+  reloads the table and the charts together.
+
+Files: `modules/operations/mortality/services/mortalitySeries.ts` (bucketing +
+`rows` for the bubbles), `hooks/useMortalitySeries.ts` (debounced fetch, abort
+on unmount, risk-point derivation), and
+`components/analysis/*` (`LossTrendChart`, `LossWaterfallChart`,
+`TripRiskChart`, `TripAnalysisPanel`, plus `chartBits.tsx` / `chartFormat.ts`
+for the shared tooltip card, formatters and colours).
+
 ### Masters
 
 Shops, Farms, Vehicles, Employees, Banks and Bird Types share consistent
