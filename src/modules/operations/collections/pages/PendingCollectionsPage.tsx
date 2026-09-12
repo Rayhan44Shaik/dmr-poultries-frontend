@@ -112,6 +112,7 @@ export default function PendingCollectionsPage() {
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   // Selection state for table
   const [selectedShopName, setSelectedShopName] = useState<string | null>(null);
@@ -271,11 +272,11 @@ export default function PendingCollectionsPage() {
   ]);
 
   const totalItems = filteredData.length;
-  const totalPages = Math.ceil(totalItems / DEFAULT_PAGE_SIZE) || 1;
+  const totalPages = Math.ceil(totalItems / pageSize) || 1;
   const paginatedData = useMemo(() => {
-    const start = (currentPage - 1) * DEFAULT_PAGE_SIZE;
-    return filteredData.slice(start, start + DEFAULT_PAGE_SIZE);
-  }, [filteredData, currentPage]);
+    const start = (currentPage - 1) * pageSize;
+    return filteredData.slice(start, start + pageSize);
+  }, [filteredData, currentPage, pageSize]);
 
   // Reset to page 1 when filters change
   useEffect(() => {
@@ -459,6 +460,11 @@ export default function PendingCollectionsPage() {
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={setCurrentPage}
+            pageSize={pageSize}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setCurrentPage(1);
+            }}
           />
         )}
       </div>

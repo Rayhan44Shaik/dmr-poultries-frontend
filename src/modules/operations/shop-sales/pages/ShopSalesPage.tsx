@@ -32,6 +32,8 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
     shopNames: salesShopNames,
     currentPage,
     setCurrentPage,
+    pageSize,
+    setPageSize,
     totalPages,
     resetFilters,
     refreshSales,
@@ -143,6 +145,11 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
             currentPage={currentPage}
             totalPages={totalPages}
             onPageChange={setCurrentPage}
+            pageSize={pageSize}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setCurrentPage(1);
+            }}
           />
         )}
       </div>

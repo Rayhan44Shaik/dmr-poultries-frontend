@@ -1,4 +1,5 @@
 import React from "react";
+import { PageSizeSelect } from "../../../../shared/ui/PageSizeSelect";
 import {
   paginationBarClass,
   paginationNavBtnClass,
@@ -12,6 +13,9 @@ interface PaginationProps {
   onPageChange: (page: number) => void;
   itemsPerPage?: number;
   totalItems?: number;
+  /** Pass with onPageSizeChange to show the global rows-per-page control. */
+  pageSize?: number;
+  onPageSizeChange?: (pageSize: number) => void;
 }
 
 const Pagination: React.FC<PaginationProps> = ({
@@ -20,6 +24,8 @@ const Pagination: React.FC<PaginationProps> = ({
   onPageChange,
   totalItems,
   itemsPerPage,
+  pageSize,
+  onPageSizeChange,
 }) => {
   if (!shouldShowPagination(totalItems ?? 0)) return null;
 
@@ -45,6 +51,11 @@ const Pagination: React.FC<PaginationProps> = ({
 
   return (
     <div className={paginationBarClass}>
+      {onPageSizeChange && pageSize != null && (
+        <div className="mr-auto flex items-center gap-1.5">
+          <PageSizeSelect value={pageSize} onChange={onPageSizeChange} />
+        </div>
+      )}
       <button
         type="button"
         onClick={() => onPageChange(currentPage - 1)}

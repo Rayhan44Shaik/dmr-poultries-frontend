@@ -11,7 +11,7 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 10;
+  const [pageSize, setPageSize] = useState(10);
 
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
@@ -47,6 +47,7 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
     }
   }, [
     currentPage,
+    pageSize,
     fromDate,
     toDate,
     selectedVehicles,
@@ -162,6 +163,8 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
     paginatedData: expenses,
     currentPage,
     setCurrentPage,
+    pageSize,
+    setPageSize,
     totalPages: meta.totalPages,
     totalCount: meta.total,
     fromDate,

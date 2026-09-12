@@ -4,11 +4,7 @@ import {
   paginationNavBtnClass,
   paginationPageBtnClass,
 } from "../../../../shared/ui/paginationStyles";
-import {
-  MAX_CUSTOM_PAGE_SIZE,
-  PAGINATION_PAGE_SIZE_OPTIONS,
-} from "../../../../shared/ui/uiTokens";
-import MasterDropdown from "../../../masters/components/MasterDropdown";
+import { PageSizeSelect } from "../../../../shared/ui/PageSizeSelect";
 import { useI18n } from "../../../../i18n";
 
 interface Props {
@@ -115,6 +111,9 @@ function TripPagination({ currentPage, totalPages, onPageChange, hidePageInfo = 
   if (hidePageInfo) {
     return (
       <div className="flex items-center justify-end flex-wrap gap-1.5">
+        {onPageSizeChange && pageSize != null && (
+          <PageSizeSelect value={pageSize} onChange={onPageSizeChange} />
+        )}
         {renderNavButtons()}
       </div>
     );
@@ -124,32 +123,7 @@ function TripPagination({ currentPage, totalPages, onPageChange, hidePageInfo = 
     <div className={paginationBarClass}>
       {onPageSizeChange && pageSize != null && (
         <div className="mr-auto flex items-center gap-1.5">
-          <span className="hidden text-xs font-semibold text-slate-600 sm:inline">
-            {t("common.rows_per_page")}
-          </span>
-          <MasterDropdown
-            label={t("common.rows_per_page")}
-            hideLabel
-            value={String(pageSize)}
-            options={PAGINATION_PAGE_SIZE_OPTIONS.map((size) => ({
-              value: String(size),
-              label: String(size),
-            }))}
-            // Same interaction as every other rows-per-page control: type to
-            // filter, or commit an arbitrary count.
-            searchable
-            allowCustomValue
-            validateCustom={(raw) => {
-              if (!/^\d+$/.test(raw)) return null;
-              const n = Number(raw);
-              return n >= 1 && n <= MAX_CUSTOM_PAGE_SIZE ? String(n) : null;
-            }}
-            onChange={(value) => {
-              const next = Number(value);
-              if (Number.isFinite(next) && next !== pageSize) onPageSizeChange(next);
-            }}
-            className="w-[86px] [&>button]:h-8 [&>button]:rounded-lg [&>button]:px-2 [&>button]:text-xs"
-          />
+          <PageSizeSelect value={pageSize} onChange={onPageSizeChange} />
         </div>
       )}
       {renderNavButtons()}

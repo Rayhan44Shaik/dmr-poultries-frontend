@@ -4,6 +4,7 @@ import {
   Search, Paperclip, Hash, Calendar, Wrench, Store, User, Gauge, Clock, Wallet, History, X
 } from 'lucide-react';
 import { useI18n, translateStatus } from '../../../../i18n';
+import { PageSizeSelect } from '../../../../shared/ui/PageSizeSelect';
 import {
   paginationBarClass,
   paginationNavBtnClass,
@@ -27,6 +28,7 @@ interface LatestMaintenanceTableProps {
   currentPage: number;
   onPageChange: (page: number) => void;
   pageSize?: number;
+  onPageSizeChange?: (pageSize: number) => void;
   onToggleView: (mode: ViewMode) => void;
 }
 
@@ -52,6 +54,7 @@ const LatestMaintenanceTable = ({
   currentPage,
   onPageChange,
   pageSize = 5,
+  onPageSizeChange,
   onToggleView,
 }: LatestMaintenanceTableProps) => {
   const { t } = useI18n();
@@ -470,6 +473,11 @@ const LatestMaintenanceTable = ({
           {/* Pagination — show whenever there is more than one page (pageSize rows). */}
           {totalRecords > pageSize && (
             <div className={paginationBarClass}>
+              {onPageSizeChange && (
+                <div className="mr-auto flex items-center gap-1.5">
+                  <PageSizeSelect value={pageSize} onChange={onPageSizeChange} />
+                </div>
+              )}
               <button
                 onClick={() => { setSelectedId(null); onPageChange(currentPage - 1); }}
                 disabled={currentPage === 1}

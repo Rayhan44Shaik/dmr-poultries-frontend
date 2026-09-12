@@ -203,9 +203,9 @@ function SectionTitle({ label, note }: { label: string; note?: string }) {
   );
 }
 
-function ShowingLabel({ total, page }: { total: number; page: number }) {
+function ShowingLabel({ total, page, pageSize }: { total: number; page: number; pageSize: number }) {
   const { to } = useOrdersI18n();
-  const { from, to: end } = pageRange(total, page, PAGE_SIZE);
+  const { from, to: end } = pageRange(total, page, pageSize);
   return (
     <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
       {to("orders.showing_range", { from, to: end, total })}
@@ -220,6 +220,8 @@ function TrackingTable({
   safePage,
   totalPages,
   onPageChange,
+  pageSize,
+  onPageSizeChange,
   supervisorOf,
   actionProps,
 }: {
@@ -228,6 +230,8 @@ function TrackingTable({
   safePage: number;
   totalPages: number;
   onPageChange: (p: number) => void;
+  pageSize: number;
+  onPageSizeChange?: (pageSize: number) => void;
   supervisorOf: (ot: OrdersTrip) => string;
   actionProps: {
     pdfBusyId: number | null;
@@ -265,7 +269,7 @@ function TrackingTable({
               <tr key={trip.id} className={ordersTableZebraRow(index, "align-middle")}>
                 <td className={opsTableTdClass}>
                   <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 text-[12px] font-semibold text-slate-600">
-                    {(safePage - 1) * PAGE_SIZE + index + 1}
+                    {(safePage - 1) * pageSize + index + 1}
                   </span>
                 </td>
                 <td className={`${opsTableTdClass} font-semibold text-emerald-700`}>
@@ -361,13 +365,15 @@ function TrackingTable({
       </table>
       {trips.length > 0 && (
         <div className="w-full flex items-center justify-between flex-wrap gap-1.5 px-4 py-3 bg-white border-t border-slate-100">
-          <ShowingLabel total={trips.length} page={safePage} />
+          <ShowingLabel total={trips.length} page={safePage} pageSize={pageSize} />
           {shouldShowPagination(trips.length) ? (
             <TripPagination
               currentPage={safePage}
               totalPages={totalPages}
               onPageChange={onPageChange}
               hidePageInfo
+              pageSize={pageSize}
+              onPageSizeChange={onPageSizeChange}
             />
           ) : null}
         </div>
@@ -423,6 +429,7 @@ function OrdersDeliveryTrackingTab({
   const [query, setQuery] = useState("");
   const [deliveryFilter, setDeliveryFilter] = useState<DeliveryFilter>("all");
   const [differenceFilter, setDifferenceFilter] = useState<DifferenceFilter>("all");
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const q = query.trim().toLowerCase();
 
   const deliveryOptions = useMemo(
@@ -505,11 +512,11 @@ function OrdersDeliveryTrackingTab({
   const filterKey = `${q}|${deliveryFilter}|${differenceFilter}|${completedFrom}|${completedTo}`;
   const [activePage, safeActivePage, activeTotalPages, setActivePage] = usePaged(
     activeFiltered,
-    PAGE_SIZE,
+    pageSize,
     filterKey
   );
   const [completedPage, safeCompletedPage, completedTotalPages, setCompletedPage] =
-    usePaged(completedFiltered, PAGE_SIZE, filterKey);
+    usePaged(completedFiltered, pageSize, filterKey);
 
   if (loading) return <OrdersTableSkeleton rows={5} />;
 
@@ -586,6 +593,12 @@ function OrdersDeliveryTrackingTab({
             safePage={safeActivePage}
             totalPages={activeTotalPages}
             onPageChange={setActivePage}
+            pageSize={pageSize}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setActivePage(1);
+              setCompletedPage(1);
+            }}
             supervisorOf={supervisorOf}
             actionProps={actionProps}
           />
@@ -660,6 +673,12 @@ function OrdersDeliveryTrackingTab({
             safePage={safeCompletedPage}
             totalPages={completedTotalPages}
             onPageChange={setCompletedPage}
+            pageSize={pageSize}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setActivePage(1);
+              setCompletedPage(1);
+            }}
             supervisorOf={supervisorOf}
             actionProps={actionProps}
           />

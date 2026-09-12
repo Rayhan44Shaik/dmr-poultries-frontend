@@ -47,7 +47,7 @@ const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
 
   // --- Deleted records (soft-deleted from backend, exposed by the hook) ---
   const [currentPage, setCurrentPage] = useState(1);
-  const pageSize = 5;
+  const [pageSize, setPageSize] = useState(5);
 
   // --- Form hook ---
   const {
@@ -385,6 +385,10 @@ const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
             currentPage={currentPage}
             onPageChange={setCurrentPage}
             pageSize={pageSize}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setCurrentPage(1);
+            }}
             onToggleView={handleViewToggle}
           />
           )}

@@ -55,6 +55,7 @@ const EmiLoansPage = ({ embedded = false, active = true }: EmiLoansPageProps) =>
   const [sortKey, setSortKey] = useState<EmiSortKey>('vehicleNumber');
   const [sortDir, setSortDir] = useState<EmiSortDirection>('asc');
   const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
 
   const reset = useCallback(() => { setSearch(''); setStatusFilter('all'); setPage(1); }, []);
   const handleSearchChange = useCallback((value: string) => { setSearch(value); setPage(1); }, []);
@@ -69,9 +70,9 @@ const EmiLoansPage = ({ embedded = false, active = true }: EmiLoansPageProps) =>
     (statusFilter === 'all' || row.status === statusFilter) && (!query || searchIndex.get(row.vehicleId)!.includes(query)),
   ), [orderedRecords, statusFilter, query, searchIndex]);
 
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const safePage = Math.min(page, totalPages);
-  const paged = useMemo(() => filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE), [filtered, safePage]);
+  const paged = useMemo(() => filtered.slice((safePage - 1) * pageSize, safePage * pageSize), [filtered, safePage, pageSize]);
   useEffect(() => {
     // The displayed page is already clamped. Reconcile the stored page too so
     // a later refresh that grows the dataset cannot jump back to an old page.
@@ -202,7 +203,7 @@ const EmiLoansPage = ({ embedded = false, active = true }: EmiLoansPageProps) =>
               </tbody>
             </table>
           </div>
-          <EmiPagination page={safePage} totalPages={totalPages} totalItems={filtered.length} pageSize={PAGE_SIZE} ready={hasSnapshot && !loading} onChange={setPage} />
+          <EmiPagination page={safePage} totalPages={totalPages} totalItems={filtered.length} pageSize={pageSize} ready={hasSnapshot && !loading} onChange={setPage} onPageSizeChange={(size) => { setPageSize(size); setPage(1); }} />
         </div>
       </div>
     </ErrorBoundary>

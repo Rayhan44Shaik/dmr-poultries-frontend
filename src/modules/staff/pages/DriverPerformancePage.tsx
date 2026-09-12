@@ -111,6 +111,7 @@ const DriverPerformancePage = () => {
   // official alternative to setState-in-effect): `applied` identity changes
   // exactly once per apply/clear, never while typing.
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(ITEMS_PER_PAGE);
   const [lastApplied, setLastApplied] = useState(applied);
   if (lastApplied !== applied) {
     setLastApplied(applied);
@@ -249,12 +250,12 @@ const DriverPerformancePage = () => {
 
   /* ----------------------------- pagination ----------------------------- */
 
-  const totalPages = Math.max(1, Math.ceil(rowsView.length / ITEMS_PER_PAGE));
+  const totalPages = Math.max(1, Math.ceil(rowsView.length / pageSize));
   const safePage = Math.min(currentPage, totalPages);
 
   const paginatedRows = useMemo(
-    () => sortedRowsView.slice((safePage - 1) * ITEMS_PER_PAGE, safePage * ITEMS_PER_PAGE),
-    [sortedRowsView, safePage],
+    () => sortedRowsView.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [sortedRowsView, safePage, pageSize],
   );
 
   /* ------------------------------- KPIs --------------------------------- */
@@ -681,8 +682,13 @@ const DriverPerformancePage = () => {
               currentPage={safePage}
               totalPages={totalPages}
               totalItems={rowsView.length}
-              itemsPerPage={ITEMS_PER_PAGE}
+              itemsPerPage={pageSize}
               onPageChange={setCurrentPage}
+              pageSize={pageSize}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+              }}
             />
           </>
         )}

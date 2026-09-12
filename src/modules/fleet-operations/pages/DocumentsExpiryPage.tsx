@@ -18,6 +18,7 @@ import {
   AlertCircle,
   Clock,
 } from 'lucide-react';
+import { PageSizeSelect } from '../../../shared/ui/PageSizeSelect';
 import {
   paginationBarClass,
   paginationNavBtnClass,
@@ -97,6 +98,7 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [editData, setEditData] = useState<{ vehicle: MatrixVehicle; docMap: MatrixDocumentMap } | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const [searchTerm, setSearchTerm] = useState('');
   /** Stamped at mount (page load / full page refresh) and again by the refresh
    * and save handlers, so the "Updated …" line is never empty. Lazy initialiser
@@ -123,14 +125,14 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
   }, [filteredMatrix]);
 
   const totalRecords = sortedMatrix.length;
-  const totalPages = Math.max(1, Math.ceil(totalRecords / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
 
   /** Derived clamp: a narrower search can shrink the list below the stored
    * page, so the rendered page is always valid without an effect. */
   const safePage = Math.min(Math.max(1, currentPage), totalPages);
 
-  const startIndex = (safePage - 1) * PAGE_SIZE;
-  const paginatedMatrix = sortedMatrix.slice(startIndex, startIndex + PAGE_SIZE);
+  const startIndex = (safePage - 1) * pageSize;
+  const paginatedMatrix = sortedMatrix.slice(startIndex, startIndex + pageSize);
 
   const handlePageChange = (page: number) => {
     if (page >= 1 && page <= totalPages) setCurrentPage(page);
@@ -337,6 +339,15 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
           {/* ── Global pagination — same bar as the trip tables ─────────── */}
           {shouldShowPagination(totalRecords) && (
             <div className={paginationBarClass}>
+              <div className="mr-auto flex items-center gap-1.5">
+                <PageSizeSelect
+                  value={pageSize}
+                  onChange={(size) => {
+                    setPageSize(size);
+                    setCurrentPage(1);
+                  }}
+                />
+              </div>
               <button
                 type="button"
                 onClick={() => handlePageChange(safePage - 1)}

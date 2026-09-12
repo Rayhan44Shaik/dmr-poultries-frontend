@@ -38,6 +38,7 @@ function LeaveManagementPage() {
     total,
     totalPages,
     setPage,
+    setPageSize,
   } = useLeaveManagement(showNotification);
 
   // Auto-hide the refresh toast
@@ -132,7 +133,18 @@ function LeaveManagementPage() {
             onDelete={handleDelete}
             onCancel={(id) => { void cancelLeave(id); }}
           />
-          <Pagination currentPage={page} totalPages={totalPages} totalItems={total} itemsPerPage={pageSize} onPageChange={setPage} />
+          <Pagination
+            currentPage={page}
+            totalPages={totalPages}
+            totalItems={total}
+            itemsPerPage={pageSize}
+            onPageChange={setPage}
+            pageSize={pageSize}
+            onPageSizeChange={(size) => {
+              setPageSize(size);
+              setPage(1);
+            }}
+          />
         </div>
       )}
 

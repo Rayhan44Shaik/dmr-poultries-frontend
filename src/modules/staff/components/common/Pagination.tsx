@@ -1,6 +1,7 @@
 import React from 'react';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useI18n } from '../../../../i18n';
+import { PageSizeSelect } from '../../../../shared/ui/PageSizeSelect';
 import {
   clampPage,
   pageRecordRange,
@@ -20,6 +21,9 @@ interface PaginationProps {
   itemsPerPage: number;
   onPageChange: (page: number) => void;
   className?: string;
+  /** Pass with onPageSizeChange to show the global rows-per-page control. */
+  pageSize?: number;
+  onPageSizeChange?: (pageSize: number) => void;
 }
 
 /**
@@ -59,6 +63,8 @@ const Pagination: React.FC<PaginationProps> = ({
   itemsPerPage,
   onPageChange,
   className = '',
+  pageSize,
+  onPageSizeChange,
 }) => {
   const { t } = useI18n();
 
@@ -83,6 +89,9 @@ const Pagination: React.FC<PaginationProps> = ({
         <span className="font-semibold">{to}</span> {t('common.of')}{' '}
         <span className="font-semibold">{totalItems}</span>
       </p>
+      {onPageSizeChange && pageSize != null && (
+        <PageSizeSelect value={pageSize} onChange={onPageSizeChange} />
+      )}
       <nav
         aria-label={t('masters.ui.pagination')}
         className="flex items-center gap-1"
