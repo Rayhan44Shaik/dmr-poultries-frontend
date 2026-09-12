@@ -119,8 +119,9 @@ calendar's own trip count. That default is derived rather than remembered, so a
 reload or a hard refresh lands on the calendar's window, and tapping the lit
 chip hands it back. The caption under the title always names the dates being
 totalled. The switcher is a rounded segmented control: one solid
-accent per option — Today sky, Week violet, Month teal, Custom slate — each with
-its own icon and its trip count set into the pill.
+accent per option — Today sky, Week violet, Month teal, Custom slate, all in a
+light wash rather than a solid fill — each with its own icon and its trip count
+set into the pill.
 
 **Reading it** — the plot stays in kilos, so there is no second reading to
 switch to, and the footer is five plain numbers that double as the legend:
@@ -132,6 +133,12 @@ the load, and the ▲▼ change against the previous bucket.
 Mortality is reported in birds, not kilos: the rose band stays in the bar only
 because the segments must add up to the farm weight, but no figure in the card
 is a mortality weight any more.
+
+Windows already fetched are remembered for the session, so flicking between the
+chips paints instantly and then refreshes quietly in the background — the request
+still goes out every time, it is just never waited on twice. The average marker's
+caption is drawn on its own rounded plate above the dashed line, so it never
+prints across a bar.
 
 The whole card is localised — Telugu reads Telugu labels, month and weekday
 names, and lakh figures (`5.20 లక్షల kg`), with only units (kg, %) and numbers
