@@ -13,7 +13,18 @@ import RecentTripsTable from "../components/RecentTripsTable";
 import ActiveCounts from "../components/ActiveCounts";
 import PendingCollectionsByShop from "../components/PendingCollectionsByShop";
 import PendingApprovalsPanel from "../components/PendingApprovalsPanel";
-import { Calendar, CalendarClock, CalendarDays, CalendarRange, ChevronDown, DatabaseZap, Layers, ArrowRightLeft, ArrowUpRight, RefreshCw } from "lucide-react";
+import {
+  Calendar,
+  CalendarClock,
+  CalendarDays,
+  CalendarRange,
+  ChevronDown,
+  Layers,
+  ArrowRightLeft,
+  ArrowUpRight,
+  RefreshCw,
+  SlidersHorizontal,
+} from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import { useI18n } from "../../../../i18n";
 import { kickApprovalSnapshot } from "../../../approvals/services/approvalSnapshot";
@@ -424,19 +435,24 @@ const windowLabel = (from: string, to: string, locale = "en-IN"): string => {
     : `${start} – ${end}`;
 };
 
-/** One accent per chip — today reads sky, week violet, month teal. */
-const VIEW_ACCENT: Record<TrendPreset, { active: string; count: string }> = {
-  today: { active: "bg-sky-50 text-sky-700 ring-sky-200", count: "text-sky-700" },
-  week: { active: "bg-violet-50 text-violet-700 ring-violet-200", count: "text-violet-700" },
-  month: { active: "bg-teal-50 text-teal-700 ring-teal-200", count: "text-teal-700" },
+/** One solid accent per chip — today reads sky, week violet, month teal. */
+const VIEW_ACCENT: Record<TrendPreset, { active: string; icon: typeof CalendarDays }> = {
+  today: { active: "bg-sky-500 text-white shadow-sky-500/25", icon: CalendarDays },
+  week: { active: "bg-violet-500 text-white shadow-violet-500/25", icon: CalendarRange },
+  month: { active: "bg-teal-500 text-white shadow-teal-500/25", icon: Calendar },
 };
 
 /** The calendar's own range reads slate — it is the default, not a preset. */
 const CALENDAR_ACCENT = {
-  active: "bg-slate-100 text-slate-700 ring-slate-200",
-  count: "text-slate-700",
+  active: "bg-slate-700 text-white shadow-slate-700/25",
+  icon: SlidersHorizontal,
 };
 
+/**
+ * Segmented switcher sitting in the card header. Each option carries its trip
+ * count, so the numbers people ask for first are also the control: pick one and
+ * the chart re-buckets the calendar's window by day, week or month.
+ */
 interface TrendViewOption {
   /** `null` is the calendar's own range, offered whenever it is custom. */
   key: TrendView;
@@ -446,9 +462,9 @@ interface TrendViewOption {
 }
 
 /**
- * Segmented switcher sitting in the card header. Each option carries its trip
- * count, so the numbers people ask for first are also the control: pick one and
- * the chart re-buckets the calendar's window by day, week or month.
+ * The card's range switcher — a proper segmented control: a rounded track, one
+ * solid accent per option, an icon that says which window it is, and the trip
+ * count set into the same pill.
  */
 function TrendViewSwitcher({
   views,
@@ -467,29 +483,39 @@ function TrendViewSwitcher({
     <div
       role="tablist"
       aria-label={label}
-      className="inline-flex shrink-0 gap-0.5 rounded-lg border border-slate-200 bg-slate-50/80 p-0.5"
+      className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200/80 bg-slate-50/70 p-1 shadow-sm"
     >
       {views.map((view) => {
         const selected = view.key === active;
         const accent = view.key ? VIEW_ACCENT[view.key] : CALENDAR_ACCENT;
+        const Icon = accent.icon;
         return (
           <button
-            key={view.key}
+            key={view.label}
             type="button"
             role="tab"
             aria-selected={selected}
             /* Tapping the lit chip lets go of the window: back to the calendar. */
             title={selected ? calendarTitle : undefined}
             onClick={() => onChange(selected ? null : view.key)}
-            className={`flex items-baseline gap-1.5 rounded-[6px] px-2.5 py-1 text-[10.5px] font-extrabold uppercase tracking-wide ring-1 ring-inset transition-all duration-150 ${
-              selected ? `${accent.active} shadow-sm` : "text-slate-400 ring-transparent hover:text-slate-600"
+            className={`group flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold tracking-tight transition-all duration-200 active:scale-[0.97] ${
+              selected
+                ? `${accent.active} shadow-[0_2px_10px_-3px] ring-1 ring-inset ring-white/20`
+                : "text-slate-500 hover:bg-white hover:text-slate-700"
             }`}
           >
-            {view.label}
+            <Icon
+              size={13}
+              strokeWidth={2.4}
+              className={
+                selected ? "text-white/90" : "text-slate-400 transition-colors group-hover:text-slate-500"
+              }
+            />
+            <span className="whitespace-nowrap">{view.label}</span>
             {view.count == null ? null : (
               <span
-                className={`text-[11.5px] font-black tabular-nums ${
-                  selected ? accent.count : "text-slate-500"
+                className={`rounded-full px-1.5 py-px text-[10.5px] font-black tabular-nums ${
+                  selected ? "bg-white/20 text-white" : "bg-slate-200/70 text-slate-600"
                 }`}
               >
                 {view.count}
@@ -502,7 +528,6 @@ function TrendViewSwitcher({
   );
 }
 
-// -------- Main Dashboard View Page --------
 function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   const { t, language: uiLanguage } = useI18n();
   const trendLocale = uiLanguage === "te" ? "te-IN" : "en-IN";
@@ -728,23 +753,6 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
       <PendingApprovalsPanel
         actions={headerActions}
       />
-
-      {/* Sample-data banner — only rendered when the API identifies itself as
-          the in-repo quarter sample server, so production numbers are never
-          dressed up as (or mistaken for) sample figures. */}
-      {data.sampleQuarter ? (
-        <div
-          className="flex flex-wrap items-center gap-x-2 gap-y-1 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] font-semibold text-amber-800 sm:text-xs"
-          title={`Sample dataset generated by scripts/quarter-sample-data.mjs · ${data.sampleQuarter.fromDate} → ${data.sampleQuarter.toDate}`}
-        >
-          <DatabaseZap size={14} className="shrink-0" />
-          <span>Sample data</span>
-          <span className="text-amber-700/80">
-            {data.sampleQuarter.label} · {formatSampleDate(data.sampleQuarter.fromDate)} –{" "}
-            {formatSampleDate(data.sampleQuarter.toDate)}
-          </span>
-        </div>
-      ) : null}
 
       <div className="relative z-10">
         <KPICards current={data} previous={previousData} rangeDays={rangeDays} />

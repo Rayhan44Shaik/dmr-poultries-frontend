@@ -45,9 +45,9 @@ prints that and exits without failing the dev command.
   drop the variable (or use `?demo=1` per URL) to exercise real login.
 - Pages can tell they are on sample data: `/api/quarter-summary` and the
   `/api/operations/dashboard` payload carry `sample: true` plus the quarter
-  window, and both dashboards show a badge (amber "Sample data" on Operations, a
-  sky quarter chip on the Executive dashboard). Nothing is ever badged in a
-  production build, because the probe is dev-only.
+  window. The Executive dashboard shows it as a sky quarter chip; the Operations
+  dashboard no longer prints a "Sample data" strip — the data speaks for itself.
+  Nothing is ever badged in a production build, because the probe is dev-only.
 - `npm run mock:backend` is kept as an alias for `dev:sample-api` (start just the
   sample API); `npm run mock:trips` serves the older, trip-wizard-focused sample
   (`scripts/dev-mock-backend.mjs`) with in-memory wizard save/submit support.
@@ -118,8 +118,9 @@ month-long one lights Month, and anything else lights Custom, which carries the
 calendar's own trip count. That default is derived rather than remembered, so a
 reload or a hard refresh lands on the calendar's window, and tapping the lit
 chip hands it back. The caption under the title always names the dates being
-totalled. Each chip carries its own accent — Today sky, Week violet, Month teal,
-Custom slate.
+totalled. The switcher is a rounded segmented control: one solid
+accent per option — Today sky, Week violet, Month teal, Custom slate — each with
+its own icon and its trip count set into the pill.
 
 **Reading it** — the plot stays in kilos, so there is no second reading to
 switch to, and the footer is five plain numbers that double as the legend:
