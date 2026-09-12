@@ -49,6 +49,8 @@ export function useTripEntry(
   const onStep1SuccessRef = useRef<((trip: Trip) => void) | null>(null);
   /** Same-tick double-click guard — React `headerLoading` is one render too late. */
   const startSubmitLockRef = useRef(false);
+  /** Per-step operation locks prevent double-click duplicate submits/saves. */
+  const operationLocksRef = useRef<Set<string>>(new Set());
   const onStep2SuccessRef = useRef<((trip: Trip) => void) | null>(null);
   const onStep3SuccessRef = useRef<((trip: Trip) => void) | null>(null);
   const onStep4SuccessRef = useRef<((trip: Trip) => void) | null>(null);
@@ -84,6 +86,15 @@ export function useTripEntry(
     (): "idle" | "saving" | "saved" => "idle",
     []
   );
+
+  const acquireOperationLock = (key: string) => {
+    if (operationLocksRef.current.has(key)) return false;
+    operationLocksRef.current.add(key);
+    return true;
+  };
+  const releaseOperationLock = (key: string) => {
+    operationLocksRef.current.delete(key);
+  };
 
   /** Step 1 edits update React state only — no localStorage, no backend. */
   const applyStartFieldChange = useCallback(
@@ -231,6 +242,8 @@ export function useTripEntry(
       return false;
     }
 
+    const lockKey = "submit:farm";
+    if (!acquireOperationLock(lockKey)) return false;
     setHeaderLoading(true);
     try {
       const submitted = await submitTripStep(current.id, "farm", {
@@ -247,6 +260,7 @@ export function useTripEntry(
       notifyRef.current?.(handleApiError(error), "error");
       return false;
     } finally {
+      releaseOperationLock(lockKey);
       setHeaderLoading(false);
     }
   };
@@ -278,6 +292,8 @@ export function useTripEntry(
       deliveries: "Delivery",
       expenses: "End",
     }[step];
+    const lockKey = `save:${step}`;
+    if (!acquireOperationLock(lockKey)) return false;
     setHeaderLoading(true);
     try {
       const saved = await saveTripStepProgress(current.id, step, current);
@@ -291,6 +307,7 @@ export function useTripEntry(
       }
       return false;
     } finally {
+      releaseOperationLock(lockKey);
       setHeaderLoading(false);
     }
   };
@@ -311,6 +328,8 @@ export function useTripEntry(
       ...row,
       clientKey: row.clientKey || (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `ck-${row.id}`),
     }));
+    const lockKey = "save:deliveries";
+    if (!acquireOperationLock(lockKey)) return false;
     setHeaderLoading(true);
     try {
       const saved = await saveTripDeliveries(current.id, { ...current, deliveries: withKeys });
@@ -320,6 +339,7 @@ export function useTripEntry(
       notifyRef.current?.(handleApiError(error), "error");
       return false;
     } finally {
+      releaseOperationLock(lockKey);
       setHeaderLoading(false);
     }
   };
@@ -362,6 +382,8 @@ export function useTripEntry(
       return false;
     }
 
+    const lockKey = "submit:pickup";
+    if (!acquireOperationLock(lockKey)) return false;
     setHeaderLoading(true);
     try {
       const submitted = await submitTripStep(current.id, "pickup", updatedData);
@@ -375,6 +397,7 @@ export function useTripEntry(
       notifyRef.current?.(handleApiError(error), "error");
       return false;
     } finally {
+      releaseOperationLock(lockKey);
       setHeaderLoading(false);
     }
   };
@@ -400,6 +423,8 @@ export function useTripEntry(
       }
     }
 
+    const lockKey = "submit:deliveries";
+    if (!acquireOperationLock(lockKey)) return false;
     setHeaderLoading(true);
     try {
       const submitted = await submitTripStep(current.id, "deliveries", current);
@@ -419,6 +444,7 @@ export function useTripEntry(
       }
       return false;
     } finally {
+      releaseOperationLock(lockKey);
       setHeaderLoading(false);
     }
   };
@@ -470,6 +496,8 @@ export function useTripEntry(
     );
     const totalKm = closingMeter - (current.openingMeter || 0);
 
+    const lockKey = "submit:expenses";
+    if (!acquireOperationLock(lockKey)) return false;
     setHeaderLoading(true);
     try {
       const submitted = await submitTripStep(current.id, "expenses", {
@@ -492,6 +520,7 @@ export function useTripEntry(
       (wrapped as Error & { cause?: unknown }).cause = error;
       throw wrapped;
     } finally {
+      releaseOperationLock(lockKey);
       setHeaderLoading(false);
     }
   };

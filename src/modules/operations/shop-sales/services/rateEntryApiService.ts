@@ -11,6 +11,7 @@
  */
 import { apiGet, apiPost, apiPut } from "../../../../api";
 import type { Trip } from "../../vehicle-trips/types/trip";
+import { uniqueTripsById } from "../../vehicle-trips/services/tripHeaderApiService";
 import type { RateEntryMarketRateMasterDto } from "../utils/rateEntryMarketMaster";
 
 const RATE_ENTRY_PATH = "/operations/rate-entry";
@@ -182,15 +183,19 @@ function mapRowToTrip(row: RateEntryTripDto, withDeliveries: boolean): Trip {
 
 /** GET /operations/rate-entry — trips currently eligible for rate entry
  * (Completed, not deleted, not rate-locked). The backend is the authority. */
-export async function listEligibleTrips(): Promise<Trip[]> {
-  const { data } = await apiGet<RateEntryTripDto[]>(RATE_ENTRY_PATH);
-  return (data || []).map((row) => mapRowToTrip(row, false));
+export async function listEligibleTrips(options: { signal?: AbortSignal } = {}): Promise<Trip[]> {
+  const { data } = await apiGet<RateEntryTripDto[]>(RATE_ENTRY_PATH, {
+    signal: options.signal,
+  });
+  return uniqueTripsById((data || []).map((row) => mapRowToTrip(row, false)));
 }
 
 /** GET /operations/rate-entry/:tripId — full trip detail with shop-wise
  * deliveries + market-rate reference, for the Enter/Modify Rate modal. */
-export async function getRateEntryTrip(tripId: number): Promise<Trip> {
-  const { data } = await apiGet<RateEntryTripDto>(`${RATE_ENTRY_PATH}/${tripId}`);
+export async function getRateEntryTrip(tripId: number, options: { signal?: AbortSignal } = {}): Promise<Trip> {
+  const { data } = await apiGet<RateEntryTripDto>(`${RATE_ENTRY_PATH}/${tripId}`, {
+    signal: options.signal,
+  });
   return mapRowToTrip(data, true);
 }
 

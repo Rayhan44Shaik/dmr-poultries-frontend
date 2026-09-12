@@ -9,6 +9,10 @@ import { getDeliveriesBalanceError } from "../../../../shared/trip/validation";
 import { StepCloseButton } from "./WizardStepUI";
 import { TripNoBadge } from "./TripNoBadge";
 import { useI18n } from "../../../../i18n";
+import { ActionTooltip } from "../../../../ui/ActionTooltip";
+import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
+import type { DeliveryEmailStatusValue } from "../services/deliveryEmailService";
+import type { DeliveryWhatsAppStatusValue } from "../services/deliveryWhatsAppService";
 
 interface Props {
   rows: ShopDelivery[];
@@ -29,6 +33,19 @@ interface Props {
   onExitEdit?: () => void;
   boxDetails?: BoxDetail[];
   persistedDeliveries?: ShopDelivery[];
+  showCommunicationStatus?: boolean;
+  emailEffectiveStatus?: (deliveryId: number) => DeliveryEmailStatusValue;
+  emailBusyIds?: Set<number>;
+  emailIsBulkSending?: boolean;
+  emailSendCountFor?: (deliveryId: number) => number;
+  emailFailureReasonFor?: (deliveryId: number) => string | null;
+  onSendOneEmail?: (delivery: ShopDelivery) => void;
+  whatsappEffectiveStatus?: (deliveryId: number) => DeliveryWhatsAppStatusValue;
+  whatsappBusyIds?: Set<number>;
+  whatsappIsBulkSending?: boolean;
+  whatsappSendCountFor?: (deliveryId: number) => number;
+  whatsappFailureReasonFor?: (deliveryId: number) => string | null;
+  onSendOneWhatsApp?: (delivery: ShopDelivery) => void;
 }
 
 export default function StepDeliveries({
@@ -48,6 +65,19 @@ export default function StepDeliveries({
   onExitEdit,
   boxDetails = [],
   persistedDeliveries,
+  showCommunicationStatus = false,
+  emailEffectiveStatus,
+  emailBusyIds,
+  emailIsBulkSending,
+  emailSendCountFor,
+  emailFailureReasonFor,
+  onSendOneEmail,
+  whatsappEffectiveStatus,
+  whatsappBusyIds,
+  whatsappIsBulkSending,
+  whatsappSendCountFor,
+  whatsappFailureReasonFor,
+  onSendOneWhatsApp,
 }: Props) {
   const { t } = useI18n();
 
@@ -154,10 +184,11 @@ export default function StepDeliveries({
                 <button
                   type="button"
                   onClick={() => setIsStepEditing(true)}
-                  className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95"
-                  title={t("ops.trip.edit_step")}
+                  className="group relative bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95"
+                  aria-label={t("ops.trip.edit_step")}
                 >
-                  <Pencil size={14} />
+                  <Pencil size={14} className={uiActionIconMotionClass.edit} />
+                  <ActionTooltip label={t("ops.trip.edit_step")} />
                 </button>
               )}
               <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
@@ -205,6 +236,19 @@ export default function StepDeliveries({
         balanceError={validationResult.balanceError}
         tripBirdTypeId={trip.birdTypeId}
         tripBirdType={trip.birdType}
+        showCommunicationStatus={showCommunicationStatus}
+        emailEffectiveStatus={emailEffectiveStatus}
+        emailBusyIds={emailBusyIds}
+        emailIsBulkSending={emailIsBulkSending}
+        emailSendCountFor={emailSendCountFor}
+        emailFailureReasonFor={emailFailureReasonFor}
+        onSendOneEmail={onSendOneEmail}
+        whatsappEffectiveStatus={whatsappEffectiveStatus}
+        whatsappBusyIds={whatsappBusyIds}
+        whatsappIsBulkSending={whatsappIsBulkSending}
+        whatsappSendCountFor={whatsappSendCountFor}
+        whatsappFailureReasonFor={whatsappFailureReasonFor}
+        onSendOneWhatsApp={onSendOneWhatsApp}
       />
     </div>
   );

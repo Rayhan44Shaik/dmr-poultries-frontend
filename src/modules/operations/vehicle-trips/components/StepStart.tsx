@@ -33,6 +33,8 @@ import {
   TRIP_FIELD_DEFINITIONS,
 } from "../../../../shared/trip/definitions";
 import { useI18n } from "../../../../i18n";
+import { ActionTooltip } from "../../../../ui/ActionTooltip";
+import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 
 type VehicleOption = { id: number; vehicleNumber: string };
 type EmployeeOption = { id: number; employeeName: string; department: string };
@@ -842,10 +844,11 @@ function StepStart({
               <button
                 type="button"
                 onClick={() => setIsLocalEditing(true)}
-                className="bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95"
-                title={t("ops.trip.edit_step")}
+                className="group relative bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-700 transition-all active:scale-95"
+                aria-label={t("ops.trip.edit_step")}
               >
-                <Pencil size={14} />
+                <Pencil size={14} className={uiActionIconMotionClass.edit} />
+                <ActionTooltip label={t("ops.trip.edit_step")} />
               </button>
             )}
             <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
@@ -911,7 +914,7 @@ function StepStart({
             value={
               loadSnapshot.openingMeter == null
                 ? t("ops.trip.not_entered")
-                : `${loadSnapshot.openingMeter} KM`
+                : `${loadSnapshot.openingMeter} ${t("common.km")}`
             }
           />
           <StepKpiCard

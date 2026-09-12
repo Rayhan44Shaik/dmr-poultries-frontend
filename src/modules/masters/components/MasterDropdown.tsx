@@ -110,12 +110,14 @@ export default function MasterDropdown({
   }, [options, allowClear, placeholder]);
   const filtered = useMemo(() => {
     const keyword = query.trim().toLocaleLowerCase();
-    return items.filter(
-      (option) =>
-        (allowClear && option.value === "") ||
-        !keyword ||
-        option.label.toLocaleLowerCase().includes(keyword),
-    );
+    return items.filter((option) => {
+      if (allowClear && option.value === "") return true;
+      if (!keyword) return true;
+      return (
+        option.label.toLocaleLowerCase().includes(keyword) ||
+        option.value.toLocaleLowerCase().includes(keyword)
+      );
+    });
   }, [items, query, allowClear]);
   const noMatches = !filtered.some(
     (option) => !(allowClear && option.value === ""),
@@ -336,7 +338,9 @@ export default function MasterDropdown({
       if (!isOpen) show();
       const index = items.findIndex(
         (option) =>
-          !option.disabled && option.label.toLocaleLowerCase().startsWith(text),
+          !option.disabled &&
+          (option.label.toLocaleLowerCase().startsWith(text) ||
+            option.value.toLocaleLowerCase().startsWith(text)),
       );
       if (index >= 0) setActive(index);
     }
@@ -370,7 +374,8 @@ export default function MasterDropdown({
                   (option) =>
                     (allowClear && option.value === "") ||
                     !keyword ||
-                    option.label.toLocaleLowerCase().includes(keyword),
+                    option.label.toLocaleLowerCase().includes(keyword) ||
+                    option.value.toLocaleLowerCase().includes(keyword),
                 );
                 setActive(
                   matches.findIndex(
@@ -413,12 +418,12 @@ export default function MasterDropdown({
             }}
             className={`flex h-9 w-full shrink-0 items-center gap-2 px-3 text-left text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40 ${
               kind === "select" && option.value === value
-                // Selected row: soft blue tint, the original Salary Register
-                // treatment. A solid fill here read as harsh.
-                ? "bg-blue-50 text-blue-600"
+                // Selected row: light-green brand treatment for All Vehicles /
+                // All Supervisors and normal options; visible but not harsh.
+                ? "bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-200"
                 : index === active
-                  ? "bg-slate-50 text-slate-700"
-                  : "text-slate-700 hover:bg-slate-50"
+                  ? "bg-emerald-100/70 text-emerald-800"
+                  : "text-slate-700 hover:bg-emerald-50 hover:text-emerald-800"
             }`}
           >
             {option.icon && (
@@ -492,7 +497,7 @@ export default function MasterDropdown({
         className={`flex h-9 w-full items-center justify-between gap-2 rounded-xl border bg-white px-3 text-xs font-medium text-slate-700 outline-none transition focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-50 ${
           error
             ? "border-red-400 focus:border-red-500 focus:ring-red-100"
-            : "border-slate-200 hover:border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
+            : "border-slate-200 hover:border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500/20"
         } ${triggerClassName}`}
       >
         <span

@@ -1,8 +1,8 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import TripFilters from "../components/TripFilters";
 import TripKPICards from "../components/TripKPICards";
 import TripMasterTable, { type TripSortKey } from "../components/TripMasterTable";
-import TripViewModal from "../components/TripViewModal";
+import { TripHistoryViewModal } from "../components/TripViewModal";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import { Pagination } from "../../../../ui";
 import { PAGINATION_DEFAULT_PAGE_SIZE } from "../../../../shared/ui/uiTokens";
@@ -10,14 +10,38 @@ import { PAGINATION_DEFAULT_PAGE_SIZE } from "../../../../shared/ui/uiTokens";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
 import { useVehicles } from "../../../masters/vehicles/hooks/useVehicles";
+import { useEmployees } from "../../../masters/employees/hooks/useEmployees";
+import { useFarms } from "../../../masters/farms/hooks/useFarms";
 import { useShops } from "../../../masters/shops/hooks/useShops";
 import { useBirdTypes } from "../../../masters/bird-types/hooks/useBirdTypes";
 
 import type { Trip } from "../types/trip";
-import { listCompletedTrips, loadTripById, type PaginatedTripListResult } from "../services/tripHeaderApiService";
+import {
+  listCompletedTrips,
+  loadTripById,
+  uniqueTripsById,
+  type PaginatedTripListResult,
+} from "../services/tripHeaderApiService";
+import { isCanceledError } from "../../../../api/errors";
 import { useI18n } from "../../../../i18n";
 
 type TripListPageProps = { embedded?: boolean };
+type FilterOption = { value: string; label: string };
+
+const ALL_VEHICLES = "All Vehicles";
+const ALL_SUPERVISORS = "All Supervisors";
+const ALL_SOURCES = "All Sources";
+const SEARCH_DEBOUNCE_MS = 300;
+
+function numericFilter(value: string, sentinel: string): number | undefined {
+  if (value === sentinel) return undefined;
+  const numeric = Number(value);
+  return Number.isFinite(numeric) && numeric > 0 ? numeric : undefined;
+}
+
+function selectedOptionLabel(options: readonly FilterOption[], value: string, fallback: string): string {
+  return options.find((option) => option.value === value)?.label ?? fallback;
+}
 
 /**
  * Loads the shop / bird-type masters the view modal needs. Kept as a separate
@@ -34,7 +58,7 @@ function TripViewModalWithMasters({
   const { shops } = useShops();
   const { birdTypes } = useBirdTypes();
   return (
-    <TripViewModal open trip={trip} shops={shops} birdTypes={birdTypes} onClose={onClose} />
+    <TripHistoryViewModal open trip={trip} shops={shops} birdTypes={birdTypes} onClose={onClose} />
   );
 }
 
@@ -46,48 +70,80 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   const [currentPage, setCurrentPage] = useState(1);
   const [totalTrips, setTotalTrips] = useState(0);
   const [search, setSearch] = useState("");
-  const [vehicle, setVehicle] = useState("All Vehicles");
-  const [supervisor, setSupervisor] = useState("All Supervisors");
-  const [farm, setFarm] = useState("All Sources");
+  const [appliedSearch, setAppliedSearch] = useState("");
+  const lastAppliedSearchRef = useRef("");
+  const [vehicle, setVehicle] = useState(ALL_VEHICLES);
+  const [supervisor, setSupervisor] = useState(ALL_SUPERVISORS);
+  const [farm, setFarm] = useState(ALL_SOURCES);
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [pageSize, setPageSize] = useState(PAGINATION_DEFAULT_PAGE_SIZE);
   const [sortBy, setSortBy] = useState<TripSortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [viewOpen, setViewOpen] = useState(false);
+  const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
+  const listRequestSeqRef = useRef(0);
+  const listAbortRef = useRef<AbortController | null>(null);
+  const viewRequestSeqRef = useRef(0);
+  const exportBusyRef = useRef<"pdf" | "excel" | null>(null);
 
-  const refreshTrips = useCallback(async () => {
+  const refreshTrips = useCallback(async (): Promise<boolean> => {
+    const requestSeq = listRequestSeqRef.current + 1;
+    listRequestSeqRef.current = requestSeq;
+    listAbortRef.current?.abort();
+    const controller = new AbortController();
+    listAbortRef.current = controller;
+
     try {
       const result: PaginatedTripListResult = await listCompletedTrips({
         fromDate: fromDate || undefined,
         toDate: toDate || undefined,
-        vehicleId: vehicle !== "All Vehicles" ? Number(vehicle) : undefined,
-        supervisorId: supervisor !== "All Supervisors" ? Number(supervisor) : undefined,
-        farmId: farm !== "All Sources" ? Number(farm) : undefined,
-        search: search || undefined,
+        vehicleId: numericFilter(vehicle, ALL_VEHICLES),
+        supervisorId: numericFilter(supervisor, ALL_SUPERVISORS),
+        farmId: numericFilter(farm, ALL_SOURCES),
+        search: appliedSearch || undefined,
         page: currentPage,
         limit: pageSize,
         sortBy: sortBy ?? undefined,
         sortDir: sortBy ? sortDir : undefined,
+        signal: controller.signal,
       });
-      setTrips(result.data);
+      if (controller.signal.aborted || requestSeq !== listRequestSeqRef.current) return false;
+      const uniqueTrips = uniqueTripsById(result.data);
+      setTrips(uniqueTrips);
       setTotalTrips(result.meta.total);
-    } catch {
+      setSelectedRowId((selectedId) =>
+        selectedId != null && !uniqueTrips.some((trip) => trip.id === selectedId) ? null : selectedId
+      );
+      return true;
+    } catch (error) {
+      if (isCanceledError(error) || requestSeq !== listRequestSeqRef.current) return false;
       showNotification(t("ops.trip.unable_load_trips"), "error");
+      return false;
+    } finally {
+      if (requestSeq === listRequestSeqRef.current) listAbortRef.current = null;
     }
-  }, [showNotification, t, currentPage, pageSize, fromDate, toDate, vehicle, supervisor, farm, search, sortBy, sortDir]);
+  }, [showNotification, t, currentPage, pageSize, fromDate, toDate, vehicle, supervisor, farm, appliedSearch, sortBy, sortDir]);
 
   useEffect(() => {
     let cancelled = false;
-    queueMicrotask(() => { if (!cancelled) void refreshTrips(); });
-    return () => { cancelled = true; };
+    queueMicrotask(() => {
+      if (!cancelled) void refreshTrips();
+    });
+    return () => {
+      cancelled = true;
+      listAbortRef.current?.abort();
+    };
   }, [refreshTrips]);
 
   const resetFilters = () => {
     setSearch("");
-    setVehicle("All Vehicles");
-    setSupervisor("All Supervisors");
-    setFarm("All Sources");
+    lastAppliedSearchRef.current = "";
+    setAppliedSearch("");
+    setVehicle(ALL_VEHICLES);
+    setSupervisor(ALL_SUPERVISORS);
+    setFarm(ALL_SOURCES);
     setFromDate("");
     setToDate("");
     setSortBy(null);
@@ -95,11 +151,46 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     setCurrentPage(1);
   };
 
-  const [viewOpen, setViewOpen] = useState(false);
-  const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
-
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const viewButtonRef = useRef<HTMLButtonElement>(null);
+
+  const commitSearch = useCallback((value = search) => {
+    const normalized = value.trim();
+    if (lastAppliedSearchRef.current === normalized) return;
+    lastAppliedSearchRef.current = normalized;
+    setAppliedSearch(normalized);
+    setCurrentPage(1);
+  }, [search]);
+
+  const handleSearchChange = useCallback((value: string) => {
+    setSearch(value);
+  }, []);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => commitSearch(search), SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [commitSearch, search]);
+
+  const setFilterFromDate = useCallback((value: string) => {
+    setFromDate(value);
+    setCurrentPage(1);
+  }, []);
+  const setFilterToDate = useCallback((value: string) => {
+    setToDate(value);
+    setCurrentPage(1);
+  }, []);
+  const setFilterVehicle = useCallback((value: string) => {
+    setVehicle(value || ALL_VEHICLES);
+    setCurrentPage(1);
+  }, []);
+  const setFilterSupervisor = useCallback((value: string) => {
+    setSupervisor(value || ALL_SUPERVISORS);
+    setCurrentPage(1);
+  }, []);
+  const setFilterFarm = useCallback((value: string) => {
+    setFarm(value || ALL_SOURCES);
+    setCurrentPage(1);
+  }, []);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -116,32 +207,93 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  useEffect(() => () => {
+    viewRequestSeqRef.current += 1;
+  }, []);
+
   const { vehicles: masterVehicles } = useVehicles();
+  const { employees: masterEmployees } = useEmployees();
+  const { farms: masterFarms } = useFarms();
 
-  const vehicleOptions = [
-    "All Vehicles",
-    ...Array.from(new Set(masterVehicles.map((v) => v.vehicleNumber).filter(Boolean))),
-  ];
+  const vehicleOptions = useMemo<FilterOption[]>(() => {
+    const seen = new Set<string>();
+    return masterVehicles.flatMap((vehicleRecord) => {
+      const value = String(vehicleRecord.id || "");
+      const label = String(vehicleRecord.vehicleNumber || "").trim();
+      const active = String(vehicleRecord.status ?? "Active") !== "Inactive";
+      if (!value || !label || !active || seen.has(value)) return [];
+      seen.add(value);
+      return [{ value, label }];
+    });
+  }, [masterVehicles]);
 
-  // Server-side pagination - trips are already filtered and paginated by the API
-  const safeTrips = Array.isArray(trips) ? trips : [];
-  const completedTrips = safeTrips;
+  const supervisorOptions = useMemo<FilterOption[]>(() => {
+    const seen = new Set<string>();
+    return masterEmployees.flatMap((employee) => {
+      const roleText = `${employee.department || ""} ${employee.role || ""}`.toLowerCase();
+      const isSupervisor = roleText.includes("supervisor");
+      const value = String(employee.id || "");
+      const label = String(employee.employeeName || "").trim();
+      const active = String(employee.status ?? "Active") !== "Inactive";
+      if (!isSupervisor || !value || !label || !active || seen.has(value)) return [];
+      seen.add(value);
+      return [{ value, label }];
+    });
+  }, [masterEmployees]);
+
+  const farmOptions = useMemo<FilterOption[]>(() => {
+    const seen = new Set<string>();
+    return masterFarms.flatMap((farmRecord) => {
+      const value = String(farmRecord.id || "");
+      const label = String(farmRecord.farmName || "").trim();
+      const active = String(farmRecord.status ?? "Active") !== "Inactive";
+      if (!value || !label || !active || seen.has(value)) return [];
+      seen.add(value);
+      return [{ value, label }];
+    });
+  }, [masterFarms]);
+
+  const selectedVehicleLabel = selectedOptionLabel(vehicleOptions, vehicle, vehicle);
+  const selectedSupervisorLabel = selectedOptionLabel(supervisorOptions, supervisor, supervisor);
+  const selectedFarmLabel = selectedOptionLabel(farmOptions, farm, farm);
+
+  // Server-side pagination - trips are already filtered and paginated by the API.
+  // Dedupe one more time on the page boundary so a repeated backend row can
+  // never render twice in Trip List.
+  const completedTrips = useMemo(() => uniqueTripsById(Array.isArray(trips) ? trips : []), [trips]);
 
   const hasFilters =
-    search !== "" ||
-    vehicle !== "All Vehicles" ||
-    supervisor !== "All Supervisors" ||
-    farm !== "All Sources" ||
+    search.trim() !== "" ||
+    vehicle !== ALL_VEHICLES ||
+    supervisor !== ALL_SUPERVISORS ||
+    farm !== ALL_SOURCES ||
     fromDate !== "" ||
     toDate !== "";
 
-  const totalCompletedTrips = totalTrips;
-  const totalCompletedShops = completedTrips.reduce((sum, t) => sum + t.totalShops, 0);
-  const totalCompletedBirds = completedTrips.reduce((sum, t) => sum + t.totalBirds, 0);
-  const totalCompletedWeight = completedTrips.reduce((sum, t) => sum + t.totalWeight, 0);
-  const totalCompletedMortality = completedTrips.reduce((sum, t) => sum + t.totalMortality, 0);
+  const totals = useMemo(() => ({
+    totalCompletedTrips: totalTrips,
+    totalCompletedShops: completedTrips.reduce((sum, trip) => sum + trip.totalShops, 0),
+    totalCompletedBirds: completedTrips.reduce((sum, trip) => sum + trip.totalBirds, 0),
+    totalCompletedWeight: completedTrips.reduce((sum, trip) => sum + trip.totalWeight, 0),
+    totalCompletedMortality: completedTrips.reduce((sum, trip) => sum + trip.totalMortality, 0),
+  }), [completedTrips, totalTrips]);
+
+  const {
+    totalCompletedTrips,
+    totalCompletedShops,
+    totalCompletedBirds,
+    totalCompletedWeight,
+    totalCompletedMortality,
+  } = totals;
 
   const paginatedTrips = completedTrips;
+
+  useEffect(() => {
+    const maxPage = Math.max(1, Math.ceil(totalCompletedTrips / pageSize));
+    if (currentPage <= maxPage) return;
+    const timer = window.setTimeout(() => setCurrentPage(maxPage), 0);
+    return () => window.clearTimeout(timer);
+  }, [currentPage, pageSize, totalCompletedTrips]);
 
   const startEntry = totalCompletedTrips === 0 ? 0 : (currentPage - 1) * pageSize + 1;
   const endEntry = Math.min(currentPage * pageSize, totalCompletedTrips);
@@ -149,13 +301,19 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   void endEntry;
 
   const openView = (trip: Trip) => {
+    const requestSeq = viewRequestSeqRef.current + 1;
+    viewRequestSeqRef.current = requestSeq;
     setSelectedTrip(trip);
     setViewOpen(true);
     setSelectedRowId(null);
     void loadTripById(trip.id)
-      .then((loaded) => setSelectedTrip(loaded))
+      .then((loaded) => {
+        if (requestSeq === viewRequestSeqRef.current) setSelectedTrip(loaded);
+      })
       .catch(() => {
-        showNotification(t("ops.trip.refresh_failed_using_cached"), "info");
+        if (requestSeq === viewRequestSeqRef.current) {
+          showNotification(t("ops.trip.refresh_failed_using_cached"), "info");
+        }
       });
   };
 
@@ -193,109 +351,128 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     const result = await listCompletedTrips({
       fromDate: fromDate || undefined,
       toDate: toDate || undefined,
-      vehicleId: vehicle !== "All Vehicles" ? Number(vehicle) : undefined,
-      supervisorId: supervisor !== "All Supervisors" ? Number(supervisor) : undefined,
-      farmId: farm !== "All Sources" ? Number(farm) : undefined,
-      search: search || undefined,
+      vehicleId: numericFilter(vehicle, ALL_VEHICLES),
+      supervisorId: numericFilter(supervisor, ALL_SUPERVISORS),
+      farmId: numericFilter(farm, ALL_SOURCES),
+      search: search.trim() || appliedSearch || undefined,
       page: 1,
-      limit: Math.max(totalTrips, 1),
+      limit: Math.max(totalTrips, pageSize, 1),
+      sortBy: sortBy ?? undefined,
+      sortDir: sortBy ? sortDir : undefined,
     });
-    return result.data;
-  }, [fromDate, toDate, vehicle, supervisor, farm, search, totalTrips]);
+    return uniqueTripsById(result.data);
+  }, [fromDate, toDate, vehicle, supervisor, farm, search, appliedSearch, totalTrips, pageSize, sortBy, sortDir]);
 
   const handleExportPDF = async () => {
-    const exportData = await fetchAllFilteredTrips();
-    if (!exportData || exportData.length === 0) {
-      showNotification(t("ops.trip.no_data_export"), "error");
-      return;
+    if (exportBusyRef.current) return;
+    exportBusyRef.current = "pdf";
+    try {
+      const exportData = await fetchAllFilteredTrips();
+      if (!exportData || exportData.length === 0) {
+        showNotification(t("ops.trip.no_data_export"), "error");
+        return;
+      }
+      const headers = [
+        t("operations.trip_no"),
+        t("table.date"),
+        t("common.vehicle"),
+        t("common.driver"),
+        t("common.supervisor"),
+        t("ops.trip.source_farm"),
+        t("ops.trip.shops"),
+        t("common.birds"),
+        t("ops.trip.weight_kg"),
+      ];
+      const rows = exportData.map((tripRecord) => [
+        tripRecord.tripNo,
+        tripRecord.tripDate,
+        tripRecord.vehicleNo,
+        tripRecord.driverName || "-",
+        tripRecord.supervisorName,
+        tripRecord.sourceFarm,
+        tripRecord.totalShops.toString(),
+        tripRecord.totalBirds.toString(),
+        tripRecord.totalWeight.toFixed(2),
+      ]);
+      const filename = `Trips_${new Date().toISOString().split("T")[0]}`;
+
+      // Report the filters actually in force, so the PDF is self-describing.
+      const activeFilters = [
+        fromDate || toDate
+          ? { label: t("table.date"), value: `${fromDate || "..."} to ${toDate || "..."}` }
+          : null,
+        vehicle !== ALL_VEHICLES ? { label: t("common.vehicle"), value: selectedVehicleLabel } : null,
+        supervisor !== ALL_SUPERVISORS ? { label: t("common.supervisor"), value: selectedSupervisorLabel } : null,
+        farm !== ALL_SOURCES ? { label: t("ops.trip.source_farm"), value: selectedFarmLabel } : null,
+        search.trim() ? { label: t("common.search"), value: search.trim() } : null,
+      ].filter((filter): filter is { label: string; value: string } => filter !== null);
+
+      exportToPDF(t("ops.trip.trip_list"), headers, rows, filename, {
+        filters: activeFilters.length
+          ? activeFilters
+          : [{ label: t("common.filter"), value: t("common.all") }],
+        summary: [
+          { label: t("ops.trip.total_trips"), value: String(exportData.length) },
+          { label: t("ops.trip.total_shops"), value: String(exportData.reduce((n, tripRecord) => n + tripRecord.totalShops, 0)) },
+          { label: t("common.birds"), value: exportData.reduce((n, tripRecord) => n + tripRecord.totalBirds, 0).toLocaleString() },
+          { label: t("ops.trip.weight_kg"), value: exportData.reduce((n, tripRecord) => n + tripRecord.totalWeight, 0).toFixed(2) },
+          { label: t("operations.mortality_count"), value: String(exportData.reduce((n, tripRecord) => n + tripRecord.totalMortality, 0)) },
+        ],
+        numericColumns: [6, 7, 8],
+      });
+      showNotification(t("notification.export_success"), "success");
+    } catch {
+      showNotification(t("ops.trip.unable_load_trips"), "error");
+    } finally {
+      exportBusyRef.current = null;
     }
-    const headers = [
-      t("operations.trip_no"),
-      t("table.date"),
-      t("common.vehicle"),
-      t("common.driver"),
-      t("common.supervisor"),
-      t("ops.trip.source_farm"),
-      t("ops.trip.shops"),
-      t("common.birds"),
-      t("ops.trip.weight_kg"),
-    ];
-    const rows = exportData.map((t) => [
-      t.tripNo,
-      t.tripDate,
-      t.vehicleNo,
-      t.driverName || "-",
-      t.supervisorName,
-      t.sourceFarm,
-      t.totalShops.toString(),
-      t.totalBirds.toString(),
-      t.totalWeight.toFixed(2),
-    ]);
-    const filename = `Trips_${new Date().toISOString().split("T")[0]}`;
-
-    // Report the filters actually in force, so the PDF is self-describing.
-    const activeFilters = [
-      fromDate || toDate
-        ? { label: t("table.date"), value: `${fromDate || "..."} to ${toDate || "..."}` }
-        : null,
-      vehicle !== "All Vehicles" ? { label: t("common.vehicle"), value: vehicle } : null,
-      supervisor !== "All Supervisors" ? { label: t("common.supervisor"), value: supervisor } : null,
-      farm !== "All Sources" ? { label: t("ops.trip.source_farm"), value: farm } : null,
-      search ? { label: t("common.search"), value: search } : null,
-    ].filter((f): f is { label: string; value: string } => f !== null);
-
-    exportToPDF(t("ops.trip.trip_list"), headers, rows, filename, {
-      filters: activeFilters.length
-        ? activeFilters
-        : [{ label: t("common.filter"), value: t("common.all") }],
-      summary: [
-        { label: t("ops.trip.total_trips"), value: String(exportData.length) },
-        { label: t("ops.trip.total_shops"), value: String(exportData.reduce((n, r) => n + r.totalShops, 0)) },
-        { label: t("common.birds"), value: exportData.reduce((n, r) => n + r.totalBirds, 0).toLocaleString() },
-        { label: t("ops.trip.weight_kg"), value: exportData.reduce((n, r) => n + r.totalWeight, 0).toFixed(2) },
-        { label: t("operations.mortality_count"), value: String(exportData.reduce((n, r) => n + r.totalMortality, 0)) },
-      ],
-      numericColumns: [6, 7, 8],
-    });
-    showNotification(t("notification.export_success"), "success");
   };
 
   const handleExportExcel = async () => {
-    const exportData = await fetchAllFilteredTrips();
-    if (!exportData || exportData.length === 0) {
-      showNotification(t("ops.trip.no_data_export"), "error");
-      return;
+    if (exportBusyRef.current) return;
+    exportBusyRef.current = "excel";
+    try {
+      const exportData = await fetchAllFilteredTrips();
+      if (!exportData || exportData.length === 0) {
+        showNotification(t("ops.trip.no_data_export"), "error");
+        return;
+      }
+      const headers = [
+        t("operations.trip_no"),
+        t("table.date"),
+        t("common.vehicle"),
+        t("common.driver"),
+        t("common.supervisor"),
+        t("ops.trip.source_farm"),
+        t("ops.trip.shops"),
+        t("common.birds"),
+        t("ops.trip.weight_kg"),
+      ];
+      const rows = exportData.map((tripRecord) => [
+        tripRecord.tripNo,
+        tripRecord.tripDate,
+        tripRecord.vehicleNo,
+        tripRecord.driverName || "-",
+        tripRecord.supervisorName,
+        tripRecord.sourceFarm,
+        tripRecord.totalShops,
+        tripRecord.totalBirds,
+        tripRecord.totalWeight,
+      ]);
+      const filename = `Trips_${new Date().toISOString().split("T")[0]}`;
+      exportToExcel(t("ops.trip.trip_list"), headers, rows, filename);
+      showNotification(t("notification.export_success"), "success");
+    } catch {
+      showNotification(t("ops.trip.unable_load_trips"), "error");
+    } finally {
+      exportBusyRef.current = null;
     }
-    const headers = [
-      t("operations.trip_no"),
-      t("table.date"),
-      t("common.vehicle"),
-      t("common.driver"),
-      t("common.supervisor"),
-      t("ops.trip.source_farm"),
-      t("ops.trip.shops"),
-      t("common.birds"),
-      t("ops.trip.weight_kg"),
-    ];
-    const rows = exportData.map((t) => [
-      t.tripNo,
-      t.tripDate,
-      t.vehicleNo,
-      t.driverName || "-",
-      t.supervisorName,
-      t.sourceFarm,
-      t.totalShops,
-      t.totalBirds,
-      t.totalWeight,
-    ]);
-    const filename = `Trips_${new Date().toISOString().split("T")[0]}`;
-    exportToExcel(t("ops.trip.trip_list"), headers, rows, filename);
-    showNotification(t("notification.export_success"), "success");
   };
 
   const handleRefreshClick = () => {
-    void refreshTrips();
-    showNotification(t("notification.data_refreshed"), "success");
+    void refreshTrips().then((ok) => {
+      if (ok) showNotification(t("notification.data_refreshed"), "success");
+    });
   };
 
   const handleResetFilters = () => {
@@ -304,7 +481,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   };
 
   const content = (
-    <div className={`w-full space-y-5 animate-in fade-in duration-500 ${
+    <div className={`w-full space-y-5 animate-in fade-in duration-200 ${
       embedded ? '' : 'px-3 md:px-6 py-4 bg-slate-50/50 min-h-screen text-slate-800'
     }`}>
       <TripFilters
@@ -314,17 +491,17 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         supervisor={supervisor}
         farm={farm}
         search={search}
-        setFromDate={setFromDate}
-        setToDate={setToDate}
-        setVehicle={setVehicle}
-        setSupervisor={setSupervisor}
-        setFarm={setFarm}
-        setSearch={setSearch}
-        onSearch={() => {}}
+        setFromDate={setFilterFromDate}
+        setToDate={setFilterToDate}
+        setVehicle={setFilterVehicle}
+        setSupervisor={setFilterSupervisor}
+        setFarm={setFilterFarm}
+        setSearch={handleSearchChange}
+        onSearch={() => commitSearch()}
         onReset={handleResetFilters}
         vehicles={vehicleOptions}
-        supervisors={[]}
-        farms={[]}
+        supervisors={supervisorOptions}
+        farms={farmOptions}
         onExportPDF={() => void handleExportPDF()}
         onExportExcel={() => void handleExportExcel()}
         onRefresh={handleRefreshClick}
@@ -372,6 +549,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         <TripViewModalWithMasters
           trip={selectedTrip}
           onClose={() => {
+            viewRequestSeqRef.current += 1;
             setViewOpen(false);
             setSelectedTrip(null);
           }}

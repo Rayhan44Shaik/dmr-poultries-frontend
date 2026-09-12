@@ -1,8 +1,8 @@
 // src/modules/operations/vehicle-trips/components/TripRecentTable.tsx
 
-import React, { useState, useRef, useEffect, useMemo } from "react";
+import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Eye, Pencil, History, Trash2, Clock, AlertCircle, Search, FileText, CheckCircle } from "lucide-react";
+import { Eye, Pencil, History, Trash2, Clock, AlertCircle, Search, FileText, CheckCircle, X } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { canEditItem, canDeleteItem } from "../../../../utils/dateUtils";
 import { formatTripListDay } from "../utils/formatTripListDay";
@@ -15,6 +15,8 @@ import { useI18n } from "../../../../i18n";
 import { notify as globalNotify } from "../../../../ui/notifications/notificationStore";
 import { uniqueTripsById } from "../services/tripHeaderApiService";
 import { BrandRefreshButton } from "../../../../ui";
+import { ActionTooltip } from "../../../../ui/ActionTooltip";
+import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import { isOrderContainer } from "../../orders/ordersUtils";
 
 interface Props {
@@ -43,8 +45,9 @@ function TripRecentTable({
   // exist purely to hold a day's order plan. They are not trips, so they must
   // never appear here. Filtered by isOrderContainer rather than by matching the
   // "ORD-" prefix, so the rule stays tied to the actual data shape.
-  const safeTrips = uniqueTripsById(
-    (Array.isArray(trips) ? trips : []).filter((t) => !isOrderContainer(t)),
+  const safeTrips = useMemo(
+    () => uniqueTripsById((Array.isArray(trips) ? trips : []).filter((trip) => !isOrderContainer(trip))),
+    [trips]
   );
 
   /** Translate, but never surface a raw i18n key: returns "" when the key is missing. */
@@ -103,13 +106,13 @@ function TripRecentTable({
 
 
   /** Effective list status: Step 5 fully submitted must never stay under Draft. */
-  const listStatus = (t: Trip): "Draft" | "Pending" | "Completed" | "Deleted" => {
+  const listStatus = useCallback((t: Trip): "Draft" | "Pending" | "Completed" | "Deleted" => {
     if (t.deleted === true || t.status === "Deleted") return "Deleted";
     if (t.status === "Completed") return "Completed";
     // Wizard done (end/expenses submitted) OR explicit Pending → Pending tab
     if (t.status === "Pending" || isTripWizardComplete(t)) return "Pending";
     return "Draft";
-  };
+  }, []);
 
   const getStepBadge = (trip: Trip) => {
     // Completed may still exist on older sample rows — show label only (no status change option).
@@ -136,61 +139,61 @@ function TripRecentTable({
     };
   };
 
-  const filterBySearch = (trips: Trip[]) => {
-    if (!searchTerm.trim()) return trips;
-    const lower = searchTerm.toLowerCase();
-    // Collapse whitespace so "step1" and "step 1" both match "Step 1".
-    const squashed = lower.replace(/\s+/g, "");
-    return trips.filter((t) => {
-      // The status column renders a STEP BADGE, so the badge's own label is
-      // what has to be searchable ("Step 1"). Matching only the raw status
-      // field would never find the text the user can actually see.
-      const badge = getStepBadge(t).label.toLowerCase();
-      return (
-        t.tripNo.toLowerCase().includes(lower) ||
-        t.tripDate.includes(lower) ||
-        t.vehicleNo.toLowerCase().includes(lower) ||
-        t.driverName.toLowerCase().includes(lower) ||
-        t.supervisorName.toLowerCase().includes(lower) ||
-        t.sourceFarm.toLowerCase().includes(lower) ||
-        badge.includes(lower) ||
-        badge.replace(/\s+/g, "").includes(squashed) ||
-        // Also match the underlying status word (draft / pending / completed /
-        // deleted) even when the badge is showing a step instead.
-        listStatus(t).toLowerCase().includes(lower)
-      );
-    });
-  };
-
   const sortedTrips = useMemo(() => {
     const lower = searchTerm.trim().toLowerCase();
-    const filtered = lower ? safeTrips.filter((trip) =>
-      trip.tripNo.toLowerCase().includes(lower) ||
-      trip.tripDate.includes(lower) ||
-      trip.vehicleNo.toLowerCase().includes(lower) ||
-      trip.driverName.toLowerCase().includes(lower) ||
-      trip.supervisorName.toLowerCase().includes(lower) ||
-      trip.sourceFarm.toLowerCase().includes(lower)
-    ) : safeTrips;
+    const squashed = lower.replace(/\s+/g, "");
+
+    const filtered = !lower
+      ? safeTrips
+      : safeTrips.filter((trip) => {
+          const effectiveStatus = listStatus(trip);
+          const statusKey = `status.${effectiveStatus.toLowerCase()}`;
+          const translatedStatus = t(statusKey);
+          const statusLabel = translatedStatus === statusKey ? effectiveStatus : translatedStatus;
+          const nextStep = effectiveStatus === "Draft" ? getNextIncompleteTripStep(trip) + 1 : null;
+          const stepLabel = nextStep ? t("ops.trip.step_label", { step: nextStep }) : "";
+          const searchValues = [
+            trip.tripNo,
+            trip.tripDate,
+            trip.vehicleNo,
+            trip.driverName,
+            trip.supervisorName,
+            trip.sourceFarm,
+            trip.status,
+            effectiveStatus,
+            statusLabel,
+            stepLabel,
+            nextStep ? `Step ${nextStep}` : "",
+            nextStep ? `Step${nextStep}` : "",
+          ];
+
+          return searchValues.some((value) => {
+            const text = String(value ?? "").toLowerCase();
+            return text.includes(lower) || text.replace(/\s+/g, "").includes(squashed);
+          });
+        });
+
     return [...filtered].sort((a, b) => {
       if (a.tripDate !== b.tripDate) return a.tripDate < b.tripDate ? 1 : -1;
       return b.id - a.id;
     });
-  }, [safeTrips, searchTerm]);
+  }, [safeTrips, searchTerm, t, listStatus]);
 
-  const allDraft = sortedTrips.filter((t) => listStatus(t) === "Draft");
-  // Pending tab: only Pending trips. Completed leaves this list (Trip List / accounts).
-  const allPending = sortedTrips.filter((t) => listStatus(t) === "Pending");
-  const allDeleted = sortedTrips.filter((t) => listStatus(t) === "Deleted");
+  const statusBuckets = useMemo(() => ({
+    draft: sortedTrips.filter((trip) => listStatus(trip) === "Draft"),
+    pending: sortedTrips.filter((trip) => listStatus(trip) === "Pending"),
+    deleted: sortedTrips.filter((trip) => listStatus(trip) === "Deleted"),
+  }), [sortedTrips, listStatus]);
 
   /** Count beside “Recent Trip Activity” follows the selected tab (Draft/Pending/Deleted). */
   const selectedTabCount =
-    statusFilter === "Draft" ? allDraft.length : statusFilter === "Pending" ? allPending.length : allDeleted.length;
+    statusFilter === "Draft" ? statusBuckets.draft.length : statusFilter === "Pending" ? statusBuckets.pending.length : statusBuckets.deleted.length;
 
-  const filteredTrips = statusFilter === "Draft" ? allDraft : statusFilter === "Pending" ? allPending : allDeleted;
+  const filteredTrips = statusFilter === "Draft" ? statusBuckets.draft : statusFilter === "Pending" ? statusBuckets.pending : statusBuckets.deleted;
 
   const totalPages = Math.ceil(filteredTrips.length / pageSize);
-  const startIndex = (currentPage - 1) * pageSize;
+  const safeCurrentPage = Math.min(currentPage, Math.max(totalPages, 1));
+  const startIndex = (safeCurrentPage - 1) * pageSize;
   const paginatedTrips = filteredTrips.slice(startIndex, startIndex + pageSize);
 
   const selectedTrip = safeTrips.find((t) => t.id === selectedTripId) || null;
@@ -332,13 +335,15 @@ function TripRecentTable({
             <div className="h-5 w-px bg-slate-200 hidden sm:block" />
 
             <div className="flex items-center gap-1">
-              <button onClick={handleEditClick} disabled={!canEdit} className={`group h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canEdit ? "bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-500 border border-emerald-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`} title={t("ops.trip.edit_selected_trip")}>
-                <span className={`inline-flex ${canEdit ? "motion-safe:group-hover:animate-[var(--animate-action-edit)]" : ""}`}><Pencil size={13} /></span>
+              <button type="button" onClick={handleEditClick} disabled={!canEdit} className={`group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canEdit ? "bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-500 border border-emerald-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`} aria-label={t("ops.trip.edit_selected_trip")}>
+                <span className={`inline-flex ${canEdit ? uiActionIconMotionClass.edit : ""}`}><Pencil size={13} /></span>
                 <span className="hidden md:inline">{t("common.edit")}</span>
+                <ActionTooltip label={t("ops.trip.edit_selected_trip")} />
               </button>
-              <button onClick={openDeleteModal} disabled={!canDelete} className={`group h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canDelete ? "bg-rose-50/70 hover:bg-rose-50/80 text-rose-500 border border-rose-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`} title={t("ops.trip.delete_selected_trip")}>
-                <span className={`inline-flex ${canDelete ? "motion-safe:group-hover:animate-[var(--animate-action-delete)]" : ""}`}><Trash2 size={13} /></span>
+              <button type="button" onClick={openDeleteModal} disabled={!canDelete} className={`group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canDelete ? "bg-rose-50/70 hover:bg-rose-50/80 text-rose-500 border border-rose-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`} aria-label={t("ops.trip.delete_selected_trip")}>
+                <span className={`inline-flex ${canDelete ? uiActionIconMotionClass.delete : ""}`}><Trash2 size={13} /></span>
                 <span className="hidden md:inline">{t("common.delete")}</span>
+                <ActionTooltip label={t("ops.trip.delete_selected_trip")} />
               </button>
               <BrandRefreshButton onClick={() => onRefresh()} />
             </div>
@@ -372,7 +377,7 @@ function TripRecentTable({
                   const isSelected = trip.id === selectedTripId;
                   const isDeleted = trip.deleted === true;
                   return (
-                    <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-all duration-150 group ${isDeleted ? "bg-red-50/50 hover:bg-red-50/80 border-l-4 border-l-red-400" : isSelected ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200" : "hover:bg-slate-50/80"}`}>
+                    <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-colors duration-150 ${isDeleted ? "bg-red-50/50 hover:bg-red-50/80 border-l-4 border-l-red-400" : isSelected ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200" : "hover:bg-slate-50/80"}`}>
                       <td className={`px-4 py-3 font-bold text-emerald-500 text-xs whitespace-nowrap ${isDeleted ? "opacity-60 line-through" : ""}`}>
                         {trip.tripNo}
                       </td>
@@ -445,7 +450,7 @@ function TripRecentTable({
                         })()}
                       </td>
                       <td className="text-center px-4 py-3">
-                        <button onClick={(e) => { e.stopPropagation(); onView(trip); }} className="group h-8 w-8 rounded-xl bg-violet-50 hover:bg-violet-500 text-violet-600 hover:text-white flex items-center justify-center mx-auto transition-all shadow-sm active:scale-95" title={t("ops.trip.view_trip_details")}><span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]"><Eye size={14} /></span></button>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); onView(trip); }} className="group relative h-8 w-8 rounded-xl bg-violet-50 hover:bg-violet-500 text-violet-600 hover:text-white flex items-center justify-center mx-auto transition-all shadow-sm active:scale-95" aria-label={t("ops.trip.view_trip_details")}><span className={`inline-flex ${uiActionIconMotionClass.view}`}><Eye size={14} /></span><ActionTooltip label={t("ops.trip.view_trip_details")} /></button>
                       </td>
                     </tr>
                   );
@@ -461,7 +466,7 @@ function TripRecentTable({
             and shouldShowPagination() was hiding the control there entirely). */}
         {filteredTrips.length > 0 && (
           <TripPagination
-            currentPage={currentPage}
+            currentPage={safeCurrentPage}
             totalPages={Math.max(totalPages, 1)}
             onPageChange={setCurrentPage}
             pageSize={pageSize}
@@ -488,15 +493,15 @@ function TripRecentTable({
             <div className="flex items-start gap-3">
               <div className="h-10 w-10 rounded-xl bg-rose-50/70 border border-rose-100 flex items-center justify-center text-rose-500"><Trash2 size={20} /></div>
               <div className="flex-1"><h3 className="text-lg font-bold text-slate-800">{t("ops.trip.delete_trip")}</h3><p className="text-sm text-slate-500 mt-1">{t("ops.trip.delete_trip_about", { no: tripToDelete?.tripNo ?? "" })}</p></div>
-              <button onClick={cancelDelete} className="h-8 w-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400"><svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" /></svg></button>
+              <button type="button" onClick={cancelDelete} className="group relative h-8 w-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-rose-500" aria-label={t("common.close")}><X size={18} className={uiActionIconMotionClass.close} /><ActionTooltip label={t("common.close")} /></button>
             </div>
             <div className="mt-4">
               <label htmlFor="deleteReason" className="block text-sm font-medium text-slate-700">{t("ops.trip.reason")} <span className="text-rose-500">*</span></label>
               <textarea id="deleteReason" rows={3} value={deleteReason} onChange={(e) => setDeleteReason(e.target.value)} placeholder={t("ops.trip.delete_reason_placeholder")} className="mt-1 w-full rounded-xl border border-slate-200 bg-slate-50/50 px-4 py-2 text-sm text-slate-700 focus:border-rose-500 focus:ring-2 focus:ring-rose-400/20 outline-none" />
             </div>
             <div className="mt-6 flex justify-end gap-3">
-              <button onClick={cancelDelete} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all">{t("common.cancel")}</button>
-              <button onClick={confirmDelete} className="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-sm font-medium text-white transition-all shadow-sm active:scale-95">{t("ops.trip.confirm_delete")}</button>
+              <button type="button" onClick={cancelDelete} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 transition-all">{t("common.cancel")}</button>
+              <button type="button" onClick={confirmDelete} className="px-4 py-2 rounded-xl bg-rose-500 hover:bg-rose-600 text-sm font-medium text-white transition-all shadow-sm active:scale-95">{t("ops.trip.confirm_delete")}</button>
             </div>
           </div>
         </div>
