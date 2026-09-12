@@ -139,7 +139,11 @@ const formatWithUnit = (value: unknown, unit?: "KG" | "₹"): string => {
     const { main, suffix } = formatCurrency(value);
     return `${main}${suffix ? ` ${suffix}` : ""}`;
   }
-  const { main, suffix } = formatLargeNumber(safeNumber(value));
+  if (unit === "KG") {
+    const { main, suffix } = formatWeightNumber(value);
+    return `${main}${suffix ? ` ${suffix}` : ""}`;
+  }
+  const { main, suffix } = formatLargeNumber(Math.round(safeNumber(value)));
   return `${main}${suffix ? ` ${suffix}` : ""}`;
 };
 
@@ -205,7 +209,7 @@ const KPICard = memo(function KPICard({
   const rangeLabel = t("ops.dashboard.vs_prev", { days });
 
   let badgeClasses =
-    "mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ";
+    "inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ";
   let iconElement: React.ReactNode = null;
   let changeText: string;
   let badgeTitle: string;
@@ -236,7 +240,7 @@ const KPICard = memo(function KPICard({
     badgeTitle = t("ops.dashboard.kpi_no_baseline", { days });
   }
 
-  const numberSizeClass = "text-[22px]";
+  const numberSizeClass = "text-[27px]";
 
   const showBreakdown = label === "Total Expenses" && breakdown;
 
@@ -264,18 +268,23 @@ const KPICard = memo(function KPICard({
         )}
       </h2>
 
-      <div className={badgeClasses} title={badgeTitle}>
-        {iconElement}
-        {changeText}
-        <span className="font-medium text-slate-400">{rangeLabel}</span>
+      {/* One line: the change, what it is measured against, and the figure
+          itself — the badge tooltip carries the same pair in full. */}
+      <div className="mt-1 flex min-w-0 items-center gap-1.5">
+        <span className={badgeClasses} title={badgeTitle}>
+          {iconElement}
+          {changeText}
+          <span className="font-medium text-slate-400">{rangeLabel}</span>
+        </span>
+        {baseline ? (
+          <span
+            className="truncate text-[10px] font-medium text-slate-400"
+            title={t("ops.dashboard.kpi_prev_value", { value: formatWithUnit(prevValue, unit) })}
+          >
+            {t("ops.dashboard.kpi_prev_value", { value: formatWithUnit(prevValue, unit) })}
+          </span>
+        ) : null}
       </div>
-
-      {/* What it is measured against — the number, not just the ratio. */}
-      {baseline ? (
-        <p className="mt-1 truncate text-[10px] font-medium text-slate-400">
-          {t("ops.dashboard.kpi_prev_value", { value: formatWithUnit(prevValue, unit) })}
-        </p>
-      ) : null}
     </div>
   );
 

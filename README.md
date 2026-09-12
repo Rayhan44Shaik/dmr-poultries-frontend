@@ -96,8 +96,9 @@ quarter). The comparison is honest in all three cases:
 - no prior window (or a zero baseline) says "—" rather than a meaningless
   0.0%, with the reason in the tooltip.
 
-Every badge also prints what it is measured against ("was ₹31.61 L"), and
-hovering gives both figures for the period.
+Every card prints the change and what it is measured against on ONE line
+("▲ 10.2% vs prev 7d  was ₹31.61 L"), truncating rather than wrapping when the
+grid is tight, and hovering gives both figures for the period.
 
 ### Operational Trends (dashboard)
 
