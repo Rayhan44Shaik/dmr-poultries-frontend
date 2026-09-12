@@ -8,6 +8,7 @@ import {
   FileText,
   Mail,
   ShieldCheck,
+  AlertCircle,
   Loader2,
   UserCheck,
   FileDown,
@@ -25,6 +26,7 @@ import {
 import { generateTripReportPDF, type TripReportEmailInfo } from "../utils/generateTripPDF";
 import { useTripDeliveryEmails } from "../hooks/useTripDeliveryEmails";
 import { useTripDeliveryWhatsApps } from "../hooks/useTripDeliveryWhatsApps";
+import { cleanDeliveryShopName } from "../utils/shopDisplayName";
 import { useI18n } from "../../../../i18n";
 import StepStart from "./StepStart";
 import StepFarm from "./StepFarm";
@@ -117,10 +119,16 @@ function Step4View({
   trip,
   shops,
   birdTypes,
+  showCommunicationStatus,
+  emailState,
+  whatsappState,
 }: {
   trip: Trip;
   shops: Shop[];
   birdTypes: BirdType[];
+  showCommunicationStatus: boolean;
+  emailState: ReturnType<typeof useTripDeliveryEmails>;
+  whatsappState: ReturnType<typeof useTripDeliveryWhatsApps>;
 }) {
   const viewTrip: Trip = { ...trip, deliveryStepSubmitted: true };
   const deliveries = Array.isArray(trip.deliveries) ? trip.deliveries : [];
@@ -138,6 +146,19 @@ function Step4View({
       editable={false}
       boxDetails={trip.boxDetails || []}
       persistedDeliveries={deliveries}
+      showCommunicationStatus={showCommunicationStatus}
+      emailEffectiveStatus={emailState.effectiveStatus}
+      emailBusyIds={emailState.busyIds}
+      emailIsBulkSending={emailState.isBulkSending}
+      emailSendCountFor={emailState.sendCountFor}
+      emailFailureReasonFor={emailState.failureReasonFor}
+      onSendOneEmail={(delivery) => void emailState.sendOne(delivery)}
+      whatsappEffectiveStatus={whatsappState.effectiveStatus}
+      whatsappBusyIds={whatsappState.busyIds}
+      whatsappIsBulkSending={whatsappState.isBulkSending}
+      whatsappSendCountFor={whatsappState.sendCountFor}
+      whatsappFailureReasonFor={whatsappState.failureReasonFor}
+      onSendOneWhatsApp={(delivery) => void whatsappState.sendOne(delivery)}
     />
   );
 }
@@ -220,13 +241,33 @@ function TripViewModal({
             failed: emailCounts.failed,
             pending: emailCounts.pending,
             byShop: (trip.deliveries || []).map((delivery) => ({
-              shopName: delivery.shopName,
+              shopName: cleanDeliveryShopName(delivery.shopName) || delivery.shopName,
               status: emailState.effectiveStatus(delivery.id),
             })),
           }
         : null;
     await generateTripReportPDF(trip, emailInfo);
   };
+
+  const firstEmailFailure = showCommunicationStatus
+    ? (trip.deliveries || []).reduce<string | null>((message, delivery) => {
+        if (message) return message;
+        const reason = emailState.failureReasonFor(delivery.id);
+        if (!reason) return null;
+        const shopName = cleanDeliveryShopName(delivery.shopName) || delivery.shopName || t("ops.trip.shops");
+        return `${shopName}: ${reason}`;
+      }, null)
+    : null;
+
+  const firstWhatsAppFailure = showCommunicationStatus
+    ? (trip.deliveries || []).reduce<string | null>((message, delivery) => {
+        if (message) return message;
+        const reason = whatsappState.failureReasonFor(delivery.id);
+        if (!reason) return null;
+        const shopName = cleanDeliveryShopName(delivery.shopName) || delivery.shopName || t("ops.trip.shops");
+        return `${shopName}: ${reason}`;
+      }, null)
+    : null;
 
   /** Each step embeds the locked Trip Entry component (same layout + fonts). */
   const emptyStep = (
@@ -247,7 +288,16 @@ function TripViewModal({
         return trip.pickupStepSubmitted ? <Step3View trip={trip} /> : emptyStep;
       case 3:
         return isDeliveryCompleted
-          ? <Step4View trip={trip} shops={shops} birdTypes={birdTypes} />
+          ? (
+              <Step4View
+                trip={trip}
+                shops={shops}
+                birdTypes={birdTypes}
+                showCommunicationStatus={showCommunicationStatus}
+                emailState={emailState}
+                whatsappState={whatsappState}
+              />
+            )
           : emptyStep;
       case 4:
         return isEndCompleted ? <Step5View trip={trip} /> : emptyStep;
@@ -271,9 +321,23 @@ function TripViewModal({
                 <FileText className="w-6 h-6" />
               </div>
               <div className="min-w-0">
-                <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight truncate">
-                  {trip.tripNo || t("ops.trip.trip_details")}
-                </h2>
+                <div className="flex items-center gap-2 flex-wrap min-w-0">
+                  <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight truncate">
+                    {trip.tripNo || t("ops.trip.trip_details")}
+                  </h2>
+                  {firstEmailFailure && (
+                    <span className="inline-flex max-w-full sm:max-w-[360px] items-center gap-1 rounded-full border border-red-100 bg-red-50/90 px-2.5 py-0.5 text-[10px] font-semibold text-red-600" title={firstEmailFailure} role="alert">
+                      <AlertCircle size={11} className="shrink-0" />
+                      <span className="truncate">{t("ops.trip.email")}: {firstEmailFailure}</span>
+                    </span>
+                  )}
+                  {firstWhatsAppFailure && (
+                    <span className="inline-flex max-w-full sm:max-w-[360px] items-center gap-1 rounded-full border border-red-100 bg-red-50/90 px-2.5 py-0.5 text-[10px] font-semibold text-red-600" title={firstWhatsAppFailure} role="alert">
+                      <AlertCircle size={11} className="shrink-0" />
+                      <span className="truncate">{t("ops.trip.whatsapp")}: {firstWhatsAppFailure}</span>
+                    </span>
+                  )}
+                </div>
                 <div className="flex items-center gap-2 flex-wrap mt-1.5">
                   {isCompleted ? (
                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 text-white px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0">

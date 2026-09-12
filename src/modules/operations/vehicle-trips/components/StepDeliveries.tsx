@@ -9,6 +9,8 @@ import { getDeliveriesBalanceError } from "../../../../shared/trip/validation";
 import { StepCloseButton } from "./WizardStepUI";
 import { TripNoBadge } from "./TripNoBadge";
 import { useI18n } from "../../../../i18n";
+import type { DeliveryEmailStatusValue } from "../services/deliveryEmailService";
+import type { DeliveryWhatsAppStatusValue } from "../services/deliveryWhatsAppService";
 
 interface Props {
   rows: ShopDelivery[];
@@ -29,6 +31,19 @@ interface Props {
   onExitEdit?: () => void;
   boxDetails?: BoxDetail[];
   persistedDeliveries?: ShopDelivery[];
+  showCommunicationStatus?: boolean;
+  emailEffectiveStatus?: (deliveryId: number) => DeliveryEmailStatusValue;
+  emailBusyIds?: Set<number>;
+  emailIsBulkSending?: boolean;
+  emailSendCountFor?: (deliveryId: number) => number;
+  emailFailureReasonFor?: (deliveryId: number) => string | null;
+  onSendOneEmail?: (delivery: ShopDelivery) => void;
+  whatsappEffectiveStatus?: (deliveryId: number) => DeliveryWhatsAppStatusValue;
+  whatsappBusyIds?: Set<number>;
+  whatsappIsBulkSending?: boolean;
+  whatsappSendCountFor?: (deliveryId: number) => number;
+  whatsappFailureReasonFor?: (deliveryId: number) => string | null;
+  onSendOneWhatsApp?: (delivery: ShopDelivery) => void;
 }
 
 export default function StepDeliveries({
@@ -48,6 +63,19 @@ export default function StepDeliveries({
   onExitEdit,
   boxDetails = [],
   persistedDeliveries,
+  showCommunicationStatus = false,
+  emailEffectiveStatus,
+  emailBusyIds,
+  emailIsBulkSending,
+  emailSendCountFor,
+  emailFailureReasonFor,
+  onSendOneEmail,
+  whatsappEffectiveStatus,
+  whatsappBusyIds,
+  whatsappIsBulkSending,
+  whatsappSendCountFor,
+  whatsappFailureReasonFor,
+  onSendOneWhatsApp,
 }: Props) {
   const { t } = useI18n();
 
@@ -205,6 +233,19 @@ export default function StepDeliveries({
         balanceError={validationResult.balanceError}
         tripBirdTypeId={trip.birdTypeId}
         tripBirdType={trip.birdType}
+        showCommunicationStatus={showCommunicationStatus}
+        emailEffectiveStatus={emailEffectiveStatus}
+        emailBusyIds={emailBusyIds}
+        emailIsBulkSending={emailIsBulkSending}
+        emailSendCountFor={emailSendCountFor}
+        emailFailureReasonFor={emailFailureReasonFor}
+        onSendOneEmail={onSendOneEmail}
+        whatsappEffectiveStatus={whatsappEffectiveStatus}
+        whatsappBusyIds={whatsappBusyIds}
+        whatsappIsBulkSending={whatsappIsBulkSending}
+        whatsappSendCountFor={whatsappSendCountFor}
+        whatsappFailureReasonFor={whatsappFailureReasonFor}
+        onSendOneWhatsApp={onSendOneWhatsApp}
       />
     </div>
   );

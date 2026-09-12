@@ -21,6 +21,8 @@ import { computeDeliveryKpiTotals } from "./deliveryKpis";
 import { formatIstStamp } from "../../services/tripHeaderApiService";
 import type { DeliveriesBalanceError } from "../../../../../shared/trip/validation";
 import type { ShopDelivery, BoxDetail, Trip } from "../../types/trip";
+import type { DeliveryEmailStatusValue } from "../../services/deliveryEmailService";
+import type { DeliveryWhatsAppStatusValue } from "../../services/deliveryWhatsAppService";
 import { WizardActionBar, WizardStepNotice } from "../WizardStepUI";
 import { useI18n } from "../../../../../i18n";
 
@@ -52,6 +54,19 @@ interface Props {
   balanceErrorShown?: boolean;
   tripBirdTypeId?: number;
   tripBirdType?: string;
+  showCommunicationStatus?: boolean;
+  emailEffectiveStatus?: (deliveryId: number) => DeliveryEmailStatusValue;
+  emailBusyIds?: Set<number>;
+  emailIsBulkSending?: boolean;
+  emailSendCountFor?: (deliveryId: number) => number;
+  emailFailureReasonFor?: (deliveryId: number) => string | null;
+  onSendOneEmail?: (delivery: ShopDelivery) => void;
+  whatsappEffectiveStatus?: (deliveryId: number) => DeliveryWhatsAppStatusValue;
+  whatsappBusyIds?: Set<number>;
+  whatsappIsBulkSending?: boolean;
+  whatsappSendCountFor?: (deliveryId: number) => number;
+  whatsappFailureReasonFor?: (deliveryId: number) => string | null;
+  onSendOneWhatsApp?: (delivery: ShopDelivery) => void;
 }
 
 // ─── Confirmation Modal Component ───────────────────────────────────
@@ -305,6 +320,19 @@ export default function UnLoadingTable({
   balanceErrorShown = false,
   tripBirdTypeId,
   tripBirdType,
+  showCommunicationStatus = false,
+  emailEffectiveStatus,
+  emailBusyIds,
+  emailIsBulkSending,
+  emailSendCountFor,
+  emailFailureReasonFor,
+  onSendOneEmail,
+  whatsappEffectiveStatus,
+  whatsappBusyIds,
+  whatsappIsBulkSending,
+  whatsappSendCountFor,
+  whatsappFailureReasonFor,
+  onSendOneWhatsApp,
 }: Props) {
   const { t } = useI18n();
   const safeRows = rows ?? [];
@@ -1233,21 +1261,38 @@ export default function UnLoadingTable({
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                {currentRows.map((row) => (
-                  <ShopDeliveryCard
-                    key={row.id}
-                    row={row as any}
-                    readOnly={readOnly}
-                    onEdit={(selectedRow) => {
-                      if (onEditShop) {
-                        onEditShop(selectedRow.id);
-                      } else {
-                        openEditForm(selectedRow);
-                      }
-                    }}
-                    onPDF={handleDownloadPDF}
-                  />
-                ))}
+                {currentRows.map((row) => {
+                  const emailStatus = emailEffectiveStatus?.(row.id) ?? "pending";
+                  const whatsappStatus = whatsappEffectiveStatus?.(row.id) ?? "pending";
+                  return (
+                    <ShopDeliveryCard
+                      key={row.id}
+                      row={row as any}
+                      readOnly={readOnly}
+                      onEdit={(selectedRow) => {
+                        if (onEditShop) {
+                          onEditShop(selectedRow.id);
+                        } else {
+                          openEditForm(selectedRow);
+                        }
+                      }}
+                      onPDF={handleDownloadPDF}
+                      communicationEnabled={showCommunicationStatus}
+                      emailStatus={emailStatus}
+                      emailSending={(emailBusyIds?.has(row.id) ?? false) || emailStatus === "sending"}
+                      emailSendCount={emailSendCountFor?.(row.id) ?? 0}
+                      emailDisabled={emailIsBulkSending}
+                      emailFailureReason={emailFailureReasonFor?.(row.id) ?? null}
+                      onSendEmail={onSendOneEmail}
+                      whatsappStatus={whatsappStatus}
+                      whatsappSending={(whatsappBusyIds?.has(row.id) ?? false) || whatsappStatus === "sending"}
+                      whatsappSendCount={whatsappSendCountFor?.(row.id) ?? 0}
+                      whatsappDisabled={whatsappIsBulkSending}
+                      whatsappFailureReason={whatsappFailureReasonFor?.(row.id) ?? null}
+                      onSendWhatsApp={onSendOneWhatsApp}
+                    />
+                  );
+                })}
               </div>
             )}
           </div>

@@ -1,14 +1,30 @@
-import { Box, Users, Scale, Clock, Pencil, FileText, Package, AlertCircle } from "lucide-react";
+import { Box, Users, Scale, Clock, Pencil, FileText, Package, AlertCircle, Mail, Loader2 } from "lucide-react";
 import type { ShopDelivery } from "../../types/trip";
 import type { ShopDeliveryWithExtra } from "./useShopDeliveryForm";
 import { useI18n } from "../../../../../i18n";
 import { cleanDeliveryShopName } from "../../utils/shopDisplayName";
+import { WhatsAppIcon } from "../../../../../ui/WhatsAppIcon";
+import type { DeliveryEmailStatusValue } from "../../services/deliveryEmailService";
+import type { DeliveryWhatsAppStatusValue } from "../../services/deliveryWhatsAppService";
 
 interface Props {
   row: ShopDeliveryWithExtra;
   readOnly: boolean;
   onEdit: (row: ShopDelivery) => void;
   onPDF: (row: ShopDeliveryWithExtra) => void;
+  communicationEnabled?: boolean;
+  emailStatus?: DeliveryEmailStatusValue;
+  emailSending?: boolean;
+  emailSendCount?: number;
+  emailDisabled?: boolean;
+  emailFailureReason?: string | null;
+  onSendEmail?: (row: ShopDelivery) => void;
+  whatsappStatus?: DeliveryWhatsAppStatusValue;
+  whatsappSending?: boolean;
+  whatsappSendCount?: number;
+  whatsappDisabled?: boolean;
+  whatsappFailureReason?: string | null;
+  onSendWhatsApp?: (row: ShopDelivery) => void;
 }
 
 /** Soft, low-eye-strain tints for box-number chips in the card. */
@@ -21,7 +37,77 @@ const BOX_CHIP_PALETTE = [
   "bg-rose-50/70 text-rose-500 border-rose-100",
 ];
 
-export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props) {
+function DeliveryCommunicationButton({
+  channel,
+  status = "pending",
+  sending = false,
+  sendCount = 0,
+  disabled = false,
+  title,
+  onClick,
+}: {
+  channel: "mail" | "whatsapp";
+  status?: DeliveryEmailStatusValue | DeliveryWhatsAppStatusValue;
+  sending?: boolean;
+  sendCount?: number;
+  disabled?: boolean;
+  title: string;
+  onClick: () => void;
+}) {
+  const isWhatsApp = channel === "whatsapp";
+  const Icon = isWhatsApp ? WhatsAppIcon : Mail;
+  const isSending = sending || status === "sending";
+  const isFailed = status === "failed" && !isSending;
+  const visibleCount = status === "sent" ? Math.max(1, Number(sendCount) || 0) : Math.max(0, Number(sendCount) || 0);
+
+  const className = isFailed
+    ? "bg-red-50/90 hover:bg-red-100 text-red-600 border-red-200"
+    : isWhatsApp
+      ? "bg-[#25D366]/10 hover:bg-[#25D366]/15 text-[#25D366] border-[#25D366]/25"
+      : "bg-red-50/90 hover:bg-red-100 text-red-500 border-red-100";
+
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || isSending}
+      className={`relative p-1.5 rounded-lg border transition-colors flex items-center justify-center active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${className} ${
+        isSending ? "motion-safe:animate-pulse" : ""
+      }`}
+      title={title}
+      aria-label={title}
+    >
+      {isSending ? <Loader2 size={13} className="animate-spin stroke-[2.5]" /> : <Icon size={13} className="stroke-[2]" />}
+      {visibleCount > 0 && (
+        <span className={`absolute -top-1.5 -right-1.5 flex h-4 min-w-4 items-center justify-center rounded-full px-1 text-[9px] font-extrabold leading-none text-white ring-2 ring-white ${
+          isWhatsApp ? "bg-[#25D366]" : "bg-red-500"
+        }`}>
+          {visibleCount > 9 ? "9+" : visibleCount}
+        </span>
+      )}
+    </button>
+  );
+}
+
+export default function ShopDeliveryCard({
+  row,
+  readOnly,
+  onEdit,
+  onPDF,
+  communicationEnabled = false,
+  emailStatus = "pending",
+  emailSending = false,
+  emailSendCount = 0,
+  emailDisabled = false,
+  emailFailureReason,
+  onSendEmail,
+  whatsappStatus = "pending",
+  whatsappSending = false,
+  whatsappSendCount = 0,
+  whatsappDisabled = false,
+  whatsappFailureReason,
+  onSendWhatsApp,
+}: Props) {
   const { t } = useI18n();
   const isWeightMode = row.deliveryMode === "weight";
   const selectedBoxes = row.selectedBoxIds || [];
@@ -55,7 +141,29 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
             </p>
           </div>
 
-          <div className="flex items-center gap-1 shrink-0">
+          <div className="flex items-center gap-2.5 shrink-0">
+            {communicationEnabled && onSendEmail && (
+              <DeliveryCommunicationButton
+                channel="mail"
+                status={emailStatus}
+                sending={emailSending}
+                sendCount={emailSendCount}
+                disabled={emailDisabled}
+                title={emailFailureReason || t("ops.trip.send_email")}
+                onClick={() => onSendEmail(row)}
+              />
+            )}
+            {communicationEnabled && onSendWhatsApp && (
+              <DeliveryCommunicationButton
+                channel="whatsapp"
+                status={whatsappStatus}
+                sending={whatsappSending}
+                sendCount={whatsappSendCount}
+                disabled={whatsappDisabled}
+                title={whatsappFailureReason || t("ops.trip.send_whatsapp")}
+                onClick={() => onSendWhatsApp(row)}
+              />
+            )}
             {!readOnly && (
               <button
                 onClick={() => onEdit(row)}
