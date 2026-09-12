@@ -84,13 +84,13 @@ only run on hover / keyboard focus, never on the active row, and the global
 
 ### Operational Trends (dashboard)
 
-Operations → **Overview** leads with the Operational Trends chart (the first
-card). It is the weight story of the completed trips in the range the global
-calendar is showing:
+Operations → **Overview** leads with **Trips & weight movement** (eyebrow:
+"Farm to shop") — the first card, and the weight story of the completed trips
+in the window it is reading:
 
 | Series | Encoding |
 |---|---|
-| Trips | Indigo line, right axis |
+| Trips | Indigo line with a soft gradient area, right axis |
 | Farm weight | The height of the stacked bar (kg) |
 | Delivered weight | Emerald segment |
 | Mortality weight | Rose segment |
@@ -99,28 +99,27 @@ calendar is showing:
 `farm = delivered + mortality + loss` holds for every trip, so the three
 segments stack to exactly the farm weight — one bar carries all four weight
 numbers at once. **Share of farm** re-reads the same data as a 100% stack, so a
-quiet week and a heavy one can be compared by shape.
+quiet bucket and a heavy one can be compared by shape.
 
-- **Range:** the chart reads the same window as the KPI cards — moving the
-  calendar refetches it, and the default bucket follows the range (≤21 days →
-  daily, ≤70 → weekly, beyond that → monthly). Because the default is derived
-  and never persisted, a reload or hard refresh always opens on the calendar's
-  own view; the chip row still lets the reader switch daily / weekly / monthly.
-- **Counts:** today's, this week's and this month's trip totals sit under the
-  heading, and the footer keeps the whole period in numbers — trips, farm
-  weight, delivered weight, mortality and weight loss, each with its share or
-  per-bucket average.
-- **Tooltip:** hover any bucket for trips, farm / delivered / mortality / loss
-  weight with each one's share of the farm weight, birds lost and its share of
-  the load, kg and birds per trip, and the ▲▼ change against the previous
-  bucket.
-- **Source of truth:** rows come from the completed-trips analysis endpoint —
-  the same one the Weight Loss / Mortality page reads — so the two can never
-  disagree, and nothing is re-derived beyond summing the server's numbers into
-  buckets (`utils/trendSeries.ts`, exercised without a browser).
+**Range** — the header carries a `Range · Today · Week · Month` switcher, and
+each option shows its own trip count, so the numbers people ask for first *are*
+the control. `Range` follows the global calendar (the default, and what a reload
+or hard refresh lands on); the others show today, the last 7 days or the last 30
+days without touching the calendar. The bucket follows the window: a week reads
+daily, a month reads weekly, a quarter reads monthly — the small
+Daily / Weekly / Monthly chips still override it.
 
-"Mortality & weight loss →" in the card header opens that page for the detail
-behind the bars.
+**Reading it** — the footer is also the legend: trips, farm weight, delivered
+weight, mortality and weight loss, each with its share of the farm weight or its
+per-bucket average. Hover any bucket for every weight with its share, birds lost
+and its share of the load, kg and birds per trip, and the ▲▼ change against the
+previous bucket.
+
+Rows come from the completed-trips analysis endpoint — the same one the Weight
+Loss / Mortality page reads — so the two can never disagree, and nothing is
+re-derived beyond summing the server's numbers into buckets
+(`utils/trendSeries.ts`, exercised without a browser). The card **title itself**
+is the link to that page, so there is no second "view details" affordance.
 
 ### Masters
 

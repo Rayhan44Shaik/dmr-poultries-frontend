@@ -22,6 +22,7 @@
 
 import { useMemo, useState } from "react";
 import {
+  Area,
   Bar,
   CartesianGrid,
   ComposedChart,
@@ -295,40 +296,54 @@ export default function OperationalTrendsChart({
           })}
         </div>
 
-        <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
-          {(["weight", "share"] as Mode[]).map((value) => (
-            <button
-              key={value}
-              type="button"
-              onClick={() => setMode(value)}
-              aria-pressed={mode === value}
-              className={`rounded-[6px] px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide transition-colors ${
-                mode === value ? "bg-white text-slate-800 shadow-sm" : "text-slate-400 hover:text-slate-600"
-              }`}
-            >
-              {t(value === "weight" ? "ops.dashboard.trend.mode_weight" : "ops.dashboard.trend.mode_share")}
-            </button>
-          ))}
+        <div className="flex items-center gap-2">
+          <span className="hidden text-[11px] font-medium text-slate-400 lg:block">
+            {mode === "weight"
+              ? t("ops.dashboard.trend.mode_weight_hint")
+              : t("ops.dashboard.trend.mode_share_hint")}
+          </span>
+          <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5">
+            {(["weight", "share"] as Mode[]).map((value) => (
+              <button
+                key={value}
+                type="button"
+                onClick={() => setMode(value)}
+                aria-pressed={mode === value}
+                className={`rounded-[6px] px-2.5 py-1 text-[11px] font-extrabold uppercase tracking-wide transition-colors ${
+                  mode === value ? "bg-white text-slate-800 shadow-sm" : "text-slate-400 hover:text-slate-600"
+                }`}
+              >
+                {t(value === "weight" ? "ops.dashboard.trend.mode_weight" : "ops.dashboard.trend.mode_share")}
+              </button>
+            ))}
+          </div>
         </div>
-      </div>
-
-      {/* ── Legend ──────────────────────────────────────────────────── */}
-      <div className="mb-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-slate-500">
-        <LegendDot color={COLOR.trips} label={t("ops.dashboard.trips")} shape="line" />
-        <LegendDot color={COLOR.delivered} label={t("ops.dashboard.trend.delivered_weight")} />
-        <LegendDot color={COLOR.mortality} label={t("ops.dashboard.trend.mortality_weight")} />
-        <LegendDot color={COLOR.weightLoss} label={t("ops.dashboard.trend.weight_loss")} />
-        <span className="text-slate-400">
-          {mode === "weight"
-            ? t("ops.dashboard.trend.mode_weight_hint")
-            : t("ops.dashboard.trend.mode_share_hint")}
-        </span>
       </div>
 
       {/* ── Plot ─────────────────────────────────────────────────────── */}
       <div className="h-[250px] w-full">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data} margin={{ top: 8, right: 4, bottom: 0, left: -8 }}>
+          <ComposedChart data={data} margin={{ top: 10, right: 2, bottom: 0, left: -8 }}>
+            <defs>
+              {/* Soft fill under the trips line, and a little depth on the bars. */}
+              <linearGradient id="ot-trips-area" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={COLOR.trips} stopOpacity={0.22} />
+                <stop offset="100%" stopColor={COLOR.trips} stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="ot-delivered" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={COLOR.delivered} stopOpacity={1} />
+                <stop offset="100%" stopColor={COLOR.delivered} stopOpacity={0.72} />
+              </linearGradient>
+              <linearGradient id="ot-mortality" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={COLOR.mortality} stopOpacity={1} />
+                <stop offset="100%" stopColor={COLOR.mortality} stopOpacity={0.78} />
+              </linearGradient>
+              <linearGradient id="ot-loss" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor={COLOR.weightLoss} stopOpacity={1} />
+                <stop offset="100%" stopColor={COLOR.weightLoss} stopOpacity={0.78} />
+              </linearGradient>
+            </defs>
+
             <CartesianGrid stroke="#f1f5f9" vertical={false} />
             <XAxis
               dataKey="date"
@@ -382,7 +397,7 @@ export default function OperationalTrendsChart({
                   dataKey="deliveredWeight"
                   stackId="wt"
                   name={t("ops.dashboard.trend.delivered_weight")}
-                  fill={COLOR.delivered}
+                  fill="url(#ot-delivered)"
                   maxBarSize={30}
                   isAnimationActive={false}
                 />
@@ -391,7 +406,7 @@ export default function OperationalTrendsChart({
                   dataKey="mortalityWeight"
                   stackId="wt"
                   name={t("ops.dashboard.trend.mortality_weight")}
-                  fill={COLOR.mortality}
+                  fill="url(#ot-mortality)"
                   maxBarSize={30}
                   isAnimationActive={false}
                 />
@@ -400,7 +415,7 @@ export default function OperationalTrendsChart({
                   dataKey="lossBar"
                   stackId="wt"
                   name={t("ops.dashboard.trend.weight_loss")}
-                  fill={COLOR.weightLoss}
+                  fill="url(#ot-loss)"
                   radius={[4, 4, 0, 0]}
                   maxBarSize={30}
                   isAnimationActive={false}
@@ -426,7 +441,7 @@ export default function OperationalTrendsChart({
                   dataKey="deliveredPct"
                   stackId="share"
                   name={t("ops.dashboard.trend.delivered_weight")}
-                  fill={COLOR.delivered}
+                  fill="url(#ot-delivered)"
                   maxBarSize={34}
                   isAnimationActive={false}
                 />
@@ -435,7 +450,7 @@ export default function OperationalTrendsChart({
                   dataKey="mortalityPct"
                   stackId="share"
                   name={t("ops.dashboard.trend.mortality_weight")}
-                  fill={COLOR.mortality}
+                  fill="url(#ot-mortality)"
                   maxBarSize={34}
                   isAnimationActive={false}
                 />
@@ -444,7 +459,7 @@ export default function OperationalTrendsChart({
                   dataKey="weightLossPct"
                   stackId="share"
                   name={t("ops.dashboard.trend.weight_loss")}
-                  fill={COLOR.weightLoss}
+                  fill="url(#ot-loss)"
                   radius={[4, 4, 0, 0]}
                   maxBarSize={34}
                   isAnimationActive={false}
@@ -452,15 +467,23 @@ export default function OperationalTrendsChart({
               </>
             )}
 
+            <Area
+              yAxisId="trips"
+              type="monotone"
+              dataKey="trips"
+              stroke="none"
+              fill="url(#ot-trips-area)"
+              isAnimationActive={false}
+            />
             <Line
               yAxisId="trips"
               type="monotone"
               dataKey="trips"
               name={t("ops.dashboard.trips")}
               stroke={COLOR.trips}
-              strokeWidth={2}
+              strokeWidth={2.2}
               dot={{ r: 2.6, fill: COLOR.trips, strokeWidth: 0 }}
-              activeDot={{ r: 4.5 }}
+              activeDot={{ r: 4.5, strokeWidth: 2, stroke: "#fff" }}
               isAnimationActive={false}
             />
           </ComposedChart>
@@ -507,27 +530,6 @@ export default function OperationalTrendsChart({
         </p>
       ) : null}
     </div>
-  );
-}
-
-function LegendDot({
-  color,
-  label,
-  shape = "square",
-}: {
-  color: string;
-  label: string;
-  shape?: "square" | "line";
-}) {
-  return (
-    <span className="flex items-center gap-1.5">
-      {shape === "line" ? (
-        <span className="h-[3px] w-4 rounded-full" style={{ backgroundColor: color }} />
-      ) : (
-        <span className="h-2 w-2 rounded-sm" style={{ backgroundColor: color }} />
-      )}
-      {label}
-    </span>
   );
 }
 

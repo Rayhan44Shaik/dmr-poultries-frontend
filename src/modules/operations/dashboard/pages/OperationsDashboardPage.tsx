@@ -1,6 +1,6 @@
 // src/modules/operations/dashboard/pages/OperationsDashboardPage.tsx
 
-import { useState, useRef, useEffect, type CSSProperties } from "react";
+import { useState, useRef, useEffect, useMemo, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { addDays, subMonths } from "date-fns";
 import { useDashboardData } from "../hooks/useDashboardData";
@@ -13,7 +13,7 @@ import RecentTripsTable from "../components/RecentTripsTable";
 import ActiveCounts from "../components/ActiveCounts";
 import PendingCollectionsByShop from "../components/PendingCollectionsByShop";
 import PendingApprovalsPanel from "../components/PendingApprovalsPanel";
-import { Calendar, CalendarClock, CalendarDays, CalendarRange, ChevronDown, DatabaseZap, Layers, ArrowRightLeft, RefreshCw } from "lucide-react";
+import { Calendar, CalendarClock, CalendarDays, CalendarRange, ChevronDown, DatabaseZap, Layers, ArrowRightLeft, ArrowUpRight, RefreshCw } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import { useI18n } from "../../../../i18n";
 import { kickApprovalSnapshot } from "../../../approvals/services/approvalSnapshot";
@@ -54,6 +54,15 @@ const toInputDateString = (date: Date | undefined): string => {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+};
+
+// -------- Helper: inclusive day count between two YYYY-MM-DD strings --------
+const daysBetween = (from: string, to: string): number | undefined => {
+  if (!from || !to) return undefined;
+  const start = new Date(`${from}T00:00:00`).getTime();
+  const end = new Date(`${to}T00:00:00`).getTime();
+  if (!Number.isFinite(start) || !Number.isFinite(end)) return undefined;
+  return Math.round((end - start) / 86_400_000) + 1;
 };
 
 // -------- Helper: Parse YYYY-MM-DD string to Date object safely --------
@@ -388,13 +397,63 @@ function RangeDatePicker({
   );
 }
 
-/** Small "Today 9" chip — the trip counts under the chart heading. */
-function TripCountPill({ label, value }: { label: string; value: number }) {
+/** Which window the Operational Trends chart is reading. `range` follows the
+ *  global calendar; the others are quick windows of their own. */
+type TrendView = "range" | "today" | "week" | "month";
+
+interface TrendViewOption {
+  key: TrendView;
+  label: string;
+  count: number;
+}
+
+/**
+ * Segmented switcher sitting in the card header. Each option carries its trip
+ * count, so the numbers people ask for first are also the control: pick one and
+ * the chart redraws for that window.
+ */
+function TrendViewSwitcher({
+  views,
+  active,
+  onChange,
+  label,
+}: {
+  views: TrendViewOption[];
+  active: TrendView;
+  onChange: (next: TrendView) => void;
+  label: string;
+}) {
   return (
-    <span className="inline-flex items-baseline gap-1 rounded-full border border-slate-100 bg-slate-50 px-2 py-0.5 text-[10.5px] font-bold text-slate-500">
-      {label}
-      <span className="text-[11.5px] font-black tabular-nums text-slate-800">{value}</span>
-    </span>
+    <div
+      role="tablist"
+      aria-label={label}
+      className="inline-flex shrink-0 rounded-lg border border-slate-200 bg-slate-50 p-0.5"
+    >
+      {views.map((view) => {
+        const selected = view.key === active;
+        return (
+          <button
+            key={view.key}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            onClick={() => onChange(view.key)}
+            className={`flex items-baseline gap-1.5 rounded-[6px] px-2.5 py-1 text-[10.5px] font-extrabold uppercase tracking-wide transition-colors ${
+              selected ? "bg-white text-slate-800 shadow-sm" : "text-slate-400 hover:text-slate-600"
+            }`}
+          >
+            {view.label}
+            <span
+              className={`text-[11.5px] font-black tabular-nums ${
+                selected ? "text-slate-900" : "text-slate-500"
+              }`}
+            >
+              {view.count}
+            </span>
+          </button>
+        );
+      })}
+    </div>
   );
 }
 
@@ -418,14 +477,28 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
     ? Math.ceil((endDate!.getTime() - startDate!.getTime()) / (1000 * 60 * 60 * 24)) + 1
     : undefined;
 
-  // The chart reads the SAME calendar window as the KPI cards, and its default
-  // bucket follows that window's length — so a reload always opens on the
-  // calendar's own view rather than a remembered toggle.
-  const trendsQuery = useOperationalTrends(
-    toInputDateString(startDate) || undefined,
-    toInputDateString(endDate) || undefined
-  );
-  const defaultGranularity = granularityForRange(rangeDays);
+  // The chart reads the SAME calendar window as the KPI cards by default, and
+  // its bucket follows that window's length — so a reload always opens on the
+  // calendar's own view. The header chips can override the window (today /
+  // last 7 days / last 30 days) without touching the global calendar.
+  const [trendView, setTrendView] = useState<TrendView>("range");
+  const calendarFrom = toInputDateString(startDate);
+  const calendarTo = toInputDateString(endDate);
+
+  const trendRange = useMemo(() => {
+    const today = toInputDateString(todayMidnight());
+    if (trendView === "today") return { from: today, to: today };
+    if (trendView === "week") {
+      return { from: toInputDateString(addDays(todayMidnight(), -6)), to: today };
+    }
+    if (trendView === "month") {
+      return { from: toInputDateString(addDays(todayMidnight(), -29)), to: today };
+    }
+    return { from: calendarFrom, to: calendarTo };
+  }, [trendView, calendarFrom, calendarTo]);
+
+  const trendsQuery = useOperationalTrends(trendRange.from || undefined, trendRange.to || undefined);
+  const defaultGranularity = granularityForRange(daysBetween(trendRange.from, trendRange.to));
 
   const handleRangeChange = (s: Date | undefined, e: Date | undefined) => {
     setStartDate(s);
@@ -447,6 +520,15 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
       window.setTimeout(() => setRefreshing(false), 450);
     }
   };
+
+  // Trip counts ride along with the switcher, so the numbers and the control
+  // are the same thing.
+  const trendViews: TrendViewOption[] = [
+    { key: "range", label: t("ops.dashboard.trend.range"), count: data?.totalTrips ?? 0 },
+    { key: "today", label: t("ops.dashboard.trend.today"), count: data?.todaysTrips ?? 0 },
+    { key: "week", label: t("ops.dashboard.trend.week"), count: data?.weeklyTrips ?? 0 },
+    { key: "month", label: t("ops.dashboard.trend.month"), count: data?.monthlyTrips ?? 0 },
+  ];
 
   const rangePicker = (
     <RangeDatePicker
@@ -562,26 +644,40 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0">
-          <div className="flex items-start justify-between gap-3">
+          <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
             <div className="min-w-0">
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.time_series")}</span>
-              <h3 className="text-sm font-black text-slate-800 mt-0.5">{t("ops.dashboard.operational_trends")}</h3>
-              {/* Trip counts for the three windows people ask about first. */}
-              <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                <TripCountPill label={t("ops.dashboard.trend.today")} value={data?.todaysTrips ?? 0} />
-                <TripCountPill label={t("ops.dashboard.trend.week")} value={data?.weeklyTrips ?? 0} />
-                <TripCountPill label={t("ops.dashboard.trend.month")} value={data?.monthlyTrips ?? 0} />
-              </div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">
+                {t("ops.dashboard.trend.eyebrow")}
+              </span>
+              {/* The title is the way through to the detail page — no second link. */}
+              <Link
+                to="/operations?tab=mortality"
+                title={t("ops.dashboard.trend.view_mortality")}
+                className="group/title mt-0.5 flex items-center gap-1.5"
+              >
+                <h3 className="text-sm font-black text-slate-800 transition-colors group-hover/title:text-emerald-600">
+                  {t("ops.dashboard.trend.title")}
+                </h3>
+                <ArrowUpRight
+                  size={13}
+                  strokeWidth={2.6}
+                  className="text-slate-300 transition-all duration-150 group-hover/title:-translate-y-[1px] group-hover/title:translate-x-[1px] group-hover/title:text-emerald-600"
+                />
+              </Link>
             </div>
-            <Link
-              to="/operations?tab=mortality"
-              className="shrink-0 text-[11px] font-bold text-blue-600 hover:underline"
-            >
-              {t("ops.dashboard.trend.view_mortality")} →
-            </Link>
+            <TrendViewSwitcher
+              views={trendViews}
+              active={trendView}
+              onChange={setTrendView}
+              label={t("ops.dashboard.trend.bucket_by")}
+            />
           </div>
           <div className="w-full overflow-hidden">
             <OperationalTrendsChart
+              /* Remount when the window changes so the bucket resets to the
+                 default the new window implies (daily for a week, weekly for a
+                 month), while a plain reload still lands on the calendar. */
+              key={`${trendView}:${trendRange.from}:${trendRange.to}`}
               trends={trendsQuery.trends}
               defaultGranularity={defaultGranularity}
               loading={trendsQuery.loading}
