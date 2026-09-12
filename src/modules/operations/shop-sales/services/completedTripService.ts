@@ -15,14 +15,14 @@ import {
 
 /** Trips currently eligible for Rate Entry (Completed, not deleted, not
  * rate-locked) — the backend query is the authority. */
-async function getCompletedTrips(): Promise<Trip[]> {
-  return listEligibleTrips();
+async function getCompletedTrips(options: { signal?: AbortSignal } = {}): Promise<Trip[]> {
+  return listEligibleTrips(options);
 }
 
 /** Loads a single trip's Rate Entry detail (shop-wise deliveries + market
  * reference) from GET /operations/rate-entry/:tripId. */
-async function getTrip(id: number): Promise<Trip> {
-  return getRateEntryTrip(id);
+async function getTrip(id: number, options: { signal?: AbortSignal } = {}): Promise<Trip> {
+  return getRateEntryTrip(id, options);
 }
 
 /** Saves shop-wise rates via PUT /operations/rate-entry/:tripId. Does NOT

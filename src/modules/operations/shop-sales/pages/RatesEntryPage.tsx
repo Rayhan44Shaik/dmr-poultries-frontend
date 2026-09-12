@@ -1,27 +1,39 @@
+import { useRef } from "react";
 import useCompletedTrips from "../hooks/useCompletedTrips";
 import CompletedTripsFilters from "../components/CompletedTripsFilters";
 import CompletedTripsTable from "../components/CompletedTripsTable";
 import EnterRateModal from "../components/EnterRateModal";
-import TripPagination from "../../vehicle-trips/components/TripPagination";
+import { Pagination } from "../../../../ui/Pagination";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import TripKPICards from "../../vehicle-trips/components/TripKPICards";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
 import { opsPageClass, opsEmptyStateClass } from "../../../../shared/ui/operationsStyles";
+import { formatTripListDay } from "../../vehicle-trips/utils/formatTripListDay";
+import { formatVehicleNumber } from "../../../../utils/format";
+import { useI18n } from "../../../../i18n";
 
 type Props = {
   embedded?: boolean;
 };
 
-export default function RatesEntryPage({ embedded: _embedded = false }: Props) {
+export default function RatesEntryPage({ embedded = false }: Props) {
+  void embedded;
+  const { t } = useI18n();
   const { showNotification } = useSafeNotification();
+  const exportBusyRef = useRef<"pdf" | "excel" | null>(null);
 
   const {
     filteredTrips,
     paginatedTrips,
     currentPage,
+    pageSize,
     totalPages,
     setCurrentPage,
+    setPageSize,
+    sortBy,
+    sortDir,
+    handleSortChange,
     filter,
     setFilter,
     resetFilters,
@@ -34,7 +46,9 @@ export default function RatesEntryPage({ embedded: _embedded = false }: Props) {
     closeRateEntry,
     saveTrip,
     saveAndLockTrip,
+    loadTrips,
     loadError,
+    isLoading,
     isSaving,
   } = useCompletedTrips();
 
@@ -49,40 +63,76 @@ export default function RatesEntryPage({ embedded: _embedded = false }: Props) {
   const totalShops = filteredTrips.reduce((sum, trip) => sum + trip.totalShops, 0);
   const totalBirds = filteredTrips.reduce((sum, trip) => sum + trip.totalBirds, 0);
   const totalWeight = filteredTrips.reduce((sum, trip) => sum + trip.totalWeight, 0);
+  const safeCurrentPage = Math.min(currentPage, Math.max(totalPages, 1));
+  const startIndex = (safeCurrentPage - 1) * pageSize;
 
   const handleResetFilters = () => {
     resetFilters();
     showNotification("Filters have been reset.", "info");
   };
 
+  const handleRefresh = () => {
+    void loadTrips().then((ok) => {
+      if (ok) showNotification(t("notification.data_refreshed"), "success");
+    });
+  };
+
   const handleExportPDF = () => {
-    if (filteredTrips.length === 0) {
-      showNotification("No data to export.", "error");
-      return;
+    if (exportBusyRef.current) return;
+    exportBusyRef.current = "pdf";
+    try {
+      if (filteredTrips.length === 0) {
+        showNotification("No data to export.", "error");
+        return;
+      }
+      const headers = ["Trip No", "Day", "Vehicle", "Supervisor", "Source Farm", "Shops", "Birds", "Weight (KG)"];
+      const rows = filteredTrips.map((trip) => [
+        trip.tripNo,
+        formatTripListDay(trip.tripDate),
+        formatVehicleNumber(trip.vehicleNo),
+        trip.supervisorName,
+        trip.sourceFarm,
+        trip.totalShops.toString(),
+        trip.totalBirds.toString(),
+        trip.totalWeight.toFixed(2),
+      ]);
+      const filename = `Rates_${new Date().toISOString().split("T")[0]}`;
+      exportToPDF("Rates Entry Report", headers, rows, filename);
+      showNotification("PDF exported successfully!", "success");
+    } catch {
+      showNotification("Unable to export Rate Entry PDF.", "error");
+    } finally {
+      exportBusyRef.current = null;
     }
-    const headers = ["Trip No", "Date", "Vehicle", "Supervisor", "Source Farm", "Shops", "Birds", "Weight (KG)"];
-    const rows = filteredTrips.map((t) => [
-      t.tripNo, t.tripDate, t.vehicleNo, t.supervisorName, t.sourceFarm,
-      t.totalShops.toString(), t.totalBirds.toString(), t.totalWeight.toFixed(2),
-    ]);
-    const filename = `Rates_${new Date().toISOString().split("T")[0]}`;
-    exportToPDF("Rates Entry Report", headers, rows, filename);
-    showNotification("PDF exported successfully!", "success");
   };
 
   const handleExportExcel = () => {
-    if (filteredTrips.length === 0) {
-      showNotification("No data to export.", "error");
-      return;
+    if (exportBusyRef.current) return;
+    exportBusyRef.current = "excel";
+    try {
+      if (filteredTrips.length === 0) {
+        showNotification("No data to export.", "error");
+        return;
+      }
+      const headers = ["Trip No", "Day", "Vehicle", "Supervisor", "Source Farm", "Shops", "Birds", "Weight (KG)"];
+      const rows = filteredTrips.map((trip) => [
+        trip.tripNo,
+        formatTripListDay(trip.tripDate),
+        formatVehicleNumber(trip.vehicleNo),
+        trip.supervisorName,
+        trip.sourceFarm,
+        trip.totalShops,
+        trip.totalBirds,
+        trip.totalWeight,
+      ]);
+      const filename = `Rates_${new Date().toISOString().split("T")[0]}`;
+      exportToExcel("Rates Entry Report", headers, rows, filename);
+      showNotification("Excel exported successfully!", "success");
+    } catch {
+      showNotification("Unable to export Rate Entry Excel.", "error");
+    } finally {
+      exportBusyRef.current = null;
     }
-    const headers = ["Trip No", "Date", "Vehicle", "Supervisor", "Source Farm", "Shops", "Birds", "Weight (KG)"];
-    const rows = filteredTrips.map((t) => [
-      t.tripNo, t.tripDate, t.vehicleNo, t.supervisorName, t.sourceFarm,
-      t.totalShops, t.totalBirds, t.totalWeight,
-    ]);
-    const filename = `Rates_${new Date().toISOString().split("T")[0]}`;
-    exportToExcel("Rates Entry Report", headers, rows, filename);
-    showNotification("Excel exported successfully!", "success");
   };
 
   const content = (
@@ -95,13 +145,15 @@ export default function RatesEntryPage({ embedded: _embedded = false }: Props) {
         supervisor={filter.supervisor}
         vehicleList={vehicleList}
         supervisorList={supervisorList}
-        setFromDate={(value) => setFilter({ ...filter, fromDate: value })}
-        setToDate={(value) => setFilter({ ...filter, toDate: value })}
-        setTripNo={(value) => setFilter({ ...filter, tripNo: value })}
-        setVehicle={(value) => setFilter({ ...filter, vehicle: value })}
-        setSupervisor={(value) => setFilter({ ...filter, supervisor: value })}
+        setFromDate={(value) => setFilter({ fromDate: value })}
+        setToDate={(value) => setFilter({ toDate: value })}
+        setTripNo={(value) => setFilter({ tripNo: value })}
+        setVehicle={(value) => setFilter({ vehicle: value })}
+        setSupervisor={(value) => setFilter({ supervisor: value })}
         onSearch={() => setCurrentPage(1)}
         onReset={handleResetFilters}
+        onRefresh={handleRefresh}
+        refreshing={isLoading}
         pendingTrips={filteredTrips.length}
         hasFilters={hasFilters}
         onExportPDF={handleExportPDF}
@@ -133,13 +185,20 @@ export default function RatesEntryPage({ embedded: _embedded = false }: Props) {
           trips={paginatedTrips}
           onEnterRate={openRateEntry}
           onModifyRate={openModifyRate}
+          startIndex={startIndex}
+          sortBy={sortBy}
+          sortDir={sortDir}
+          onSortChange={handleSortChange}
         >
           {shouldShowPagination(filteredTrips.length) && (
-          <TripPagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-          />
+            <Pagination
+              page={safeCurrentPage}
+              pageSize={pageSize}
+              totalItems={filteredTrips.length}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={setPageSize}
+              disabled={isLoading}
+            />
           )}
         </CompletedTripsTable>
       )}
