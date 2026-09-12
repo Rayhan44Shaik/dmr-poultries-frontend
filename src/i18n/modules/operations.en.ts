@@ -262,7 +262,7 @@ export default {
   'ops.trip.captured': 'Captured',
   'ops.trip.captured_at': 'Captured at',
   'ops.trip.captured_on_first_submit': 'Captured on first submit',
-  'ops.trip.captured_time': 'Captured Time',
+  'ops.trip.captured_time': 'Capture Time',
   'ops.trip.choose_image': 'Choose Image',
   'ops.trip.clear_search': 'Clear search',
   'ops.trip.click_add_shop': 'Click Add Shop to record shop deliveries.',

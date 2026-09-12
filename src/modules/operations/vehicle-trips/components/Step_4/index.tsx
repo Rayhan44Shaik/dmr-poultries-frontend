@@ -1137,8 +1137,8 @@ export default function UnLoadingTable({
       </div>
 
       {/* ─── TOP KPI SUMMARY — same font as StepKpiCard (all steps) ─── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-        <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs col-span-2 sm:col-span-1">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3">
+        <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs col-span-2 sm:col-span-2 lg:col-span-2">
           <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
             <span className="h-5 w-5 rounded-md bg-indigo-50/70 text-indigo-500 flex items-center justify-center shrink-0">
               <Clock size={12} />
@@ -1148,7 +1148,7 @@ export default function UnLoadingTable({
           <TripTimestampDisplay
             value={topKpiTotals.lastCaptureTime === "—" ? "" : formatTripViewStamp(topKpiTotals.lastCaptureTime, language)}
             empty="—"
-            className="border-indigo-100 bg-indigo-50/70 px-1.5 py-0.5 text-[10px]"
+            className="border-indigo-100 bg-indigo-50/70 px-2 py-1 text-[10px]"
           />
         </div>
         <div className="bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs">

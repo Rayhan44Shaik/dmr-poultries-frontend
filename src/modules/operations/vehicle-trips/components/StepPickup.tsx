@@ -625,14 +625,14 @@ export default function StepPickup({
         </div>
 
         {/* Same StepKpiCard font/layout as steps 1–2 / 4–5 (time first) */}
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 pt-2">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-3 pt-2">
           <StepKpiCard
             icon={Clock}
             tone="bg-blue-50/70 text-blue-500"
-            label={t("ops.trip.date_time")}
-            value={<TripTimestampDisplay value={officialPickupTime} empty="--" />}
+            label={t("ops.trip.captured_time")}
+            value={<TripTimestampDisplay value={officialPickupTime} empty="--" className="px-2 py-1" />}
             title={officialPickupTime || undefined}
-            cardClass="col-span-2 sm:col-span-1"
+            cardClass="col-span-2 sm:col-span-2 md:col-span-2"
             valueClass="overflow-visible whitespace-normal text-[11px] leading-none"
           />
           <StepKpiCard
