@@ -84,8 +84,11 @@ only run on hover / keyboard focus, never on the active row, and the global
 
 ### KPI cards
 
-Six cards — trips, weight, sales, collections, pending collections and
-expenses. Each is measured against the **equal-length window immediately before
+Seven cards — trips, **birds**, weight, sales, collections, pending collections
+and expenses. Birds are not in the dashboard payload: they come from the
+completed-trip aggregates (one tiny `limit=1` request per window, since the
+endpoint's totals cover the whole filtered set), so the KPI row counts the
+birds loaded at the farm while the chart below weighs them. Each is measured against the **equal-length window immediately before
 the one on screen**, fetched separately from the same dashboard endpoint (so a
 7-day calendar compares with the 7 days before it, a quarter with the previous
 quarter). The comparison is honest in all three cases:

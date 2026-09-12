@@ -34,6 +34,15 @@ export interface OperationalTrendsQuery {
   toDate?: string;
 }
 
+/** The window's bird counts, as the server totals them. */
+export interface TrendBirdTotals {
+  /** Birds loaded at the farm — what the KPI row calls "Total Birds". */
+  farmBirds: number;
+  deliveredBirds: number;
+  mortalityCount: number;
+  totalTrips: number;
+}
+
 const toNumber = (value: unknown): number => {
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : 0;
@@ -66,5 +75,29 @@ export async function fetchOperationalTrends(
     totalTrips: total,
     countedTrips: rows.length,
     truncated: rows.length < total,
+  };
+}
+
+/**
+ * Bird totals for a window, straight from the endpoint's own aggregates (a
+ * one-row request — the kpis cover the whole filtered set, not the page). Used
+ * by the KPI row, which counts birds rather than weighing them.
+ */
+export async function fetchTrendBirds(
+  query: OperationalTrendsQuery,
+  signal?: AbortSignal
+): Promise<TrendBirdTotals> {
+  const params: Record<string, string | number> = { limit: 1 };
+  if (query.fromDate) params.fromDate = query.fromDate;
+  if (query.toDate) params.toDate = query.toDate;
+
+  const { data } = await apiGet<Record<string, unknown>>(BASE, { params, signal });
+  const kpis = (data as { kpis?: Record<string, unknown> } | null)?.kpis ?? {};
+
+  return {
+    farmBirds: toNumber(kpis.farmBirds),
+    deliveredBirds: toNumber(kpis.deliveredBirds),
+    mortalityCount: toNumber(kpis.mortalityCount),
+    totalTrips: toNumber(kpis.totalTrips),
   };
 }

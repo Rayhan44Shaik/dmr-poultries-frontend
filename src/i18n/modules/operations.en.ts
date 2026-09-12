@@ -175,6 +175,7 @@ export default {
   'ops.dashboard.kpi_prev_value': 'was {value}',
   'ops.dashboard.vs_prev': 'vs prev {days}d',
   'ops.dashboard.kpi_pending_collections': 'Pending Collections',
+  'ops.dashboard.kpi_total_birds': 'Total Birds',
   'ops.dashboard.kpi_total_collections': 'Total Collections',
   'ops.dashboard.kpi_total_expenses': 'Total Expenses',
   'ops.dashboard.kpi_total_sales': 'Total Sales',

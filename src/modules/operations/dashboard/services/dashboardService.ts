@@ -51,6 +51,8 @@ export interface DashboardData {
   totalTrips: number;
   totalSalesWeight: number;
   totalSalesAmount: number;
+  /** Birds loaded at the farm across the window (completed trips). */
+  totalBirds?: number;
   totalCollections: number;
   pendingCollections: number;
   totalExpenses: number;
@@ -289,7 +291,7 @@ function demoDashboard(from: Date | null, to: Date | null): DashboardData {
 
   const sum = (pick: (d: DemoDay) => number) => days.reduce((acc, d) => acc + pick(d), 0);
   const empty: DashboardData = {
-    totalTrips: 0, totalSalesWeight: 0, totalSalesAmount: 0, totalCollections: 0,
+    totalTrips: 0, totalSalesWeight: 0, totalSalesAmount: 0, totalBirds: 0, totalCollections: 0,
     pendingCollections: 0, totalExpenses: 0, fuelExpense: 0, tripExpense: 0,
     todaysTrips: 0, weeklyTrips: 0, monthlyTrips: 0, trendData: [], topShops: [],
     collectionsByMode: [], expensesByCategory: [], mortalityData: [], recentTrips: [],

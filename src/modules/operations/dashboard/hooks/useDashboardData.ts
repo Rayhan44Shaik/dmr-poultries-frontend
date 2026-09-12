@@ -7,6 +7,7 @@ import {
   loadOperationsDashboard,
   type DashboardData,
 } from "../services/dashboardService";
+import { fetchTrendBirds } from "../services/operationalTrends";
 
 export type { DashboardData };
 
@@ -37,6 +38,12 @@ function filterForRange(data: DashboardData, from: Date | null, to: Date | null)
     mortalityData: data.mortalityData.filter((point) => trendData.some((item) => item.date === point.date)),
   };
 }
+
+const toBusinessDateLocal = (date: Date): string => {
+  const month = `${date.getMonth() + 1}`.padStart(2, "0");
+  const day = `${date.getDate()}`.padStart(2, "0");
+  return `${date.getFullYear()}-${month}-${day}`;
+};
 
 const initialData: DashboardData = {
   totalTrips: 0,
@@ -103,6 +110,8 @@ export function useDashboardData(
 
   const loadData = useCallback(async () => {
     const requestId = ++requestRef.current;
+    const fromDate = _fromDate ?? new Date();
+    const toDate = _toDate ?? new Date();
     if (!hasLoadedRef.current) setIsLoading(true);
     setError(null);
     try {
@@ -125,6 +134,27 @@ export function useDashboardData(
       }
     }
 
+    /* Birds are not in the dashboard payload — they come from the completed-trip
+       aggregates, one tiny request per window (the totals cover the whole
+       filtered set, so a single row is enough). */
+    const withBirds = async (
+      window: { from: Date; to: Date }
+    ): Promise<Pick<DashboardData, "totalBirds"> | null> => {
+      try {
+        const birds = await fetchTrendBirds({
+          fromDate: toBusinessDateLocal(window.from),
+          toDate: toBusinessDateLocal(window.to),
+        });
+        return { totalBirds: birds.farmBirds };
+      } catch {
+        return null;
+      }
+    };
+
+    const currentBirds = await withBirds({ from: fromDate, to: toDate });
+    if (requestId !== requestRef.current) return;
+    if (currentBirds) setData((current) => ({ ...current, ...currentBirds }));
+
     // The baseline is a separate request for the window just before this one,
     // so the two never race: a late answer is dropped on the floor.
     if (!previousWindow) {
@@ -132,13 +162,17 @@ export function useDashboardData(
       return;
     }
     try {
-      const baseline = await loadOperationsDashboard(previousWindow.from, previousWindow.to);
+      const [baseline, baselineBirds] = await Promise.all([
+        loadOperationsDashboard(previousWindow.from, previousWindow.to),
+        withBirds(previousWindow),
+      ]);
       if (requestId !== requestRef.current) return;
-      setPreviousData(
-        import.meta.env.DEV
+      setPreviousData({
+        ...(import.meta.env.DEV
           ? baseline
-          : filterForRange(baseline, previousWindow.from, previousWindow.to)
-      );
+          : filterForRange(baseline, previousWindow.from, previousWindow.to)),
+        ...baselineBirds,
+      });
     } catch {
       if (requestId !== requestRef.current) return;
       setPreviousData(null);

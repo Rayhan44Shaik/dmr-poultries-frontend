@@ -175,6 +175,7 @@ export default {
   'ops.dashboard.kpi_prev_value': 'గతం {value}',
   'ops.dashboard.vs_prev': 'గత {days} రోజులతో',
   'ops.dashboard.kpi_pending_collections': 'పెండింగ్ కలెక్షన్లు',
+  'ops.dashboard.kpi_total_birds': 'మొత్తం పక్షులు',
   'ops.dashboard.kpi_total_collections': 'మొత్తం కలెక్షన్లు',
   'ops.dashboard.kpi_total_expenses': 'మొత్తం ఖర్చులు',
   'ops.dashboard.kpi_total_sales': 'మొత్తం అమ్మకాలు',

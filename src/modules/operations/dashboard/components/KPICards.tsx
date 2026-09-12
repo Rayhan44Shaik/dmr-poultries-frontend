@@ -2,6 +2,7 @@
 
 import { useMemo, memo } from "react";
 import {
+  Bird,
   Truck,
   ShoppingBag,
   IndianRupee,
@@ -16,6 +17,8 @@ import { useI18n } from "../../../../i18n";
 // ---------- Type Definitions ----------
 export interface DashboardMetrics {
   totalTrips?: number;
+  /** Birds loaded at the farm across the window. */
+  totalBirds?: number;
   totalSalesWeight?: number;
   totalSalesAmount?: number;
   totalCollections?: number;
@@ -80,6 +83,12 @@ const cardConfig = {
     bg: "bg-blue-500",
     text: "text-blue-600",
     icon: Truck,
+    upIsGood: true,
+  },
+  "Total Birds": {
+    bg: "bg-amber-500",
+    text: "text-amber-600",
+    icon: Bird,
     upIsGood: true,
   },
   "Total Weight (KG)": {
@@ -161,6 +170,8 @@ const kpiCardLabel = (label: CardLabel): string => {
   switch (label) {
     case "Total Trips":
       return "ops.dashboard.kpi_total_trips";
+    case "Total Birds":
+      return "ops.dashboard.kpi_total_birds";
     case "Total Weight (KG)":
       return "ops.dashboard.kpi_total_weight";
     case "Total Sales Amount":
@@ -360,6 +371,11 @@ export default function KPICards({
         prevValue: safeNumber(prev.totalTrips),
       },
       {
+        label: "Total Birds" as CardLabel,
+        value: safeNumber(current.totalBirds),
+        prevValue: safeNumber(prev.totalBirds),
+      },
+      {
         label: "Total Weight (KG)" as CardLabel,
         value: safeNumber(current.totalSalesWeight),
         prevValue: safeNumber(prev.totalSalesWeight),
@@ -402,7 +418,7 @@ export default function KPICards({
   );
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
+    <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
       {finalCards.map((card) => (
         <KPICard key={card.label} {...card} />
       ))}
