@@ -1,4 +1,4 @@
-﻿export default {
+export default {
   // Header — notifications & menu
   'header.overdueCollections': '{count} కలెక్షన్లు గడువు దాటాయి',
   'header.overdueCollectionDesc': '{amount} కలెక్షన్ కోసం వేచి ఉంది',
@@ -18,6 +18,11 @@
   // Sidebar
   'sidebar.erpSystem': 'ERP మేనేజ్‌మెంట్ సిస్టమ్',
   'sidebar.comingSoon': 'త్వరలో',
+  // Sidebar width controls (expanded → icon rail → hidden)
+  'sidebar.collapseToIcons': 'ఐకాన్‌లకు కుదించు',
+  'sidebar.expandSidebar': 'సైడ్‌బార్‌ను విస్తరించు',
+  'sidebar.hideSidebar': 'సైడ్‌బార్‌ను దాచు',
+  'sidebar.showSidebar': 'సైడ్‌బార్‌ను చూపు',
 
   // Command palette
   'command.search': 'పేజీలు, చర్యలు, మాడ్యూల్స్ కోసం వెతకండి…',

@@ -58,6 +58,30 @@ prints that and exits without failing the dev command.
 Full module-by-module verification steps live in
 [`docs/QUARTER_SAMPLE_DATA_TESTING_GUIDE.md`](./docs/QUARTER_SAMPLE_DATA_TESTING_GUIDE.md).
 
+### Navigation
+
+The sidebar is flexible, never a fixed panel. On `lg` screens and up it steps
+through three shapes, and the choice is remembered per browser (`dmr-sidebar-mode`):
+
+| Shape | Width | How to get there |
+|---|---|---|
+| Expanded | 260px | Default. Click ⤢ in the brand row, or the header menu button when collapsed |
+| Icon rail | 72px | Click ⤡ in the brand row (labels become hover tooltips, badges become dots) |
+| Hidden | 0 | Click ✕ while in the rail; the header menu button brings it back |
+
+⌘/Ctrl + B cycles the shapes; the content column animates its offset so pages
+reflow instead of jumping. Below `lg` the same entries live in the floating
+popup opened from the header menu button.
+
+Every nav glyph animates on hover with a motion written for its own name — the
+truck drives off and back (Trip Entry / Trip List / Driver Performance), the
+rupee flips (Rate Entry), the wrench tightens (Maintenance Entry), the page
+turns over (Permits & Documents / Shop Ledger), the fuel pump rocks, the hen
+flaps… One motion per meaning, keyed by path in `ui/Sidebar/navMotion.ts` with
+the keyframes in the `--animate-nav-*` family of `styles/tokens.css`. Motions
+only run on hover / keyboard focus, never on the active row, and the global
+`prefers-reduced-motion` rule disables them.
+
 ### Masters
 
 Shops, Farms, Vehicles, Employees, Banks and Bird Types share consistent

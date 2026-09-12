@@ -1,4 +1,4 @@
-﻿export default {
+export default {
   // Header — notifications & menu
   'header.overdueCollections': '{count} collections overdue',
   'header.overdueCollectionDesc': '{amount} waiting to be collected',
@@ -18,6 +18,11 @@
   // Sidebar
   'sidebar.erpSystem': 'ERP Management System',
   'sidebar.comingSoon': 'Soon',
+  // Sidebar width controls (expanded → icon rail → hidden)
+  'sidebar.collapseToIcons': 'Collapse to icons',
+  'sidebar.expandSidebar': 'Expand sidebar',
+  'sidebar.hideSidebar': 'Hide sidebar',
+  'sidebar.showSidebar': 'Show sidebar',
 
   // Command palette
   'command.search': 'Search pages, actions, modules…',
