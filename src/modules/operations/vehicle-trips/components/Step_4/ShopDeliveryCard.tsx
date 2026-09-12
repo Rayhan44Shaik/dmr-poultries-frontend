@@ -2,6 +2,7 @@ import { Box, Users, Scale, Clock, Pencil, FileText, Package, AlertCircle } from
 import type { ShopDelivery } from "../../types/trip";
 import type { ShopDeliveryWithExtra } from "./useShopDeliveryForm";
 import { useI18n } from "../../../../../i18n";
+import { cleanDeliveryShopName } from "../../utils/shopDisplayName";
 
 interface Props {
   row: ShopDeliveryWithExtra;
@@ -31,6 +32,7 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
     if (value == null || value === "" || (typeof value === "number" && Number.isNaN(value))) return t("ops.trip.not_entered");
     return String(value);
   };
+  const displayShopName = cleanDeliveryShopName(row.shopName) || t("ops.trip.not_entered");
 
   return (
     <div className="group relative overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-sm hover:shadow-md transition-all duration-200 flex flex-col">
@@ -48,8 +50,8 @@ export default function ShopDeliveryCard({ row, readOnly, onEdit, onPDF }: Props
             >
               {isWeightMode ? <Scale size={15} /> : <Box size={15} />}
             </div>
-            <p className="font-bold text-slate-800 text-[13px] truncate leading-tight" title={row.shopName}>
-              {row.shopName || t("ops.trip.not_entered")}
+            <p className="font-bold text-slate-800 text-[13px] truncate leading-tight" title={displayShopName}>
+              {displayShopName}
             </p>
           </div>
 

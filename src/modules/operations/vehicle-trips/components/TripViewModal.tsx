@@ -13,7 +13,7 @@ import {
   FileDown,
 } from "lucide-react";
 import { WhatsAppIcon } from "../../../../ui/WhatsAppIcon";
-import type { Trip, ShopDelivery } from "../types/trip";
+import type { Trip } from "../types/trip";
 import type { Shop } from "../../../masters/shops/types/shop";
 import type { BirdType } from "../../../masters/bird-types/types/birdType";
 import {
@@ -23,7 +23,6 @@ import {
   getNextIncompleteTripStep,
 } from "../../../../shared/trip";
 import { generateTripReportPDF, type TripReportEmailInfo } from "../utils/generateTripPDF";
-import { generateShopPDF } from "../utils/generateShopPDF";
 import { useTripDeliveryEmails } from "../hooks/useTripDeliveryEmails";
 import { useTripDeliveryWhatsApps } from "../hooks/useTripDeliveryWhatsApps";
 import { useI18n } from "../../../../i18n";
@@ -32,7 +31,6 @@ import StepFarm from "./StepFarm";
 import StepPickup from "./StepPickup";
 import StepEnd from "./Step_5/StepEnd";
 import StepDeliveries from "./StepDeliveries";
-import TripViewShopCards from "./TripViewShopCards";
 
 import TripWizardStepper from "./TripWizardStepper";
 import TripFinalKPI from "./TripFinalKPI";
@@ -119,63 +117,13 @@ function Step4View({
   trip,
   shops,
   birdTypes,
-  showCommunicationStatus,
-  emailState,
-  whatsappState,
 }: {
   trip: Trip;
   shops: Shop[];
   birdTypes: BirdType[];
-  showCommunicationStatus: boolean;
-  emailState: ReturnType<typeof useTripDeliveryEmails>;
-  whatsappState: ReturnType<typeof useTripDeliveryWhatsApps>;
 }) {
   const viewTrip: Trip = { ...trip, deliveryStepSubmitted: true };
   const deliveries = Array.isArray(trip.deliveries) ? trip.deliveries : [];
-
-  if (showCommunicationStatus) {
-    const downloadShopPdf = (delivery: ShopDelivery) => {
-      void generateShopPDF(
-        delivery as Parameters<typeof generateShopPDF>[0],
-        trip.boxDetails || [],
-        trip.tripNo,
-        trip.vehicleNo,
-        trip.supervisorName,
-        "",
-        trip.tripDate,
-        undefined,
-        undefined,
-        delivery.autoCaptureTime,
-        trip.driverName
-      );
-    };
-
-    return (
-      <TripViewShopCards
-        trip={trip}
-        shops={shops}
-        effectiveStatus={emailState.effectiveStatus}
-        busyIds={emailState.busyIds}
-        isBulkSending={emailState.isBulkSending}
-        bulkProgress={emailState.bulkProgress}
-        shopEmailFor={emailState.shopEmailFor}
-        sendCountFor={emailState.sendCountFor}
-        onSendOne={(delivery) => void emailState.sendOne(delivery)}
-        onDownloadPdf={downloadShopPdf}
-        emailCounts={emailState.counts}
-        whatsappEffectiveStatus={whatsappState.effectiveStatus}
-        whatsappBusyIds={whatsappState.busyIds}
-        whatsappIsBulkSending={whatsappState.isBulkSending}
-        shopWhatsAppFor={whatsappState.shopWhatsAppFor}
-        whatsappSendCountFor={whatsappState.sendCountFor}
-        onSendOneWhatsApp={(delivery) => void whatsappState.sendOne(delivery)}
-        whatsappCounts={whatsappState.counts}
-        failureReasonFor={emailState.failureReasonFor}
-        whatsappFailureReasonFor={whatsappState.failureReasonFor}
-      />
-    );
-  }
-
   return (
     <StepDeliveries
       rows={deliveries}
@@ -193,6 +141,7 @@ function Step4View({
     />
   );
 }
+
 
 function Step5View({ trip }: { trip: Trip }) {
   const viewTrip: Trip = {
@@ -298,16 +247,7 @@ function TripViewModal({
         return trip.pickupStepSubmitted ? <Step3View trip={trip} /> : emptyStep;
       case 3:
         return isDeliveryCompleted
-          ? (
-              <Step4View
-                trip={trip}
-                shops={shops}
-                birdTypes={birdTypes}
-                showCommunicationStatus={showCommunicationStatus}
-                emailState={emailState}
-                whatsappState={whatsappState}
-              />
-            )
+          ? <Step4View trip={trip} shops={shops} birdTypes={birdTypes} />
           : emptyStep;
       case 4:
         return isEndCompleted ? <Step5View trip={trip} /> : emptyStep;
@@ -397,13 +337,13 @@ function TripViewModal({
                 )}
               </div>
 
-              <div className="flex items-center gap-2 flex-wrap justify-end shrink-0">
+              <div className="flex items-center gap-3 flex-wrap justify-end shrink-0">
                 {showCommunicationStatus && emailCounts.total > 0 && (
                   <button
                     type="button"
                     onClick={() => void emailState.sendAll()}
                     disabled={emailState.isBulkSending}
-                    className="inline-flex items-center gap-2 rounded-xl border border-red-100 bg-red-50/90 hover:bg-red-100 px-4 py-2 text-xs font-semibold text-red-600 shadow-sm shadow-red-100/60 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-2.5 rounded-xl border border-red-100 bg-red-50/90 hover:bg-red-100 px-4 py-2 text-xs font-semibold text-red-600 shadow-sm shadow-red-100/60 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                     title={t("ops.trip.send_email_all")}
                   >
                     {emailState.isBulkSending ? (
@@ -419,7 +359,7 @@ function TripViewModal({
                     type="button"
                     onClick={() => void whatsappState.sendAll()}
                     disabled={whatsappState.isBulkSending}
-                    className="inline-flex items-center gap-2 rounded-xl border border-[#25D366] bg-[#25D366] hover:bg-[#1ebe5d] px-4 py-2 text-xs font-semibold text-white shadow-md shadow-[#25D366]/25 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                    className="inline-flex items-center gap-2.5 rounded-xl border border-[#25D366] bg-[#25D366] hover:bg-[#1ebe5d] px-4 py-2 text-xs font-semibold text-white shadow-md shadow-[#25D366]/25 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
                     title={t("ops.trip.send_whatsapp_all")}
                   >
                     {whatsappState.isBulkSending ? (
