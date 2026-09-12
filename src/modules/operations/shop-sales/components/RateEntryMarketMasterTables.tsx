@@ -177,9 +177,9 @@ export default function RateEntryMarketMasterTables({
             <thead>
               <tr className="bg-white text-slate-500">
                 <th className="px-2 py-1.5 text-left font-semibold">{t("ops.rate.market.date")}</th>
-                <th className="px-2 py-1.5 text-center font-semibold">Vij</th>
-                <th className="px-2 py-1.5 text-center font-semibold">Gun</th>
-                <th className="px-2 py-1.5 text-center font-semibold">R.P</th>
+                <th className="px-2 py-1.5 text-center font-semibold">{t("ops.rate.market.col.vij")}</th>
+                <th className="px-2 py-1.5 text-center font-semibold">{t("ops.rate.market.col.gun")}</th>
+                <th className="px-2 py-1.5 text-center font-semibold">{t("ops.rate.market.col.rp")}</th>
               </tr>
             </thead>
             <tbody>
@@ -200,11 +200,11 @@ export default function RateEntryMarketMasterTables({
             <thead>
               <tr className="bg-white text-slate-500">
                 <th className="px-2 py-1.5 text-left font-semibold">{t("ops.rate.market.date")}</th>
-                <th className="px-2 py-1.5 text-center font-semibold whitespace-nowrap">Sneha</th>
-                <th className="px-2 py-1.5 text-center font-semibold whitespace-nowrap">Ven Rate</th>
-                <th className="px-2 py-1.5 text-center font-semibold whitespace-nowrap">Ven Vij</th>
-                <th className="px-2 py-1.5 text-center font-semibold whitespace-nowrap">Ven Gun</th>
-                <th className="px-2 py-1.5 text-center font-semibold whitespace-nowrap">Asso Vij</th>
+                <th className="px-2 py-1.5 text-center font-semibold whitespace-nowrap">{t("ops.rate.market.col.sneha")}</th>
+                <th className="px-2 py-1.5 text-center font-semibold whitespace-nowrap">{t("ops.rate.market.col.ven_rate")}</th>
+                <th className="px-2 py-1.5 text-center font-semibold whitespace-nowrap">{t("ops.rate.market.col.ven_vij")}</th>
+                <th className="px-2 py-1.5 text-center font-semibold whitespace-nowrap">{t("ops.rate.market.col.ven_gun")}</th>
+                <th className="px-2 py-1.5 text-center font-semibold whitespace-nowrap">{t("ops.rate.market.col.asso_vij")}</th>
               </tr>
             </thead>
             <tbody>

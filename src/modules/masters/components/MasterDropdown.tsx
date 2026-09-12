@@ -418,11 +418,11 @@ export default function MasterDropdown({
             }}
             className={`flex h-9 w-full shrink-0 items-center gap-2 px-3 text-left text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40 ${
               kind === "select" && option.value === value
-                // Selected row: brighter brand fill so a chosen Vehicle /
-                // Supervisor is immediately visible in dense Operations filters.
-                ? "bg-emerald-500 text-white"
+                // Selected row: light-green brand treatment for All Vehicles /
+                // All Supervisors and normal options; visible but not harsh.
+                ? "bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-200"
                 : index === active
-                  ? "bg-emerald-50 text-emerald-800"
+                  ? "bg-emerald-100/70 text-emerald-800"
                   : "text-slate-700 hover:bg-emerald-50 hover:text-emerald-800"
             }`}
           >
@@ -497,7 +497,7 @@ export default function MasterDropdown({
         className={`flex h-9 w-full items-center justify-between gap-2 rounded-xl border bg-white px-3 text-xs font-medium text-slate-700 outline-none transition focus:ring-2 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:opacity-50 ${
           error
             ? "border-red-400 focus:border-red-500 focus:ring-red-100"
-            : "border-slate-200 hover:border-slate-300 focus:border-blue-500 focus:ring-blue-500/20"
+            : "border-slate-200 hover:border-emerald-300 focus:border-emerald-500 focus:ring-emerald-500/20"
         } ${triggerClassName}`}
       >
         <span

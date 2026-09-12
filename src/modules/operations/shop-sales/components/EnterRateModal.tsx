@@ -399,127 +399,156 @@ export default function EnterRateModal({
             </div>
           )}
 
-          <div className="px-5 py-2 flex-1 min-h-0 flex flex-col overflow-hidden">
-            <div className="overflow-auto flex-1 min-h-0">
-              <table className="min-w-full text-sm">
-                <thead className="sticky top-0 bg-white z-10">
-                  <tr className="text-slate-500 border-b border-slate-200">
-                    <th className="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider">{t("ops.rate.modal.s_no")}</th>
-                    <th className="px-2 py-2 text-left text-[10px] font-semibold uppercase tracking-wider">{t("ops.rate.modal.shop_name")}</th>
-                    <th className="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider">{t("common.birds")}</th>
-                    <th className="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider">{t("ops.trip.weight_kg")}</th>
-                    <th className="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider">{t("ops.rate.modal.market_rate")}</th>
-                    <th className="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider">{t("ops.rate.modal.rate")}</th>
-                    <th className="px-2 py-2 text-center text-[10px] font-semibold uppercase tracking-wider">{t("ops.rate.modal.amount")}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {pagedDeliveries.map(({ row: delivery, index }) => {
-                    const rate = normalizeRate(delivery.rate);
-                    const isValid = isValidSellingRate(rate);
-                    const amount = isValid ? Number((delivery.weight * (rate as number)).toFixed(2)) : 0;
-                    const marketRateValue = suggestedMarketRate(delivery, tripDateVenRate);
-                    const masterShop = resolveShopMaster(delivery, shopMasterLookup);
-                    const association = masterShop?.associationType?.trim() ?? "";
-                    const paperRate = Number(masterShop?.paperRate ?? 0);
-                    const belowMin = rate != null && rate < 50;
-                    const aboveMax = rate != null && rate > 300;
-                    const missingForLock = lockAttempted && !isValid;
+          <div className="px-5 py-3 flex-1 min-h-0 flex flex-col overflow-hidden bg-white">
+            <div className="mb-2 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <div className="flex items-center gap-2">
+                <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-orange-100 text-orange-700">
+                  <Store size={17} />
+                </span>
+                <div>
+                  <h3 className="text-sm font-extrabold text-slate-900">{t("ops.rate.modal.shop_rates")}</h3>
+                  <p className="text-[11px] font-medium text-slate-500">{t("ops.rate.modal.shop_master_details")}</p>
+                </div>
+              </div>
+            </div>
 
-                    return (
-                      <tr
-                        key={delivery.id}
-                        className={`border-b border-slate-100 ${missingForLock ? "bg-red-50" : ""}`}
-                      >
-                        <td className="px-2 py-2.5 text-center text-xs text-slate-500">{index + 1}</td>
-                        <td className="px-2 py-2.5 text-xs text-slate-800 min-w-[260px]">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <span className="font-bold text-slate-900">{displayRateEntryShopName(delivery.shopName, language)}</span>
-                            {association && (
-                              <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2 py-0.5 text-[10px] font-bold text-violet-700">
-                                <Users size={11} />
-                                {t("ops.rate.modal.association_short")}: {displayRateEntryName(association, language)}
-                              </span>
-                            )}
-                            {Number.isFinite(paperRate) && paperRate > 0 && (
-                              <span className="inline-flex items-center gap-1 rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-orange-700">
-                                <FileText size={11} />
-                                {t("ops.rate.modal.paper_short")}: {paperRate}
-                              </span>
-                            )}
+            <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="h-full overflow-auto">
+                <table className="min-w-[980px] w-full text-sm">
+                  <thead className="sticky top-0 z-10 bg-slate-50">
+                    <tr className="border-b border-slate-200 text-slate-500">
+                      <th className="px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider">{t("ops.rate.modal.s_no")}</th>
+                      <th className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider">{t("ops.rate.modal.shop_name")}</th>
+                      <th className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider">{t("ops.rate.modal.association")}</th>
+                      <th className="px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider">{t("ops.rate.modal.paper_rate")}</th>
+                      <th className="px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider">{t("common.birds")}</th>
+                      <th className="px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider">{t("ops.trip.weight_kg")}</th>
+                      <th className="px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider">{t("ops.rate.modal.market_rate")}</th>
+                      <th className="px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider">{t("ops.rate.modal.rate")}</th>
+                      <th className="px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider">{t("ops.rate.modal.amount")}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pagedDeliveries.map(({ row: delivery, index }) => {
+                      const rate = normalizeRate(delivery.rate);
+                      const isValid = isValidSellingRate(rate);
+                      const amount = isValid ? Number((delivery.weight * (rate as number)).toFixed(2)) : 0;
+                      const marketRateValue = suggestedMarketRate(delivery, tripDateVenRate);
+                      const masterShop = resolveShopMaster(delivery, shopMasterLookup);
+                      const association = masterShop?.associationType?.trim() ?? "";
+                      const paperRate = Number(masterShop?.paperRate ?? 0);
+                      const hasPaperRate = Number.isFinite(paperRate) && paperRate > 0;
+                      const belowMin = rate != null && rate < 50;
+                      const aboveMax = rate != null && rate > 300;
+                      const missingForLock = lockAttempted && !isValid;
+
+                      return (
+                        <tr
+                          key={delivery.id}
+                          className={`border-b border-slate-100 transition-colors ${
+                            missingForLock
+                              ? "bg-red-50"
+                              : index % 2 === 0
+                                ? "bg-white hover:bg-emerald-50/30"
+                                : "bg-slate-50/40 hover:bg-emerald-50/30"
+                          }`}
+                        >
+                          <td className="px-3 py-3 text-center text-xs font-semibold text-slate-500">{index + 1}</td>
+                          <td className="min-w-[220px] px-3 py-3 text-xs text-slate-800">
+                            <div className="font-bold text-slate-900">{displayRateEntryShopName(delivery.shopName, language)}</div>
                             {!masterShop && shopsLoading && (
-                              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                              <div className="mt-1 text-[10px] font-semibold text-slate-500">
                                 {t("ops.rate.modal.shop_master_loading")}
-                              </span>
+                              </div>
                             )}
-                          </div>
-                        </td>
-                        <td className="px-2 py-2.5 text-center text-xs font-semibold text-emerald-600">
-                          {delivery.birds.toLocaleString()}
-                        </td>
-                        <td className="px-2 py-2.5 text-center text-xs font-semibold text-orange-500">
-                          {delivery.weight.toFixed(2)}
-                        </td>
-                        <td className="px-2 py-2.5 text-center text-xs font-semibold text-sky-600">
-                          {marketRateValue != null ? (
-                            <span className="inline-flex items-center overflow-hidden rounded-full border border-sky-200 bg-sky-50 text-sky-700 shadow-xs">
-                              <span className="px-2 py-1 tabular-nums">₹ {Number(marketRateValue).toFixed(2)}</span>
-                              {!rateLocked && (
-                                <button
-                                  type="button"
-                                  onClick={() => applyMarketRate(index, marketRateValue)}
+                          </td>
+                          <td className="min-w-[150px] px-3 py-3 text-xs">
+                            {association ? (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-violet-200 bg-violet-50 px-2.5 py-1 text-[11px] font-bold text-violet-700">
+                                <Users size={12} />
+                                {displayRateEntryName(association, language)}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-center text-xs">
+                            {hasPaperRate ? (
+                              <span className="inline-flex items-center justify-center gap-1 rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-[11px] font-bold text-orange-700 tabular-nums">
+                                <FileText size={12} />
+                                {paperRate}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-center text-xs font-semibold text-emerald-600">
+                            {delivery.birds.toLocaleString()}
+                          </td>
+                          <td className="px-3 py-3 text-center text-xs font-semibold text-orange-500">
+                            {delivery.weight.toFixed(2)}
+                          </td>
+                          <td className="px-3 py-3 text-center text-xs font-semibold text-sky-600">
+                            {marketRateValue != null ? (
+                              <span className="inline-flex items-center overflow-hidden rounded-full border border-sky-200 bg-sky-50 text-sky-700 shadow-xs">
+                                <span className="px-2 py-1 tabular-nums">₹ {Number(marketRateValue).toFixed(2)}</span>
+                                {!rateLocked && (
+                                  <button
+                                    type="button"
+                                    onClick={() => applyMarketRate(index, marketRateValue)}
+                                    disabled={saving}
+                                    className="border-l border-sky-200 bg-white/80 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700 transition-colors hover:bg-emerald-50 hover:text-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+                                  >
+                                    {t("ops.rate.modal.use_market")}
+                                  </button>
+                                )}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3">
+                            {rateLocked ? (
+                              <span className="block text-center text-sm font-bold text-slate-600">
+                                {rate != null ? rate.toFixed(2) : "—"}
+                              </span>
+                            ) : (
+                              <div className="flex flex-col items-center">
+                                <input
+                                  type="number"
+                                  step="0.01"
+                                  value={rate === null ? "" : rate}
+                                  placeholder=""
                                   disabled={saving}
-                                  className="border-l border-sky-200 bg-white/80 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700 transition-colors hover:bg-emerald-50 hover:text-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
-                                >
-                                  {t("ops.rate.modal.use_market")}
-                                </button>
-                              )}
-                            </span>
-                          ) : (
-                            "—"
-                          )}
-                        </td>
-                        <td className="px-2 py-2">
-                          {rateLocked ? (
-                            <span className="block text-center text-sm font-bold text-slate-600">
-                              {rate != null ? rate.toFixed(2) : "—"}
-                            </span>
-                          ) : (
-                            <div className="flex flex-col items-center">
-                              <input
-                                type="number"
-                                step="0.01"
-                                value={rate === null ? "" : rate}
-                                placeholder=""
-                                disabled={saving}
-                                onChange={(e) => {
-                                  const value = e.target.value;
-                                  const updated = [...deliveries];
-                                  const num = value === "" ? null : Number(value);
-                                  (updated[index] as Trip["deliveries"][number]).rate = num;
-                                  setDeliveries(updated);
-                                }}
-                                className={`w-[88px] px-2 py-1 rounded-md border text-center text-sm font-semibold outline-none no-spinner ${
-                                  rate == null
-                                    ? "border-slate-300"
-                                    : isValid
-                                      ? "border-emerald-500 bg-emerald-50 text-emerald-800"
-                                      : "border-red-500 bg-red-50 text-red-700"
-                                }`}
-                              />
-                              {belowMin && <p className="text-[10px] text-red-500 mt-0.5">⚠ {t("ops.rate.modal.min_rate")}</p>}
-                              {aboveMax && <p className="text-[10px] text-red-500 mt-0.5">⚠ {t("ops.rate.modal.max_rate")}</p>}
-                            </div>
-                          )}
-                        </td>
-                        <td className="px-2 py-2.5 text-center text-xs font-semibold text-slate-700">
-                          ₹ {formatInr(amount)}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+                                  onChange={(e) => {
+                                    const value = e.target.value;
+                                    const updated = [...deliveries];
+                                    const num = value === "" ? null : Number(value);
+                                    (updated[index] as Trip["deliveries"][number]).rate = num;
+                                    setDeliveries(updated);
+                                  }}
+                                  className={`h-8 w-[92px] rounded-lg border px-2 text-center text-sm font-semibold outline-none no-spinner ${
+                                    rate == null
+                                      ? "border-slate-300 bg-white"
+                                      : isValid
+                                        ? "border-emerald-500 bg-emerald-50 text-emerald-800"
+                                        : "border-red-500 bg-red-50 text-red-700"
+                                  }`}
+                                />
+                                {belowMin && <p className="mt-0.5 text-[10px] text-red-500">⚠ {t("ops.rate.modal.min_rate")}</p>}
+                                {aboveMax && <p className="mt-0.5 text-[10px] text-red-500">⚠ {t("ops.rate.modal.max_rate")}</p>}
+                              </div>
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-center text-xs font-semibold text-slate-700">
+                            ₹ {formatInr(amount)}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
             </div>
 
             {deliveries.length > 0 && (
@@ -534,7 +563,7 @@ export default function EnterRateModal({
                 }}
                 disabled={saving}
                 ariaLabel={t("ops.rate.modal.shop_rates_pagination")}
-                className="mt-2 rounded-xl border border-slate-200 bg-white px-3 py-2"
+                className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2"
               />
             )}
           </div>
