@@ -82,6 +82,23 @@ the keyframes in the `--animate-nav-*` family of `styles/tokens.css`. Motions
 only run on hover / keyboard focus, never on the active row, and the global
 `prefers-reduced-motion` rule disables them.
 
+### KPI cards
+
+Six cards — trips, weight, sales, collections, pending collections and
+expenses. Each is measured against the **equal-length window immediately before
+the one on screen**, fetched separately from the same dashboard endpoint (so a
+7-day calendar compares with the 7 days before it, a quarter with the previous
+quarter). The comparison is honest in all three cases:
+
+- a real move shows the change with a ▲/▼ arrow, coloured by whether it is
+  actually good — **expenses and outstanding dues are green when they FALL**;
+- no movement says "No change";
+- no prior window (or a zero baseline) says "—" rather than a meaningless
+  0.0%, with the reason in the tooltip.
+
+Every badge also prints what it is measured against ("was ₹31.61 L"), and
+hovering gives both figures for the period.
+
 ### Operational Trends (dashboard)
 
 Operations → **Overview** leads with **Trips & weight movement** — the first

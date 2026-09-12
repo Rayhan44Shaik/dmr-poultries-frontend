@@ -27,7 +27,8 @@ export interface DashboardMetrics {
 
 export interface KPICardsProps {
   current: DashboardMetrics;
-  previous?: DashboardMetrics;
+  /** The equal-length window before the one on screen; `null` until it loads. */
+  previous?: DashboardMetrics | null;
   rangeDays?: number;
 }
 
@@ -69,8 +70,8 @@ const formatCurrency = (amount: unknown): { main: string; suffix: string } => {
 };
 
 const formatWeightNumber = (value: unknown): { main: string; suffix: string } => {
-  const num = safeNumber(value);
-  return formatLargeNumber(num);
+  // Kilos are whole numbers on a dashboard — nobody reads 27,744.23 kg.
+  return formatLargeNumber(Math.round(safeNumber(value)));
 };
 
 // ---------- Configuration ----------
@@ -79,35 +80,68 @@ const cardConfig = {
     bg: "bg-blue-500",
     text: "text-blue-600",
     icon: Truck,
+    upIsGood: true,
   },
   "Total Weight (KG)": {
     bg: "bg-green-500",
     text: "text-green-600",
     icon: ShoppingBag,
+    upIsGood: true,
   },
   "Total Sales Amount": {
     bg: "bg-violet-500",
     text: "text-violet-600",
     icon: IndianRupee,
+    upIsGood: true,
   },
   "Total Collections": {
     bg: "bg-orange-500",
     text: "text-orange-600",
     icon: Wallet,
+    upIsGood: true,
   },
   "Pending Collections": {
     bg: "bg-cyan-500",
     text: "text-cyan-600",
     icon: Hourglass,
+    // Outstanding dues going UP is not a win.
+    upIsGood: false,
   },
   "Total Expenses": {
     bg: "bg-pink-500",
     text: "text-pink-600",
     icon: ReceiptIndianRupee,
+    // Nor is spending more.
+    upIsGood: false,
   },
 } as const;
 
 type CardLabel = keyof typeof cardConfig;
+
+/** One comparison, three honest answers: a move, a flat line, or no baseline. */
+type Comparison =
+  | { kind: "move"; pct: number; good: boolean }
+  | { kind: "flat" }
+  | { kind: "no-baseline" };
+
+const compare = (value: number, previous: number, upIsGood: boolean): Comparison => {
+  if (!Number.isFinite(previous) || previous <= 0) return { kind: "no-baseline" };
+  const pct = ((value - previous) / previous) * 100;
+  if (Math.abs(pct) < 0.05) return { kind: "flat" };
+  return { kind: "move", pct, good: pct > 0 === upIsGood };
+};
+
+const formatPct = (pct: number): string =>
+  `${Math.abs(pct) < 0.1 ? "<0.1" : Math.abs(pct).toFixed(1)}%`;
+
+const formatWithUnit = (value: unknown, unit?: "KG" | "₹"): string => {
+  if (unit === "₹") {
+    const { main, suffix } = formatCurrency(value);
+    return `${main}${suffix ? ` ${suffix}` : ""}`;
+  }
+  const { main, suffix } = formatLargeNumber(safeNumber(value));
+  return `${main}${suffix ? ` ${suffix}` : ""}`;
+};
 
 // ---------- Individual Card ----------
 interface KPICardProps {
@@ -148,12 +182,8 @@ const KPICard = memo(function KPICard({
   const config = cardConfig[label];
   const Icon = config.icon;
 
-  const change = prevValue > 0 ? ((value - prevValue) / prevValue) * 100 : 0;
-  const isUp = change > 0;
-  const isDown = change < 0;
-
   let displayMain: string;
-  let displaySuffix: string = "";
+  let displaySuffix: string;
 
   if (unit === "₹") {
     const formatted = formatCurrency(value);
@@ -169,29 +199,44 @@ const KPICard = memo(function KPICard({
     displaySuffix = formatted.suffix;
   }
 
-  // Shortened comparison label
-  let rangeLabel = t("ops.dashboard.vs_7d");
-  if (rangeDays && rangeDays > 0) {
-    rangeLabel = `${t("ops.dashboard.vs")} ${rangeDays}d`;
-  }
+  const comparison = compare(value, prevValue, config.upIsGood);
+  const baseline = prevValue > 0;
+  const days = rangeDays && rangeDays > 0 ? rangeDays : 7;
+  const rangeLabel = t("ops.dashboard.vs_prev", { days });
 
   let badgeClasses =
     "mt-1 inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold whitespace-nowrap ";
   let iconElement: React.ReactNode = null;
+  let changeText: string;
+  let badgeTitle: string;
 
-  if (isUp) {
-    badgeClasses += "bg-green-50 text-green-600";
-    iconElement = <TrendingUp size={10} />;
-  } else if (isDown) {
-    badgeClasses += "bg-red-50 text-red-500";
-    iconElement = <TrendingDown size={10} />;
-  } else {
+  if (comparison.kind === "move") {
+    badgeClasses += comparison.good
+      ? "bg-emerald-50 text-emerald-700"
+      : "bg-rose-50 text-rose-600";
+    iconElement = comparison.pct > 0 ? <TrendingUp size={10} /> : <TrendingDown size={10} />;
+    changeText = formatPct(comparison.pct);
+    badgeTitle = t("ops.dashboard.kpi_compare_title", {
+      current: formatWithUnit(value, unit),
+      previous: formatWithUnit(prevValue, unit),
+      days,
+    });
+  } else if (comparison.kind === "flat") {
     badgeClasses += "bg-slate-100 text-slate-500";
-    iconElement = <span className="w-3" />;
+    changeText = t("ops.dashboard.kpi_no_change");
+    badgeTitle = t("ops.dashboard.kpi_compare_title", {
+      current: formatWithUnit(value, unit),
+      previous: formatWithUnit(prevValue, unit),
+      days,
+    });
+  } else {
+    // No prior window to measure against — say so instead of printing 0.0%.
+    badgeClasses += "bg-slate-100 text-slate-400";
+    changeText = "—";
+    badgeTitle = t("ops.dashboard.kpi_no_baseline", { days });
   }
 
-  // ✅ Uniform number size for all cards (no conditional)
-  const numberSizeClass = "text-2xl";
+  const numberSizeClass = "text-[22px]";
 
   const showBreakdown = label === "Total Expenses" && breakdown;
 
@@ -219,11 +264,18 @@ const KPICard = memo(function KPICard({
         )}
       </h2>
 
-      <div className={badgeClasses}>
+      <div className={badgeClasses} title={badgeTitle}>
         {iconElement}
-        {Math.abs(change).toFixed(1)}%
-        <span className="text-slate-400 font-medium">{rangeLabel}</span>
+        {changeText}
+        <span className="font-medium text-slate-400">{rangeLabel}</span>
       </div>
+
+      {/* What it is measured against — the number, not just the ratio. */}
+      {baseline ? (
+        <p className="mt-1 truncate text-[10px] font-medium text-slate-400">
+          {t("ops.dashboard.kpi_prev_value", { value: formatWithUnit(prevValue, unit) })}
+        </p>
+      ) : null}
     </div>
   );
 
