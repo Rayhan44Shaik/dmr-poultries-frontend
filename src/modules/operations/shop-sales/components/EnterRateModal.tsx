@@ -27,7 +27,7 @@ import {
   formatRateEntryTripDate,
 } from "../utils/rateEntryDisplay";
 import type { RateEntryMarketRateMasterDto } from "../utils/rateEntryMarketMaster";
-import { addCalendarDays } from "../utils/rateEntryMarketMaster";
+import { addCalendarDays, sizeCategoryHeaders } from "../utils/rateEntryMarketMaster";
 
 const SHOPS_PAGE_SIZE = 10;
 
@@ -61,7 +61,7 @@ function formatInr(n: number): string {
   return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-function formatDdMm(iso: string): string {
+function formatDdMmYy(iso: string): string {
   const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
   if (!m) return iso;
   return `${m[3]}-${m[2]}-${m[1]}`;
@@ -143,7 +143,7 @@ export default function EnterRateModal({
     return (trip as Trip & { marketRateMaster?: RateEntryMarketRateMasterDto | null } | null)?.marketRateMaster;
   }, [trip]);
 
-  // 3 days: yesterday, today, tomorrow - perfect highlight today
+  // 3 days: yesterday, today, tomorrow - like market rates page but only 3 days, today highlighted
   const marketThreeDays = useMemo(() => {
     if (!trip?.tripDate || !marketMaster) return [];
     const today = trip.tripDate;
@@ -152,9 +152,12 @@ export default function EnterRateModal({
     return [yesterday, today, tomorrow].map((date) => {
       const comp = marketMaster.companyRates.find((r) => r.date === date);
       const add = marketMaster.additionalMetrics.find((r) => r.date === date);
-      return { date, comp, add, isToday: date === today };
+      const size = marketMaster.sizeCategoryBreakdown.find((r) => r.date === date);
+      return { date, comp, add, size, isToday: date === today };
     });
   }, [trip?.tripDate, marketMaster]);
+
+  const sizeKeys = useMemo(() => sizeCategoryHeaders(marketMaster).slice(0, 5), [marketMaster]);
 
   const isDirty = useMemo(() => {
     if (!trip) return false;
@@ -258,39 +261,28 @@ export default function EnterRateModal({
       <style>{`
         .no-spinner::-webkit-inner-spin-button,.no-spinner::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
         .no-spinner{-moz-appearance:textfield}
-        /* global animations like trip list */
         .btn-anim{transition:all 0.2s cubic-bezier(0.4,0,0.2,1)}
         .btn-anim:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.1)}
-        .btn-anim:active{transform:scale(0.96) translateY(0)}
+        .btn-anim:active{transform:scale(0.96)}
         .x-anim{transition:all 0.25s ease}
         .x-anim:hover{transform:rotate(90deg) scale(1.1);background:#f1f5f9}
         .x-anim:active{transform:rotate(90deg) scale(0.9)}
         .lock-anim{transition:all 0.25s cubic-bezier(0.4,0,0.2,1);position:relative;overflow:hidden}
         .lock-anim:hover{transform:translateY(-2px) scale(1.02);box-shadow:0 8px 20px rgba(16,185,129,0.3)}
         .lock-anim:active{transform:scale(0.97)}
-        .lock-anim::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent);transition:left 0.5s}
-        .lock-anim:hover::before{left:100%}
-        .save-anim{transition:all 0.2s ease}
-        .save-anim:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(245,158,11,0.2)}
-        .save-anim:active{transform:scale(0.96)}
-        .reset-anim{transition:all 0.2s ease}
-        .reset-anim:hover{transform:translateY(-1px) rotate(-3deg);box-shadow:0 4px 12px rgba(0,0,0,0.08)}
-        .reset-anim:active{transform:scale(0.96) rotate(0)}
-        /* table rate input like market rates neat way */
         .rate-input-market{border:1px solid #e2e8f0;background:white;border-radius:8px;padding:6px 8px;text-align:center;font-weight:600;transition:all 0.2s}
         .rate-input-market:focus{border-color:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,0.1);outline:none}
         .rate-input-market.valid{border-color:#10b981;background:#ecfdf5;color:#065f46}
         .rate-input-market.invalid{border-color:#ef4444;background:#fef2f2;color:#991b1b}
-        /* responsive perfect middle for all screens 14,15,36 */
-        @media (min-width: 1280px){.modal-responsive{max-width:1150px}}
-        @media (min-width: 1536px){.modal-responsive{max-width:1250px}}
-        @media (min-width: 1920px){.modal-responsive{max-width:1350px}}
-        @media (min-width: 2560px){.modal-responsive{max-width:1500px}}
+        /* no drag - ensure table fits */
+        .no-drag-table{overflow:hidden}
+        .no-drag-table table{width:100%;table-layout:fixed}
+        @media (min-width:1280px){.modal-responsive{max-width:1150px}} @media (min-width:1536px){.modal-responsive{max-width:1250px}} @media (min-width:1920px){.modal-responsive{max-width:1350px}} @media (min-width:2560px){.modal-responsive{max-width:1500px}}
       `}</style>
 
       {showSuccessToast && createPortal(
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20">
-          <div className="bg-white rounded-2xl shadow-2xl border border-emerald-100 p-6 flex flex-col items-center gap-3 animate-in zoom-in">
+          <div className="bg-white rounded-2xl shadow-2xl border border-emerald-100 p-6 flex flex-col items-center gap-3">
             <div className="h-12 w-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center"><CheckCircle2 size={28} /></div>
             <div className="text-center"><h3 className="text-base font-bold text-slate-800">{t("ops.rate.modal.saved_title")}</h3><p className="text-xs text-slate-500 mt-0.5">{t("ops.rate.modal.saved_desc")}</p></div>
           </div>
@@ -321,12 +313,10 @@ export default function EnterRateModal({
 
       <AppShellModal open={open} onClose={onClose} panelClassName="bg-white modal-responsive mx-auto my-auto">
         <div className="bg-white w-full h-full flex flex-col relative overflow-hidden rounded-2xl max-h-[92vh] mx-auto">
-          {/* Header - logo same size as rate entry table font/size */}
+          {/* Header - logo same size as rate entry table */}
           <div className="bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shrink-0 rounded-t-2xl">
             <div className="flex items-center gap-3">
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm">
-                <Store size={17} />
-              </span>
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm"><Store size={17} /></span>
               <h2 className="text-[15px] font-bold tracking-tight text-slate-900">Enter shop wise rate</h2>
             </div>
             <div className="flex items-center gap-2">
@@ -334,13 +324,11 @@ export default function EnterRateModal({
                 <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 <span className="text-[11px] font-bold text-emerald-800 tabular-nums">{totals.ratedCount}/{deliveries.length} • {totals.progressPct}%</span>
               </div>
-              <button onClick={onClose} className="h-8 w-8 rounded-full flex items-center justify-center border border-slate-200 bg-white x-anim" aria-label="Close">
-                <X size={16} className="text-slate-600" />
-              </button>
+              <button onClick={onClose} className="h-8 w-8 rounded-full flex items-center justify-center border border-slate-200 bg-white x-anim"><X size={16} className="text-slate-600" /></button>
             </div>
           </div>
 
-          {/* Trip info - 14,15,36 inch suitable, perfect middle */}
+          {/* Trip info */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 px-5 py-3 shrink-0 bg-slate-50/70 border-b border-slate-100">
             <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm btn-anim">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700"><PackageCheck size={16} /></span>
@@ -360,28 +348,114 @@ export default function EnterRateModal({
             </div>
           </div>
 
-          {/* Market Rate - 3 days perfect, today highlighted, no extra Window texts */}
+          {/* Market Rate - 3 tables side wise like Masters > Market Rates image, only 3 days, today highlighted, no Window texts */}
           {marketThreeDays.length > 0 && (
-            <div className="px-5 py-3 bg-white border-b border-slate-100 shrink-0">
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                {marketThreeDays.map(({ date, comp, isToday }) => (
-                  <div key={date} className={`rounded-xl border px-3 py-2.5 transition-all ${isToday ? "border-emerald-300 bg-emerald-50 ring-2 ring-emerald-100 shadow-md" : "border-slate-200 bg-white"}`}>
-                    <div className="flex items-center justify-between mb-2">
-                      <p className={`text-[12px] font-bold ${isToday ? "text-emerald-800" : "text-slate-700"}`}>{formatDdMm(date)} {isToday ? "• Today" : date < (trip?.tripDate || "") ? "• Yesterday" : "• Tomorrow"}</p>
-                      {isToday && <span className="rounded-full bg-emerald-600 text-white px-2 py-0.5 text-[10px] font-bold animate-pulse">Today</span>}
+            <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 shrink-0">
+              <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
+                {/* Company & Association Rates */}
+                <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                  <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">📊</span>
+                      <p className="text-[12px] font-bold text-slate-800">Company & Association Rates</p>
                     </div>
-                    <div className="grid grid-cols-2 gap-2 text-[11px]">
-                      <div className="rounded-lg bg-slate-50 border border-slate-200 px-2 py-1.5">
-                        <p className="text-[10px] font-semibold text-slate-500">Vencob Rate</p>
-                        <p className="font-bold text-slate-800 tabular-nums">{comp?.vencobRate != null ? `₹ ${Number(comp.vencobRate).toFixed(2)}` : "—"}</p>
-                      </div>
-                      <div className="rounded-lg bg-slate-50 border border-slate-200 px-2 py-1.5">
-                        <p className="text-[10px] font-semibold text-slate-500">Sneha</p>
-                        <p className="font-bold text-slate-800 tabular-nums">{comp?.sneha != null ? comp.sneha.toFixed(2) : "—"}</p>
-                      </div>
-                    </div>
+                    <span className="text-[10px] font-bold text-slate-500">3 days • Today highlighted</span>
                   </div>
-                ))}
+                  <div className="overflow-hidden">
+                    <table className="w-full text-[11px]">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-100 text-slate-500">
+                          <th className="px-2 py-2 text-left font-semibold">Date</th>
+                          <th className="px-2 py-2 text-center font-semibold">Sneha / Farmer</th>
+                          <th className="px-2 py-2 text-center font-semibold">Ven Vij</th>
+                          <th className="px-2 py-2 text-center font-semibold">Ven Gun</th>
+                          <th className="px-2 py-2 text-center font-semibold">Ass Vij</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {marketThreeDays.map(({ date, comp, isToday }) => (
+                          <tr key={date} className={`border-t border-slate-100 ${isToday ? "bg-indigo-50/60" : "bg-white"}`}>
+                            <td className="px-2 py-2 font-medium text-slate-700">{formatDdMmYy(date)}</td>
+                            <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-white border-slate-200 font-bold text-slate-900" : "bg-white border-slate-200 text-slate-600"}`}>{comp?.sneha != null ? Number(comp.sneha).toFixed(0) : "—"}</div></td>
+                            <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-white border-slate-200 font-bold text-slate-900" : "bg-white border-slate-200 text-slate-600"}`}>{comp?.vencobVii != null ? Number(comp.vencobVii).toFixed(0) : "—"}</div></td>
+                            <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-white border-slate-200 font-bold text-slate-900" : "bg-white border-slate-200 text-slate-600"}`}>{comp?.vencobGun != null ? Number(comp.vencobGun).toFixed(0) : "—"}</div></td>
+                            <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-white border-slate-200 font-bold text-slate-900" : "bg-white border-slate-200 text-slate-600"}`}>{comp?.associationVii != null ? Number(comp.associationVii).toFixed(0) : "—"}</div></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Additional Metrics Entry */}
+                <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                  <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-sky-50 text-sky-600">Σ</span>
+                      <p className="text-[12px] font-bold text-slate-800">Additional Metrics Entry</p>
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-500">3 days</span>
+                  </div>
+                  <div className="overflow-hidden">
+                    <table className="w-full text-[11px]">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-100 text-slate-500">
+                          <th className="px-2 py-2 text-left font-semibold">Date</th>
+                          <th className="px-2 py-2 text-center font-semibold">Vij</th>
+                          <th className="px-2 py-2 text-center font-semibold">Gun</th>
+                          <th className="px-2 py-2 text-center font-semibold">R.P</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {marketThreeDays.map(({ date, add, isToday }) => (
+                          <tr key={date} className={`border-t border-slate-100 ${isToday ? "bg-indigo-50/60" : "bg-white"}`}>
+                            <td className="px-2 py-2 font-medium text-slate-700">{formatDdMmYy(date)}</td>
+                            <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-white border-slate-200 font-bold text-slate-900" : "bg-white border-slate-200 text-slate-600"}`}>{add?.vij != null ? Number(add.vij).toFixed(0) : "—"}</div></td>
+                            <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-white border-slate-200 font-bold text-slate-900" : "bg-white border-slate-200 text-slate-600"}`}>{add?.gun != null ? Number(add.gun).toFixed(0) : "—"}</div></td>
+                            <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums font-bold ${isToday ? "bg-white border-emerald-200 text-emerald-700" : "bg-white border-slate-200 text-emerald-600"}`}>{add?.rp != null ? Number(add.rp).toFixed(0) : "—"}</div></td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
+                {/* Shop Rates Less Breakdown */}
+                <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
+                  <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-slate-100">
+                    <div className="flex items-center gap-2">
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-violet-50 text-violet-600">◈</span>
+                      <p className="text-[12px] font-bold text-slate-800">Shop Rates Less Breakdown</p>
+                    </div>
+                    <span className="text-[10px] font-bold text-slate-500">3 days</span>
+                  </div>
+                  <div className="overflow-hidden">
+                    <table className="w-full text-[11px]">
+                      <thead>
+                        <tr className="bg-slate-50 border-b border-slate-100 text-slate-500">
+                          <th className="px-2 py-2 text-left font-semibold">Date</th>
+                          {sizeKeys.map((k) => (
+                            <th key={k} className="px-2 py-2 text-center font-semibold">{k.replace(/^c/i, "")}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {marketThreeDays.map(({ date, size, isToday }) => (
+                          <tr key={date} className={`border-t border-slate-100 ${isToday ? "bg-indigo-50/60" : "bg-white"}`}>
+                            <td className="px-2 py-2 font-medium text-slate-700">{formatDdMmYy(date)}</td>
+                            {sizeKeys.map((k) => (
+                              <td key={k} className="px-2 py-2">
+                                <div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-white border-slate-200 font-bold text-slate-900" : "bg-white border-slate-200 text-slate-600"}`}>
+                                  {size?.columns?.[k] != null ? Number(size.columns[k]).toFixed(0) : "—"}
+                                </div>
+                              </td>
+                            ))}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -392,42 +466,42 @@ export default function EnterRateModal({
             </div>
           )}
 
-          {/* Shop table - no colour for association/S.No/paper, birds weight same colour, amount decent, 10 shops, equally divided, no drag, perfect middle */}
+          {/* Shop table - no colour for S.No/association/paper, birds weight same colour, amount simple, 10 shops, no drag, perfect middle */}
           <div className="px-5 py-3 flex-1 min-h-0 flex flex-col overflow-hidden bg-white">
-            <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+            <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm no-drag-table">
               <div className="h-full overflow-hidden">
-                <table className="w-full table-fixed text-sm">
+                <table className="w-full text-sm">
                   <thead className="bg-slate-50">
                     <tr className="border-b border-slate-200">
                       <th className="w-[7%] px-2 py-3 text-center">
-                        <button type="button" onClick={() => toggleShopSort("time")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider transition-colors ${shopSortKey === "time" ? "bg-slate-100 text-slate-900 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+                        <button type="button" onClick={() => toggleShopSort("time")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "time" ? "bg-slate-100 text-slate-900 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
                           S.No {shopSortKey === "time" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
                       <th className="w-[22%] px-2 py-3 text-left">
-                        <button type="button" onClick={() => toggleShopSort("shopName")} className={`flex items-center gap-1 rounded-md px-2 py-1 text-[12px] font-bold uppercase tracking-wider transition-colors ${shopSortKey === "shopName" ? "bg-slate-100 text-slate-900 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+                        <button type="button" onClick={() => toggleShopSort("shopName")} className={`flex items-center gap-1 rounded-md px-2 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "shopName" ? "bg-slate-100 text-slate-900 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
                           Shop Name {shopSortKey === "shopName" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
                       <th className="w-[13%] px-2 py-3 text-left text-[12px] font-bold uppercase tracking-wider text-slate-600">Association</th>
                       <th className="w-[10%] px-2 py-3 text-center text-[12px] font-bold uppercase tracking-wider text-slate-600">Paper Rate</th>
                       <th className="w-[8%] px-2 py-3 text-center">
-                        <button type="button" onClick={() => toggleShopSort("birds")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider transition-colors ${shopSortKey === "birds" ? "bg-slate-100 text-slate-900 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+                        <button type="button" onClick={() => toggleShopSort("birds")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "birds" ? "bg-slate-100 text-slate-900 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
                           Birds {shopSortKey === "birds" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
                       <th className="w-[10%] px-2 py-3 text-center">
-                        <button type="button" onClick={() => toggleShopSort("weight")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider transition-colors ${shopSortKey === "weight" ? "bg-slate-100 text-slate-900 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+                        <button type="button" onClick={() => toggleShopSort("weight")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "weight" ? "bg-slate-100 text-slate-900 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
                           Weight {shopSortKey === "weight" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
                       <th className="w-[15%] px-2 py-3 text-center">
-                        <button type="button" onClick={() => toggleShopSort("rate")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider transition-colors ${shopSortKey === "rate" ? "bg-slate-100 text-slate-900 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+                        <button type="button" onClick={() => toggleShopSort("rate")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "rate" ? "bg-slate-100 text-slate-900 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
                           Rate {shopSortKey === "rate" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
                       <th className="w-[15%] px-2 py-3 text-center">
-                        <button type="button" onClick={() => toggleShopSort("amount")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider transition-colors ${shopSortKey === "amount" ? "bg-slate-100 text-slate-900 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+                        <button type="button" onClick={() => toggleShopSort("amount")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "amount" ? "bg-slate-100 text-slate-900 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
                           Amount {shopSortKey === "amount" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
@@ -448,9 +522,9 @@ export default function EnterRateModal({
 
                       return (
                         <tr key={delivery.id} className={`border-b border-slate-100 ${missingForLock ? "bg-red-50" : originalIndex % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-slate-50/50 hover:bg-slate-50"}`}>
-                          <td className="px-2 py-3 text-center text-[13px] font-medium text-slate-700 tabular-nums">{originalIndex + 1}</td>
+                          <td className="px-2 py-3 text-center text-[13px] font-normal text-slate-700 tabular-nums">{originalIndex + 1}</td>
                           <td className="px-3 py-3">
-                            <div className="text-[15px] font-medium text-slate-900 leading-tight truncate">{displayRateEntryShopName(delivery.shopName, language)}</div>
+                            <div className="text-[15px] font-normal text-slate-900 leading-tight truncate">{displayRateEntryShopName(delivery.shopName, language)}</div>
                             {masterShop && <div className="text-[11px] font-normal text-slate-500 truncate">{masterShop.city}</div>}
                           </td>
                           <td className="px-2 py-3 text-[13px] font-normal text-slate-700 truncate">{association ? displayRateEntryName(association, language) : "—"}</td>
@@ -482,7 +556,7 @@ export default function EnterRateModal({
                             )}
                           </td>
                           <td className="px-2 py-3 text-center">
-                            <span className="inline-flex items-center justify-center rounded-lg bg-slate-900 text-white px-2.5 py-1 text-[12px] font-bold tabular-nums shadow-sm">
+                            <span className="inline-flex items-center justify-center rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 px-2.5 py-1 text-[12px] font-semibold tabular-nums">
                               ₹ {formatInr(amount)}
                             </span>
                           </td>
@@ -497,7 +571,6 @@ export default function EnterRateModal({
               </div>
             </div>
 
-            {/* Pagination - light green on right corner */}
             {filteredSortedDeliveries.length > 0 && (
               <div className="mt-3 flex items-center justify-end">
                 <div className="flex items-center gap-1 rounded-lg border border-emerald-200 bg-white px-1.5 py-1 shadow-sm">
@@ -505,7 +578,7 @@ export default function EnterRateModal({
                     <ChevronLeft size={12} /> Previous
                   </button>
                   {pageNumbers.map((num) => (
-                    <button key={num} type="button" onClick={() => setShopPage(num)} disabled={saving} className={`h-7 w-7 rounded-md text-[11px] font-bold tabular-nums btn-anim ${num === shopPage ? "bg-emerald-600 text-white shadow-sm" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"}`}>{num}</button>
+                    <button key={num} type="button" onClick={() => setShopPage(num)} disabled={saving} className={`h-7 w-7 rounded-md text-[11px] font-bold tabular-nums btn-anim ${num === shopPage ? "bg-emerald-600 text-white" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"}`}>{num}</button>
                   ))}
                   <button type="button" onClick={() => setShopPage((p) => Math.min(shopPageCount, p + 1))} disabled={shopPage >= shopPageCount || saving} className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-semibold hover:bg-emerald-100 disabled:opacity-40 btn-anim">
                     Next <ChevronRight size={12} />
@@ -515,7 +588,6 @@ export default function EnterRateModal({
             )}
           </div>
 
-          {/* Footer - reset, cancel, save, lock big with animations global */}
           <div className="bg-white border-t border-slate-200 px-5 py-3 shrink-0 rounded-b-2xl">
             {rateLocked ? (
               <div className="flex justify-end"><button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-[13px] font-medium text-slate-700 hover:bg-slate-50 btn-anim">Close</button></div>
@@ -529,7 +601,7 @@ export default function EnterRateModal({
                 <div className="flex items-center gap-2">
                   <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-[13px] font-medium text-slate-600 hover:bg-slate-50 btn-anim">Cancel</button>
                   <button type="button" onClick={() => confirmSave("save")} disabled={saving || !isDirty || hasInvalidEnteredRate} className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border text-[13px] font-medium disabled:opacity-50 save-anim ${isDirty ? "border-amber-300 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
-                    <Save size={14} /> {saving ? t("ops.rate.modal.saving") : "Save"}
+                    <Save size={14} /> Save
                   </button>
                   <button
                     type="button"
