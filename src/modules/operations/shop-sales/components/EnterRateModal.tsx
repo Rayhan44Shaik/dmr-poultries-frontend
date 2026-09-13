@@ -261,15 +261,34 @@ export default function EnterRateModal({
       <style>{`
         .no-spinner::-webkit-inner-spin-button,.no-spinner::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
         .no-spinner{-moz-appearance:textfield}
+        /* global animations - like trip list */
         .btn-anim{transition:all 0.2s cubic-bezier(0.4,0,0.2,1)}
         .btn-anim:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.1)}
         .btn-anim:active{transform:scale(0.96)}
         .x-anim{transition:all 0.25s ease}
         .x-anim:hover{transform:rotate(90deg) scale(1.1);background:#f1f5f9}
         .x-anim:active{transform:rotate(90deg) scale(0.9)}
+        /* reset animation like trip list - icon spins -180 */
+        .reset-anim{transition:all 0.25s cubic-bezier(0.4,0,0.2,1)}
+        .reset-anim svg{transition:transform 0.45s cubic-bezier(0.4,0,0.2,1)}
+        .reset-anim:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.08);background:#f8fafc}
+        .reset-anim:hover svg{transform:rotate(-180deg)}
+        .reset-anim:active{transform:scale(0.96)}
+        .reset-anim:active svg{transform:rotate(-360deg)}
+        /* save animation */
+        .save-anim{transition:all 0.25s cubic-bezier(0.4,0,0.2,1);position:relative;overflow:hidden}
+        .save-anim:hover{transform:translateY(-1px) scale(1.02);box-shadow:0 6px 16px rgba(0,0,0,0.12)}
+        .save-anim:active{transform:scale(0.97)}
+        .save-anim::after{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.4),transparent);transition:left 0.5s}
+        .save-anim:hover::after{left:100%}
+        /* save & lock big lock animation */
         .lock-anim{transition:all 0.25s cubic-bezier(0.4,0,0.2,1);position:relative;overflow:hidden}
-        .lock-anim:hover{transform:translateY(-2px) scale(1.02);box-shadow:0 8px 20px rgba(16,185,129,0.3)}
+        .lock-anim:hover{transform:translateY(-2px) scale(1.02);box-shadow:0 8px 20px rgba(16,185,129,0.35)}
         .lock-anim:active{transform:scale(0.97)}
+        .lock-anim svg{transition:transform 0.3s ease}
+        .lock-anim:hover svg{transform:scale(1.15) rotate(5deg)}
+        .lock-anim::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent);transition:left 0.6s}
+        .lock-anim:hover::before{left:100%}
         .rate-input-market{border:1px solid #e2e8f0;background:white;border-radius:8px;padding:6px 8px;text-align:center;font-weight:600;transition:all 0.2s}
         .rate-input-market:focus{border-color:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,0.1);outline:none}
         .rate-input-market.valid{border-color:#10b981;background:#ecfdf5;color:#065f46}
