@@ -304,9 +304,7 @@ export default function EnterRateModal({
         .lock-anim:active{transform:scale(0.96)}
         .lock-anim svg{transition:transform 0.3s ease; transform-origin:center}
         .lock-anim:hover svg{animation:lock-open-close 0.6s ease-in-out; transform-origin:center left}
-        .lock-anim:hover .lock-icon-wrap{animation:lock-pulse 1.5s infinite}
-        .lock-anim:hover .lock-icon-wrap{animation:lock-pulse 1.2s infinite, lock-open-close 0.9s ease infinite}
-        .lock-anim::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.25),transparent);transition:left 0.6s}
+        .lock-anim:hover         .lock-anim:hover         .lock-anim::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.25),transparent);transition:left 0.6s}
         .lock-anim:hover::before{left:100%}
         .rate-input-market{border:1px solid #e2e8f0;background:white;border-radius:8px;padding:6px 8px;text-align:center;font-weight:600;transition:all 0.2s}
         .rate-input-market:focus{border-color:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,0.1);outline:none}
@@ -314,8 +312,7 @@ export default function EnterRateModal({
         .rate-input-market.invalid{border-color:#ef4444;background:#fef2f2;color:#991b1b}
         /* perf scroll - fix freezing */
         @keyframes lock-pulse{0%,100%{box-shadow:0 0 0 0 rgba(249,115,22,0.45)}50%{box-shadow:0 0 0 8px rgba(249,115,22,0)}}
-        .lock-icon-wrap{animation:lock-pulse 2s infinite; border-radius:9999px; transform-origin:center left}
-        .scroll-perf{-webkit-overflow-scrolling:touch;overscroll-behavior:contain;transform:translateZ(0);will-change:scroll-position}
+                .scroll-perf{-webkit-overflow-scrolling:touch;overscroll-behavior:contain;transform:translateZ(0);will-change:scroll-position}
         .no-drag-table{overflow:hidden;transform:translateZ(0)}
         .no-drag-table table{width:100%;table-layout:fixed}
         @media (min-width:1280px){.modal-responsive{max-width:1150px}} @media (min-width:1536px){.modal-responsive{max-width:1250px}} @media (min-width:1920px){.modal-responsive{max-width:1350px}} @media (min-width:2560px){.modal-responsive{max-width:1500px}}
@@ -346,7 +343,7 @@ export default function EnterRateModal({
             </div>
             <div className="mt-6 flex justify-end gap-3">
               <button onClick={() => setShowConfirm(false)} className="group relative inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 cancel-anim"><span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-close)]"><X size={14} /></span> Cancel</button>
-              <button onClick={() => confirmSave("lock")} disabled={saving} className="group relative inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-orange-600 border border-orange-600 text-white text-sm font-bold shadow-md hover:bg-orange-700 hover:shadow-lg lock-anim"><span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-white border border-orange-200 text-orange-600 shadow-sm lock-icon-wrap"><Lock size={16} /></span> Lock</button>
+              <button onClick={() => confirmSave("lock")} disabled={saving} className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-sm font-medium text-white shadow-sm lock-anim">Lock</button>
             </div>
           </div>
         </div>, document.body
@@ -661,8 +658,8 @@ export default function EnterRateModal({
                 </div>
                 <div className="flex items-center gap-3">
                   <button type="button" onClick={onClose} className="group relative inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-slate-300 bg-white text-[14px] font-semibold text-slate-600 hover:bg-slate-50 cancel-anim min-w-[110px]"><span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-close)]"><X size={14} /></span> Cancel</button>
-                  <button type="button" onClick={() => confirmSave("save")} disabled={saving || !isDirty || hasInvalidEnteredRate} className={`group relative inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl border border-emerald-300 bg-emerald-50 text-emerald-800 text-[14px] font-bold disabled:opacity-50 save-anim min-w-[130px] hover:bg-emerald-100 hover:border-emerald-400`}>
-                    <span className="inline-flex text-emerald-700 motion-safe:group-hover:animate-[var(--animate-action-edit)]"><Save size={16} /></span> Save
+                  <button type="button" onClick={() => confirmSave("save")} disabled={saving || !isDirty || hasInvalidEnteredRate} className={`group relative inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl border text-[14px] font-bold disabled:opacity-50 save-anim min-w-[130px] ${isDirty ? "border-amber-300 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
+                    <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-edit)]"><Save size={16} /></span> Save
                   </button>
                   <button
                     type="button"
@@ -680,9 +677,9 @@ export default function EnterRateModal({
                       setShowConfirm(true);
                     }}
                     disabled={saving}
-                    className="group relative inline-flex items-center justify-center gap-2.5 px-8 py-3.5 rounded-xl bg-orange-600 border border-orange-600 text-white text-[15px] font-extrabold shadow-xl hover:bg-orange-700 hover:shadow-2xl hover:border-orange-700 disabled:opacity-50 lock-anim min-w-[190px]"
+                    className="inline-flex items-center justify-center gap-2.5 px-8 py-3.5 rounded-xl bg-emerald-600 text-white text-[15px] font-extrabold shadow-xl hover:shadow-2xl disabled:opacity-50 lock-anim min-w-[180px]"
                   >
-                    <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-white border border-orange-200 text-orange-600 shadow-sm lock-icon-wrap"><Lock size={20} /></span> Save & Lock
+                    <Lock size={18} className="text-emerald-100" /> Save & Lock
                   </button>
                 </div>
               </div>
