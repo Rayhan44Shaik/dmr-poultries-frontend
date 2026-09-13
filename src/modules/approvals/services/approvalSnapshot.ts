@@ -10,6 +10,7 @@
 //   rateEntries  Completed trips awaiting rates → Operations · Rate Entry
 //   payments     Draft payment requests          → Accounts · Payment Register
 //   collections  Cash/bank collections entered   → Operations · Collection Entry
+//   leaves       Leave requests awaiting a yes/no → Staff · Leaves
 //
 // The Approval Center refreshes this store after every decision, so badges and
 // bell counts stay in sync app-wide.
@@ -22,6 +23,8 @@ import { fleetSharedGet } from '../../fleet-operations/services/fleetSessionCach
 import { listEligibleTrips } from '../../operations/shop-sales/services/rateEntryApiService';
 import { listPayments } from '../../accounts/services/paymentApiService';
 import { createDemoPayments } from '../../accounts/utils/paymentRegisterDemo';
+import { listLeaves } from '../../staff/services/leaveService';
+import { STAFF_LEAVES_CHANGED } from '../../staff/services/staffEvents';
 import { apiGet } from '../../../api';
 
 export interface ApprovalQueueItem {
@@ -54,6 +57,8 @@ export interface ApprovalSnapshot {
   collections: ApprovalQueue;
   /** Expired fleet permits/documents (RC, insurance, fitness, permit, PUC). */
   documents: ApprovalQueue;
+  /** Leave requests still waiting for the owner's approval. */
+  leaves: ApprovalQueue;
   total: number;
 }
 
@@ -70,6 +75,7 @@ const INITIAL: ApprovalSnapshot = {
   payments: { ...EMPTY_QUEUE },
   collections: { ...EMPTY_QUEUE },
   documents: { ...EMPTY_QUEUE },
+  leaves: { ...EMPTY_QUEUE },
   total: 0,
 };
 
@@ -96,7 +102,8 @@ function publish(next: Partial<ApprovalSnapshot>) {
     snapshot.maintenance.count +
     snapshot.rateEntries.count +
     snapshot.payments.count +
-    snapshot.collections.count;
+    snapshot.collections.count +
+    snapshot.leaves.count;
   for (const listener of listeners) listener();
 }
 
@@ -160,10 +167,20 @@ export function refreshApprovalSnapshot(force = false): Promise<void> {
       demoPayments ? Promise.resolve(createDemoPayments()) : listPayments().catch(() => []),
       fleetSharedGet('permits:list', () => permitApi.list()).catch(() => []),
       listPendingApprovalCollections(),
+      // Every pending leave, whatever month it was raised in — the queue the
+      // owner has to clear is not scoped to the month the Staff page filters to.
+      listLeaves({ status: 'Pending', limit: cap }),
     ]);
 
-    const [tripsResult, maintenanceResult, rateResult, paymentsResult, documentsResult, collectionsResult] =
-      results;
+    const [
+      tripsResult,
+      maintenanceResult,
+      rateResult,
+      paymentsResult,
+      documentsResult,
+      collectionsResult,
+      leavesResult,
+    ] = results;
 
     // Trips awaiting approval (Pending, excluding the [ORDER] container trips).
     let tripsQueue = snapshot.trips;
@@ -253,6 +270,25 @@ export function refreshApprovalSnapshot(force = false): Promise<void> {
       };
     }
 
+    // Leave requests waiting for a decision. `count` comes from the API's total
+    // (the request only carries the first few rows for the tooltip/bell).
+    let leavesQueue = snapshot.leaves;
+    if (leavesResult.status === 'fulfilled') {
+      const pending = leavesResult.value.items.filter((leave) => leave.status === 'Pending');
+      leavesQueue = {
+        count: leavesResult.value.total || pending.length,
+        value: 0,
+        items: pending.slice(0, cap).map((leave) => ({
+          id: `leave-${leave.id}`,
+          ref: leave.employeeName || `Leave #${leave.id}`,
+          sub: [leave.type, leave.days ? `${leave.days}d` : '', leave.fromDate]
+            .filter(Boolean)
+            .join(' · ') || 'Leave request',
+          waitingFrom: leave.createdAt || (leave.fromDate ? `${leave.fromDate}T00:00:00` : null),
+        })),
+      };
+    }
+
     // Expired fleet permits/documents (mirrors the Permits matrix threshold:
     // expiry strictly before today is "expired"; within 30 days is "expiring").
     let documentsQueue = snapshot.documents;
@@ -289,6 +325,7 @@ export function refreshApprovalSnapshot(force = false): Promise<void> {
       payments: paymentQueue,
       collections: collectionsQueue,
       documents: documentsQueue,
+      leaves: leavesQueue,
     });
   })();
 
@@ -321,8 +358,24 @@ export function startApprovalPolling(intervalMs = 90_000): () => void {
     if (!document.hidden) void refreshApprovalSnapshot();
   };
   document.addEventListener('visibilitychange', onVisible);
+
+  /* Approving or rejecting a leave fires this event (staff/services/staffEvents),
+     so the Leaves tile and the bell drop their count at once instead of waiting
+     up to 90 s for the next poll. Debounced: clearing a handful of requests in a
+     row should cost one refresh, not one per click. The store listens rather than
+     the leave hook calling in — that keeps the dependency pointing one way
+     (aggregator → modules) and browser-only services out of the staff chunk. */
+  let leavesChangedTimer: number | undefined;
+  const onLeavesChanged = () => {
+    window.clearTimeout(leavesChangedTimer);
+    leavesChangedTimer = window.setTimeout(() => void kickApprovalSnapshot(), 600);
+  };
+  window.addEventListener(STAFF_LEAVES_CHANGED, onLeavesChanged);
+
   return () => {
     window.clearInterval(timer);
+    window.clearTimeout(leavesChangedTimer);
     document.removeEventListener('visibilitychange', onVisible);
+    window.removeEventListener(STAFF_LEAVES_CHANGED, onLeavesChanged);
   };
 }
