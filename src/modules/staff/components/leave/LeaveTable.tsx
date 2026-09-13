@@ -82,9 +82,10 @@ function LeaveTable({ leaves, onApprove, onReject, onDelete, onCancel }: LeaveTa
 
   return (
     <>
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-slate-200">
+      {/* No card chrome here — the page wrapper (border + LeaveTableHeader)
+          provides it; this only scrolls the grid. */}
+      <div className="overflow-x-auto">
+        <table className="min-w-full divide-y divide-slate-200">
             <thead className="bg-slate-50">
               <tr>
                 <th className="px-3 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Leave No.</th>
@@ -177,7 +178,6 @@ function LeaveTable({ leaves, onApprove, onReject, onDelete, onCancel }: LeaveTa
               ))}
             </tbody>
           </table>
-        </div>
       </div>
 
       {/* Employee Leave History Modal */}

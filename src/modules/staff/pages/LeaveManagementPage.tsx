@@ -8,6 +8,7 @@ import LeaveFilters from '../components/leave/LeaveFilters';
 import LeaveRequestForm from '../components/leave/LeaveRequestForm';
 import type { LeaveRequestInput } from '../components/leave/LeaveRequestForm';
 import LeaveTable from '../components/leave/LeaveTable';
+import LeaveTableHeader from '../components/leave/LeaveTableHeader';
 import Pagination from '../components/common/Pagination';
 
 const REFRESH_TOAST_DURATION = 5000;
@@ -120,12 +121,16 @@ function LeaveManagementPage() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600" />
         </div>
       ) : leaves.length === 0 ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
-          <p className="text-sm font-medium text-slate-500">No leave requests found</p>
-          <p className="text-xs text-slate-400 mt-1">Try adjusting your filters or create a new request.</p>
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <LeaveTableHeader />
+          <div className="p-8 text-center">
+            <p className="text-sm font-medium text-slate-500">No leave requests found</p>
+            <p className="text-xs text-slate-400 mt-1">Try adjusting your filters or create a new request.</p>
+          </div>
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <LeaveTableHeader />
           <LeaveTable
             leaves={leaves}
             onApprove={handleApprove}

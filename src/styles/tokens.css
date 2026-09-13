@@ -420,6 +420,7 @@
   --animate-action-whatsapp: action-whatsapp 1s ease-in-out infinite;
   --animate-action-close: action-close 0.8s ease-in-out infinite;
   --animate-action-excel: action-excel 0.9s ease-in-out infinite;
+  --animate-action-add: action-add 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) infinite;
 
   /* Magnifier sweeps side to side with a slight tilt, as if scanning a line. */
   @keyframes action-search {
@@ -504,6 +505,16 @@
     25%      { transform: translateY(-2.5px) rotate(-4deg); }
     50%      { transform: translateY(0) rotate(0deg); }
     75%      { transform: translateY(-1.5px) rotate(4deg); }
+  }
+
+  /* Add / New: the plus stamps itself into existence — winds up small and
+   * turned, springs past full size, then settles. Reads as "click a new item
+   * into being" for New Trip / New Request / Add-style primary actions. */
+  @keyframes action-add {
+    0%, 100% { transform: scale(1) rotate(0deg); }
+    30%      { transform: scale(0.7) rotate(-90deg); }
+    60%      { transform: scale(1.28) rotate(0deg); }
+    80%      { transform: scale(0.92) rotate(0deg); }
   }
 
   /* =========================================================================
