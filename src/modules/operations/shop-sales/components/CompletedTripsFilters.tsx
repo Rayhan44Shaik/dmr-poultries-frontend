@@ -69,7 +69,9 @@ function CompletedTripsFilters({
   onExportExcel,
 }: Props) {
   const { t } = useI18n();
-  const enableExports = hasFilters && pendingTrips > 0;
+  // Exports should be available whenever there is data, not only when filtered
+  const enableExports = pendingTrips > 0;
+  void hasFilters;
   const vehicleOptions = withoutSentinel(vehicleList || [], "All Vehicles");
   const supervisorOptions = withoutSentinel(supervisorList || [], "All Supervisors");
 

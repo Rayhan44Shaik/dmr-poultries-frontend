@@ -15,6 +15,8 @@ import {
   ArrowUp,
   ArrowDown,
   Check,
+  TrendingUp,
+  AlertCircle,
 } from "lucide-react";
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
 import { formatVehicleNumber } from "../../../../utils/format";
@@ -58,6 +60,30 @@ function SortArrows({ active, dir }: { active: boolean; dir?: "asc" | "desc" }) 
   );
 }
 
+function RateProgress({ trip }: { trip: Trip }) {
+  const total = trip.totalShops ?? trip.deliveries?.length ?? 0;
+  const entered = (trip as unknown as { ratesEntered?: number }).ratesEntered ?? 0;
+  // For pending trips where rates are null, entered is 0, total is shops
+  const pct = total ? Math.round((entered / total) * 100) : 0;
+  if (total === 0) return <span className="text-slate-400">—</span>;
+  return (
+    <div className="flex flex-col items-center gap-1 min-w-[84px]">
+      <div className="flex items-center gap-1 text-[11px] font-bold">
+        <span className={entered === total ? "text-emerald-600" : entered > 0 ? "text-amber-600" : "text-slate-500"}>
+          {entered}/{total}
+        </span>
+        <span className="text-[10px] font-medium text-slate-400">{pct}%</span>
+      </div>
+      <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${entered === total ? "bg-emerald-500" : "bg-amber-500"}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 function CompletedTripsTable({
   trips,
   onEnterRate,
@@ -93,60 +119,107 @@ function CompletedTripsTable({
 
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+      <div className="px-4 py-2.5 bg-gradient-to-r from-slate-50 to-emerald-50/30 border-b border-slate-200 flex items-center justify-between">
+        <div className="flex items-center gap-2 text-[12px] font-semibold text-slate-600">
+          <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
+            <TrendingUp size={13} />
+          </span>
+          Rate Entry — Synced with quarter sample • {trips.length} trips in view
+        </div>
+        <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+          <span className="inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-amber-700">
+            <AlertCircle size={11} /> Pending rates require entry
+          </span>
+        </div>
+      </div>
+
       <div className="w-full overflow-x-auto">
         <table className="min-w-full text-sm text-left border-collapse">
           <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-600">
             <tr className="whitespace-nowrap">
-              <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider w-10">#</th>
-              <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
-                {sortable("tripNo", <div className="flex items-center gap-1.5">
-                  <Hash size={13} className="text-slate-400 flex-shrink-0" />
-                  <span>{t("operations.trip_no")}</span>
-                </div>)}
+              <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wider w-10">#</th>
+              <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
+                {sortable(
+                  "tripNo",
+                  <div className="flex items-center gap-1.5">
+                    <Hash size={13} className="text-slate-400 flex-shrink-0" />
+                    <span>{t("operations.trip_no")}</span>
+                  </div>
+                )}
               </th>
-              <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
-                {sortable("tripDate", <div className="flex items-center gap-1.5">
-                  <Calendar size={13} className="text-blue-500 flex-shrink-0" />
-                  <span>{t("ops.rate.col.day")}</span>
-                </div>)}
+              <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
+                {sortable(
+                  "tripDate",
+                  <div className="flex items-center gap-1.5">
+                    <Calendar size={13} className="text-blue-500 flex-shrink-0" />
+                    <span>{t("ops.rate.col.day")}</span>
+                  </div>
+                )}
               </th>
-              <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
-                {sortable("vehicleNo", <div className="flex items-center gap-1.5">
-                  <Truck size={13} className="text-indigo-500 flex-shrink-0" />
-                  <span>{t("common.vehicle")}</span>
-                </div>)}
+              <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
+                {sortable(
+                  "vehicleNo",
+                  <div className="flex items-center gap-1.5">
+                    <Truck size={13} className="text-indigo-500 flex-shrink-0" />
+                    <span>{t("common.vehicle")}</span>
+                  </div>
+                )}
               </th>
-              <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
-                {sortable("supervisorName", <div className="flex items-center gap-1.5">
-                  <UserCog size={13} className="text-purple-500 flex-shrink-0" />
-                  <span>{t("common.supervisor")}</span>
-                </div>)}
+              <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
+                {sortable(
+                  "supervisorName",
+                  <div className="flex items-center gap-1.5">
+                    <UserCog size={13} className="text-purple-500 flex-shrink-0" />
+                    <span>{t("common.supervisor")}</span>
+                  </div>
+                )}
               </th>
-              <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
-                {sortable("sourceFarm", <div className="flex items-center gap-1.5">
-                  <Warehouse size={13} className="text-amber-500 flex-shrink-0" />
-                  <span>{t("ops.trip.source_farm")}</span>
-                </div>)}
+              <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
+                {sortable(
+                  "sourceFarm",
+                  <div className="flex items-center gap-1.5">
+                    <Warehouse size={13} className="text-amber-500 flex-shrink-0" />
+                    <span>{t("ops.trip.source_farm")}</span>
+                  </div>
+                )}
               </th>
-              <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
-                {sortable("totalShops", <div className="flex items-center justify-center gap-1.5">
-                  <ShoppingBag size={13} className="text-cyan-500 flex-shrink-0" />
-                  <span>{t("ops.trip.shops")}</span>
-                </div>, true)}
+              <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
+                {sortable(
+                  "totalShops",
+                  <div className="flex items-center justify-center gap-1.5">
+                    <ShoppingBag size={13} className="text-cyan-500 flex-shrink-0" />
+                    <span>{t("ops.trip.shops")}</span>
+                  </div>,
+                  true
+                )}
               </th>
-              <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
-                {sortable("totalBirds", <div className="flex items-center justify-center gap-1.5">
-                  <Bird size={13} className="text-blue-500 flex-shrink-0" />
-                  <span>{t("common.birds")}</span>
-                </div>, true)}
+              <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
+                {sortable(
+                  "totalBirds",
+                  <div className="flex items-center justify-center gap-1.5">
+                    <Bird size={13} className="text-blue-500 flex-shrink-0" />
+                    <span>{t("common.birds")}</span>
+                  </div>,
+                  true
+                )}
               </th>
-              <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
-                {sortable("totalWeight", <div className="flex items-center justify-center gap-1.5">
-                  <Scale size={13} className="text-orange-500 flex-shrink-0" />
-                  <span>{t("ops.trip.weight_kg")}</span>
-                </div>, true)}
+              <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
+                {sortable(
+                  "totalWeight",
+                  <div className="flex items-center justify-center gap-1.5">
+                    <Scale size={13} className="text-orange-500 flex-shrink-0" />
+                    <span>{t("ops.trip.weight_kg")}</span>
+                  </div>,
+                  true
+                )}
               </th>
-              <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
+              <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
+                <div className="flex items-center justify-center gap-1.5">
+                  <IndianRupee size={13} className="text-emerald-600 flex-shrink-0" />
+                  <span>Rate Progress</span>
+                </div>
+              </th>
+              <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
                 <div className="flex items-center justify-center gap-1.5">
                   <Settings size={13} className="text-slate-500 flex-shrink-0" />
                   <span>{t("ops.rate.col.action")}</span>
@@ -157,7 +230,7 @@ function CompletedTripsTable({
           <tbody className="divide-y divide-slate-100">
             {trips.length === 0 ? (
               <tr>
-                <td colSpan={10} className="py-12 text-center text-slate-400 text-xs font-medium">
+                <td colSpan={11} className="py-12 text-center text-slate-400 text-xs font-medium">
                   {t("ops.rate.no_waiting_trips")}
                 </td>
               </tr>
@@ -168,6 +241,8 @@ function CompletedTripsTable({
                 const isReadOnly = isLocked && !canModify;
                 const serialNo = startIndex + index + 1;
                 const isSelected = trip.id === selectedRowId;
+                const totalShops = trip.totalShops ?? 0;
+                const hasMarketRef = (trip as unknown as { marketRatesWindow?: unknown[] }).marketRatesWindow != null;
 
                 return (
                   <tr
@@ -176,23 +251,51 @@ function CompletedTripsTable({
                     className={`${onRowClick ? "cursor-pointer" : ""} border-t transition-colors duration-150 ${
                       isSelected
                         ? "bg-orange-50/80 border-l-4 border-l-orange-200 ring-1 ring-inset ring-orange-100"
-                        : `${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"} hover:bg-slate-50/60`
+                        : `${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"} hover:bg-emerald-50/40`
                     }`}
                   >
-                    <td className="px-4 py-3 text-center text-xs text-slate-500 font-medium w-10">
+                    <td className="px-3 py-3 text-center text-xs text-slate-500 font-medium w-10">
                       {isSelected ? <Check size={15} className="inline text-orange-500" /> : serialNo}
                     </td>
-                    <td className="px-4 py-3 font-bold text-emerald-500 text-xs whitespace-nowrap">{trip.tripNo}</td>
-                    <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">{formatRateEntryDay(trip.tripDate, language)}</td>
-                    <td className="px-4 py-3 text-xs font-medium text-slate-700 whitespace-nowrap">{formatVehicleNumber(trip.vehicleNo)}</td>
-                    <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">{displayRateEntryName(trip.supervisorName, language)}</td>
-                    <td className="px-4 py-3 text-xs text-slate-600 font-medium whitespace-nowrap">{displayRateEntryName(trip.sourceFarm, language)}</td>
-                    <td className="px-4 py-3 text-center text-xs font-bold text-slate-700 whitespace-nowrap">{trip.totalShops}</td>
-                    <td className="px-4 py-3 text-center text-xs font-bold text-blue-500 whitespace-nowrap">{trip.totalBirds.toLocaleString()}</td>
-                    <td className="px-4 py-3 text-center text-xs font-bold text-amber-500 whitespace-nowrap">{trip.totalWeight.toFixed(2)}</td>
-                    <td className="px-4 py-3 text-center whitespace-nowrap">
+                    <td className="px-3 py-3 font-bold text-emerald-600 text-xs whitespace-nowrap">
+                      <div className="flex flex-col">
+                        <span>{trip.tripNo}</span>
+                        {hasMarketRef && (
+                          <span className="text-[10px] font-medium text-sky-600">Market synced</span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">
+                      <div className="flex flex-col">
+                        <span>{formatRateEntryDay(trip.tripDate, language)}</span>
+                        <span className="text-[10px] text-slate-400">{trip.tripDate}</span>
+                      </div>
+                    </td>
+                    <td className="px-3 py-3 text-xs font-medium text-slate-700 whitespace-nowrap">
+                      {formatVehicleNumber(trip.vehicleNo)}
+                    </td>
+                    <td className="px-3 py-3 text-xs text-slate-600 whitespace-nowrap">
+                      {displayRateEntryName(trip.supervisorName, language)}
+                    </td>
+                    <td className="px-3 py-3 text-xs text-slate-600 font-medium whitespace-nowrap">
+                      {displayRateEntryName(trip.sourceFarm, language)}
+                    </td>
+                    <td className="px-3 py-3 text-center whitespace-nowrap">
+                      <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-bold text-slate-700">
+                        {totalShops}
+                      </span>
+                    </td>
+                    <td className="px-3 py-3 text-center text-xs font-bold text-blue-600 whitespace-nowrap">
+                      {trip.totalBirds.toLocaleString()}
+                    </td>
+                    <td className="px-3 py-3 text-center text-xs font-bold text-amber-600 whitespace-nowrap">
+                      {trip.totalWeight.toFixed(2)}
+                    </td>
+                    <td className="px-3 py-3 text-center whitespace-nowrap">
+                      <RateProgress trip={trip} />
+                    </td>
+                    <td className="px-3 py-3 text-center whitespace-nowrap">
                       {!isLocked ? (
-                        // Enter Rates – always enabled for un-locked trips
                         <button
                           type="button"
                           onClick={(event) => {
@@ -202,12 +305,13 @@ function CompletedTripsTable({
                           className="group relative inline-flex items-center gap-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 text-xs font-semibold transition-[color,background-color,border-color,box-shadow,transform] duration-150 shadow-sm active:scale-95"
                           aria-label={`${t("ops.rate.enter_tooltip")} ${trip.tripNo}`}
                         >
-                          <span className={`inline-flex ${uiActionIconMotionClass.edit}`}><IndianRupee size={14} /></span>
+                          <span className={`inline-flex ${uiActionIconMotionClass.edit}`}>
+                            <IndianRupee size={14} />
+                          </span>
                           {t("ops.rate.enter_rates")}
                           <ActionTooltip label={t("ops.rate.enter_tooltip")} />
                         </button>
                       ) : canModify ? (
-                        // Rates – editable within 10 days
                         <button
                           type="button"
                           onClick={(event) => {
@@ -217,12 +321,15 @@ function CompletedTripsTable({
                           className="group relative inline-flex items-center gap-1.5 rounded-xl border border-orange-200 bg-orange-50 text-orange-700 hover:border-orange-300 hover:bg-orange-100 hover:text-orange-800 px-3 py-1.5 text-xs font-semibold transition-[color,background-color,border-color,box-shadow,transform] duration-150 shadow-sm active:scale-95"
                           aria-label={`${t("ops.rate.modify_tooltip")} ${trip.tripNo}`}
                         >
-                          <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full bg-orange-100 text-orange-600 ring-1 ring-orange-200 group-hover:bg-orange-200 ${uiActionIconMotionClass.edit}`}><Pencil size={13} /></span>
+                          <span
+                            className={`inline-flex h-5 w-5 items-center justify-center rounded-full bg-orange-100 text-orange-600 ring-1 ring-orange-200 group-hover:bg-orange-200 ${uiActionIconMotionClass.edit}`}
+                          >
+                            <Pencil size={13} />
+                          </span>
                           {t("ops.rate.modify_rates")}
                           <ActionTooltip label={t("ops.rate.modify_tooltip")} />
                         </button>
                       ) : isReadOnly ? (
-                        // Read-only – older than 10 days
                         <span className="inline-flex items-center gap-1 rounded-xl bg-slate-100 text-slate-400 px-3 py-1.5 text-xs font-semibold cursor-not-allowed">
                           <Lock size={14} />
                           {t("ops.rate.locked")}
@@ -236,7 +343,7 @@ function CompletedTripsTable({
           </tbody>
         </table>
       </div>
-      {children}
+      {children && <div className="border-t border-slate-200 bg-slate-50/50 px-3 py-2">{children}</div>}
     </div>
   );
 }
