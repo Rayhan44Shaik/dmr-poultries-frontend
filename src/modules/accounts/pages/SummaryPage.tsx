@@ -1,6 +1,7 @@
 // src/modules/accounts/pages/SummaryPage.tsx
 
 import React, { useRef, useState, useMemo, useCallback, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Download,
   ChevronLeft,
@@ -417,17 +418,35 @@ function KpiCard({
 type SummaryPageProps = { embedded?: boolean };
 
 export default function SummaryPage({ embedded = false }: SummaryPageProps) {
-  const [period, setPeriod] = useState<PeriodId>('week');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [period, setPeriod] = useState<PeriodId>(() => (searchParams.get('period') as PeriodId) || 'week');
   const [selectedMonthDate, setSelectedMonthDate] = useState<Date>(() => {
+    const pMonth = searchParams.get('month');
+    if (pMonth) return new Date(pMonth);
     const now = new Date();
-    return new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    return new Date(now.getFullYear(), now.getMonth(), 1);
   });
-  const [customStart, setCustomStart] = useState<string>('');
-  const [customEnd, setCustomEnd] = useState<string>('');
+  const [customStart, setCustomStart] = useState<string>(() => searchParams.get('start') || '');
+  const [customEnd, setCustomEnd] = useState<string>(() => searchParams.get('end') || '');
   const [refreshKey, setRefreshKey] = useState(0);
   const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
   const [monthMenuOpen, setMonthMenuOpen] = useState(false);
-  const [comparePrevious, setComparePrevious] = useState(false);
+  const [comparePrevious, setComparePrevious] = useState(() => searchParams.get('compare') === 'true');
+
+  useEffect(() => {
+    const params = new URLSearchParams(searchParams);
+    params.set('tab', 'summary');
+    params.set('period', period);
+    params.set('compare', comparePrevious ? 'true' : 'false');
+    if (period === 'month') {
+      params.set('month', selectedMonthDate.toISOString());
+    }
+    if (period === 'custom') {
+      if (customStart) params.set('start', customStart);
+      if (customEnd) params.set('end', customEnd);
+    }
+    setSearchParams(params, { replace: true });
+  }, [period, comparePrevious, selectedMonthDate, customStart, customEnd, setSearchParams]);
   const [tripViewerOpen, setTripViewerOpen] = useState(false);
   const [tripViewerTrips, setTripViewerTrips] = useState<Trip[]>([]);
   const [tripViewerLabel, setTripViewerLabel] = useState('');

@@ -23,6 +23,7 @@ import PendingCollectionsCard from "./components/PendingCollectionsCard";
 import FleetStatusCard from "./components/FleetStatusCard";
 import ActivityTimeline from "./components/ActivityTimeline";
 import DashboardSkeleton from "./components/DashboardSkeleton";
+import { DashboardFilters } from "./components/DashboardFilters";
 import {
   DeliveryVolumeChart,
   SalesVsCollectionsChart,
@@ -31,7 +32,7 @@ import {
 } from "./components/DashboardCharts";
 
 function DashboardPage() {
-  const { data, derived, loading, error, refetch, loadDemo, clearDemo, demoBusy } = useExecutiveDashboard();
+  const { data, derived, loading, error, refetch, loadDemo, clearDemo, demoBusy, period, setPeriod, comparePrevious, setComparePrevious, customStart, setCustomStart, customEnd, setCustomEnd } = useExecutiveDashboard();
   const { showNotification } = useNotification();
   const { t } = useI18n();
 
@@ -47,6 +48,16 @@ function DashboardPage() {
     await clearDemo();
     showNotification(t("notification.data_loaded"), "info");
   };
+
+  const accountSummaryParams = new URLSearchParams();
+  accountSummaryParams.set('tab', 'summary');
+  accountSummaryParams.set('period', period);
+  accountSummaryParams.set('compare', comparePrevious ? 'true' : 'false');
+  if (period === 'custom') {
+    if (customStart) accountSummaryParams.set('start', customStart);
+    if (customEnd) accountSummaryParams.set('end', customEnd);
+  }
+  const accountSummaryLink = `/accounts?${accountSummaryParams.toString()}`;
 
   return (
     <div className="mx-auto w-full max-w-[1480px] space-y-5 px-4 py-6 sm:px-6 lg:px-8">
@@ -88,42 +99,54 @@ function DashboardPage() {
           <p className="mt-0.5 text-xs font-medium text-slate-400 dark:text-slate-500">{formatDateLong(new Date())}</p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-{derived && !derived.hasAnyData && !data?.demoActive && (
-            <button
-              type="button"
-              onClick={() => void handleLoadDemo()}
-              disabled={demoBusy}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {derived && !derived.hasAnyData && !data?.demoActive && (
+              <button
+                type="button"
+                onClick={() => void handleLoadDemo()}
+                disabled={demoBusy}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+              >
+                {demoBusy ? <RefreshCw size={15} className="animate-spin" /> : <DatabaseZap size={15} className="text-amber-500" />}
+                {demoBusy ? t("common.loading") : t("common.load")}
+              </button>
+            )}
+            {error && (
+              <button
+                type="button"
+                onClick={refetch}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+              >
+                <RefreshCw size={15} />
+                {t("common.retry")}
+              </button>
+            )}
+            <Link
+              to="/operations?tab=collection"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
             >
-              {demoBusy ? <RefreshCw size={15} className="animate-spin" /> : <DatabaseZap size={15} className="text-amber-500" />}
-              {demoBusy ? t("common.loading") : t("common.load")}
-            </button>
-          )}
-          {error && (
-            <button
-              type="button"
-              onClick={refetch}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+              <CreditCard size={15} />
+              {t("common.record_collection")}
+            </Link>
+            <Link
+              to="/operations?tab=trip-entry"
+              className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3.5 py-2 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-brand-600 dark:bg-brand-600 dark:hover:bg-brand-500"
             >
-              <RefreshCw size={15} />
-              {t("common.retry")}
-            </button>
-          )}
-          <Link
-            to="/operations?tab=collection"
-            className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
-          >
-            <CreditCard size={15} />
-            {t("common.record_collection")}
-          </Link>
-          <Link
-            to="/operations?tab=trip-entry"
-            className="inline-flex items-center gap-1.5 rounded-lg bg-brand-600 px-3.5 py-2 text-[13px] font-semibold text-white shadow-sm transition-colors hover:bg-brand-600 dark:bg-brand-600 dark:hover:bg-brand-500"
-          >
-            <PackageOpen size={15} />
-            {t("quick.new_trip")}
-          </Link>
+              <PackageOpen size={15} />
+              {t("quick.new_trip")}
+            </Link>
+          </div>
+          <DashboardFilters 
+            period={period} 
+            setPeriod={setPeriod} 
+            comparePrevious={comparePrevious} 
+            setComparePrevious={setComparePrevious} 
+            customStart={customStart} 
+            setCustomStart={setCustomStart} 
+            customEnd={customEnd} 
+            setCustomEnd={setCustomEnd} 
+          />
         </div>
       </div>
 
@@ -134,9 +157,11 @@ function DashboardPage() {
           {/* ------------------------------------------------------ */}
           {/* KPI cards                                               */}
           {/* ------------------------------------------------------ */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          <div className="flex flex-nowrap items-stretch justify-between rounded-xl border border-slate-200/80 bg-white p-1 shadow-sm dark:border-slate-800 dark:bg-slate-900 w-full overflow-hidden">
             {derived.kpis.map((kpi, i) => (
-              <KpiCard key={kpi.key} kpi={kpi} index={i} />
+              <Link key={kpi.key} to={accountSummaryLink} className="flex-1 min-w-0 px-2 sm:px-2.5 border-r border-slate-100 last:border-0 dark:border-slate-800 hover:bg-slate-50 transition-colors rounded-lg flex items-center justify-center">
+                <KpiCard kpi={kpi} index={i} />
+              </Link>
             ))}
           </div>
 
