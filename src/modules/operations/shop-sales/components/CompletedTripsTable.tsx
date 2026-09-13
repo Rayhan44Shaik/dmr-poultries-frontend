@@ -216,34 +216,6 @@ function CompletedTripsTable({
             })
           )}
         </tbody>
-        {trips.length > 0 && (
-          <tfoot className="bg-gradient-to-r from-emerald-50/80 via-white to-amber-50/60 border-t-2 border-emerald-200">
-            <tr className="font-bold">
-              <td className="px-4 py-3 text-center text-[11px] text-slate-400">—</td>
-              <td className="px-4 py-3 text-[13px] font-bold text-slate-800">Total: {trips.length} trips</td>
-              <td className="px-4 py-3"></td>
-              <td className="px-4 py-3"></td>
-              <td className="px-4 py-3"></td>
-              <td className="px-4 py-3"></td>
-              <td className="px-4 py-3 text-center">
-                <span className="inline-flex items-center rounded-full border border-slate-300 bg-white px-3 py-1 text-[12px] font-bold text-slate-800 shadow-sm">
-                  {trips.reduce((sum, t) => sum + (t.totalShops ?? 0), 0)} shops
-                </span>
-              </td>
-              <td className="px-4 py-3 text-center text-[13px] font-bold text-blue-700 tabular-nums">
-                {trips.reduce((sum, t) => sum + (t.totalBirds ?? 0), 0).toLocaleString()} birds
-              </td>
-              <td className="px-4 py-3 text-center text-[13px] font-bold text-amber-700 tabular-nums">
-                {trips.reduce((sum, t) => sum + (t.totalWeight ?? 0), 0).toFixed(2)} KG
-              </td>
-              <td className="px-4 py-3 text-center">
-                <span className="inline-flex items-center rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-1.5 text-[13px] font-bold tabular-nums shadow-sm">
-                  ₹ {trips.reduce((sum, t) => sum + t.deliveries.reduce((s, d) => s + (d.amount ?? 0), 0), 0).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                </span>
-              </td>
-            </tr>
-          </tfoot>
-        )}
       </table>
       {children && <div className="border-t border-slate-200 bg-slate-50/50 px-3 py-2">{children}</div>}
     </div>
