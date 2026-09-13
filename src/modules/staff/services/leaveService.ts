@@ -93,8 +93,6 @@ export async function listLeaves(
     page: filters.page ?? 1,
     limit: filters.limit ?? 50,
   };
-  if (filters.sortBy) params.sortBy = filters.sortBy;
-  if (filters.sortDir) params.sortDir = filters.sortDir;
   if (filters.status) params.status = filters.status;
   if (filters.month) params.month = filters.month;
   if (filters.employeeId != null) params.employeeId = filters.employeeId;

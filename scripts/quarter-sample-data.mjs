@@ -3994,7 +3994,13 @@ const server = http.createServer(async (req, res) => {
             String(l.employeeNo ?? "").includes(search)
         );
       }
-      const sorted = sortLeaves(rows, q.get("sortBy"), q.get("sortDir"));
+      const sorted = q.get("sortBy")
+        ? sortLeaves(rows, q.get("sortBy"), q.get("sortDir"))
+        : [...rows].sort(
+            (a, b) =>
+              (a.employeeName || "").localeCompare(b.employeeName || "", undefined, { numeric: true }) ||
+              (a.fromDate || "").localeCompare(b.fromDate || "")
+          );
       const { data, meta } = paginate(sorted, q, 50);
       return send(200, { items: data, ...meta });
     }

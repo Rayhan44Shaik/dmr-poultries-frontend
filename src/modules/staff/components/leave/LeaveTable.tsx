@@ -17,11 +17,8 @@ import {
   MessageSquareText,
   Activity,
   Settings,
-  ArrowUp,
-  ArrowDown,
 } from 'lucide-react';
 import type { LeaveRequest } from '../../types/staffDashboard';
-import type { LeaveSortKey } from '../../hooks/useLeaveManagement';
 import { usePendingDelete } from '../../../../hooks/usePendingDelete';
 import { PendingDeleteNotification } from '../../../../components/common/PendingDeleteNotification';
 import { ActionTooltip } from '../../../../ui/ActionTooltip';
@@ -33,29 +30,8 @@ interface LeaveTableProps {
   onReject: (id: string, reason: string) => void;
   onDelete: (id: string) => void;
   onCancel: (id: string) => void;
-  /** Trips-list sorting contract. */
-  sortBy?: LeaveSortKey | null;
-  sortDir?: 'asc' | 'desc';
-  onSortChange?: (key: LeaveSortKey) => void;
   /** Serial-number offset for the "#" column (page-aware). */
   startIndex?: number;
-}
-
-/**
- * Sort affordance: compact side-by-side up/down arrows beside the label, like
- * the Trip List reference header. Both arrows always render so every header
- * keeps the same width; only the active direction turns emerald.
- */
-function SortArrows({ active, dir }: { active: boolean; dir?: 'asc' | 'desc' }) {
-  const base = 'h-3 w-3 shrink-0 transition-colors';
-  const on = 'text-emerald-600';
-  const off = 'text-slate-400 group-hover/sort:text-slate-600';
-  return (
-    <span className="inline-flex shrink-0 items-center gap-0.5" aria-hidden="true">
-      <ArrowUp size={12} strokeWidth={2.7} className={`${base} ${active && dir === 'asc' ? on : off}`} />
-      <ArrowDown size={12} strokeWidth={2.7} className={`${base} ${active && dir === 'desc' ? on : off}`} />
-    </span>
-  );
 }
 
 function LeaveTable({
@@ -64,9 +40,6 @@ function LeaveTable({
   onReject,
   onDelete,
   onCancel,
-  sortBy = null,
-  sortDir = 'asc',
-  onSortChange,
   startIndex = 0,
 }: LeaveTableProps) {
   const { requestDelete, cancel, pendingItems } = usePendingDelete(onDelete);
@@ -84,24 +57,6 @@ function LeaveTable({
     const month = leave.createdAt.slice(0, 7).replace('-', '') || 'UNKNOWN';
     const compactId = leave.id.replace(/-/g, '');
     return `LEV-${month}-${compactId.slice(-12).toUpperCase()}`;
-  };
-
-  /** Wraps a header's content in a sort button when sorting is enabled. */
-  const sortable = (key: LeaveSortKey, content: React.ReactNode, center = false) => {
-    if (!onSortChange) return content;
-    const active = sortBy === key;
-    return (
-      <button
-        type="button"
-        onClick={() => onSortChange(key)}
-        title="Sort"
-        aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
-        className={`group/sort flex w-full items-center gap-2 text-[11px] font-bold uppercase tracking-wider transition-colors hover:text-emerald-700 ${center ? 'justify-center' : ''} ${active ? 'text-emerald-700' : ''}`}
-      >
-        {content}
-        <SortArrows active={active} dir={sortDir} />
-      </button>
-    );
   };
 
   const getStatusBadge = (status: string) => {
@@ -166,60 +121,46 @@ function LeaveTable({
             <tr className="whitespace-nowrap">
               <th className={`${th} w-10 text-center`}>#</th>
               <th className={`${th} text-left`}>
-                {sortable('leaveNo', (
-                  <span className="flex items-center gap-1.5">
-                    <Hash size={13} className="shrink-0 text-slate-400" />
-                    <span>Leave No.</span>
-                  </span>
-                ))}
+                <span className="flex items-center gap-1.5">
+                  <Hash size={13} className="shrink-0 text-slate-400" />
+                  <span>Leave No.</span>
+                </span>
               </th>
               <th className={`${th} text-left`}>
-                {sortable('employeeName', (
-                  <span className="flex items-center gap-1.5">
-                    <User size={13} className="shrink-0 text-emerald-500" />
-                    <span>Employee</span>
-                  </span>
-                ))}
+                <span className="flex items-center gap-1.5">
+                  <User size={13} className="shrink-0 text-emerald-500" />
+                  <span>Employee</span>
+                </span>
               </th>
               <th className={`${th} text-left`}>
-                {sortable('department', (
-                  <span className="flex items-center gap-1.5">
-                    <Building2 size={13} className="shrink-0 text-indigo-500" />
-                    <span>Department</span>
-                  </span>
-                ))}
+                <span className="flex items-center gap-1.5">
+                  <Building2 size={13} className="shrink-0 text-indigo-500" />
+                  <span>Department</span>
+                </span>
               </th>
               <th className={`${th} text-left`}>
-                {sortable('type', (
-                  <span className="flex items-center gap-1.5">
-                    <CalendarOff size={13} className="shrink-0 text-purple-500" />
-                    <span>Leave Type</span>
-                  </span>
-                ))}
+                <span className="flex items-center gap-1.5">
+                  <CalendarOff size={13} className="shrink-0 text-purple-500" />
+                  <span>Leave Type</span>
+                </span>
               </th>
               <th className={`${th} text-left`}>
-                {sortable('fromDate', (
-                  <span className="flex items-center gap-1.5">
-                    <Calendar size={13} className="shrink-0 text-blue-500" />
-                    <span>From</span>
-                  </span>
-                ))}
+                <span className="flex items-center gap-1.5">
+                  <Calendar size={13} className="shrink-0 text-blue-500" />
+                  <span>From</span>
+                </span>
               </th>
               <th className={`${th} text-left`}>
-                {sortable('toDate', (
-                  <span className="flex items-center gap-1.5">
-                    <CalendarRange size={13} className="shrink-0 text-cyan-500" />
-                    <span>To</span>
-                  </span>
-                ))}
+                <span className="flex items-center gap-1.5">
+                  <CalendarRange size={13} className="shrink-0 text-cyan-500" />
+                  <span>To</span>
+                </span>
               </th>
               <th className={`${th} text-center`}>
-                {sortable('days', (
-                  <span className="flex items-center justify-center gap-1.5">
-                    <Sun size={13} className="shrink-0 text-amber-500" />
-                    <span>Days</span>
-                  </span>
-                ), true)}
+                <span className="flex items-center justify-center gap-1.5">
+                  <Sun size={13} className="shrink-0 text-amber-500" />
+                  <span>Days</span>
+                </span>
               </th>
               <th className={`${th} text-left`}>
                 <span className="flex items-center gap-1.5">
@@ -228,12 +169,10 @@ function LeaveTable({
                 </span>
               </th>
               <th className={`${th} text-center`}>
-                {sortable('status', (
-                  <span className="flex items-center justify-center gap-1.5">
-                    <Activity size={13} className="shrink-0 text-sky-500" />
-                    <span>Status</span>
-                  </span>
-                ), true)}
+                <span className="flex items-center justify-center gap-1.5">
+                  <Activity size={13} className="shrink-0 text-sky-500" />
+                  <span>Status</span>
+                </span>
               </th>
               <th className={`${th} text-right`}>
                 <span className="flex items-center justify-end gap-1.5">
@@ -252,7 +191,7 @@ function LeaveTable({
                 <td className="w-10 px-4 py-3 text-center text-xs font-medium text-slate-500">
                   {startIndex + index + 1}
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 text-xs font-bold text-emerald-500 tabular-nums">
+                <td className="whitespace-nowrap px-4 py-3 text-xs font-bold text-slate-900 tabular-nums">
                   {leaveNumber(leave)}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-700">{leave.employeeName}</td>

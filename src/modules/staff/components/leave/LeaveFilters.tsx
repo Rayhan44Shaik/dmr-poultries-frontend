@@ -208,10 +208,13 @@ function LeaveFilters({
 }: LeaveFiltersProps) {
   const departmentOptions = departments.map((d) => ({ value: d, label: d }));
 
-  const employeeOptions = employees.map((e) => ({
-    value: String(e.id),
-    label: e.employeeName,
-  }));
+  // Alphabetical from the first word, so the dropdown reads A → Z.
+  const employeeOptions = [...employees]
+    .sort((a, b) => a.employeeName.localeCompare(b.employeeName, undefined, { numeric: true }))
+    .map((e) => ({
+      value: String(e.id),
+      label: e.employeeName,
+    }));
 
   const leaveTypeOptions = LEAVE_TYPES.map((t) => ({ value: t, label: t }));
 

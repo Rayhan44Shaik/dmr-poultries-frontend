@@ -24,17 +24,6 @@ import type {
 
 type NotificationFn = (message: string, type?: 'success' | 'error' | 'info') => void;
 
-/** Columns the leave list can be sorted by (same contract as the trips list). */
-export type LeaveSortKey =
-  | 'leaveNo'
-  | 'employeeName'
-  | 'department'
-  | 'type'
-  | 'fromDate'
-  | 'toDate'
-  | 'days'
-  | 'status';
-
 export interface LeaveFilters {
   status: 'All' | 'Pending' | 'Approved' | 'Rejected' | 'Cancelled';
   month: string;
@@ -64,8 +53,6 @@ export function useLeaveManagement(showNotification?: NotificationFn) {
   const [list, setList] = useState<LeaveListResult>({ items: [], total: 0, page: 1, limit: 100, totalPages: 0 });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-  const [sortBy, setSortBy] = useState<LeaveSortKey | null>(null);
-  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
   const [report, setReport] = useState<LeaveReport>({ month: DEFAULT_FILTERS.month, items: [] });
   const [loading, setLoading] = useState(true);
   const [reportLoading, setReportLoading] = useState(false);
@@ -99,10 +86,8 @@ export function useLeaveManagement(showNotification?: NotificationFn) {
       search: filters.search || undefined,
       page,
       limit: pageSize,
-      sortBy: sortBy ?? undefined,
-      sortDir: sortBy ? sortDir : undefined,
     });
-  }, [filters.status, filters.month, filters.department, filters.employeeId, filters.leaveType, filters.search, page, pageSize, sortBy, sortDir]);
+  }, [filters.status, filters.month, filters.department, filters.employeeId, filters.leaveType, filters.search, page, pageSize]);
 
   const fetchReport = useCallback(async () => {
     return getLeaveReport({
@@ -202,26 +187,7 @@ export function useLeaveManagement(showNotification?: NotificationFn) {
   const resetFilters = useCallback(() => {
     setPage(1);
     setFilters(DEFAULT_FILTERS);
-    setSortBy(null);
-    setSortDir('asc');
   }, []);
-
-  /** First click sorts ascending; second flips to descending; a third click on
-   *  the active column clears the sort entirely (deselect) — trips-list rule. */
-  const toggleSort = useCallback((key: LeaveSortKey) => {
-    if (sortBy === key) {
-      if (sortDir === 'asc') {
-        setSortDir('desc');
-      } else {
-        setSortBy(null);
-        setSortDir('asc');
-      }
-    } else {
-      setSortBy(key);
-      setSortDir('asc');
-    }
-    setPage(1);
-  }, [sortBy, sortDir]);
 
   const addLeave = useCallback(
     async (input: {
@@ -334,9 +300,6 @@ export function useLeaveManagement(showNotification?: NotificationFn) {
     filters,
     setFilter,
     resetFilters,
-    sortBy,
-    sortDir,
-    toggleSort,
     employees,
     departments,
     addLeave,
