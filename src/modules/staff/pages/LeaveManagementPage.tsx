@@ -48,6 +48,11 @@ function LeaveManagementPage() {
     return () => window.clearTimeout(timer);
   }, [refreshToast]);
 
+  const onStatusChange = useCallback(
+    (status: 'All' | 'Pending' | 'Approved' | 'Rejected') => setFilter('status', status),
+    [setFilter]
+  );
+
   const handleRefresh = useCallback(() => {
     void refresh();
     setRefreshToast(true);
@@ -122,7 +127,7 @@ function LeaveManagementPage() {
         </div>
       ) : leaves.length === 0 ? (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-          <LeaveTableHeader />
+          <LeaveTableHeader status={filters.status} onStatusChange={onStatusChange} count={total} />
           <div className="p-8 text-center">
             <p className="text-sm font-medium text-slate-500">No leave requests found</p>
             <p className="text-xs text-slate-400 mt-1">Try adjusting your filters or create a new request.</p>
@@ -130,7 +135,7 @@ function LeaveManagementPage() {
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-          <LeaveTableHeader />
+          <LeaveTableHeader status={filters.status} onStatusChange={onStatusChange} count={total} />
           <LeaveTable
             leaves={leaves}
             onApprove={handleApprove}

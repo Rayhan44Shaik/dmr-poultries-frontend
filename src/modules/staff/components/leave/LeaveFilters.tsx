@@ -3,15 +3,10 @@
 import { memo, useState, useRef, useEffect, useCallback } from 'react';
 import {
   Search,
-  CheckCircle2,
-  Clock,
-  XCircle,
-  LayoutGrid,
   UsersRound,
   Building2,
   Calendar,
   CalendarOff,
-  Activity,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -48,15 +43,6 @@ interface LeaveFiltersProps {
     onLeaveToday: number;
   };
 }
-
-type LeaveStatusTab = 'All' | 'Pending' | 'Approved' | 'Rejected';
-
-const STATUS_TABS: { label: LeaveStatusTab; Icon: typeof Clock }[] = [
-  { label: 'All', Icon: LayoutGrid },
-  { label: 'Pending', Icon: Clock },
-  { label: 'Approved', Icon: CheckCircle2 },
-  { label: 'Rejected', Icon: XCircle },
-];
 
 const LEAVE_TYPES = ['Casual', 'Sick', 'Emergency', 'Annual'] as const;
 
@@ -289,63 +275,22 @@ function LeaveFilters({
         </div>
       </div>
 
-      {/* Row 2 — Search (left) + Status segmented toggle (right) */}
-      <div className="grid grid-cols-1 items-end gap-3.5 lg:grid-cols-12">
-        <div className="lg:col-span-5">
-          <label className={uiFilterLabelClass}>
-            <Search size={13} className="shrink-0 text-slate-400" />
-            <span>Search</span>
-          </label>
-          <div className="relative">
-            <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              placeholder="Search employee, leave type, reason..."
-              value={filters.search}
-              onChange={(e) => onFilterChange('search', e.target.value)}
-              className={`${uiInputClass} pl-10`}
-            />
-          </div>
-        </div>
-
-        <div className="lg:col-span-7 lg:flex lg:justify-end">
-          <span className={uiFilterLabelClass}>
-            <Activity size={13} className="shrink-0 text-emerald-500" />
-            <span>Status</span>
-          </span>
-          <div
-            role="group"
-            aria-label="Filter by status"
-            className="flex h-10 w-full items-center gap-0.5 overflow-x-auto rounded-lg border border-slate-200/70 bg-slate-100/70 p-0.5 lg:ml-auto lg:w-auto"
-          >
-            {STATUS_TABS.map(({ label, Icon }) => {
-              const isActive = filters.status === label;
-              // Active tab wears its status colour: Pending orange, Approved
-              // the app green, Rejected light red; All stays neutral white.
-              const activeClass = {
-                All: 'bg-white text-slate-700 shadow-sm ring-1 ring-slate-200/60',
-                Pending: 'bg-orange-50 text-orange-700 shadow-sm ring-1 ring-orange-200/70',
-                Approved: 'bg-emerald-50 text-emerald-700 shadow-sm ring-1 ring-emerald-200/70',
-                Rejected: 'bg-rose-50 text-rose-700 shadow-sm ring-1 ring-rose-200/70',
-              }[label];
-              return (
-                <button
-                  key={label}
-                  type="button"
-                  onClick={() => onFilterChange('status', label)}
-                  aria-pressed={isActive}
-                  className={`flex h-9 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-md px-1.5 text-[11px] font-semibold transition focus-visible:ring-2 focus-visible:ring-emerald-300 sm:px-2 sm:text-xs lg:flex-none lg:px-2.5 ${
-                    isActive
-                      ? activeClass
-                      : 'text-slate-500 hover:bg-white/70 hover:text-slate-900'
-                  }`}
-                >
-                  <Icon size={13} className="hidden shrink-0 sm:block" aria-hidden="true" />
-                  {label}
-                </button>
-              );
-            })}
-          </div>
+      {/* Row 2 — Search. The status toggle lives at table level, in the
+          Leave Request header beside the title (Recent Trips pattern). */}
+      <div>
+        <label className={uiFilterLabelClass}>
+          <Search size={13} className="shrink-0 text-slate-400" />
+          <span>Search</span>
+        </label>
+        <div className="relative">
+          <Search size={16} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          <input
+            type="text"
+            placeholder="Search employee, leave type, reason..."
+            value={filters.search}
+            onChange={(e) => onFilterChange('search', e.target.value)}
+            className={`${uiInputClass} pl-10`}
+          />
         </div>
       </div>
 
