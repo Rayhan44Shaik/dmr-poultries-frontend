@@ -169,6 +169,41 @@ export default function EnterRateModal({
     return deliveries.some((row, i) => normalizeRate(row.rate) !== normalizeRate(trip.deliveries[i]?.rate));
   }, [deliveries, trip]);
 
+  const marketLabels = useMemo(() => {
+    if (localLanguage === "te") {
+      return {
+        companyTitle: "కంపెనీ & అసోసియేషన్ రేట్లు",
+        additionalTitle: "అదనపు మెట్రిక్స్ ఎంట్రీ",
+        shopBreakdownTitle: "షాప్ రేట్ల తగ్గింపు వివరాలు",
+        threeDaysToday: "3 రోజులు • నేడు హైలైట్",
+        threeDays: "3 రోజులు",
+        date: "తేదీ",
+        snehaFarmer: "స్నేహ / ఫార్మర్",
+        venVij: "వెన్ విజ్",
+        venGun: "వెన్ గన్",
+        assVij: "అసో విజ్",
+        vij: "విజ్",
+        gun: "గన్",
+        rp: "ఆర్.పి",
+      };
+    }
+    return {
+      companyTitle: "Company & Association Rates",
+      additionalTitle: "Additional Metrics Entry",
+      shopBreakdownTitle: "Shop Rates Less Breakdown",
+      threeDaysToday: "3 days • Today highlighted",
+      threeDays: "3 days",
+      date: "Date",
+      snehaFarmer: "Sneha / Farmer",
+      venVij: "Ven Vij",
+      venGun: "Ven Gun",
+      assVij: "Ass Vij",
+      vij: "Vij",
+      gun: "Gun",
+      rp: "R.P",
+    };
+  }, [localLanguage]);
+
   const totals = useMemo(() => {
     let ratedCount = 0;
     let totalWeight = 0;
@@ -422,24 +457,24 @@ export default function EnterRateModal({
           {marketThreeDays.length > 0 && (
             <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 shrink-0 max-h-[22vh] overflow-auto scroll-perf scroll-smooth">
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
-                {/* Company & Association Rates */}
+                {/* Company & Association Rates - Telugu supported via localLanguage */}
                 <div className="rounded-xl border border-emerald-200 bg-white shadow-sm overflow-hidden">
                   <div className="flex items-center justify-between px-3 py-2 bg-emerald-50/80 border-b border-emerald-100">
                     <div className="flex items-center gap-2">
                       <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-white border border-emerald-200 text-emerald-700 shadow-sm">📊</span>
-                      <p className="text-[12px] font-bold text-emerald-900">Company & Association Rates</p>
+                      <p className="text-[12px] font-bold text-emerald-900">{marketLabels.companyTitle}</p>
                     </div>
-                    <span className="text-[10px] font-bold text-emerald-700/70">3 days • Today highlighted</span>
+                    <span className="text-[10px] font-bold text-emerald-700/70">{marketLabels.threeDaysToday}</span>
                   </div>
                   <div className="overflow-hidden">
                     <table className="w-full text-[11px]">
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-100 text-slate-500">
-                          <th className="px-2 py-2 text-left font-semibold">Date</th>
-                          <th className="px-2 py-2 text-center font-semibold">Sneha / Farmer</th>
-                          <th className="px-2 py-2 text-center font-semibold">Ven Vij</th>
-                          <th className="px-2 py-2 text-center font-semibold">Ven Gun</th>
-                          <th className="px-2 py-2 text-center font-semibold">Ass Vij</th>
+                          <th className="px-2 py-2 text-left font-semibold">{marketLabels.date}</th>
+                          <th className="px-2 py-2 text-center font-semibold">{marketLabels.snehaFarmer}</th>
+                          <th className="px-2 py-2 text-center font-semibold">{marketLabels.venVij}</th>
+                          <th className="px-2 py-2 text-center font-semibold">{marketLabels.venGun}</th>
+                          <th className="px-2 py-2 text-center font-semibold">{marketLabels.assVij}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -457,23 +492,23 @@ export default function EnterRateModal({
                   </div>
                 </div>
 
-                {/* Additional Metrics Entry */}
+                {/* Additional Metrics Entry - Telugu supported */}
                 <div className="rounded-xl border border-sky-200 bg-white shadow-sm overflow-hidden">
                   <div className="flex items-center justify-between px-3 py-2 bg-sky-50/80 border-b border-sky-100">
                     <div className="flex items-center gap-2">
                       <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-white border border-sky-200 text-sky-700 shadow-sm">Σ</span>
-                      <p className="text-[12px] font-bold text-sky-900">Additional Metrics Entry</p>
+                      <p className="text-[12px] font-bold text-sky-900">{marketLabels.additionalTitle}</p>
                     </div>
-                    <span className="text-[10px] font-bold text-sky-700/70">3 days</span>
+                    <span className="text-[10px] font-bold text-sky-700/70">{marketLabels.threeDays}</span>
                   </div>
                   <div className="overflow-hidden">
                     <table className="w-full text-[11px]">
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-100 text-slate-500">
-                          <th className="px-2 py-2 text-left font-semibold">Date</th>
-                          <th className="px-2 py-2 text-center font-semibold">Vij</th>
-                          <th className="px-2 py-2 text-center font-semibold">Gun</th>
-                          <th className="px-2 py-2 text-center font-semibold">R.P</th>
+                          <th className="px-2 py-2 text-left font-semibold">{marketLabels.date}</th>
+                          <th className="px-2 py-2 text-center font-semibold">{marketLabels.vij}</th>
+                          <th className="px-2 py-2 text-center font-semibold">{marketLabels.gun}</th>
+                          <th className="px-2 py-2 text-center font-semibold">{marketLabels.rp}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -490,20 +525,20 @@ export default function EnterRateModal({
                   </div>
                 </div>
 
-                {/* Shop Rates Less Breakdown */}
+                {/* Shop Rates Less Breakdown - Telugu supported */}
                 <div className="rounded-xl border border-violet-200 bg-white shadow-sm overflow-hidden">
                   <div className="flex items-center justify-between px-3 py-2 bg-violet-50/80 border-b border-violet-100">
                     <div className="flex items-center gap-2">
                       <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-white border border-violet-200 text-violet-700 shadow-sm">◈</span>
-                      <p className="text-[12px] font-bold text-violet-900">Shop Rates Less Breakdown</p>
+                      <p className="text-[12px] font-bold text-violet-900">{marketLabels.shopBreakdownTitle}</p>
                     </div>
-                    <span className="text-[10px] font-bold text-violet-700/70">3 days</span>
+                    <span className="text-[10px] font-bold text-violet-700/70">{marketLabels.threeDays}</span>
                   </div>
                   <div className="overflow-hidden">
                     <table className="w-full text-[11px]">
                       <thead>
                         <tr className="bg-slate-50 border-b border-slate-100 text-slate-500">
-                          <th className="px-2 py-2 text-left font-semibold">Date</th>
+                          <th className="px-2 py-2 text-left font-semibold">{marketLabels.date}</th>
                           {sizeKeys.map((k) => (
                             <th key={k} className="px-2 py-2 text-center font-semibold">{k.replace(/^c/i, "")}</th>
                           ))}

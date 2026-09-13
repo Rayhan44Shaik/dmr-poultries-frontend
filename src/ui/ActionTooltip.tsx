@@ -8,33 +8,58 @@ type ActionTooltipProps = {
 };
 
 const placementClass = {
-  top: "bottom-full left-1/2 mb-2 -translate-x-1/2 group-hover:-translate-y-0.5",
-  bottom: "top-full left-1/2 mt-2 -translate-x-1/2 group-hover:translate-y-0.5",
+  top: "bottom-full left-1/2 mb-2.5 -translate-x-1/2",
+  bottom: "top-full left-1/2 mt-2.5 -translate-x-1/2",
 };
 
 /**
- * Reusable polished tooltip for icon/action buttons.
+ * Global polished tooltip - very neat perfect way, supports Telugu as well
+ * - rounded-2xl with backdrop-blur
+ * - soft shadow, border, animation
+ * - whitespace-normal, break-words, leading-relaxed for Telugu script
+ * - arrow with same bg
  * Place inside a `relative group` button/link/container.
  */
 export function ActionTooltip({ label, placement = "top", side, className }: ActionTooltipProps) {
   const resolvedPlacement = side ?? placement;
+  const isTop = resolvedPlacement === "top";
   return (
     <span
       role="tooltip"
       className={cn(
-        "pointer-events-none absolute z-[90] max-w-[240px] whitespace-nowrap rounded-xl bg-slate-900/95 px-2.5 py-1.5 text-[11px] font-semibold leading-none text-white shadow-xl shadow-slate-900/20 opacity-0 scale-95 transition-all duration-150 group-hover:opacity-100 group-hover:scale-100 group-focus-visible:opacity-100 group-focus-visible:scale-100",
+        // base - neat perfect global
+        "pointer-events-none absolute z-[90] max-w-[320px] min-w-[72px]",
+        "rounded-2xl border border-white/10 bg-slate-900/95 backdrop-blur-xl",
+        "px-3.5 py-2.5 text-center text-[12px] font-semibold leading-[1.6] tracking-wide text-white",
+        "shadow-[0_8px_32px_rgba(0,0,0,0.24),0_2px_8px_rgba(0,0,0,0.12)] ring-1 ring-white/5",
+        "whitespace-normal break-words text-pretty",
+        // animation - like trip list refresh hen dance smoothness
+        "opacity-0 scale-[0.92] translate-y-1 transition-all duration-200 ease-[cubic-bezier(0.34,1.56,0.64,1)]",
+        "group-hover:opacity-100 group-hover:scale-100 group-hover:translate-y-0",
+        "group-focus-visible:opacity-100 group-focus-visible:scale-100 group-focus-visible:translate-y-0",
+        // origin for scale
+        isTop ? "origin-bottom" : "origin-top",
         placementClass[resolvedPlacement],
         className,
       )}
+      style={{
+        // font smoothing for Telugu
+        fontFeatureSettings: '"liga" 1, "calt" 1',
+        textRendering: "optimizeLegibility",
+        WebkitFontSmoothing: "antialiased",
+      }}
     >
-      {label}
+      <span className="block">{label}</span>
+      {/* arrow - neat diamond */}
       <span
         className={cn(
-          "absolute left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 bg-slate-900/95",
-          resolvedPlacement === "top" ? "-bottom-1" : "-top-1",
+          "absolute left-1/2 h-2.5 w-2.5 -translate-x-1/2 rotate-45 bg-slate-900/95 border-r border-b border-white/10 backdrop-blur-xl",
+          isTop ? "-bottom-[5px]" : "-top-[5px] border-r-0 border-b-0 border-l border-t",
         )}
         aria-hidden="true"
       />
+      {/* subtle inner highlight for neatness */}
+      <span className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-b from-white/[0.08] to-transparent" aria-hidden="true" />
     </span>
   );
 }
