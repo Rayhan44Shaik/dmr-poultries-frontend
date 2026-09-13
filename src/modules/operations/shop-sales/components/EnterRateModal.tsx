@@ -168,16 +168,18 @@ export default function EnterRateModal({
     let ratedCount = 0;
     let totalWeight = 0;
     let totalAmount = 0;
+    let totalBirds = 0;
     for (const d of deliveries) {
       const rate = normalizeRate(d.rate);
       totalWeight += d.weight ?? 0;
+      totalBirds += d.birds ?? 0;
       if (isValidSellingRate(rate)) {
         ratedCount += 1;
         totalAmount += (d.weight ?? 0) * (rate as number);
       }
     }
     const progressPct = deliveries.length ? Math.round((ratedCount / deliveries.length) * 100) : 0;
-    return { ratedCount, totalWeight, totalAmount, progressPct };
+    return { ratedCount, totalWeight, totalAmount, totalBirds, progressPct };
   }, [deliveries]);
 
   const filteredSortedDeliveries = useMemo(() => {
@@ -258,7 +260,7 @@ export default function EnterRateModal({
 
   return (
     <>
-      <style>{`
+            <style>{`
         .no-spinner::-webkit-inner-spin-button,.no-spinner::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
         .no-spinner{-moz-appearance:textfield}
         /* global animations - like trip list */
@@ -271,34 +273,39 @@ export default function EnterRateModal({
         /* reset animation like trip list - icon spins -180 */
         .reset-anim{transition:all 0.25s cubic-bezier(0.4,0,0.2,1)}
         .reset-anim svg{transition:transform 0.45s cubic-bezier(0.4,0,0.2,1)}
-        .reset-anim:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(0,0,0,0.08);background:#f8fafc}
+        .reset-anim:hover{transform:translateY(-1px) scale(1.03);box-shadow:0 4px 12px rgba(0,0,0,0.08);background:#f8fafc}
         .reset-anim:hover svg{transform:rotate(-180deg)}
         .reset-anim:active{transform:scale(0.96)}
         .reset-anim:active svg{transform:rotate(-360deg)}
         /* cancel animation */
         .cancel-anim{transition:all 0.2s cubic-bezier(0.4,0,0.2,1)}
-        .cancel-anim:hover{transform:translateY(-1px) scale(1.02);box-shadow:0 4px 12px rgba(0,0,0,0.08);background:#f8fafc}
+        .cancel-anim:hover{transform:translateY(-1px) scale(1.03);box-shadow:0 4px 12px rgba(0,0,0,0.08);background:#f8fafc}
         .cancel-anim:active{transform:scale(0.96)}
-        /* save animation */
+        /* save animation - enhanced */
+        @keyframes save-float{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-3px) scale(1.15)}}
         .save-anim{transition:all 0.25s cubic-bezier(0.4,0,0.2,1);position:relative;overflow:hidden}
-        .save-anim:hover{transform:translateY(-1px) scale(1.02);box-shadow:0 6px 16px rgba(0,0,0,0.12)}
+        .save-anim:hover{transform:translateY(-2px) scale(1.04);box-shadow:0 8px 20px rgba(0,0,0,0.15)}
         .save-anim:active{transform:scale(0.97)}
-        .save-anim::after{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.4),transparent);transition:left 0.5s}
+        .save-anim svg{transition:transform 0.3s ease}
+        .save-anim:hover svg{animation:save-float 0.7s ease infinite}
+        .save-anim::after{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.5),transparent);transition:left 0.5s}
         .save-anim:hover::after{left:100%}
-        /* save & lock big lock animation */
-        .lock-anim{transition:all 0.25s cubic-bezier(0.4,0,0.2,1);position:relative;overflow:hidden}
-        .lock-anim:hover{transform:translateY(-2px) scale(1.02);box-shadow:0 8px 20px rgba(16,185,129,0.35)}
-        .lock-anim:active{transform:scale(0.97)}
+        /* save & lock big lock animation - more enhanced */
+        @keyframes lock-bounce{0%,100%{transform:scale(1) rotate(0)}20%{transform:scale(1.25) rotate(-10deg)}40%{transform:scale(1.25) rotate(10deg)}60%{transform:scale(1.2) rotate(-5deg)}80%{transform:scale(1.2) rotate(5deg)}}
+        .lock-anim{transition:all 0.3s cubic-bezier(0.4,0,0.2,1);position:relative;overflow:hidden}
+        .lock-anim:hover{transform:translateY(-3px) scale(1.05);box-shadow:0 12px 28px rgba(16,185,129,0.45)}
+        .lock-anim:active{transform:scale(0.96)}
         .lock-anim svg{transition:transform 0.3s ease}
-        .lock-anim:hover svg{transform:scale(1.15) rotate(5deg)}
-        .lock-anim::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.2),transparent);transition:left 0.6s}
+        .lock-anim:hover svg{animation:lock-bounce 0.6s ease}
+        .lock-anim::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.25),transparent);transition:left 0.6s}
         .lock-anim:hover::before{left:100%}
         .rate-input-market{border:1px solid #e2e8f0;background:white;border-radius:8px;padding:6px 8px;text-align:center;font-weight:600;transition:all 0.2s}
         .rate-input-market:focus{border-color:#10b981;box-shadow:0 0 0 3px rgba(16,185,129,0.1);outline:none}
         .rate-input-market.valid{border-color:#10b981;background:#ecfdf5;color:#065f46}
         .rate-input-market.invalid{border-color:#ef4444;background:#fef2f2;color:#991b1b}
-        /* no drag - ensure table fits */
-        .no-drag-table{overflow:hidden}
+        /* perf scroll - fix freezing */
+        .scroll-perf{-webkit-overflow-scrolling:touch;overscroll-behavior:contain;transform:translateZ(0);will-change:scroll-position}
+        .no-drag-table{overflow:hidden;transform:translateZ(0)}
         .no-drag-table table{width:100%;table-layout:fixed}
         @media (min-width:1280px){.modal-responsive{max-width:1150px}} @media (min-width:1536px){.modal-responsive{max-width:1250px}} @media (min-width:1920px){.modal-responsive{max-width:1350px}} @media (min-width:2560px){.modal-responsive{max-width:1500px}}
       `}</style>
@@ -367,13 +374,13 @@ export default function EnterRateModal({
             </div>
             <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm btn-anim">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white border border-amber-200 text-amber-700 shadow-sm"><Calculator size={16} /></span>
-              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-amber-700/70 font-semibold">Total</p><p className="text-[13px] font-bold text-amber-900 tabular-nums">{deliveries.length} shops • {totals.totalWeight.toFixed(1)} KG</p></div>
+              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-amber-700/70 font-semibold">Total</p><p className="text-[12px] font-bold text-amber-900 tabular-nums leading-tight">{deliveries.length} shops • {totals.totalBirds.toLocaleString()} birds • {totals.totalWeight.toFixed(1)} KG</p></div>
             </div>
           </div>
 
           {/* Market Rate - 3 tables side wise like Masters > Market Rates image, only 3 days, today highlighted, no Window texts - with gap */}
           {marketThreeDays.length > 0 && (
-            <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 shrink-0 max-h-[28vh] overflow-auto">
+            <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 shrink-0 max-h-[22vh] overflow-auto scroll-perf scroll-smooth">
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
                 {/* Company & Association Rates */}
                 <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
@@ -492,7 +499,7 @@ export default function EnterRateModal({
           {/* Shop table - no colour for S.No/association/paper, birds weight same colour, amount simple, 10 shops, no drag, perfect middle with gaps */}
           <div className="px-5 py-3 flex-1 min-h-0 flex flex-col overflow-hidden bg-white">
             <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm no-drag-table flex flex-col">
-              <div className="flex-1 min-h-0 overflow-auto">
+              <div className="flex-1 min-h-0 overflow-auto scroll-perf scroll-smooth">
                 <table className="w-full table-fixed text-sm">
                   <thead className="bg-slate-50">
                     <tr className="border-b border-slate-200">
@@ -617,14 +624,14 @@ export default function EnterRateModal({
             ) : (
               <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={resetRates} disabled={saving} className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-[13px] font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50 reset-anim">
-                    <RotateCcw size={14} /> Reset
+                  <button type="button" onClick={resetRates} disabled={saving} className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-slate-200 bg-white text-[14px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 reset-anim min-w-[100px]">
+                    <RotateCcw size={16} /> Reset
                   </button>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-[13px] font-medium text-slate-600 hover:bg-slate-50 cancel-anim">Cancel</button>
-                  <button type="button" onClick={() => confirmSave("save")} disabled={saving || !isDirty || hasInvalidEnteredRate} className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border text-[13px] font-medium disabled:opacity-50 save-anim ${isDirty ? "border-amber-300 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
-                    <Save size={14} /> Save
+                <div className="flex items-center gap-3">
+                  <button type="button" onClick={onClose} className="px-5 py-3 rounded-xl border border-slate-300 bg-white text-[14px] font-semibold text-slate-600 hover:bg-slate-50 cancel-anim min-w-[90px]">Cancel</button>
+                  <button type="button" onClick={() => confirmSave("save")} disabled={saving || !isDirty || hasInvalidEnteredRate} className={`inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl border text-[14px] font-bold disabled:opacity-50 save-anim min-w-[130px] ${isDirty ? "border-amber-300 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
+                    <Save size={16} /> Save
                   </button>
                   <button
                     type="button"
@@ -642,9 +649,9 @@ export default function EnterRateModal({
                       setShowConfirm(true);
                     }}
                     disabled={saving}
-                    className="inline-flex items-center gap-2 px-6 py-3 rounded-xl bg-emerald-600 text-white text-[14px] font-extrabold shadow-lg hover:shadow-xl disabled:opacity-50 lock-anim"
+                    className="inline-flex items-center justify-center gap-2.5 px-8 py-3.5 rounded-xl bg-emerald-600 text-white text-[15px] font-extrabold shadow-xl hover:shadow-2xl disabled:opacity-50 lock-anim min-w-[180px]"
                   >
-                    <Lock size={16} className="text-emerald-100 animate-pulse" /> Save & Lock
+                    <Lock size={18} className="text-emerald-100" /> Save & Lock
                   </button>
                 </div>
               </div>
