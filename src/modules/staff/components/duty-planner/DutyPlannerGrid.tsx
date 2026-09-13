@@ -4,7 +4,7 @@ import { getCoreDutyRole } from '../../services/dutyRules';
 import { isDateLocked } from '../../hooks/useDutyPlanner';
 import { useDutyPlannerText } from '../../hooks/useDutyPlannerText';
 import { dutyDisplayValue } from '../../i18n/dutyPlannerCopy';
-import { countDutyCells, formatDutyWeekday, getDutyLabel, todayStr, type DutyReportCell, type DutyReportEmployee } from '../../services/dutyReport';
+import { countDutyCells, dutyDisplayName, formatDutyWeekday, getDutyLabel, todayStr, type DutyReportCell, type DutyReportEmployee } from '../../services/dutyReport';
 
 interface Props {
   employees: DutyReportEmployee[];
@@ -54,7 +54,7 @@ function DutyPlannerGrid({ employees, weekDays, getDutyCell, onCellClick, loadin
             return (
               <tr key={employee.id}>
                 <td className="sticky left-0 z-10 min-w-[180px] border-r border-slate-200 bg-white px-4 py-3 text-left">
-                  <div className="flex flex-col gap-0.5"><span className="text-[13px] font-semibold text-slate-900">{employee.employeeName}</span><span className="text-[11px] text-slate-400">{dutyDisplayValue(employee.role, language)}</span></div>
+                  <div className="flex flex-col gap-0.5"><span className="text-[13px] font-semibold text-slate-900">{dutyDisplayName(employee, language)}</span><span className="text-[11px] text-slate-400">{dutyDisplayValue(employee.role, language)}</span></div>
                 </td>
                 {weekDays.map((date) => {
                   const cell = getDutyCell(employee.id, date);
@@ -99,7 +99,7 @@ function DutyPlannerGrid({ employees, weekDays, getDutyCell, onCellClick, loadin
                           onDropDuty({ employeeId: Number(employeeId), date: rest.join(':') }, { employeeId: employee.id, date });
                         }}
                         title={`${label}${pending ? ` · ${t('pendingCell')}` : ''}${cell?.automatic && !future ? ` · ${t('automaticHint')}` : ''}${draggable ? ` · ${t('dragHint')}` : ''}`}
-                        aria-label={`${employee.employeeName} · ${date} · ${label}${pending ? ` · ${t('pendingCell')}` : ''}`}
+                        aria-label={`${dutyDisplayName(employee, language)} · ${date} · ${label}${pending ? ` · ${t('pendingCell')}` : ''}`}
                         className={`min-h-10 w-full rounded-lg border px-2 py-1 text-xs font-medium transition-colors ${colors} ${locked ? 'cursor-default' : 'hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300'} ${draggable ? 'cursor-grab active:cursor-grabbing' : ''} ${dragKey === key ? 'opacity-40' : ''} ${overKey === key ? 'ring-2 ring-emerald-400 ring-offset-1' : ''}`}
                       >{empty ? (pending ? '—' : null) : getDutyLabel(cell?.dutyType ?? null, language)}</button>
                     </td>

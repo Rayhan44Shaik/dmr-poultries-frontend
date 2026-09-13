@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { AlertCircle, CheckCircle2, Wand2 } from 'lucide-react';
-import { formatDutyDate, formatDutyWeekday } from '../../services/dutyReport';
+import { dutyDisplayName, formatDutyDate, formatDutyWeekday } from '../../services/dutyReport';
 import { useDutyPlannerText } from '../../hooks/useDutyPlannerText';
 import { dutyDisplayValue } from '../../i18n/dutyPlannerCopy';
 import type { PendingDutyEmployee } from '../../hooks/useDutyPlanner';
@@ -62,9 +62,9 @@ function PendingDutiesPanel({ pending, unassignedCount, canEdit, saving = false,
             {pending.map((row) => (
               <div key={row.employeeId} role="listitem" className="flex flex-col gap-2.5 rounded-xl border border-amber-200/60 bg-amber-50/40 px-3.5 py-3">
                 <div className="flex min-w-0 items-center gap-2.5">
-                  <span aria-hidden="true" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-bold text-amber-700 ring-1 ring-inset ring-amber-200">{initials(row.employeeName)}</span>
+                  <span aria-hidden="true" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-bold text-amber-700 ring-1 ring-inset ring-amber-200">{initials(dutyDisplayName(row, language))}</span>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold leading-tight text-slate-900">{row.employeeName}</p>
+                    <p className="truncate text-sm font-semibold leading-tight text-slate-900">{dutyDisplayName(row, language)}</p>
                     <p className="truncate text-[10px] font-medium leading-tight text-slate-400">
                       {dutyDisplayValue(row.role, language)}{row.department ? ` · ${dutyDisplayValue(row.department, language)}` : ''}
                     </p>

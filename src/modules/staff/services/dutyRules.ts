@@ -2,7 +2,7 @@ import type { DutyAssignment, Employee, LeaveRequest } from '../types/staffDashb
 import type { DutyPlannerWeek, UpsertAssignmentInput } from './dutyPlannerService';
 
 export const DUTY_CORE_ROLES = ['Supervisor', 'Driver', 'Helper', 'Loader'] as const;
-export type DutyEmployeeIdentity = Pick<Employee, 'id' | 'employeeName' | 'role' | 'department'> & Partial<Pick<Employee, 'status' | 'joiningDate' | 'employeeNo'>>;
+export type DutyEmployeeIdentity = Pick<Employee, 'id' | 'employeeName' | 'role' | 'department'> & Partial<Pick<Employee, 'status' | 'joiningDate' | 'employeeNo' | 'employeeNameTe'>>;
 
 const normalize = (value: string) => value.trim().toLowerCase().replace(/[\u200b-\u200d\ufeff]/g, '').replace(/[-_/]+/g, ' ').replace(/\s+/g, ' ');
 const CORE_ALIASES: Record<string, string[]> = {

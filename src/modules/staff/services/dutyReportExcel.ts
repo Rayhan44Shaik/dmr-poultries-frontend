@@ -1,7 +1,7 @@
 // Loaded only when Download Excel is clicked. The workbook mirrors the table:
 // employee rows, date columns, individual counts last; no grand totals/legend.
 import ExcelJS from 'exceljs';
-import { DUTY_COUNT_COLUMNS, formatDutyDate, formatDutyWeekday, getDutyCountKey, getDutyCountLabel, getDutyLabel, getDutyReportDays, summarizeDutyReport, todayStr, type DutyReportCell, type DutyReportData, type DutyReportEmployee, type DutyReportRange } from './dutyReport';
+import { DUTY_COUNT_COLUMNS, dutyDisplayName, formatDutyDate, formatDutyWeekday, getDutyCountKey, getDutyCountLabel, getDutyLabel, getDutyReportDays, summarizeDutyReport, todayStr, type DutyReportCell, type DutyReportData, type DutyReportEmployee, type DutyReportRange } from './dutyReport';
 import { isManualDutyRole } from './dutyRules';
 import { dutyDisplayValue, dutyLocale, dutyTranslator, type DutyLanguage } from '../i18n/dutyPlannerCopy';
 
@@ -110,7 +110,7 @@ export function buildDutyWorkbook(input: DutyExcelInput): ExcelJS.Workbook {
     const cells = data.byEmployee[employee.id];
     const counts = summary.byEmployee[employee.id];
     const row = sheet.addRow([
-      employee.employeeNo ?? '', employee.employeeName, dutyDisplayValue(employee.role, language), dutyDisplayValue(employee.department, language),
+      employee.employeeNo ?? '', dutyDisplayName(employee, language), dutyDisplayValue(employee.role, language), dutyDisplayValue(employee.department, language),
       ...cells.map((cell) => cell.date > asOf || !cell.dutyType ? '' : getDutyLabel(cell.dutyType, language)),
       ...DUTY_COUNT_COLUMNS.map(({ key }) => counts[key]),
     ]);
@@ -144,7 +144,7 @@ export function buildDutyWorkbook(input: DutyExcelInput): ExcelJS.Workbook {
     for (const cell of data.byEmployee[employee.id]) {
       const future = cell.date > asOf;
       const row = details.addRow([
-        employee.employeeNo ?? '', employee.employeeName, dutyDisplayValue(employee.role, language), dutyDisplayValue(employee.department, language),
+        employee.employeeNo ?? '', dutyDisplayName(employee, language), dutyDisplayValue(employee.role, language), dutyDisplayValue(employee.department, language),
         language === 'te' ? formatDutyDate(cell.date, language) : new Date(`${cell.date}T00:00:00Z`), formatDutyWeekday(cell.date, language),
         future || !cell.dutyType ? '' : getDutyLabel(cell.dutyType, language),
         future ? '' : cell.assignedDutyType ?? '', future ? '' : cell.vehicleNo,

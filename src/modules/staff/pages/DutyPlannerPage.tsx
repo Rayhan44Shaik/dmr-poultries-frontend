@@ -12,7 +12,7 @@ import ShiftPicker from '../components/duty-planner/ShiftPicker';
 import { useDutyPlannerText } from '../hooks/useDutyPlannerText';
 import { dutyDisplayValue, dutyLocale, localizeDutyError } from '../i18n/dutyPlannerCopy';
 import '../styles/dutyPlanner.css';
-import { filterDutyEmployees, formatDutyDate, getDutyRangeError, todayStr, type DutyReportData, type DutyReportRange } from '../services/dutyReport';
+import { dutyDisplayName, filterDutyEmployees, formatDutyDate, getDutyRangeError, todayStr, type DutyReportData, type DutyReportRange } from '../services/dutyReport';
 import { CheckCircle2, AlertCircle, LoaderCircle, RefreshCw, LockKeyhole, ChevronDown } from 'lucide-react';
 import type { DutyPlannerFilters as DutyPlannerFiltersType, DutyAssignment } from '../types/staffDashboard';
 
@@ -492,7 +492,7 @@ function DutyPlannerPage() {
           onRemove={getAssignment(selectedCell.employeeId, selectedCell.date)?.id ? handleRemoveDuty : undefined}
           currentDuty={getDutyCell(selectedCell.employeeId, selectedCell.date)?.dutyType ?? undefined}
           date={selectedCell.date}
-          employeeName={selectedEmployee ? selectedEmployee.employeeName : ''}
+          employeeName={selectedEmployee ? dutyDisplayName(selectedEmployee, language) : ''}
           employeeRole={selectedEmployee ? selectedEmployee.role : ''}
           employeeDepartment={selectedEmployee?.department}
         />

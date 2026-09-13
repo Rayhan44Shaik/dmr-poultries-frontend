@@ -142,14 +142,15 @@ describe('Duty Planner Excel workbook', () => {
     assert.equal(sheet.getCell('E7').type, ExcelJS.ValueType.String);
   });
 
-  it('exports Telugu sheet names, headings, duties and roles without translating employee names', async () => {
+  it('exports Telugu sheet names, headings, duties, roles and employee names', async () => {
     const loaded = new ExcelJS.Workbook();
     await loaded.xlsx.load(await buildDutyWorkbook({ ...fixture(), language: 'te' }).xlsx.writeBuffer());
     const sheet = loaded.getWorksheet('డ్యూటీ పట్టిక')!;
     assert.ok(loaded.getWorksheet('రోజువారీ వివరాలు'));
     assert.equal(sheet.getCell('B6').value, 'ఉద్యోగి');
     assert.equal(sheet.getCell('N6').value, 'డ్యూటీ రోజులు');
-    assert.equal(sheet.getCell('B7').value, 'Ravi Kumar');
+    // Names follow the page language: Telugu when a transliteration exists.
+    assert.equal(sheet.getCell('B7').value, 'రవి కుమార్');
     assert.equal(sheet.getCell('C7').value, 'డ్రైవర్');
     assert.equal(sheet.getCell('F7').value, 'సెలవు');
     assert.equal(sheet.getCell('E9').value, 'ఆఫీస్');

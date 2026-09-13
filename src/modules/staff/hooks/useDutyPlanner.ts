@@ -16,7 +16,7 @@ import {
   type DutyPlannerValidation,
   type DutyPlannerWeek,
 } from '../services/dutyPlannerService';
-import { loadDutyReportLeaves, loadDutyReportRange, formatDutyDate, todayStr, type DutyReportRange } from '../services/dutyReport';
+import { dutyDisplayName, loadDutyReportLeaves, loadDutyReportRange, formatDutyDate, todayStr, type DutyReportRange } from '../services/dutyReport';
 import { listLeaves } from '../services/leaveService';
 import { AutomaticDutySyncError, getAutomaticDuty, hasApprovedDutyLeave, resolveDutyCell, syncAutomaticDuties } from '../services/dutyRules';
 import { STAFF_LEAVES_CHANGED } from '../services/staffEvents';
@@ -31,6 +31,7 @@ const DEFAULT_ROLES = ['Supervisor', 'Driver', 'Helper', 'Loader'];
 export interface PendingDutyEmployee {
   employeeId: number;
   employeeName: string;
+  employeeNameTe?: string;
   role: string;
   department?: string;
   missingDays: string[];
@@ -247,7 +248,7 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
         const hasDuty = assignments.some((a) => a.employeeId === emp.id && a.date === day);
         return !hasDuty && !isOnApprovedLeave(emp.id, day) && !getAutomaticDuty(emp, day);
       });
-      if (missingDays.length) rows.push({ employeeId: emp.id, employeeName: emp.employeeName, role: emp.role, department: emp.department, missingDays });
+      if (missingDays.length) rows.push({ employeeId: emp.id, employeeName: emp.employeeName, employeeNameTe: emp.employeeNameTe, role: emp.role, department: emp.department, missingDays });
     }
     // Date-wise order: whoever misses the earliest day of the week appears
     // first (lowest date first), with the roster name as the tie-breaker.
@@ -416,7 +417,10 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
         } else {
           applyWeek(await getDutyPlannerWeek(weekStart));
         }
-        const nameOf = (employeeId: number) => employees.find((e) => e.id === employeeId)?.employeeName ?? '';
+        const nameOf = (employeeId: number) => {
+          const employee = employees.find((e) => e.id === employeeId);
+          return employee ? dutyDisplayName(employee, languageRef.current) : '';
+        };
         showNotification?.(
           text(targetDuty ? 'dragSwapped' : 'dragMoved', {
             source: `${nameOf(source.employeeId)} · ${formatDutyDate(source.date, languageRef.current)}`,

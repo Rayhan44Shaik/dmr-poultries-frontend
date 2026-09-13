@@ -3,7 +3,7 @@ import { getShiftConfigsForRole } from '../../services/staffService';
 import { getCoreDutyRole } from '../../services/dutyRules';
 import { useDutyPlannerText } from '../../hooks/useDutyPlannerText';
 import { dutyDisplayValue } from '../../i18n/dutyPlannerCopy';
-import { DUTY_COUNT_COLUMNS, formatDutyDate, formatDutyWeekday, getDutyCountLabel, getDutyLabel, summarizeDutyReport, type DutyReportData, type DutyReportEmployee } from '../../services/dutyReport';
+import { DUTY_COUNT_COLUMNS, dutyDisplayName, formatDutyDate, formatDutyWeekday, getDutyCountLabel, getDutyLabel, summarizeDutyReport, type DutyReportData, type DutyReportEmployee } from '../../services/dutyReport';
 
 interface Props {
   data: DutyReportData;
@@ -44,7 +44,7 @@ export default function DutyPlannerReportTable({ data, employees, asOf, dates }:
             {employees.map((employee) => (
               <tr key={employee.id}>
                 <th scope="row" className="sticky left-0 z-10 border-r border-slate-200 bg-white px-4 py-3 text-left">
-                  <div className="max-w-[240px] font-semibold text-slate-800">{employee.employeeName}</div>
+                  <div className="max-w-[240px] font-semibold text-slate-800">{dutyDisplayName(employee, language)}</div>
                   <div className="mt-0.5 text-[10px] font-normal text-slate-400">{employee.employeeNo != null ? `#${employee.employeeNo} · ` : ''}{dutyDisplayValue(employee.role, language)}</div>
                 </th>
                 {(visibleSet ? data.byEmployee[employee.id].filter((cell) => visibleSet.has(cell.date)) : data.byEmployee[employee.id]).map((cell) => {
@@ -56,7 +56,7 @@ export default function DutyPlannerReportTable({ data, employees, asOf, dates }:
                   const label = future ? t('future') : cell.isLeave ? t('approvedLeave') : getDutyLabel(cell.dutyType, language);
                   return (
                     <td key={cell.date} data-date={cell.date} data-empty={empty} className="px-1 py-1.5">
-                      <div title={`${employee.employeeName} · ${cell.date} · ${label}${cell.automatic && !future ? ` · ${t('automaticHint')}` : ''}`} aria-label={`${employee.employeeName} · ${cell.date} · ${label}`} className={`flex min-h-9 items-center justify-center rounded-md border px-2 py-1 text-center font-medium ${language === 'te' ? 'text-xs' : 'text-[11px]'} ${colors}`}>
+                      <div title={`${dutyDisplayName(employee, language)} · ${cell.date} · ${label}${cell.automatic && !future ? ` · ${t('automaticHint')}` : ''}`} aria-label={`${dutyDisplayName(employee, language)} · ${cell.date} · ${label}`} className={`flex min-h-9 items-center justify-center rounded-md border px-2 py-1 text-center font-medium ${language === 'te' ? 'text-xs' : 'text-[11px]'} ${colors}`}>
                         {empty ? null : getDutyLabel(cell.dutyType, language)}
                       </div>
                     </td>

@@ -254,6 +254,19 @@ const EMP_LAST = [
   "Kumar", "Rao", "Reddy", "Naidu", "Goud", "Chary", "Prasad", "Sharma",
   "Yadav", "Babu", "Shaik", "Varma", "Sastry", "Murthy", "Pillai",
 ];
+// Telugu transliterations, index-aligned with the English arrays above, so
+// every employee carries a bilingual name: employeeName (English, still used
+// for search) and employeeNameTe (Telugu display name).
+const EMP_FIRST_TE = [
+  "రవి", "శ్రీనివాస్", "మోహన్", "అనిల్", "ఇమ్రాన్", "కిరణ్", "రమేష్", "ప్రకాష్",
+  "ఆనంద్", "నవీన్", "వినయ్", "మహేష్", "మల్లి", "బాషా", "రాజు", "సతీష్",
+  "గణేష్", "రాజేష్", "నాగరాజు", "యేసు", "భాస్కర్", "చందు", "దినేష్",
+  "ఈశ్వర్", "ఫెరోజ్", "గోపి", "హరీష్", "ఇస్మాయిల్", "జగదీష్", "కార్తీక్",
+];
+const EMP_LAST_TE = [
+  "కుమార్", "రావు", "రెడ్డి", "నాయుడు", "గౌడ్", "చారి", "ప్రసాద్", "శర్మ",
+  "యాదవ్", "బాబు", "షేక్", "వర్మ", "శాస్త్రి", "మూర్తి", "పిళ్ళై",
+];
 
 let empSeq = 0;
 const EMPLOYEES = [];
@@ -270,6 +283,9 @@ for (const plan of DEPT_PLAN) {
       id: empSeq,
       employeeNo: empSeq,
       employeeName: name,
+      employeeNameTe: `${EMP_FIRST_TE[(empSeq - 1) % EMP_FIRST_TE.length]} ${
+        EMP_LAST_TE[Math.floor((empSeq - 1) / EMP_FIRST_TE.length) % EMP_LAST_TE.length]
+      }`,
       department: plan.department,
       role: plan.role,
       phoneNumber: String(9880000000 + empSeq * 173),

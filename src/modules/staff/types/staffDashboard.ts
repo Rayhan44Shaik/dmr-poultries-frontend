@@ -8,6 +8,8 @@ export interface Employee {
   id: number;
   employeeNo: number;
   employeeName: string;
+  /** Telugu display name (sample data); search matches both names. */
+  employeeNameTe?: string;
   department: string;
   role: string;
   phoneNumber: string;
