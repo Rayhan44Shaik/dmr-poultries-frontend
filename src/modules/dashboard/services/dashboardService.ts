@@ -145,10 +145,90 @@ async function fetchSampleFuel(): Promise<FuelExpense[]> {
   }
 }
 
+async function fetchSampleCollections(): Promise<Collection[]> {
+  try {
+    const { data } = await apiClient.get<{ data?: Record<string, unknown>[] } | Record<string, unknown>[]>("/operations/collections/entry", {
+      params: sampleWindow(),
+      timeout: 10_000,
+    });
+    const rows = Array.isArray(data) ? data : (data?.data ?? []);
+    return (Array.isArray(rows) ? rows : []).map(row => ({
+      id: String(row.id ?? ""),
+      collectionNo: String(row.collectionNo ?? ""),
+      collectionDate: String(row.collectionDate ?? ""),
+      shopName: String(row.shopName ?? ""),
+      collectorName: String(row.collector ?? ""),
+      paymentModeName: String(row.paymentMode ?? ""),
+      referenceNo: String(row.referenceNo ?? ""),
+      amount: Number(row.amount ?? row.amountCollected ?? 0),
+      remarks: String(row.remarks ?? ""),
+      status: (String(row.status) === "Approved" ? "Approved" : "Pending") as any,
+      createdDate: String(row.createdAt ?? row.collectionDate ?? ""),
+      createdBy: String(row.createdBy ?? "Admin"),
+      numericId: Number(row.id),
+      numericShopId: Number(row.shopId),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function fetchSamplePendingCollections(): Promise<PendingCollection[]> {
+  try {
+    const { data } = await apiClient.get<{ data?: Record<string, unknown>[] } | Record<string, unknown>[]>("/operations/collections/pending", {
+      params: sampleWindow(),
+      timeout: 10_000,
+    });
+    const rows = Array.isArray(data) ? data : (data?.data ?? []);
+    return (Array.isArray(rows) ? rows : []).map(row => ({
+      shopId: Number(row.shopId ?? 0),
+      shopName: String(row.shopName ?? ""),
+      totalSales: Number(row.totalSales ?? 0),
+      totalCollections: Number(row.totalCollections ?? 0),
+      currentPending: Number(row.currentPending ?? 0),
+      overdueDays: Number(row.overdueDays ?? 0),
+      lastCollectionDate: String(row.lastCollectionDate ?? ""),
+    }));
+  } catch {
+    return [];
+  }
+}
+
+async function fetchSampleShopSales(): Promise<ShopSale[]> {
+  try {
+    const { data } = await apiClient.get<{ data?: Record<string, unknown>[] } | Record<string, unknown>[]>("/operations/shop-sales", {
+      params: sampleWindow(),
+      timeout: 10_000,
+    });
+    const rows = Array.isArray(data) ? data : (data?.data ?? []);
+    return (Array.isArray(rows) ? rows : []).map(row => ({
+      id: String(row.id ?? ""),
+      tripId: String(row.tripId ?? ""),
+      tripNo: String(row.tripNo ?? ""),
+      tripDate: String(row.saleDate ?? row.tripDate ?? ""),
+      shopId: String(row.shopId ?? ""),
+      shopName: String(row.shopName ?? ""),
+      birdType: String(row.birdType ?? ""),
+      totalBirds: Number(row.birds ?? 0),
+      totalWeight: Number(row.weight ?? 0),
+      rate: row.rate == null ? null : Number(row.rate),
+      amount: Number(row.amount ?? 0),
+      remark: String(row.remarks ?? row.remark ?? ""),
+      status: "Completed",
+      numericId: Number(row.id),
+      numericTripId: Number(row.tripId),
+      numericShopId: Number(row.shopId),
+    }));
+  } catch {
+    return [];
+  }
+}
+
 /** Backend rows win; anything only held locally is kept. */
-function mergeById<T extends { id: unknown }>(primary: T[], secondary: T[]): T[] {
-  const seen = new Set(primary.map((row) => String(row.id)));
-  return [...primary, ...secondary.filter((row) => !seen.has(String(row.id)))];
+function mergeById<T extends { id?: unknown; shopId?: unknown; numericId?: unknown }>(primary: T[], secondary: T[]): T[] {
+  const getId = (row: T) => String(row.id ?? row.shopId ?? row.numericId ?? "");
+  const seen = new Set(primary.map(getId));
+  return [...primary, ...secondary.filter((row) => !seen.has(getId(row)))];
 }
 
 /* ------------------------------------------------------------------ */
@@ -296,9 +376,18 @@ export async function loadDashboardData(): Promise<DashboardData> {
   // untouched: the probe resolves to null outside dev/preview.
   const sampleQuarter = (await getQuarterSampleInfo())?.quarter ?? null;
   if (sampleQuarter) {
-    const [apiTrips, apiFuel] = await Promise.all([fetchSampleTrips(), fetchSampleFuel()]);
+    const [apiTrips, apiFuel, apiCollections, apiPendingCollections, apiShopSales] = await Promise.all([
+      fetchSampleTrips(),
+      fetchSampleFuel(),
+      fetchSampleCollections(),
+      fetchSamplePendingCollections(),
+      fetchSampleShopSales()
+    ]);
     trips = mergeById(apiTrips, trips);
     fuelExpenses = mergeById(apiFuel, fuelExpenses);
+    collections = mergeById(apiCollections, collections);
+    pendingCollections = mergeById(apiPendingCollections, pendingCollections);
+    shopSales = mergeById(apiShopSales, shopSales);
   }
 
   return {
