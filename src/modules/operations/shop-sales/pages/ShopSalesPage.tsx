@@ -5,6 +5,7 @@ import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { handleApiError } from "../../../../api";
 
 import useShopSales from "../hooks/useShopSales";
+import { useKpiDrill } from "../../../../shared/kpi/useKpiDrill";
 import { useShops } from "../../../masters/shops/hooks/useShops";
 import ShopSalesFilters from "../components/ShopSalesFilters";
 import ShopSalesSummary from "../components/ShopSalesSummary";
@@ -59,6 +60,26 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
       showNotification(`Loaded sales for Trip #${tripNo}`, "success");
     }
   }, [initialTrip, setFilter, showNotification]);
+
+  /* Opened from a dashboard KPI tile: this page follows the window that tile
+     was showing, and the equal-length window before it when the range bar above
+     is flipped to "previous". Clearing the bar hands the dates back to this
+     page's own default.
+     Same "adjust state while rendering" pattern the dashboard uses: the URL is
+     the source of truth, so a refresh or a shared link lands filtered too. */
+  const { drill, activeFrom, activeTo } = useKpiDrill();
+  const drillKey = drill ? `${activeFrom}/${activeTo}` : "";
+  const [appliedDrillKey, setAppliedDrillKey] = useState<string | null>(null);
+  if (drillKey !== appliedDrillKey) {
+    setAppliedDrillKey(drillKey);
+    if (drill) {
+      setFilter((prev) => ({ ...prev, fromDate: activeFrom, toDate: activeTo }));
+      setCurrentPage(1);
+    } else if (appliedDrillKey) {
+      setFilter((prev) => ({ ...prev, fromDate: "", toDate: "" }));
+      setCurrentPage(1);
+    }
+  }
 
   const shopNames = Array.from(
     new Set([

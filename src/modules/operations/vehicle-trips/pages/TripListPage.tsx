@@ -24,6 +24,7 @@ import {
 } from "../services/tripHeaderApiService";
 import { isCanceledError } from "../../../../api/errors";
 import { useI18n } from "../../../../i18n";
+import { useKpiDrill } from "../../../../shared/kpi/useKpiDrill";
 
 type TripListPageProps = { embedded?: boolean };
 type FilterOption = { value: string; label: string };
@@ -136,6 +137,28 @@ function TripListPage({ embedded = false }: TripListPageProps) {
       listAbortRef.current?.abort();
     };
   }, [refreshTrips]);
+
+  /* Opened from a dashboard KPI tile: this page follows the window that tile
+     was showing, and the equal-length window before it when the range bar above
+     is flipped to "previous". Clearing the bar hands the dates back to this
+     page's own default.
+     Same "adjust state while rendering" pattern the dashboard uses: the URL is
+     the source of truth, so a refresh or a shared link lands filtered too. */
+  const { drill, activeFrom, activeTo } = useKpiDrill();
+  const drillKey = drill ? `${activeFrom}/${activeTo}` : "";
+  const [appliedDrillKey, setAppliedDrillKey] = useState<string | null>(null);
+  if (drillKey !== appliedDrillKey) {
+    setAppliedDrillKey(drillKey);
+    if (drill) {
+      setFromDate(activeFrom);
+      setToDate(activeTo);
+      setCurrentPage(1);
+    } else if (appliedDrillKey) {
+      setFromDate("");
+      setToDate("");
+      setCurrentPage(1);
+    }
+  }
 
   const resetFilters = () => {
     setSearch("");

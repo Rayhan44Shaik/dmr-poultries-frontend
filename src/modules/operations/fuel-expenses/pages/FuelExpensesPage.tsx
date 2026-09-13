@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useMemo, useCallback } from "react";
 import Select from "react-select";
 import { useFuelExpenses } from "../hooks/useFuelExpenses";
+import { useKpiDrill } from "../../../../shared/kpi/useKpiDrill";
 import { FuelKPICards } from "../components/FuelKPICards";
 import { FuelEntryForm } from "../components/FuelEntryForm";
 import { FuelBillTable } from "../components/FuelBillTable";
@@ -133,6 +134,26 @@ function FuelExpensesPage() {
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
+
+  /* Opened from a dashboard KPI tile: this page follows the window that tile
+     was showing, and the equal-length window before it when the range bar above
+     is flipped to "previous". Clearing the bar hands the dates back to this
+     page's own default.
+     Same "adjust state while rendering" pattern the dashboard uses: the URL is
+     the source of truth, so a refresh or a shared link lands filtered too. */
+  const { drill, activeFrom, activeTo } = useKpiDrill();
+  const drillKey = drill ? `${activeFrom}/${activeTo}` : "";
+  const [appliedDrillKey, setAppliedDrillKey] = useState<string | null>(null);
+  if (drillKey !== appliedDrillKey) {
+    setAppliedDrillKey(drillKey);
+    if (drill) {
+      setFromDate(activeFrom);
+      setToDate(activeTo);
+    } else if (appliedDrillKey) {
+      setFromDate("");
+      setToDate("");
+    }
+  }
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingData, setEditingData] = useState<FuelExpense | null>(null);

@@ -14,6 +14,7 @@ import PendingCollectionsTable from "../components/pending/PendingCollectionsTab
 import ShopSalesPagination from "../components/pending/ShopSalesPagination";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import { useI18n } from "../../../../i18n";
+import { useKpiDrill } from "../../../../shared/kpi/useKpiDrill";
 
 const getCurrentWeekRange = (): { fromDate: string; toDate: string } => {
   const today = new Date();
@@ -147,14 +148,41 @@ export default function PendingCollectionsPage() {
     void loadData();
   }, [loadData]);
 
+  /* Opened from a dashboard KPI tile: this page follows the window that tile
+     was showing, and the equal-length window before it when the range bar above
+     is flipped to "previous". Clearing the bar hands the dates back to this
+     page's own default (the current week).
+     Same "adjust state while rendering" pattern the dashboard uses: the URL is
+     the source of truth, so a refresh or a shared link lands filtered too — and
+     it runs BEFORE the default-week effect below, which then stands aside. */
+  const { drill, activeFrom, activeTo } = useKpiDrill();
+  const drillKey = drill ? `${activeFrom}/${activeTo}` : "";
+  const [appliedDrillKey, setAppliedDrillKey] = useState<string | null>(null);
+  if (drillKey !== appliedDrillKey) {
+    setAppliedDrillKey(drillKey);
+    if (drill) {
+      setFromDate(activeFrom);
+      setToDate(activeTo);
+      setAppliedFromDate(activeFrom);
+      setAppliedToDate(activeTo);
+    } else if (appliedDrillKey) {
+      const week = getCurrentWeekRange();
+      setFromDate(week.fromDate);
+      setToDate(week.toDate);
+      setAppliedFromDate(week.fromDate);
+      setAppliedToDate(week.toDate);
+    }
+  }
+
   // Initialize default date range (current week Mon-Sun)
   useEffect(() => {
+    if (drill) return; // a dashboard KPI already picked the window
     const { fromDate: mon, toDate: sun } = getCurrentWeekRange();
     setFromDate(mon);
     setToDate(sun);
     setAppliedFromDate(mon);
     setAppliedToDate(sun);
-  }, []);
+  }, [drill]);
 
   // Fetch pending summary when applied date range changes
   useEffect(() => {
