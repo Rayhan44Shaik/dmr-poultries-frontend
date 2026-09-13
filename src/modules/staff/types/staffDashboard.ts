@@ -128,6 +128,8 @@ export interface AttendanceFilters {
 
 export interface LeaveRequest {
   id: string;
+  /** Human-friendly number in the trip-number format: LEV-YYYYMMDD-NNN. */
+  leaveNo?: string;
   employeeId: number;
   employeeName: string;
   type: 'Casual' | 'Sick' | 'Emergency' | 'Annual';
@@ -187,6 +189,8 @@ export interface LeaveListFilters {
   search?: string;
   page?: number;
   limit?: number;
+  sortBy?: string;
+  sortDir?: 'asc' | 'desc';
 }
 
 export interface LeaveBalance {

@@ -11,6 +11,7 @@ import {
   Building2,
   Calendar,
   CalendarOff,
+  Activity,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
@@ -50,12 +51,12 @@ interface LeaveFiltersProps {
   };
 }
 
-const STATUS_TABS: { label: LeaveFilterState['status']; icon: React.ReactNode }[] = [
-  { label: 'All', icon: <LayoutGrid size={13} /> },
-  { label: 'Pending', icon: <Clock size={13} /> },
-  { label: 'Approved', icon: <CheckCircle2 size={13} /> },
-  { label: 'Rejected', icon: <XCircle size={13} /> },
-  { label: 'Cancelled', icon: <X size={13} /> },
+const STATUS_TABS: { label: LeaveFilterState['status']; Icon: typeof Clock }[] = [
+  { label: 'All', Icon: LayoutGrid },
+  { label: 'Pending', Icon: Clock },
+  { label: 'Approved', Icon: CheckCircle2 },
+  { label: 'Rejected', Icon: XCircle },
+  { label: 'Cancelled', Icon: X },
 ];
 
 const LEAVE_TYPES = ['Casual', 'Sick', 'Emergency', 'Annual'] as const;
@@ -305,28 +306,32 @@ function LeaveFilters({
           </div>
         </div>
 
-        <div className="lg:col-span-7">
+        <div className="lg:col-span-7 lg:flex lg:justify-end">
+          <span className={uiFilterLabelClass}>
+            <Activity size={13} className="shrink-0 text-emerald-500" />
+            <span>Status</span>
+          </span>
           <div
             role="group"
             aria-label="Filter by status"
-            className="flex max-w-full min-h-9 flex-nowrap items-center gap-0.5 overflow-x-auto rounded-lg border border-slate-200/60 bg-slate-100/80 p-1 lg:justify-end"
+            className="flex h-10 w-full items-center gap-0.5 overflow-x-auto rounded-lg border border-slate-200/70 bg-slate-100/70 p-0.5 lg:ml-auto lg:w-auto"
           >
-            {STATUS_TABS.map((tab) => {
-              const isActive = filters.status === tab.label;
+            {STATUS_TABS.map(({ label, Icon }) => {
+              const isActive = filters.status === label;
               return (
                 <button
-                  key={tab.label}
+                  key={label}
                   type="button"
-                  onClick={() => onFilterChange('status', tab.label)}
+                  onClick={() => onFilterChange('status', label)}
                   aria-pressed={isActive}
-                  className={`flex h-7 shrink-0 items-center gap-1 whitespace-nowrap rounded-md px-2.5 text-xs font-semibold transition focus-visible:ring-2 focus-visible:ring-emerald-300 ${
+                  className={`flex h-9 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-md px-1.5 text-[11px] font-semibold transition focus-visible:ring-2 focus-visible:ring-emerald-300 sm:px-2 sm:text-xs lg:flex-none lg:px-2.5 ${
                     isActive
                       ? 'bg-white text-emerald-700 shadow-sm ring-1 ring-slate-200/60'
                       : 'text-slate-500 hover:bg-white/70 hover:text-slate-900'
                   }`}
                 >
-                  {tab.icon}
-                  {tab.label}
+                  <Icon size={13} className="hidden shrink-0 sm:block" aria-hidden="true" />
+                  {label}
                 </button>
               );
             })}

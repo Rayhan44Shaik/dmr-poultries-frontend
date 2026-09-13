@@ -25,6 +25,9 @@ function LeaveManagementPage() {
     filters,
     setFilter,
     resetFilters,
+    sortBy,
+    sortDir,
+    toggleSort,
     employees,
     departments,
     addLeave,
@@ -137,6 +140,10 @@ function LeaveManagementPage() {
             onReject={handleReject}
             onDelete={handleDelete}
             onCancel={(id) => { void cancelLeave(id); }}
+            sortBy={sortBy}
+            sortDir={sortDir}
+            onSortChange={toggleSort}
+            startIndex={(page - 1) * pageSize}
           />
           <Pagination
             currentPage={page}

@@ -1394,17 +1394,24 @@ for (const weekOffset of [0, 1]) {
 const LEAVE_TYPES = ["Casual", "Sick", "Emergency", "Annual"];
 const LEAVES = [];
 let leaveSeq = 0;
+const leaveNoByDate = new Map();
 for (const e of EMPLOYEES) {
   const r = rng(14000 + e.id);
   const n = between(r, 1, 4);
   for (let i = 0; i < n; i += 1) {
     leaveSeq += 1;
     const fromDate = DATES[(e.id * 5 + i * 19) % DATES.length];
+    // Leave numbers mirror the trip-number format: LEV-YYYYMMDD-NNN, with a
+    // per-day sequence so the list reads exactly like the Trip List table.
+    const daySeq = (leaveNoByDate.get(fromDate) ?? 0) + 1;
+    leaveNoByDate.set(fromDate, daySeq);
+    const leaveNo = `LEV-${fromDate.replace(/-/g, "")}-${String(daySeq).padStart(3, "0")}`;
     const days = between(r, 1, 4);
     const toDate = addDays(fromDate, days - 1);
     const status = ["Approved", "Approved", "Pending", "Rejected", "Cancelled"][leaveSeq % 5];
     LEAVES.push({
       id: String(leaveSeq),
+      leaveNo,
       employeeId: e.id,
       employeeNo: e.employeeNo,
       employeeName: e.employeeName,
@@ -2618,8 +2625,10 @@ function createLeaveRow(body) {
     Number(body.days) ||
     Math.max(1, dayDiff(fromDate, toDate) + 1);
   leaveEditSeq += 1;
+  const daySeq = LEAVES.filter((l) => l.fromDate === fromDate).length + 1;
   const row = {
     id: String(leaveEditSeq),
+    leaveNo: `LEV-${fromDate.replace(/-/g, "")}-${String(daySeq).padStart(3, "0")}`,
     employeeId: Number(body.employeeId),
     employeeNo: emp?.employeeNo ?? Number(body.employeeId),
     employeeName: emp?.employeeName ?? String(body.employeeId),
@@ -3117,6 +3126,29 @@ function paginate(rows, params, defLimit = 200) {
     data: rows.slice((page - 1) * limit, (page - 1) * limit + limit),
     meta: { total, page, limit, totalPages: Math.max(1, Math.ceil(total / limit)) },
   };
+}
+
+/** Leave-list sorting — same contract as the trips list (sortBy + sortDir). */
+function sortLeaves(rows, sortBy, sortDir) {
+  if (!sortBy) return rows;
+  const dir = sortDir === "desc" ? -1 : 1;
+  const pick = {
+    leaveNo: (l) => l.leaveNo || "",
+    employeeName: (l) => l.employeeName || "",
+    department: (l) => l.department || "",
+    type: (l) => l.type || "",
+    fromDate: (l) => l.fromDate || "",
+    toDate: (l) => l.toDate || "",
+    days: (l) => l.days ?? 0,
+    status: (l) => l.status || "",
+  }[sortBy];
+  if (!pick) return rows;
+  return [...rows].sort((a, b) => {
+    const x = pick(a);
+    const y = pick(b);
+    if (typeof x === "number" && typeof y === "number") return (x - y) * dir;
+    return String(x).localeCompare(String(y), undefined, { numeric: true }) * dir;
+  });
 }
 
 function readBody(req) {
@@ -3962,7 +3994,8 @@ const server = http.createServer(async (req, res) => {
             String(l.employeeNo ?? "").includes(search)
         );
       }
-      const { data, meta } = paginate(rows, q, 50);
+      const sorted = sortLeaves(rows, q.get("sortBy"), q.get("sortDir"));
+      const { data, meta } = paginate(sorted, q, 50);
       return send(200, { items: data, ...meta });
     }
     // New leave request (Leave Management page) — always starts Pending.

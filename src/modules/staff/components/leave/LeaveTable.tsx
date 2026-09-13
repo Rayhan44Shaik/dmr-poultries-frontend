@@ -1,10 +1,30 @@
 // src/modules/staff/components/leave/LeaveTable.tsx
 
 import { memo, useState, useMemo } from 'react';
-import { CheckCircle, XCircle, Trash2, Eye, X, Calendar } from 'lucide-react';
+import {
+  CheckCircle,
+  XCircle,
+  Trash2,
+  Eye,
+  X,
+  Calendar,
+  Hash,
+  User,
+  Building2,
+  CalendarOff,
+  CalendarRange,
+  Sun,
+  MessageSquareText,
+  Activity,
+  Settings,
+  ArrowUp,
+  ArrowDown,
+} from 'lucide-react';
 import type { LeaveRequest } from '../../types/staffDashboard';
+import type { LeaveSortKey } from '../../hooks/useLeaveManagement';
 import { usePendingDelete } from '../../../../hooks/usePendingDelete';
 import { PendingDeleteNotification } from '../../../../components/common/PendingDeleteNotification';
+import { ActionTooltip } from '../../../../ui/ActionTooltip';
 
 interface LeaveTableProps {
   leaves: LeaveRequest[];
@@ -12,9 +32,42 @@ interface LeaveTableProps {
   onReject: (id: string, reason: string) => void;
   onDelete: (id: string) => void;
   onCancel: (id: string) => void;
+  /** Trips-list sorting contract. */
+  sortBy?: LeaveSortKey | null;
+  sortDir?: 'asc' | 'desc';
+  onSortChange?: (key: LeaveSortKey) => void;
+  /** Serial-number offset for the "#" column (page-aware). */
+  startIndex?: number;
 }
 
-function LeaveTable({ leaves, onApprove, onReject, onDelete, onCancel }: LeaveTableProps) {
+/**
+ * Sort affordance: compact side-by-side up/down arrows beside the label, like
+ * the Trip List reference header. Both arrows always render so every header
+ * keeps the same width; only the active direction turns emerald.
+ */
+function SortArrows({ active, dir }: { active: boolean; dir?: 'asc' | 'desc' }) {
+  const base = 'h-3 w-3 shrink-0 transition-colors';
+  const on = 'text-emerald-600';
+  const off = 'text-slate-400 group-hover/sort:text-slate-600';
+  return (
+    <span className="inline-flex shrink-0 items-center gap-0.5" aria-hidden="true">
+      <ArrowUp size={12} strokeWidth={2.7} className={`${base} ${active && dir === 'asc' ? on : off}`} />
+      <ArrowDown size={12} strokeWidth={2.7} className={`${base} ${active && dir === 'desc' ? on : off}`} />
+    </span>
+  );
+}
+
+function LeaveTable({
+  leaves,
+  onApprove,
+  onReject,
+  onDelete,
+  onCancel,
+  sortBy = null,
+  sortDir = 'asc',
+  onSortChange,
+  startIndex = 0,
+}: LeaveTableProps) {
   const { requestDelete, cancel, pendingItems } = usePendingDelete(onDelete);
   const [viewEmployeeModal, setViewEmployeeModal] = useState<{
     employeeName: string;
@@ -24,10 +77,30 @@ function LeaveTable({ leaves, onApprove, onReject, onDelete, onCancel }: LeaveTa
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
 
+  /** Leave number in the trip-number format: LEV-YYYYMMDD-NNN. */
   const leaveNumber = (leave: LeaveRequest) => {
+    if (leave.leaveNo) return leave.leaveNo;
     const month = leave.createdAt.slice(0, 7).replace('-', '') || 'UNKNOWN';
     const compactId = leave.id.replace(/-/g, '');
     return `LEV-${month}-${compactId.slice(-12).toUpperCase()}`;
+  };
+
+  /** Wraps a header's content in a sort button when sorting is enabled. */
+  const sortable = (key: LeaveSortKey, content: React.ReactNode, center = false) => {
+    if (!onSortChange) return content;
+    const active = sortBy === key;
+    return (
+      <button
+        type="button"
+        onClick={() => onSortChange(key)}
+        title="Sort"
+        aria-sort={active ? (sortDir === 'asc' ? 'ascending' : 'descending') : 'none'}
+        className={`group/sort flex w-full items-center gap-2 text-[11px] font-bold uppercase tracking-wider transition-colors hover:text-emerald-700 ${center ? 'justify-center' : ''} ${active ? 'text-emerald-700' : ''}`}
+      >
+        {content}
+        <SortArrows active={active} dir={sortDir} />
+      </button>
+    );
   };
 
   const getStatusBadge = (status: string) => {
@@ -80,104 +153,191 @@ function LeaveTable({ leaves, onApprove, onReject, onDelete, onCancel }: LeaveTa
     );
   }
 
+  const th = 'px-4 py-3 text-[11px] font-bold uppercase tracking-wider';
+
   return (
     <>
       {/* No card chrome here — the page wrapper (border + LeaveTableHeader)
           provides it; this only scrolls the grid. */}
       <div className="overflow-x-auto">
-        <table className="min-w-full divide-y divide-slate-200">
-            <thead className="bg-slate-50">
-              <tr>
-                <th className="px-3 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">Leave No.</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-slate-500 uppercase">Employee</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-slate-500 uppercase">Department</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-slate-500 uppercase">Leave Type</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">From</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-slate-500 uppercase whitespace-nowrap">To</th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-slate-500 uppercase">Days</th>
-                <th className="px-3 py-3 text-left text-xs font-medium text-slate-500 uppercase">Reason</th>
-                <th className="px-3 py-3 text-center text-xs font-medium text-slate-500 uppercase">Status</th>
-                <th className="px-3 py-3 text-right text-xs font-medium text-slate-500 uppercase">Action</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 bg-white">
-              {leaves.map((leave) => (
-                <tr key={leave.id} className="hover:bg-slate-50 transition-colors">
-                  <td className="px-3 py-3 text-xs font-mono font-semibold text-slate-700 whitespace-nowrap">
-                    {leaveNumber(leave)}
-                  </td>
-                  <td className="px-3 py-3 text-sm font-medium text-slate-800 whitespace-nowrap">{leave.employeeName}</td>
-                  <td className="px-3 py-3 text-sm text-slate-600 whitespace-nowrap">{leave.department || '—'}</td>
-                  <td className="px-3 py-3">
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${getTypeColor(leave.type)}`}>
-                      {leave.type}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 text-sm text-slate-600 whitespace-nowrap">{leave.fromDate}</td>
-                  <td className="px-3 py-3 text-sm text-slate-600 whitespace-nowrap">{leave.toDate}</td>
-                  <td className="px-3 py-3 text-sm text-slate-600 text-center font-semibold">{leave.days}</td>
-                  <td className="px-3 py-3 text-sm text-slate-500 max-w-[160px] truncate" title={leave.reason}>
-                    {leave.reason || '—'}
-                  </td>
-                  <td className="px-3 py-3 text-center">
-                    <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium border ${getStatusBadge(leave.status)}`}>
-                      {leave.status}
-                    </span>
-                  </td>
-                  <td className="px-3 py-3 text-right">
-                    <div className="flex items-center justify-end gap-1">
+        <table className="min-w-full text-left text-sm border-collapse">
+          <thead className="border-b border-slate-200 bg-slate-50/80 text-slate-600">
+            <tr className="whitespace-nowrap">
+              <th className={`${th} w-10 text-center`}>#</th>
+              <th className={`${th} text-left`}>
+                {sortable('leaveNo', (
+                  <span className="flex items-center gap-1.5">
+                    <Hash size={13} className="shrink-0 text-slate-400" />
+                    <span>Leave No.</span>
+                  </span>
+                ))}
+              </th>
+              <th className={`${th} text-left`}>
+                {sortable('employeeName', (
+                  <span className="flex items-center gap-1.5">
+                    <User size={13} className="shrink-0 text-emerald-500" />
+                    <span>Employee</span>
+                  </span>
+                ))}
+              </th>
+              <th className={`${th} text-left`}>
+                {sortable('department', (
+                  <span className="flex items-center gap-1.5">
+                    <Building2 size={13} className="shrink-0 text-indigo-500" />
+                    <span>Department</span>
+                  </span>
+                ))}
+              </th>
+              <th className={`${th} text-left`}>
+                {sortable('type', (
+                  <span className="flex items-center gap-1.5">
+                    <CalendarOff size={13} className="shrink-0 text-purple-500" />
+                    <span>Leave Type</span>
+                  </span>
+                ))}
+              </th>
+              <th className={`${th} text-left`}>
+                {sortable('fromDate', (
+                  <span className="flex items-center gap-1.5">
+                    <Calendar size={13} className="shrink-0 text-blue-500" />
+                    <span>From</span>
+                  </span>
+                ))}
+              </th>
+              <th className={`${th} text-left`}>
+                {sortable('toDate', (
+                  <span className="flex items-center gap-1.5">
+                    <CalendarRange size={13} className="shrink-0 text-cyan-500" />
+                    <span>To</span>
+                  </span>
+                ))}
+              </th>
+              <th className={`${th} text-center`}>
+                {sortable('days', (
+                  <span className="flex items-center justify-center gap-1.5">
+                    <Sun size={13} className="shrink-0 text-amber-500" />
+                    <span>Days</span>
+                  </span>
+                ), true)}
+              </th>
+              <th className={`${th} text-left`}>
+                <span className="flex items-center gap-1.5">
+                  <MessageSquareText size={13} className="shrink-0 text-slate-400" />
+                  <span>Reason</span>
+                </span>
+              </th>
+              <th className={`${th} text-center`}>
+                {sortable('status', (
+                  <span className="flex items-center justify-center gap-1.5">
+                    <Activity size={13} className="shrink-0 text-sky-500" />
+                    <span>Status</span>
+                  </span>
+                ), true)}
+              </th>
+              <th className={`${th} text-right`}>
+                <span className="flex items-center justify-end gap-1.5">
+                  <Settings size={13} className="shrink-0 text-slate-400" />
+                  <span>Action</span>
+                </span>
+              </th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {leaves.map((leave, index) => (
+              <tr
+                key={leave.id}
+                className={`transition-colors duration-150 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'} hover:bg-slate-50/60`}
+              >
+                <td className="w-10 px-4 py-3 text-center text-xs font-medium text-slate-500">
+                  {startIndex + index + 1}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-xs font-bold text-emerald-500 tabular-nums">
+                  {leaveNumber(leave)}
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-700">{leave.employeeName}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600">{leave.department || '—'}</td>
+                <td className="px-4 py-3">
+                  <span className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${getTypeColor(leave.type)}`}>
+                    {leave.type}
+                  </span>
+                </td>
+                <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-600">{leave.fromDate}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-600">{leave.toDate}</td>
+                <td className="px-4 py-3 text-center text-xs font-bold text-slate-700">{leave.days}</td>
+                <td className="max-w-[160px] truncate px-4 py-3 text-xs text-slate-500" title={leave.reason}>
+                  {leave.reason || '—'}
+                </td>
+                <td className="px-4 py-3 text-center">
+                  <span className={`inline-block whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium ${getStatusBadge(leave.status)}`}>
+                    {leave.status}
+                  </span>
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <div className="flex items-center justify-end gap-1">
+                    <button
+                      onClick={() => {
+                        setSelectedYear(new Date().getFullYear());
+                        setSelectedMonth('all');
+                        setViewEmployeeModal({
+                          employeeName: leave.employeeName,
+                          employeeId: leave.employeeId,
+                        });
+                      }}
+                      className="group relative rounded-lg p-1.5 text-slate-400 transition hover:bg-violet-50 hover:text-violet-600"
+                      aria-label={`View leave history for ${leave.employeeName}`}
+                    >
+                      <span className="inline-flex group-hover:animate-[var(--animate-action-view)]"><Eye size={16} /></span>
+                      <ActionTooltip label="View leave history" />
+                    </button>
+                    {leave.status === 'Pending' && (
+                      <button
+                        onClick={() => onApprove(leave.id)}
+                        className="group relative rounded-lg p-1.5 text-emerald-400 transition hover:bg-emerald-50 hover:text-emerald-600"
+                        aria-label={`Approve leave for ${leave.employeeName}`}
+                      >
+                        <span className="inline-flex group-hover:animate-[var(--animate-action-approve)]"><CheckCircle size={16} /></span>
+                        <ActionTooltip label="Approve" />
+                      </button>
+                    )}
+                    {leave.status === 'Approved' && (
+                      <button
+                        onClick={() => { if (window.confirm(`Cancel approved leave for ${leave.employeeName}?`)) onCancel(leave.id); }}
+                        className="group relative rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+                        aria-label={`Cancel leave for ${leave.employeeName}`}
+                      >
+                        <span className="inline-flex group-hover:animate-[var(--animate-action-close)]"><XCircle size={16} /></span>
+                        <ActionTooltip label="Cancel leave" />
+                      </button>
+                    )}
+                    {leave.status === 'Pending' && (
                       <button
                         onClick={() => {
-                          setSelectedYear(new Date().getFullYear());
-                          setSelectedMonth('all');
-                          setViewEmployeeModal({
-                            employeeName: leave.employeeName,
-                            employeeId: leave.employeeId,
-                          });
+                          const reason = prompt('Rejection reason:');
+                          if (reason !== null) onReject(leave.id, reason);
                         }}
-                        className="p-1 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded transition"
-                        title="View Employee Leave History"
+                        className="group relative rounded-lg p-1.5 text-rose-400 transition hover:bg-rose-50 hover:text-rose-600"
+                        aria-label={`Reject leave for ${leave.employeeName}`}
                       >
-                        <Eye size={16} />
+                        <span className="inline-flex group-hover:animate-[var(--animate-action-close)]"><XCircle size={16} /></span>
+                        <ActionTooltip label="Reject" />
                       </button>
-                      {leave.status === 'Pending' && (
-                        <button onClick={() => onApprove(leave.id)} className="p-1 text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50 rounded transition" title="Approve">
-                          <CheckCircle size={16} />
-                        </button>
-                      )}
-                      {leave.status === 'Approved' && (
-                        <button
-                          onClick={() => { if (window.confirm(`Cancel approved leave for ${leave.employeeName}?`)) onCancel(leave.id); }}
-                          className="p-1 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded transition"
-                          aria-label={`Cancel leave for ${leave.employeeName}`}
-                          title="Cancel leave"
-                        >
-                          <XCircle size={16} />
-                        </button>
-                      )}
-                      {leave.status === 'Pending' && (
-                        <button
-                          onClick={() => {
-                            const reason = prompt('Rejection reason:');
-                            if (reason !== null) onReject(leave.id, reason);
-                          }}
-                          className="p-1 text-rose-400 hover:text-rose-600 hover:bg-rose-50 rounded transition"
-                          title="Reject"
-                        >
-                          <XCircle size={16} />
-                        </button>
-                      )}
-                      {leave.status === 'Pending' && (
-                        <button onClick={() => requestDelete(leave.id, { label: `Deleting leave for ${leave.employeeName}` })} className="p-1 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded transition" title="Delete">
-                          <Trash2 size={16} />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                    )}
+                    {leave.status === 'Pending' && (
+                      <button
+                        onClick={() => requestDelete(leave.id, { label: `Deleting leave for ${leave.employeeName}` })}
+                        className="group relative rounded-lg p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                        aria-label={`Delete leave for ${leave.employeeName}`}
+                      >
+                        <span className="inline-flex group-hover:animate-[var(--animate-action-delete)]"><Trash2 size={16} /></span>
+                        <ActionTooltip label="Delete" />
+                      </button>
+                    )}
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
 
       {/* Employee Leave History Modal */}
