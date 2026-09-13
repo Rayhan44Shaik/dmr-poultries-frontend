@@ -102,6 +102,7 @@ export default function EnterRateModal({
   const [shopPage, setShopPage] = useState(1);
   const [shopSortKey, setShopSortKey] = useState<ShopSortKey>("time");
   const [shopSortDir, setShopSortDir] = useState<"asc" | "desc">("asc");
+  const [shopSearch, setShopSearch] = useState("");
 
   const saving = isSaving || busy;
   const rateLocked = trip?.rateCompleted === true;
@@ -115,6 +116,7 @@ export default function EnterRateModal({
     setShopPage(1);
     setShopSortKey("time");
     setShopSortDir("asc");
+    setShopSearch("");
     setDeliveries(trip.deliveries.map((d) => ({ ...d, rate: normalizeRate(d.rate) })));
   }, [trip]);
 
@@ -184,6 +186,10 @@ export default function EnterRateModal({
 
   const filteredSortedDeliveries = useMemo(() => {
     let list = deliveries.map((row, idx) => ({ row, originalIndex: idx }));
+    if (shopSearch.trim()) {
+      const q = shopSearch.trim().toLowerCase();
+      list = list.filter(({ row }) => row.shopName.toLowerCase().includes(q));
+    }
     list.sort((a, b) => {
       const dir = shopSortDir === "asc" ? 1 : -1;
       const ra = a.row;
@@ -344,11 +350,11 @@ export default function EnterRateModal({
       )}
 
       <AppShellModal open={open} onClose={onClose} panelClassName="bg-white modal-responsive mx-auto">
-        <div className="bg-white w-full h-full flex flex-col relative overflow-hidden rounded-2xl max-h-full mx-auto">
-          {/* Header - logo same size as rate entry table */}
+        <div className="bg-white w-full h-full flex flex-col relative overflow-hidden rounded-2xl max-h-full mx-auto animate-fade-in-up">
+          {/* Header - logo with hen dance animation like refresh + trip list search animation */}
           <div className="bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shrink-0 rounded-t-2xl">
-            <div className="flex items-center gap-3">
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm"><Store size={17} /></span>
+            <div className="flex items-center gap-3 group">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm group-hover:animate-[var(--animate-brand-dance)] motion-safe:group-hover:animate-[var(--animate-brand-dance)]"><Store size={17} className="group-hover:animate-[var(--animate-action-search)]" /></span>
               <h2 className="text-[15px] font-bold tracking-tight text-slate-900">Enter shop wise rate</h2>
             </div>
             <div className="flex items-center gap-2">
@@ -497,6 +503,26 @@ export default function EnterRateModal({
               <AlertCircle size={14} className="text-red-600" /><span className="text-xs font-medium text-red-700">{lockError || loadError}</span>
             </div>
           )}
+
+          {/* Shop table search - same animation as trip list search + refresh hen + login close/open */}
+          <div className="px-5 py-2 flex items-center gap-2 shrink-0 bg-white border-b border-slate-100">
+            <div className="relative flex-1 max-w-[280px] group">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-hover:animate-[var(--animate-action-search)] motion-safe:group-hover:animate-[var(--animate-action-search)]"><Store size={14} /></span>
+              <input
+                type="search"
+                value={shopSearch}
+                onChange={(e) => { setShopSearch(e.target.value); setShopPage(1); }}
+                placeholder="Search shops..."
+                className="w-full h-9 pl-9 pr-3 rounded-lg border border-slate-200 bg-white text-[13px] text-slate-700 placeholder:text-slate-400 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none transition-all"
+              />
+            </div>
+            {shopSearch && (
+              <button type="button" onClick={() => { setShopSearch(""); setShopPage(1); }} className="group relative inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white text-[12px] font-semibold text-slate-600 hover:bg-slate-50 reset-anim">
+                <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><X size={12} /></span> Clear
+              </button>
+            )}
+            <span className="ml-auto text-[11px] font-medium text-slate-500 tabular-nums">{filteredSortedDeliveries.length} shops</span>
+          </div>
 
           {/* Shop table - no colour for S.No/association/paper, birds weight same colour, amount simple, 10 shops, no drag, perfect middle with gaps */}
           <div className="px-5 py-3 flex-1 min-h-0 flex flex-col overflow-hidden bg-white">
