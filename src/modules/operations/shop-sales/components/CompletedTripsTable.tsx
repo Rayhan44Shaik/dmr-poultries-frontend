@@ -96,85 +96,31 @@ function CompletedTripsTable({
           <tr className="whitespace-nowrap">
             <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider w-10">#</th>
             <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
-              {sortable(
-                "tripNo",
-                <div className="flex items-center gap-1.5">
-                  <Hash size={13} className="text-slate-400 flex-shrink-0" />
-                  <span>{t("operations.trip_no")}</span>
-                </div>
-              )}
+              {sortable("tripNo", <span>{t("operations.trip_no")}</span>)}
             </th>
             <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
-              {sortable(
-                "tripDate",
-                <div className="flex items-center gap-1.5">
-                  <Calendar size={13} className="text-blue-500 flex-shrink-0" />
-                  <span>{t("ops.rate.col.day")}</span>
-                </div>
-              )}
+              {sortable("tripDate", <span>{t("ops.rate.col.day")}</span>)}
             </th>
             <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
-              {sortable(
-                "vehicleNo",
-                <div className="flex items-center gap-1.5">
-                  <Truck size={13} className="text-indigo-500 flex-shrink-0" />
-                  <span>{t("common.vehicle")}</span>
-                </div>
-              )}
+              {sortable("vehicleNo", <span>{t("common.vehicle")}</span>)}
             </th>
             <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
-              {sortable(
-                "supervisorName",
-                <div className="flex items-center gap-1.5">
-                  <UserCog size={13} className="text-purple-500 flex-shrink-0" />
-                  <span>{t("common.supervisor")}</span>
-                </div>
-              )}
+              {sortable("supervisorName", <span>{t("common.supervisor")}</span>)}
             </th>
             <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
-              {sortable(
-                "sourceFarm",
-                <div className="flex items-center gap-1.5">
-                  <Warehouse size={13} className="text-amber-500 flex-shrink-0" />
-                  <span>{t("ops.trip.source_farm")}</span>
-                </div>
-              )}
+              {sortable("sourceFarm", <span>{t("ops.trip.source_farm")}</span>)}
             </th>
             <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
-              {sortable(
-                "totalShops",
-                <div className="flex items-center justify-center gap-1.5">
-                  <ShoppingBag size={13} className="text-cyan-500 flex-shrink-0" />
-                  <span>{t("ops.trip.shops")}</span>
-                </div>,
-                true
-              )}
+              {sortable("totalShops", <span>{t("ops.trip.shops")}</span>, true)}
             </th>
             <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
-              {sortable(
-                "totalBirds",
-                <div className="flex items-center justify-center gap-1.5">
-                  <Bird size={13} className="text-blue-500 flex-shrink-0" />
-                  <span>{t("common.birds")}</span>
-                </div>,
-                true
-              )}
+              {sortable("totalBirds", <span>{t("common.birds")}</span>, true)}
             </th>
             <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
-              {sortable(
-                "totalWeight",
-                <div className="flex items-center justify-center gap-1.5">
-                  <Scale size={13} className="text-orange-500 flex-shrink-0" />
-                  <span>{t("ops.trip.weight_kg")}</span>
-                </div>,
-                true
-              )}
+              {sortable("totalWeight", <span>{t("ops.trip.weight_kg")}</span>, true)}
             </th>
             <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
-              <div className="flex items-center justify-center gap-1.5">
-                <Settings size={13} className="text-slate-500 flex-shrink-0" />
-                <span>{t("ops.rate.col.action")}</span>
-              </div>
+              <span>{t("ops.rate.col.action")}</span>
             </th>
           </tr>
         </thead>
@@ -233,7 +179,7 @@ function CompletedTripsTable({
                           event.stopPropagation();
                           onEnterRate(trip);
                         }}
-                        className="group relative inline-flex items-center gap-1 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white px-3 py-1.5 text-xs font-semibold shadow-sm active:scale-95"
+                        className="group inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 hover:text-emerald-800 px-3.5 py-1.5 text-xs font-bold shadow-sm transition-all active:scale-95"
                         aria-label={`${t("ops.rate.enter_tooltip")} ${trip.tripNo}`}
                       >
                         <span className={`inline-flex ${uiActionIconMotionClass.edit}`}>
@@ -249,7 +195,7 @@ function CompletedTripsTable({
                           event.stopPropagation();
                           onModifyRate(trip);
                         }}
-                        className="group relative inline-flex items-center gap-1.5 rounded-xl border border-orange-200 bg-orange-50 text-orange-700 hover:border-orange-300 hover:bg-orange-100 px-3 py-1.5 text-xs font-semibold shadow-sm active:scale-95"
+                        className="group inline-flex items-center gap-1.5 rounded-xl border border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100 hover:border-orange-300 px-3.5 py-1.5 text-xs font-bold shadow-sm transition-all active:scale-95"
                         aria-label={`${t("ops.rate.modify_tooltip")} ${trip.tripNo}`}
                       >
                         <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full bg-orange-100 text-orange-600 ring-1 ring-orange-200 group-hover:bg-orange-200 ${uiActionIconMotionClass.edit}`}>

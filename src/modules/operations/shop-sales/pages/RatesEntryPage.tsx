@@ -224,18 +224,15 @@ export default function RatesEntryPage({ embedded = false }: Props) {
 
       {/* Table — separate card like trip list, Rate Entry on top of table */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        {/* Rate Entry header on top of table — perfect light background + animated rate symbol */}
-        <div className="flex items-center justify-between px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-blue-50/60">
+        {/* Rate Entry header on top of table — perfect light background + animated ₹ */}
+        <div className="flex items-center px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-emerald-50/60 via-white to-emerald-50/40">
           <div className="flex items-center gap-3">
             <div className="group h-9 w-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-inner">
-              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]">
+              <span className="inline-flex motion-safe:animate-[var(--animate-action-view)]">
                 <IndianRupee className="w-5 h-5" />
               </span>
             </div>
             <h3 className="text-base font-bold text-slate-800 tracking-tight">Rate Entry</h3>
-          </div>
-          <div className="hidden sm:flex items-center gap-2 text-[11px] font-medium text-slate-400">
-            <span>Light background • animated ₹ perfect</span>
           </div>
         </div>
 
