@@ -275,6 +275,10 @@ export default function EnterRateModal({
         .reset-anim:hover svg{transform:rotate(-180deg)}
         .reset-anim:active{transform:scale(0.96)}
         .reset-anim:active svg{transform:rotate(-360deg)}
+        /* cancel animation */
+        .cancel-anim{transition:all 0.2s cubic-bezier(0.4,0,0.2,1)}
+        .cancel-anim:hover{transform:translateY(-1px) scale(1.02);box-shadow:0 4px 12px rgba(0,0,0,0.08);background:#f8fafc}
+        .cancel-anim:active{transform:scale(0.96)}
         /* save animation */
         .save-anim{transition:all 0.25s cubic-bezier(0.4,0,0.2,1);position:relative;overflow:hidden}
         .save-anim:hover{transform:translateY(-1px) scale(1.02);box-shadow:0 6px 16px rgba(0,0,0,0.12)}
@@ -323,7 +327,7 @@ export default function EnterRateModal({
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-3">
-              <button onClick={() => setShowConfirm(false)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 btn-anim">Cancel</button>
+              <button onClick={() => setShowConfirm(false)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 cancel-anim">Cancel</button>
               <button onClick={() => confirmSave("lock")} disabled={saving} className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-sm font-medium text-white shadow-sm lock-anim">Lock</button>
             </div>
           </div>
@@ -347,23 +351,23 @@ export default function EnterRateModal({
             </div>
           </div>
 
-          {/* Trip info - perfect colour neat way: emerald / sky / indigo / amber */}
+          {/* Trip info - TRIP NO light green, Vehicle light blue, Date light violet, Total light amber - perfect colour neat */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 px-5 py-3 shrink-0 bg-slate-50/70 border-b border-slate-100">
-            <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-white px-4 py-3 shadow-sm btn-anim">
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-700"><PackageCheck size={16} /></span>
-              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Trip No</p><p className="text-[13px] font-bold text-slate-800 truncate">{trip.tripNo}</p></div>
+            <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm btn-anim">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white border border-emerald-200 text-emerald-700 shadow-sm"><PackageCheck size={16} /></span>
+              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-emerald-700/70 font-semibold">Trip No</p><p className="text-[13px] font-bold text-emerald-900 truncate">{trip.tripNo}</p></div>
             </div>
-            <div className="flex items-center gap-3 rounded-xl border border-sky-100 bg-white px-4 py-3 shadow-sm btn-anim">
-              <div className="h-9 w-9 rounded-lg bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-700"><Truck size={16} /></div>
-              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Vehicle</p><p className="text-[13px] font-bold text-slate-800 truncate">{formatVehicleNumber(trip.vehicleNo)}</p></div>
+            <div className="flex items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 shadow-sm btn-anim">
+              <div className="h-9 w-9 rounded-lg bg-white border border-sky-200 flex items-center justify-center text-sky-700 shadow-sm"><Truck size={16} /></div>
+              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-sky-700/70 font-semibold">Vehicle</p><p className="text-[13px] font-bold text-sky-900 truncate">{formatVehicleNumber(trip.vehicleNo)}</p></div>
             </div>
-            <div className="flex items-center gap-3 rounded-xl border border-indigo-100 bg-white px-4 py-3 shadow-sm btn-anim">
-              <div className="h-9 w-9 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700"><CalendarDays size={16} /></div>
-              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Date</p><p className="text-[13px] font-bold text-slate-800 truncate">{formatRateEntryTripDate(trip.tripDate)}</p></div>
+            <div className="flex items-center gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 shadow-sm btn-anim">
+              <div className="h-9 w-9 rounded-lg bg-white border border-violet-200 flex items-center justify-center text-violet-700 shadow-sm"><CalendarDays size={16} /></div>
+              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-violet-700/70 font-semibold">Date</p><p className="text-[13px] font-bold text-violet-900 truncate">{formatRateEntryTripDate(trip.tripDate)}</p></div>
             </div>
-            <div className="flex items-center gap-3 rounded-xl border border-amber-100 bg-white px-4 py-3 shadow-sm btn-anim">
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 border border-amber-100 text-amber-700"><Calculator size={16} /></span>
-              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Total</p><p className="text-[13px] font-bold text-slate-800 tabular-nums">{deliveries.length} shops • {totals.totalWeight.toFixed(1)} KG</p></div>
+            <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm btn-anim">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white border border-amber-200 text-amber-700 shadow-sm"><Calculator size={16} /></span>
+              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-amber-700/70 font-semibold">Total</p><p className="text-[13px] font-bold text-amber-900 tabular-nums">{deliveries.length} shops • {totals.totalWeight.toFixed(1)} KG</p></div>
             </div>
           </div>
 
@@ -618,7 +622,7 @@ export default function EnterRateModal({
                   </button>
                 </div>
                 <div className="flex items-center gap-2">
-                  <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-[13px] font-medium text-slate-600 hover:bg-slate-50 btn-anim">Cancel</button>
+                  <button type="button" onClick={onClose} className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-[13px] font-medium text-slate-600 hover:bg-slate-50 cancel-anim">Cancel</button>
                   <button type="button" onClick={() => confirmSave("save")} disabled={saving || !isDirty || hasInvalidEnteredRate} className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border text-[13px] font-medium disabled:opacity-50 save-anim ${isDirty ? "border-amber-300 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
                     <Save size={14} /> Save
                   </button>
