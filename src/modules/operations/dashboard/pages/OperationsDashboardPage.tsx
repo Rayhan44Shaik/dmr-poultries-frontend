@@ -585,6 +585,15 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   const calendarFrom = toInputDateString(startDate);
   const calendarTo = toInputDateString(endDate);
 
+  /* The window on screen, handed to the KPI tiles: each tile deep-links to its
+     analysis page filtered to these exact dates, and the link also carries the
+     equal-length window before them, so the analysis page can compare the same
+     way the tiles do. */
+  const kpiRange = useMemo(
+    () => (calendarFrom && calendarTo ? { from: calendarFrom, to: calendarTo } : null),
+    [calendarFrom, calendarTo]
+  );
+
   const calendarKey = `${calendarFrom}:${calendarTo}`;
   const [lastCalendarKey, setLastCalendarKey] = useState(calendarKey);
   if (calendarKey !== lastCalendarKey) {
@@ -753,7 +762,12 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
       />
 
       <div className="relative z-10">
-        <KPICards current={data} previous={previousData} rangeDays={rangeDays} />
+        <KPICards
+          current={data}
+          previous={previousData}
+          rangeDays={rangeDays}
+          range={kpiRange}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
@@ -802,18 +816,6 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
         </div>
         
         <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.credit_allocations")}</span>
-            <h3 className="text-sm font-black text-slate-800 mt-0.5">{t("ops.dashboard.outstanding_balances")}</h3>
-          </div>
-          <div className="w-full overflow-hidden">
-            <PendingCollectionsByShop data={data?.pendingCollectionsByShop || []} />
-          </div>
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0">
           <div className="flex items-start justify-between gap-3">
             <div>
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.payment_breakdown")}</span>
@@ -823,6 +825,18 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
           </div>
           <div className="w-full flex justify-center items-center py-2 overflow-hidden">
             <CollectionsPie data={data?.collectionsByMode || []} />
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.credit_allocations")}</span>
+            <h3 className="text-sm font-black text-slate-800 mt-0.5">{t("ops.dashboard.outstanding_balances")}</h3>
+          </div>
+          <div className="w-full overflow-hidden">
+            <PendingCollectionsByShop data={data?.pendingCollectionsByShop || []} />
           </div>
         </div>
         

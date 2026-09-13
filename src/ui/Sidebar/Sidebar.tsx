@@ -35,6 +35,8 @@ function navApprovalBadge(path: string, approvals: ReturnType<typeof usePendingA
       return approvals.collections.count;
     case "/accounts?tab=paid-payments":
       return approvals.payments.count;
+    case "/staff?tab=leaves":
+      return approvals.leaves.count;
     default:
       return 0;
   }

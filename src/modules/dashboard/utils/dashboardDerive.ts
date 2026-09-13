@@ -3,7 +3,8 @@
 // No side effects — easy to reuse from any client (web / mobile).
 
 import type { LucideIcon } from "lucide-react";
-import { toBusinessDate } from '../../../utils/businessDate';
+import { subDays } from "date-fns";
+import { isBusinessDate, parseBusinessDate, toBusinessDate } from '../../../utils/businessDate';
 import {
   Bird,
   CreditCard,
@@ -17,7 +18,7 @@ import {
 import type { DashboardData, VehicleRow } from "../services/dashboardService";
 import type { Trip } from "../../operations/vehicle-trips/types/trip";
 import { getMaintenance } from "../../fleet-operations/services/storage";
-import { formatINR, formatINRCompact, formatNumber, formatWeight } from "../../../utils/format";
+import { formatDateShort, formatINR, formatINRCompact, formatNumber, formatWeight } from "../../../utils/format";
 import { translate } from "../../../i18n";
 
 export interface KpiDatum {
@@ -94,14 +95,25 @@ export interface DerivedDashboard {
 /* ------------------------------------------------------------------ */
 /*  Helpers                                                            */
 /* ------------------------------------------------------------------ */
-function todayIso(): string {
-  return toBusinessDate(new Date());
+/**
+ * The dashboard's business date.
+ *
+ * When the quarter sample API is the data source, its own "today" wins: the
+ * dataset is generated against the ERP's business timezone (IST), so a browser
+ * in any other zone would otherwise label a different day as "today" and the
+ * dashboard tiles would disagree with every page reading the same API. Without
+ * a sample server this is exactly the previous behaviour — the local calendar
+ * date.
+ */
+function dashboardToday(sampleToday?: string | null): string {
+  return isBusinessDate(sampleToday) ? sampleToday : toBusinessDate(new Date());
 }
 
-function isoDaysAgo(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d.toISOString().slice(0, 10);
+/** `anchor` minus `days` as YYYY-MM-DD. Calendar-safe: never `toISOString()`,
+ *  which shifts the day for non-UTC browsers (see utils/businessDate). */
+function businessDaysBefore(anchor: string, days: number): string {
+  const base = parseBusinessDate(anchor);
+  return base ? toBusinessDate(subDays(base, days)) : anchor;
 }
 
 function sum(arr: number[]): number {
@@ -120,8 +132,8 @@ const getT = (t?: (key: string, params?: Record<string, string | number>) => str
 
 export function deriveDashboard(data: DashboardData, t?: (key: string, params?: Record<string, string | number>) => string): DerivedDashboard {
   const tFunc = getT(t);
-  const today = todayIso();
-  const yesterday = isoDaysAgo(1);
+  const today = dashboardToday(data.sampleQuarter?.today);
+  const yesterday = businessDaysBefore(today, 1);
 
   const todaySales = sum(data.shopSales.filter((s) => s.tripDate === today).map((s) => Number(s.amount) || 0));
   const yesterdaySales = sum(data.shopSales.filter((s) => s.tripDate === yesterday).map((s) => Number(s.amount) || 0));
@@ -142,9 +154,9 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
   const activeVehicles = data.vehicles.filter((v) => v.status === "Active").length;
   const activeEmployees = data.employees.filter((e) => e.status === "Active").length;
 
-  /* ----- 7-day series ----- */
+  /* ----- 7-day series (ends on the dashboard's business date) ----- */
   const series = Array.from({ length: 7 }, (_, i) => {
-    const date = isoDaysAgo(6 - i);
+    const date = businessDaysBefore(today, 6 - i);
     const sales = sum(data.shopSales.filter((s) => s.tripDate === date).map((s) => Number(s.amount) || 0));
     const collections = sum(data.collections.filter((c) => c.collectionDate === date).map((c) => Number(c.amount) || 0));
     const birds = sum(data.shopSales.filter((s) => s.tripDate === date).map((s) => Number(s.totalBirds) || 0));
@@ -184,13 +196,19 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
 
   /* ----- Fleet status ----- */
   const todayPendingTrips = data.trips.filter((t) => t.tripDate === today && (t.status === "Pending" || t.status === "Draft"));
-  const maintenanceRecords = (() => {
-    try {
-      return getMaintenance() as unknown[];
-    } catch {
-      return [];
-    }
-  })();
+  // Fleet jobs: the synced API rows win when the quarter sample API is the data
+  // source; otherwise keep the existing localStorage (fleet storage) read. A
+  // copy is taken because the activity timeline below sorts in place.
+  const maintenanceRecords: unknown[] =
+    data.maintenance.length > 0
+      ? [...data.maintenance]
+      : (() => {
+          try {
+            return getMaintenance() as unknown[];
+          } catch {
+            return [];
+          }
+        })();
 
   const fleet: FleetVehicleView[] = data.vehicles.map((v) => {
     const vehicleTrips = data.trips.filter((t) => t.vehicleNo === v.number);
@@ -301,7 +319,9 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
         id: `maint-${m.vehicleNo}-${m.date}`,
         title: tFunc("dashboard.activity.maintenance_completed", { vehicleNo: m.vehicleNo ?? tFunc("common.vehicle") }),
         description: tFunc("dashboard.activity.maintenance_desc", { amount: formatINR(Number(m.totalCost) || 0) }),
-        time: m.date ?? "",
+        // The fleet API stamps jobs with a full ISO date-time; show the same
+        // short date label the rest of the timeline uses.
+        time: m.date ? formatDateShort(m.date) : "",
         tone: "violet",
         icon: Truck,
       });

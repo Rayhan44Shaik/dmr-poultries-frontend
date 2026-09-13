@@ -42,14 +42,27 @@ const DEFAULT_FILTERS: LeaveFilters = {
   search: '',
 };
 
-export function useLeaveManagement(showNotification?: NotificationFn) {
+/**
+ * @param initialFilters Filters to open with, taken from a deep link — e.g. the
+ *   dashboard's pending-approvals tile sends `status: 'Pending', month: ''` so
+ *   the page's very first fetch already asks for exactly what the tile counted.
+ *   They seed the state rather than being patched on afterwards, which keeps the
+ *   first request correct (and the set-state-in-effect rule quiet).
+ */
+export function useLeaveManagement(
+  showNotification?: NotificationFn,
+  initialFilters?: Partial<LeaveFilters>
+) {
   const notify = useMemo(
     () => showNotification || ((msg: string) => console.log(msg)),
     [showNotification]
   );
 
   const [employees, setEmployees] = useState<Employee[]>([]);
-  const [filters, setFilters] = useState<LeaveFilters>(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState<LeaveFilters>(() => ({
+    ...DEFAULT_FILTERS,
+    ...(initialFilters ?? {}),
+  }));
   const [list, setList] = useState<LeaveListResult>({ items: [], total: 0, page: 1, limit: 100, totalPages: 0 });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);

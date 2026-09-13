@@ -1,8 +1,10 @@
 // src/modules/staff/pages/LeaveManagementPage.tsx
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { CheckCircle2, X } from 'lucide-react';
 import { useLeaveManagement } from '../hooks/useLeaveManagement';
+import { leaveFiltersFromSearch } from '../utils/leaveDeepLink';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import LeaveFilters from '../components/leave/LeaveFilters';
 import LeaveRequestForm from '../components/leave/LeaveRequestForm';
@@ -15,6 +17,14 @@ const REFRESH_TOAST_DURATION = 5000;
 
 function LeaveManagementPage() {
   const { showNotification } = useSafeNotification();
+  const [searchParams] = useSearchParams();
+  /* Read once: the hook seeds its state with these, so a later change of the
+     toggle belongs to the user, not to the URL. */
+  const initialFilters = useMemo(
+    () => leaveFiltersFromSearch(searchParams.toString()),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  );
   const [showForm, setShowForm] = useState(false);
   const [refreshToast, setRefreshToast] = useState(false);
 
@@ -38,7 +48,7 @@ function LeaveManagementPage() {
     totalPages,
     setPage,
     setPageSize,
-  } = useLeaveManagement(showNotification);
+  } = useLeaveManagement(showNotification, initialFilters);
 
   // Auto-hide the refresh toast
   useEffect(() => {

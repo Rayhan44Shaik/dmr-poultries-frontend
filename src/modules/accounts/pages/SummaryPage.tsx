@@ -35,6 +35,20 @@ import { FarmPaymentService } from '../services/FarmPaymentService';
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
 import type { WeeklyMetrics, ExpenseBreakdown } from '../types/summary.types';
 import { useI18n } from '../../../i18n';
+import { useLocation } from 'react-router-dom';
+import { analysisLinkKey, readAnalysisLink } from '../../../shared/kpi/analysisLink';
+import {
+  customRange,
+  getMonday,
+  getSunday,
+  isSameMonth,
+  monthRange,
+  periodForWindow,
+  quarterRange,
+  toISODate,
+  weekRange,
+  type PeriodRange,
+} from '../utils/periodRanges';
 
 // ---- Helpers ----
 const inrGrouped = new Intl.NumberFormat('en-IN', {
@@ -115,28 +129,6 @@ function splitPeriodLabel(label: string): { name: string; span: string } {
   if (!m) return { name: label.trim(), span: '' };
   return { name: label.slice(0, m.index).trim(), span: [m[1], m[2].trim()].filter(Boolean).join(' ') };
 }
-
-const getMonday = (date: Date): Date => {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  d.setDate(diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
-};
-
-const getSunday = (date: Date): Date => {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = day === 0 ? 0 : 7 - day;
-  d.setDate(d.getDate() + diff);
-  d.setHours(23, 59, 59, 999);
-  return d;
-};
-
-const isSameMonth = (d1: Date, d2: Date): boolean => {
-  return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth();
-};
 
 const getQuarterLabel = (quarter: number): string => {
   const labels = ['Q1 (Jan–Mar)', 'Q2 (Apr–Jun)', 'Q3 (Jul–Sep)', 'Q4 (Oct–Dec)'];
@@ -261,8 +253,6 @@ type PeriodId = (typeof PERIOD_TABS)[number]['id'];
 // ---- Custom-range helpers ---------------------------------------------------
 // Quick ranges offered beside the date fields ("last N days, ending today").
 const CUSTOM_PRESET_DAYS = [7, 30, 90] as const;
-
-const toISODate = (date: Date): string => format(date, 'yyyy-MM-dd');
 
 function presetRange(days: number): { from: Date; to: Date } {
   const to = new Date();
@@ -418,6 +408,7 @@ type SummaryPageProps = { embedded?: boolean };
 
 export default function SummaryPage({ embedded = false }: SummaryPageProps) {
   const [period, setPeriod] = useState<PeriodId>('week');
+  const [weekAnchor, setWeekAnchor] = useState<Date>(() => new Date());
   const [selectedMonthDate, setSelectedMonthDate] = useState<Date>(() => {
     const now = new Date();
     return new Date(now.getFullYear(), now.getMonth() - 1, 1);
@@ -438,6 +429,51 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
     window.addEventListener('storage', handleStorage);
     return () => window.removeEventListener('storage', handleStorage);
   }, []);
+
+  /* ---- Arrived from an Operations dashboard KPI tile -----------------------
+     Every KPI tile there links here carrying the window it was showing and
+     asking for the comparison: ?from=…&to=…&compare=1. The window is applied to
+     this page's OWN controls, so the period chips, the custom pickers and the
+     Compare toggle all say what the tile said — the chip that can show those
+     dates without moving them, Custom otherwise (see periodForWindow), which is
+     what keeps "7 days there" exactly 7 days here.
+     Adjusting state while rendering (the pattern the operations dashboard uses)
+     puts the right window on screen at the first paint, and because it comes
+     from the URL a refresh or a shared link lands filtered too. */
+  const location = useLocation();
+  const analysisLink = useMemo(() => readAnalysisLink(location.search), [location.search]);
+  const linkKey = analysisLinkKey(analysisLink);
+  const [appliedLinkKey, setAppliedLinkKey] = useState<string | null>(null);
+  if (linkKey !== appliedLinkKey) {
+    setAppliedLinkKey(linkKey);
+    const landing = analysisLink ? periodForWindow(analysisLink.from, analysisLink.to) : null;
+    if (analysisLink && landing) {
+      setCustomStart(landing.customStart);
+      setCustomEnd(landing.customEnd);
+      if (landing.weekAnchor) setWeekAnchor(landing.weekAnchor);
+      if (landing.monthDate) setSelectedMonthDate(landing.monthDate);
+      setPeriod(landing.period);
+      setComparePrevious(analysisLink.compare);
+    }
+  }
+
+  /* The Week chip is a week AROUND an anchor day, not permanently "this" week:
+     a window arriving from a dashboard KPI can be last week, and the chevrons
+     let anyone walk weeks the way the Month stepper walks months. The anchor
+     starts on today, so the page still opens on the current week. */
+  const goToPrevWeek = () =>
+    setWeekAnchor((prev) => {
+      const monday = getMonday(prev);
+      monday.setDate(monday.getDate() - 7);
+      return monday;
+    });
+  const goToNextWeek = () =>
+    setWeekAnchor((prev) => {
+      const monday = getMonday(prev);
+      monday.setDate(monday.getDate() + 7);
+      return monday;
+    });
+  const goToThisWeek = () => setWeekAnchor(new Date());
 
   const goToPrevMonth = () =>
     setSelectedMonthDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
@@ -493,55 +529,25 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
     }
   };
 
-  const getDateRange = useCallback(() => {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    let start: Date, end: Date;
-
+  /* Which dates the selected chip means. The bodies live in utils/periodRanges
+     so a window arriving from a dashboard KPI can be matched against them (see
+     the deep link below) rather than re-derived here. */
+  const getDateRange = useCallback((): PeriodRange => {
     switch (period) {
-      case 'week': {
-        const monday = getMonday(now);
-        start = new Date(monday);
-        end = new Date(monday);
-        end.setDate(end.getDate() + 6);
-        end.setHours(23, 59, 59, 999);
-        break;
+      case 'week':
+        return weekRange(weekAnchor);
+      case 'month':
+        return monthRange(selectedMonthDate);
+      case 'quarter':
+        return quarterRange();
+      case 'custom':
+        return customRange(customStart, customEnd);
+      default: {
+        const now = new Date();
+        return { start: now, end: now };
       }
-      case 'month': {
-        const year = selectedMonthDate.getFullYear();
-        const month = selectedMonthDate.getMonth();
-        const first = new Date(year, month, 1);
-        const firstMonday = getMonday(first);
-        const last = new Date(year, month + 1, 0);
-        let lastSunday = getSunday(last);
-        if (!isSameMonth(lastSunday, first)) {
-          lastSunday = new Date(lastSunday);
-          lastSunday.setDate(lastSunday.getDate() - 7);
-        }
-        start = firstMonday;
-        end = lastSunday;
-        break;
-      }
-      case 'quarter': {
-        start = new Date(currentYear, 0, 1);
-        end = new Date(currentYear, 11, 31);
-        end.setHours(23, 59, 59, 999);
-        break;
-      }
-      case 'custom': {
-        start = customStart ? new Date(customStart) : new Date();
-        end = customEnd ? new Date(customEnd) : new Date();
-        start.setHours(0, 0, 0, 0);
-        end.setHours(23, 59, 59, 999);
-        break;
-      }
-      default:
-        start = new Date();
-        end = new Date();
     }
-
-    return { start, end };
-  }, [period, selectedMonthDate, customStart, customEnd]);
+  }, [period, weekAnchor, selectedMonthDate, customStart, customEnd]);
 
   const { start, end } = getDateRange();
   const previousRange = useMemo(() => getPreviousRange(start, end), [start, end]);
@@ -592,6 +598,10 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
   }, [period, customStart, customEnd]);
 
   const activeTone = PERIOD_TABS.find((tab) => tab.id === period) ?? PERIOD_TABS[0];
+  /* The week chip only calls itself "This Week" while it is on the current one;
+     stepped back (or arrived from a dashboard KPI carrying last week) it reads
+     "Week" and the stepper beside it names the dates. */
+  const isCurrentWeek = toISODate(getMonday(weekAnchor)) === toISODate(getMonday(new Date()));
   const rangeLabel = formatSpanLong(start, end);
   const groupSpanShort = (group?: { startDate: Date; endDate: Date }): string =>
     group ? formatSpanShort(group.startDate, group.endDate) : '—';
@@ -863,18 +873,8 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
     const result: { label: string; start: Date; end: Date; metrics: WeeklyMetrics; expenses: ExpenseBreakdown; distance: number; trips: Trip[] }[] = [];
     for (let offset = 2; offset >= 0; offset--) {
       const d = new Date(selectedMonthDate.getFullYear(), selectedMonthDate.getMonth() - offset, 1);
-      const year = d.getFullYear();
-      const month = d.getMonth();
-      const first = new Date(year, month, 1);
-      const firstMonday = getMonday(first);
-      const last = new Date(year, month + 1, 0);
-      let lastSunday = getSunday(last);
-      if (!isSameMonth(lastSunday, first)) {
-        lastSunday = new Date(lastSunday);
-        lastSunday.setDate(lastSunday.getDate() - 7);
-      }
-      const s = firstMonday;
-      const e = lastSunday;
+      // Exactly the span the Month chip shows for that month.
+      const { start: s, end: e } = monthRange(d);
       const tripsM = summaryService.getCompletedTripsByDateRange(s, e);
       const collM = summaryService.getApprovedCollectionsByDateRange(s, e);
       const metricsM = summaryService.computeMetrics(tripsM, collM);
@@ -1101,11 +1101,59 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                     strokeWidth={2}
                     className={active ? 'text-white' : `${tab.text} opacity-70 group-hover:opacity-100`}
                   />
-                  <span>{t(tab.labelKey)}</span>
+                  <span>
+                    {tab.id === 'week' && !isCurrentWeek
+                      ? t('accounts.summary.period.week')
+                      : t(tab.labelKey)}
+                  </span>
                 </button>
               );
             })}
           </div>
+
+          {/* Week stepper — Week period only. Same shape as the month stepper:
+              colour dot, step back, the week, step forward. The middle button
+              reads the week's own dates and jumps back to the current one, so a
+              week arrived-at from a dashboard KPI says which week it is. */}
+          {period === 'week' && (
+            <div className="relative inline-flex items-center gap-1 rounded-xl border border-sky-200/80 bg-white px-1.5 py-1 dark:border-sky-500/25 dark:bg-slate-800">
+              <span aria-hidden="true" className="h-2 w-2 shrink-0 rounded-full bg-sky-500" />
+              <button
+                type="button"
+                onClick={goToPrevWeek}
+                aria-label={t('accounts.summary.prev_week')}
+                className={`shrink-0 rounded-lg p-1 text-sky-500 outline-none hover:bg-sky-50 hover:text-sky-700 dark:text-sky-400 dark:hover:bg-sky-500/15 dark:hover:text-sky-200 ${uiFocusRing} ${uiTransition}`}
+              >
+                <ChevronLeft size={14} />
+              </button>
+
+              <button
+                type="button"
+                onClick={goToThisWeek}
+                title={t('accounts.summary.back_to_this_week')}
+                aria-label={t('accounts.summary.back_to_this_week')}
+                aria-pressed={isCurrentWeek}
+                className={`inline-flex h-6 shrink-0 items-center rounded-md px-2 text-[11px] font-bold outline-none ${uiFocusRing} ${uiTransition} ${
+                  isCurrentWeek
+                    ? 'bg-sky-50 text-sky-700 dark:bg-sky-500/15 dark:text-sky-200'
+                    : 'text-slate-700 hover:bg-sky-50 dark:text-slate-100 dark:hover:bg-sky-500/15'
+                }`}
+              >
+                <span className="min-w-[4.75rem] whitespace-nowrap text-center">
+                  {formatSpanShort(start, end)}
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={goToNextWeek}
+                aria-label={t('accounts.summary.next_week')}
+                className={`shrink-0 rounded-lg p-1 text-sky-500 outline-none hover:bg-sky-50 hover:text-sky-700 dark:text-sky-400 dark:hover:bg-sky-500/15 dark:hover:text-sky-200 ${uiFocusRing} ${uiTransition}`}
+              >
+                <ChevronRight size={14} />
+              </button>
+            </div>
+          )}
 
           {/* Month stepper — Month period only, and deliberately month-only: the
               chevrons cross year boundaries, so a year selector is redundant and

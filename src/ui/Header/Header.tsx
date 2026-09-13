@@ -12,6 +12,7 @@ import { Link, useLocation } from "react-router-dom";
 import {
   Banknote,
   Bell,
+  CalendarDays,
   Check,
   ChevronDown,
   ChevronRight,
@@ -35,6 +36,7 @@ import LanguageSwitcher from "./LanguageSwitcher";
 import { getPendingCollectionSnapshot, subscribePendingCollectionSnapshot } from "../../modules/operations/collections/services/collectionSnapshot";
 import { usePendingApprovals } from "../../modules/approvals/hooks/usePendingApprovals";
 import { startApprovalPolling } from "../../modules/approvals/services/approvalSnapshot";
+import { PENDING_LEAVES_PATH } from "../../modules/staff/utils/leaveDeepLink";
 import { tripService } from "../../modules/operations/vehicle-trips/services/tripService";
 import { getDocuments } from "../../modules/fleet-operations/services/storage";
 import { getCurrentUser } from "../../modules/settings/services";
@@ -267,7 +269,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.key, language, pendingCollections]);
 
-  /* ----- Pending-approval notifications (trips · bills · rates · payments) ----- */
+  /* ----- Pending-approval notifications (trips · bills · rates · payments · leaves) ----- */
   const approvalNotifications = useMemo<NotificationItem[]>(() => {
     if (!pendingApprovals.loaded) return [];
     const now = formatRelativeTime(new Date());
@@ -315,6 +317,17 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
         description: `${formatINR(q.payments.value)} awaiting sign-off · ${q.payments.items.map((i) => i.sub).slice(0, 2).join(", ")}${q.payments.count > 2 ? " …" : ""}`,
         time: now,
         path: "/accounts?tab=paid-payments",
+      });
+    }
+    if (q.leaves.count > 0) {
+      items.push({
+        id: "approval-leaves",
+        icon: CalendarDays,
+        tone: "warning",
+        title: `${q.leaves.count} leave request${q.leaves.count === 1 ? "" : "s"} to approve`,
+        description: `${q.leaves.items.map((i) => i.ref).slice(0, 2).join(", ")}${q.leaves.count > 2 ? " …" : ""}`,
+        time: now,
+        path: PENDING_LEAVES_PATH,
       });
     }
     return items;

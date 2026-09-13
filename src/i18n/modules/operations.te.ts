@@ -1,4 +1,6 @@
 export default {
+  // ----- KPI tiles → Accounts → Analysis deep link -----
+  'ops.analysis.open_kpi': '{range} కోసం {kpi} విశ్లేషణ తెరవండి',
   // ----- Collections module -----
   'ops.collection.add_notes': 'గమనికలు జోడించండి',
   'ops.collection.after_approval': 'ఆమోదం తర్వాత',

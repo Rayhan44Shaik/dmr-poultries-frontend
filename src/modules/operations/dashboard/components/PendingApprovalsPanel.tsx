@@ -1,8 +1,9 @@
 // -----------------------------------------------------------------------------
 // PENDING APPROVALS — slim inline KPI strip for the dashboard / trip entry.
-// Just a small coloured logo, the count and a short label per queue — nothing
-// else. Each tile has a readable custom tooltip. `actions` (e.g. the
-// date-range filter) sits on the same row, right side.
+// Queues: Trips · Rate entries · Collections · Maintenance · Payments ·
+// Leaves · Documents. Just a small coloured logo, the count and a short label
+// per queue — nothing else. Each tile has a readable custom tooltip. `actions`
+// (e.g. the date-range filter) sits on the same row, right side.
 // Live data via the approval snapshot store.
 // -----------------------------------------------------------------------------
 
@@ -11,6 +12,7 @@ import { Link } from "react-router-dom";
 import type { LucideIcon } from "lucide-react";
 import {
   Banknote,
+  CalendarDays,
   CheckCircle2,
   FileWarning,
   ReceiptText,
@@ -19,6 +21,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { usePendingApprovals } from "../../../approvals/hooks/usePendingApprovals";
+import { PENDING_LEAVES_PATH } from "../../../staff/utils/leaveDeepLink";
 
 /* Preload the destination route/tab chunk as soon as a tile is hovered or
    focused, so the click itself never waits on a download. Bundler de-dupes. */
@@ -46,6 +49,8 @@ const preloaders: Record<string, () => void> = {
   },
   payments: () =>
     preloadOnce("accounts", () => import("../../../accounts/pages/AccountsPage")),
+  leaves: () =>
+    preloadOnce("staff", () => import("../../../staff/pages/StaffPages")),
   documents: () => {
     preloadOnce("fleet", () => import("../../../fleet-operations/pages/FleetPages"));
     preloadOnce("fleet-permits", () =>
@@ -152,6 +157,21 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
       dot: "bg-emerald-500",
     },
     {
+      key: "leaves",
+      label: "Leaves",
+      href: PENDING_LEAVES_PATH,
+      icon: CalendarDays,
+      count: q.leaves.count,
+      tip: "Leave requests waiting for your approval",
+      /* Tiles are 2-up on mobile, where this one lands in the right column, so
+         the bubble hugs the right edge there and centres from `sm` up. */
+      tipClass: "right-0 sm:right-auto sm:left-1/2 sm:-translate-x-1/2",
+      arrowClass: "right-4 sm:right-auto sm:left-1/2 sm:-translate-x-1/2",
+      chip: "bg-cyan-100 text-cyan-700",
+      hover: "hover:bg-cyan-50",
+      dot: "bg-cyan-500",
+    },
+    {
       key: "documents",
       label: "Documents",
       href: "/fleet?tab=permits",
@@ -180,7 +200,7 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
     >
       {loading ? (
         <div className="flex items-center gap-4 px-1">
-          {[0, 1, 2, 3, 4, 5].map((i) => (
+          {[0, 1, 2, 3, 4, 5, 6].map((i) => (
             <div key={i} className="h-8 w-24 animate-pulse rounded-md bg-slate-100" />
           ))}
         </div>

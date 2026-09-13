@@ -1,4 +1,6 @@
 export default {
+  // ----- KPI tiles → Accounts → Analysis deep link -----
+  'ops.analysis.open_kpi': 'Open {kpi} analysis for {range}',
   // ----- Collections module -----
   'ops.collection.add_notes': 'Add notes',
   'ops.collection.after_approval': 'After approval',

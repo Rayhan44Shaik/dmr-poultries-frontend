@@ -3,7 +3,9 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "engines": { "node": ">=22 <26" },
+  "engines": {
+    "node": ">=22 <26"
+  },
   "scripts": {
     "dev": "concurrently -n sample-api,web -c magenta,cyan \"npm:dev:sample-api\" \"npm:dev:web\"",
     "dev:web": "vite --config vite.config.ts",
@@ -33,11 +35,13 @@
     "test:e2e:emi": "playwright test --config tests/emi/playwright.config.ts",
     "test:i18n": "tsx --test tests/i18n/context.test.ts",
     "test:collections": "tsx --test src/modules/operations/collections/services/collectionService.contract.test.ts src/modules/operations/collections/services/collectionBalance.ui.test.ts",
+    "test:accounts-analysis": "tsx --test src/modules/accounts/utils/periodRanges.test.ts src/shared/kpi/analysisLink.test.ts",
     "test:e2e": "playwright test",
     "mock:backend": "node scripts/quarter-sample-data.mjs",
     "mock:trips": "node scripts/dev-mock-backend.mjs",
     "smoke": "node scripts/ssr-smoke.mjs",
     "test:duty-planner": "tsx --test src/modules/staff/services/dutyReport.test.ts src/modules/staff/services/dutyReportExcel.test.ts src/modules/staff/services/dutyRules.test.ts",
+    "test:leave-deep-link": "tsx --test src/modules/staff/utils/leaveDeepLink.test.ts",
     "test:e2e:duty-planner": "playwright test --config tests/duty-planner/playwright.config.ts",
     "test:e2e:leave-management": "playwright test --config tests/leave-management/playwright.config.ts",
     "test:e2e:masters": "playwright test --config tests/masters/playwright.config.ts"
