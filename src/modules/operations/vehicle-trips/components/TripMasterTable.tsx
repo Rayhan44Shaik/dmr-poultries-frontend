@@ -160,14 +160,13 @@ function TripMasterTable({
                     <td className="px-4 py-3.5 text-center text-[13px] text-slate-500 font-medium w-10">
                       {isSelected ? <Check size={16} className="text-blue-500 inline" /> : serialNo}
                     </td>
-                    <td className="px-4 py-3.5 font-bold text-emerald-600 text-[13px] whitespace-nowrap">
-                      {trip.tripNo}
-                    </td>
-                    <td className="px-4 py-3.5 text-[13px] font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(trip.tripDate)}</td>
-                    <td className="px-4 py-3.5 text-[13px] font-medium text-slate-700 whitespace-nowrap">{formatVehicleNumber(trip.vehicleNo)}</td>
-                    <td className="px-4 py-3.5 text-[13px] text-slate-600 whitespace-nowrap">{trip.driverName || "-"}</td>
-                    <td className="px-4 py-3.5 text-[13px] text-slate-600 whitespace-nowrap">{trip.supervisorName}</td>
-                    <td className="px-4 py-3.5 text-[13px] text-slate-600 font-medium whitespace-nowrap">{trip.sourceFarm}</td>
+                    {/* Keep logo in header, but working start from name of columns — S for Supervisor etc. */}
+                    <td className="px-4 py-3.5 pl-9 font-bold text-emerald-600 text-[13px] whitespace-nowrap">{trip.tripNo}</td>
+                    <td className="px-4 py-3.5 pl-9 text-[13px] font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(trip.tripDate)}</td>
+                    <td className="px-4 py-3.5 pl-9 text-[13px] font-medium text-slate-700 whitespace-nowrap">{formatVehicleNumber(trip.vehicleNo)}</td>
+                    <td className="px-4 py-3.5 pl-9 text-[13px] text-slate-600 whitespace-nowrap">{trip.driverName || "-"}</td>
+                    <td className="px-4 py-3.5 pl-9 text-[13px] text-slate-600 whitespace-nowrap">{trip.supervisorName}</td>
+                    <td className="px-4 py-3.5 pl-9 text-[13px] text-slate-600 font-medium whitespace-nowrap">{trip.sourceFarm}</td>
                     <td className="px-4 py-3.5 text-center text-[13px] font-bold text-slate-700 whitespace-nowrap">{trip.totalShops}</td>
                     <td className="px-4 py-3.5 text-center text-[13px] font-bold text-blue-600 whitespace-nowrap">{trip.totalBirds.toLocaleString()}</td>
                     <td className="px-4 py-3.5 text-center text-[13px] font-bold text-amber-600 whitespace-nowrap">{trip.totalWeight.toFixed(2)}</td>

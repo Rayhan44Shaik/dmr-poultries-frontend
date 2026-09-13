@@ -166,8 +166,8 @@ function CompletedTripsFilters({
       </div>
 
       <div className="flex items-center justify-between flex-wrap gap-4 pt-1">
-        <div className="text-xs font-semibold text-slate-600">
-          {t("ops.rate.pending_trips")} : <span className="font-bold text-orange-600">{pendingTrips}</span>
+        <div className="text-[14px] font-bold text-slate-700">
+          {t("ops.rate.pending_trips")} : <span className="font-extrabold text-orange-600 text-[16px] tabular-nums">{pendingTrips}</span>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <button type="button" onClick={onSearch} className={`group relative ${opsPrimaryButtonClass}`} aria-label={t("ops.rate.search_tooltip")}>
