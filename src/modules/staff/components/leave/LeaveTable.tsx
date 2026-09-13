@@ -25,6 +25,7 @@ import type { LeaveSortKey } from '../../hooks/useLeaveManagement';
 import { usePendingDelete } from '../../../../hooks/usePendingDelete';
 import { PendingDeleteNotification } from '../../../../components/common/PendingDeleteNotification';
 import { ActionTooltip } from '../../../../ui/ActionTooltip';
+import { uiActionIconMotionClass } from '../../../../shared/ui/uiTokens';
 
 interface LeaveTableProps {
   leaves: LeaveRequest[];
@@ -274,7 +275,9 @@ function LeaveTable({
                 </td>
                 <td className="px-4 py-3 text-right">
                   <div className="flex items-center justify-end gap-1">
+                    {/* View — the TripRecentTable reference tile, verbatim. */}
                     <button
+                      type="button"
                       onClick={() => {
                         setSelectedYear(new Date().getFullYear());
                         setSelectedMonth('all');
@@ -283,52 +286,56 @@ function LeaveTable({
                           employeeId: leave.employeeId,
                         });
                       }}
-                      className="group relative rounded-lg p-1.5 text-slate-400 transition hover:bg-violet-50 hover:text-violet-600"
+                      className="group relative flex h-8 w-8 items-center justify-center rounded-xl bg-violet-50 text-violet-600 shadow-sm transition-all hover:bg-violet-500 hover:text-white active:scale-95"
                       aria-label={`View leave history for ${leave.employeeName}`}
                     >
-                      <span className="inline-flex group-hover:animate-[var(--animate-action-view)]"><Eye size={16} /></span>
+                      <span className={`inline-flex ${uiActionIconMotionClass.view}`}><Eye size={14} /></span>
                       <ActionTooltip label="View leave history" />
                     </button>
                     {leave.status === 'Pending' && (
                       <button
+                        type="button"
                         onClick={() => onApprove(leave.id)}
-                        className="group relative rounded-lg p-1.5 text-emerald-400 transition hover:bg-emerald-50 hover:text-emerald-600"
+                        className="group relative flex h-8 w-8 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 shadow-sm transition-all hover:bg-emerald-500 hover:text-white active:scale-95"
                         aria-label={`Approve leave for ${leave.employeeName}`}
                       >
-                        <span className="inline-flex group-hover:animate-[var(--animate-action-approve)]"><CheckCircle size={16} /></span>
+                        <span className={`inline-flex ${uiActionIconMotionClass.approve}`}><CheckCircle size={14} /></span>
                         <ActionTooltip label="Approve" />
                       </button>
                     )}
                     {leave.status === 'Approved' && (
                       <button
+                        type="button"
                         onClick={() => { if (window.confirm(`Cancel approved leave for ${leave.employeeName}?`)) onCancel(leave.id); }}
-                        className="group relative rounded-lg p-1.5 text-slate-400 transition hover:bg-rose-50 hover:text-rose-600"
+                        className="group relative flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-500 shadow-sm transition-all hover:bg-slate-500 hover:text-white active:scale-95"
                         aria-label={`Cancel leave for ${leave.employeeName}`}
                       >
-                        <span className="inline-flex group-hover:animate-[var(--animate-action-close)]"><XCircle size={16} /></span>
+                        <span className={`inline-flex ${uiActionIconMotionClass.close}`}><XCircle size={14} /></span>
                         <ActionTooltip label="Cancel leave" />
                       </button>
                     )}
                     {leave.status === 'Pending' && (
                       <button
+                        type="button"
                         onClick={() => {
                           const reason = prompt('Rejection reason:');
                           if (reason !== null) onReject(leave.id, reason);
                         }}
-                        className="group relative rounded-lg p-1.5 text-rose-400 transition hover:bg-rose-50 hover:text-rose-600"
+                        className="group relative flex h-8 w-8 items-center justify-center rounded-xl bg-rose-50 text-rose-600 shadow-sm transition-all hover:bg-rose-500 hover:text-white active:scale-95"
                         aria-label={`Reject leave for ${leave.employeeName}`}
                       >
-                        <span className="inline-flex group-hover:animate-[var(--animate-action-close)]"><XCircle size={16} /></span>
+                        <span className={`inline-flex ${uiActionIconMotionClass.reject}`}><XCircle size={14} /></span>
                         <ActionTooltip label="Reject" />
                       </button>
                     )}
                     {leave.status === 'Pending' && (
                       <button
+                        type="button"
                         onClick={() => requestDelete(leave.id, { label: `Deleting leave for ${leave.employeeName}` })}
-                        className="group relative rounded-lg p-1.5 text-slate-400 transition hover:bg-red-50 hover:text-red-600"
+                        className="group relative flex h-8 w-8 items-center justify-center rounded-xl bg-rose-50 text-rose-600 shadow-sm transition-all hover:bg-rose-500 hover:text-white active:scale-95"
                         aria-label={`Delete leave for ${leave.employeeName}`}
                       >
-                        <span className="inline-flex group-hover:animate-[var(--animate-action-delete)]"><Trash2 size={16} /></span>
+                        <span className={`inline-flex ${uiActionIconMotionClass.delete}`}><Trash2 size={14} /></span>
                         <ActionTooltip label="Delete" />
                       </button>
                     )}
