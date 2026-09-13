@@ -15,10 +15,8 @@ import {
   FileText,
   Search,
   Filter,
-  TrendingUp,
   PackageCheck,
   Zap,
-  BarChart3,
   Calculator,
 } from "lucide-react";
 import AppShellModal from "../../../../ui/AppShellModal";
@@ -33,7 +31,6 @@ import {
   formatRateEntryTripDate,
   formatRateEntryWeekday,
 } from "../utils/rateEntryDisplay";
-import RateEntryMarketMasterTables from "./RateEntryMarketMasterTables";
 import type { RateEntryMarketRateMasterDto } from "../utils/rateEntryMarketMaster";
 import { Pagination } from "../../../../ui/Pagination";
 
@@ -121,7 +118,6 @@ export default function EnterRateModal({
   const [bulkRate, setBulkRate] = useState<string>("");
   const [shopSortKey, setShopSortKey] = useState<ShopSortKey>("shopName");
   const [shopSortDir, setShopSortDir] = useState<"asc" | "desc">("asc");
-  const [showMarketMaster, setShowMarketMaster] = useState(true);
 
   const saving = isSaving || busy;
   const rateLocked = trip?.rateCompleted === true;
@@ -488,9 +484,6 @@ export default function EnterRateModal({
                 <h2 className="text-[16px] font-extrabold tracking-tight text-slate-900">
                   {rateLocked ? t("ops.rate.modal.title_readonly") : t("ops.rate.modal.title_enter")}
                 </h2>
-                <p className="text-[11px] font-medium text-slate-500">
-                  Synced with quarter sample • {deliveries.length} shops • Market rates from master • App shell gaps
-                </p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -565,33 +558,6 @@ export default function EnterRateModal({
             </div>
           </div>
 
-          {/* Market master toggle */}
-          <div className="shrink-0 border-b border-slate-200 bg-white px-5 py-2 flex items-center justify-between">
-            <button
-              type="button"
-              onClick={() => setShowMarketMaster((v) => !v)}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-slate-700 hover:bg-slate-50"
-            >
-              <BarChart3 size={14} />
-              {showMarketMaster ? "Hide" : "Show"} Market Rate Master
-              <span className="ml-1 rounded-full bg-emerald-50 border border-emerald-200 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
-                Synced
-              </span>
-            </button>
-            <div className="flex items-center gap-2 text-[11px] font-medium text-slate-500">
-              <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 border border-sky-200 px-2 py-0.5 text-sky-700">
-                <TrendingUp size={11} /> Market ref from quarter
-              </span>
-              <span className="hidden sm:inline">Trip day highlighted • Gaps from shell</span>
-            </div>
-          </div>
-
-          {showMarketMaster && (
-            <div className="shrink-0 border-b border-slate-100 max-h-[32vh] overflow-auto">
-              <RateEntryMarketMasterTables master={marketMaster} tripDate={trip.tripDate} loadError={null} />
-            </div>
-          )}
-
           {(loadError || lockError) && (
             <div className="px-5 py-2 border-b border-red-200 bg-red-50 flex items-center gap-2 shrink-0">
               <AlertCircle size={14} className="text-red-600" />
@@ -614,9 +580,6 @@ export default function EnterRateModal({
                         {filteredSortedDeliveries.length}/{deliveries.length}
                       </span>
                     </h3>
-                    <p className="text-[11px] font-medium text-slate-500">
-                      {t("ops.rate.modal.shop_master_details")} • Paper rate & association from Masters → Shops
-                    </p>
                   </div>
                 </div>
 
