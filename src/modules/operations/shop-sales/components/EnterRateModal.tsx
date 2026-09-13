@@ -499,7 +499,7 @@ export default function EnterRateModal({
                       <tbody>
                         {marketThreeDays.map(({ date, comp, isToday }) => (
                           <tr key={date} className={`border-t ${isToday ? "border-emerald-200 bg-emerald-50/40" : "border-slate-100 bg-white"}`}>
-                            <td className="px-2 py-2 font-bold text-slate-800">{formatDdMmYy(date)}</td>
+                            <td className="px-2 py-2 font-medium text-slate-700">{formatDdMmYy(date)}</td>
                             <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-emerald-50 border-emerald-200 font-bold text-emerald-900 shadow-sm" : "bg-white border-slate-200 text-slate-600"}`}>{comp?.sneha != null ? Number(comp.sneha).toFixed(0) : "—"}</div></td>
                             <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-emerald-50 border-emerald-200 font-bold text-emerald-900 shadow-sm" : "bg-white border-slate-200 text-slate-600"}`}>{comp?.vencobVii != null ? Number(comp.vencobVii).toFixed(0) : "—"}</div></td>
                             <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-emerald-50 border-emerald-200 font-bold text-emerald-900 shadow-sm" : "bg-white border-slate-200 text-slate-600"}`}>{comp?.vencobGun != null ? Number(comp.vencobGun).toFixed(0) : "—"}</div></td>
@@ -533,7 +533,7 @@ export default function EnterRateModal({
                       <tbody>
                         {marketThreeDays.map(({ date, add, isToday }) => (
                           <tr key={date} className={`border-t ${isToday ? "border-sky-200 bg-sky-50/40" : "border-slate-100 bg-white"}`}>
-                            <td className="px-2 py-2 font-bold text-slate-800">{formatDdMmYy(date)}</td>
+                            <td className="px-2 py-2 font-medium text-slate-700">{formatDdMmYy(date)}</td>
                             <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-sky-50 border-sky-200 font-bold text-sky-900 shadow-sm" : "bg-white border-slate-200 text-slate-600"}`}>{add?.vij != null ? Number(add.vij).toFixed(0) : "—"}</div></td>
                             <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-sky-50 border-sky-200 font-bold text-sky-900 shadow-sm" : "bg-white border-slate-200 text-slate-600"}`}>{add?.gun != null ? Number(add.gun).toFixed(0) : "—"}</div></td>
                             <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums font-bold ${isToday ? "bg-emerald-50 border-emerald-300 text-emerald-800 shadow-sm" : "bg-white border-slate-200 text-emerald-600"}`}>{add?.rp != null ? Number(add.rp).toFixed(0) : "—"}</div></td>
@@ -566,7 +566,7 @@ export default function EnterRateModal({
                       <tbody>
                         {marketThreeDays.map(({ date, size, isToday }) => (
                           <tr key={date} className={`border-t ${isToday ? "border-violet-200 bg-violet-50/40" : "border-slate-100 bg-white"}`}>
-                            <td className="px-2 py-2 font-bold text-slate-800">{formatDdMmYy(date)}</td>
+                            <td className="px-2 py-2 font-medium text-slate-700">{formatDdMmYy(date)}</td>
                             {sizeKeys.map((k) => (
                               <td key={k} className="px-2 py-2">
                                 <div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-violet-50 border-violet-200 font-bold text-violet-900 shadow-sm" : "bg-white border-slate-200 text-slate-600"}`}>
@@ -646,10 +646,10 @@ export default function EnterRateModal({
                             <div className="text-[14px] font-bold text-slate-800 leading-tight truncate">{displayRateEntryShopName(delivery.shopName, localLanguage)}</div>
                             {masterShop && <div className="text-[11px] font-normal text-slate-500 truncate">{masterShop.city}</div>}
                           </td>
-                          <td className="px-2 py-3.5"><span className="inline-flex items-center justify-center rounded-lg border bg-violet-50 border-violet-200 text-violet-800 px-2.5 py-1 text-[12px] font-bold truncate max-w-full">{association ? displayRateEntryName(association, localLanguage) : "—"}</span></td>
-                          <td className="px-2 py-3.5 text-center"><span className="inline-flex items-center justify-center rounded-lg border bg-sky-50 border-sky-200 text-sky-800 px-2.5 py-1 text-[12px] font-bold tabular-nums">{hasPaperRate ? paperRate : "—"}</span></td>
-                          <td className="px-2 py-3.5 text-center text-[13px] font-bold text-slate-800 tabular-nums">{delivery.birds.toLocaleString()}</td>
-                          <td className="px-2 py-3.5 text-center text-[13px] font-bold text-slate-800 tabular-nums">{delivery.weight.toFixed(2)}</td>
+                          <td className="px-2 py-3.5"><span className="inline-flex items-center justify-center rounded-lg border bg-violet-50 border-violet-200 text-violet-800 px-2.5 py-1 text-[12px] font-medium truncate max-w-full">{association ? displayRateEntryName(association, localLanguage) : "—"}</span></td>
+                          <td className="px-2 py-3.5 text-center"><span className="inline-flex items-center justify-center rounded-lg border bg-sky-50 border-sky-200 text-sky-800 px-2.5 py-1 text-[12px] font-semibold tabular-nums">{hasPaperRate ? paperRate : "—"}</span></td>
+                          <td className="px-2 py-3.5 text-center text-[13px] font-normal text-slate-700 tabular-nums">{delivery.birds.toLocaleString()}</td>
+                          <td className="px-2 py-3.5 text-center text-[13px] font-normal text-slate-700 tabular-nums">{delivery.weight.toFixed(2)}</td>
                           <td className="px-2 py-3.5">
                             {rateLocked ? (
                               <span className="block text-center text-[13px] font-semibold text-slate-800 tabular-nums rate-input-market valid">{rate != null ? rate.toFixed(2) : "—"}</span>
