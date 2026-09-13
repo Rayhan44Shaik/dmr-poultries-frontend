@@ -13,9 +13,11 @@ import {
   RotateCcw,
   Users,
   FileText,
-  Search,
   PackageCheck,
   Calculator,
+  TrendingUp,
+  ChevronLeft,
+  ChevronRight,
 } from "lucide-react";
 import AppShellModal from "../../../../ui/AppShellModal";
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
@@ -30,6 +32,7 @@ import {
   formatRateEntryWeekday,
 } from "../utils/rateEntryDisplay";
 import type { RateEntryMarketRateMasterDto } from "../utils/rateEntryMarketMaster";
+import { addCalendarDays } from "../utils/rateEntryMarketMaster";
 
 const SHOPS_PAGE_SIZE = 10;
 
@@ -77,6 +80,21 @@ function formatInr(n: number): string {
   return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+function formatDdMmYy(iso: string): string {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return iso;
+  return `${m[3]}-${m[2]}-${m[1]}`;
+}
+
+function formatShortDay(iso: string, language: string): string {
+  try {
+    const d = new Date(iso + "T00:00:00");
+    return d.toLocaleDateString(language === "te" ? "te-IN" : "en-IN", { weekday: "short" });
+  } catch {
+    return "";
+  }
+}
+
 type ShopSortKey = "time" | "shopName" | "birds" | "weight" | "rate" | "amount";
 
 interface Props {
@@ -110,7 +128,6 @@ export default function EnterRateModal({
   const [lockError, setLockError] = useState<string | null>(null);
   const [lockAttempted, setLockAttempted] = useState(false);
   const [shopPage, setShopPage] = useState(1);
-  const [shopSearch, setShopSearch] = useState("");
   const [shopSortKey, setShopSortKey] = useState<ShopSortKey>("time");
   const [shopSortDir, setShopSortDir] = useState<"asc" | "desc">("asc");
 
@@ -124,7 +141,6 @@ export default function EnterRateModal({
     setLockError(null);
     setLockAttempted(false);
     setShopPage(1);
-    setShopSearch("");
     setShopSortKey("time");
     setShopSortDir("asc");
     setDeliveries(
@@ -171,6 +187,18 @@ export default function EnterRateModal({
     return row.vencobRate;
   }, [marketMaster, trip?.tripDate]);
 
+  const marketTwoDays = useMemo(() => {
+    if (!trip?.tripDate || !marketMaster) return [];
+    const today = trip.tripDate;
+    const yesterday = addCalendarDays(today, -1);
+    const dates = [yesterday, today];
+    return dates.map((date) => {
+      const comp = marketMaster.companyRates.find((r) => r.date === date);
+      const add = marketMaster.additionalMetrics.find((r) => r.date === date);
+      return { date, comp, add, isToday: date === today };
+    });
+  }, [trip?.tripDate, marketMaster]);
+
   const isDirty = useMemo(() => {
     if (!trip) return false;
     return deliveries.some((row, i) => normalizeRate(row.rate) !== normalizeRate(trip.deliveries[i]?.rate));
@@ -215,17 +243,6 @@ export default function EnterRateModal({
 
   const filteredSortedDeliveries = useMemo(() => {
     let list = deliveries.map((row, idx) => ({ row, originalIndex: idx }));
-    if (shopSearch.trim()) {
-      const q = shopSearch.toLowerCase().trim();
-      list = list.filter(({ row }) => {
-        const shopName = row.shopName.toLowerCase();
-        const master = resolveShopMaster(row, shopMasterLookup);
-        const assoc = master?.associationType?.toLowerCase() ?? "";
-        const city = master?.city?.toLowerCase() ?? "";
-        return shopName.includes(q) || assoc.includes(q) || city.includes(q) || String(row.birds).includes(q);
-      });
-    }
-    // Time-based ordering: by originalIndex (delivery sequence / time)
     list.sort((a, b) => {
       const dir = shopSortDir === "asc" ? 1 : -1;
       const ra = a.row;
@@ -254,7 +271,7 @@ export default function EnterRateModal({
       }
     });
     return list;
-  }, [deliveries, shopSearch, shopSortKey, shopSortDir, shopMasterLookup]);
+  }, [deliveries, shopSortKey, shopSortDir]);
 
   const shopPageCount = Math.max(1, Math.ceil(filteredSortedDeliveries.length / SHOPS_PAGE_SIZE));
   const pagedDeliveries = useMemo(() => {
@@ -267,10 +284,6 @@ export default function EnterRateModal({
     const timer = window.setTimeout(() => setShopPage(shopPageCount), 0);
     return () => window.clearTimeout(timer);
   }, [shopPage, shopPageCount]);
-
-  useEffect(() => {
-    setShopPage(1);
-  }, [shopSearch]);
 
   const applyMarketRate = (originalIndex: number, rate: number) => {
     if (saving || rateLocked) return;
@@ -285,11 +298,6 @@ export default function EnterRateModal({
       const marketRate = suggestedMarketRate(row, tripDateVenRate);
       const currentRate = normalizeRate(row.rate);
       if (marketRate == null || isValidSellingRate(currentRate)) return row;
-      if (shopSearch.trim()) {
-        const q = shopSearch.toLowerCase().trim();
-        const match = row.shopName.toLowerCase().includes(q);
-        if (!match) return row;
-      }
       changed = true;
       return { ...row, rate: marketRate };
     });
@@ -365,6 +373,8 @@ export default function EnterRateModal({
 
   if (!open || !trip) return null;
 
+  const pageNumbers = Array.from({ length: shopPageCount }, (_, i) => i + 1);
+
   return (
     <>
       <style>{`
@@ -373,6 +383,8 @@ export default function EnterRateModal({
         .no-spinner { -moz-appearance: textfield; }
         @keyframes rate-table-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
         .rate-table-animate { animation: rate-table-in 0.25s ease-out; }
+        @keyframes pulse-emerald { 0%, 100% { box-shadow: 0 0 0 0 rgba(16,185,129,0.4); } 50% { box-shadow: 0 0 0 6px rgba(16,185,129,0); } }
+        .pulse-today { animation: pulse-emerald 2s infinite; }
       `}</style>
 
       {showSuccessToast &&
@@ -440,18 +452,18 @@ export default function EnterRateModal({
 
       <AppShellModal open={open} onClose={onClose} panelClassName="bg-white">
         <div className="bg-white w-full h-full flex flex-col relative overflow-hidden rounded-2xl">
-          {/* Header - Enter shop wise rate with perfect logo same size as table */}
+          {/* Header */}
           <div className="bg-white border-b border-slate-200 px-5 py-4 flex items-center justify-between shrink-0 rounded-t-2xl">
             <div className="flex items-center gap-3.5">
               <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-md ring-2 ring-emerald-100 animate-in zoom-in duration-300">
-                <Store size={22} className="drop-shadow-sm" />
+                <Store size={22} />
               </span>
               <div>
                 <h2 className="text-[19px] font-extrabold tracking-tight text-slate-900 leading-none">
                   Enter shop wise rate
                 </h2>
                 <p className="mt-1 text-[12px] font-semibold text-slate-500 tracking-wide">
-                  {trip.tripNo} • {formatRateEntryWeekday(trip.tripDate, language)} • Time based ordering
+                  {trip.tripNo} • {formatRateEntryWeekday(trip.tripDate, language)} • Time based
                 </p>
               </div>
             </div>
@@ -472,47 +484,127 @@ export default function EnterRateModal({
             </div>
           </div>
 
-          {/* Trip info cards - increased size */}
+          {/* Trip info cards - increased */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 px-5 py-4 shrink-0 bg-slate-50/70 border-b border-slate-100">
-            <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-white px-4 py-3.5 shadow-sm hover:shadow-md transition-shadow">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 shrink-0">
+            <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-white px-4 py-3.5 shadow-sm">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700">
                 <PackageCheck size={18} />
               </span>
               <div className="min-w-0">
                 <p className="text-[11px] uppercase tracking-wider text-slate-500 font-bold">Trip No</p>
-                <p className="text-[15px] font-extrabold text-emerald-700 truncate leading-tight">{trip.tripNo}</p>
+                <p className="text-[15px] font-extrabold text-emerald-700 truncate">{trip.tripNo}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3.5 shadow-sm hover:shadow-md transition-shadow">
-              <div className="h-10 w-10 rounded-xl bg-sky-100 flex items-center justify-center shrink-0">
+            <div className="flex items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3.5 shadow-sm">
+              <div className="h-10 w-10 rounded-xl bg-sky-100 flex items-center justify-center">
                 <Truck size={18} className="text-sky-700" />
               </div>
               <div className="min-w-0">
                 <p className="text-[11px] uppercase tracking-wider text-slate-500 font-bold">Vehicle</p>
-                <p className="text-[15px] font-extrabold text-slate-900 truncate leading-tight">{formatVehicleNumber(trip.vehicleNo)}</p>
+                <p className="text-[15px] font-extrabold text-slate-900 truncate">{formatVehicleNumber(trip.vehicleNo)}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3.5 shadow-sm hover:shadow-md transition-shadow">
-              <div className="h-10 w-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+            <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3.5 shadow-sm">
+              <div className="h-10 w-10 rounded-xl bg-emerald-100 flex items-center justify-center">
                 <CalendarDays size={18} className="text-emerald-700" />
               </div>
               <div className="min-w-0">
                 <p className="text-[11px] uppercase tracking-wider text-slate-500 font-bold">Date</p>
-                <p className="text-[15px] font-extrabold text-slate-900 truncate leading-tight">{formatRateEntryTripDate(trip.tripDate)}</p>
+                <p className="text-[15px] font-extrabold text-slate-900 truncate">{formatRateEntryTripDate(trip.tripDate)}</p>
               </div>
             </div>
-            <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5 shadow-sm hover:shadow-md transition-shadow">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700 shrink-0">
+            <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5 shadow-sm">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700">
                 <Calculator size={18} />
               </span>
               <div className="min-w-0">
-                <p className="text-[11px] uppercase tracking-wider text-slate-500 font-bold">Total Shops</p>
-                <p className="text-[15px] font-extrabold text-slate-900 tabular-nums leading-tight">
+                <p className="text-[11px] uppercase tracking-wider text-slate-500 font-bold">Total</p>
+                <p className="text-[15px] font-extrabold text-slate-900 tabular-nums">
                   {deliveries.length} shops • {totals.totalWeight.toFixed(1)} KG
                 </p>
               </div>
             </div>
           </div>
+
+          {/* Market Rate - 2 days (yesterday & today) below trip no, highlight today */}
+          {marketTwoDays.length > 0 && (
+            <div className="px-5 py-3 bg-white border-b border-slate-100 shrink-0">
+              <div className="flex items-center gap-2 mb-2.5">
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-600 text-white">
+                  <TrendingUp size={14} />
+                </span>
+                <h3 className="text-[13px] font-extrabold text-slate-900 tracking-tight">Market Rate • 2 Days</h3>
+                <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                  Yesterday & Today • Today highlighted
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {marketTwoDays.map(({ date, comp, add, isToday }) => (
+                  <div
+                    key={date}
+                    className={`relative rounded-2xl border px-4 py-3 shadow-sm transition-all ${
+                      isToday
+                        ? "border-emerald-300 bg-emerald-50/80 pulse-today ring-2 ring-emerald-100"
+                        : "border-slate-200 bg-slate-50/60"
+                    }`}
+                  >
+                    {isToday && (
+                      <span className="absolute -top-2 -right-2 rounded-full bg-emerald-600 text-white px-2.5 py-0.5 text-[10px] font-extrabold shadow-md animate-in zoom-in">
+                        TODAY • {formatShortDay(date, language)}
+                      </span>
+                    )}
+                    {!isToday && (
+                      <span className="absolute -top-2 -right-2 rounded-full bg-slate-800 text-white px-2 py-0.5 text-[10px] font-bold">
+                        YESTERDAY • {formatShortDay(date, language)}
+                      </span>
+                    )}
+                    <div className="flex items-center justify-between mb-2">
+                      <p className={`text-[13px] font-extrabold ${isToday ? "text-emerald-800" : "text-slate-700"}`}>
+                        {formatDdMmYy(date)}
+                      </p>
+                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full border ${isToday ? "bg-white border-emerald-200 text-emerald-700" : "bg-white border-slate-200 text-slate-600"}`}>
+                        {comp?.entered || add?.entered ? "Entered" : "Not entered"}
+                      </span>
+                    </div>
+                    <div className="grid grid-cols-3 gap-2 text-[11px]">
+                      <div className={`rounded-xl border px-2.5 py-2 ${isToday ? "bg-white border-emerald-200" : "bg-white border-slate-200"}`}>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase">Vencob Rate</p>
+                        <p className={`text-[13px] font-extrabold tabular-nums ${isToday ? "text-emerald-700" : "text-slate-800"}`}>
+                          {comp?.vencobRate != null ? `₹ ${Number(comp.vencobRate).toFixed(2)}` : "—"}
+                        </p>
+                      </div>
+                      <div className={`rounded-xl border px-2.5 py-2 ${isToday ? "bg-white border-emerald-200" : "bg-white border-slate-200"}`}>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase">Vij / Gun</p>
+                        <p className="text-[12px] font-bold text-slate-800 tabular-nums">
+                          {comp?.vencobVii != null ? comp.vencobVii.toFixed(2) : "—"} / {comp?.vencobGun != null ? comp.vencobGun.toFixed(2) : "—"}
+                        </p>
+                      </div>
+                      <div className={`rounded-xl border px-2.5 py-2 ${isToday ? "bg-white border-emerald-200" : "bg-white border-slate-200"}`}>
+                        <p className="text-[10px] font-bold text-slate-500 uppercase">Sneha / Asso</p>
+                        <p className="text-[12px] font-bold text-slate-800 tabular-nums">
+                          {comp?.sneha != null ? comp.sneha.toFixed(2) : "—"} / {comp?.associationVii != null ? comp.associationVii.toFixed(2) : "—"}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-2 grid grid-cols-3 gap-2 text-[11px]">
+                      <div className="rounded-lg bg-white border border-slate-200 px-2 py-1.5">
+                        <span className="text-[10px] font-bold text-slate-500">Vij</span>
+                        <span className="ml-1 font-bold text-slate-800 tabular-nums">{add?.vij != null ? Number(add.vij).toFixed(2) : "—"}</span>
+                      </div>
+                      <div className="rounded-lg bg-white border border-slate-200 px-2 py-1.5">
+                        <span className="text-[10px] font-bold text-slate-500">Gun</span>
+                        <span className="ml-1 font-bold text-slate-800 tabular-nums">{add?.gun != null ? Number(add.gun).toFixed(2) : "—"}</span>
+                      </div>
+                      <div className="rounded-lg bg-white border border-slate-200 px-2 py-1.5">
+                        <span className="text-[10px] font-bold text-slate-500">RP</span>
+                        <span className="ml-1 font-bold text-slate-800 tabular-nums">{add?.rp != null ? Number(add.rp).toFixed(2) : "—"}</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
 
           {(loadError || lockError) && (
             <div className="px-5 py-2.5 border-b border-red-200 bg-red-50 flex items-center gap-2 shrink-0">
@@ -521,90 +613,40 @@ export default function EnterRateModal({
             </div>
           )}
 
-          {/* Shop table - clean, time based, shop size increased, no extra KPI */}
+          {/* Shop table - S.No, Shop Name, Association, Paper Rate, Birds, Weight, Rate, Amount */}
           <div className="px-5 py-4 flex-1 min-h-0 flex flex-col overflow-hidden bg-white">
-            {/* Minimal top bar - only search, time based info */}
-            <div className="mb-3 flex items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-[13px] font-bold text-slate-700">
-                <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900 text-white">
-                  <Store size={14} />
-                </span>
-                <span className="tracking-tight">Shops • Time based order</span>
-                <span className="rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5 text-[11px] font-bold text-slate-600">
-                  {filteredSortedDeliveries.length} shops
-                </span>
-              </div>
-              <div className="relative w-64">
-                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="search"
-                  value={shopSearch}
-                  onChange={(e) => setShopSearch(e.target.value)}
-                  placeholder="Search shop..."
-                  className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-8 pr-3 text-[13px] font-medium text-slate-700 placeholder:text-slate-400 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 outline-none"
-                />
-              </div>
-            </div>
-
             <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm rate-table-animate">
               <div className="h-full overflow-auto">
-                <table className="min-w-[1050px] w-full text-sm">
+                <table className="min-w-[1100px] w-full text-sm">
                   <thead className="sticky top-0 z-10 bg-slate-50">
                     <tr className="border-b border-slate-200 text-slate-500">
                       <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
-                        <button
-                          type="button"
-                          onClick={() => toggleShopSort("time")}
-                          className="flex items-center justify-center gap-1 w-full hover:text-emerald-700"
-                        >
+                        <button type="button" onClick={() => toggleShopSort("time")} className="flex items-center justify-center gap-1 w-full hover:text-emerald-700">
                           S.No
                           {shopSortKey === "time" && <span className="text-emerald-600">{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
-                      <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
-                        Shop Name
-                      </th>
+                      <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">Shop Name</th>
+                      <th className="px-3 py-3 text-left text-[11px] font-bold uppercase tracking-wider">Association</th>
+                      <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wider">Paper Rate</th>
                       <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
-                        <button
-                          type="button"
-                          onClick={() => toggleShopSort("birds")}
-                          className="flex items-center justify-center gap-1 w-full hover:text-emerald-700"
-                        >
-                          Birds
-                          {shopSortKey === "birds" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
+                        <button type="button" onClick={() => toggleShopSort("birds")} className="flex items-center justify-center gap-1 w-full hover:text-emerald-700">
+                          Birds {shopSortKey === "birds" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
                       <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
-                        <button
-                          type="button"
-                          onClick={() => toggleShopSort("weight")}
-                          className="flex items-center justify-center gap-1 w-full hover:text-emerald-700"
-                        >
-                          Weight KG
-                          {shopSortKey === "weight" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
+                        <button type="button" onClick={() => toggleShopSort("weight")} className="flex items-center justify-center gap-1 w-full hover:text-emerald-700">
+                          Weight {shopSortKey === "weight" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
                       <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
-                        Market Rate
-                      </th>
-                      <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
-                        <button
-                          type="button"
-                          onClick={() => toggleShopSort("rate")}
-                          className="flex items-center justify-center gap-1 w-full hover:text-emerald-700"
-                        >
-                          Rate
-                          {shopSortKey === "rate" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
+                        <button type="button" onClick={() => toggleShopSort("rate")} className="flex items-center justify-center gap-1 w-full hover:text-emerald-700">
+                          Rate {shopSortKey === "rate" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
                       <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
-                        <button
-                          type="button"
-                          onClick={() => toggleShopSort("amount")}
-                          className="flex items-center justify-center gap-1 w-full hover:text-emerald-700"
-                        >
-                          Amount
-                          {shopSortKey === "amount" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
+                        <button type="button" onClick={() => toggleShopSort("amount")} className="flex items-center justify-center gap-1 w-full hover:text-emerald-700">
+                          Amount {shopSortKey === "amount" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
                     </tr>
@@ -614,8 +656,10 @@ export default function EnterRateModal({
                       const rate = normalizeRate(delivery.rate);
                       const isValid = isValidSellingRate(rate);
                       const amount = isValid ? Number((delivery.weight * (rate as number)).toFixed(2)) : 0;
-                      const marketRateValue = suggestedMarketRate(delivery, tripDateVenRate);
                       const masterShop = resolveShopMaster(delivery, shopMasterLookup);
+                      const association = masterShop?.associationType?.trim() ?? "";
+                      const paperRate = Number(masterShop?.paperRate ?? 0);
+                      const hasPaperRate = Number.isFinite(paperRate) && paperRate > 0;
                       const belowMin = rate != null && rate < 50;
                       const aboveMax = rate != null && rate > 300;
                       const missingForLock = lockAttempted && !isValid;
@@ -624,35 +668,51 @@ export default function EnterRateModal({
                         <tr
                           key={delivery.id}
                           className={`border-b border-slate-100 transition-all duration-200 hover:bg-emerald-50/40 ${
-                            missingForLock
-                              ? "bg-red-50"
-                              : originalIndex % 2 === 0
-                                ? "bg-white"
-                                : "bg-slate-50/40"
+                            missingForLock ? "bg-red-50" : originalIndex % 2 === 0 ? "bg-white" : "bg-slate-50/40"
                           }`}
                         >
-                          <td className="px-3 py-3.5 text-center text-[13px] font-bold text-slate-600 tabular-nums">
-                            {originalIndex + 1}
-                          </td>
-                          <td className="min-w-[340px] px-4 py-3.5">
+                          <td className="px-3 py-3.5 text-center text-[13px] font-bold text-slate-600 tabular-nums">{originalIndex + 1}</td>
+                          <td className="min-w-[300px] px-4 py-3.5">
                             <div className="font-extrabold text-[15px] text-slate-900 tracking-tight leading-tight">
                               {displayRateEntryShopName(delivery.shopName, language)}
                             </div>
                             {masterShop && (
-                              <div className="mt-1 flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
-                                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5">
-                                  <Users size={10} />
-                                  {displayRateEntryName(masterShop.associationType ?? "", language) || masterShop.city}
-                                </span>
-                                {masterShop.paperRate > 0 && (
-                                  <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 border border-orange-200 px-2 py-0.5 text-orange-700">
-                                    <FileText size={10} />{masterShop.paperRate}
-                                  </span>
-                                )}
+                              <div className="mt-0.5 text-[11px] font-medium text-slate-500">
+                                {masterShop.city} • Bal ₹ {formatInr(masterShop.currentBalance ?? 0)}
                               </div>
                             )}
                             {!masterShop && shopsLoading && (
                               <div className="mt-1 text-[11px] font-semibold text-slate-400">Loading master...</div>
+                            )}
+                          </td>
+                          <td className="min-w-[130px] px-3 py-3.5">
+                            {association ? (
+                              <span
+                                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold ${
+                                  association === "Association"
+                                    ? "border-violet-200 bg-violet-50 text-violet-700"
+                                    : association === "Non-Association"
+                                      ? "border-slate-200 bg-slate-50 text-slate-600"
+                                      : association === "Direct"
+                                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                        : "border-amber-200 bg-amber-50 text-amber-700"
+                                }`}
+                              >
+                                <Users size={11} />
+                                {displayRateEntryName(association, language)}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">—</span>
+                            )}
+                          </td>
+                          <td className="px-3 py-3.5 text-center">
+                            {hasPaperRate ? (
+                              <span className="inline-flex items-center gap-1 rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-[11px] font-bold text-orange-700 tabular-nums">
+                                <FileText size={11} />
+                                {paperRate}
+                              </span>
+                            ) : (
+                              <span className="text-slate-400">—</span>
                             )}
                           </td>
                           <td className="px-3 py-3.5 text-center text-[13px] font-bold text-emerald-700 tabular-nums">
@@ -660,25 +720,6 @@ export default function EnterRateModal({
                           </td>
                           <td className="px-3 py-3.5 text-center text-[13px] font-bold text-orange-600 tabular-nums">
                             {delivery.weight.toFixed(2)}
-                          </td>
-                          <td className="px-3 py-3.5 text-center">
-                            {marketRateValue != null ? (
-                              <span className="inline-flex items-center overflow-hidden rounded-full border border-sky-200 bg-sky-50 text-sky-700 shadow-xs">
-                                <span className="px-2.5 py-1 text-[12px] font-bold tabular-nums">₹ {Number(marketRateValue).toFixed(2)}</span>
-                                {!rateLocked && (
-                                  <button
-                                    type="button"
-                                    onClick={() => applyMarketRate(originalIndex, marketRateValue)}
-                                    disabled={saving}
-                                    className="border-l border-sky-200 bg-white/80 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700 transition-colors hover:bg-emerald-50 hover:text-emerald-800 disabled:opacity-50"
-                                  >
-                                    Use
-                                  </button>
-                                )}
-                              </span>
-                            ) : (
-                              <span className="text-slate-300">—</span>
-                            )}
                           </td>
                           <td className="px-3 py-3.5">
                             {rateLocked ? (
@@ -713,18 +754,16 @@ export default function EnterRateModal({
                               </div>
                             )}
                           </td>
-                          <td className="px-3 py-3.5 text-center text-[13px] font-bold text-slate-800 tabular-nums">
-                            ₹ {formatInr(amount)}
-                          </td>
+                          <td className="px-3 py-3.5 text-center text-[13px] font-bold text-slate-800 tabular-nums">₹ {formatInr(amount)}</td>
                         </tr>
                       );
                     })}
                     {pagedDeliveries.length === 0 && (
                       <tr>
-                        <td colSpan={7} className="py-14 text-center">
+                        <td colSpan={8} className="py-14 text-center">
                           <div className="flex flex-col items-center gap-2 text-slate-400">
-                            <Search size={22} />
-                            <p className="text-[13px] font-semibold">No shops match "{shopSearch}"</p>
+                            <Store size={22} />
+                            <p className="text-[13px] font-semibold">No shops</p>
                           </div>
                         </td>
                       </tr>
@@ -734,45 +773,54 @@ export default function EnterRateModal({
               </div>
             </div>
 
-            {/* Simple 10 per page - Next / Previous only */}
+            {/* Pagination - Previous 1 2 Next */}
             {filteredSortedDeliveries.length > 0 && (
-              <div className="mt-3 flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm">
-                <div className="text-[12px] font-bold text-slate-600 tabular-nums">
-                  Page {shopPage} of {shopPageCount} • {filteredSortedDeliveries.length} shops • 10 per page • Time based
-                </div>
-                <div className="flex items-center gap-2">
+              <div className="mt-3 flex items-center justify-center rounded-xl border border-slate-200 bg-white px-3 py-2.5 shadow-sm">
+                <div className="flex items-center gap-1">
                   <button
                     type="button"
                     onClick={() => setShopPage((p) => Math.max(1, p - 1))}
                     disabled={shopPage <= 1 || saving}
-                    className="h-8 px-3 rounded-lg border border-slate-200 bg-white text-[12px] font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="inline-flex items-center gap-1 h-8 px-3 rounded-lg border border-slate-200 bg-white text-[12px] font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    Previous
+                    <ChevronLeft size={14} /> Previous
                   </button>
-                  <span className="text-[12px] font-bold text-slate-500 tabular-nums">
-                    {shopPage} / {shopPageCount}
-                  </span>
+                  {pageNumbers.map((num) => (
+                    <button
+                      key={num}
+                      type="button"
+                      onClick={() => setShopPage(num)}
+                      disabled={saving}
+                      className={`h-8 w-8 rounded-lg text-[12px] font-extrabold tabular-nums transition-colors ${
+                        num === shopPage
+                          ? "bg-slate-900 text-white shadow-sm"
+                          : "bg-white border border-slate-200 text-slate-700 hover:bg-slate-50"
+                      }`}
+                    >
+                      {num}
+                    </button>
+                  ))}
                   <button
                     type="button"
                     onClick={() => setShopPage((p) => Math.min(shopPageCount, p + 1))}
                     disabled={shopPage >= shopPageCount || saving}
-                    className="h-8 px-3 rounded-lg bg-slate-900 text-white text-[12px] font-bold hover:bg-black disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    className="inline-flex items-center gap-1 h-8 px-3 rounded-lg bg-slate-900 text-white text-[12px] font-bold hover:bg-black disabled:opacity-40 disabled:cursor-not-allowed"
                   >
-                    Next
+                    Next <ChevronRight size={14} />
                   </button>
                 </div>
               </div>
             )}
           </div>
 
-          {/* Footer - clean, no KPI cards weight/amount/avg */}
+          {/* Footer */}
           <div className="bg-white border-t border-slate-200 px-5 py-3.5 shrink-0 rounded-b-2xl">
             {rateLocked ? (
               <div className="flex justify-end">
                 <button
                   type="button"
                   onClick={onClose}
-                  className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+                  className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50"
                 >
                   {t("common.close")}
                 </button>
@@ -784,27 +832,24 @@ export default function EnterRateModal({
                     type="button"
                     onClick={resetRates}
                     disabled={saving}
-                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-[13px] font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-[13px] font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50"
                   >
-                    <RotateCcw size={14} />
-                    Reset
+                    <RotateCcw size={14} /> Reset
                   </button>
                   <button
                     type="button"
                     onClick={applyMarketRates}
                     disabled={saving || !canApplyMarketRates}
-                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-orange-200 bg-orange-50 text-[13px] font-bold text-orange-700 hover:bg-orange-100 disabled:opacity-50 transition-colors"
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-orange-200 bg-orange-50 text-[13px] font-bold text-orange-700 hover:bg-orange-100 disabled:opacity-50"
                   >
-                    <IndianRupee size={14} />
-                    Apply Market Rates
+                    <IndianRupee size={14} /> Apply Market Rates
                   </button>
                 </div>
-
                 <div className="flex items-center justify-end gap-2">
                   <button
                     type="button"
                     onClick={onClose}
-                    className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-[13px] font-bold text-slate-600 hover:bg-slate-50 transition-colors"
+                    className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-[13px] font-bold text-slate-600 hover:bg-slate-50"
                   >
                     {t("common.cancel")}
                   </button>
@@ -812,14 +857,11 @@ export default function EnterRateModal({
                     type="button"
                     onClick={() => confirmSave("save")}
                     disabled={saving || !isDirty || hasInvalidEnteredRate}
-                    className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border text-[13px] font-bold transition-all disabled:opacity-50 ${
-                      isDirty
-                        ? "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
-                        : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border text-[13px] font-bold disabled:opacity-50 ${
+                      isDirty ? "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100" : "border-emerald-200 bg-emerald-50 text-emerald-700"
                     }`}
                   >
-                    <Save size={14} />
-                    {saving ? t("ops.rate.modal.saving") : t("ops.rate.modal.save_progress")}
+                    <Save size={14} /> {saving ? t("ops.rate.modal.saving") : t("ops.rate.modal.save_progress")}
                   </button>
                   <button
                     type="button"
@@ -827,28 +869,20 @@ export default function EnterRateModal({
                       if (saving) return;
                       setLockAttempted(true);
                       if (!canLock) {
-                        const firstMissing = deliveries.findIndex(
-                          (row) => !isValidSellingRate(normalizeRate(row.rate))
-                        );
+                        const firstMissing = deliveries.findIndex((row) => !isValidSellingRate(normalizeRate(row.rate)));
                         if (firstMissing >= 0) {
-                          const idxInFiltered = filteredSortedDeliveries.findIndex(
-                            (f) => f.originalIndex === firstMissing
-                          );
-                          if (idxInFiltered >= 0) {
-                            setShopPage(Math.floor(idxInFiltered / SHOPS_PAGE_SIZE) + 1);
-                          } else {
-                            setShopPage(Math.floor(firstMissing / SHOPS_PAGE_SIZE) + 1);
-                          }
+                          const idxInFiltered = filteredSortedDeliveries.findIndex((f) => f.originalIndex === firstMissing);
+                          if (idxInFiltered >= 0) setShopPage(Math.floor(idxInFiltered / SHOPS_PAGE_SIZE) + 1);
+                          else setShopPage(Math.floor(firstMissing / SHOPS_PAGE_SIZE) + 1);
                         }
                         return;
                       }
                       setShowConfirm(true);
                     }}
                     disabled={saving}
-                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-600 text-white text-[13px] font-extrabold shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-600 text-white text-[13px] font-extrabold shadow-sm hover:bg-emerald-700 disabled:opacity-50"
                   >
-                    <Lock size={14} className="text-emerald-100" />
-                    {saving ? t("ops.rate.modal.locking") : t("ops.rate.modal.lock_submit")}
+                    <Lock size={14} className="text-emerald-100" /> {saving ? t("ops.rate.modal.locking") : t("ops.rate.modal.lock_submit")}
                   </button>
                 </div>
               </div>
