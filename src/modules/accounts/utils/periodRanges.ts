@@ -4,15 +4,20 @@
    SummaryPage owns the UI; this file owns the answer to "which dates does this
    chip mean", so the same question can be asked from outside the page. That
    matters because a dashboard KPI arrives with a window of its own (say
-   07 Sep → 13 Sep) and the page has to decide which chip can show that window
-   WITHOUT moving it — `periodForWindow` picks the chip only when the dates it
-   would produce are exactly the dates that arrived, and falls back to Custom
-   otherwise, because Custom is the only chip that honours arbitrary dates to
-   the day (a 7-day window stays 7 days, a custom range stays that range).
+   31 Aug → 06 Sep) and the page has to decide which chip shows it.
+   `periodForWindow` answers with the NEAREST chip — a week or less goes to Week
+   (anchored to the week that overlaps the window most), a month-ish window goes
+   to Month, a longer one inside this year goes to Quarter — and only a window no
+   chip can represent (15 days, say, or one from another year) falls to Custom,
+   which honours arbitrary dates to the day. The window's own dates always come
+   back alongside the choice, so the Custom pickers are seeded with exactly what
+   the tile was showing even when a chip is selected.
 
    The week/month/quarter bodies below are the ones SummaryPage has always used,
    lifted verbatim so the page and this helper cannot drift apart:
-   - week    → the current Monday to Sunday
+   - week    → the Monday to Sunday around an anchor day (today by default; the
+               page can step it, which is what lets it show a week that a
+               dashboard KPI arrived with)
    - month   → the selected month, snapped OUT to whole Mon–Sun weeks that still
                end inside the month (so September can read 31 Aug → 27 Sep)
    - quarter → the whole of the current year, 1 Jan → 31 Dec
@@ -53,9 +58,9 @@ export const isSameMonth = (d1: Date, d2: Date): boolean => {
   return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth();
 };
 
-/** "This Week": the current Monday through the current Sunday. */
-export function weekRange(now: Date = new Date()): PeriodRange {
-  const start = getMonday(now);
+/** "Week": the Monday through the Sunday around `anchor` (today by default). */
+export function weekRange(anchor: Date = new Date()): PeriodRange {
+  const start = getMonday(anchor);
   const end = new Date(start);
   end.setDate(end.getDate() + 6);
   end.setHours(23, 59, 59, 999);
@@ -95,9 +100,11 @@ export function customRange(startKey: string, endKey: string): PeriodRange {
 }
 
 export interface WindowLanding {
-  /** The chip that shows the window; 'custom' unless a chip matches it exactly. */
+  /** The chip that shows the window — the nearest one, Custom if none fits. */
   period: SummaryPeriodId;
-  /** Present when `period` is 'month' — the month that chip should display. */
+  /** Present when `period` is 'week' — a day inside the week to display. */
+  weekAnchor?: Date;
+  /** Present when `period` is 'month' — the month to display. */
   monthDate?: Date;
   /** The window itself, which is what the Custom chip shows. */
   customStart: string;
@@ -106,19 +113,57 @@ export interface WindowLanding {
 
 const DATE_KEY = /^\d{4}-\d{2}-\d{2}$/;
 
-/** First-of-month dates for the two months a window could belong to. */
-function candidateMonths(from: string, to: string): Date[] {
-  const monthOf = (key: string) => new Date(Number(key.slice(0, 4)), Number(key.slice(5, 7)) - 1, 1);
-  const start = monthOf(from);
-  const end = monthOf(to);
-  return start.getTime() === end.getTime() ? [start] : [start, end];
+/** Days in a window, inclusive of both ends. */
+export function daysInWindow(from: string, to: string): number {
+  const start = new Date(`${from}T00:00:00`);
+  const end = new Date(`${to}T00:00:00`);
+  return Math.round((end.getTime() - start.getTime()) / 86_400_000) + 1;
+}
+
+const firstOfMonth = (dateKey: string) =>
+  new Date(Number(dateKey.slice(0, 4)), Number(dateKey.slice(5, 7)) - 1, 1);
+
+/**
+ * The Mon–Sun week that overlaps a window most — the week a rolling "last 7
+ * days" belongs to. A window inside one week returns that week; one straddling
+ * two returns whichever holds more of its days (the earlier one on a tie).
+ */
+export function weekAnchorFor(from: string, to: string): Date {
+  const startMonday = getMonday(new Date(`${from}T00:00:00`));
+  const endMonday = getMonday(new Date(`${to}T00:00:00`));
+  if (startMonday.getTime() === endMonday.getTime()) return startMonday;
+
+  const overlap = (monday: Date): number => {
+    let days = 0;
+    const cursor = new Date(monday);
+    for (let i = 0; i < 7; i += 1) {
+      const key = toISODate(cursor);
+      if (key >= from && key <= to) days += 1;
+      cursor.setDate(cursor.getDate() + 1);
+    }
+    return days;
+  };
+  return overlap(endMonday) > overlap(startMonday) ? endMonday : startMonday;
 }
 
 /**
- * Which chip can show the window [from, to] without changing it.
+ * Which chip a window arriving from a dashboard KPI lands on.
  *
- * A chip is chosen only when the dates it produces are EXACTLY the dates that
- * arrived; otherwise the window lands on Custom, which keeps them to the day.
+ * The nearest chip wins, so a week reads as a week and a month as a month
+ * instead of everything dropping into Custom:
+ *
+ *   up to 7 days      → Week, anchored to the week that overlaps it most
+ *   8 – 27 days       → Custom (no chip means "fifteen days")
+ *   28 – 45 days      → Month, the month the window ends in
+ *   46 days and more  → Quarter, which on this page is the whole current year —
+ *                       only when the window is inside this year, since the chip
+ *                       cannot show another one
+ *
+ * A chip is still chosen when it shows the window exactly (a Mon–Sun week, the
+ * month whose snapped span is the window), so nothing is needlessly widened.
+ * The exact dates always come back as customStart/customEnd, which is what the
+ * Custom pickers are seeded with.
+ *
  * Returns null for a window that is not two well-ordered YYYY-MM-DD dates.
  */
 export function periodForWindow(
@@ -128,20 +173,16 @@ export function periodForWindow(
 ): WindowLanding | null {
   if (!DATE_KEY.test(from) || !DATE_KEY.test(to) || from > to) return null;
 
-  const landing: WindowLanding = { period: 'custom', customStart: from, customEnd: to };
-  const isExact = (range: PeriodRange) => toISODate(range.start) === from && toISODate(range.end) === to;
+  const landing = { customStart: from, customEnd: to };
+  const days = daysInWindow(from, to);
 
-  if (isExact(weekRange(now))) return { ...landing, period: 'week' };
-  if (isExact(quarterRange(now))) return { ...landing, period: 'quarter' };
+  if (days <= 7) return { ...landing, period: 'week', weekAnchor: weekAnchorFor(from, to) };
+  if (days <= 27) return { ...landing, period: 'custom' };
+  if (days <= 45) return { ...landing, period: 'month', monthDate: firstOfMonth(to) };
 
-  /* The Month chip is the only other one that could match. It is keyed by a
-     month but shows that month snapped out to whole weeks, so its span can start
-     in the month before and end before the month's last day — which means the
-     window could belong to either the month it starts in or the month it ends
-     in. Both are tried; neither is assumed. */
-  for (const monthDate of candidateMonths(from, to)) {
-    if (isExact(monthRange(monthDate))) return { ...landing, period: 'month', monthDate };
-  }
+  const year = quarterRange(now);
+  const insideThisYear = from >= toISODate(year.start) && to <= toISODate(year.end);
+  if (insideThisYear) return { ...landing, period: 'quarter' };
 
-  return landing;
+  return { ...landing, period: 'custom' };
 }

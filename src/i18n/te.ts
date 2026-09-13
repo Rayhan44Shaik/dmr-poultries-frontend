@@ -1086,6 +1086,7 @@ export default {
   // Accounts Summary
   'accounts.summary.title': 'అకౌంట్స్ సారాంశం',
   'accounts.summary.period.this_week': 'ఈ వారం',
+  'accounts.summary.period.week': 'వారం',
   'accounts.summary.period.month': 'నెల',
   'accounts.summary.period.quarter': 'త్రైమాసికం',
   'accounts.summary.period.custom_range': 'కస్టం పరిధి',
@@ -1097,6 +1098,9 @@ export default {
   'accounts.summary.fy': 'ఫినాంషియల్ యీర్ {year}-{nextYear}',
   'accounts.summary.prev_month': 'మునుపటి నెల',
   'accounts.summary.next_month': 'తదుపరి నెల',
+  'accounts.summary.prev_week': 'మునుపటి వారం',
+  'accounts.summary.next_week': 'తదుపరి వారం',
+  'accounts.summary.back_to_this_week': 'ఈ వారానికి తిరిగి వెళ్లండి',
   'accounts.summary.start_date': 'ప్రారంభ తేదీ',
   'accounts.summary.end_date': 'ముగింపు తేదీ',
   'accounts.summary.report_title.week': 'వారపు వ్యాపార సారాంశం',

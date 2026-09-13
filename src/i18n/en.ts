@@ -1128,6 +1128,7 @@ export default {
   // Accounts Summary
   'accounts.summary.title': 'Accounts Summary',
   'accounts.summary.period.this_week': 'This Week',
+  'accounts.summary.period.week': 'Week',
   'accounts.summary.period.month': 'Month',
   'accounts.summary.period.quarter': 'Quarter',
   'accounts.summary.period.custom_range': 'Custom Range',
@@ -1139,6 +1140,9 @@ export default {
   'accounts.summary.fy': 'FY {year}-{nextYear}',
   'accounts.summary.prev_month': 'Previous month',
   'accounts.summary.next_month': 'Next month',
+  'accounts.summary.prev_week': 'Previous week',
+  'accounts.summary.next_week': 'Next week',
+  'accounts.summary.back_to_this_week': 'Back to this week',
   'accounts.summary.start_date': 'Start Date',
   'accounts.summary.end_date': 'End Date',
   'accounts.summary.report_title.week': 'Weekly Business Summary',
