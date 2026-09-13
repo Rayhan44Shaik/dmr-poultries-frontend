@@ -129,7 +129,7 @@ function CommunicationIcon({
           </span>
         )}
         {isSent && sendCount > 0 && (
-          <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-500 text-white text-[10px] font-bold leading-none px-1 border-2 border-white">
+          <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-500 text-white text-[11px] font-bold leading-none px-1 border-2 border-white">
             {sendCount > 9 ? "9+" : sendCount}
           </span>
         )}
@@ -140,7 +140,7 @@ function CommunicationIcon({
           type="button"
           onClick={onRetry}
           disabled={disabled}
-          className="group relative inline-flex items-center gap-1.5 rounded-xl border border-amber-100 bg-amber-50/70 px-2.5 py-1.5 text-[11px] font-semibold text-amber-500 hover:bg-amber-50/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          className="group relative inline-flex items-center gap-1.5 rounded-xl border border-amber-100 bg-amber-50/70 px-2.5 py-1.5 text-[12px] font-semibold text-amber-500 hover:bg-amber-50/80 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           aria-label={t("ops.trip.retry")}
         >
           <RotateCw size={12} className={uiActionIconMotionClass.reset} />
@@ -159,11 +159,11 @@ function MetricBlock({ icon, label, value, iconColor = "text-slate-500" }: {
 }) {
   return (
     <div className="flex flex-col items-center justify-center text-center p-2.5 bg-white rounded-xl border border-slate-100 min-w-0">
-      <span className="text-[10px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
+      <span className="text-[12px] uppercase font-semibold text-slate-400 flex items-center gap-1 mb-1">
         <span className={iconColor}>{icon}</span>
         {label}
       </span>
-      <span className="text-sm font-bold text-slate-800 truncate w-full">{value}</span>
+      <span className="text-[15px] font-bold text-slate-800 truncate w-full">{value}</span>
     </div>
   );
 }
@@ -224,9 +224,9 @@ export function TripViewShopCards({
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2 flex-1 min-w-0">
           <Package size={18} className="text-emerald-500 shrink-0" />
-          <h3 className="text-sm font-bold text-slate-800 truncate">
+          <h3 className="text-[15px] font-bold text-slate-800 truncate">
             {t("ops.trip.step.deliveries")}
-            <span className="normal-case font-semibold text-[11px] text-slate-400 ml-1">({deliveries.length})</span>
+            <span className="normal-case font-semibold text-[12px] text-slate-400 ml-1">({deliveries.length})</span>
           </h3>
         </div>
         <div className="relative shrink-0 w-full md:w-[220px] max-w-[240px]">
@@ -255,7 +255,7 @@ export function TripViewShopCards({
       </div>
 
       {filteredDeliveries.length === 0 ? (
-        <div className="rounded-2xl border-2 border-dashed border-slate-200 p-8 text-center text-xs text-slate-400">
+        <div className="rounded-2xl border-2 border-dashed border-slate-200 p-8 text-center text-[13px] text-slate-400">
           {t("ops.trip.no_matching_shops")} “{search.trim()}”. {t("ops.trip.try_another_keyword")}.
         </div>
       ) : (
@@ -291,20 +291,20 @@ export function TripViewShopCards({
                 {/* Header: Shop name, email, delivery mode badge */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="text-sm font-bold text-slate-800 truncate" title={displayShopName}>
+                    <p className="text-[15px] font-bold text-slate-800 truncate" title={displayShopName}>
                       {displayShopName}
                     </p>
-                    <p className="text-xs text-slate-500 truncate mt-0.5">
+                    <p className="text-[13px] text-slate-500 truncate mt-0.5">
                       {shopEmailFor(delivery)}
                     </p>
                     {shopWhatsAppFor && (
-                      <p className="text-xs text-slate-500 truncate mt-0.5">
+                      <p className="text-[13px] text-slate-500 truncate mt-0.5">
                         {t("ops.trip.whatsapp")}: {shopWhatsAppFor(delivery)}
                       </p>
                     )}
                   </div>
                   <span
-                    className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-bold border ${
+                    className={`shrink-0 rounded-md px-2 py-0.5 text-[11px] font-bold border ${
                       isWeightMode
                         ? "bg-purple-50/70 text-purple-500 border-purple-200/60"
                         : "bg-amber-50/70 text-amber-500 border-amber-200/60"
@@ -337,7 +337,7 @@ export function TripViewShopCards({
 
                 {/* Mortality - compact red warning row */}
                 {(mortalityCount > 0 || mortKg > 0) && (
-                  <div className="flex items-center justify-between px-2 py-1.5 bg-red-50/60 rounded-lg border border-red-100 text-[11px]">
+                  <div className="flex items-center justify-between px-2 py-1.5 bg-red-50/60 rounded-lg border border-red-100 text-[12px]">
                     <span className="text-red-500 font-semibold flex items-center gap-1">
                       <AlertCircle size={12} className="text-rose-500" /> {t("ops.trip.mortality_birds")}
                     </span>
@@ -349,15 +349,15 @@ export function TripViewShopCards({
 
                 {/* Box Numbers - compact */}
                 {selectedBoxes.length > 0 && (
-                  <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-50/60 rounded-lg border border-slate-100 text-[11px] overflow-x-auto">
-                    <span className="text-slate-400 font-semibold shrink-0 text-[10px] uppercase flex items-center gap-1">
+                  <div className="flex items-center gap-2 px-2 py-1.5 bg-slate-50/60 rounded-lg border border-slate-100 text-[12px] overflow-x-auto">
+                    <span className="text-slate-400 font-semibold shrink-0 text-[11px] uppercase flex items-center gap-1">
                       <Package size={11} className="text-slate-500" /> {t("ops.trip.box_nos")}
                     </span>
                     <div className="flex items-center gap-1 flex-wrap">
                       {selectedBoxes.map((id) => (
                         <span
                           key={id}
-                          className="px-1.5 py-0.5 bg-white text-slate-700 font-bold rounded border border-slate-200/80 text-[10px] shrink-0"
+                          className="px-1.5 py-0.5 bg-white text-slate-700 font-bold rounded border border-slate-200/80 text-[11px] shrink-0"
                         >
                           {String(id).padStart(2, "0")}
                         </span>
@@ -367,17 +367,17 @@ export function TripViewShopCards({
                 )}
 
                 {/* Capture info + bird type */}
-                <div className="flex items-center justify-between gap-3 text-[11px] text-slate-400 font-medium pt-0.5">
+                <div className="flex items-center justify-between gap-3 text-[12px] text-slate-400 font-medium pt-0.5">
                   <div className="flex min-w-0 items-center gap-1 text-slate-600" title={capturedTime}>
                     <span className="h-4 w-4 rounded bg-indigo-50/70 text-indigo-500 flex items-center justify-center shrink-0">
                       <Clock size={12} />
                     </span>
-                    <span className="whitespace-nowrap text-[10px] font-semibold leading-none tabular-nums">
+                    <span className="whitespace-nowrap text-[11px] font-semibold leading-none tabular-nums">
                       {capturedTime}
                     </span>
                   </div>
                   {delivery.birdType ? (
-                    <span className="px-2 py-0.5 bg-sky-50/70 text-sky-500 font-semibold rounded-md text-[10px] border border-sky-100">
+                    <span className="px-2 py-0.5 bg-sky-50/70 text-sky-500 font-semibold rounded-md text-[11px] border border-sky-100">
                       {delivery.birdType}
                     </span>
                   ) : null}
@@ -385,10 +385,10 @@ export function TripViewShopCards({
 
                 {/* Failure reasons */}
                 {failedReason && (
-                  <p className="text-[11px] text-red-500 px-1 truncate" title={failedReason}>{failedReason}</p>
+                  <p className="text-[12px] text-red-500 px-1 truncate" title={failedReason}>{failedReason}</p>
                 )}
                 {whatsappFailedReason && (
-                  <p className="text-[11px] text-red-500 px-1 truncate" title={whatsappFailedReason}>{t("ops.trip.whatsapp")}: {whatsappFailedReason}</p>
+                  <p className="text-[12px] text-red-500 px-1 truncate" title={whatsappFailedReason}>{t("ops.trip.whatsapp")}: {whatsappFailedReason}</p>
                 )}
 
                 {/* Communication Controls - Icon only */}
@@ -429,7 +429,7 @@ export function TripViewShopCards({
                   )}
 
                   {/* Communication status icons */}
-                  <div className="ml-auto flex items-center gap-1 text-[10px]" aria-label={t("ops.trip.communication_status")}>
+                  <div className="ml-auto flex items-center gap-1 text-[11px]" aria-label={t("ops.trip.communication_status")}>
                     {status === "sent" && <CheckCircle2 size={12} className="text-emerald-500" />}
                     {status === "failed" && <XCircle size={12} className="text-red-500" />}
                     {whatsappStatus === "sent" && <CheckCircle2 size={12} className="text-green-500" />}

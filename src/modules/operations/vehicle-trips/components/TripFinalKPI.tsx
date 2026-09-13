@@ -233,7 +233,7 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
 
   return (
     <div className="mt-8 p-6 md:p-8 w-full bg-slate-50/50 rounded-3xl border border-slate-200/60 shadow-sm overflow-x-auto scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent">
-      <h3 className="text-sm font-bold text-slate-700 mb-5 uppercase tracking-wider pl-1">
+      <h3 className="text-[15px] font-bold text-slate-700 mb-5 uppercase tracking-wider pl-1">
         {translate("ops.trip.final_kpi_summary")}
       </h3>
       
@@ -245,7 +245,7 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
             className={`${card.bg} p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between gap-3 overflow-hidden min-w-[140px]`}
           >
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
                 {card.label}
               </span>
               <div className="p-1.5 bg-white/70 rounded-full border border-slate-100/80 shadow-xs shrink-0">
@@ -253,10 +253,10 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
               </div>
             </div>
             <div className="mt-1">
-              <div className="text-xl font-bold text-slate-900 truncate">
+              <div className="text-[21px] font-bold text-slate-900 truncate">
                 {card.value}
               </div>
-              <div className="text-xs text-slate-500 font-medium mt-1.5 truncate">
+              <div className="text-[13px] text-slate-500 font-medium mt-1.5 truncate">
                 {card.sub}
               </div>
             </div>
@@ -272,7 +272,7 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
             className={`${card.bg} p-5 rounded-2xl border border-slate-100 shadow-sm flex flex-col justify-between gap-3 overflow-hidden min-w-[140px]`}
           >
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-slate-500 uppercase tracking-wide">
+              <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wide">
                 {card.label}
               </span>
               <div className="p-1.5 bg-white/70 rounded-full border border-slate-100/80 shadow-xs shrink-0">
@@ -280,10 +280,10 @@ export default function TripFinalKPI({ trip, deliveries = [] }: Props) {
               </div>
             </div>
             <div className="mt-1">
-              <div className="text-xl font-bold text-slate-900 truncate">
+              <div className="text-[21px] font-bold text-slate-900 truncate">
                 {card.value}
               </div>
-              <div className="text-xs text-slate-500 font-medium mt-1.5 truncate">
+              <div className="text-[13px] text-slate-500 font-medium mt-1.5 truncate">
                 {card.sub}
               </div>
             </div>
