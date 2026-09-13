@@ -16,7 +16,7 @@ import {
   type DutyPlannerValidation,
   type DutyPlannerWeek,
 } from '../services/dutyPlannerService';
-import { loadDutyReportLeaves, loadDutyReportRange, todayStr, type DutyReportRange } from '../services/dutyReport';
+import { loadDutyReportLeaves, loadDutyReportRange, formatDutyDate, todayStr, type DutyReportRange } from '../services/dutyReport';
 import { listLeaves } from '../services/leaveService';
 import { AutomaticDutySyncError, getAutomaticDuty, hasApprovedDutyLeave, resolveDutyCell, syncAutomaticDuties } from '../services/dutyRules';
 import { STAFF_LEAVES_CHANGED } from '../services/staffEvents';
@@ -25,6 +25,16 @@ import { dutyText, localizeDutyError, dutyDisplayValue, type DutyTextKey } from 
 import type { Employee, DutyAssignment, DutyPlannerFilters, LeaveRequest } from '../types/staffDashboard';
 
 const DEFAULT_ROLES = ['Supervisor', 'Driver', 'Helper', 'Loader'];
+
+/** An employee with at least one day this week that has no duty, no approved
+ *  leave and no automatic duty — a cell that is truly pending assignment. */
+export interface PendingDutyEmployee {
+  employeeId: number;
+  employeeName: string;
+  role: string;
+  department?: string;
+  missingDays: string[];
+}
 
 export function isDateLocked(dateStr: string): boolean {
   const current = new Date(`${todayStr()}T00:00:00Z`);
@@ -227,18 +237,24 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
     return employee ? resolveDutyCell(employee, date, getAssignment(employeeId, date), isOnApprovedLeave(employeeId, date)) : undefined;
   }, [employees, getAssignment, isOnApprovedLeave]);
 
-  // Number of (employee × day) cells in this week that still have no duty
-  // AND no approved leave/default. The week can only be submitted when this is 0.
-  const unassignedCount = useMemo(() => {
-    let count = 0;
+  // (employee × day) cells in this week that still have no duty AND no approved
+  // leave/default, grouped per employee. The week can only be submitted when
+  // this list is empty; the UI shows exactly WHO is missing WHICH days.
+  const pendingDuties = useMemo<PendingDutyEmployee[]>(() => {
+    const rows: PendingDutyEmployee[] = [];
     for (const emp of employees) {
-      for (const day of weekDays) {
+      const missingDays = weekDays.filter((day) => {
         const hasDuty = assignments.some((a) => a.employeeId === emp.id && a.date === day);
-        if (!hasDuty && !isOnApprovedLeave(emp.id, day) && !getAutomaticDuty(emp, day)) count += 1;
-      }
+        return !hasDuty && !isOnApprovedLeave(emp.id, day) && !getAutomaticDuty(emp, day);
+      });
+      if (missingDays.length) rows.push({ employeeId: emp.id, employeeName: emp.employeeName, role: emp.role, department: emp.department, missingDays });
     }
-    return count;
+    return rows;
   }, [employees, weekDays, assignments, isOnApprovedLeave]);
+  const unassignedCount = useMemo(
+    () => pendingDuties.reduce((count, row) => count + row.missingDays.length, 0),
+    [pendingDuties]
+  );
 
   /** Week, month or custom-range reports use the same authoritative data.
    * Sample mode is explicit and preserves edits to the currently loaded week.
@@ -347,6 +363,75 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
     [getAssignment, applyWeek, showNotification, canEditWeek, weekStatus, isOnApprovedLeave, text]
   );
 
+  /** Drag & drop: move a duty from one cell to another. When the target cell
+   *  already holds a duty the two swap; an empty target receives the duty and
+   *  the source is cleared. One notification covers the whole move. */
+  const moveDuty = useCallback(
+    async (
+      source: { employeeId: number; date: string },
+      target: { employeeId: number; date: string },
+    ): Promise<boolean> => {
+      if (source.employeeId === target.employeeId && source.date === target.date) return false;
+      const sourceAssignment = getAssignment(source.employeeId, source.date);
+      if (!sourceAssignment?.dutyType) return false;
+      const sourceDuty = sourceAssignment.dutyType as DutyAssignment['dutyType'];
+      const targetExisting = getAssignment(target.employeeId, target.date);
+      const targetDuty = (targetExisting?.dutyType as DutyAssignment['dutyType'] | undefined) ?? null;
+      const blockedMessage = (employeeId: number, date: string): string | null => {
+        if (date > todayStr()) return text('futureLocked');
+        if (isOnApprovedLeave(employeeId, date)) return text('leaveLocked');
+        if (isDateLocked(date)) return text('pastLocked');
+        return null;
+      };
+      const blocked =
+        blockedMessage(source.employeeId, source.date) ?? blockedMessage(target.employeeId, target.date);
+      if (blocked) { showNotification?.(blocked, 'error'); return false; }
+      if (!canEditWeek) {
+        showNotification?.(text('weekReadOnly', { status: dutyDisplayValue(weekStatus, languageRef.current) }), 'error');
+        return false;
+      }
+      if (mutationInFlight.current) return false;
+      mutationInFlight.current = true;
+      setSaving(true);
+      setError(null);
+      try {
+        // 1) The target cell receives the dragged duty.
+        await upsertDutyAssignment({ id: targetExisting?.id, employeeId: target.employeeId, dutyType: sourceDuty, date: target.date });
+        // 2) The source cell swaps in the target's old duty, or is cleared.
+        if (targetDuty) {
+          const week = await upsertDutyAssignment({ id: sourceAssignment.id, employeeId: source.employeeId, dutyType: targetDuty, date: source.date });
+          applyWeek(week);
+        } else if (sourceAssignment.id) {
+          let week = await deleteDutyAssignment(sourceAssignment.id);
+          const approved = await loadDutyReportLeaves({ fromDate: week.weekStart, toDate: week.weekEnd }, listLeaves);
+          week = await syncAutomaticDuties(week, approved, todayStr(), upsertDutyAssignment);
+          applyWeek(week);
+          setLeaves(approved);
+        } else {
+          applyWeek(await getDutyPlannerWeek(weekStart));
+        }
+        const nameOf = (employeeId: number) => employees.find((e) => e.id === employeeId)?.employeeName ?? '';
+        showNotification?.(
+          text(targetDuty ? 'dragSwapped' : 'dragMoved', {
+            source: `${nameOf(source.employeeId)} · ${formatDutyDate(source.date, languageRef.current)}`,
+            target: `${nameOf(target.employeeId)} · ${formatDutyDate(target.date, languageRef.current)}`,
+          }),
+          'success',
+        );
+        return true;
+      } catch (err) {
+        const message = localizeDutyError(new Error(handleApiError(err)), languageRef.current);
+        setError(message);
+        showNotification?.(message, 'error');
+        return false;
+      } finally {
+        mutationInFlight.current = false;
+        setSaving(false);
+      }
+    },
+    [getAssignment, isOnApprovedLeave, canEditWeek, weekStatus, weekStart, employees, applyWeek, setLeaves, showNotification, text],
+  );
+
   const autoAssignAll = useCallback(async (): Promise<{ ok: boolean; plan?: AutoPlan; message?: string }> => {
     if (!canEditWeek) {
       showNotification?.(text('weekReadOnly', { status: dutyDisplayValue(weekStatus, languageRef.current) }), 'error');
@@ -441,6 +526,7 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
     prevWeekClosed,
     weekDays,
     unassignedCount,
+    pendingDuties,
     leaves,
     isOnApprovedLeave,
     getRangeDuties,
@@ -467,6 +553,7 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
     saturday,
     validation,
     autoAssignAll,
+    moveDuty,
     submitCurrentWeek,
   };
 }
