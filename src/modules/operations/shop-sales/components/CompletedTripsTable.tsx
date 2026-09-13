@@ -56,26 +56,6 @@ function SortArrows({ active, dir }: { active: boolean; dir?: "asc" | "desc" }) 
   );
 }
 
-function RateProgress({ trip }: { trip: Trip }) {
-  const total = trip.totalShops ?? trip.deliveries?.length ?? 0;
-  const entered = (trip as unknown as { ratesEntered?: number }).ratesEntered ?? 0;
-  const pct = total ? Math.round((entered / total) * 100) : 0;
-  if (total === 0) return <span className="text-slate-400">—</span>;
-  return (
-    <div className="flex flex-col items-center gap-1 min-w-[84px]">
-      <div className="flex items-center gap-1 text-[11px] font-bold">
-        <span className={entered === total ? "text-emerald-600" : entered > 0 ? "text-amber-600" : "text-slate-500"}>
-          {entered}/{total}
-        </span>
-        <span className="text-[10px] font-medium text-slate-400">{pct}%</span>
-      </div>
-      <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
-        <div className={`h-full rounded-full transition-all ${entered === total ? "bg-emerald-500" : "bg-amber-500"}`} style={{ width: `${pct}%` }} />
-      </div>
-    </div>
-  );
-}
-
 function CompletedTripsTable({
   trips,
   onEnterRate,
@@ -110,7 +90,7 @@ function CompletedTripsTable({
   };
 
   return (
-    <div className="w-full overflow-x-auto rounded-xl border border-slate-200 bg-white">
+    <div className="w-full overflow-x-auto">
       <table className="min-w-full text-sm text-left border-collapse">
         <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-600">
           <tr className="whitespace-nowrap">
@@ -192,12 +172,6 @@ function CompletedTripsTable({
             </th>
             <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
               <div className="flex items-center justify-center gap-1.5">
-                <IndianRupee size={13} className="text-emerald-600 flex-shrink-0" />
-                <span>Rate Progress</span>
-              </div>
-            </th>
-            <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
-              <div className="flex items-center justify-center gap-1.5">
                 <Settings size={13} className="text-slate-500 flex-shrink-0" />
                 <span>{t("ops.rate.col.action")}</span>
               </div>
@@ -207,7 +181,7 @@ function CompletedTripsTable({
         <tbody className="divide-y divide-slate-100">
           {trips.length === 0 ? (
             <tr>
-              <td colSpan={11} className="py-12 text-center text-slate-400 text-xs font-medium">
+              <td colSpan={10} className="py-12 text-center text-slate-400 text-xs font-medium">
                 {t("ops.rate.no_waiting_trips")}
               </td>
             </tr>
@@ -233,7 +207,6 @@ function CompletedTripsTable({
                   <td className="px-4 py-3 text-center text-xs text-slate-500 font-medium w-10">
                     {isSelected ? <Check size={15} className="inline text-blue-500" /> : serialNo}
                   </td>
-                  {/* Trip no perfectly like font and colour like trip table of list */}
                   <td className="px-4 py-3 font-bold text-emerald-500 text-xs whitespace-nowrap">{trip.tripNo}</td>
                   <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">
                     {formatRateEntryDay(trip.tripDate, language)}
@@ -252,9 +225,6 @@ function CompletedTripsTable({
                     {trip.totalBirds.toLocaleString()}
                   </td>
                   <td className="px-4 py-3 text-center text-xs font-bold text-amber-500 whitespace-nowrap">{trip.totalWeight.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-center whitespace-nowrap">
-                    <RateProgress trip={trip} />
-                  </td>
                   <td className="px-4 py-3 text-center whitespace-nowrap">
                     {!isLocked ? (
                       <button

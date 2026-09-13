@@ -1,5 +1,5 @@
-import { useMemo, useRef, useState, type ComponentProps } from "react";
-import { IndianRupee, Store, History } from "lucide-react";
+import { useRef, useState, type ComponentProps } from "react";
+import { IndianRupee, Store } from "lucide-react";
 import useCompletedTrips from "../hooks/useCompletedTrips";
 import CompletedTripsFilters from "../components/CompletedTripsFilters";
 import CompletedTripsTable from "../components/CompletedTripsTable";
@@ -48,7 +48,6 @@ export default function RatesEntryPage({ embedded = false }: Props) {
   const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
 
   const {
-    trips,
     filteredTrips,
     paginatedTrips,
     currentPage,
@@ -191,66 +190,65 @@ export default function RatesEntryPage({ embedded = false }: Props) {
     }
   };
 
-  // Reference: Recent Trip Activity header style
   return (
-    <div className="space-y-6">
-      {/* Header — perfect logo same font and size like Recent Trip Activity */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xl shadow-slate-100 overflow-hidden transition-all duration-300">
-        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-slate-50">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-xl bg-blue-50/70 border border-blue-100 flex items-center justify-center text-blue-500 shadow-inner">
-                <IndianRupee className="w-5 h-5" />
-              </div>
-              <h3 className="text-base font-bold text-slate-800 tracking-tight">Rate Entry</h3>
-            </div>
-            <span className="inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 rounded-full shadow-sm tabular-nums">
-              {filteredTrips.length}
-            </span>
-          </div>
+    <div className={`w-full space-y-5 ${embedded ? "" : "px-3 md:px-6 py-4 bg-slate-50/50 min-h-screen text-slate-800"}`}>
+      {/* Filter — separate card like trip list */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 sm:p-5">
+        <CompletedTripsFilters
+          fromDate={draftFilter.fromDate}
+          toDate={draftFilter.toDate}
+          search={draftFilter.search}
+          vehicle={draftFilter.vehicle}
+          supervisor={draftFilter.supervisor}
+          vehicleList={vehicleList}
+          supervisorList={supervisorList}
+          setFromDate={(value) => setDraftFilter((current) => ({ ...current, fromDate: value }))}
+          setToDate={(value) => setDraftFilter((current) => ({ ...current, toDate: value }))}
+          setSearch={(value) => setDraftFilter((current) => ({ ...current, search: value }))}
+          setVehicle={(value) => setDraftFilter((current) => ({ ...current, vehicle: value }))}
+          setSupervisor={(value) => setDraftFilter((current) => ({ ...current, supervisor: value }))}
+          onSearch={handleApplyFilters}
+          onReset={handleResetFilters}
+          onRefresh={handleRefresh}
+          refreshing={isLoading}
+          pendingTrips={filteredTrips.length}
+          hasFilters={hasFilters}
+          onExportPDF={handleExportPDF}
+          onExportExcel={handleExportExcel}
+        />
+      </div>
 
-          <div className="flex flex-wrap items-center gap-2 text-[11px] font-medium text-slate-500">
-            <span className="hidden sm:inline">Perfect & neat • same as Recent Trip Activity</span>
+      {loadError && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{loadError}</div>
+      )}
+
+      {/* Table — separate card like trip list, Rate Entry on top of table */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+        {/* Rate Entry header on top of table — perfect light background + animated rate symbol */}
+        <div className="flex items-center justify-between px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-blue-50/60">
+          <div className="flex items-center gap-3">
+            <div className="group h-9 w-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-inner">
+              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]">
+                <IndianRupee className="w-5 h-5" />
+              </span>
+            </div>
+            <h3 className="text-base font-bold text-slate-800 tracking-tight">Rate Entry</h3>
+          </div>
+          <div className="hidden sm:flex items-center gap-2 text-[11px] font-medium text-slate-400">
+            <span>Light background • animated ₹ perfect</span>
           </div>
         </div>
 
-        <div className="p-4 sm:p-5 space-y-4">
-          <CompletedTripsFilters
-            fromDate={draftFilter.fromDate}
-            toDate={draftFilter.toDate}
-            search={draftFilter.search}
-            vehicle={draftFilter.vehicle}
-            supervisor={draftFilter.supervisor}
-            vehicleList={vehicleList}
-            supervisorList={supervisorList}
-            setFromDate={(value) => setDraftFilter((current) => ({ ...current, fromDate: value }))}
-            setToDate={(value) => setDraftFilter((current) => ({ ...current, toDate: value }))}
-            setSearch={(value) => setDraftFilter((current) => ({ ...current, search: value }))}
-            setVehicle={(value) => setDraftFilter((current) => ({ ...current, vehicle: value }))}
-            setSupervisor={(value) => setDraftFilter((current) => ({ ...current, supervisor: value }))}
-            onSearch={handleApplyFilters}
-            onReset={handleResetFilters}
-            onRefresh={handleRefresh}
-            refreshing={isLoading}
-            pendingTrips={filteredTrips.length}
-            hasFilters={hasFilters}
-            onExportPDF={handleExportPDF}
-            onExportExcel={handleExportExcel}
-          />
-
-          {loadError && (
-            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{loadError}</div>
-          )}
-
-          {filteredTrips.length === 0 && !loadError ? (
-            <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center rounded-xl border border-dashed border-slate-200 bg-slate-50/50">
-              <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
-                <Store size={20} />
-              </span>
-              <p className="font-semibold text-slate-700">{t("ops.rate.no_trips")}</p>
-              <p className="text-xs font-medium text-slate-500 max-w-md">No pending trips awaiting rates</p>
-            </div>
-          ) : (
+        {filteredTrips.length === 0 && !loadError ? (
+          <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
+            <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+              <Store size={20} />
+            </span>
+            <p className="font-semibold text-slate-700">{t("ops.rate.no_trips")}</p>
+            <p className="text-xs font-medium text-slate-500">No pending trips awaiting rates</p>
+          </div>
+        ) : (
+          <>
             <CompletedTripsTable
               trips={paginatedTrips}
               onEnterRate={openRateEntry}
@@ -261,8 +259,9 @@ export default function RatesEntryPage({ embedded = false }: Props) {
               sortBy={sortBy}
               sortDir={sortDir}
               onSortChange={handleSortChange}
-            >
-              {shouldShowPagination(filteredTrips.length) && (
+            />
+            {shouldShowPagination(filteredTrips.length) && (
+              <div className="border-t border-slate-200 bg-slate-50/50 px-3 py-2">
                 <Pagination
                   page={safeCurrentPage}
                   pageSize={pageSize}
@@ -271,10 +270,10 @@ export default function RatesEntryPage({ embedded = false }: Props) {
                   onPageSizeChange={setPageSize}
                   disabled={isLoading}
                 />
-              )}
-            </CompletedTripsTable>
-          )}
-        </div>
+              </div>
+            )}
+          </>
+        )}
       </div>
 
       {modalOpen && (
