@@ -187,7 +187,7 @@ img{max-width:100%;max-height:calc(100vh - 64px);object-fit:contain;border-radiu
           >
             <div className="rounded-xl border border-slate-200 bg-white shadow-2xl shadow-slate-900/25 overflow-hidden ring-1 ring-black/5">
               <div className="bg-slate-50 px-3 py-2 border-b border-slate-100">
-                <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
                   {t("ops.trip.bill_uploaded_row")}
                 </p>
                 <p className="text-[12px] font-semibold text-slate-800 break-all leading-snug mt-0.5">
@@ -214,7 +214,7 @@ img{max-width:100%;max-height:calc(100vh - 64px);object-fit:contain;border-radiu
                   type="button"
                   onClick={openLightbox}
                   onMouseDown={(e) => e.preventDefault()}
-                  className="flex-1 h-8 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-[11px] font-bold shadow-sm"
+                  className="flex-1 h-8 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-[12px] font-bold shadow-sm"
                 >
                   {t("ops.trip.bill_open_full")}
                 </button>
@@ -222,7 +222,7 @@ img{max-width:100%;max-height:calc(100vh - 64px);object-fit:contain;border-radiu
                   type="button"
                   onClick={openInNewTab}
                   onMouseDown={(e) => e.preventDefault()}
-                  className="h-8 px-2.5 rounded-lg border border-emerald-100 bg-white hover:bg-emerald-50/70 text-emerald-500 text-[11px] font-bold inline-flex items-center gap-1"
+                  className="h-8 px-2.5 rounded-lg border border-emerald-100 bg-white hover:bg-emerald-50/70 text-emerald-500 text-[12px] font-bold inline-flex items-center gap-1"
                   title={t("ops.trip.bill_open_new_tab")}
                 >
                   <ExternalLink size={12} />
@@ -256,10 +256,10 @@ img{max-width:100%;max-height:calc(100vh - 64px);object-fit:contain;border-radiu
             >
               <div className="flex items-center justify-between gap-3 px-4 py-3 border-b border-slate-100 bg-slate-50 shrink-0">
                 <div className="min-w-0">
-                  <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">
+                  <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
                     {t("ops.trip.bill_uploaded_row")}
                   </p>
-                  <p className="text-sm font-semibold text-slate-800 truncate" title={fileName}>
+                  <p className="text-[15px] font-semibold text-slate-800 truncate" title={fileName}>
                     {fileName || t("ops.trip.bill_uploaded_short")}
                   </p>
                 </div>
@@ -267,7 +267,7 @@ img{max-width:100%;max-height:calc(100vh - 64px);object-fit:contain;border-radiu
                   <button
                     type="button"
                     onClick={openInNewTab}
-                    className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-emerald-100 bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-500 text-xs font-bold shadow-sm"
+                    className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-emerald-100 bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-500 text-[13px] font-bold shadow-sm"
                     title={t("ops.trip.bill_open_new_tab")}
                   >
                     <ExternalLink size={14} strokeWidth={2.25} />
@@ -292,10 +292,10 @@ img{max-width:100%;max-height:calc(100vh - 64px);object-fit:contain;border-radiu
                     className="max-w-full max-h-[min(78vh,900px)] w-auto h-auto object-contain rounded-lg border border-slate-200 bg-white shadow-md"
                   />
                 ) : (
-                  <p className="text-sm text-slate-500">{t("ops.trip.bill_image_required")}</p>
+                  <p className="text-[15px] text-slate-500">{t("ops.trip.bill_image_required")}</p>
                 )}
               </div>
-              <div className="px-4 py-2.5 border-t border-slate-100 bg-white text-[11px] text-slate-500 font-medium flex items-center justify-between gap-2 shrink-0">
+              <div className="px-4 py-2.5 border-t border-slate-100 bg-white text-[12px] text-slate-500 font-medium flex items-center justify-between gap-2 shrink-0">
                 <span className="inline-flex items-center gap-1">
                   <ZoomIn size={12} className="text-slate-400" />
                   {t("ops.trip.bill_view_hint")}
@@ -328,7 +328,7 @@ img{max-width:100%;max-height:calc(100vh - 64px);object-fit:contain;border-radiu
         onPointerDown={(e) => e.stopPropagation()}
         className={
           className ||
-          "inline-flex items-center gap-0.5 text-[11px] text-emerald-500 font-semibold underline decoration-emerald-300/70 hover:decoration-emerald-600 leading-tight whitespace-nowrap cursor-pointer bg-transparent border-0 p-0.5 rounded hover:bg-emerald-50/70"
+          "inline-flex items-center gap-0.5 text-[12px] text-emerald-500 font-semibold underline decoration-emerald-300/70 hover:decoration-emerald-600 leading-tight whitespace-nowrap cursor-pointer bg-transparent border-0 p-0.5 rounded hover:bg-emerald-50/70"
         }
         title={t("ops.trip.bill_open_full")}
       >
