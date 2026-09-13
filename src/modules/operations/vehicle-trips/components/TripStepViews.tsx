@@ -35,18 +35,18 @@ function GpsAddressBlock({ trip }: { trip: Trip }) {
   const captured = hasFarmGps(trip);
   return (
     <div className="bg-white border border-slate-200/80 rounded-xl p-3.5 shadow-2xs">
-      <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
+      <span className="text-[13px] uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
         <span className="h-5 w-5 rounded-md bg-cyan-50/70 text-cyan-500 flex items-center justify-center shrink-0">
           <MapPin size={12} />
         </span>
         {t("ops.trip.field.gps_address")}
       </span>
       {captured ? (
-        <p className="text-sm font-semibold text-slate-800 break-words leading-relaxed">
+        <p className="text-[15px] font-semibold text-slate-800 break-words leading-relaxed">
           <GpsAddressText lat={trip.farmGpsLat} lon={trip.farmGpsLon} fallback={t("ops.trip.location_captured")} />
         </p>
       ) : (
-        <p className="text-sm font-semibold text-slate-400">{t("ops.trip.not_captured")}</p>
+        <p className="text-[15px] font-semibold text-slate-400">{t("ops.trip.not_captured")}</p>
       )}
     </div>
   );
@@ -66,7 +66,7 @@ export function FarmStepView({ trip }: { trip: Trip }) {
       : `${Number(trip.avgBirdWeight).toFixed(2)} kg`;
   return (
     <section className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3 shadow-sm">
-      <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+      <h3 className="text-[17px] sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
         <MapPin size={18} className="text-indigo-500" />
         {t("ops.trip.title.farm")}
       </h3>
@@ -134,11 +134,11 @@ export function PickupStepView({ trip }: { trip: Trip }) {
   return (
     <section className="bg-white border border-slate-200 rounded-2xl p-5 sm:p-6 space-y-4 shadow-sm">
       <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
-        <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+        <h3 className="text-[17px] sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
           <Package size={18} className="text-amber-500" />
           {t("ops.trip.title.pickup")}
         </h3>
-        <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
+        <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-[13px] font-semibold whitespace-nowrap">
           {t("ops.trip.submitted_locked")}
         </span>
       </div>
@@ -174,9 +174,9 @@ export function PickupStepView({ trip }: { trip: Trip }) {
 
       {pickupBoxes.length > 0 && (
         <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto max-h-96 overflow-y-auto">
-          <table className="w-full table-fixed border-collapse text-xs">
+          <table className="w-full table-fixed border-collapse text-[13px]">
             <thead>
-              <tr className="bg-slate-50 text-slate-600 text-[10px] uppercase sticky top-0 z-10 border-b border-slate-200">
+              <tr className="bg-slate-50 text-slate-600 text-[11px] uppercase sticky top-0 z-10 border-b border-slate-200">
                 <th className="text-center px-2 py-2 font-bold border-r border-slate-200">{t("ops.trip.box")}</th>
                 <th className="text-center px-2 py-2 font-bold border-r border-slate-200">{t("common.birds")}</th>
                 <th className="text-center px-2 py-2 font-bold border-r border-slate-200">{t("ops.trip.wt_kg")}</th>
