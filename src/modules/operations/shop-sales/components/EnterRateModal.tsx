@@ -291,12 +291,12 @@ export default function EnterRateModal({
         .save-anim::after{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.5),transparent);transition:left 0.5s}
         .save-anim:hover::after{left:100%}
         /* save & lock big lock animation - more enhanced */
-        @keyframes lock-bounce{0%,100%{transform:scale(1) rotate(0)}20%{transform:scale(1.25) rotate(-10deg)}40%{transform:scale(1.25) rotate(10deg)}60%{transform:scale(1.2) rotate(-5deg)}80%{transform:scale(1.2) rotate(5deg)}}
+        @keyframes lock-bounce{0%,100%{transform:scale(1) rotate(0)}10%{transform:scale(1.35) rotate(-15deg)}20%{transform:scale(1.35) rotate(15deg)}30%{transform:scale(1.3) rotate(-10deg)}40%{transform:scale(1.3) rotate(10deg)}50%{transform:scale(1.25) rotate(-5deg)}60%{transform:scale(1.25) rotate(5deg)}70%{transform:scale(1.2) rotate(-3deg)}80%{transform:scale(1.2) rotate(3deg)}90%{transform:scale(1.1) rotate(0)}}
         .lock-anim{transition:all 0.3s cubic-bezier(0.4,0,0.2,1);position:relative;overflow:hidden}
-        .lock-anim:hover{transform:translateY(-3px) scale(1.05);box-shadow:0 12px 28px rgba(16,185,129,0.45)}
+        .lock-anim:hover{transform:translateY(-3px) scale(1.05);box-shadow:0 12px 28px rgba(249,115,22,0.35)}
         .lock-anim:active{transform:scale(0.96)}
-        .lock-anim svg{transition:transform 0.3s ease}
-        .lock-anim:hover svg{animation:lock-bounce 0.6s ease}
+        .lock-anim svg{transition:transform 0.3s ease; transform-origin:center}
+        .lock-anim:hover svg{animation:lock-bounce 0.8s ease infinite; transform-origin:center}
         .lock-anim::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.25),transparent);transition:left 0.6s}
         .lock-anim:hover::before{left:100%}
         .rate-input-market{border:1px solid #e2e8f0;background:white;border-radius:8px;padding:6px 8px;text-align:center;font-weight:600;transition:all 0.2s}
@@ -304,6 +304,8 @@ export default function EnterRateModal({
         .rate-input-market.valid{border-color:#10b981;background:#ecfdf5;color:#065f46}
         .rate-input-market.invalid{border-color:#ef4444;background:#fef2f2;color:#991b1b}
         /* perf scroll - fix freezing */
+        @keyframes lock-pulse{0%,100%{box-shadow:0 0 0 0 rgba(249,115,22,0.4)}50%{box-shadow:0 0 0 8px rgba(249,115,22,0)}}
+        .lock-icon-wrap{animation:lock-pulse 2s infinite; border-radius:9999px}
         .scroll-perf{-webkit-overflow-scrolling:touch;overscroll-behavior:contain;transform:translateZ(0);will-change:scroll-position}
         .no-drag-table{overflow:hidden;transform:translateZ(0)}
         .no-drag-table table{width:100%;table-layout:fixed}
@@ -335,7 +337,7 @@ export default function EnterRateModal({
             </div>
             <div className="mt-6 flex justify-end gap-3">
               <button onClick={() => setShowConfirm(false)} className="group relative inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 cancel-anim"><span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-close)]"><X size={14} /></span> Cancel</button>
-              <button onClick={() => confirmSave("lock")} disabled={saving} className="group relative inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-orange-50 border border-orange-300 text-orange-800 text-sm font-bold shadow-sm hover:bg-orange-100 lock-anim"><span className="inline-flex text-orange-700"><Lock size={14} /></span> Lock</button>
+              <button onClick={() => confirmSave("lock")} disabled={saving} className="group relative inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-orange-50 border border-orange-300 text-orange-800 text-sm font-bold shadow-sm hover:bg-orange-100 hover:shadow-md lock-anim"><span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-white border border-orange-200 text-orange-700 shadow-sm"><Lock size={16} /></span> Lock</button>
             </div>
           </div>
         </div>, document.body
@@ -651,7 +653,7 @@ export default function EnterRateModal({
                     disabled={saving}
                     className="group relative inline-flex items-center justify-center gap-2.5 px-8 py-3.5 rounded-xl bg-orange-50 border border-orange-300 text-orange-800 text-[15px] font-extrabold shadow-lg hover:bg-orange-100 hover:shadow-xl hover:border-orange-400 disabled:opacity-50 lock-anim min-w-[190px]"
                   >
-                    <span className="inline-flex text-orange-700"><Lock size={18} /></span> Save & Lock
+                    <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-white border border-orange-300 text-orange-700 shadow-sm lock-icon-wrap"><Lock size={20} /></span> Save & Lock
                   </button>
                 </div>
               </div>
