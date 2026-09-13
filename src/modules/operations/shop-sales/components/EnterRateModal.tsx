@@ -30,7 +30,7 @@ import {
 import type { RateEntryMarketRateMasterDto } from "../utils/rateEntryMarketMaster";
 import { addCalendarDays, sizeCategoryHeaders } from "../utils/rateEntryMarketMaster";
 
-const SHOPS_PAGE_SIZE = 12;
+const SHOPS_PAGE_SIZE = 10;
 
 function isValidSellingRate(rate: number | null | undefined): boolean {
   return rate != null && Number.isFinite(rate) && rate >= 50 && rate <= 300;
@@ -591,20 +591,15 @@ export default function EnterRateModal({
             </div>
           )}
 
-          {/* Shop count bar - search now at top beside title, this shows count and clear */}
-          <div className="px-5 py-2 flex items-center gap-2 shrink-0 bg-white border-b border-slate-100">
-            <div className="flex items-center gap-2">
-              <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700"><Store size={12} /></span>
-              <span className="text-[12px] font-bold text-slate-700 tabular-nums">{filteredSortedDeliveries.length} shops • {localLanguage === "te" ? "సమయ క్రమంలో" : "time sorted"} • S.No 1→{deliveries.length}</span>
-              {shopSearch && <span className="text-[11px] font-medium text-violet-600">• filtered: "{shopSearch}"</span>}
-            </div>
-            {shopSearch && (
+          {/* Shop count minimal - info bar removed as per request, only pagination below */}
+          {shopSearch && (
+            <div className="px-5 py-2 flex items-center gap-2 shrink-0 bg-white border-b border-slate-100">
+              <span className="text-[11px] font-medium text-violet-600">Filtered: "{shopSearch}" • {filteredSortedDeliveries.length} shops</span>
               <button type="button" onClick={() => { setShopSearch(""); setShopPage(1); }} className="ml-2 group relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-600 hover:bg-slate-50 reset-anim">
                 <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><X size={12} /></span> Clear
               </button>
-            )}
-            <span className="ml-auto text-[11px] font-medium text-slate-500 tabular-nums">Page {shopPage}/{shopPageCount}</span>
-          </div>
+            </div>
+          )}
 
           {/* Shop table - increased size by way, bigger table, perfect middle with gaps */}
           <div className="px-5 py-3 flex-[1.6] min-h-[380px] flex flex-col overflow-hidden bg-white">
