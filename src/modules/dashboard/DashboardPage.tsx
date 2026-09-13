@@ -134,9 +134,19 @@ function DashboardPage() {
           {/* ------------------------------------------------------ */}
           {/* KPI cards                                               */}
           {/* ------------------------------------------------------ */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+          {/* ALL EIGHT KPIs ON ONE LINE, no sideways dragging: a fixed 8-column
+              grid gives every card 1/8 of the page width, so Shops · Farms ·
+              Vehicles · Employees · Sales · Collections · Pending · Profit stay
+              on a single row at any window size instead of wrapping onto a
+              second one. The cards are taller and adapt (see KpiCard) so the
+              label, value, delta chip and sparkline all still fit.
+              `min-w-0` on the cells lets them shrink with the page instead of
+              forcing overflow. */}
+          <div className="grid min-w-0 grid-cols-8 gap-1.5 sm:gap-2">
             {derived.kpis.map((kpi, i) => (
-              <KpiCard key={kpi.key} kpi={kpi} index={i} />
+              <div key={kpi.key} className="min-w-0">
+                <KpiCard kpi={kpi} index={i} />
+              </div>
             ))}
           </div>
 
