@@ -328,23 +328,23 @@ export default function EnterRateModal({
             </div>
           </div>
 
-          {/* Trip info */}
+          {/* Trip info - perfect colour neat way: emerald / sky / indigo / amber */}
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 px-5 py-3 shrink-0 bg-slate-50/70 border-b border-slate-100">
-            <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm btn-anim">
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700"><PackageCheck size={16} /></span>
-              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Trip No</p><p className="text-[14px] font-bold text-slate-900 truncate">{trip.tripNo}</p></div>
+            <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-white px-4 py-3 shadow-sm btn-anim">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-emerald-50 border border-emerald-100 text-emerald-700"><PackageCheck size={16} /></span>
+              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Trip No</p><p className="text-[13px] font-bold text-slate-800 truncate">{trip.tripNo}</p></div>
             </div>
-            <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm btn-anim">
-              <div className="h-9 w-9 rounded-lg bg-slate-100 flex items-center justify-center"><Truck size={16} className="text-slate-700" /></div>
-              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Vehicle</p><p className="text-[14px] font-bold text-slate-900 truncate">{formatVehicleNumber(trip.vehicleNo)}</p></div>
+            <div className="flex items-center gap-3 rounded-xl border border-sky-100 bg-white px-4 py-3 shadow-sm btn-anim">
+              <div className="h-9 w-9 rounded-lg bg-sky-50 border border-sky-100 flex items-center justify-center text-sky-700"><Truck size={16} /></div>
+              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Vehicle</p><p className="text-[13px] font-bold text-slate-800 truncate">{formatVehicleNumber(trip.vehicleNo)}</p></div>
             </div>
-            <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm btn-anim">
-              <div className="h-9 w-9 rounded-lg bg-slate-100 flex items-center justify-center"><CalendarDays size={16} className="text-slate-700" /></div>
-              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Date</p><p className="text-[14px] font-bold text-slate-900 truncate">{formatRateEntryTripDate(trip.tripDate)}</p></div>
+            <div className="flex items-center gap-3 rounded-xl border border-indigo-100 bg-white px-4 py-3 shadow-sm btn-anim">
+              <div className="h-9 w-9 rounded-lg bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-700"><CalendarDays size={16} /></div>
+              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Date</p><p className="text-[13px] font-bold text-slate-800 truncate">{formatRateEntryTripDate(trip.tripDate)}</p></div>
             </div>
-            <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm btn-anim">
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-slate-100 text-slate-700"><Calculator size={16} /></span>
-              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Total</p><p className="text-[14px] font-bold text-slate-900 tabular-nums">{deliveries.length} shops • {totals.totalWeight.toFixed(1)} KG</p></div>
+            <div className="flex items-center gap-3 rounded-xl border border-amber-100 bg-white px-4 py-3 shadow-sm btn-anim">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-amber-50 border border-amber-100 text-amber-700"><Calculator size={16} /></span>
+              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Total</p><p className="text-[13px] font-bold text-slate-800 tabular-nums">{deliveries.length} shops • {totals.totalWeight.toFixed(1)} KG</p></div>
             </div>
           </div>
 
@@ -474,34 +474,34 @@ export default function EnterRateModal({
                   <thead className="bg-slate-50">
                     <tr className="border-b border-slate-200">
                       <th className="w-[7%] px-2 py-3 text-center">
-                        <button type="button" onClick={() => toggleShopSort("time")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "time" ? "bg-slate-100 text-slate-900 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+                        <button type="button" onClick={() => toggleShopSort("time")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "time" ? "bg-slate-100 text-slate-700 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-700 hover:bg-slate-100"}`}>
                           S.No {shopSortKey === "time" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
                       <th className="w-[22%] px-2 py-3 text-left">
-                        <button type="button" onClick={() => toggleShopSort("shopName")} className={`flex items-center gap-1 rounded-md px-2 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "shopName" ? "bg-slate-100 text-slate-900 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+                        <button type="button" onClick={() => toggleShopSort("shopName")} className={`flex items-center gap-1 rounded-md px-2 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "shopName" ? "bg-slate-100 text-slate-700 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-700 hover:bg-slate-100"}`}>
                           Shop Name {shopSortKey === "shopName" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
                       <th className="w-[13%] px-2 py-3 text-left text-[12px] font-bold uppercase tracking-wider text-slate-600">Association</th>
                       <th className="w-[10%] px-2 py-3 text-center text-[12px] font-bold uppercase tracking-wider text-slate-600">Paper Rate</th>
                       <th className="w-[8%] px-2 py-3 text-center">
-                        <button type="button" onClick={() => toggleShopSort("birds")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "birds" ? "bg-slate-100 text-slate-900 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+                        <button type="button" onClick={() => toggleShopSort("birds")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "birds" ? "bg-slate-100 text-slate-700 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-700 hover:bg-slate-100"}`}>
                           Birds {shopSortKey === "birds" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
                       <th className="w-[10%] px-2 py-3 text-center">
-                        <button type="button" onClick={() => toggleShopSort("weight")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "weight" ? "bg-slate-100 text-slate-900 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+                        <button type="button" onClick={() => toggleShopSort("weight")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "weight" ? "bg-slate-100 text-slate-700 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-700 hover:bg-slate-100"}`}>
                           Weight {shopSortKey === "weight" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
                       <th className="w-[15%] px-2 py-3 text-center">
-                        <button type="button" onClick={() => toggleShopSort("rate")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "rate" ? "bg-slate-100 text-slate-900 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+                        <button type="button" onClick={() => toggleShopSort("rate")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "rate" ? "bg-slate-100 text-slate-700 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-700 hover:bg-slate-100"}`}>
                           Rate {shopSortKey === "rate" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
                       <th className="w-[15%] px-2 py-3 text-center">
-                        <button type="button" onClick={() => toggleShopSort("amount")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "amount" ? "bg-slate-100 text-slate-900 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-900 hover:bg-slate-100"}`}>
+                        <button type="button" onClick={() => toggleShopSort("amount")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "amount" ? "bg-slate-100 text-slate-700 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-700 hover:bg-slate-100"}`}>
                           Amount {shopSortKey === "amount" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
@@ -524,13 +524,13 @@ export default function EnterRateModal({
                         <tr key={delivery.id} className={`border-b border-slate-100 ${missingForLock ? "bg-red-50" : originalIndex % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-slate-50/50 hover:bg-slate-50"}`}>
                           <td className="px-2 py-3 text-center text-[13px] font-normal text-slate-700 tabular-nums">{originalIndex + 1}</td>
                           <td className="px-3 py-3">
-                            <div className="text-[15px] font-normal text-slate-900 leading-tight truncate">{displayRateEntryShopName(delivery.shopName, language)}</div>
+                            <div className="text-[14px] font-medium text-slate-700 leading-tight truncate">{displayRateEntryShopName(delivery.shopName, language)}</div>
                             {masterShop && <div className="text-[11px] font-normal text-slate-500 truncate">{masterShop.city}</div>}
                           </td>
                           <td className="px-2 py-3 text-[13px] font-normal text-slate-700 truncate">{association ? displayRateEntryName(association, language) : "—"}</td>
                           <td className="px-2 py-3 text-center text-[13px] font-normal text-slate-700 tabular-nums">{hasPaperRate ? paperRate : "—"}</td>
-                          <td className="px-2 py-3 text-center text-[13px] font-medium text-slate-700 tabular-nums">{delivery.birds.toLocaleString()}</td>
-                          <td className="px-2 py-3 text-center text-[13px] font-medium text-slate-700 tabular-nums">{delivery.weight.toFixed(2)}</td>
+                          <td className="px-2 py-3 text-center text-[13px] font-normal text-slate-700 tabular-nums">{delivery.birds.toLocaleString()}</td>
+                          <td className="px-2 py-3 text-center text-[13px] font-normal text-slate-700 tabular-nums">{delivery.weight.toFixed(2)}</td>
                           <td className="px-2 py-3">
                             {rateLocked ? (
                               <span className="block text-center text-[13px] font-semibold text-slate-800 tabular-nums rate-input-market valid">{rate != null ? rate.toFixed(2) : "—"}</span>
