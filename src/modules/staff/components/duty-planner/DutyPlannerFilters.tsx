@@ -107,13 +107,13 @@ function DutyPlannerFilters({ role, roles, searchQuery, onSearchChange, onRoleCh
 
         <div role="group" aria-label={t('actions')} className="flex flex-wrap items-center gap-2 lg:col-span-2 lg:col-start-3 lg:row-start-2 lg:justify-end">
           <button type="button" onClick={onReset} className={`group relative ${uiResetButtonClass}`} aria-label={t('reset')}>
-            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>
+            <span className="inline-flex group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>
             {t('reset')}
             <ActionTooltip label={t('reset')} />
           </button>
           {onRefresh && <BrandRefreshButton loading={refreshing} onClick={onRefresh} ariaLabel={t('refreshData')}>{t('refresh')}</BrandRefreshButton>}
           <button type="button" onClick={onDownloadExcel} disabled={!canDownloadExcel || exporting} aria-busy={exporting} className={`group relative ${uiExcelButtonClass}`} aria-label={t('download')}>
-            <span className={`inline-flex ${canDownloadExcel && !exporting ? 'motion-safe:group-hover:animate-[var(--animate-action-excel)]' : ''}`}>
+            <span className={`inline-flex ${canDownloadExcel && !exporting ? 'group-hover:animate-[var(--animate-action-excel)]' : ''}`}>
               {exporting ? <LoaderCircle size={15} className="animate-spin" /> : <FileSpreadsheet size={15} />}
             </span>
             {exporting ? t('preparing') : t('excel')}

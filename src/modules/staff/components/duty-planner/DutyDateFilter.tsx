@@ -13,8 +13,9 @@ interface Props {
 
 /**
  * Date-wise table filter, rendered inside the Duty Assign table header at
- * table level. A single neat trips-style dropdown (searchable, clearable):
- * "All dates" shows every column, picking a date shows only that day.
+ * table level. Small and simple — a compact single dropdown pinned to the
+ * right of the header row: "All dates" shows every column, picking a date
+ * shows only that day. No search box (a week has at most 7 options).
  */
 function DutyDateFilter({ dates, value, onChange }: Props) {
   const { language, t } = useDutyPlannerText();
@@ -30,9 +31,9 @@ function DutyDateFilter({ dates, value, onChange }: Props) {
       options={options}
       onChange={(next) => onChange(next || null)}
       placeholder={t('allDatesLabel')}
-      searchable
       allowClear
-      className="w-full sm:w-60"
+      className="ml-auto w-44 shrink-0 sm:w-48"
+      triggerClassName="!h-8 px-2.5"
     />
   );
 }

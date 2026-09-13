@@ -30,7 +30,9 @@
  *   The hen is decorative (`aria-hidden`), the accessible name is always a
  *   verb phrase ("Refresh data"), and the live state is announced via
  *   `aria-busy` rather than by swapping the label.
- *   Users with `prefers-reduced-motion` get the static logo — no dance.
+ *   The hen animates for EVERY user — the dance/wiggle is intentionally not
+ *   gated behind `prefers-reduced-motion` (product decision: the brand motion
+ *   is the loading indicator, so it must never silently disappear).
  * =============================================================================
  */
 
@@ -73,15 +75,15 @@ function BrandGlyph({ loading, compact }: { loading: boolean; compact: boolean }
         className={cn(
           "inline-flex h-full w-full items-center justify-center",
           loading
-            ? "motion-safe:animate-[var(--animate-brand-dance)]"
-            : "motion-safe:group-hover:animate-[var(--animate-brand-dance)]",
+            ? "animate-[var(--animate-brand-dance)]"
+            : "group-hover:animate-[var(--animate-brand-dance)]",
         )}
       >
         {/* Peck layer: a head-bob punctuating the dance. */}
         <span
           className={cn(
             "inline-flex h-full w-full items-center justify-center",
-            loading && "motion-safe:animate-[var(--animate-brand-peck)]",
+            loading && "animate-[var(--animate-brand-peck)]",
           )}
         >
           <img
