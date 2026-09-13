@@ -572,7 +572,7 @@ export function uiPaginationPageButtonClass(active: boolean): string {
     uiFocusRing,
     "disabled:cursor-not-allowed disabled:opacity-40",
     active
-      ? "border-emerald-600 bg-emerald-600 text-white"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm ring-1 ring-emerald-100"
       : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300",
   ].join(" ");
 }

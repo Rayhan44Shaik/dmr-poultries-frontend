@@ -112,7 +112,10 @@ function TripPagination({ currentPage, totalPages, onPageChange, hidePageInfo = 
     return (
       <div className="flex items-center justify-end flex-wrap gap-1.5">
         {onPageSizeChange && pageSize != null && (
-          <PageSizeSelect value={pageSize} onChange={onPageSizeChange} />
+          <div className="flex items-center gap-2">
+            <PageSizeSelect value={pageSize} onChange={onPageSizeChange} />
+            <span className="text-[13px] font-semibold text-slate-600">Rows Per Page</span>
+          </div>
         )}
         {renderNavButtons()}
       </div>
@@ -122,8 +125,9 @@ function TripPagination({ currentPage, totalPages, onPageChange, hidePageInfo = 
   return (
     <div className={paginationBarClass}>
       {onPageSizeChange && pageSize != null && (
-        <div className="mr-auto flex items-center gap-1.5">
+        <div className="mr-auto flex items-center gap-2">
           <PageSizeSelect value={pageSize} onChange={onPageSizeChange} />
+          <span className="text-[13px] font-semibold text-slate-600">Rows Per Page</span>
         </div>
       )}
       {renderNavButtons()}

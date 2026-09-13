@@ -40,8 +40,9 @@ function ShopSalesPagination({ currentPage, totalPages, onPageChange, pageSize, 
   return (
     <div className={paginationBarClass}>
       {onPageSizeChange && pageSize != null && (
-        <div className="mr-auto flex items-center gap-1.5">
+        <div className="mr-auto flex items-center gap-2">
           <PageSizeSelect value={pageSize} onChange={onPageSizeChange} />
+          <span className="text-[13px] font-semibold text-slate-600">Rows Per Page</span>
         </div>
       )}
       <button

@@ -8,8 +8,8 @@ interface PageSizeSelectProps {
   className?: string;
 }
 
-// Only 5 at a time: 10,15,20,30,50 — as requested, supervisor-like neat
-const PAGE_SIZE_OPTIONS = [10, 15, 20, 30, 50] as const;
+// Global: 10,15,20,30,45,50 — includes 45 as requested, light green only
+const PAGE_SIZE_OPTIONS = [10, 15, 20, 30, 45, 50] as const;
 const RANGE_MIN = 5;
 const RANGE_MAX = 500;
 
@@ -19,11 +19,11 @@ function clampToRange(raw: number): number {
 }
 
 /**
- * GLOBAL pagination dropdown — no ROWS per page label, with search + custom Use
+ * GLOBAL pagination dropdown — light green only, includes 45, Rows Per Page outside
  * - Search input at top, type e.g. 12
- * - If not in 5 options, shows Use X
- * - If 5 not there then Use — e.g. type 12 → Use 12
- * - Supervisor-like perfectly colour neat: rounded-2xl, emerald accent, shadow-xl
+ * - If not in 6 options (10,15,20,30,45,50), shows Use X
+ * - If not there then Use — e.g. type 12 → Use 12
+ * - Light green: border-emerald-200 bg-emerald-50 text-emerald-700, active light green
  * - Global for all modules
  */
 export function PageSizeSelect({ value, onChange, disabled = false, className = "" }: PageSizeSelectProps) {
@@ -84,10 +84,10 @@ export function PageSizeSelect({ value, onChange, disabled = false, className = 
         aria-haspopup="listbox"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
-        className="inline-flex h-8 min-w-[64px] items-center justify-between gap-1.5 rounded-xl border border-slate-200 bg-white px-3 text-[13px] font-semibold text-slate-700 shadow-sm transition-all hover:border-emerald-200 hover:bg-emerald-50/40 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+        className="inline-flex h-8 min-w-[64px] items-center justify-between gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-[13px] font-bold text-emerald-700 shadow-sm transition-all hover:border-emerald-300 hover:bg-emerald-100 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
       >
         <span className="tabular-nums">{safeValue}</span>
-        <ChevronDown size={14} className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
+        <ChevronDown size={14} className={`text-emerald-500 transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
       {open && (
@@ -114,12 +114,12 @@ export function PageSizeSelect({ value, onChange, disabled = false, className = 
                   role="option"
                   aria-selected={selected}
                   onClick={() => commit(opt)}
-                  className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all ${
-                    selected ? "bg-emerald-600 text-white shadow-sm" : "text-slate-700 hover:bg-slate-50"
+                  className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all border ${
+                    selected ? "bg-emerald-50 border-emerald-200 text-emerald-700 shadow-sm ring-1 ring-emerald-100" : "border-transparent text-slate-700 hover:bg-slate-50"
                   }`}
                 >
                   <span className="tabular-nums">{opt}</span>
-                  {selected && <Check size={14} />}
+                  {selected && <Check size={14} className="text-emerald-600" />}
                 </button>
               );
             })}
@@ -141,7 +141,7 @@ export function PageSizeSelect({ value, onChange, disabled = false, className = 
           </div>
 
           <div className="border-t border-slate-100 bg-white px-3 py-2 text-center">
-            <p className="text-[10px] font-medium text-slate-400">5 options • search • custom Use</p>
+            <p className="text-[10px] font-medium text-slate-400">6 options • 45 included • search • custom Use</p>
           </div>
         </div>
       )}

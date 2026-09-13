@@ -6,6 +6,14 @@ import {
   ArrowUp,
   ArrowDown,
   Check,
+  Hash,
+  Calendar,
+  Truck,
+  UserCog,
+  Warehouse,
+  ShoppingBag,
+  Bird,
+  Scale,
 } from "lucide-react";
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
 import { formatVehicleNumber } from "../../../../utils/format";
@@ -87,31 +95,31 @@ function CompletedTripsTable({
           <tr className="whitespace-nowrap">
             <th className="px-4 py-3.5 text-center text-[12px] font-bold uppercase tracking-wider w-10">#</th>
             <th className="px-4 py-3.5 text-left text-[12px] font-bold uppercase tracking-wider">
-              {sortable("tripNo", <span>{t("operations.trip_no")}</span>)}
+              {sortable("tripNo", <div className="flex items-center gap-1.5"><Hash size={14} className="text-slate-400 flex-shrink-0" /><span>{t("operations.trip_no")}</span></div>)}
             </th>
             <th className="px-4 py-3.5 text-left text-[12px] font-bold uppercase tracking-wider">
-              {sortable("tripDate", <span>{t("ops.rate.col.day")}</span>)}
+              {sortable("tripDate", <div className="flex items-center gap-1.5"><Calendar size={14} className="text-blue-500 flex-shrink-0" /><span>{t("ops.rate.col.day")}</span></div>)}
             </th>
             <th className="px-4 py-3.5 text-left text-[12px] font-bold uppercase tracking-wider">
-              {sortable("vehicleNo", <span>{t("common.vehicle")}</span>)}
+              {sortable("vehicleNo", <div className="flex items-center gap-1.5"><Truck size={14} className="text-indigo-500 flex-shrink-0" /><span>{t("common.vehicle")}</span></div>)}
             </th>
             <th className="px-4 py-3.5 text-left text-[12px] font-bold uppercase tracking-wider">
-              {sortable("supervisorName", <span>{t("common.supervisor")}</span>)}
+              {sortable("supervisorName", <div className="flex items-center gap-1.5"><UserCog size={14} className="text-purple-500 flex-shrink-0" /><span>{t("common.supervisor")}</span></div>)}
             </th>
             <th className="px-4 py-3.5 text-left text-[12px] font-bold uppercase tracking-wider">
-              {sortable("sourceFarm", <span>{t("ops.trip.source_farm")}</span>)}
+              {sortable("sourceFarm", <div className="flex items-center gap-1.5"><Warehouse size={14} className="text-amber-500 flex-shrink-0" /><span>{t("ops.trip.source_farm")}</span></div>)}
             </th>
             <th className="px-4 py-3.5 text-center text-[12px] font-bold uppercase tracking-wider">
-              {sortable("totalShops", <span>{t("ops.trip.shops")}</span>, true)}
+              {sortable("totalShops", <div className="flex items-center justify-center gap-1.5"><ShoppingBag size={14} className="text-cyan-500 flex-shrink-0" /><span>{t("ops.trip.shops")}</span></div>, true)}
             </th>
             <th className="px-4 py-3.5 text-center text-[12px] font-bold uppercase tracking-wider">
-              {sortable("totalBirds", <span>{t("common.birds")}</span>, true)}
+              {sortable("totalBirds", <div className="flex items-center justify-center gap-1.5"><Bird size={14} className="text-blue-500 flex-shrink-0" /><span>{t("common.birds")}</span></div>, true)}
             </th>
             <th className="px-4 py-3.5 text-center text-[12px] font-bold uppercase tracking-wider">
-              {sortable("totalWeight", <span>{t("ops.trip.weight_kg")}</span>, true)}
+              {sortable("totalWeight", <div className="flex items-center justify-center gap-1.5"><Scale size={14} className="text-orange-500 flex-shrink-0" /><span>{t("ops.trip.weight_kg")}</span></div>, true)}
             </th>
             <th className="px-4 py-3.5 text-center text-[12px] font-bold uppercase tracking-wider">
-              <span>{t("ops.rate.col.action")}</span>
+              <div className="flex items-center justify-center gap-1.5"><IndianRupee size={14} className="text-emerald-500 flex-shrink-0" /><span>{t("ops.rate.col.action")}</span></div>
             </th>
           </tr>
         </thead>
@@ -144,13 +152,14 @@ function CompletedTripsTable({
                   <td className="px-4 py-3.5 text-center text-[13px] text-slate-500 font-medium w-10">
                     {isSelected ? <Check size={16} className="inline text-blue-500" /> : serialNo}
                   </td>
-                  <td className="px-4 py-3.5 font-bold text-emerald-600 text-[13px] whitespace-nowrap">{trip.tripNo}</td>
-                  <td className="px-4 py-3.5 text-[13px] font-medium text-slate-600 whitespace-nowrap">
+                  {/* Keep 2d logo in header but working start from name S */}
+                  <td className="px-4 py-3.5 pl-9 font-bold text-emerald-600 text-[13px] whitespace-nowrap">{trip.tripNo}</td>
+                  <td className="px-4 py-3.5 pl-9 text-[13px] font-medium text-slate-600 whitespace-nowrap">
                     {formatRateEntryDay(trip.tripDate, language)}
                   </td>
-                  <td className="px-4 py-3.5 text-[13px] font-medium text-slate-700 whitespace-nowrap">{formatVehicleNumber(trip.vehicleNo)}</td>
-                  <td className="px-4 py-3.5 text-[13px] text-slate-600 whitespace-nowrap">{displayRateEntryName(trip.supervisorName, language)}</td>
-                  <td className="px-4 py-3.5 text-[13px] text-slate-600 font-medium whitespace-nowrap">
+                  <td className="px-4 py-3.5 pl-9 text-[13px] font-medium text-slate-700 whitespace-nowrap">{formatVehicleNumber(trip.vehicleNo)}</td>
+                  <td className="px-4 py-3.5 pl-9 text-[13px] text-slate-600 whitespace-nowrap">{displayRateEntryName(trip.supervisorName, language)}</td>
+                  <td className="px-4 py-3.5 pl-9 text-[13px] text-slate-600 font-medium whitespace-nowrap">
                     {displayRateEntryName(trip.sourceFarm, language)}
                   </td>
                   <td className="px-4 py-3.5 text-center whitespace-nowrap">

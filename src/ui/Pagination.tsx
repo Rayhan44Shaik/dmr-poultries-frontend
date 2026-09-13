@@ -146,11 +146,14 @@ export function Pagination({
       ) : null}
 
       {onPageSizeChange ? (
-        <PageSizeSelect
-          value={pageSize}
-          onChange={onPageSizeChange}
-          disabled={disabled}
-        />
+        <div className="flex items-center gap-2">
+          <PageSizeSelect
+            value={pageSize}
+            onChange={onPageSizeChange}
+            disabled={disabled}
+          />
+          <span className="text-[13px] font-semibold text-slate-600">Rows Per Page</span>
+        </div>
       ) : null}
 
       <nav
