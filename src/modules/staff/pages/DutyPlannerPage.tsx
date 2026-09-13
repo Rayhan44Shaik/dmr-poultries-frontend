@@ -6,7 +6,7 @@ import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import DutyPlannerFilters, { type DutyPlannerView } from '../components/duty-planner/DutyPlannerFilters';
 import DutyPlannerGrid from '../components/duty-planner/DutyPlannerGrid';
 import DutyPlannerReportTable from '../components/duty-planner/DutyPlannerReportTable';
-import DutyDateFilter from '../components/duty-planner/DutyDateFilter';
+import DutyTableHeader from '../components/duty-planner/DutyTableHeader';
 import PendingDutiesPanel from '../components/duty-planner/PendingDutiesPanel';
 import ShiftPicker from '../components/duty-planner/ShiftPicker';
 import { useDutyPlannerText } from '../hooks/useDutyPlannerText';
@@ -386,17 +386,13 @@ function DutyPlannerPage() {
         </div>
       )}
 
-      {/* Date-wise table filter — one chip per date column, applies to the
-          week grid and the month/custom report tables alike. */}
-      {tableDates.length > 0 && !loading && (
-        <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden">
-          <DutyDateFilter dates={tableDates} visible={visibleTableDates} onToggleDate={toggleTableDate} onShowAll={showAllTableDates} />
-        </div>
-      )}
-
-      {/* Week remains editable; month/custom ranges are read-only reports. */}
+      {/* Duty Assign table — the name header and the date-wise column filter
+          live at table level inside the card (no separate filter row). */}
       {view === 'week' ? (
         <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden">
+          {!loading && tableDates.length > 0 && (
+            <DutyTableHeader dates={tableDates} visible={visibleTableDates} onToggleDate={toggleTableDate} onShowAll={showAllTableDates} />
+          )}
           <DutyPlannerGrid
             employees={tableEmployees}
             weekDays={visibleTableDates}
@@ -410,7 +406,10 @@ function DutyPlannerPage() {
           />
         </div>
       ) : reportData ? (
-        <DutyPlannerReportTable data={reportData} employees={tableEmployees} asOf={today} dates={visibleTableDates} />
+        <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden">
+          <DutyTableHeader dates={tableDates} visible={visibleTableDates} onToggleDate={toggleTableDate} onShowAll={showAllTableDates} />
+          <DutyPlannerReportTable data={reportData} employees={tableEmployees} asOf={today} dates={visibleTableDates} />
+        </div>
       ) : (
         <div className="rounded-xl border border-slate-200/90 bg-white p-12 text-center text-sm text-slate-500">
           {rangeError ? t('chooseRange') : reportError ? t('loadRetry') : t('loading')}

@@ -4,6 +4,7 @@ export type DutyLanguage = 'en' | 'te';
 
 export const dutyEnglish = {
   planner: 'Duty Planner', details: 'Daily Details', filters: 'Duty Planner filters',
+  dutyAssign: 'Duty Assign', dutyAssignHint: 'Assign a duty for every employee, every day of the week.',
   actions: 'Duty Planner actions', weekTable: 'Duty Planner week table', dateTable: 'Duty Planner date matrix',
   employee: 'Employee', employeeNo: 'Employee No.', role: 'Role', roles: 'Roles', department: 'Department',
   filterRoles: 'Filter employee roles', includeRoles: 'Include roles', allRoles: 'All roles',
@@ -64,6 +65,7 @@ export const dutyEnglish = {
 
 export const dutyTelugu: Record<keyof typeof dutyEnglish, string> = {
   planner: 'డ్యూటీ పట్టిక', details: 'రోజువారీ వివరాలు', filters: 'డ్యూటీ పట్టిక ఫిల్టర్లు',
+  dutyAssign: 'డ్యూటీ అసైన్', dutyAssignHint: 'ప్రతి ఉద్యోగికి వారంలోని ప్రతి రోజూ డ్యూటీ కేటాయించండి.',
   actions: 'డ్యూటీ పట్టిక చర్యలు', weekTable: 'వారపు డ్యూటీ పట్టిక', dateTable: 'తేదీల వారీ డ్యూటీ పట్టిక',
   employee: 'ఉద్యోగి', employeeNo: 'ఉద్యోగి సంఖ్య', role: 'హోదా', roles: 'హోదాలు', department: 'విభాగం',
   filterRoles: 'ఉద్యోగుల హోదాలను ఎంచుకోండి', includeRoles: 'చేర్చాల్సిన హోదాలు', allRoles: 'అన్ని హోదాలు',

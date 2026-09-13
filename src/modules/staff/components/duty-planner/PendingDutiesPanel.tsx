@@ -28,7 +28,7 @@ function PendingDutiesPanel({ pending, unassignedCount, canEdit, saving = false,
   const initials = (name: string) => name.trim().split(/\s+/).slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('');
   return (
     <section id="duty-pending-panel" aria-label={t('pendingDuties')} className="overflow-hidden rounded-xl border border-amber-200/80 bg-white shadow-sm">
-      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-amber-100 bg-amber-50/70 px-4 py-3">
+      <header className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-amber-100 bg-amber-50/70 px-5 py-3.5">
         <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-amber-100 text-amber-600">
           {pending.length ? <AlertCircle size={16} /> : <CheckCircle2 size={16} />}
         </span>
@@ -54,22 +54,23 @@ function PendingDutiesPanel({ pending, unassignedCount, canEdit, saving = false,
           <CheckCircle2 size={16} className="shrink-0" />{t('ready')}
         </div>
       ) : (
-        <div role="list" aria-label={t('pendingDuties')} className="max-h-96 overflow-y-auto px-4 py-3">
+        <div role="list" aria-label={t('pendingDuties')} className="max-h-96 overflow-y-auto px-5 py-4">
           {/* Borderless table: Employee | missing count | missing days —
               columns stay perfectly aligned across employees without any
-              visible table lines; each employee's days flow horizontally. */}
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1.5 sm:grid-cols-[minmax(200px,250px)_auto_minmax(0,1fr)] sm:gap-x-4 sm:gap-y-2.5">
+              visible table lines; each employee's days flow horizontally
+              with generous, even margins between rows and columns. */}
+          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 sm:grid-cols-[minmax(210px,260px)_auto_minmax(0,1fr)] sm:gap-x-6 sm:gap-y-3.5">
             {pending.map((row) => (
               <div key={row.employeeId} role="listitem" className="contents">
-                <div className="flex min-w-0 items-center gap-2.5">
-                  <span aria-hidden="true" className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-amber-50 text-[11px] font-bold text-amber-700 ring-1 ring-inset ring-amber-200">{initials(row.employeeName)}</span>
+                <div className="flex min-w-0 items-center gap-3">
+                  <span aria-hidden="true" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-50 text-[11px] font-bold text-amber-700 ring-1 ring-inset ring-amber-200">{initials(row.employeeName)}</span>
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold leading-tight text-slate-900">{row.employeeName}</p>
                     <p className="truncate text-[10px] font-medium leading-tight text-slate-400">{dutyDisplayValue(row.role, language)}</p>
                   </div>
                 </div>
                 <span title={t('missingDays')} className="inline-flex h-5 items-center justify-center self-center rounded-full bg-amber-100 px-1.5 text-[10px] font-bold tabular-nums text-amber-700">{row.missingDays.length}</span>
-                <div role="group" aria-label={t('missingDays')} className="col-span-2 flex flex-wrap items-center gap-1 sm:col-span-1">
+                <div role="group" aria-label={t('missingDays')} className="col-span-2 flex flex-wrap items-center gap-1.5 sm:col-span-1">
                   {row.missingDays.map((date) => (
                     <button
                       key={date}

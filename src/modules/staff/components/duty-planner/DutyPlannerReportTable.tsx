@@ -23,9 +23,8 @@ export default function DutyPlannerReportTable({ data, employees, asOf, dates }:
     [data.days, visibleSet],
   );
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200/90 bg-white shadow-sm">
-      <div className="overflow-x-auto">
-        <table className="w-full text-xs" aria-label={t('dateTable')}>
+    <div className="overflow-x-auto">
+      <table className="w-full text-xs" aria-label={t('dateTable')}>
           <thead>
             <tr className="border-b border-slate-200 bg-slate-50">
               <th scope="col" className="sticky left-0 z-20 min-w-[190px] border-r border-slate-200 bg-slate-50 px-4 py-3 text-left text-[11px] font-semibold text-slate-500">{t('employee')}</th>
@@ -69,6 +68,5 @@ export default function DutyPlannerReportTable({ data, employees, asOf, dates }:
           </tbody>
         </table>
       </div>
-    </div>
   );
 }
