@@ -783,7 +783,7 @@ export const uiEmptySurfaceClass =
  * ------------------------------------------------------------------------- */
 
 export const uiOverlayClass =
-  "fixed inset-0 bg-slate-900/45 backdrop-blur-[1px] animate-fade-in";
+  "fixed inset-0 bg-slate-900/10 backdrop-blur-[1px] animate-fade-in";
 
 export const uiDialogPanelClass =
   "relative flex w-full flex-col overflow-hidden rounded-2xl border " +
