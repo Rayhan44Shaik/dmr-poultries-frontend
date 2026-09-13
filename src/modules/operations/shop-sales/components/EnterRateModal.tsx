@@ -391,13 +391,13 @@ export default function EnterRateModal({
             <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 shrink-0 max-h-[22vh] overflow-auto scroll-perf scroll-smooth">
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
                 {/* Company & Association Rates */}
-                <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                  <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-slate-100">
+                <div className="rounded-xl border border-emerald-200 bg-white shadow-sm overflow-hidden">
+                  <div className="flex items-center justify-between px-3 py-2 bg-emerald-50/80 border-b border-emerald-100">
                     <div className="flex items-center gap-2">
-                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-50 text-emerald-600">📊</span>
-                      <p className="text-[12px] font-bold text-slate-800">Company & Association Rates</p>
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-white border border-emerald-200 text-emerald-700 shadow-sm">📊</span>
+                      <p className="text-[12px] font-bold text-emerald-900">Company & Association Rates</p>
                     </div>
-                    <span className="text-[10px] font-bold text-slate-500">3 days • Today highlighted</span>
+                    <span className="text-[10px] font-bold text-emerald-700/70">3 days • Today highlighted</span>
                   </div>
                   <div className="overflow-hidden">
                     <table className="w-full text-[11px]">
@@ -412,12 +412,12 @@ export default function EnterRateModal({
                       </thead>
                       <tbody>
                         {marketThreeDays.map(({ date, comp, isToday }) => (
-                          <tr key={date} className={`border-t border-slate-100 ${isToday ? "bg-indigo-50/60" : "bg-white"}`}>
+                          <tr key={date} className={`border-t ${isToday ? "border-emerald-200 bg-emerald-50/40" : "border-slate-100 bg-white"}`}>
                             <td className="px-2 py-2 font-medium text-slate-700">{formatDdMmYy(date)}</td>
-                            <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-white border-slate-200 font-bold text-slate-900" : "bg-white border-slate-200 text-slate-600"}`}>{comp?.sneha != null ? Number(comp.sneha).toFixed(0) : "—"}</div></td>
-                            <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-white border-slate-200 font-bold text-slate-900" : "bg-white border-slate-200 text-slate-600"}`}>{comp?.vencobVii != null ? Number(comp.vencobVii).toFixed(0) : "—"}</div></td>
-                            <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-white border-slate-200 font-bold text-slate-900" : "bg-white border-slate-200 text-slate-600"}`}>{comp?.vencobGun != null ? Number(comp.vencobGun).toFixed(0) : "—"}</div></td>
-                            <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-white border-slate-200 font-bold text-slate-900" : "bg-white border-slate-200 text-slate-600"}`}>{comp?.associationVii != null ? Number(comp.associationVii).toFixed(0) : "—"}</div></td>
+                            <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-emerald-50 border-emerald-200 font-bold text-emerald-900 shadow-sm" : "bg-white border-slate-200 text-slate-600"}`}>{comp?.sneha != null ? Number(comp.sneha).toFixed(0) : "—"}</div></td>
+                            <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-emerald-50 border-emerald-200 font-bold text-emerald-900 shadow-sm" : "bg-white border-slate-200 text-slate-600"}`}>{comp?.vencobVii != null ? Number(comp.vencobVii).toFixed(0) : "—"}</div></td>
+                            <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-emerald-50 border-emerald-200 font-bold text-emerald-900 shadow-sm" : "bg-white border-slate-200 text-slate-600"}`}>{comp?.vencobGun != null ? Number(comp.vencobGun).toFixed(0) : "—"}</div></td>
+                            <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-emerald-50 border-emerald-200 font-bold text-emerald-900 shadow-sm" : "bg-white border-slate-200 text-slate-600"}`}>{comp?.associationVii != null ? Number(comp.associationVii).toFixed(0) : "—"}</div></td>
                           </tr>
                         ))}
                       </tbody>
@@ -426,13 +426,13 @@ export default function EnterRateModal({
                 </div>
 
                 {/* Additional Metrics Entry */}
-                <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                  <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-slate-100">
+                <div className="rounded-xl border border-sky-200 bg-white shadow-sm overflow-hidden">
+                  <div className="flex items-center justify-between px-3 py-2 bg-sky-50/80 border-b border-sky-100">
                     <div className="flex items-center gap-2">
-                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-sky-50 text-sky-600">Σ</span>
-                      <p className="text-[12px] font-bold text-slate-800">Additional Metrics Entry</p>
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-white border border-sky-200 text-sky-700 shadow-sm">Σ</span>
+                      <p className="text-[12px] font-bold text-sky-900">Additional Metrics Entry</p>
                     </div>
-                    <span className="text-[10px] font-bold text-slate-500">3 days</span>
+                    <span className="text-[10px] font-bold text-sky-700/70">3 days</span>
                   </div>
                   <div className="overflow-hidden">
                     <table className="w-full text-[11px]">
@@ -446,11 +446,11 @@ export default function EnterRateModal({
                       </thead>
                       <tbody>
                         {marketThreeDays.map(({ date, add, isToday }) => (
-                          <tr key={date} className={`border-t border-slate-100 ${isToday ? "bg-indigo-50/60" : "bg-white"}`}>
+                          <tr key={date} className={`border-t ${isToday ? "border-sky-200 bg-sky-50/40" : "border-slate-100 bg-white"}`}>
                             <td className="px-2 py-2 font-medium text-slate-700">{formatDdMmYy(date)}</td>
-                            <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-white border-slate-200 font-bold text-slate-900" : "bg-white border-slate-200 text-slate-600"}`}>{add?.vij != null ? Number(add.vij).toFixed(0) : "—"}</div></td>
-                            <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-white border-slate-200 font-bold text-slate-900" : "bg-white border-slate-200 text-slate-600"}`}>{add?.gun != null ? Number(add.gun).toFixed(0) : "—"}</div></td>
-                            <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums font-bold ${isToday ? "bg-white border-emerald-200 text-emerald-700" : "bg-white border-slate-200 text-emerald-600"}`}>{add?.rp != null ? Number(add.rp).toFixed(0) : "—"}</div></td>
+                            <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-sky-50 border-sky-200 font-bold text-sky-900 shadow-sm" : "bg-white border-slate-200 text-slate-600"}`}>{add?.vij != null ? Number(add.vij).toFixed(0) : "—"}</div></td>
+                            <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-sky-50 border-sky-200 font-bold text-sky-900 shadow-sm" : "bg-white border-slate-200 text-slate-600"}`}>{add?.gun != null ? Number(add.gun).toFixed(0) : "—"}</div></td>
+                            <td className="px-2 py-2"><div className={`rounded-lg border px-2 py-1 text-center tabular-nums font-bold ${isToday ? "bg-emerald-50 border-emerald-300 text-emerald-800 shadow-sm" : "bg-white border-slate-200 text-emerald-600"}`}>{add?.rp != null ? Number(add.rp).toFixed(0) : "—"}</div></td>
                           </tr>
                         ))}
                       </tbody>
@@ -459,13 +459,13 @@ export default function EnterRateModal({
                 </div>
 
                 {/* Shop Rates Less Breakdown */}
-                <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-                  <div className="flex items-center justify-between px-3 py-2 bg-white border-b border-slate-100">
+                <div className="rounded-xl border border-violet-200 bg-white shadow-sm overflow-hidden">
+                  <div className="flex items-center justify-between px-3 py-2 bg-violet-50/80 border-b border-violet-100">
                     <div className="flex items-center gap-2">
-                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-violet-50 text-violet-600">◈</span>
-                      <p className="text-[12px] font-bold text-slate-800">Shop Rates Less Breakdown</p>
+                      <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-white border border-violet-200 text-violet-700 shadow-sm">◈</span>
+                      <p className="text-[12px] font-bold text-violet-900">Shop Rates Less Breakdown</p>
                     </div>
-                    <span className="text-[10px] font-bold text-slate-500">3 days</span>
+                    <span className="text-[10px] font-bold text-violet-700/70">3 days</span>
                   </div>
                   <div className="overflow-hidden">
                     <table className="w-full text-[11px]">
@@ -479,11 +479,11 @@ export default function EnterRateModal({
                       </thead>
                       <tbody>
                         {marketThreeDays.map(({ date, size, isToday }) => (
-                          <tr key={date} className={`border-t border-slate-100 ${isToday ? "bg-indigo-50/60" : "bg-white"}`}>
+                          <tr key={date} className={`border-t ${isToday ? "border-violet-200 bg-violet-50/40" : "border-slate-100 bg-white"}`}>
                             <td className="px-2 py-2 font-medium text-slate-700">{formatDdMmYy(date)}</td>
                             {sizeKeys.map((k) => (
                               <td key={k} className="px-2 py-2">
-                                <div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-white border-slate-200 font-bold text-slate-900" : "bg-white border-slate-200 text-slate-600"}`}>
+                                <div className={`rounded-lg border px-2 py-1 text-center tabular-nums ${isToday ? "bg-violet-50 border-violet-200 font-bold text-violet-900 shadow-sm" : "bg-white border-slate-200 text-slate-600"}`}>
                                   {size?.columns?.[k] != null ? Number(size.columns[k]).toFixed(0) : "—"}
                                 </div>
                               </td>
@@ -625,6 +625,18 @@ export default function EnterRateModal({
                       <tr><td colSpan={8} className="py-10 text-center text-slate-400 text-[12px]">No shops</td></tr>
                     )}
                   </tbody>
+                  <tfoot>
+                    <tr className="bg-slate-50 border-t-2 border-slate-300">
+                      <td className="px-2 py-3 text-center text-[12px] font-bold text-slate-600">—</td>
+                      <td className="px-3 py-3 text-[13px] font-bold text-slate-800">Total: {deliveries.length} shops • {trip.tripNo}</td>
+                      <td className="px-2 py-3"><span className="inline-flex items-center justify-center rounded-lg border bg-violet-50 border-violet-200 text-violet-800 px-2.5 py-1 text-[12px] font-bold tabular-nums">{totals.totalBirds.toLocaleString()} birds</span></td>
+                      <td className="px-2 py-3"></td>
+                      <td className="px-2 py-3 text-center text-[13px] font-bold text-slate-800 tabular-nums">{totals.totalBirds.toLocaleString()}</td>
+                      <td className="px-2 py-3 text-center text-[13px] font-bold text-slate-800 tabular-nums">{totals.totalWeight.toFixed(2)}</td>
+                      <td className="px-2 py-3"></td>
+                      <td className="px-2 py-3 text-center"><span className="inline-flex items-center justify-center rounded-lg bg-emerald-600 text-white px-3 py-1.5 text-[13px] font-bold tabular-nums shadow-sm">₹ {formatInr(totals.totalAmount)}</span></td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             </div>
