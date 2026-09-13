@@ -35,6 +35,20 @@ import { FarmPaymentService } from '../services/FarmPaymentService';
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
 import type { WeeklyMetrics, ExpenseBreakdown } from '../types/summary.types';
 import { useI18n } from '../../../i18n';
+import { useLocation } from 'react-router-dom';
+import { analysisLinkKey, readAnalysisLink } from '../../../shared/kpi/analysisLink';
+import {
+  customRange,
+  getMonday,
+  getSunday,
+  isSameMonth,
+  monthRange,
+  periodForWindow,
+  quarterRange,
+  toISODate,
+  weekRange,
+  type PeriodRange,
+} from '../utils/periodRanges';
 
 // ---- Helpers ----
 const inrGrouped = new Intl.NumberFormat('en-IN', {
@@ -115,28 +129,6 @@ function splitPeriodLabel(label: string): { name: string; span: string } {
   if (!m) return { name: label.trim(), span: '' };
   return { name: label.slice(0, m.index).trim(), span: [m[1], m[2].trim()].filter(Boolean).join(' ') };
 }
-
-const getMonday = (date: Date): Date => {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = d.getDate() - day + (day === 0 ? -6 : 1);
-  d.setDate(diff);
-  d.setHours(0, 0, 0, 0);
-  return d;
-};
-
-const getSunday = (date: Date): Date => {
-  const d = new Date(date);
-  const day = d.getDay();
-  const diff = day === 0 ? 0 : 7 - day;
-  d.setDate(d.getDate() + diff);
-  d.setHours(23, 59, 59, 999);
-  return d;
-};
-
-const isSameMonth = (d1: Date, d2: Date): boolean => {
-  return d1.getFullYear() === d2.getFullYear() && d1.getMonth() === d2.getMonth();
-};
 
 const getQuarterLabel = (quarter: number): string => {
   const labels = ['Q1 (Jan–Mar)', 'Q2 (Apr–Jun)', 'Q3 (Jul–Sep)', 'Q4 (Oct–Dec)'];
@@ -261,8 +253,6 @@ type PeriodId = (typeof PERIOD_TABS)[number]['id'];
 // ---- Custom-range helpers ---------------------------------------------------
 // Quick ranges offered beside the date fields ("last N days, ending today").
 const CUSTOM_PRESET_DAYS = [7, 30, 90] as const;
-
-const toISODate = (date: Date): string => format(date, 'yyyy-MM-dd');
 
 function presetRange(days: number): { from: Date; to: Date } {
   const to = new Date();
@@ -439,6 +429,32 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
     return () => window.removeEventListener('storage', handleStorage);
   }, []);
 
+  /* ---- Arrived from an Operations dashboard KPI tile -----------------------
+     Every KPI tile there links here carrying the window it was showing and
+     asking for the comparison: ?from=…&to=…&compare=1. The window is applied to
+     this page's OWN controls, so the period chips, the custom pickers and the
+     Compare toggle all say what the tile said — the chip that can show those
+     dates without moving them, Custom otherwise (see periodForWindow), which is
+     what keeps "7 days there" exactly 7 days here.
+     Adjusting state while rendering (the pattern the operations dashboard uses)
+     puts the right window on screen at the first paint, and because it comes
+     from the URL a refresh or a shared link lands filtered too. */
+  const location = useLocation();
+  const analysisLink = useMemo(() => readAnalysisLink(location.search), [location.search]);
+  const linkKey = analysisLinkKey(analysisLink);
+  const [appliedLinkKey, setAppliedLinkKey] = useState<string | null>(null);
+  if (linkKey !== appliedLinkKey) {
+    setAppliedLinkKey(linkKey);
+    const landing = analysisLink ? periodForWindow(analysisLink.from, analysisLink.to) : null;
+    if (analysisLink && landing) {
+      setCustomStart(landing.customStart);
+      setCustomEnd(landing.customEnd);
+      if (landing.monthDate) setSelectedMonthDate(landing.monthDate);
+      setPeriod(landing.period);
+      setComparePrevious(analysisLink.compare);
+    }
+  }
+
   const goToPrevMonth = () =>
     setSelectedMonthDate((prev) => new Date(prev.getFullYear(), prev.getMonth() - 1, 1));
   const goToNextMonth = () =>
@@ -493,54 +509,24 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
     }
   };
 
-  const getDateRange = useCallback(() => {
-    const now = new Date();
-    const currentYear = now.getFullYear();
-    let start: Date, end: Date;
-
+  /* Which dates the selected chip means. The bodies live in utils/periodRanges
+     so a window arriving from a dashboard KPI can be matched against them (see
+     the deep link below) rather than re-derived here. */
+  const getDateRange = useCallback((): PeriodRange => {
     switch (period) {
-      case 'week': {
-        const monday = getMonday(now);
-        start = new Date(monday);
-        end = new Date(monday);
-        end.setDate(end.getDate() + 6);
-        end.setHours(23, 59, 59, 999);
-        break;
+      case 'week':
+        return weekRange();
+      case 'month':
+        return monthRange(selectedMonthDate);
+      case 'quarter':
+        return quarterRange();
+      case 'custom':
+        return customRange(customStart, customEnd);
+      default: {
+        const now = new Date();
+        return { start: now, end: now };
       }
-      case 'month': {
-        const year = selectedMonthDate.getFullYear();
-        const month = selectedMonthDate.getMonth();
-        const first = new Date(year, month, 1);
-        const firstMonday = getMonday(first);
-        const last = new Date(year, month + 1, 0);
-        let lastSunday = getSunday(last);
-        if (!isSameMonth(lastSunday, first)) {
-          lastSunday = new Date(lastSunday);
-          lastSunday.setDate(lastSunday.getDate() - 7);
-        }
-        start = firstMonday;
-        end = lastSunday;
-        break;
-      }
-      case 'quarter': {
-        start = new Date(currentYear, 0, 1);
-        end = new Date(currentYear, 11, 31);
-        end.setHours(23, 59, 59, 999);
-        break;
-      }
-      case 'custom': {
-        start = customStart ? new Date(customStart) : new Date();
-        end = customEnd ? new Date(customEnd) : new Date();
-        start.setHours(0, 0, 0, 0);
-        end.setHours(23, 59, 59, 999);
-        break;
-      }
-      default:
-        start = new Date();
-        end = new Date();
     }
-
-    return { start, end };
   }, [period, selectedMonthDate, customStart, customEnd]);
 
   const { start, end } = getDateRange();
@@ -863,18 +849,8 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
     const result: { label: string; start: Date; end: Date; metrics: WeeklyMetrics; expenses: ExpenseBreakdown; distance: number; trips: Trip[] }[] = [];
     for (let offset = 2; offset >= 0; offset--) {
       const d = new Date(selectedMonthDate.getFullYear(), selectedMonthDate.getMonth() - offset, 1);
-      const year = d.getFullYear();
-      const month = d.getMonth();
-      const first = new Date(year, month, 1);
-      const firstMonday = getMonday(first);
-      const last = new Date(year, month + 1, 0);
-      let lastSunday = getSunday(last);
-      if (!isSameMonth(lastSunday, first)) {
-        lastSunday = new Date(lastSunday);
-        lastSunday.setDate(lastSunday.getDate() - 7);
-      }
-      const s = firstMonday;
-      const e = lastSunday;
+      // Exactly the span the Month chip shows for that month.
+      const { start: s, end: e } = monthRange(d);
       const tripsM = summaryService.getCompletedTripsByDateRange(s, e);
       const collM = summaryService.getApprovedCollectionsByDateRange(s, e);
       const metricsM = summaryService.computeMetrics(tripsM, collM);
