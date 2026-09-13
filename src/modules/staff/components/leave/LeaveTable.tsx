@@ -35,6 +35,13 @@ interface LeaveTableProps {
   startIndex?: number;
 }
 
+/** Rolling year window for the history filter: five past years plus the
+ *  coming one (in 2026: 2022-2027), so the future year is always offered. */
+const MODAL_YEARS = (() => {
+  const current = new Date().getFullYear();
+  return Array.from({ length: 6 }, (_, i) => current - 4 + i);
+})();
+
 const MODAL_MONTHS = [
   { value: 'all', label: 'All Months' },
   { value: '0', label: 'January' },
@@ -316,7 +323,7 @@ function LeaveTable({
                 type="button"
                 onClick={() => setViewEmployeeModal(null)}
                 aria-label="Close"
-                className="group relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 active:scale-95"
+                className="group relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 active:scale-95"
               >
                 <span className={`inline-flex ${uiActionIconMotionClass.close}`}><X size={18} /></span>
               </button>
@@ -324,17 +331,17 @@ function LeaveTable({
 
             {/* Filter Controls — trips-list supervisor dropdowns (searchable,
                 five rows visible, same font & colours, rotating chevron). */}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/50 p-4">
-              <div className="flex items-center gap-2">
-                <Calendar size={16} className="text-slate-500" />
-                <span className="text-xs font-semibold text-slate-600">Filter By:</span>
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/50 px-6 py-3.5">
+              <div className="flex items-center gap-1.5">
+                <Calendar size={13} className="shrink-0 text-emerald-500" />
+                <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Filter By</span>
               </div>
               <div className="flex flex-wrap items-center gap-2">
                 <MasterDropdown
                   hideLabel
                   label="Year"
                   value={String(selectedYear)}
-                  options={[2024, 2025, 2026, 2027, 2028].map((y) => ({ value: String(y), label: String(y) }))}
+                  options={MODAL_YEARS.map((y) => ({ value: String(y), label: String(y) }))}
                   onChange={(next) => setSelectedYear(Number(next))}
                   className="w-28"
                 />
@@ -365,16 +372,16 @@ function LeaveTable({
                 </div>
               ) : (
                 <div className="border border-slate-200 rounded-xl overflow-hidden">
-                  <table className="min-w-full divide-y divide-slate-200 text-left text-xs">
-                    <thead className="bg-slate-50 text-slate-500">
+                  <table className="min-w-full divide-y divide-slate-200 text-left text-[13px]">
+                    <thead className="bg-slate-50/80 text-slate-600">
                       <tr>
-                        <th className="px-3 py-2 font-medium">
+                        <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">
                           <span className="flex items-center gap-1.5">
                             <CalendarOff size={12} className="shrink-0 text-purple-500" />
                             <span>Type</span>
                           </span>
                         </th>
-                        <th className="px-3 py-2 font-medium">
+                        <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">
                           <span className="flex items-center gap-1">
                             <Calendar size={12} className="shrink-0 text-blue-500" />
                             <span>From</span>
@@ -383,19 +390,19 @@ function LeaveTable({
                             <span>To</span>
                           </span>
                         </th>
-                        <th className="px-3 py-2 font-medium text-center">
+                        <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-center">
                           <span className="flex items-center justify-center gap-1.5">
                             <Sun size={12} className="shrink-0 text-amber-500" />
                             <span>Days</span>
                           </span>
                         </th>
-                        <th className="px-3 py-2 font-medium text-center">
+                        <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider text-center">
                           <span className="flex items-center justify-center gap-1.5">
                             <Activity size={12} className="shrink-0 text-sky-500" />
                             <span>Status</span>
                           </span>
                         </th>
-                        <th className="px-3 py-2 font-medium">
+                        <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">
                           <span className="flex items-center gap-1.5">
                             <MessageSquareText size={12} className="shrink-0 text-slate-400" />
                             <span>Reason</span>
@@ -406,21 +413,21 @@ function LeaveTable({
                     <tbody className="divide-y divide-slate-100 bg-white text-slate-700">
                       {employeeLeaveHistory.map((item) => (
                         <tr key={item.id} className="hover:bg-slate-50">
-                          <td className="px-3 py-2.5">
-                            <span className={`inline-block px-2 py-0.5 rounded-full font-medium ${getTypeColor(item.type)}`}>
+                          <td className="px-4 py-3">
+                            <span className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${getTypeColor(item.type)}`}>
                               {item.type}
                             </span>
                           </td>
-                          <td className="px-3 py-2.5 text-slate-600">
+                          <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-600">
                             {item.fromDate} → {item.toDate}
                           </td>
-                          <td className="px-3 py-2.5 text-center font-semibold">{item.days}</td>
-                          <td className="px-3 py-2.5 text-center">
-                            <span className={`inline-block px-2 py-0.5 rounded-full font-medium border ${getStatusBadge(item.status)}`}>
+                          <td className="px-4 py-3 text-center text-xs font-bold text-slate-700">{item.days}</td>
+                          <td className="px-4 py-3 text-center">
+                            <span className={`inline-block whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium ${getStatusBadge(item.status)}`}>
                               {item.status}
                             </span>
                           </td>
-                          <td className="px-3 py-2.5 text-slate-500 italic max-w-[150px] truncate">
+                          <td className="max-w-[180px] truncate px-4 py-3 text-xs italic text-slate-500">
                             {item.reason || 'N/A'}
                           </td>
                         </tr>
@@ -438,7 +445,7 @@ function LeaveTable({
                 onClick={() => setViewEmployeeModal(null)}
                 className="group relative inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 shadow-xs transition hover:border-slate-300 hover:bg-slate-50 active:bg-slate-100"
               >
-                <span className={`inline-flex ${uiActionIconMotionClass.close}`}><X size={14} /></span>
+                <span className={`inline-flex text-slate-500 group-hover:text-rose-600 ${uiActionIconMotionClass.close}`}><X size={14} /></span>
                 Close
               </button>
             </div>
