@@ -297,12 +297,14 @@ export default function EnterRateModal({
         .save-anim::after{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.5),transparent);transition:left 0.5s}
         .save-anim:hover::after{left:100%}
         /* save & lock big lock animation - more enhanced */
-        @keyframes lock-bounce{0%,100%{transform:scale(1) rotate(0)}10%{transform:scale(1.35) rotate(-15deg)}20%{transform:scale(1.35) rotate(15deg)}30%{transform:scale(1.3) rotate(-10deg)}40%{transform:scale(1.3) rotate(10deg)}50%{transform:scale(1.25) rotate(-5deg)}60%{transform:scale(1.25) rotate(5deg)}70%{transform:scale(1.2) rotate(-3deg)}80%{transform:scale(1.2) rotate(3deg)}90%{transform:scale(1.1) rotate(0)}}
+        @keyframes lock-bounce{0%,100%{transform:scale(1) translateY(0) rotate(0deg)}10%{transform:scale(1.3) translateY(-2px) rotate(-12deg)}20%{transform:scale(1.25) translateY(-1px) rotate(0deg)}30%{transform:scale(1.35) translateY(-3px) rotate(12deg)}40%{transform:scale(1.2) translateY(0) rotate(-8deg)}50%{transform:scale(1.15) translateY(0) rotate(0deg)}60%{transform:scale(1.3) translateY(-2px) rotate(8deg)}70%{transform:scale(1.25) translateY(-1px) rotate(-6deg)}80%{transform:scale(1.2) translateY(0) rotate(4deg)}90%{transform:scale(1.1) translateY(0) rotate(0deg)}}
+        @keyframes lock-open-close{0%{transform:scale(1) translateY(0) rotate(0deg)}15%{transform:scale(1.2) translateY(-4px) rotate(-10deg)}30%{transform:scale(1.1) translateY(-2px) rotate(0deg)}45%{transform:scale(1.3) translateY(-3px) rotate(10deg)}60%{transform:scale(1) translateY(0) rotate(0deg)}75%{transform:scale(1.15) translateY(-1px) rotate(-5deg)}100%{transform:scale(1) translateY(0) rotate(0deg)}}
         .lock-anim{transition:all 0.3s cubic-bezier(0.4,0,0.2,1);position:relative;overflow:hidden}
         .lock-anim:hover{transform:translateY(-3px) scale(1.05);box-shadow:0 12px 28px rgba(249,115,22,0.35)}
         .lock-anim:active{transform:scale(0.96)}
         .lock-anim svg{transition:transform 0.3s ease; transform-origin:center}
-        .lock-anim:hover svg{animation:lock-bounce 0.8s ease infinite; transform-origin:center}
+        .lock-anim:hover svg{animation:lock-open-close 0.9s ease infinite; transform-origin:center}
+        .lock-anim:hover .lock-icon-wrap{animation:lock-pulse 1.2s infinite, lock-open-close 0.9s ease infinite}
         .lock-anim::before{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.25),transparent);transition:left 0.6s}
         .lock-anim:hover::before{left:100%}
         .rate-input-market{border:1px solid #e2e8f0;background:white;border-radius:8px;padding:6px 8px;text-align:center;font-weight:600;transition:all 0.2s}
@@ -585,8 +587,8 @@ export default function EnterRateModal({
                             <div className="text-[14px] font-medium text-slate-700 leading-tight truncate">{displayRateEntryShopName(delivery.shopName, language)}</div>
                             {masterShop && <div className="text-[11px] font-normal text-slate-500 truncate">{masterShop.city}</div>}
                           </td>
-                          <td className="px-2 py-3 text-[13px] font-normal text-slate-700 truncate">{association ? displayRateEntryName(association, language) : "—"}</td>
-                          <td className="px-2 py-3 text-center text-[13px] font-normal text-slate-700 tabular-nums">{hasPaperRate ? paperRate : "—"}</td>
+                          <td className="px-2 py-3"><span className="inline-flex items-center justify-center rounded-lg border bg-violet-50 border-violet-200 text-violet-800 px-2.5 py-1 text-[12px] font-medium truncate max-w-full">{association ? displayRateEntryName(association, language) : "—"}</span></td>
+                          <td className="px-2 py-3 text-center"><span className="inline-flex items-center justify-center rounded-lg border bg-sky-50 border-sky-200 text-sky-800 px-2.5 py-1 text-[12px] font-semibold tabular-nums">{hasPaperRate ? paperRate : "—"}</span></td>
                           <td className="px-2 py-3 text-center text-[13px] font-normal text-slate-700 tabular-nums">{delivery.birds.toLocaleString()}</td>
                           <td className="px-2 py-3 text-center text-[13px] font-normal text-slate-700 tabular-nums">{delivery.weight.toFixed(2)}</td>
                           <td className="px-2 py-3">
