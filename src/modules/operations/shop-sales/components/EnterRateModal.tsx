@@ -30,7 +30,7 @@ import {
 import type { RateEntryMarketRateMasterDto } from "../utils/rateEntryMarketMaster";
 import { addCalendarDays, sizeCategoryHeaders } from "../utils/rateEntryMarketMaster";
 
-const SHOPS_PAGE_SIZE = 10;
+const SHOPS_PAGE_SIZE = 12;
 
 function isValidSellingRate(rate: number | null | undefined): boolean {
   return rate != null && Number.isFinite(rate) && rate >= 50 && rate <= 300;
@@ -373,7 +373,7 @@ export default function EnterRateModal({
                 .scroll-perf{-webkit-overflow-scrolling:touch;overscroll-behavior:contain;transform:translateZ(0);will-change:scroll-position}
         .no-drag-table{overflow:hidden;transform:translateZ(0)}
         .no-drag-table table{width:100%;table-layout:fixed}
-        @media (min-width:1280px){.modal-responsive{max-width:1150px}} @media (min-width:1536px){.modal-responsive{max-width:1250px}} @media (min-width:1920px){.modal-responsive{max-width:1350px}} @media (min-width:2560px){.modal-responsive{max-width:1500px}}
+        @media (min-width:1280px){.modal-responsive{max-width:1250px}} @media (min-width:1536px){.modal-responsive{max-width:1350px}} @media (min-width:1920px){.modal-responsive{max-width:1480px}} @media (min-width:2560px){.modal-responsive{max-width:1650px}} .modal-responsive{height:88vh; max-height:88vh} .no-drag-table{max-height:100%}
       `}</style>
 
       {showSuccessToast && createPortal(
@@ -409,13 +409,33 @@ export default function EnterRateModal({
 
       <AppShellModal open={open} onClose={onClose} panelClassName="bg-white modal-responsive mx-auto">
         <div className="bg-white w-full h-full flex flex-col relative overflow-hidden rounded-2xl max-h-full mx-auto animate-fade-in-up">
-          {/* Header - logo with hen dance + local Telugu toggle for this view only */}
-          <div className="bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shrink-0 rounded-t-2xl">
-            <div className="flex items-center gap-3 group">
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm group-hover:animate-[var(--animate-brand-dance)] motion-safe:group-hover:animate-[var(--animate-brand-dance)]"><Store size={17} className="group-hover:animate-[var(--animate-action-search)]" /></span>
-              <h2 className="text-[15px] font-bold tracking-tight text-slate-900">Enter shop wise rate</h2>
+          {/* Header - logo with hen dance + search beside title + local Telugu toggle */}
+          <div className="bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shrink-0 rounded-t-2xl gap-3">
+            <div className="flex items-center gap-3 group flex-1 min-w-0">
+              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm group-hover:animate-[var(--animate-brand-dance)] motion-safe:group-hover:animate-[var(--animate-brand-dance)] shrink-0"><Store size={17} className="group-hover:animate-[var(--animate-action-search)]" /></span>
+              <h2 className="text-[15px] font-bold tracking-tight text-slate-900 shrink-0">Enter shop wise rate</h2>
+              {/* Search shop at top beside title - same animation as trip list */}
+              <div className="relative flex-1 max-w-[320px] ml-2 group/search">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-hover/search:animate-[var(--animate-action-search)] motion-safe:group-hover/search:animate-[var(--animate-action-search)]"><Store size={14} /></span>
+                <input
+                  type="search"
+                  value={shopSearch}
+                  onChange={(e) => { setShopSearch(e.target.value); setShopPage(1); }}
+                  placeholder={localLanguage === "te" ? "షాప్ వెతకండి..." : "Search shops..."}
+                  className="w-full h-9 pl-9 pr-9 rounded-xl border border-slate-200 bg-slate-50/80 text-[13px] font-medium text-slate-700 placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100 outline-none transition-all shadow-sm hover:border-slate-300 hover:bg-white"
+                />
+                {shopSearch ? (
+                  <button
+                    type="button"
+                    onClick={() => { setShopSearch(""); setShopPage(1); }}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 inline-flex h-7 w-7 items-center justify-center rounded-full bg-white border border-slate-200 text-slate-500 hover:bg-slate-50 hover:text-slate-700 transition-all x-anim"
+                  >
+                    <X size={12} />
+                  </button>
+                ) : null}
+              </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
               <button
                 type="button"
                 onClick={() => setLocalLanguage((prev) => (prev === "te" ? "en" : "te"))}
@@ -455,7 +475,7 @@ export default function EnterRateModal({
 
           {/* Market Rate - 3 tables side wise like Masters > Market Rates image, only 3 days, today highlighted, no Window texts - with gap */}
           {marketThreeDays.length > 0 && (
-            <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 shrink-0 max-h-[22vh] overflow-auto scroll-perf scroll-smooth">
+            <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 shrink-0 max-h-[18vh] overflow-auto scroll-perf scroll-smooth">
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
                 {/* Company & Association Rates - Telugu supported via localLanguage */}
                 <div className="rounded-xl border border-emerald-200 bg-white shadow-sm overflow-hidden">
@@ -571,32 +591,27 @@ export default function EnterRateModal({
             </div>
           )}
 
-          {/* Shop table search - same animation as trip list search + refresh hen + login close/open */}
+          {/* Shop count bar - search now at top beside title, this shows count and clear */}
           <div className="px-5 py-2 flex items-center gap-2 shrink-0 bg-white border-b border-slate-100">
-            <div className="relative flex-1 max-w-[280px] group">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-hover:animate-[var(--animate-action-search)] motion-safe:group-hover:animate-[var(--animate-action-search)]"><Store size={14} /></span>
-              <input
-                type="search"
-                value={shopSearch}
-                onChange={(e) => { setShopSearch(e.target.value); setShopPage(1); }}
-                placeholder="Search shops..."
-                className="w-full h-9 pl-9 pr-3 rounded-lg border border-slate-200 bg-white text-[13px] text-slate-700 placeholder:text-slate-400 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 outline-none transition-all"
-              />
+            <div className="flex items-center gap-2">
+              <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-700"><Store size={12} /></span>
+              <span className="text-[12px] font-bold text-slate-700 tabular-nums">{filteredSortedDeliveries.length} shops • {localLanguage === "te" ? "సమయ క్రమంలో" : "time sorted"} • S.No 1→{deliveries.length}</span>
+              {shopSearch && <span className="text-[11px] font-medium text-violet-600">• filtered: "{shopSearch}"</span>}
             </div>
             {shopSearch && (
-              <button type="button" onClick={() => { setShopSearch(""); setShopPage(1); }} className="group relative inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-slate-200 bg-white text-[12px] font-semibold text-slate-600 hover:bg-slate-50 reset-anim">
+              <button type="button" onClick={() => { setShopSearch(""); setShopPage(1); }} className="ml-2 group relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-600 hover:bg-slate-50 reset-anim">
                 <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><X size={12} /></span> Clear
               </button>
             )}
-            <span className="ml-auto text-[11px] font-medium text-slate-500 tabular-nums">{filteredSortedDeliveries.length} shops</span>
+            <span className="ml-auto text-[11px] font-medium text-slate-500 tabular-nums">Page {shopPage}/{shopPageCount}</span>
           </div>
 
-          {/* Shop table - no colour for S.No/association/paper, birds weight same colour, amount simple, 10 shops, no drag, perfect middle with gaps */}
-          <div className="px-5 py-3 flex-1 min-h-0 flex flex-col overflow-hidden bg-white">
+          {/* Shop table - increased size by way, bigger table, perfect middle with gaps */}
+          <div className="px-5 py-3 flex-[1.6] min-h-[380px] flex flex-col overflow-hidden bg-white">
             <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm no-drag-table flex flex-col">
               <div className="flex-1 min-h-0 overflow-auto scroll-perf scroll-smooth">
-                <table className="w-full table-fixed text-sm">
-                  <thead className="bg-slate-50">
+                <table className="w-full table-fixed text-[13.5px]">
+                  <thead className="bg-slate-50 sticky top-0 z-[1]">
                     <tr className="border-b border-slate-200">
                       <th className="w-[7%] px-2 py-3 text-center text-[12px] font-bold uppercase tracking-wider text-slate-600">S.No</th>
                       <th className="w-[22%] px-2 py-3 text-left">
@@ -632,16 +647,16 @@ export default function EnterRateModal({
 
                       return (
                         <tr key={delivery.id} className={`border-b border-slate-100 ${missingForLock ? "bg-red-50" : idx % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-slate-50/50 hover:bg-slate-50"}`}>
-                          <td className="px-2 py-3 text-center text-[13px] font-normal text-slate-700 tabular-nums">{serialNo}</td>
-                          <td className="px-3 py-3">
+                          <td className="px-2 py-3.5 text-center text-[13px] font-bold text-slate-700 tabular-nums bg-slate-50/50 border-r border-slate-100">{serialNo}</td>
+                          <td className="px-3 py-3.5">
                             <div className="text-[14px] font-medium text-slate-700 leading-tight truncate">{displayRateEntryShopName(delivery.shopName, localLanguage)}</div>
                             {masterShop && <div className="text-[11px] font-normal text-slate-500 truncate">{masterShop.city}</div>}
                           </td>
-                          <td className="px-2 py-3"><span className="inline-flex items-center justify-center rounded-lg border bg-violet-50 border-violet-200 text-violet-800 px-2.5 py-1 text-[12px] font-medium truncate max-w-full">{association ? displayRateEntryName(association, localLanguage) : "—"}</span></td>
-                          <td className="px-2 py-3 text-center"><span className="inline-flex items-center justify-center rounded-lg border bg-sky-50 border-sky-200 text-sky-800 px-2.5 py-1 text-[12px] font-semibold tabular-nums">{hasPaperRate ? paperRate : "—"}</span></td>
-                          <td className="px-2 py-3 text-center text-[13px] font-normal text-slate-700 tabular-nums">{delivery.birds.toLocaleString()}</td>
-                          <td className="px-2 py-3 text-center text-[13px] font-normal text-slate-700 tabular-nums">{delivery.weight.toFixed(2)}</td>
-                          <td className="px-2 py-3">
+                          <td className="px-2 py-3.5"><span className="inline-flex items-center justify-center rounded-lg border bg-violet-50 border-violet-200 text-violet-800 px-2.5 py-1 text-[12px] font-medium truncate max-w-full">{association ? displayRateEntryName(association, localLanguage) : "—"}</span></td>
+                          <td className="px-2 py-3.5 text-center"><span className="inline-flex items-center justify-center rounded-lg border bg-sky-50 border-sky-200 text-sky-800 px-2.5 py-1 text-[12px] font-semibold tabular-nums">{hasPaperRate ? paperRate : "—"}</span></td>
+                          <td className="px-2 py-3.5 text-center text-[13px] font-medium text-slate-700 tabular-nums">{delivery.birds.toLocaleString()}</td>
+                          <td className="px-2 py-3.5 text-center text-[13px] font-medium text-slate-700 tabular-nums">{delivery.weight.toFixed(2)}</td>
+                          <td className="px-2 py-3.5">
                             {rateLocked ? (
                               <span className="block text-center text-[13px] font-semibold text-slate-800 tabular-nums rate-input-market valid">{rate != null ? rate.toFixed(2) : "—"}</span>
                             ) : (
@@ -665,7 +680,7 @@ export default function EnterRateModal({
                               </div>
                             )}
                           </td>
-                          <td className="px-2 py-3 text-center">
+                          <td className="px-2 py-3.5 text-center">
                             <span className="inline-flex items-center justify-center rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 px-2.5 py-1 text-[12px] font-semibold tabular-nums">
                               ₹ {formatInr(amount)}
                             </span>
