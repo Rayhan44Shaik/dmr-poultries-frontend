@@ -148,13 +148,12 @@ export default function EnterRateModal({
     return (trip as Trip & { marketRateMaster?: RateEntryMarketRateMasterDto | null } | null)?.marketRateMaster;
   }, [trip]);
 
-  // 3 days: yesterday, today, tomorrow - like market rates page but only 3 days, today highlighted
+  // 2 days: yesterday, today - today highlighted, as per request only 2 days
   const marketThreeDays = useMemo(() => {
     if (!trip?.tripDate || !marketMaster) return [];
     const today = trip.tripDate;
     const yesterday = addCalendarDays(today, -1);
-    const tomorrow = addCalendarDays(today, 1);
-    return [yesterday, today, tomorrow].map((date) => {
+    return [yesterday, today].map((date) => {
       const comp = marketMaster.companyRates.find((r) => r.date === date);
       const add = marketMaster.additionalMetrics.find((r) => r.date === date);
       const size = marketMaster.sizeCategoryBreakdown.find((r) => r.date === date);
@@ -175,8 +174,8 @@ export default function EnterRateModal({
         companyTitle: "కంపెనీ & అసోసియేషన్ రేట్లు",
         additionalTitle: "అదనపు మెట్రిక్స్ ఎంట్రీ",
         shopBreakdownTitle: "షాప్ రేట్ల తగ్గింపు వివరాలు",
-        threeDaysToday: "3 రోజులు • నేడు హైలైట్",
-        threeDays: "3 రోజులు",
+        threeDaysToday: "2 రోజులు • నేడు హైలైట్",
+        threeDays: "2 రోజులు",
         date: "తేదీ",
         snehaFarmer: "స్నేహ / ఫార్మర్",
         venVij: "వెన్ విజ్",
@@ -191,8 +190,8 @@ export default function EnterRateModal({
       companyTitle: "Company & Association Rates",
       additionalTitle: "Additional Metrics Entry",
       shopBreakdownTitle: "Shop Rates Less Breakdown",
-      threeDaysToday: "3 days • Today highlighted",
-      threeDays: "3 days",
+      threeDaysToday: "2 days • Today highlighted",
+      threeDays: "2 days",
       date: "Date",
       snehaFarmer: "Sneha / Farmer",
       venVij: "Ven Vij",
