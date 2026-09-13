@@ -585,6 +585,15 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   const calendarFrom = toInputDateString(startDate);
   const calendarTo = toInputDateString(endDate);
 
+  /* The window on screen, handed to the KPI tiles: each tile deep-links to its
+     analysis page filtered to these exact dates, and the link also carries the
+     equal-length window before them, so the analysis page can compare the same
+     way the tiles do. */
+  const kpiRange = useMemo(
+    () => (calendarFrom && calendarTo ? { from: calendarFrom, to: calendarTo } : null),
+    [calendarFrom, calendarTo]
+  );
+
   const calendarKey = `${calendarFrom}:${calendarTo}`;
   const [lastCalendarKey, setLastCalendarKey] = useState(calendarKey);
   if (calendarKey !== lastCalendarKey) {
@@ -753,7 +762,12 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
       />
 
       <div className="relative z-10">
-        <KPICards current={data} previous={previousData} rangeDays={rangeDays} />
+        <KPICards
+          current={data}
+          previous={previousData}
+          rangeDays={rangeDays}
+          range={kpiRange}
+        />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
