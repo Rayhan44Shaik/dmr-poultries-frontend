@@ -114,20 +114,20 @@ function ConfirmationModal({
             </div>
             <div>
               <h3 className="text-lg font-bold text-slate-800">{title}</h3>
-              <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">{message}</p>
+              <p className="text-[15px] text-slate-600 mt-1.5 leading-relaxed">{message}</p>
             </div>
           </div>
         </div>
         <div className="flex justify-end gap-3 px-6 py-4 bg-slate-50 border-t border-slate-100">
           <button
             onClick={onCancel}
-            className="h-10 px-5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium text-slate-600 transition-all hover:shadow-sm inline-flex items-center justify-center shrink-0"
+            className="h-10 px-5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-[15px] font-medium text-slate-600 transition-all hover:shadow-sm inline-flex items-center justify-center shrink-0"
           >
             {t(cancelLabel)}
           </button>
           <button
             onClick={onConfirm}
-            className={`h-10 px-5 rounded-lg text-sm font-bold text-white shadow-sm transition-all hover:shadow-md active:scale-[0.98] inline-flex items-center justify-center shrink-0 ${
+            className={`h-10 px-5 rounded-lg text-[15px] font-bold text-white shadow-sm transition-all hover:shadow-md active:scale-[0.98] inline-flex items-center justify-center shrink-0 ${
               type === "warning"
                 ? "bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-500 hover:to-orange-500"
                 : "bg-blue-500 hover:bg-blue-600"
@@ -598,7 +598,7 @@ export default function StepPickup({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-3 gap-3">
           <div className="flex flex-wrap items-center gap-2.5 min-w-0">
-            <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+            <h3 className="text-[17px] sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
               <Package size={18} className="text-amber-500" />
               {t("ops.trip.title.pickup")}
             </h3>
@@ -618,7 +618,7 @@ export default function StepPickup({
                 <ActionTooltip label={t("ops.trip.edit_step")} />
               </button>
             )}
-            <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
+            <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-[13px] font-semibold whitespace-nowrap">
               {t("ops.trip.submitted_locked")}
             </span>
           </div>
@@ -633,7 +633,7 @@ export default function StepPickup({
             value={<TripTimestampDisplay value={officialPickupTime} empty="--" />}
             title={officialPickupTime || undefined}
             cardClass="col-span-2 sm:col-span-1"
-            valueClass="overflow-visible whitespace-normal text-[11px] leading-none"
+            valueClass="overflow-visible whitespace-normal text-[12px] leading-none"
           />
           <StepKpiCard
             icon={Scale}
@@ -663,7 +663,7 @@ export default function StepPickup({
 
         {/* DC Photo Status Card */}
         {photos.length > 0 && (
-          <div className="bg-white p-3 rounded-xl border border-slate-200 flex items-center gap-3 text-xs font-medium text-slate-700 flex-wrap">
+          <div className="bg-white p-3 rounded-xl border border-slate-200 flex items-center gap-3 text-[13px] font-medium text-slate-700 flex-wrap">
             <span className="h-5 w-5 rounded-md bg-emerald-50/80 text-emerald-500 flex items-center justify-center shrink-0"><Camera size={ 16 } /></span>
             <span>{t("ops.trip.photos_uploaded", { count: photos.length })}</span>
             {photos.map((p) => (
@@ -675,14 +675,14 @@ export default function StepPickup({
         {/* Box Table */}
         {trip.boxDetails && trip.boxDetails.length > 0 && (
           <div className="bg-white rounded-xl border border-slate-200 overflow-x-auto max-h-96 overflow-y-auto">
-            <table className="w-full table-fixed border-collapse text-xs">
+            <table className="w-full table-fixed border-collapse text-[13px]">
               <colgroup>
                 {Array.from({ length: 12 }).map((_, i) => (
                   <col key={i} className="w-[8.33%]" />
                 ))}
               </colgroup>
               <thead>
-                <tr className="bg-slate-50 text-slate-600 text-[10px] uppercase sticky top-0 z-10 border-b border-slate-200">
+                <tr className="bg-slate-50 text-slate-600 text-[11px] uppercase sticky top-0 z-10 border-b border-slate-200">
                   {[1, 2, 3].map((i, idx) => (
                     <React.Fragment key={i}>
                       <th className={`text-center px-2 py-2 font-bold bg-slate-50 text-slate-600 border-r border-slate-200 ${idx > 0 ? 'pl-4' : ''}`}>{t("ops.trip.box")}</th>
@@ -727,7 +727,7 @@ export default function StepPickup({
 
         {/* Bottom Banner with Actions */}
         <div className="bg-white rounded-xl border border-slate-200 p-3.5 flex items-center justify-between flex-wrap gap-2">
-          <p className="text-xs text-slate-600 font-normal">
+          <p className="text-[13px] text-slate-600 font-normal">
             {t("ops.trip.pickup_submitted_ok")}
           </p>
           <div className="flex items-center gap-2 flex-wrap">
@@ -840,7 +840,7 @@ export default function StepPickup({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-100 pb-4 gap-3">
           <div className="flex flex-wrap items-center gap-2.5 min-w-0">
-            <h3 className="text-base sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
+            <h3 className="text-[17px] sm:text-lg font-bold text-slate-800 flex items-center gap-2 tracking-tight">
               <Package size={18} className="text-amber-500" />
               {t("ops.trip.title.pickup")}
             </h3>
@@ -852,7 +852,7 @@ export default function StepPickup({
               <StepCloseButton onClose={handleExitToLocked} animated />
             ) : null}
             {(isEditMode || isLocalEditing) && trip.pickupStepSubmitted && (
-              <span className="text-xs text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
+              <span className="text-[13px] text-slate-700 font-medium bg-slate-100 px-3 py-1 rounded-full border border-slate-200 whitespace-nowrap">
                 {t("ops.trip.editable_view")}
               </span>
             )}
@@ -860,13 +860,13 @@ export default function StepPickup({
         </div>
 
         {/* Official time capture — set once at submit, cannot be edited */}
-        <div className="flex items-center gap-2 text-xs text-slate-600 font-medium overflow-x-auto">
+        <div className="flex items-center gap-2 text-[13px] text-slate-600 font-medium overflow-x-auto">
           <span className="h-5 w-5 rounded-md bg-blue-50/80 text-blue-500 flex items-center justify-center shrink-0"><Clock size={ 14 } /></span>
           {officialPickupTime ? (
             <>
               <TripTimestampDisplay value={officialPickupTime} />
               <span
-                className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-slate-400 bg-slate-100 border border-slate-200 rounded-full px-2 py-0.5"
+                className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-slate-400 bg-slate-100 border border-slate-200 rounded-full px-2 py-0.5"
                 title={t("ops.trip.time_locked_hint")}
               >
                 <Lock size={9} /> {t("ops.trip.time_locked")}
@@ -879,12 +879,12 @@ export default function StepPickup({
 
         {/* Image Upload Section — two DC photo slots */}
         <div className="border border-slate-200 rounded-xl p-3 bg-slate-50/50">
-          <label className="text-sm font-semibold text-slate-600 flex items-center gap-2 flex-wrap">
+          <label className="text-[15px] font-semibold text-slate-600 flex items-center gap-2 flex-wrap">
             <span className="h-6 w-6 rounded-md bg-sky-50/80 text-sky-500 flex items-center justify-center shrink-0">
               <Camera size={14} />
             </span>
             {t("ops.trip.field.dc_photo")} {TRIP_FIELD_DEFINITIONS.dcPhotoKey.required && <span className="text-red-500">*</span>}
-            <span className="text-xs font-normal text-slate-400">
+            <span className="text-[13px] font-normal text-slate-400">
               {t("ops.trip.photos_of_2", { count: photos.length })}
             </span>
           </label>
@@ -897,7 +897,7 @@ export default function StepPickup({
                   <button
                     type="button"
                     onClick={() => void removeImage(p.key)}
-                    className="absolute -top-1.5 -right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full w-5 h-5 text-[10px] leading-5 shadow-sm transition-all active:scale-90"
+                    className="absolute -top-1.5 -right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full w-5 h-5 text-[11px] leading-5 shadow-sm transition-all active:scale-90"
                     title={t("ops.trip.remove_photo")}
                   >
                     ×
@@ -915,7 +915,7 @@ export default function StepPickup({
                   title={t("ops.trip.choose_image")}
                 >
                   <Camera size={18} />
-                  <span className="text-[10px] font-bold uppercase tracking-wide">{t("ops.trip.add_photo")}</span>
+                  <span className="text-[11px] font-bold uppercase tracking-wide">{t("ops.trip.add_photo")}</span>
                 </button>
               );
             })}
@@ -926,14 +926,14 @@ export default function StepPickup({
               onChange={handleFileSelect}
               className="hidden"
             />
-            <p className="text-[10px] text-slate-400 flex-1 min-w-[140px]">{t("ops.trip.photo_requirements")}</p>
+            <p className="text-[11px] text-slate-400 flex-1 min-w-[140px]">{t("ops.trip.photo_requirements")}</p>
           </div>
         </div>
 
         {/* Entry Table Container */}
         <div>
           <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-semibold text-slate-600 flex items-center gap-2">
+            <span className="text-[15px] font-semibold text-slate-600 flex items-center gap-2">
               <span className="h-6 w-6 rounded-md bg-violet-50/80 text-violet-500 flex items-center justify-center shrink-0">
                 <Package size={14} />
               </span>
@@ -942,14 +942,14 @@ export default function StepPickup({
           </div>
 
           <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs max-h-80 overflow-y-auto">
-            <table className="w-full table-fixed border-collapse text-xs">
+            <table className="w-full table-fixed border-collapse text-[13px]">
               <colgroup>
                 {Array.from({ length: 12 }).map((_, i) => (
                   <col key={i} className="w-[8.33%]" />
                 ))}
               </colgroup>
               <thead>
-                <tr className="bg-slate-50 text-slate-600 text-[10px] uppercase font-bold sticky top-0 z-10 border-b border-slate-200">
+                <tr className="bg-slate-50 text-slate-600 text-[11px] uppercase font-bold sticky top-0 z-10 border-b border-slate-200">
                   {[1, 2, 3].map((blockIdx) => (
                     <React.Fragment key={blockIdx}>
                       <th className={`text-center px-1 py-2 font-bold text-slate-600 bg-slate-50 border-r border-slate-200 ${blockIdx > 1 ? 'pl-4' : ''}`}>{t("ops.trip.box")}</th>
@@ -974,7 +974,7 @@ export default function StepPickup({
                             <button
                               type="button"
                               onClick={addRow}
-                              className="w-full h-8 text-[10px] font-bold uppercase tracking-wide text-blue-500 bg-blue-50/70 hover:bg-blue-50/70 border border-blue-100 rounded-lg"
+                              className="w-full h-8 text-[11px] font-bold uppercase tracking-wide text-blue-500 bg-blue-50/70 hover:bg-blue-50/70 border border-blue-100 rounded-lg"
                             >
                               <Plus size={12} className="inline mr-1" /> {t("ops.trip.add_box")}
                             </button>
@@ -984,7 +984,7 @@ export default function StepPickup({
                       const row = slot.row;
                       return (
                       <React.Fragment key={row.uid}>
-                        <td className={`text-center px-1 py-1.5 font-bold text-slate-700 text-xs bg-white border-r border-slate-200 ${groupIdx > 0 ? 'pl-4' : ''}`}>{row.boxNo}</td>
+                        <td className={`text-center px-1 py-1.5 font-bold text-slate-700 text-[13px] bg-white border-r border-slate-200 ${groupIdx > 0 ? 'pl-4' : ''}`}>{row.boxNo}</td>
                         <td className="px-1 py-1.5 bg-white border-r border-slate-200">
                           <input
                             type="number"
@@ -1022,7 +1022,7 @@ export default function StepPickup({
                             </button>
                           </div>
                         </td>
-                        <td className={`text-center px-1 py-1.5 text-xs font-semibold text-slate-700 bg-white ${groupIdx < 2 ? 'border-r-2 border-slate-300' : ''}`}>
+                        <td className={`text-center px-1 py-1.5 text-[13px] font-semibold text-slate-700 bg-white ${groupIdx < 2 ? 'border-r-2 border-slate-300' : ''}`}>
                           {formatAvg(row.birds, row.weight, row.avgWeight)}
                         </td>
                       </React.Fragment>
@@ -1033,10 +1033,10 @@ export default function StepPickup({
                         const emptyIdx = group.length + i;
                         return (
                           <React.Fragment key={i}>
-                            <td className={`text-center px-1 py-1.5 text-slate-300 text-xs bg-white border-r border-slate-200 ${emptyIdx > 0 ? 'pl-4' : ''}`}>—</td>
-                            <td className="text-center px-1 py-1.5 text-slate-300 text-xs bg-white border-r border-slate-200">—</td>
-                            <td className="text-center px-1 py-1.5 text-slate-300 text-xs bg-white border-r border-slate-200">—</td>
-                            <td className={`text-center px-1 py-1.5 text-slate-300 text-xs bg-white ${emptyIdx < 2 ? 'border-r-2 border-slate-300' : ''}`}>—</td>
+                            <td className={`text-center px-1 py-1.5 text-slate-300 text-[13px] bg-white border-r border-slate-200 ${emptyIdx > 0 ? 'pl-4' : ''}`}>—</td>
+                            <td className="text-center px-1 py-1.5 text-slate-300 text-[13px] bg-white border-r border-slate-200">—</td>
+                            <td className="text-center px-1 py-1.5 text-slate-300 text-[13px] bg-white border-r border-slate-200">—</td>
+                            <td className={`text-center px-1 py-1.5 text-slate-300 text-[13px] bg-white ${emptyIdx < 2 ? 'border-r-2 border-slate-300' : ''}`}>—</td>
                           </React.Fragment>
                         );
                       })}
@@ -1045,7 +1045,7 @@ export default function StepPickup({
               </tbody>
             </table>
           </div>
-          <p className="text-[10px] text-slate-400 mt-1.5">
+          <p className="text-[11px] text-slate-400 mt-1.5">
             {t("ops.trip.use_tab_navigate")}
             {!isLastRowComplete && rows.length > 0 && (
               <span className="text-amber-500 ml-2">⚠️ {t("ops.trip.fill_current_box_warn")}</span>

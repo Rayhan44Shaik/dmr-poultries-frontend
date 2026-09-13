@@ -2,6 +2,7 @@
 // Shared read-only Trip View shell. Recent and History use dedicated wrappers.
 // Steps 1–5 embed the same locked Trip Entry components (shared fonts/layout).
 // Email/WhatsApp bulk actions are enabled only by the Trip History wrapper.
+// Now uses AppShellModal for neat gaps from header/sidebar/page edges.
 
 import React, { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
@@ -17,6 +18,7 @@ import {
   Languages,
   X,
 } from "lucide-react";
+import AppShellModal from "../../../../ui/AppShellModal";
 import { WhatsAppIcon } from "../../../../ui/WhatsAppIcon";
 import type { Trip, ShopDelivery } from "../types/trip";
 import type { Shop } from "../../../masters/shops/types/shop";
@@ -190,7 +192,6 @@ function Step4View({
   );
 }
 
-
 function Step5View({ trip }: { trip: Trip }) {
   const viewTrip: Trip = {
     ...trip,
@@ -209,8 +210,6 @@ function Step5View({ trip }: { trip: Trip }) {
   );
 }
 
-
-
 function TripViewModal({
   open,
   trip,
@@ -221,8 +220,6 @@ function TripViewModal({
   showCommunicationStatus = true,
 }: Props) {
   const { t, language, toggleLanguage } = useI18n();
-  // Completed trips open on Step 4 (Shop Deliveries); incomplete on Step 1.
-  // A caller-provided initialStep wins (e.g. Farm Payment opens Step 2).
   const initialViewStep = (trip: Trip | null) => {
     if (initialStep != null) return initialStep;
     return trip && trip.status === "Completed" && isTripWizardComplete(trip) ? 3 : 0;
@@ -243,8 +240,6 @@ function TripViewModal({
     [t]
   );
 
-  // Reset the selected step when a different trip is opened (render-phase
-  // adjustment — the official "adjust state when props change" pattern).
   if (trip && trip.id !== lastTripId) {
     setLastTripId(trip.id);
     setViewStepIndex(initialViewStep(trip));
@@ -260,7 +255,6 @@ function TripViewModal({
     return () => window.clearTimeout(timeoutId);
   }, [communicationFeedback]);
 
-  // ─── Early return – ensures trip is never null after this ─────
   if (!open || !trip) return null;
 
   const viewTrip = displayTrip ?? trip;
@@ -270,20 +264,14 @@ function TripViewModal({
   const popupLanguageLabel = language === "te" ? "ఇంగ్లీష్" : t("settings.telugu");
   const isCompleted = trip.status === "Completed" && isTripWizardComplete(trip);
 
-  // ─── STEP STATE FLAGS (backend submitted flags only) ───
   const isStartCompleted = Boolean(trip.startStepSubmitted);
   const isDeliveryCompleted = Boolean(trip.deliveryStepSubmitted);
   const isEndCompleted = isTripWizardComplete(trip);
   const completedMask = getTripWizardCompletedMask(trip);
-  // Read-only view: future steps on an incomplete trip stay locked; a completed
-  // trip can review every step.
-  const maxAllowedViewStep = isTripWizardComplete(trip)
-    ? 4
-    : getNextIncompleteTripStep(trip);
+  const maxAllowedViewStep = isTripWizardComplete(trip) ? 4 : getNextIncompleteTripStep(trip);
   const lockedSteps = TRIP_STEP_LABELS.map((_, index) => index > maxAllowedViewStep);
   const safeViewStepIndex = Math.min(Math.max(0, viewStepIndex), maxAllowedViewStep);
 
-  // ─── Create PDF — professional A4 portrait trip report ────────────
   const downloadTripReport = async () => {
     const emailInfo: TripReportEmailInfo | null =
       emailCounts.total > 0
@@ -331,7 +319,6 @@ function TripViewModal({
     });
   };
 
-  /** Each step embeds the locked Trip Entry component (same layout + fonts). */
   const emptyStep = (
     <div className="mt-8 text-center p-12 border-2 border-dashed border-slate-200 rounded-2xl text-slate-400 text-sm">
       {t("ops.trip.select_completed_step")}
@@ -343,26 +330,24 @@ function TripViewModal({
       case 0:
         return isStartCompleted ? <Step1View trip={viewTrip} /> : emptyStep;
       case 1:
-        return trip.farmStepSubmitted
-          ? <Step2View trip={viewTrip} birdTypes={displayBirdTypes} />
-          : emptyStep;
+        return trip.farmStepSubmitted ? <Step2View trip={viewTrip} birdTypes={displayBirdTypes} /> : emptyStep;
       case 2:
         return trip.pickupStepSubmitted ? <Step3View trip={viewTrip} /> : emptyStep;
       case 3:
-        return isDeliveryCompleted
-          ? (
-              <Step4View
-                trip={viewTrip}
-                shops={displayShops}
-                birdTypes={displayBirdTypes}
-                showCommunicationStatus={showCommunicationStatus}
-                emailState={emailState}
-                whatsappState={whatsappState}
-                onSendOneEmail={handleSendOneEmail}
-                onSendOneWhatsApp={handleSendOneWhatsApp}
-              />
-            )
-          : emptyStep;
+        return isDeliveryCompleted ? (
+          <Step4View
+            trip={viewTrip}
+            shops={displayShops}
+            birdTypes={displayBirdTypes}
+            showCommunicationStatus={showCommunicationStatus}
+            emailState={emailState}
+            whatsappState={whatsappState}
+            onSendOneEmail={handleSendOneEmail}
+            onSendOneWhatsApp={handleSendOneWhatsApp}
+          />
+        ) : (
+          emptyStep
+        );
       case 4:
         return isEndCompleted ? <Step5View trip={viewTrip} /> : emptyStep;
       default:
@@ -373,262 +358,247 @@ function TripViewModal({
   const emailCounts = emailState.counts;
   const whatsappCounts = whatsappState.counts;
 
-  // Rendered through a portal to <body> so the `fixed inset-0` overlay covers
-  // the real viewport. An ancestor (the page's `animate-page-pop` wrapper) has a
-  // persistent `transform` with `animation-fill-mode: both`, which turns it into
-  // the containing block for `position: fixed` and would otherwise shrink the
-  // "full-screen" view down to that container's bounds.
-  return createPortal(
-    <div className="fixed inset-0 bg-black/40 z-50 animate-fade-in">
-      <div className="bg-white w-full h-full overflow-hidden flex flex-col">
-        {/* ─── Header ─────────────────────────────────────────────── */}
-        <div className="border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/80">
-          {/* Top row: Trip identity + status */}
-          <div className="px-6 md:px-8 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div className="flex items-center gap-4 min-w-0 flex-1 sm:flex-none">
-              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-400/20 text-white shrink-0">
-                <FileText className="w-6 h-6" />
-              </div>
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap min-w-0">
-                  <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight truncate">
-                    {viewTrip.tripNo || t("ops.trip.trip_details")}
-                  </h2>
+  return (
+    <>
+      <AppShellModal open={open} onClose={onClose} panelClassName="bg-white">
+        <div className="bg-white w-full h-full overflow-hidden flex flex-col rounded-2xl">
+          {/* Header — rounded top */}
+          <div className="border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/80 rounded-t-2xl">
+            <div className="px-6 md:px-8 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex items-center gap-4 min-w-0 flex-1 sm:flex-none">
+                <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-400/20 text-white shrink-0">
+                  <FileText className="w-6 h-6" />
                 </div>
-                <div className="flex items-center gap-2 flex-wrap mt-1.5">
-                  {isCompleted ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 text-white px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0">
-                      <ShieldCheck size={11} /> {t("ops.trip.submitted_locked")}
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2 flex-wrap min-w-0">
+                    <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight truncate">
+                      {viewTrip.tripNo || t("ops.trip.trip_details")}
+                    </h2>
+                    <span className="hidden sm:inline-flex items-center rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-500">
+                      Shell gaps • {language === "te" ? "తెలుగు" : "EN"}
                     </span>
-                  ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-50/80 text-amber-500 border border-amber-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0">
-                      {viewStatus || t("status.pending")}
-                    </span>
-                  )}
-                  <span className="text-xs font-medium text-slate-400">{t("ops.trip.read_only_overview")}</span>
+                  </div>
+                  <div className="flex items-center gap-2 flex-wrap mt-1.5">
+                    {isCompleted ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 text-white px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0">
+                        <ShieldCheck size={11} /> {t("ops.trip.submitted_locked")}
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-amber-50/80 text-amber-500 border border-amber-100 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0">
+                        {viewStatus || t("status.pending")}
+                      </span>
+                    )}
+                    <span className="text-xs font-medium text-slate-400">{t("ops.trip.read_only_overview")}</span>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            <div className="flex items-center gap-2 flex-wrap justify-end shrink-0 w-full sm:w-auto">
-              {isCompleted && viewTrip.approvedBy && (
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 border border-slate-200 shadow-sm shrink-0">
-                  <UserCheck size={12} className="text-emerald-500" />
-                  {t("ops.trip.approved_by")}: {viewTrip.approvedBy}
-                </span>
-              )}
-              <button
-                type="button"
-                onClick={toggleLanguage}
-                className="group relative inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-3 py-1.5 text-xs font-bold text-emerald-700 shadow-sm shadow-emerald-100/60 transition-all hover:-translate-y-0.5 hover:bg-emerald-50 active:scale-95"
-                aria-label={t("ops.trip.popup_language_toggle")}
-              >
-                <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]">
-                  <Languages size={13} />
-                </span>
-                {popupLanguageLabel}
-                <ActionTooltip label={t("ops.trip.popup_language_tooltip")} side="bottom" />
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className="group relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:-translate-y-0.5 hover:border-red-100 hover:bg-red-50 hover:text-red-500 active:scale-95"
-                aria-label={t("ops.trip.close_view")}
-              >
-                <span className={`inline-flex ${uiActionIconMotionClass.close}`}>
-                  <X size={16} />
-                </span>
-                <ActionTooltip label={t("ops.trip.close_view")} side="bottom" />
-              </button>
-            </div>
-          </div>
-
-          {/* Bottom row: Email/WhatsApp counts + Actions */}
-          {isCompleted && (
-            <div className="px-6 md:px-8 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-slate-100/50">
-              <div className="flex items-center gap-3 flex-wrap">
-                {showCommunicationStatus && emailCounts.total > 0 && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-red-100 bg-red-50/80 px-2.5 py-1 text-xs font-medium text-red-600" role="status" aria-live="polite">
-                    <Mail size={12} className="text-red-500" />
-                    {emailState.isBulkSending ? (
-                      <>
-                        {t("ops.trip.sending")}... {emailState.bulkProgress?.sent ?? emailCounts.sent} / {emailState.bulkProgress?.total ?? emailCounts.total}
-                      </>
-                    ) : (
-                      <>
-                        {emailCounts.total} {t("ops.trip.shops").toLowerCase()} · {emailCounts.sent} {t("common.sent").toLowerCase()}
-                        {emailCounts.pending > 0 ? ` · ${emailCounts.pending} ${t("common.pending").toLowerCase()}` : ""}
-                        {emailCounts.failed > 0 ? ` · ${emailCounts.failed} ${t("common.failed").toLowerCase()}` : ""}
-                      </>
-                    )}
+              <div className="flex items-center gap-2 flex-wrap justify-end shrink-0 w-full sm:w-auto">
+                {isCompleted && viewTrip.approvedBy && (
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 border border-slate-200 shadow-sm shrink-0">
+                    <UserCheck size={12} className="text-emerald-500" />
+                    {t("ops.trip.approved_by")}: {viewTrip.approvedBy}
                   </span>
-                )}
-                {showCommunicationStatus && whatsappCounts.total > 0 && (
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-[#25D366]/25 bg-[#25D366]/10 px-2.5 py-1 text-xs font-medium text-[#128C7E]" role="status" aria-live="polite">
-                    <WhatsAppIcon size={12} className="text-[#25D366]" />
-                    {whatsappState.isBulkSending ? (
-                      <>
-                        {t("ops.trip.sending")}... {whatsappState.bulkProgress?.sent ?? whatsappCounts.sent} / {whatsappState.bulkProgress?.total ?? whatsappCounts.total}
-                      </>
-                    ) : (
-                      <>
-                        {whatsappCounts.total} {t("ops.trip.shops").toLowerCase()} · {whatsappCounts.sent} {t("common.sent").toLowerCase()}
-                        {whatsappCounts.pending > 0 ? ` · ${whatsappCounts.pending} ${t("common.pending").toLowerCase()}` : ""}
-                        {whatsappCounts.failed > 0 ? ` · ${whatsappCounts.failed} ${t("common.failed").toLowerCase()}` : ""}
-                      </>
-                    )}
-                  </span>
-                )}
-              </div>
-
-              <div className="flex items-center gap-3 flex-wrap justify-end shrink-0">
-                {showCommunicationStatus && emailCounts.total > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => void emailState.sendAll()}
-                    disabled={emailState.isBulkSending}
-                    className="group relative inline-flex items-center gap-2.5 rounded-xl border border-red-100 bg-red-50/90 hover:bg-red-100 px-4 py-2 text-xs font-semibold text-red-600 shadow-sm shadow-red-100/60 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
-                    aria-label={t("ops.trip.send_email_all")}
-                  >
-                    {emailState.isBulkSending ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <span className={`inline-flex ${uiActionIconMotionClass.mail}`}><Mail size={14} /></span>
-                    )}
-                    {emailState.isBulkSending ? `${t("ops.trip.sending")}...` : t("ops.trip.send_all_email")}
-                    <ActionTooltip label={t("ops.trip.send_email_all")} side="bottom" />
-                  </button>
-                )}
-                {showCommunicationStatus && whatsappCounts.total > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => void whatsappState.sendAll()}
-                    disabled={whatsappState.isBulkSending}
-                    className="group relative inline-flex items-center gap-2.5 rounded-xl border border-[#25D366]/25 bg-[#25D366]/10 hover:bg-[#25D366]/15 px-4 py-2 text-xs font-semibold text-[#128C7E] shadow-sm shadow-[#25D366]/10 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
-                    aria-label={t("ops.trip.send_whatsapp_all")}
-                  >
-                    {whatsappState.isBulkSending ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <span className={`inline-flex ${uiActionIconMotionClass.whatsapp}`}><WhatsAppIcon size={14} /></span>
-                    )}
-                    {whatsappState.isBulkSending ? `${t("ops.trip.sending")}...` : t("ops.trip.send_all_whatsapp")}
-                    <ActionTooltip label={t("ops.trip.send_whatsapp_all")} side="bottom" />
-                  </button>
                 )}
                 <button
                   type="button"
-                  onClick={() => void downloadTripReport()}
-                  className="group relative inline-flex items-center justify-center rounded-xl border border-red-100 bg-red-50/70 hover:bg-red-50/80 p-2 text-red-500 shadow-sm transition-all active:scale-95"
-                  aria-label={t("ops.trip.create_pdf")}
+                  onClick={toggleLanguage}
+                  className="group relative inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-3 py-1.5 text-xs font-bold text-emerald-700 shadow-sm shadow-emerald-100/60 transition-all hover:-translate-y-0.5 hover:bg-emerald-50 active:scale-95"
+                  aria-label={t("ops.trip.popup_language_toggle")}
                 >
-                  <span className={`inline-flex ${uiActionIconMotionClass.pdf}`}><FileDown size={16} /></span>
-                  <ActionTooltip label={t("ops.trip.create_pdf_title")} side="bottom" />
+                  <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]">
+                    <Languages size={13} />
+                  </span>
+                  {popupLanguageLabel}
+                  <ActionTooltip label={t("ops.trip.popup_language_tooltip")} side="bottom" />
+                </button>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="group relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:-translate-y-0.5 hover:border-red-100 hover:bg-red-50 hover:text-red-500 active:scale-95"
+                  aria-label={t("ops.trip.close_view")}
+                >
+                  <span className={`inline-flex ${uiActionIconMotionClass.close}`}>
+                    <X size={16} />
+                  </span>
+                  <ActionTooltip label={t("ops.trip.close_view")} side="bottom" />
                 </button>
               </div>
             </div>
-          )}
-        </div>
 
-        {/* ─── Body ─────────────────────────────────────────────────── */}
-        <div className="py-6 md:py-8 px-4 md:px-8 overflow-y-auto space-y-5 flex-1">
-          <TripWizardStepper
-            steps={localizedStepLabels}
-            currentStep={safeViewStepIndex}
-            completedMask={completedMask}
-            lockedSteps={lockedSteps}
-            onStepClick={setViewStepIndex}
-            onLockedStepClick={() => {
-              if (!isTripWizardComplete(trip)) {
-                setViewStepIndex(maxAllowedViewStep);
-              }
-            }}
-          />
-          <div key={`${trip.id}-step-${safeViewStepIndex}`} className="animate-fade-in-up">
-            {renderStepContent()}
-          </div>
-          <TripFinalKPI trip={viewTrip} deliveries={viewTrip.deliveries} />
-        </div>
+            {isCompleted && (
+              <div className="px-6 md:px-8 pb-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-t border-slate-100/50">
+                <div className="flex items-center gap-3 flex-wrap">
+                  {showCommunicationStatus && emailCounts.total > 0 && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-red-100 bg-red-50/80 px-2.5 py-1 text-xs font-medium text-red-600" role="status" aria-live="polite">
+                      <Mail size={12} className="text-red-500" />
+                      {emailState.isBulkSending ? (
+                        <>
+                          {t("ops.trip.sending")}... {emailState.bulkProgress?.sent ?? emailCounts.sent} / {emailState.bulkProgress?.total ?? emailCounts.total}
+                        </>
+                      ) : (
+                        <>
+                          {emailCounts.total} {t("ops.trip.shops").toLowerCase()} · {emailCounts.sent} {t("common.sent").toLowerCase()}
+                          {emailCounts.pending > 0 ? ` · ${emailCounts.pending} ${t("common.pending").toLowerCase()}` : ""}
+                          {emailCounts.failed > 0 ? ` · ${emailCounts.failed} ${t("common.failed").toLowerCase()}` : ""}
+                        </>
+                      )}
+                    </span>
+                  )}
+                  {showCommunicationStatus && whatsappCounts.total > 0 && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full border border-[#25D366]/25 bg-[#25D366]/10 px-2.5 py-1 text-xs font-medium text-[#128C7E]" role="status" aria-live="polite">
+                      <WhatsAppIcon size={12} className="text-[#25D366]" />
+                      {whatsappState.isBulkSending ? (
+                        <>
+                          {t("ops.trip.sending")}... {whatsappState.bulkProgress?.sent ?? whatsappCounts.sent} / {whatsappState.bulkProgress?.total ?? whatsappCounts.total}
+                        </>
+                      ) : (
+                        <>
+                          {whatsappCounts.total} {t("ops.trip.shops").toLowerCase()} · {whatsappCounts.sent} {t("common.sent").toLowerCase()}
+                          {whatsappCounts.pending > 0 ? ` · ${whatsappCounts.pending} ${t("common.pending").toLowerCase()}` : ""}
+                          {whatsappCounts.failed > 0 ? ` · ${whatsappCounts.failed} ${t("common.failed").toLowerCase()}` : ""}
+                        </>
+                      )}
+                    </span>
+                  )}
+                </div>
 
-        {/* ─── Footer ───────────────────────────────────────────────── */}
-        <div className="px-6 md:px-8 py-5 border-t border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 flex items-center justify-end gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="group relative inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-all active:scale-95"
-            aria-label={t("ops.trip.close_view")}
-          >
-            <span className={`inline-flex ${uiActionIconMotionClass.close}`}>
-              <X size={15} />
-            </span>
-            {t("common.close")}
-            <ActionTooltip label={t("ops.trip.close_view")} side="top" />
-          </button>
-        </div>
-      </div>
-
-      {communicationFeedback && (
-        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 pointer-events-none">
-          <style>{`@keyframes trip-communication-feedback-timer { from { transform: scaleX(1); } to { transform: scaleX(0); } }`}</style>
-          <div
-            key={communicationFeedback.id}
-            className={`w-full max-w-sm overflow-hidden rounded-3xl border bg-white shadow-2xl animate-fade-in pointer-events-auto ${
-              communicationFeedback.type === "success" ? "border-emerald-100" : "border-red-100"
-            }`}
-            role={communicationFeedback.type === "success" ? "status" : "alert"}
-            aria-live="polite"
-          >
-            <div className="p-5 text-center">
-              <div
-                className={`mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full ${
-                  communicationFeedback.type === "success"
-                    ? communicationFeedback.channel === "whatsapp"
-                      ? "bg-[#25D366]/10 text-[#25D366]"
-                      : "bg-emerald-50 text-emerald-500"
-                    : "bg-red-50 text-red-500"
-                }`}
-              >
-                {communicationFeedback.type === "success" ? (
-                  communicationFeedback.channel === "whatsapp" ? <WhatsAppIcon size={22} /> : <CheckCircle2 size={22} />
-                ) : (
-                  <AlertCircle size={22} />
-                )}
+                <div className="flex items-center gap-3 flex-wrap justify-end shrink-0">
+                  {showCommunicationStatus && emailCounts.total > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => void emailState.sendAll()}
+                      disabled={emailState.isBulkSending}
+                      className="group relative inline-flex items-center gap-2.5 rounded-xl border border-red-100 bg-red-50/90 hover:bg-red-100 px-4 py-2 text-xs font-semibold text-red-600 shadow-sm shadow-red-100/60 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                      aria-label={t("ops.trip.send_email_all")}
+                    >
+                      {emailState.isBulkSending ? <Loader2 size={14} className="animate-spin" /> : <span className={`inline-flex ${uiActionIconMotionClass.mail}`}><Mail size={14} /></span>}
+                      {emailState.isBulkSending ? `${t("ops.trip.sending")}...` : t("ops.trip.send_all_email")}
+                      <ActionTooltip label={t("ops.trip.send_email_all")} side="bottom" />
+                    </button>
+                  )}
+                  {showCommunicationStatus && whatsappCounts.total > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => void whatsappState.sendAll()}
+                      disabled={whatsappState.isBulkSending}
+                      className="group relative inline-flex items-center gap-2.5 rounded-xl border border-[#25D366]/25 bg-[#25D366]/10 hover:bg-[#25D366]/15 px-4 py-2 text-xs font-semibold text-[#128C7E] shadow-sm shadow-[#25D366]/10 transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+                      aria-label={t("ops.trip.send_whatsapp_all")}
+                    >
+                      {whatsappState.isBulkSending ? <Loader2 size={14} className="animate-spin" /> : <span className={`inline-flex ${uiActionIconMotionClass.whatsapp}`}><WhatsAppIcon size={14} /></span>}
+                      {whatsappState.isBulkSending ? `${t("ops.trip.sending")}...` : t("ops.trip.send_all_whatsapp")}
+                      <ActionTooltip label={t("ops.trip.send_whatsapp_all")} side="bottom" />
+                    </button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => void downloadTripReport()}
+                    className="group relative inline-flex items-center justify-center rounded-xl border border-red-100 bg-red-50/70 hover:bg-red-50/80 p-2 text-red-500 shadow-sm transition-all active:scale-95"
+                    aria-label={t("ops.trip.create_pdf")}
+                  >
+                    <span className={`inline-flex ${uiActionIconMotionClass.pdf}`}><FileDown size={16} /></span>
+                    <ActionTooltip label={t("ops.trip.create_pdf_title")} side="bottom" />
+                  </button>
+                </div>
               </div>
-              <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
-                {communicationFeedback.channel === "whatsapp" ? t("ops.trip.whatsapp") : t("ops.trip.email")}
-              </p>
-              <p className="mt-1 text-sm font-bold text-slate-800">
-                {communicationFeedback.message}
-              </p>
-              <p className="mt-1 text-xs font-medium text-slate-500 truncate" title={communicationFeedback.shopName}>
-                {communicationFeedback.shopName}
-              </p>
-              {communicationFeedback.type === "success" && communicationFeedback.count ? (
-                <p className="mt-2 text-xs font-semibold text-emerald-600">
-                  {t("common.sent")} · {communicationFeedback.count}
-                </p>
-              ) : null}
-              <p className="mt-3 text-[10px] font-semibold text-slate-400">
-                {t("ops.trip.closes_in_seconds", { seconds: 5 })}
-              </p>
+            )}
+          </div>
+
+          <div className="py-6 md:py-8 px-4 md:px-8 overflow-y-auto space-y-5 flex-1">
+            <TripWizardStepper
+              steps={localizedStepLabels}
+              currentStep={safeViewStepIndex}
+              completedMask={completedMask}
+              lockedSteps={lockedSteps}
+              onStepClick={setViewStepIndex}
+              onLockedStepClick={() => {
+                if (!isTripWizardComplete(trip)) {
+                  setViewStepIndex(maxAllowedViewStep);
+                }
+              }}
+            />
+            <div key={`${trip.id}-step-${safeViewStepIndex}`} className="animate-fade-in-up">
+              {renderStepContent()}
             </div>
-            <div className="h-1 bg-slate-100">
-              <div
-                className={`h-full origin-left ${
-                  communicationFeedback.type === "success"
-                    ? communicationFeedback.channel === "whatsapp"
-                      ? "bg-[#25D366]"
-                      : "bg-emerald-500"
-                    : "bg-red-500"
-                }`}
-                style={{ animation: "trip-communication-feedback-timer 5s linear forwards" }}
-              />
-            </div>
+            <TripFinalKPI trip={viewTrip} deliveries={viewTrip.deliveries} />
+          </div>
+
+          <div className="px-6 md:px-8 py-5 border-t border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 flex items-center justify-end gap-3 rounded-b-2xl">
+            <button
+              type="button"
+              onClick={onClose}
+              className="group relative inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-all active:scale-95"
+              aria-label={t("ops.trip.close_view")}
+            >
+              <span className={`inline-flex ${uiActionIconMotionClass.close}`}>
+                <X size={15} />
+              </span>
+              {t("common.close")}
+              <ActionTooltip label={t("ops.trip.close_view")} side="top" />
+            </button>
           </div>
         </div>
-      )}
-    </div>,
-    document.body,
+      </AppShellModal>
+
+      {communicationFeedback &&
+        createPortal(
+          <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 pointer-events-none">
+            <style>{`@keyframes trip-communication-feedback-timer { from { transform: scaleX(1); } to { transform: scaleX(0); } }`}</style>
+            <div
+              key={communicationFeedback.id}
+              className={`w-full max-w-sm overflow-hidden rounded-3xl border bg-white shadow-2xl animate-fade-in pointer-events-auto ${
+                communicationFeedback.type === "success" ? "border-emerald-100" : "border-red-100"
+              }`}
+              role={communicationFeedback.type === "success" ? "status" : "alert"}
+              aria-live="polite"
+            >
+              <div className="p-5 text-center">
+                <div
+                  className={`mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full ${
+                    communicationFeedback.type === "success"
+                      ? communicationFeedback.channel === "whatsapp"
+                        ? "bg-[#25D366]/10 text-[#25D366]"
+                        : "bg-emerald-50 text-emerald-500"
+                      : "bg-red-50 text-red-500"
+                  }`}
+                >
+                  {communicationFeedback.type === "success" ? (
+                    communicationFeedback.channel === "whatsapp" ? <WhatsAppIcon size={22} /> : <CheckCircle2 size={22} />
+                  ) : (
+                    <AlertCircle size={22} />
+                  )}
+                </div>
+                <p className="text-[11px] font-bold uppercase tracking-wider text-slate-400">
+                  {communicationFeedback.channel === "whatsapp" ? t("ops.trip.whatsapp") : t("ops.trip.email")}
+                </p>
+                <p className="mt-1 text-sm font-bold text-slate-800">{communicationFeedback.message}</p>
+                <p className="mt-1 text-xs font-medium text-slate-500 truncate" title={communicationFeedback.shopName}>
+                  {communicationFeedback.shopName}
+                </p>
+                {communicationFeedback.type === "success" && communicationFeedback.count ? (
+                  <p className="mt-2 text-xs font-semibold text-emerald-600">
+                    {t("common.sent")} · {communicationFeedback.count}
+                  </p>
+                ) : null}
+                <p className="mt-3 text-[10px] font-semibold text-slate-400">{t("ops.trip.closes_in_seconds", { seconds: 5 })}</p>
+              </div>
+              <div className="h-1 bg-slate-100">
+                <div
+                  className={`h-full origin-left ${
+                    communicationFeedback.type === "success"
+                      ? communicationFeedback.channel === "whatsapp"
+                        ? "bg-[#25D366]"
+                        : "bg-emerald-500"
+                      : "bg-red-500"
+                  }`}
+                  style={{ animation: "trip-communication-feedback-timer 5s linear forwards" }}
+                />
+              </div>
+            </div>
+          </div>,
+          document.body
+        )}
+    </>
   );
 }
 
@@ -641,12 +611,10 @@ function ScopedTripViewModal(props: Props) {
   );
 }
 
-/** Recent Activity view: read-only Trip steps without communication counters. */
 export function RecentTripViewModal(props: Props) {
   return <ScopedTripViewModal {...props} showCommunicationStatus={false} />;
 }
 
-/** Trip History/List view: includes email and WhatsApp delivery counters/actions. */
 export function TripHistoryViewModal(props: Props) {
   return <ScopedTripViewModal {...props} showCommunicationStatus />;
 }

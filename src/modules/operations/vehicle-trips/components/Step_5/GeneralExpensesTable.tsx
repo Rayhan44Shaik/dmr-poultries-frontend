@@ -145,7 +145,7 @@ export default function GeneralExpensesTable({
       {/* Date / Vehicle / Advance removed from table top — shown as separate summary cards in StepEnd. */}
       <table className="sheet-joined-table w-full border-collapse">
         <tbody>
-          <tr className="bg-gradient-to-r from-violet-50 via-slate-50 to-amber-50 text-[11px] font-bold text-slate-600 border-b border-slate-200">
+          <tr className="bg-gradient-to-r from-violet-50 via-slate-50 to-amber-50 text-[12px] font-bold text-slate-600 border-b border-slate-200">
             <td className="py-2 px-3 w-[28%]">
               <span className="inline-flex items-center gap-1.5">
                 <span className="h-5 w-5 rounded-md bg-violet-50/80 text-violet-500 flex items-center justify-center">
@@ -285,7 +285,7 @@ export default function GeneralExpensesTable({
             return <>{rows}</>;
           })()}
 
-          <tr className="bg-slate-100/80 font-bold text-slate-800 text-xs border-b border-slate-200">
+          <tr className="bg-slate-100/80 font-bold text-slate-800 text-[13px] border-b border-slate-200">
             <td className="py-2.5 px-3">{t("common.total")} (₹)</td>
             <td colSpan={2} className="text-slate-900 px-3 border-r border-slate-200 tabular-nums">
               {formatInrPlain(totalExpenses1)}
@@ -297,7 +297,7 @@ export default function GeneralExpensesTable({
               {formatInrPlain(totalExpenses2)}
             </td>
           </tr>
-          <tr className="bg-emerald-50/80 font-bold text-slate-800 text-xs border-b border-slate-200">
+          <tr className="bg-emerald-50/80 font-bold text-slate-800 text-[13px] border-b border-slate-200">
             <td className="py-2.5 px-3" colSpan={5}>
               {t("ops.trip.combined_expense_total")}
             </td>
@@ -308,7 +308,7 @@ export default function GeneralExpensesTable({
 
           {/* ODOMETER — compact single-line rows (same height as Total Pickup Tolls) */}
           <tr className="border-b border-slate-100">
-            <td className="font-medium text-slate-700 py-2 px-3 align-middle text-xs">
+            <td className="font-medium text-slate-700 py-2 px-3 align-middle text-[13px]">
               <span className="inline-flex items-center gap-1">
                 {t("ops.trip.start_meter_reading")}
                 <span title={t("ops.trip.locked_from_step1")} className="inline-flex items-center cursor-help">
@@ -318,20 +318,20 @@ export default function GeneralExpensesTable({
             </td>
             <td
               colSpan={2}
-              className="font-semibold text-slate-900 px-3 py-2 bg-slate-100/60 border-r border-slate-200 select-none align-middle text-xs tabular-nums"
+              className="font-semibold text-slate-900 px-3 py-2 bg-slate-100/60 border-r border-slate-200 select-none align-middle text-[13px] tabular-nums"
             >
               {actualStartMeter > 0 ? `${actualStartMeter} KM` : "---"}
             </td>
-            <td colSpan={2} className="font-medium text-slate-700 px-3 py-2 border-r border-slate-200 bg-slate-50/30 align-middle text-xs">
+            <td colSpan={2} className="font-medium text-slate-700 px-3 py-2 border-r border-slate-200 bg-slate-50/30 align-middle text-[13px]">
               {t("ops.trip.total_distance_km")}
             </td>
-            <td colSpan={2} className="font-semibold text-slate-900 px-3 py-2 bg-slate-50/50 align-middle text-xs tabular-nums">
+            <td colSpan={2} className="font-semibold text-slate-900 px-3 py-2 bg-slate-50/50 align-middle text-[13px] tabular-nums">
               {computedDistance > 0 ? computedDistance : "---"}
             </td>
           </tr>
 
           <tr className="border-b border-slate-200">
-            <td className="font-medium text-slate-700 py-2 px-3 align-middle text-xs">
+            <td className="font-medium text-slate-700 py-2 px-3 align-middle text-[13px]">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <span className="inline-flex items-center gap-1 shrink-0">
                   {t("ops.trip.field.end_meter")}
@@ -340,14 +340,14 @@ export default function GeneralExpensesTable({
                 {/* Validation sits beside the End Meter heading — neat, readable, single place */}
                 {endMeterErrorMsg ? (
                   <span
-                    className="inline-flex items-center max-w-[min(18rem,55vw)] rounded-md border border-red-100 bg-red-50/70 px-2 py-0.5 text-[10px] font-semibold text-red-500 leading-snug"
+                    className="inline-flex items-center max-w-[min(18rem,55vw)] rounded-md border border-red-100 bg-red-50/70 px-2 py-0.5 text-[11px] font-semibold text-red-500 leading-snug"
                     role="alert"
                     title={endMeterErrorMsg}
                   >
                     {endMeterErrorMsg}
                   </span>
                 ) : requiredMinMeter > 0 ? (
-                  <span className="text-[10px] font-medium text-slate-400 tabular-nums">
+                  <span className="text-[11px] font-medium text-slate-400 tabular-nums">
                     &gt; {requiredMinMeter} KM
                   </span>
                 ) : null}
@@ -392,29 +392,29 @@ export default function GeneralExpensesTable({
                   }}
                   aria-invalid={isEndMeterInvalid}
                   title={endMeterErrorMsg || undefined}
-                  className={`w-full max-w-[7.5rem] font-semibold text-xs tabular-nums outline-none bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
+                  className={`w-full max-w-[7.5rem] font-semibold text-[13px] tabular-nums outline-none bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
                     isEndMeterInvalid ? "text-red-500" : "text-slate-900"
                   }`}
                 />
-                <span className="text-[10px] font-semibold text-slate-400 shrink-0">KM</span>
+                <span className="text-[11px] font-semibold text-slate-400 shrink-0">KM</span>
               </div>
             </td>
-            <td colSpan={2} className="font-medium text-slate-700 px-3 py-2 border-r border-slate-200 bg-slate-50/30 align-middle text-xs">
+            <td colSpan={2} className="font-medium text-slate-700 px-3 py-2 border-r border-slate-200 bg-slate-50/30 align-middle text-[13px]">
               {t("ops.trip.average_km_ltr")}
             </td>
-            <td colSpan={2} className="font-semibold text-blue-500 px-3 py-2 bg-slate-50/50 align-middle text-xs">
+            <td colSpan={2} className="font-semibold text-blue-500 px-3 py-2 bg-slate-50/50 align-middle text-[13px]">
               {computedAverage ? computedAverage : t("ops.trip.not_available")}
             </td>
           </tr>
 
           <tr className="bg-slate-50/50 border-b border-slate-100">
-            <td className="font-medium text-slate-700 py-2 px-3 align-middle text-xs">
+            <td className="font-medium text-slate-700 py-2 px-3 align-middle text-[13px]">
               {t("ops.trip.total_toll_pickup")} <span className="text-red-500">*</span>
             </td>
-            <td colSpan={2} className="font-semibold text-slate-900 px-3 py-2 select-none border-r border-slate-200 align-middle text-xs tabular-nums">
+            <td colSpan={2} className="font-semibold text-slate-900 px-3 py-2 select-none border-r border-slate-200 align-middle text-[13px] tabular-nums">
               {pickupTolls}
             </td>
-            <td colSpan={2} className="font-medium text-slate-700 px-3 py-2 border-r border-slate-200 bg-slate-50/30 align-middle text-xs">
+            <td colSpan={2} className="font-medium text-slate-700 px-3 py-2 border-r border-slate-200 bg-slate-50/30 align-middle text-[13px]">
               {t("ops.trip.field.delivery_tolls")}{" "}
               {TRIP_FIELD_DEFINITIONS.deliveryTolls.required && <span className="text-red-500">*</span>}
             </td>
@@ -432,7 +432,7 @@ export default function GeneralExpensesTable({
                   handleChange("destinationTolls", val === "" ? "" : Math.floor(Number(val)));
                 }}
                 onWheel={blockWheelChange}
-                className="font-semibold text-blue-500 text-xs w-full px-3 py-2 outline-none bg-transparent tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                className="font-semibold text-blue-500 text-[13px] w-full px-3 py-2 outline-none bg-transparent tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               />
             </td>
           </tr>

@@ -217,7 +217,11 @@ const SHOPS = Array.from({ length: 200 }, (_, i) => {
     address: `${locality}, ${city} — ${500000 + n}`,
     latitude: round(16.5 + (n % 40) * 0.03, 6),
     longitude: round(78.2 + (n % 55) * 0.03, 6),
-    paperRate: 0,
+    paperRate: (() => {
+      // 90% have paper rate 92-155, 10% have 0 (not set) — synced with shop master
+      const hasPaper = r() < 0.9;
+      return hasPaper ? between(r, 92, 155) : 0;
+    })(),
     associationType: ASSOCIATIONS[i % ASSOCIATIONS.length],
     status: n % 25 === 0 ? "Inactive" : "Active",
     openingBalance: money(r, 0, 90000, 500),
@@ -594,6 +598,19 @@ for (const date of OP_DATES) {
     const fuel = dieselEntries.reduce((a, d) => a + (d.amount ?? 0), 0);
     const expense = deliveryTolls + pickupTolls + meals + loading + vehicleMaintenance;
 
+    // ── Rate Entry sample enrichment: last 20 days have 60% pending for rate entry ──
+    const isRecentForRate = OP_DATES.indexOf(date) >= OP_DATES.length - 20;
+    const makePendingForRateEntry = isRecentForRate && status === "Completed" && r() < 0.6;
+    const effectiveStatus = makePendingForRateEntry ? "Pending" : status;
+    const effectiveRateLockedAt = makePendingForRateEntry ? null : (status === "Completed" ? ts(date, "20:10:00") : null);
+    const effectiveRateCompleted = makePendingForRateEntry ? false : status === "Completed";
+    const effectiveRateLockedBy = makePendingForRateEntry ? null : (status === "Completed" ? "Owner" : null);
+    const effectiveRatesEntered = makePendingForRateEntry ? 0 : (status === "Completed" ? deliveries.length : 0);
+    // For pending rate entry trips, clear rates on deliveries so modal shows blank rates awaiting entry
+    const effectiveDeliveries = makePendingForRateEntry
+      ? deliveries.map((d) => ({ ...d, rate: null, amount: 0 }))
+      : deliveries;
+
     const trip = {
       id: 10000 + tripSeq,
       tripNo: `TRP-${date.replace(/-/g, "")}-${String(k + 1).padStart(3, "0")}`,
@@ -648,8 +665,8 @@ for (const date of OP_DATES) {
       dcPhotoMime: stage >= 3 ? "image/jpeg" : undefined,
       dcPhotoKey2: stage >= 3 && k % 2 === 0 ? `dc/${date}/${tripSeq}-2.jpg` : undefined,
 
-      // Step 4 (deliveries)
-      deliveries: stage >= 4 ? deliveries : [],
+      // Step 4 (deliveries) — use effectiveDeliveries for rate-entry pending sample
+      deliveries: stage >= 4 ? effectiveDeliveries : [],
       deliveryStepSubmitted: stage >= 4,
 
       // Step 5 (close + expenses)
@@ -687,11 +704,11 @@ for (const date of OP_DATES) {
       fuel,
       expense,
       remarks: status === "Deleted" ? "Cancelled — vehicle breakdown" : "",
-      status,
-      rateCompleted: status === "Completed",
-      rateLockedAt: status === "Completed" ? ts(date, "20:10:00") : null,
-      rateLockedBy: status === "Completed" ? "Owner" : null,
-      ratesEntered: status === "Completed" ? deliveries.length : 0,
+      status: effectiveStatus,
+      rateCompleted: effectiveRateCompleted,
+      rateLockedAt: effectiveRateLockedAt,
+      rateLockedBy: effectiveRateLockedBy,
+      ratesEntered: effectiveRatesEntered,
       version: 1,
       createdAt: ts(date, "05:05:00"),
       updatedAt: ts(date, "20:15:00"),
@@ -2153,6 +2170,41 @@ function attendanceSummary(month) {
 }
 
 function rateEntryTrip(t, withDeliveries) {
+  const windowRates = MARKET_RATES.filter(
+    (m) => m.businessDate >= addDays(t.tripDate, -3) && m.businessDate <= addDays(t.tripDate, 1)
+  ).sort((a,b) => a.businessDate.localeCompare(b.businessDate));
+
+  const fromDate = windowRates[0]?.businessDate ?? addDays(t.tripDate, -3);
+  const toDate = windowRates[windowRates.length-1]?.businessDate ?? t.tripDate;
+
+  const marketRateMaster = {
+    tripDate: t.tripDate,
+    fromDate,
+    toDate,
+    additionalMetrics: windowRates.map((m) => ({
+      date: m.businessDate,
+      entered: true,
+      vij: m.vij,
+      gun: m.gun,
+      rp: m.rp,
+    })),
+    companyRates: windowRates.map((m) => ({
+      date: m.businessDate,
+      entered: true,
+      sneha: m.sneha,
+      vencobRate: m.vencobRate,
+      vencobVii: m.vencobVii,
+      vencobGun: m.vencobGun,
+      associationVii: m.associationVii,
+    })),
+    sizeCategoryBreakdown: windowRates.map((m) => ({
+      date: m.businessDate,
+      entered: true,
+      columns: { c17: m.c17, c15: m.c15, c13: m.c13, c12: m.c12, c10: m.c10 },
+    })),
+    sizeColumnKeys: ["c17", "c15", "c13", "c12", "c10"],
+  };
+
   return {
     id: t.id,
     tripNo: t.tripNo,
@@ -2172,9 +2224,7 @@ function rateEntryTrip(t, withDeliveries) {
     deliveriesCount: t.deliveries.length,
     totalAmount: round(t.deliveries.reduce((a, d) => a + d.amount, 0), 2),
     deliveries: withDeliveries ? t.deliveries : [],
-    marketRatesWindow: MARKET_RATES.filter(
-      (m) => m.businessDate >= addDays(t.tripDate, -3) && m.businessDate <= t.tripDate
-    ).map((m) => ({
+    marketRatesWindow: windowRates.map((m) => ({
       businessDate: m.businessDate,
       entered: true,
       vencobRate: m.vencobRate,
@@ -2187,6 +2237,7 @@ function rateEntryTrip(t, withDeliveries) {
       rp: m.rp,
       sizeColumns: { c17: m.c17, c15: m.c15, c13: m.c13, c12: m.c12, c10: m.c10 },
     })),
+    marketRateMaster,
   };
 }
 

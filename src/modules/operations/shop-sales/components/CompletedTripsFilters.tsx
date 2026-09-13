@@ -69,7 +69,9 @@ function CompletedTripsFilters({
   onExportExcel,
 }: Props) {
   const { t } = useI18n();
-  const enableExports = hasFilters && pendingTrips > 0;
+  // Exports should be available whenever there is data, not only when filtered
+  const enableExports = pendingTrips > 0;
+  void hasFilters;
   const vehicleOptions = withoutSentinel(vehicleList || [], "All Vehicles");
   const supervisorOptions = withoutSentinel(supervisorList || [], "All Supervisors");
 
@@ -78,7 +80,7 @@ function CompletedTripsFilters({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
         <div>
           <label className={opsFilterLabelClass}>
-            <Calendar size={13} className="text-emerald-500 flex-shrink-0" />
+            <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
             <span>{t("ops.rate.from_date")}</span>
           </label>
           <DatePicker
@@ -91,7 +93,7 @@ function CompletedTripsFilters({
 
         <div>
           <label className={opsFilterLabelClass}>
-            <Calendar size={13} className="text-emerald-500 flex-shrink-0" />
+            <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
             <span>{t("ops.rate.to_date")}</span>
           </label>
           <DatePicker
@@ -104,7 +106,7 @@ function CompletedTripsFilters({
 
         <div>
           <label className={opsFilterLabelClass}>
-            <Truck size={13} className="text-emerald-500 flex-shrink-0" />
+            <Truck size={17} className="text-emerald-500 flex-shrink-0" />
             <span>{t("common.vehicle")}</span>
           </label>
           <MasterDropdown
@@ -123,7 +125,7 @@ function CompletedTripsFilters({
 
         <div>
           <label className={opsFilterLabelClass}>
-            <UserCog size={13} className="text-emerald-500 flex-shrink-0" />
+            <UserCog size={17} className="text-emerald-500 flex-shrink-0" />
             <span>{t("common.supervisor")}</span>
           </label>
           <MasterDropdown
@@ -142,11 +144,11 @@ function CompletedTripsFilters({
 
         <div>
           <label className={opsFilterLabelClass}>
-            <Search size={13} className="text-slate-400 flex-shrink-0" />
+            <Search size={17} className="text-slate-400 flex-shrink-0" />
             <span>{t("ops.rate.search_label")}</span>
           </label>
           <div className="relative">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="search"
               value={search}
@@ -164,8 +166,8 @@ function CompletedTripsFilters({
       </div>
 
       <div className="flex items-center justify-between flex-wrap gap-4 pt-1">
-        <div className="text-xs font-semibold text-slate-600">
-          {t("ops.rate.pending_trips")} : <span className="font-bold text-orange-600">{pendingTrips}</span>
+        <div className="text-[14px] font-bold text-slate-700">
+          {t("ops.rate.pending_trips")} : <span className="font-extrabold text-orange-600 text-[16px] tabular-nums">{pendingTrips}</span>
         </div>
         <div className="flex items-center gap-2 flex-wrap justify-end">
           <button type="button" onClick={onSearch} className={`group relative ${opsPrimaryButtonClass}`} aria-label={t("ops.rate.search_tooltip")}>

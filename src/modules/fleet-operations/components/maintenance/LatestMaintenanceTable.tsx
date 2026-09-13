@@ -474,9 +474,10 @@ const LatestMaintenanceTable = ({
           {totalRecords > pageSize && (
             <div className={paginationBarClass}>
               {onPageSizeChange && (
-                <div className="mr-auto flex items-center gap-1.5">
-                  <PageSizeSelect value={pageSize} onChange={onPageSizeChange} />
-                </div>
+                <div className="mr-auto flex items-center gap-2">
+          <span className="text-[13px] font-semibold text-slate-600">Rows Per Page</span>
+          <PageSizeSelect value={pageSize} onChange={onPageSizeChange} />
+        </div>
               )}
               <button
                 onClick={() => { setSelectedId(null); onPageChange(currentPage - 1); }}

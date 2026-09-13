@@ -1,4 +1,5 @@
 import { useRef, useState, type ComponentProps } from "react";
+import { IndianRupee, Store } from "lucide-react";
 import useCompletedTrips from "../hooks/useCompletedTrips";
 import CompletedTripsFilters from "../components/CompletedTripsFilters";
 import CompletedTripsTable from "../components/CompletedTripsTable";
@@ -7,12 +8,8 @@ import { Pagination } from "../../../../ui/Pagination";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
-import { opsPageClass, opsEmptyStateClass } from "../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../i18n";
-import {
-  displayRateEntryName,
-  formatRateEntryDay,
-} from "../utils/rateEntryDisplay";
+import { displayRateEntryName, formatRateEntryDay } from "../utils/rateEntryDisplay";
 import { formatVehicleNumber } from "../../../../utils/format";
 import { useShops } from "../../../masters/shops/hooks/useShops";
 
@@ -109,7 +106,6 @@ export default function RatesEntryPage({ embedded = false }: Props) {
   };
 
   const handleRefresh = () => {
-    // Refresh should always return Rate Entry to the clean, unfiltered view.
     setDraftFilter({ ...EMPTY_RATE_FILTER });
     resetFilters();
     setSelectedRowId(null);
@@ -194,65 +190,88 @@ export default function RatesEntryPage({ embedded = false }: Props) {
     }
   };
 
-  const content = (
-    <div className={opsPageClass}>
-      <CompletedTripsFilters
-        fromDate={draftFilter.fromDate}
-        toDate={draftFilter.toDate}
-        search={draftFilter.search}
-        vehicle={draftFilter.vehicle}
-        supervisor={draftFilter.supervisor}
-        vehicleList={vehicleList}
-        supervisorList={supervisorList}
-        setFromDate={(value) => setDraftFilter((current) => ({ ...current, fromDate: value }))}
-        setToDate={(value) => setDraftFilter((current) => ({ ...current, toDate: value }))}
-        setSearch={(value) => setDraftFilter((current) => ({ ...current, search: value }))}
-        setVehicle={(value) => setDraftFilter((current) => ({ ...current, vehicle: value }))}
-        setSupervisor={(value) => setDraftFilter((current) => ({ ...current, supervisor: value }))}
-        onSearch={handleApplyFilters}
-        onReset={handleResetFilters}
-        onRefresh={handleRefresh}
-        refreshing={isLoading}
-        pendingTrips={filteredTrips.length}
-        hasFilters={hasFilters}
-        onExportPDF={handleExportPDF}
-        onExportExcel={handleExportExcel}
-      />
+  return (
+    <div className={`w-full space-y-5 ${embedded ? "" : "px-3 md:px-6 py-4 bg-slate-50/50 min-h-screen text-slate-800"}`}>
+      {/* Filter — separate card like trip list */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 sm:p-5">
+        <CompletedTripsFilters
+          fromDate={draftFilter.fromDate}
+          toDate={draftFilter.toDate}
+          search={draftFilter.search}
+          vehicle={draftFilter.vehicle}
+          supervisor={draftFilter.supervisor}
+          vehicleList={vehicleList}
+          supervisorList={supervisorList}
+          setFromDate={(value) => setDraftFilter((current) => ({ ...current, fromDate: value }))}
+          setToDate={(value) => setDraftFilter((current) => ({ ...current, toDate: value }))}
+          setSearch={(value) => setDraftFilter((current) => ({ ...current, search: value }))}
+          setVehicle={(value) => setDraftFilter((current) => ({ ...current, vehicle: value }))}
+          setSupervisor={(value) => setDraftFilter((current) => ({ ...current, supervisor: value }))}
+          onSearch={handleApplyFilters}
+          onReset={handleResetFilters}
+          onRefresh={handleRefresh}
+          refreshing={isLoading}
+          pendingTrips={filteredTrips.length}
+          hasFilters={hasFilters}
+          onExportPDF={handleExportPDF}
+          onExportExcel={handleExportExcel}
+        />
+      </div>
 
       {loadError && (
-        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">
-          {loadError}
-        </div>
+        <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm font-medium text-red-700">{loadError}</div>
       )}
 
-      {filteredTrips.length === 0 && !loadError ? (
-        <div className={opsEmptyStateClass}>
-          {t("ops.rate.no_trips")}
+      {/* Table — separate card like trip list, Rate Entry on top of table */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+        {/* Rate Entry header on top of table — perfect light background + animated ₹ */}
+        <div className="flex items-center px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-emerald-50/60 via-white to-emerald-50/40">
+          <div className="flex items-center gap-3">
+            <div className="group h-9 w-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-inner">
+              <span className="inline-flex motion-safe:animate-[var(--animate-action-view)]">
+                <IndianRupee className="w-5 h-5" />
+              </span>
+            </div>
+            <h3 className="text-base font-bold text-slate-800 tracking-tight">Rate Entry</h3>
+          </div>
         </div>
-      ) : (
-        <CompletedTripsTable
-          trips={paginatedTrips}
-          onEnterRate={openRateEntry}
-          onModifyRate={openModifyRate}
-          startIndex={startIndex}
-          selectedRowId={selectedRowId}
-          onRowClick={(trip) => setSelectedRowId((current) => (current === trip.id ? null : trip.id))}
-          sortBy={sortBy}
-          sortDir={sortDir}
-          onSortChange={handleSortChange}
-        >
-          {shouldShowPagination(filteredTrips.length) && (
-            <Pagination
-              page={safeCurrentPage}
-              pageSize={pageSize}
-              totalItems={filteredTrips.length}
-              onPageChange={setCurrentPage}
-              onPageSizeChange={setPageSize}
-              disabled={isLoading}
+
+        {filteredTrips.length === 0 && !loadError ? (
+          <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
+            <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
+              <Store size={20} />
+            </span>
+            <p className="font-semibold text-slate-700">{t("ops.rate.no_trips")}</p>
+            <p className="text-xs font-medium text-slate-500">No pending trips awaiting rates</p>
+          </div>
+        ) : (
+          <>
+            <CompletedTripsTable
+              trips={paginatedTrips}
+              onEnterRate={openRateEntry}
+              onModifyRate={openModifyRate}
+              startIndex={startIndex}
+              selectedRowId={selectedRowId}
+              onRowClick={(trip) => setSelectedRowId((current) => (current === trip.id ? null : trip.id))}
+              sortBy={sortBy}
+              sortDir={sortDir}
+              onSortChange={handleSortChange}
             />
-          )}
-        </CompletedTripsTable>
-      )}
+            {shouldShowPagination(filteredTrips.length) && (
+              <div className="border-t border-slate-200 bg-slate-50/50 px-3 py-2">
+                <Pagination
+                  page={safeCurrentPage}
+                  pageSize={pageSize}
+                  totalItems={filteredTrips.length}
+                  onPageChange={setCurrentPage}
+                  onPageSizeChange={setPageSize}
+                  disabled={isLoading}
+                />
+              </div>
+            )}
+          </>
+        )}
+      </div>
 
       {modalOpen && (
         <EnterRateModalWithShopMaster
@@ -267,6 +286,4 @@ export default function RatesEntryPage({ embedded = false }: Props) {
       )}
     </div>
   );
-
-  return content;
 }

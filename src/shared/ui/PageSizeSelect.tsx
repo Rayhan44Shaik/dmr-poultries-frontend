@@ -1,21 +1,17 @@
-import { useEffect, useId, useState } from "react";
-import { useI18n } from "../../i18n";
-import { MAX_CUSTOM_PAGE_SIZE } from "./uiTokens";
+import { useEffect, useId, useRef, useState, useMemo } from "react";
+import { ChevronDown, Check, Search } from "lucide-react";
 
 interface PageSizeSelectProps {
-  /** Current rows-per-page. */
   value: number;
-  /** Fired with the committed page size. */
   onChange: (pageSize: number) => void;
   disabled?: boolean;
-  /** Extra classes for the wrapper. */
   className?: string;
 }
 
-/** Inclusive range the slider can select. */
+// Global: 10,15,20,30,45,50 — includes 45 as requested, light green only
+const PAGE_SIZE_OPTIONS = [10, 15, 20, 30, 45, 50] as const;
 const RANGE_MIN = 5;
-const RANGE_MAX = MAX_CUSTOM_PAGE_SIZE; // 500
-const RANGE_STEP = 5;
+const RANGE_MAX = 500;
 
 function clampToRange(raw: number): number {
   if (!Number.isFinite(raw)) return RANGE_MIN;
@@ -23,81 +19,132 @@ function clampToRange(raw: number): number {
 }
 
 /**
- * GLOBAL "rows per page" selector — a CUSTOM RANGE, not the built-in presets.
- *
- * Replaces the old preset-only dropdown (10 / 20 / 50 / 100) with a free range
- * slider (5–500) plus a numeric input, so an operator can pick ANY count within
- * the range instead of being limited to fixed options. The slider drags in
- * steps of 5; the numeric input accepts any exact whole number (clamped on
- * commit to the same 5–500 range).
- *
- * Used by the shared `<Pagination>` and every module pagination footer, so the
- * same custom-range behaviour is available on every list (Rate Entry, Trip
- * List, Masters, Fleet, Staff, …).
+ * GLOBAL pagination dropdown — light green only, includes 45, Rows Per Page outside
+ * - Search input at top, type e.g. 12
+ * - If not in 6 options (10,15,20,30,45,50), shows Use X
+ * - If not there then Use — e.g. type 12 → Use 12
+ * - Light green: border-emerald-200 bg-emerald-50 text-emerald-700, active light green
+ * - Global for all modules
  */
-export function PageSizeSelect({
-  value,
-  onChange,
-  disabled = false,
-  className = "",
-}: PageSizeSelectProps) {
-  const { t } = useI18n();
+export function PageSizeSelect({ value, onChange, disabled = false, className = "" }: PageSizeSelectProps) {
   const id = useId();
   const safeValue = clampToRange(value);
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const wrapperRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
 
-  // Local draft for the numeric input so typing "30" isn't clobbered mid-keystroke
-  // (the first "3" would otherwise clamp to the 5-minimum before the "0" lands).
-  const [draft, setDraft] = useState<string>(String(safeValue));
   useEffect(() => {
-    setDraft(String(clampToRange(value)));
-  }, [value]);
+    if (open) {
+      setQuery("");
+      setTimeout(() => inputRef.current?.focus(), 0);
+    }
+  }, [open]);
 
-  const commitFromDraft = () => {
-    const n = Number(draft);
-    const next = clampToRange(n);
-    setDraft(String(next));
-    if (next !== value) onChange(next);
+  useEffect(() => {
+    if (!open) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (wrapperRef.current && !wrapperRef.current.contains(e.target as Node)) setOpen(false);
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setOpen(false);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  const filtered = useMemo(() => {
+    if (!query.trim()) return PAGE_SIZE_OPTIONS as readonly number[];
+    const q = query.trim().toLowerCase();
+    return (PAGE_SIZE_OPTIONS as readonly number[]).filter((opt) => String(opt).includes(q));
+  }, [query]);
+
+  const queryNum = Number(query);
+  const isQueryNumeric = query.trim() !== "" && Number.isFinite(queryNum) && queryNum >= RANGE_MIN && queryNum <= RANGE_MAX;
+  const queryClamped = isQueryNumeric ? clampToRange(queryNum) : null;
+  const showUseThis = isQueryNumeric && !(PAGE_SIZE_OPTIONS as readonly number[]).includes(queryClamped as number);
+
+  const commit = (next: number) => {
+    const clamped = clampToRange(next);
+    if (clamped !== value) onChange(clamped);
+    setOpen(false);
+    setQuery("");
   };
 
   return (
-    <div className={`flex items-center gap-1.5 ${className}`}>
-      <span className="hidden text-xs font-semibold text-slate-600 sm:inline">
-        {t("common.rows_per_page")}
-      </span>
-      <input
+    <div ref={wrapperRef} className={`relative ${className}`}>
+      <button
         id={id}
-        type="range"
-        min={RANGE_MIN}
-        max={RANGE_MAX}
-        step={RANGE_STEP}
-        value={safeValue}
+        type="button"
         disabled={disabled}
-        aria-label={t("common.rows_per_page")}
-        onChange={(event) => {
-          const next = clampToRange(Number(event.target.value));
-          setDraft(String(next));
-          if (next !== value) onChange(next);
-        }}
-        className="h-2.5 w-24 cursor-pointer appearance-none rounded-full bg-slate-200 accent-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
-      />
-      <input
-        type="number"
-        min={RANGE_MIN}
-        max={RANGE_MAX}
-        step={1}
-        value={draft}
-        disabled={disabled}
-        aria-label={t("common.rows_per_page")}
-        onChange={(event) => setDraft(event.target.value)}
-        onBlur={commitFromDraft}
-        onKeyDown={(event) => {
-          if (event.key === "Enter") {
-            event.preventDefault();
-            (event.target as HTMLInputElement).blur();
-          }
-        }}
-        className="h-8 w-16 rounded-lg border border-slate-200 bg-white px-2 text-xs font-semibold text-slate-700 tabular-nums outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-500/20 disabled:cursor-not-allowed disabled:opacity-50 [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:m-0 [&::-webkit-outer-spin-button]:m-0"
-      />
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        onClick={() => setOpen((v) => !v)}
+        className="inline-flex h-8 min-w-[64px] items-center justify-between gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 px-3 text-[13px] font-bold text-emerald-700 shadow-sm transition-all hover:border-emerald-300 hover:bg-emerald-100 focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 focus:outline-none disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <span className="tabular-nums">{safeValue}</span>
+        <ChevronDown size={14} className={`text-emerald-500 transition-transform ${open ? "rotate-180" : ""}`} />
+      </button>
+
+      {open && (
+        <div className="absolute bottom-full z-50 mb-2 w-52 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-xl animate-scale-in">
+          <div className="relative p-2 border-b border-slate-100 bg-slate-50/60">
+            <Search size={14} className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              ref={inputRef}
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search or type custom"
+              className="h-8 w-full rounded-xl border border-slate-200 bg-white pl-8 pr-3 text-[13px] font-medium text-slate-700 placeholder:text-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
+            />
+          </div>
+
+          <div className="max-h-60 overflow-auto p-1.5">
+            {filtered.map((opt) => {
+              const selected = safeValue === opt;
+              return (
+                <button
+                  key={opt}
+                  type="button"
+                  role="option"
+                  aria-selected={selected}
+                  onClick={() => commit(opt)}
+                  className={`flex w-full items-center justify-between rounded-xl px-3 py-2.5 text-[13px] font-semibold transition-all border ${
+                    selected ? "bg-emerald-50 border-emerald-200 text-emerald-700 shadow-sm ring-1 ring-emerald-100" : "border-transparent text-slate-700 hover:bg-slate-50"
+                  }`}
+                >
+                  <span className="tabular-nums">{opt}</span>
+                  {selected && <Check size={14} className="text-emerald-600" />}
+                </button>
+              );
+            })}
+
+            {filtered.length === 0 && !showUseThis && (
+              <div className="px-3 py-3 text-center text-[12px] font-medium text-slate-400">No match — type custom</div>
+            )}
+
+            {showUseThis && queryClamped != null && (
+              <button
+                type="button"
+                onClick={() => commit(queryClamped)}
+                className="mt-1.5 flex w-full items-center justify-between rounded-xl bg-slate-900 px-3 py-2.5 text-[13px] font-bold text-white shadow-sm hover:bg-black"
+              >
+                <span>Use {queryClamped}</span>
+                <span className="text-[11px] opacity-70">custom</span>
+              </button>
+            )}
+          </div>
+
+          <div className="border-t border-slate-100 bg-white px-3 py-2 text-center">
+            <p className="text-[10px] font-medium text-slate-400">6 options • 45 included • search • custom Use</p>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

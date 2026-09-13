@@ -339,7 +339,8 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
           {/* ── Global pagination — same bar as the trip tables ─────────── */}
           {shouldShowPagination(totalRecords) && (
             <div className={paginationBarClass}>
-              <div className="mr-auto flex items-center gap-1.5">
+              <div className="mr-auto flex items-center gap-2">
+                <span className="text-[13px] font-semibold text-slate-600">Rows Per Page</span>
                 <PageSizeSelect
                   value={pageSize}
                   onChange={(size) => {

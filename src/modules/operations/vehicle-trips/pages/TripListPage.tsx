@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { History, Truck } from "lucide-react";
 import TripFilters from "../components/TripFilters";
 import TripKPICards from "../components/TripKPICards";
 import TripMasterTable, { type TripSortKey } from "../components/TripMasterTable";
@@ -522,6 +523,16 @@ function TripListPage({ embedded = false }: TripListPageProps) {
       )}
 
       <div ref={tableContainerRef} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden text-xs md:text-sm">
+        {/* Header — neatly like Recent Trip Activity, same at top */}
+        <div className="flex items-center px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-blue-50/60 via-white to-blue-50/40">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-blue-50/70 border border-blue-100 flex items-center justify-center text-blue-500 shadow-inner">
+              <History className="w-5 h-5" />
+            </div>
+            <h3 className="text-base font-bold text-slate-800 tracking-tight">Trip List</h3>
+          </div>
+        </div>
+
         <TripMasterTable
           trips={paginatedTrips}
           selectedRowId={selectedRowId}

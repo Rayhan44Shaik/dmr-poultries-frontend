@@ -53,7 +53,10 @@ function EmiPagination({ page, totalPages, totalItems, pageSize, ready, onChange
         {ready ? t('fleet.emi.showing_rows', { from, to, total: totalItems }) : '—'}
       </p>
       {onPageSizeChange && (
+        <div className="flex items-center gap-2">
+        <span className="text-[13px] font-semibold text-slate-600">Rows Per Page</span>
         <PageSizeSelect value={pageSize} onChange={onPageSizeChange} disabled={!ready} />
+      </div>
       )}
       <nav aria-label={t('fleet.emi.pagination_label')} className="flex items-center justify-end gap-1.5">
         <button type="button" aria-label={t('common.previous')} disabled={!canNavigate || currentPage === 1} onClick={() => choosePage(currentPage - 1)} className={navButtonClass}>

@@ -67,6 +67,7 @@ export {
 
 /* --- overlays ------------------------------------------------------------ */
 export { Modal, type ModalProps, type ModalSize } from "./Modal";
+export { default as AppShellModal } from "./AppShellModal";
 export { ConfirmDialog, type ConfirmDialogProps } from "./ConfirmDialog";
 export { confirmDialog, type ConfirmOptions, type ConfirmTone } from "./confirm/confirmStore";
 

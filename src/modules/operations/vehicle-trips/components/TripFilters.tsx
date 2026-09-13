@@ -87,7 +87,7 @@ function TripFilters({
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
         <div>
           <label className={opsFilterLabelClass}>
-            <Calendar size={13} className="text-emerald-500 flex-shrink-0" />
+            <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
             <span>{t("common.from")}</span>
           </label>
           <DatePicker
@@ -100,7 +100,7 @@ function TripFilters({
 
         <div>
           <label className={opsFilterLabelClass}>
-            <Calendar size={13} className="text-emerald-500 flex-shrink-0" />
+            <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
             <span>{t("common.to")}</span>
           </label>
           <DatePicker
@@ -113,7 +113,7 @@ function TripFilters({
 
         <div>
           <label className={opsFilterLabelClass}>
-            <Truck size={13} className="text-emerald-500 flex-shrink-0" />
+            <Truck size={17} className="text-emerald-500 flex-shrink-0" />
             <span>{t("common.vehicle")}</span>
           </label>
           <MasterDropdown
@@ -131,7 +131,7 @@ function TripFilters({
 
         <div>
           <label className={opsFilterLabelClass}>
-            <UserCog size={13} className="text-emerald-500 flex-shrink-0" />
+            <UserCog size={17} className="text-emerald-500 flex-shrink-0" />
             <span>{t("common.supervisor")}</span>
           </label>
           <MasterDropdown
@@ -149,7 +149,7 @@ function TripFilters({
 
         <div>
           <label className={opsFilterLabelClass}>
-            <Warehouse size={13} className="text-emerald-500 flex-shrink-0" />
+            <Warehouse size={17} className="text-amber-500 flex-shrink-0" />
             <span>{t("ops.trip.source_farm")}</span>
           </label>
           <MasterDropdown
@@ -169,11 +169,11 @@ function TripFilters({
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-end pt-1">
         <div className="lg:col-span-5">
           <label className={opsFilterLabelClass}>
-            <Search size={13} className="text-slate-400 flex-shrink-0" />
+            <Search size={17} className="text-slate-400 flex-shrink-0" />
             <span>{t("common.search")}</span>
           </label>
           <div className="relative">
-            <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               value={search}
               onChange={(e) => setSearch(e.target.value)}

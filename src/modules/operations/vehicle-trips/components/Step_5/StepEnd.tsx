@@ -46,13 +46,13 @@ function ConfirmationModal({ isOpen, title, message, confirmLabel = "ops.trip.ye
             </div>
             <div>
               <h3 className="text-lg font-bold text-slate-800">{title}</h3>
-              <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">{message}</p>
+              <p className="text-[15px] text-slate-600 mt-1.5 leading-relaxed">{message}</p>
             </div>
           </div>
         </div>
         <div className="flex justify-end gap-3 px-6 py-4 bg-slate-50 border-t border-slate-100">
-          <button onClick={onCancel} className="h-10 px-5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium text-slate-600 transition-all shadow-xs inline-flex items-center justify-center shrink-0">{t(cancelLabel)}</button>
-          <button onClick={onConfirm} className={`h-10 px-5 rounded-lg text-sm font-bold text-white shadow-xs transition-all active:scale-[0.98] inline-flex items-center justify-center shrink-0 ${type === "warning" ? "bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-500 hover:to-orange-500" : "bg-emerald-500 hover:bg-emerald-600"}`}>
+          <button onClick={onCancel} className="h-10 px-5 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-[15px] font-medium text-slate-600 transition-all shadow-xs inline-flex items-center justify-center shrink-0">{t(cancelLabel)}</button>
+          <button onClick={onConfirm} className={`h-10 px-5 rounded-lg text-[15px] font-bold text-white shadow-xs transition-all active:scale-[0.98] inline-flex items-center justify-center shrink-0 ${type === "warning" ? "bg-gradient-to-r from-amber-400 to-orange-400 hover:from-amber-500 hover:to-orange-500" : "bg-emerald-500 hover:bg-emerald-600"}`}>
             {t(confirmLabel)}
           </button>
         </div>
@@ -688,7 +688,7 @@ export default function StepEnd({
                   <ActionTooltip label={t("ops.trip.edit_step")} />
                 </button>
               )}
-              <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
+              <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-[13px] font-semibold whitespace-nowrap">
                 {t("ops.trip.submitted_locked")}
               </span>
             </div>
@@ -734,8 +734,8 @@ export default function StepEnd({
                 key={f.label}
                 className={`rounded-xl border px-3 py-2.5 min-w-0 shadow-sm ${f.wide ? "col-span-2 sm:col-span-1" : ""} ${f.tone}`}
               >
-                <p className="text-xs uppercase font-semibold text-slate-400 tracking-wide truncate">{f.label}</p>
-                <p className={`${f.wide ? "overflow-visible whitespace-normal text-[11px] leading-none" : "truncate text-sm"} font-bold text-slate-800 mt-1 tabular-nums`}>{f.value}</p>
+                <p className="text-[13px] uppercase font-semibold text-slate-400 tracking-wide truncate">{f.label}</p>
+                <p className={`${f.wide ? "overflow-visible whitespace-normal text-[12px] leading-none" : "truncate text-[15px]"} font-bold text-slate-800 mt-1 tabular-nums`}>{f.value}</p>
               </div>
             ))}
           </div>
@@ -781,7 +781,7 @@ export default function StepEnd({
               {isSubmitted ? (
                 <StepCloseButton onClose={handleExitToLocked} animated />
               ) : null}
-              <span className="text-[11px] text-slate-700 font-medium bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200 whitespace-nowrap">
+              <span className="text-[12px] text-slate-700 font-medium bg-slate-100 px-2.5 py-0.5 rounded-full border border-slate-200 whitespace-nowrap">
                 {t("ops.trip.editable_view")}
               </span>
             </div>
@@ -828,8 +828,8 @@ export default function StepEnd({
                 key={f.label}
                 className={`rounded-xl border px-3 py-2.5 min-w-0 shadow-sm ${f.wide ? "col-span-2 sm:col-span-1" : ""} ${f.tone}`}
               >
-                <p className="text-xs uppercase font-semibold text-slate-400 tracking-wide truncate">{f.label}</p>
-                <p className={`${f.wide ? "overflow-visible whitespace-normal text-[11px] leading-none" : "truncate text-sm"} font-bold text-slate-800 mt-1 tabular-nums`}>{f.value}</p>
+                <p className="text-[13px] uppercase font-semibold text-slate-400 tracking-wide truncate">{f.label}</p>
+                <p className={`${f.wide ? "overflow-visible whitespace-normal text-[12px] leading-none" : "truncate text-[15px]"} font-bold text-slate-800 mt-1 tabular-nums`}>{f.value}</p>
               </div>
             ))}
           </div>
@@ -862,7 +862,7 @@ export default function StepEnd({
           />
 
           {errorMsg ? (
-            <div className="p-2.5 bg-red-50/70 border border-red-100 text-red-500 text-xs font-semibold rounded-lg">
+            <div className="p-2.5 bg-red-50/70 border border-red-100 text-red-500 text-[13px] font-semibold rounded-lg">
               {errorMsg}
             </div>
           ) : null}
@@ -878,11 +878,11 @@ export default function StepEnd({
                 setSheetData(updated);
               }}
               placeholder={t("ops.trip.optional_trip_notes")}
-              className="w-full text-xs font-medium text-slate-800 outline-none bg-transparent resize-none placeholder:text-slate-400 text-left"
+              className="w-full text-[13px] font-medium text-slate-800 outline-none bg-transparent resize-none placeholder:text-slate-400 text-left"
             />
           </div>
 
-          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center justify-between gap-2 font-bold text-xs text-slate-900">
+          <div className="bg-slate-50 border border-slate-200 rounded-lg p-3 flex items-center justify-between gap-2 font-bold text-[13px] text-slate-900">
             <span>{t("ops.trip.balance_remaining")}</span>
             <span className="text-emerald-500 tabular-nums">{formatInr(remainingBalance)}</span>
           </div>

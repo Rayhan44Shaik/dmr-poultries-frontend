@@ -37,26 +37,27 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
   const [storedMode, setStoredMode] = useLocalStorage<string>(SIDEBAR_STORAGE_KEY, "expanded");
   const sidebarMode: SidebarMode = isValidSidebarMode(storedMode) ? storedMode : "expanded";
   const setSidebarMode = useCallback(
-    (mode: SidebarMode) => setStoredMode(mode),
+    (mode: SidebarMode) => {
+      setStoredMode(mode);
+      // Notify AppShellModal instantly — same-tab localStorage doesn't fire storage event
+      try {
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent("dmr-sidebar-mode-change", { detail: mode }));
+        }
+      } catch {
+        // ignore
+      }
+    },
     [setStoredMode]
   );
 
-  // The small-screen popup is closed by default; the header menu button opens
-  // it. Clicking outside the popup (or pressing Escape) closes it.
   const [navOpen, setNavOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
 
-  // Scroll the content area back to the top on navigation.
   useEffect(() => {
     mainRef.current?.scrollTo({ top: 0 });
   }, [location.pathname, location.search]);
 
-  /**
-   * Header menu button:
-   *   • desktop — steps the persistent panel (hidden/rail → expanded, expanded
-   *     → rail) instead of opening the popup;
-   *   • below lg — opens the floating popup, as before.
-   */
   const handleMenuClick = useCallback(() => {
     if (typeof window !== "undefined" && window.matchMedia(LG_QUERY).matches) {
       setSidebarMode(sidebarMode === "expanded" ? "rail" : "expanded");
@@ -65,11 +66,9 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
     setNavOpen(true);
   }, [sidebarMode, setSidebarMode]);
 
-  // ⌘/Ctrl + B — the familiar "toggle navigation" shortcut.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== "b") return;
-      // Never steal the shortcut while the user is typing.
       const target = e.target as HTMLElement | null;
       if (target && (target.isContentEditable || /^(input|textarea|select)$/i.test(target.tagName))) return;
       e.preventDefault();
@@ -88,31 +87,17 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
       className={`h-screen overflow-hidden bg-slate-100/80 transition-[padding] duration-300 ease-out dark:bg-slate-950 ${SIDEBAR_CONTENT_CLASS[sidebarMode]}`}
     >
       <div className="flex h-full min-w-0 flex-col">
-        <Header
-          onMenuClick={handleMenuClick}
-          menuOpen={navOpen}
-          onOpenCommand={() => setCommandOpen(true)}
-        />
+        <Header onMenuClick={handleMenuClick} menuOpen={navOpen} onOpenCommand={() => setCommandOpen(true)} />
 
         <main ref={mainRef} className="flex-1 overflow-y-auto" id="app-scroll">
           {children}
         </main>
       </div>
 
-      <CommandPalette
-        open={commandOpen}
-        onOpen={() => setCommandOpen(true)}
-        onClose={() => setCommandOpen(false)}
-      />
+      <CommandPalette open={commandOpen} onOpen={() => setCommandOpen(true)} onClose={() => setCommandOpen(false)} />
 
-      <Sidebar
-        open={navOpen}
-        onClose={() => setNavOpen(false)}
-        mode={sidebarMode}
-        onModeChange={setSidebarMode}
-      />
+      <Sidebar open={navOpen} onClose={() => setNavOpen(false)} mode={sidebarMode} onModeChange={setSidebarMode} />
 
-      {/* One-time sign-in alert when work is waiting for approval. */}
       <ApprovalAlertToaster />
     </div>
   );

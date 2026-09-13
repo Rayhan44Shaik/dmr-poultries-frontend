@@ -90,7 +90,10 @@ const Pagination: React.FC<PaginationProps> = ({
         <span className="font-semibold">{totalItems}</span>
       </p>
       {onPageSizeChange && pageSize != null && (
-        <PageSizeSelect value={pageSize} onChange={onPageSizeChange} />
+        <div className="flex items-center gap-2">
+          <span className="text-[13px] font-semibold text-slate-600">Rows Per Page</span>
+          <PageSizeSelect value={pageSize} onChange={onPageSizeChange} />
+        </div>
       )}
       <nav
         aria-label={t('masters.ui.pagination')}

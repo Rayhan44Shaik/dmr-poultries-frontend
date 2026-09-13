@@ -572,7 +572,7 @@ export function uiPaginationPageButtonClass(active: boolean): string {
     uiFocusRing,
     "disabled:cursor-not-allowed disabled:opacity-40",
     active
-      ? "border-emerald-600 bg-emerald-600 text-white"
+      ? "border-emerald-200 bg-emerald-50 text-emerald-700 shadow-sm ring-1 ring-emerald-100"
       : "border-slate-200 bg-white text-slate-700 hover:bg-slate-50 hover:border-slate-300",
   ].join(" ");
 }
@@ -783,7 +783,7 @@ export const uiEmptySurfaceClass =
  * ------------------------------------------------------------------------- */
 
 export const uiOverlayClass =
-  "fixed inset-0 bg-slate-900/45 backdrop-blur-[1px] animate-fade-in";
+  "fixed inset-0 bg-slate-900/[0.05] backdrop-blur-[1px] animate-fade-in";
 
 export const uiDialogPanelClass =
   "relative flex w-full flex-col overflow-hidden rounded-2xl border " +

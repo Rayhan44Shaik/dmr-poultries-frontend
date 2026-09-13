@@ -175,10 +175,11 @@ export function Button({
     {title && tooltipOpen && typeof document !== "undefined" && createPortal(
       <span
         role="tooltip"
-        className="pointer-events-none fixed z-[9999] rounded-md border border-slate-700/10 bg-slate-900 px-2.5 py-1.5 text-left text-[11px] font-medium leading-snug text-white shadow-lg"
-        style={{ top: tooltipPosition.top, left: tooltipPosition.left, width: tooltipPosition.width, whiteSpace: "normal" }}
+        className="pointer-events-none fixed z-[9999] max-w-[320px] rounded-2xl border border-white/10 bg-slate-900/95 px-3.5 py-2.5 text-center text-[12px] font-semibold leading-[1.6] tracking-wide text-white shadow-[0_8px_32px_rgba(0,0,0,0.24),0_2px_8px_rgba(0,0,0,0.12)] ring-1 ring-white/5 backdrop-blur-xl whitespace-normal break-words text-pretty animate-[fadeIn_0.18s_cubic-bezier(0.34,1.56,0.64,1)]"
+        style={{ top: tooltipPosition.top, left: tooltipPosition.left, width: tooltipPosition.width }}
       >
-        {title}
+        <span className="block">{title}</span>
+        <span className="pointer-events-none absolute inset-0 rounded-2xl bg-gradient-to-b from-white/[0.08] to-transparent" aria-hidden="true" />
       </span>,
       document.body,
     )}
