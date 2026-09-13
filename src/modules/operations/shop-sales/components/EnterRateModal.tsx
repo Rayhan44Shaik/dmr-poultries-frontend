@@ -101,7 +101,7 @@ export default function EnterRateModal({
   const [lockError, setLockError] = useState<string | null>(null);
   const [lockAttempted, setLockAttempted] = useState(false);
   const [shopPage, setShopPage] = useState(1);
-  const [shopSortKey, setShopSortKey] = useState<ShopSortKey>("shopName");
+  const [shopSortKey, setShopSortKey] = useState<ShopSortKey>("time");
   const [shopSortDir, setShopSortDir] = useState<"asc" | "desc">("asc");
   const [shopSearch, setShopSearch] = useState("");
   const [localLanguage, setLocalLanguage] = useState(language);
@@ -116,7 +116,7 @@ export default function EnterRateModal({
     setLockError(null);
     setLockAttempted(false);
     setShopPage(1);
-    setShopSortKey("shopName");
+    setShopSortKey("time");
     setShopSortDir("asc");
     setShopSearch("");
     setLocalLanguage(language);
@@ -617,7 +617,8 @@ export default function EnterRateModal({
                     </tr>
                   </thead>
                   <tbody>
-                    {pagedDeliveries.map(({ row: delivery, originalIndex }) => {
+                    {pagedDeliveries.map(({ row: delivery, originalIndex }, idx) => {
+                      const serialNo = (shopPage - 1) * SHOPS_PAGE_SIZE + idx + 1;
                       const rate = normalizeRate(delivery.rate);
                       const isValid = isValidSellingRate(rate);
                       const amount = isValid ? Number((delivery.weight * (rate as number)).toFixed(2)) : 0;
@@ -630,8 +631,8 @@ export default function EnterRateModal({
                       const missingForLock = lockAttempted && !isValid;
 
                       return (
-                        <tr key={delivery.id} className={`border-b border-slate-100 ${missingForLock ? "bg-red-50" : originalIndex % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-slate-50/50 hover:bg-slate-50"}`}>
-                          <td className="px-2 py-3 text-center text-[13px] font-normal text-slate-700 tabular-nums">{originalIndex + 1}</td>
+                        <tr key={delivery.id} className={`border-b border-slate-100 ${missingForLock ? "bg-red-50" : idx % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-slate-50/50 hover:bg-slate-50"}`}>
+                          <td className="px-2 py-3 text-center text-[13px] font-normal text-slate-700 tabular-nums">{serialNo}</td>
                           <td className="px-3 py-3">
                             <div className="text-[14px] font-medium text-slate-700 leading-tight truncate">{displayRateEntryShopName(delivery.shopName, localLanguage)}</div>
                             {masterShop && <div className="text-[11px] font-normal text-slate-500 truncate">{masterShop.city}</div>}
