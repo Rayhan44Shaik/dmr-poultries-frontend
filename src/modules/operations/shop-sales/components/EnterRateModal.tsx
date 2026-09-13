@@ -334,8 +334,8 @@ export default function EnterRateModal({
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-3">
-              <button onClick={() => setShowConfirm(false)} className="px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 cancel-anim">Cancel</button>
-              <button onClick={() => confirmSave("lock")} disabled={saving} className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-sm font-medium text-white shadow-sm lock-anim">Lock</button>
+              <button onClick={() => setShowConfirm(false)} className="group relative inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 cancel-anim"><span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-close)]"><X size={14} /></span> Cancel</button>
+              <button onClick={() => confirmSave("lock")} disabled={saving} className="group relative inline-flex items-center gap-2 px-5 py-2 rounded-xl bg-orange-50 border border-orange-300 text-orange-800 text-sm font-bold shadow-sm hover:bg-orange-100 lock-anim"><span className="inline-flex text-orange-700"><Lock size={14} /></span> Lock</button>
             </div>
           </div>
         </div>, document.body
@@ -354,7 +354,7 @@ export default function EnterRateModal({
                 <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 <span className="text-[11px] font-bold text-emerald-800 tabular-nums">{totals.ratedCount}/{deliveries.length} • {totals.progressPct}%</span>
               </div>
-              <button onClick={onClose} className="h-8 w-8 rounded-full flex items-center justify-center border border-slate-200 bg-white x-anim"><X size={16} className="text-slate-600" /></button>
+              <button onClick={onClose} className="group relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:-translate-y-0.5 hover:border-red-100 hover:bg-red-50 hover:text-red-500 active:scale-95 x-anim"><span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-close)]"><X size={16} /></span></button>
             </div>
           </div>
 
@@ -629,9 +629,9 @@ export default function EnterRateModal({
                   </button>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button type="button" onClick={onClose} className="px-5 py-3 rounded-xl border border-slate-300 bg-white text-[14px] font-semibold text-slate-600 hover:bg-slate-50 cancel-anim min-w-[90px]">Cancel</button>
-                  <button type="button" onClick={() => confirmSave("save")} disabled={saving || !isDirty || hasInvalidEnteredRate} className={`inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl border text-[14px] font-bold disabled:opacity-50 save-anim min-w-[130px] ${isDirty ? "border-amber-300 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
-                    <Save size={16} /> Save
+                  <button type="button" onClick={onClose} className="group relative inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-slate-300 bg-white text-[14px] font-semibold text-slate-600 hover:bg-slate-50 cancel-anim min-w-[110px]"><span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-close)]"><X size={14} /></span> Cancel</button>
+                  <button type="button" onClick={() => confirmSave("save")} disabled={saving || !isDirty || hasInvalidEnteredRate} className={`group relative inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl border text-[14px] font-bold disabled:opacity-50 save-anim min-w-[130px] ${isDirty ? "border-amber-300 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
+                    <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-edit)]"><Save size={16} /></span> Save
                   </button>
                   <button
                     type="button"
@@ -649,9 +649,9 @@ export default function EnterRateModal({
                       setShowConfirm(true);
                     }}
                     disabled={saving}
-                    className="inline-flex items-center justify-center gap-2.5 px-8 py-3.5 rounded-xl bg-emerald-600 text-white text-[15px] font-extrabold shadow-xl hover:shadow-2xl disabled:opacity-50 lock-anim min-w-[180px]"
+                    className="group relative inline-flex items-center justify-center gap-2.5 px-8 py-3.5 rounded-xl bg-orange-50 border border-orange-300 text-orange-800 text-[15px] font-extrabold shadow-lg hover:bg-orange-100 hover:shadow-xl hover:border-orange-400 disabled:opacity-50 lock-anim min-w-[190px]"
                   >
-                    <Lock size={18} className="text-emerald-100" /> Save & Lock
+                    <span className="inline-flex text-orange-700"><Lock size={18} /></span> Save & Lock
                   </button>
                 </div>
               </div>
