@@ -249,6 +249,12 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
       });
       if (missingDays.length) rows.push({ employeeId: emp.id, employeeName: emp.employeeName, role: emp.role, department: emp.department, missingDays });
     }
+    // Date-wise order: whoever misses the earliest day of the week appears
+    // first (lowest date first), with the roster name as the tie-breaker.
+    rows.sort((a, b) =>
+      (a.missingDays[0] ?? '').localeCompare(b.missingDays[0] ?? '') ||
+      a.employeeName.localeCompare(b.employeeName)
+    );
     return rows;
   }, [employees, weekDays, assignments, isOnApprovedLeave]);
   const unassignedCount = useMemo(

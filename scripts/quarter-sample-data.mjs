@@ -2430,6 +2430,46 @@ function dutyWeekStatus(weekStart) {
   return "Open";
 }
 
+/**
+ * Week-opening validation (mirrors the app rule): a week accepts duty
+ * changes only while its own status is open AND its previous week has been
+ * submitted/locked/closed — once this week is submitted, only then can the
+ * next week be opened. Applies even after a week's dates have passed.
+ */
+function dutyWeekEditable(weekStart) {
+  const status = dutyWeekStatus(weekStart);
+  if (["Submitted", "Locked", "Closed"].includes(status))
+    return { ok: false, reason: `week ${weekStart} is already ${status} (read-only)` };
+  const prev = addDays(weekStart, -7);
+  const prevStatus = dutyWeekStatus(prev);
+  if (!["Submitted", "Locked", "Closed"].includes(prevStatus))
+    return { ok: false, reason: `previous week ${prev} is ${prevStatus} — submit it first` };
+  return { ok: true };
+}
+
+/**
+ * Pending (employee × day) cells in a week: active manual-duty-role
+ * employees with no assignment and no approved leave. Non-manual roles
+ * always receive an automatic duty (Office/Collection/WeeklyOff), so they
+ * are never pending — same rule as the frontend pending counter.
+ */
+const MANUAL_DUTY_ROLES = new Set(["Supervisor", "Driver", "Helper", "Loader"]);
+function dutyPendingCount(weekStart) {
+  let pending = 0;
+  for (const e of EMPLOYEES) {
+    if (e.status !== "Active" || !MANUAL_DUTY_ROLES.has(e.role)) continue;
+    for (let i = 0; i < 7; i += 1) {
+      const d = addDays(weekStart, i);
+      const assigned = (DUTY_BY_DATE.get(d) ?? []).some((a) => a.employeeId === e.id);
+      const onLeave = LEAVES.some(
+        (l) => l.status === "Approved" && l.employeeId === e.id && l.fromDate <= d && l.toDate >= d
+      );
+      if (!assigned && !onLeave) pending += 1;
+    }
+  }
+  return pending;
+}
+
 let dutyEditSeq = 0;
 
 /** Create or replace the assignment of one employee on one date. */
@@ -3967,6 +4007,8 @@ const server = http.createServer(async (req, res) => {
     // Cell edit: POST /api/staff/duty-planner/assign → reloaded week.
     if (p === "/api/staff/duty-planner/assign" && method === "POST") {
       const body = await readBody(req);
+      const gate = dutyWeekEditable(weekKey(String(body?.date ?? TODAY)));
+      if (!gate.ok) return send(409, { error: `Duty changes rejected: ${gate.reason}.` });
       putDutyAssignment(body ?? {});
       return send(200, dutyPlannerWeek(weekKey(String(body?.date ?? TODAY))));
     }
@@ -3978,14 +4020,24 @@ const server = http.createServer(async (req, res) => {
     if (p === "/api/staff/duty-planner/auto-assign/apply" && method === "POST") {
       const body = await readBody(req);
       const start = String(body?.weekStart ?? CURRENT_WEEK_START);
+      const gate = dutyWeekEditable(start);
+      if (!gate.ok) return send(409, { error: `Auto-assign rejected: ${gate.reason}.` });
       const rows = Array.isArray(body?.plan?.rows) ? body.plan.rows : dutyAutoPlan(start).rows;
       for (const proposal of rows) putDutyAssignment(proposal);
       return send(200, dutyPlannerWeek(start));
     }
     // Submit week: locks the week (status → Submitted, read-only).
+    // Validation: the previous week must already be submitted (the next week
+    // only opens after this one is submitted), and every employee must have
+    // a duty on every day of the week before it can be closed.
     if (p === "/api/staff/duty-planner/submit" && method === "POST") {
       const body = await readBody(req);
       const start = String(body?.weekStart ?? CURRENT_WEEK_START);
+      const gate = dutyWeekEditable(start);
+      if (!gate.ok) return send(409, { error: `Cannot submit: ${gate.reason}.` });
+      const pending = dutyPendingCount(start);
+      if (pending > 0)
+        return send(409, { error: `Cannot submit — ${pending} days still have no duty assigned. Assign every day for every employee first.` });
       DUTY_WEEK_STATUS.set(start, "Submitted");
       return send(200, dutyPlannerWeek(start));
     }
@@ -3995,12 +4047,19 @@ const server = http.createServer(async (req, res) => {
     if (m(/^\/api\/staff\/duty-planner\/([^\/]+)$/) && ["PUT", "PATCH"].includes(method)) {
       const row = findDutyAssignment(m(/^\/api\/staff\/duty-planner\/([^\/]+)$/)[1]);
       if (!row) return send(404, { error: "not_found" });
+      const gate = dutyWeekEditable(weekKey(row.date));
+      if (!gate.ok) return send(409, { error: `Duty changes rejected: ${gate.reason}.` });
       const body = await readBody(req);
       if (body?.dutyType) row.dutyType = body.dutyType;
       return send(200, dutyPlannerWeek(weekKey(row.date)));
     }
     if (m(/^\/api\/staff\/duty-planner\/([^\/]+)$/) && method === "DELETE") {
-      const result = removeDutyAssignment(m(/^\/api\/staff\/duty-planner\/([^\/]+)$/)[1]);
+      const idValue = m(/^\/api\/staff\/duty-planner\/([^\/]+)$/)[1];
+      const existing = findDutyAssignment(idValue);
+      if (!existing) return send(404, { error: "not_found" });
+      const gate = dutyWeekEditable(weekKey(existing.date));
+      if (!gate.ok) return send(409, { error: `Duty changes rejected: ${gate.reason}.` });
+      const result = removeDutyAssignment(idValue);
       if (!result) return send(404, { error: "not_found" });
       return send(200, dutyPlannerWeek(result.weekStart));
     }
