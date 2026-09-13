@@ -1,24 +1,27 @@
 // src/modules/staff/components/leave/LeaveFilters.tsx
 
 import { memo, useState, useRef, useEffect, useCallback } from 'react';
-import { uiSearchInputWithClearClass } from '../../../../shared/ui/uiTokens';
 import {
   Search,
-  CheckCircle2,
-  Clock,
-  XCircle,
-  LayoutGrid,
-  Users,
-  Filter,
+  UsersRound,
+  Building2,
+  Calendar,
+  CalendarOff,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  X,
-  RefreshCw,
-  Plus,
   RotateCcw,
-  Calendar,
+  Plus,
 } from 'lucide-react';
+import {
+  uiCardClass,
+  uiFilterLabelClass,
+  uiInputClass,
+} from '../../../../shared/ui/uiTokens';
+import { Button } from '../../../../ui';
+import { BrandRefreshButton } from '../../../../ui';
+import { ActionTooltip } from '../../../../ui/ActionTooltip';
+import MasterDropdown from '../../../masters/components/MasterDropdown';
 import type { LeaveFilters as LeaveFilterState } from '../../hooks/useLeaveManagement';
 import type { Employee } from '../../../masters/employees/types/employee';
 
@@ -32,24 +35,9 @@ interface LeaveFiltersProps {
   onNewRequest: () => void;
   loading: boolean;
   showForm: boolean;
-  stats: {
-    approved: number;
-    pending: number;
-    rejected: number;
-    approvedDays: number;
-    onLeaveToday: number;
-  };
 }
 
-const STATUS_TABS: { label: LeaveFilterState['status']; icon: React.ReactNode }[] = [
-  { label: 'All', icon: <LayoutGrid size={13} /> },
-  { label: 'Pending', icon: <Clock size={13} /> },
-  { label: 'Approved', icon: <CheckCircle2 size={13} /> },
-  { label: 'Rejected', icon: <XCircle size={13} /> },
-  { label: 'Cancelled', icon: <X size={13} /> },
-];
-
-const LEAVE_TYPES = ['All', 'Casual', 'Sick', 'Emergency', 'Annual'] as const;
+const LEAVE_TYPES = ['Casual', 'Sick', 'Emergency', 'Annual'] as const;
 
 const MONTHS = [
   { value: '01', label: 'Jan' },
@@ -66,7 +54,11 @@ const MONTHS = [
   { value: '12', label: 'Dec' },
 ];
 
-/** Month-only picker: shows a grid of month names with year navigation. */
+/**
+ * Month-only picker: a grid of month names with year navigation. Styled to
+ * match the MasterDropdown trigger it sits beside (same 36px white control,
+ * 12px corners, rotating chevron) so the filter row reads as one system.
+ */
 function MonthPicker({
   value,
   onChange,
@@ -103,25 +95,33 @@ function MonthPicker({
 
   return (
     <div className="relative" ref={ref}>
-      <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-1.5">
-        <Calendar size={13} className="text-brand-500" /> Month
+      <span className={uiFilterLabelClass}>
+        <Calendar size={13} className="shrink-0 text-emerald-500" />
+        <span>Month</span>
       </span>
       <button
         type="button"
         onClick={() => setOpen(!open)}
-        className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm bg-slate-50/50 hover:bg-slate-50 transition text-left flex items-center justify-between text-slate-700 font-medium"
+        aria-label="Select month"
+        aria-expanded={open}
+        className="flex h-9 w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none transition hover:border-emerald-300 focus-visible:border-emerald-500 focus-visible:ring-2 focus-visible:ring-emerald-500/20"
       >
-        <span>{displayLabel}</span>
-        <ChevronDown size={14} className="text-slate-400 shrink-0 ml-1" />
+        <span className="truncate">{displayLabel}</span>
+        <ChevronDown
+          size={14}
+          aria-hidden="true"
+          className={`shrink-0 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`}
+        />
       </button>
       {open && (
-        <div className="absolute left-0 right-0 z-50 mt-1 bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden min-w-[260px]">
+        <div className="absolute left-0 right-0 z-50 mt-1 min-w-[260px] overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xl">
           {/* Year navigation */}
-          <div className="flex items-center justify-between px-3 py-2.5 border-b border-slate-100">
+          <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2.5">
             <button
               type="button"
               onClick={() => setViewYear((y) => y - 1)}
-              className="p-1 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition"
+              aria-label="Previous year"
+              className="rounded-lg p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
             >
               <ChevronLeft size={16} />
             </button>
@@ -129,7 +129,8 @@ function MonthPicker({
             <button
               type="button"
               onClick={() => setViewYear((y) => y + 1)}
-              className="p-1 rounded-lg text-slate-500 hover:bg-slate-100 hover:text-slate-700 transition"
+              aria-label="Next year"
+              className="rounded-lg p-1 text-slate-500 transition hover:bg-slate-100 hover:text-slate-700"
             >
               <ChevronRight size={16} />
             </button>
@@ -144,11 +145,11 @@ function MonthPicker({
                   key={month.value}
                   type="button"
                   onClick={() => handleMonthClick(month.value)}
-                  className={`py-2.5 rounded-lg text-xs font-semibold transition ${
+                  className={`rounded-lg py-2.5 text-xs font-semibold transition ${
                     isSelected
-                      ? 'bg-brand-600 text-white shadow-sm'
+                      ? 'bg-emerald-600 text-white shadow-sm'
                       : isCurrentMonth
-                        ? 'bg-brand-50 text-brand-700 border border-brand-200'
+                        ? 'border border-emerald-200 bg-emerald-50 text-emerald-700'
                         : 'text-slate-700 hover:bg-slate-100'
                   }`}
                 >
@@ -163,112 +164,14 @@ function MonthPicker({
   );
 }
 
-/** Compact searchable dropdown. Max 5 visible items at a time. */
-function SearchableDropdown({
-  label,
-  icon,
-  value,
-  options,
-  placeholder,
-  onChange,
-}: {
-  label: string;
-  icon: React.ReactNode;
-  value: string;
-  options: { value: string; label: string }[];
-  placeholder: string;
-  onChange: (value: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const [search, setSearch] = useState('');
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
-  const filtered = options.filter((o) =>
-    o.label.toLowerCase().includes(search.toLowerCase())
-  );
-
-  const displayLabel = options.find((o) => o.value === value)?.label || placeholder;
-
-  return (
-    <div className="relative" ref={ref}>
-      <span className="flex items-center gap-1.5 text-xs font-semibold text-slate-600 mb-1.5">
-        {icon} {label}
-      </span>
-      <button
-        type="button"
-        onClick={() => {
-          setOpen(!open);
-          setSearch('');
-        }}
-        className="w-full h-10 px-3 rounded-xl border border-slate-200 text-sm bg-slate-50/50 hover:bg-slate-50 transition text-left flex items-center justify-between text-slate-700 font-medium"
-      >
-        <span className="truncate">{displayLabel}</span>
-        <ChevronDown size={14} className="text-slate-400 shrink-0 ml-1" />
-      </button>
-      {open && (
-        <div className="absolute left-0 right-0 z-50 mt-1 bg-white rounded-xl border border-slate-200 shadow-xl overflow-hidden">
-          {options.length > 5 && (
-            <div className="p-1.5 border-b border-slate-100">
-              <div className="relative">
-                <Search size={13} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search..."
-                  autoFocus
-                  className={uiSearchInputWithClearClass}
-                />
-                {search && (
-                  <button
-                    type="button"
-                    onClick={() => setSearch('')}
-                    className="absolute right-1.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-                  >
-                    <X size={12} />
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
-          <div className="max-h-[200px] overflow-y-auto p-1">
-            {filtered.length === 0 ? (
-              <div className="px-3 py-2 text-xs text-slate-400 text-center">No matches</div>
-            ) : (
-              filtered.map((o) => (
-                <button
-                  key={o.value}
-                  type="button"
-                  onClick={() => {
-                    onChange(o.value);
-                    setOpen(false);
-                    setSearch('');
-                  }}
-                  className={`w-full text-left px-3 py-2 text-xs font-medium rounded-lg transition ${
-                    value === o.value
-                      ? 'bg-brand-50 text-brand-700 font-semibold'
-                      : 'text-slate-700 hover:bg-slate-50'
-                  }`}
-                >
-                  {o.label}
-                </button>
-              ))
-            )}
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
-
+/**
+ * Leave Management filter card, standardised on the Trip List / Shop List
+ * conventions: uppercase micro-labels with emerald glyphs, MasterDropdown
+ * controls, the trips search input, a segmented status toggle, and the shared
+ * action buttons — Reset (ghost + spin), the DMR-hen Refresh pill, and the
+ * emerald New Request primary whose plus icon stamps on hover. Every hover
+ * animation plays unconditionally (no `motion-safe:` guard).
+ */
 function LeaveFilters({
   filters,
   employees,
@@ -279,22 +182,18 @@ function LeaveFilters({
   onNewRequest,
   loading,
   showForm,
-  stats,
 }: LeaveFiltersProps) {
-  const departmentOptions = [
-    { value: '', label: 'All Departments' },
-    ...departments.map((d) => ({ value: d, label: d })),
-  ];
+  const departmentOptions = departments.map((d) => ({ value: d, label: d }));
 
-  const employeeOptions = [
-    { value: '', label: 'All Employees' },
-    ...employees.map((e) => ({ value: String(e.id), label: e.employeeName })),
-  ];
+  // Alphabetical from the first word, so the dropdown reads A → Z.
+  const employeeOptions = [...employees]
+    .sort((a, b) => a.employeeName.localeCompare(b.employeeName, undefined, { numeric: true }))
+    .map((e) => ({
+      value: String(e.id),
+      label: e.employeeName,
+    }));
 
-  const leaveTypeOptions = LEAVE_TYPES.map((t) => ({
-    value: t,
-    label: t === 'All' ? 'All Types' : t,
-  }));
+  const leaveTypeOptions = LEAVE_TYPES.map((t) => ({ value: t, label: t }));
 
   const handleEmployeeChange = useCallback(
     (val: string) => {
@@ -304,137 +203,121 @@ function LeaveFilters({
   );
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 p-4 sm:p-5 shadow-xs space-y-3">
+    <div className={`${uiCardClass} space-y-4 p-4 md:p-5`}>
       {/* Row 1 — Month, Department, Employee, Leave Type */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+        <MonthPicker
+          value={filters.month}
+          onChange={(val) => onFilterChange('month', val)}
+        />
+
         <div>
-          <MonthPicker
-            value={filters.month}
-            onChange={(val) => onFilterChange('month', val)}
+          <label className={uiFilterLabelClass}>
+            <Building2 size={13} className="shrink-0 text-emerald-500" />
+            <span>Department</span>
+          </label>
+          <MasterDropdown
+            hideLabel
+            label="Department"
+            value={filters.department}
+            options={departmentOptions}
+            onChange={(val) => onFilterChange('department', val)}
+            placeholder="All Departments"
+            allowClear
+            disabled={loading}
+            className="w-full"
           />
         </div>
 
-        <SearchableDropdown
-          label="Department"
-          icon={<Users size={13} className="text-brand-500" />}
-          value={filters.department}
-          options={departmentOptions}
-          placeholder="All Departments"
-          onChange={(val) => onFilterChange('department', val)}
-        />
+        <div>
+          <label className={uiFilterLabelClass}>
+            <UsersRound size={13} className="shrink-0 text-emerald-500" />
+            <span>Employee</span>
+          </label>
+          <MasterDropdown
+            hideLabel
+            label="Employee"
+            value={filters.employeeId ? String(filters.employeeId) : ''}
+            options={employeeOptions}
+            onChange={handleEmployeeChange}
+            placeholder="All Employees"
+            searchable
+            allowClear
+            disabled={loading}
+            className="w-full"
+          />
+        </div>
 
-        <SearchableDropdown
-          label="Employee"
-          icon={<Users size={13} className="text-brand-500" />}
-          value={filters.employeeId ? String(filters.employeeId) : ''}
-          options={employeeOptions}
-          placeholder="All Employees"
-          onChange={handleEmployeeChange}
-        />
-
-        <SearchableDropdown
-          label="Leave Type"
-          icon={<Filter size={13} className="text-brand-500" />}
-          value={filters.leaveType}
-          options={leaveTypeOptions}
-          placeholder="All Types"
-          onChange={(val) => onFilterChange('leaveType', val as LeaveFilterState['leaveType'])}
-        />
+        <div>
+          <label className={uiFilterLabelClass}>
+            <CalendarOff size={13} className="shrink-0 text-emerald-500" />
+            <span>Leave Type</span>
+          </label>
+          <MasterDropdown
+            hideLabel
+            label="Leave Type"
+            value={filters.leaveType === 'All' ? '' : filters.leaveType}
+            options={leaveTypeOptions}
+            onChange={(val) => onFilterChange('leaveType', (val || 'All') as LeaveFilterState['leaveType'])}
+            placeholder="All Types"
+            allowClear
+            disabled={loading}
+            className="w-full"
+          />
+        </div>
       </div>
 
-      {/* Row 2 — Search + Status (perfect single line) */}
-      <div className="flex min-w-0 flex-col items-stretch gap-3 lg:flex-row lg:items-center">
-        <div className="relative flex-1 min-w-0">
-          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" size={16} />
+      {/* Row 2 — compact search + actions in ONE line (Recent Trips pattern:
+          small search on the left, Reset / Refresh / New Request on the right). */}
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="relative w-full min-w-0 sm:w-64">
+          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
+            aria-label="Search leave requests"
             placeholder="Search employee, leave type, reason..."
             value={filters.search}
             onChange={(e) => onFilterChange('search', e.target.value)}
-            className="w-full h-10 pl-10 pr-9 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-brand-500/20 focus:border-brand-500 outline-none bg-slate-50/50 hover:bg-slate-50 transition text-slate-700 placeholder-slate-400 font-medium"
+            className={`${uiInputClass} pl-10`}
           />
-          {filters.search && (
-            <button
-              type="button"
-              onClick={() => onFilterChange('search', '')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition"
-              title="Clear search"
-            >
-              <X size={14} />
-            </button>
-          )}
         </div>
 
-        <div className="flex max-w-full items-center flex-nowrap gap-0.5 overflow-x-auto bg-slate-100/80 p-1 rounded-xl border border-slate-200/60 min-h-10 lg:shrink-0">
-          {STATUS_TABS.map((tab) => {
-            const isActive = filters.status === tab.label;
-            return (
-              <button
-                key={tab.label}
-                type="button"
-                onClick={() => onFilterChange('status', tab.label)}
-                className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-all whitespace-nowrap ${
-                  isActive
-                    ? 'bg-white text-brand-700 shadow-sm border border-slate-200/60'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200/50'
-                }`}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      {/* Row 3 — KPI stats (left) + Action buttons (right) */}
-      <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-slate-100">
-        {/* KPI stats */}
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-slate-100 text-xs font-semibold text-slate-700">
-            Total <span className="text-slate-900 font-bold">{stats.approved + stats.pending + stats.rejected}</span>
-          </span>
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-emerald-50 text-xs font-semibold text-emerald-700 border border-emerald-200/60">
-            Approved <span className="font-bold">{stats.approved}</span>
-          </span>
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-amber-50 text-xs font-semibold text-amber-700 border border-amber-200/60">
-            Pending <span className="font-bold">{stats.pending}</span>
-          </span>
-          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg bg-rose-50 text-xs font-semibold text-rose-700 border border-rose-200/60">
-            Rejected <span className="font-bold">{stats.rejected}</span>
-          </span>
-        </div>
-
-        {/* Action buttons */}
-        <div className="flex max-w-full flex-wrap items-center gap-2 sm:shrink-0">
+        <div className="ml-auto flex max-w-full flex-wrap items-center gap-2 sm:shrink-0">
           <button
             type="button"
             onClick={onReset}
-            className="inline-flex items-center gap-2 h-9 px-4 rounded-lg border border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 text-sm font-semibold shadow-sm transition active:scale-95"
+            className="group relative inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-xs transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 active:bg-slate-100 focus-visible:ring-2 focus-visible:ring-emerald-300"
+            aria-label="Reset filters"
           >
-            <RotateCcw size={14} />
+            <span className="inline-flex group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>
             Reset
+            <ActionTooltip label="Reset filters" />
           </button>
 
-          <button
+          <BrandRefreshButton loading={loading} onClick={onRefresh} size="lg" ariaLabel="Refresh leave data">
+            Refresh
+          </BrandRefreshButton>
+
+          <Button
+            type="button"
+            size="lg"
+            className="group"
             onClick={onNewRequest}
-            className="inline-flex items-center gap-2 h-9 px-4 bg-brand-600 hover:bg-brand-700 text-white rounded-lg text-sm font-medium shadow-sm transition active:scale-95"
+            icon={
+              <span className={`inline-flex ${showForm ? '' : 'group-hover:animate-[var(--animate-action-add)]'}`}>
+                <Plus
+                  size={16}
+                  aria-hidden="true"
+                  className={`transition-transform duration-200 ${showForm ? 'rotate-45' : ''}`}
+                />
+              </span>
+            }
           >
-            <Plus size={16} />
             {showForm ? 'Hide Form' : 'New Request'}
-          </button>
-
-          <button
-            onClick={onRefresh}
-            disabled={loading}
-            title="Refresh"
-            aria-label="Refresh"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900 shadow-sm transition active:scale-95 disabled:opacity-60"
-          >
-            <RefreshCw size={16} className={loading ? 'animate-spin' : ''} />
-          </button>
+          </Button>
         </div>
       </div>
+
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { describe, it } from 'node:test';
 import {
-  buildDutyReport, countDutyCells, filterDutyEmployees, formatDutyDate, getDutyLabel,
+  buildDutyReport, countDutyCells, dutyDisplayName, filterDutyEmployees, formatDutyDate, getDutyLabel,
   getDutyRangeError, getDutyReportDays, getDutyReportWeekStarts, loadDutyReportLeaves,
   loadDutyReportRange, summarizeDutyReport,
 } from './dutyReport';
@@ -118,6 +118,24 @@ describe('Duty Planner cells, filters and totals', () => {
     assert.equal(summarizeDutyReport(data, selected, asOf).totals.duty, 4);
     assert.equal(filterDutyEmployees(data.employees, [], '').length, 4);
     assert.equal(filterDutyEmployees(data.employees, ['Helper'], 'Ravi').length, 0);
+  });
+
+  it('matches English search even though the page displays the Telugu name, and vice versa', () => {
+    const data = countFixture();
+    // English query still finds employees while names render in Telugu.
+    assert.deepEqual(filterDutyEmployees(data.employees, [], 'ravi ku').map((e) => e.id), [1]);
+    assert.deepEqual(filterDutyEmployees(data.employees, [], 'MOHAN').map((e) => e.id), [4]);
+    // Telugu query matches the Telugu name.
+    assert.deepEqual(filterDutyEmployees(data.employees, [], 'రవి').map((e) => e.id), [1]);
+    assert.deepEqual(filterDutyEmployees(data.employees, [], 'కుమార్').map((e) => e.id), [1]);
+    // Queries that match nothing in either language return an empty list.
+    assert.equal(filterDutyEmployees(data.employees, [], 'zzz').length, 0);
+    assert.equal(filterDutyEmployees(data.employees, [], 'లేనిపేరు').length, 0);
+    // Display: Telugu name when the language is Telugu and one exists,
+    // English otherwise (English language or missing Telugu name).
+    assert.equal(dutyDisplayName(data.employees[0], 'en'), 'Ravi Kumar');
+    assert.equal(dutyDisplayName(data.employees[0], 'te'), 'రవి కుమార్');
+    assert.equal(dutyDisplayName({ employeeName: 'Legacy Name' }, 'te'), 'Legacy Name');
   });
 
   it('keeps historical employees absent from the current roster and avoids duplicate IDs', () => {

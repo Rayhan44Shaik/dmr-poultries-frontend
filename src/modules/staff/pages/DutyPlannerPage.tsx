@@ -6,13 +6,26 @@ import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import DutyPlannerFilters, { type DutyPlannerView } from '../components/duty-planner/DutyPlannerFilters';
 import DutyPlannerGrid from '../components/duty-planner/DutyPlannerGrid';
 import DutyPlannerReportTable from '../components/duty-planner/DutyPlannerReportTable';
+import DutyTableHeader from '../components/duty-planner/DutyTableHeader';
+import PendingDutiesPanel from '../components/duty-planner/PendingDutiesPanel';
 import ShiftPicker from '../components/duty-planner/ShiftPicker';
 import { useDutyPlannerText } from '../hooks/useDutyPlannerText';
 import { dutyDisplayValue, dutyLocale, localizeDutyError } from '../i18n/dutyPlannerCopy';
 import '../styles/dutyPlanner.css';
-import { filterDutyEmployees, formatDutyDate, getDutyRangeError, todayStr, type DutyReportData, type DutyReportRange } from '../services/dutyReport';
-import { CheckCircle2, AlertCircle, LoaderCircle, RefreshCw, LockKeyhole } from 'lucide-react';
+import { dutyDisplayName, filterDutyEmployees, formatDutyDate, getDutyRangeError, todayStr, type DutyReportData, type DutyReportRange } from '../services/dutyReport';
+import { CheckCircle2, AlertCircle, LoaderCircle, RefreshCw, LockKeyhole, ChevronDown } from 'lucide-react';
 import type { DutyPlannerFilters as DutyPlannerFiltersType, DutyAssignment } from '../types/staffDashboard';
+
+/* Default Period state — shared by the initial mount and by Reset so the two
+   can never drift apart. Reset always lands back on the Weekly view of the
+   current week, whatever Period / custom date range was active before. */
+const initialMonthCursor = () => {
+  const d = new Date();
+  return { y: d.getFullYear(), m: d.getMonth() };
+};
+const initialCustomRange = (): DutyReportRange => ({
+  fromDate: `${todayStr().slice(0, 7)}-01`, toDate: todayStr(),
+});
 
 function DutyPlannerPage() {
   const { showNotification } = useSafeNotification();
@@ -45,25 +58,28 @@ function DutyPlannerPage() {
     weekStatus,
     canEditWeek,
     unassignedCount,
+    pendingDuties,
     isOnApprovedLeave,
     getRangeDuties,
     prevWeekClosed,
     prevWeekStart,
     validation,
+    autoAssignAll,
+    moveDuty,
     submitCurrentWeek,
   } = useDutyPlanner(showNotification);
 
   const [searchQuery, setSearchQuery] = useState('');
+  /* Pending-duties checker (week view): lists exactly who is missing which day. */
+  const [showPending, setShowPending] = useState(false);
+  /* Date-wise table filter: the single date column shown, or null for all. */
+  const [dateFilter, setDateFilter] = useState<string | null>(null);
+  const handleDateFilterChange = useCallback((date: string | null) => setDateFilter(date), []);
 
   /* ----- Week / Month / Custom-range views ----- */
   const [view, setView] = useState<DutyPlannerView>('week');
-  const [monthCursor, setMonthCursor] = useState(() => {
-    const d = new Date();
-    return { y: d.getFullYear(), m: d.getMonth() };
-  });
-  const [customRange, setCustomRange] = useState<DutyReportRange>(() => ({
-    fromDate: `${todayStr().slice(0, 7)}-01`, toDate: todayStr(),
-  }));
+  const [monthCursor, setMonthCursor] = useState(initialMonthCursor);
+  const [customRange, setCustomRange] = useState<DutyReportRange>(initialCustomRange);
   const [refreshKey, setRefreshKey] = useState(0);
   const [exporting, setExporting] = useState(false);
   const [reportState, setReportState] = useState<{
@@ -154,23 +170,69 @@ function DutyPlannerPage() {
     });
   }, [selectedCell, deleteAssignment, setSelectedCell, setShowPicker]);
 
+  // Submit stays clickable while cells are pending: submitCurrentWeek() blocks
+  // it with a notification, and the pending panel opens automatically so the
+  // user sees exactly WHO is missing WHICH days instead of a bare count.
   const handleSubmitWeek = useCallback(() => {
+    if (unassignedCount > 0) setShowPending(true);
     void submitCurrentWeek();
-  }, [submitCurrentWeek]);
+  }, [submitCurrentWeek, unassignedCount]);
+
+  // Brand refresh: reload the editable week and the range report together.
+  const handleRefresh = useCallback(() => {
+    refreshDuties();
+    setRefreshKey((key) => key + 1);
+  }, [refreshDuties]);
+
+  const handleAutoAssign = useCallback(() => {
+    void autoAssignAll();
+  }, [autoAssignAll]);
+
+  // Drag & drop: move a duty to another cell (swaps when the target has one).
+  const handleDropDuty = useCallback(
+    (source: { employeeId: number; date: string }, target: { employeeId: number; date: string }) => {
+      void moveDuty(source, target);
+    },
+    [moveDuty],
+  );
 
   const handleClosePicker = useCallback(() => {
     setShowPicker(false);
     setSelectedCell(null);
   }, [setShowPicker, setSelectedCell]);
 
+  // Reset restores the WHOLE filter panel: default roles, current week, the
+  // default Weekly period view, the default custom range and a cleared
+  // employee search — one click always returns to the standard starting view.
   const handleReset = useCallback(() => {
     resetFilters();
     setSearchQuery('');
+    setView('week');
+    setMonthCursor(initialMonthCursor());
+    setCustomRange(initialCustomRange());
+    setDateFilter(null);
   }, [resetFilters]);
 
   const filteredEmployees = useMemo(
     () => filterDutyEmployees(employees, filters.role, searchQuery),
     [employees, filters.role, searchQuery],
+  );
+  // `employeeId:date` keys of every pending cell — the week grid flags these
+  // amber so the gaps are visible while scrolling, not only in the panel.
+  const pendingCellKeys = useMemo(
+    () => new Set(pendingDuties.flatMap((row) => row.missingDays.map((date) => `${row.employeeId}:${date}`))),
+    [pendingDuties],
+  );
+  // Date columns of whichever table is active (week grid or report table).
+  const tableDates = useMemo(
+    () => (view === 'week' ? weekDays : reportData?.days.map((day) => day.date) ?? []),
+    [view, weekDays, reportData],
+  );
+  // A stale filter (date outside the current range) quietly falls back to all.
+  const activeDateFilter = dateFilter && tableDates.includes(dateFilter) ? dateFilter : null;
+  const visibleTableDates = useMemo(
+    () => (activeDateFilter ? [activeDateFilter] : tableDates),
+    [tableDates, activeDateFilter],
   );
   const reportEmployees = useMemo(
     () => filterDutyEmployees(reportData?.employees ?? [], filters.role, searchQuery),
@@ -252,9 +314,8 @@ function DutyPlannerPage() {
         onDownloadExcel={() => { void handleDownloadExcel(); }}
         canDownloadExcel={canDownloadExcel}
         exporting={exporting}
-        downloadTitle={rangeError || reportError || (saving ? t('saveWait') : reportData
-          ? t('downloadScope', { from: formatDutyDate(fromDate, language), to: formatDutyDate(toDate, language), count: tableEmployees.length })
-          : t('loading'))}
+        onRefresh={handleRefresh}
+        refreshing={loading || saving}
         view={view}
         onViewChange={setView}
         periodLabel={view === 'month' ? monthLabel : formatWeekRange(filters.weekStart, true)}
@@ -320,20 +381,30 @@ function DutyPlannerPage() {
         </div>
       )}
 
-      {/* Week remains editable; month/custom ranges are read-only reports. */}
+      {/* Duty Assign table — the name header and the date-wise column filter
+          live at table level inside the card (no separate filter row). */}
       {view === 'week' ? (
         <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden">
+          {!loading && tableDates.length > 0 && (
+            <DutyTableHeader dates={tableDates} value={activeDateFilter} onChange={handleDateFilterChange} />
+          )}
           <DutyPlannerGrid
             employees={tableEmployees}
-            weekDays={weekDays}
+            weekDays={visibleTableDates}
+            countDays={weekDays}
             getDutyCell={getDutyCell}
             onCellClick={handleCellClick}
             loading={loading}
             weekLocked={!canEditWeek}
+            pendingDates={pendingCellKeys}
+            onDropDuty={handleDropDuty}
           />
         </div>
       ) : reportData ? (
-        <DutyPlannerReportTable data={reportData} employees={tableEmployees} asOf={today} />
+        <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden">
+          <DutyTableHeader dates={tableDates} value={activeDateFilter} onChange={handleDateFilterChange} />
+          <DutyPlannerReportTable data={reportData} employees={tableEmployees} asOf={today} dates={visibleTableDates} />
+        </div>
       ) : (
         <div className="rounded-xl border border-slate-200/90 bg-white p-12 text-center text-sm text-slate-500">
           {rangeError ? t('chooseRange') : reportError ? t('loadRetry') : t('loading')}
@@ -345,7 +416,7 @@ function DutyPlannerPage() {
       <div className="bg-white rounded-xl border border-slate-200/90 p-4 shadow-sm flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <button
           onClick={handleSubmitWeek}
-          disabled={!canEditWeek || loading || saving || automaticSaveError || unassignedCount > 0}
+          disabled={!canEditWeek || loading || saving || automaticSaveError}
           title={
             !prevWeekClosed
               ? t('closePrevious')
@@ -358,21 +429,22 @@ function DutyPlannerPage() {
           <CheckCircle2 size={15} />
           {t('submit')}
         </button>
-        <div className="flex items-center gap-2 text-xs text-slate-500">
-          {unassignedCount > 0 ? (
-            <span
-              className="flex items-center gap-1.5 text-amber-600"
-              title={t('assignAll', { count: unassignedCount })}
-            >
-              <AlertCircle size={12} />
-              {t('unassigned', { count: unassignedCount, total: employees.length * weekDays.length })}
-            </span>
-          ) : (
-            <span className="flex items-center gap-1.5 text-emerald-600">
-              <CheckCircle2 size={12} />
-              {t('ready')}
-            </span>
-          )}
+        <div className="flex flex-wrap items-center gap-2 text-xs text-slate-500">
+          {/* Pending-duties checker: expands the panel below. */}
+          <button
+            type="button"
+            onClick={() => setShowPending((value) => !value)}
+            aria-expanded={showPending}
+            aria-controls="duty-pending-panel"
+            title={unassignedCount > 0 ? t('assignAll', { count: unassignedCount }) : t('ready')}
+            className={`inline-flex h-7 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition focus-visible:ring-2 focus-visible:ring-emerald-300 ${unassignedCount > 0
+              ? 'border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300 hover:bg-amber-100'
+              : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100'}`}
+          >
+            {unassignedCount > 0 ? <AlertCircle size={12} /> : <CheckCircle2 size={12} />}
+            {unassignedCount > 0 ? `${t('pendingDuties')} · ${unassignedCount}` : t('allAssigned')}
+            <ChevronDown size={12} className={`transition-transform ${showPending ? 'rotate-180' : ''}`} />
+          </button>
           {!validation.ok && (
             <span className="flex items-center gap-1.5 text-rose-600 ml-2 border-l border-slate-200 pl-2">
               <AlertCircle size={12} />
@@ -381,6 +453,18 @@ function DutyPlannerPage() {
           )}
         </div>
       </div>
+      )}
+
+      {/* Pending duties — who is missing which day (week view only) */}
+      {view === 'week' && !loading && showPending && (
+        <PendingDutiesPanel
+          pending={pendingDuties}
+          unassignedCount={unassignedCount}
+          canEdit={canEditWeek}
+          saving={saving}
+          onPickCell={handleCellClick}
+          onAutoAssign={handleAutoAssign}
+        />
       )}
 
       {/* Validation issues - week view only */}
@@ -408,7 +492,7 @@ function DutyPlannerPage() {
           onRemove={getAssignment(selectedCell.employeeId, selectedCell.date)?.id ? handleRemoveDuty : undefined}
           currentDuty={getDutyCell(selectedCell.employeeId, selectedCell.date)?.dutyType ?? undefined}
           date={selectedCell.date}
-          employeeName={selectedEmployee ? selectedEmployee.employeeName : ''}
+          employeeName={selectedEmployee ? dutyDisplayName(selectedEmployee, language) : ''}
           employeeRole={selectedEmployee ? selectedEmployee.role : ''}
           employeeDepartment={selectedEmployee?.department}
         />

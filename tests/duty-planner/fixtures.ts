@@ -4,10 +4,10 @@ import { getDutyReportDays } from '../../src/modules/staff/services/dutyReport';
 
 export const TEST_TODAY = '2026-09-07';
 export const TEST_EMPLOYEES: Employee[] = [
-  { id: 1, employeeNo: 101, employeeName: 'Ravi Kumar', role: 'Driver', department: 'Fleet' },
-  { id: 2, employeeNo: 102, employeeName: 'Lakshmi Devi', role: 'Supervisor', department: 'Operations' },
-  { id: 3, employeeNo: 103, employeeName: 'Anil Accounts', role: 'Accountant', department: 'Accounts' },
-  { id: 4, employeeNo: 104, employeeName: 'Mohan Helper', role: 'Helper', department: 'Farm' },
+  { id: 1, employeeNo: 101, employeeName: 'Ravi Kumar', employeeNameTe: 'రవి కుమార్', role: 'Driver', department: 'Fleet' },
+  { id: 2, employeeNo: 102, employeeName: 'Lakshmi Devi', employeeNameTe: 'లక్ష్మి దేవి', role: 'Supervisor', department: 'Operations' },
+  { id: 3, employeeNo: 103, employeeName: 'Anil Accounts', employeeNameTe: 'అనిల్ అకౌంట్స్', role: 'Accountant', department: 'Accounts' },
+  { id: 4, employeeNo: 104, employeeName: 'Mohan Helper', employeeNameTe: 'మోహన్ హెల్పర్', role: 'Helper', department: 'Farm' },
 ].map((employee) => ({ ...employee, status: 'Active', salary: 0, phoneNumber: '', email: '', joiningDate: '2020-01-01' }));
 
 export function testAssignment(employeeId: number, date: string, dutyType: string): DutyAssignment {

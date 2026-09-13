@@ -138,14 +138,27 @@ export function countDutyCells(cells: DutyReportCell[], asOf = todayStr()): Duty
   return counts;
 }
 
-export function filterDutyEmployees<T extends Pick<Employee, 'employeeName' | 'role'>>(
+export function filterDutyEmployees<T extends Pick<Employee, 'employeeName' | 'role'> & { employeeNameTe?: string }>(
   employees: T[], roles: string[], search: string,
 ): T[] {
   const query = search.trim().toLocaleLowerCase();
   return employees.filter((employee) =>
     (!roles.length || roles.includes(employee.role)) &&
-    (!query || employee.employeeName.toLocaleLowerCase().includes(query)),
+    // Bilingual search: the English name always matches (even while the page
+    // displays the Telugu name), and the Telugu name matches Telugu input.
+    (!query ||
+      employee.employeeName.toLocaleLowerCase().includes(query) ||
+      employee.employeeNameTe?.includes(query)),
   );
+}
+
+/** Display name for the active language: the Telugu transliteration when the
+ *  language asks for it and the data provides one, the English name otherwise. */
+export function dutyDisplayName(
+  employee: { employeeName: string; employeeNameTe?: string | null },
+  language: DutyLanguage = 'en',
+): string {
+  return language === 'te' && employee.employeeNameTe ? employee.employeeNameTe : employee.employeeName;
 }
 
 export function summarizeDutyReport(data: DutyReportData, employees: DutyReportEmployee[], asOf = todayStr()) {

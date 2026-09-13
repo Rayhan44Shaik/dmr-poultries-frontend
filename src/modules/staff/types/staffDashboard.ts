@@ -8,6 +8,8 @@ export interface Employee {
   id: number;
   employeeNo: number;
   employeeName: string;
+  /** Telugu display name (sample data); search matches both names. */
+  employeeNameTe?: string;
   department: string;
   role: string;
   phoneNumber: string;
@@ -126,6 +128,8 @@ export interface AttendanceFilters {
 
 export interface LeaveRequest {
   id: string;
+  /** Human-friendly number in the trip-number format: LEV-YYYYMMDD-NNN. */
+  leaveNo?: string;
   employeeId: number;
   employeeName: string;
   type: 'Casual' | 'Sick' | 'Emergency' | 'Annual';

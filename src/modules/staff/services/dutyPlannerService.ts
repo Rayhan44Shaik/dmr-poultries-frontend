@@ -123,6 +123,7 @@ function mapEmployee(raw: Record<string, unknown>): Employee {
     id: num(raw.id),
     employeeNo: num(raw.employeeNo ?? raw.employee_no),
     employeeName: str(raw.name ?? raw.employeeName ?? raw.employee_name),
+    employeeNameTe: maybeStr(raw.employeeNameTe ?? raw.employee_name_te),
     department: str(raw.department),
     role: str(raw.role),
     phoneNumber: str(raw.phoneNumber ?? raw.phone_number),

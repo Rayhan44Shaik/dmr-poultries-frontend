@@ -8,6 +8,7 @@ import LeaveFilters from '../components/leave/LeaveFilters';
 import LeaveRequestForm from '../components/leave/LeaveRequestForm';
 import type { LeaveRequestInput } from '../components/leave/LeaveRequestForm';
 import LeaveTable from '../components/leave/LeaveTable';
+import LeaveTableHeader from '../components/leave/LeaveTableHeader';
 import Pagination from '../components/common/Pagination';
 
 const REFRESH_TOAST_DURATION = 5000;
@@ -30,9 +31,7 @@ function LeaveManagementPage() {
     approveLeave,
     rejectLeave,
     deleteLeave,
-    cancelLeave,
     refresh,
-    stats,
     page,
     pageSize,
     total,
@@ -47,6 +46,11 @@ function LeaveManagementPage() {
     const timer = window.setTimeout(() => setRefreshToast(false), REFRESH_TOAST_DURATION);
     return () => window.clearTimeout(timer);
   }, [refreshToast]);
+
+  const onStatusChange = useCallback(
+    (status: 'All' | 'Pending' | 'Approved' | 'Rejected') => setFilter('status', status),
+    [setFilter]
+  );
 
   const handleRefresh = useCallback(() => {
     void refresh();
@@ -82,6 +86,7 @@ function LeaveManagementPage() {
     [deleteLeave]
   );
 
+
   return (
     <div className="min-w-0 max-w-full space-y-4">
       {/* Filters — includes Reset, New Request, Refresh inside the filter box */}
@@ -95,7 +100,6 @@ function LeaveManagementPage() {
         onNewRequest={() => setShowForm(!showForm)}
         loading={loading}
         showForm={showForm}
-        stats={stats}
       />
 
       {/* New request form */}
@@ -120,18 +124,22 @@ function LeaveManagementPage() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600" />
         </div>
       ) : leaves.length === 0 ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
-          <p className="text-sm font-medium text-slate-500">No leave requests found</p>
-          <p className="text-xs text-slate-400 mt-1">Try adjusting your filters or create a new request.</p>
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <LeaveTableHeader status={filters.status} onStatusChange={onStatusChange} count={total} />
+          <div className="p-8 text-center">
+            <p className="text-sm font-medium text-slate-500">No leave requests found</p>
+            <p className="text-xs text-slate-400 mt-1">Try adjusting your filters or create a new request.</p>
+          </div>
         </div>
       ) : (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <LeaveTableHeader status={filters.status} onStatusChange={onStatusChange} count={total} />
           <LeaveTable
             leaves={leaves}
             onApprove={handleApprove}
             onReject={handleReject}
             onDelete={handleDelete}
-            onCancel={(id) => { void cancelLeave(id); }}
+            startIndex={(page - 1) * pageSize}
           />
           <Pagination
             currentPage={page}

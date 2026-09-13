@@ -43,6 +43,7 @@ function maybeStr(value: unknown): string | undefined {
 function mapLeave(raw: Record<string, unknown>): LeaveRequest {
   return {
     id: str(raw.id),
+    leaveNo: maybeStr(raw.leaveNo ?? raw.leave_no),
     employeeId: num(raw.employeeId ?? raw.employee_id),
     employeeName: str(raw.employeeName ?? raw.employee_name),
     type: str(raw.type ?? raw.leave_type) as LeaveRequest["type"],

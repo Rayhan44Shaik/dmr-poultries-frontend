@@ -270,18 +270,24 @@ export const actionIconSizeCompact = 14;
 
 /** Semantic hover motion for action glyphs. Wrap the icon in an inline-flex span
  * inside a `group` button/link so PDF, Mail, WhatsApp, Edit, Delete, etc. keep
- * the same animation language everywhere. */
+ * the same animation language everywhere.
+ *
+ * Deliberately NOT gated behind `prefers-reduced-motion`: these glyphs ARE the
+ * affordance's meaning (approve ticks, rejects shake, bins dump), so they must
+ * animate for every user — same product decision as the brand refresh hen. */
 export const uiActionIconMotionClass = {
-  search: "motion-safe:group-hover:animate-[var(--animate-action-search)]",
-  reset: "motion-safe:group-hover:animate-[var(--animate-action-reset)]",
-  edit: "motion-safe:group-hover:animate-[var(--animate-action-edit)]",
-  delete: "motion-safe:group-hover:animate-[var(--animate-action-delete)]",
-  view: "motion-safe:group-hover:animate-[var(--animate-action-view)]",
-  pdf: "motion-safe:group-hover:animate-[var(--animate-action-pdf)]",
-  mail: "motion-safe:group-hover:animate-[var(--animate-action-mail)]",
-  whatsapp: "motion-safe:group-hover:animate-[var(--animate-action-whatsapp)]",
-  close: "motion-safe:group-hover:animate-[var(--animate-action-close)]",
-  excel: "motion-safe:group-hover:animate-[var(--animate-action-excel)]",
+  search: "group-hover:animate-[var(--animate-action-search)]",
+  reset: "group-hover:animate-[var(--animate-action-reset)]",
+  edit: "group-hover:animate-[var(--animate-action-edit)]",
+  delete: "group-hover:animate-[var(--animate-action-delete)]",
+  view: "group-hover:animate-[var(--animate-action-view)]",
+  pdf: "group-hover:animate-[var(--animate-action-pdf)]",
+  mail: "group-hover:animate-[var(--animate-action-mail)]",
+  whatsapp: "group-hover:animate-[var(--animate-action-whatsapp)]",
+  close: "group-hover:animate-[var(--animate-action-close)]",
+  excel: "group-hover:animate-[var(--animate-action-excel)]",
+  approve: "group-hover:animate-[var(--animate-action-approve)]",
+  reject: "group-hover:animate-[var(--animate-action-reject)]",
 } as const;
 
 /* ---------------------------------------------------------------------------
