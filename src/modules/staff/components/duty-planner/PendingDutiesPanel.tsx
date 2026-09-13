@@ -17,11 +17,11 @@ interface Props {
 }
 
 /**
- * "Pending duties" checker for the current week, laid out as a borderless
- * aligned table: Employee | missing-days count | day chips. Columns line up
- * across employees without visible table lines, and each employee's missing
- * days flow horizontally. A chip opens the shift picker directly on that
- * cell; Auto-assign asks the backend to plan the whole week at once.
+ * "Pending duties" checker for the current week, laid out HORIZONTALLY:
+ * employees flow side by side as equal-width cards in a responsive grid,
+ * each card holding the avatar, name, missing-days count and day chips. A
+ * chip opens the shift picker directly on that cell; Auto-assign asks the
+ * backend to plan the whole week at once.
  */
 function PendingDutiesPanel({ pending, unassignedCount, canEdit, saving = false, onPickCell, onAutoAssign }: Props) {
   const { language, t } = useDutyPlannerText();
@@ -50,27 +50,26 @@ function PendingDutiesPanel({ pending, unassignedCount, canEdit, saving = false,
         )}
       </header>
       {pending.length === 0 ? (
-        <div className="flex items-center gap-2 px-4 py-6 text-sm font-medium text-emerald-700">
+        <div className="flex items-center gap-2 px-5 py-6 text-sm font-medium text-emerald-700">
           <CheckCircle2 size={16} className="shrink-0" />{t('ready')}
         </div>
       ) : (
         <div role="list" aria-label={t('pendingDuties')} className="max-h-96 overflow-y-auto px-5 py-4">
-          {/* Borderless table: Employee | missing count | missing days —
-              columns stay perfectly aligned across employees without any
-              visible table lines; each employee's days flow horizontally
-              with generous, even margins between rows and columns. */}
-          <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-2 sm:grid-cols-[minmax(210px,260px)_auto_minmax(0,1fr)] sm:gap-x-6 sm:gap-y-3.5">
+          {/* Horizontal layout: employees flow side by side as equal-width
+              cards in a responsive grid — one neat row of cards per line,
+              each card holding the avatar, name, count and day chips. */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
             {pending.map((row) => (
-              <div key={row.employeeId} role="listitem" className="contents">
-                <div className="flex min-w-0 items-center gap-3">
-                  <span aria-hidden="true" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-amber-50 text-[11px] font-bold text-amber-700 ring-1 ring-inset ring-amber-200">{initials(row.employeeName)}</span>
-                  <div className="min-w-0">
+              <div key={row.employeeId} role="listitem" className="flex flex-col gap-2.5 rounded-xl border border-amber-200/60 bg-amber-50/40 px-3.5 py-3">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span aria-hidden="true" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-bold text-amber-700 ring-1 ring-inset ring-amber-200">{initials(row.employeeName)}</span>
+                  <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold leading-tight text-slate-900">{row.employeeName}</p>
                     <p className="truncate text-[10px] font-medium leading-tight text-slate-400">{dutyDisplayValue(row.role, language)}</p>
                   </div>
+                  <span title={t('missingDays')} className="inline-flex h-5 shrink-0 items-center justify-center rounded-full bg-amber-100 px-1.5 text-[10px] font-bold tabular-nums text-amber-700">{row.missingDays.length}</span>
                 </div>
-                <span title={t('missingDays')} className="inline-flex h-5 items-center justify-center self-center rounded-full bg-amber-100 px-1.5 text-[10px] font-bold tabular-nums text-amber-700">{row.missingDays.length}</span>
-                <div role="group" aria-label={t('missingDays')} className="col-span-2 flex flex-wrap items-center gap-1.5 sm:col-span-1">
+                <div role="group" aria-label={t('missingDays')} className="flex flex-wrap items-center gap-1.5">
                   {row.missingDays.map((date) => (
                     <button
                       key={date}

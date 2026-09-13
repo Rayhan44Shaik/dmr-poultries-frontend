@@ -72,16 +72,9 @@ function DutyPlannerPage() {
   const [searchQuery, setSearchQuery] = useState('');
   /* Pending-duties checker (week view): lists exactly who is missing which day. */
   const [showPending, setShowPending] = useState(false);
-  /* Date-wise table filter: date columns hidden from the active table. */
-  const [hiddenDates, setHiddenDates] = useState<Set<string>>(new Set());
-  const toggleTableDate = useCallback((date: string) => {
-    setHiddenDates((prev) => {
-      const next = new Set(prev);
-      if (next.has(date)) next.delete(date); else next.add(date);
-      return next;
-    });
-  }, []);
-  const showAllTableDates = useCallback(() => setHiddenDates(new Set()), []);
+  /* Date-wise table filter: the single date column shown, or null for all. */
+  const [dateFilter, setDateFilter] = useState<string | null>(null);
+  const handleDateFilterChange = useCallback((date: string | null) => setDateFilter(date), []);
 
   /* ----- Week / Month / Custom-range views ----- */
   const [view, setView] = useState<DutyPlannerView>('week');
@@ -217,7 +210,7 @@ function DutyPlannerPage() {
     setView('week');
     setMonthCursor(initialMonthCursor());
     setCustomRange(initialCustomRange());
-    setHiddenDates(new Set());
+    setDateFilter(null);
   }, [resetFilters]);
 
   const filteredEmployees = useMemo(
@@ -235,9 +228,11 @@ function DutyPlannerPage() {
     () => (view === 'week' ? weekDays : reportData?.days.map((day) => day.date) ?? []),
     [view, weekDays, reportData],
   );
+  // A stale filter (date outside the current range) quietly falls back to all.
+  const activeDateFilter = dateFilter && tableDates.includes(dateFilter) ? dateFilter : null;
   const visibleTableDates = useMemo(
-    () => tableDates.filter((date) => !hiddenDates.has(date)),
-    [tableDates, hiddenDates],
+    () => (activeDateFilter ? [activeDateFilter] : tableDates),
+    [tableDates, activeDateFilter],
   );
   const reportEmployees = useMemo(
     () => filterDutyEmployees(reportData?.employees ?? [], filters.role, searchQuery),
@@ -391,7 +386,7 @@ function DutyPlannerPage() {
       {view === 'week' ? (
         <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden">
           {!loading && tableDates.length > 0 && (
-            <DutyTableHeader dates={tableDates} visible={visibleTableDates} onToggleDate={toggleTableDate} onShowAll={showAllTableDates} />
+            <DutyTableHeader dates={tableDates} value={activeDateFilter} onChange={handleDateFilterChange} />
           )}
           <DutyPlannerGrid
             employees={tableEmployees}
@@ -407,7 +402,7 @@ function DutyPlannerPage() {
         </div>
       ) : reportData ? (
         <div className="bg-white rounded-xl border border-slate-200/90 shadow-sm overflow-hidden">
-          <DutyTableHeader dates={tableDates} visible={visibleTableDates} onToggleDate={toggleTableDate} onShowAll={showAllTableDates} />
+          <DutyTableHeader dates={tableDates} value={activeDateFilter} onChange={handleDateFilterChange} />
           <DutyPlannerReportTable data={reportData} employees={tableEmployees} asOf={today} dates={visibleTableDates} />
         </div>
       ) : (

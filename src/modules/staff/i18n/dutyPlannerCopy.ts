@@ -4,7 +4,7 @@ export type DutyLanguage = 'en' | 'te';
 
 export const dutyEnglish = {
   planner: 'Duty Planner', details: 'Daily Details', filters: 'Duty Planner filters',
-  dutyAssign: 'Duty Assign', dutyAssignHint: 'Assign a duty for every employee, every day of the week.',
+  dutyAssign: 'Duty Assign',
   actions: 'Duty Planner actions', weekTable: 'Duty Planner week table', dateTable: 'Duty Planner date matrix',
   employee: 'Employee', employeeNo: 'Employee No.', role: 'Role', roles: 'Roles', department: 'Department',
   filterRoles: 'Filter employee roles', includeRoles: 'Include roles', allRoles: 'All roles',
@@ -43,7 +43,7 @@ export const dutyEnglish = {
   pendingPick: 'Assign duty for this day', pendingCell: 'Duty not assigned', missingDays: 'Days without duty',
   allAssigned: 'All assigned', autoAssign: 'Auto-assign',
   refresh: 'Refresh', refreshData: 'Refresh data',
-  dates: 'Dates', allDates: 'All', daysShown: '{visible} of {total} days shown',
+  dates: 'Dates', allDates: 'All', allDatesLabel: 'All dates',
   dragHint: 'Drag to another day to move or swap', dragMoved: 'Duty moved to {target}', dragSwapped: 'Duties swapped: {source} ⇄ {target}',
   ready: 'All duties assigned — ready to submit', issues: '{count} issues', validation: 'Validation issues',
   pastLocked: 'Cannot edit duties for previous completed weeks.', weekReadOnly: 'This week is {status} and cannot be modified.',
@@ -65,7 +65,7 @@ export const dutyEnglish = {
 
 export const dutyTelugu: Record<keyof typeof dutyEnglish, string> = {
   planner: 'డ్యూటీ పట్టిక', details: 'రోజువారీ వివరాలు', filters: 'డ్యూటీ పట్టిక ఫిల్టర్లు',
-  dutyAssign: 'డ్యూటీ అసైన్', dutyAssignHint: 'ప్రతి ఉద్యోగికి వారంలోని ప్రతి రోజూ డ్యూటీ కేటాయించండి.',
+  dutyAssign: 'డ్యూటీ అసైన్',
   actions: 'డ్యూటీ పట్టిక చర్యలు', weekTable: 'వారపు డ్యూటీ పట్టిక', dateTable: 'తేదీల వారీ డ్యూటీ పట్టిక',
   employee: 'ఉద్యోగి', employeeNo: 'ఉద్యోగి సంఖ్య', role: 'హోదా', roles: 'హోదాలు', department: 'విభాగం',
   filterRoles: 'ఉద్యోగుల హోదాలను ఎంచుకోండి', includeRoles: 'చేర్చాల్సిన హోదాలు', allRoles: 'అన్ని హోదాలు',
@@ -104,7 +104,7 @@ export const dutyTelugu: Record<keyof typeof dutyEnglish, string> = {
   pendingPick: 'ఈ రోజు డ్యూటీ కేటాయించండి', pendingCell: 'డ్యూటీ కేటాయించలేదు', missingDays: 'డ్యూటీ లేని రోజులు',
   allAssigned: 'అన్నీ కేటాయించారు', autoAssign: 'ఆటో-అసైన్',
   refresh: 'రిఫ్రెష్', refreshData: 'డేటా రిఫ్రెష్ చేయండి',
-  dates: 'తేదీలు', allDates: 'అన్నీ', daysShown: '{total} రోజులలో {visible} చూపుతున్నాం',
+  dates: 'తేదీలు', allDates: 'అన్నీ', allDatesLabel: 'అన్ని తేదీలు',
   dragHint: 'మరో రోజుకు లాగి మార్చండి లేదా స్వాప్ చేయండి', dragMoved: 'డ్యూటీ {target} కి మార్చబడింది', dragSwapped: 'డ్యూటీలు స్వాప్ అయ్యాయి: {source} ⇄ {target}',
   ready: 'అన్ని డ్యూటీలు కేటాయించారు — సమర్పించవచ్చు', issues: '{count} సమస్యలు', validation: 'పరిశీలించాల్సిన సమస్యలు',
   pastLocked: 'ముగిసిన వారాల డ్యూటీలను మార్చలేరు.', weekReadOnly: 'ఈ వారం స్థితి: {status}. మార్పులు చేయలేరు.',
