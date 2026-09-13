@@ -154,12 +154,12 @@ function CompletedTripsTable({
                   </td>
                   {/* Keep 2d logo in header but working start from name S */}
                   <td className="px-4 py-4 pl-9 font-bold text-emerald-600 text-[13px] whitespace-nowrap">{trip.tripNo}</td>
-                  <td className="px-4 py-4 pl-9 text-[13px] font-medium text-slate-600 whitespace-nowrap">
+                  <td className="px-4 py-4 pl-9 text-[13px] font-bold text-slate-700 whitespace-nowrap">
                     {formatRateEntryDay(trip.tripDate, language)}
                   </td>
-                  <td className="px-4 py-4 pl-9 text-[13px] font-medium text-slate-700 whitespace-nowrap">{formatVehicleNumber(trip.vehicleNo)}</td>
-                  <td className="px-4 py-4 pl-9 text-[13px] text-slate-600 whitespace-nowrap">{displayRateEntryName(trip.supervisorName, language)}</td>
-                  <td className="px-4 py-4 pl-9 text-[13px] text-slate-600 font-medium whitespace-nowrap">
+                  <td className="px-4 py-4 pl-9 text-[13px] font-bold text-slate-700 whitespace-nowrap">{formatVehicleNumber(trip.vehicleNo)}</td>
+                  <td className="px-4 py-4 pl-9 text-[13px] font-bold text-slate-700 whitespace-nowrap">{displayRateEntryName(trip.supervisorName, language)}</td>
+                  <td className="px-4 py-4 pl-9 text-[13px] font-bold text-slate-700 whitespace-nowrap">
                     {displayRateEntryName(trip.sourceFarm, language)}
                   </td>
                   <td className="px-4 py-4 text-center whitespace-nowrap">
