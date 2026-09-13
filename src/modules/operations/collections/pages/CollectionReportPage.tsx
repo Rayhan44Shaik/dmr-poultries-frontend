@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { collectionService } from "../services/collectionService";
-import { useKpiDrill } from "../../../../shared/kpi/useKpiDrill";
 import type { CollectionApiEntry, CollectionReportSummary } from "../types/collection";
 import { useShops } from "../../../masters/shops/hooks/useShops";
 import { useEmployees } from "../../../masters/employees/hooks/useEmployees";
@@ -251,27 +250,6 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
     void loadReport();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fromDate, toDate, shopName, collector, paymentMode]);
-
-  /* Opened from a dashboard KPI tile: this page follows the window that tile
-     was showing, and the equal-length window before it when the range bar above
-     is flipped to "previous". Clearing the bar hands the dates back to this
-     page's own default.
-     Same "adjust state while rendering" pattern the dashboard uses: the URL is
-     the source of truth, so a refresh or a shared link lands filtered too. */
-  const { drill, activeFrom, activeTo } = useKpiDrill();
-  const drillKey = drill ? `${activeFrom}/${activeTo}` : "";
-  const [appliedDrillKey, setAppliedDrillKey] = useState<string | null>(null);
-  if (drillKey !== appliedDrillKey) {
-    setAppliedDrillKey(drillKey);
-    if (drill) {
-      setFromDate(activeFrom);
-      setToDate(activeTo);
-    } else if (appliedDrillKey) {
-      // Back to this page's own default: the current week from the backend.
-      setFromDate(weekBounds.from);
-      setToDate(weekBounds.to);
-    }
-  }
 
   const totalCollections = report?.totalAmount ?? 0;
   const totalCollectorsCount = report?.totalCollectors ?? 0;

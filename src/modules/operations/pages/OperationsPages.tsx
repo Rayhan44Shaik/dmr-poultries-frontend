@@ -3,9 +3,6 @@
 import React, { useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import { useKpiDrill } from "../../../shared/kpi/useKpiDrill";
-import KpiRangeBar from "./KpiRangeBar";
-
 import OperationsDashboardPage from "../dashboard/pages/OperationsDashboardPage";
 import TripEntryPage from "../vehicle-trips/pages/TripEntryPage";
 import TripListPage from "../vehicle-trips/pages/TripListPage";
@@ -71,21 +68,9 @@ function OperationsPages() {
     return tabComponents[activeTab] ?? OperationsDashboardPage;
   }, [activeTab]);
 
-  /* Opened from a dashboard KPI tile? Say so above the page: which KPI, which
-     window is applied, which one it is compared against, and a toggle between
-     them. The child page reads the same query params through useKpiDrill and
-     filters itself to `activeFrom`/`activeTo`. */
-  const { drill, setWindow, clear } = useKpiDrill();
-  const drillBar = drill && drill.tab === activeTab ? drill : null;
-
   return (
     <div className="w-full px-4 pb-8 pt-6 sm:px-5 lg:px-6">
       <div key={activeTab} className="mx-auto w-full max-w-[1600px] animate-page-pop">
-        {drillBar ? (
-          <div className="mb-4">
-            <KpiRangeBar drill={drillBar} onWindow={setWindow} onClear={clear} />
-          </div>
-        ) : null}
         <ActiveComponent embedded={true} />
       </div>
     </div>

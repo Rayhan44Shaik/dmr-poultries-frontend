@@ -1,10 +1,6 @@
 export default {
-  // ----- Analysis deep links (dashboard KPI → its analysis page) -----
-  'ops.analysis.clear_drill': 'Clear the KPI filter',
-  'ops.analysis.from_dashboard': 'from the dashboard',
+  // ----- KPI tiles → Accounts → Analysis deep link -----
   'ops.analysis.open_kpi': 'Open {kpi} analysis for {range}',
-  'ops.analysis.window_current': 'Last {days} days',
-  'ops.analysis.window_previous': 'Previous {days} days',
   // ----- Collections module -----
   'ops.collection.add_notes': 'Add notes',
   'ops.collection.after_approval': 'After approval',

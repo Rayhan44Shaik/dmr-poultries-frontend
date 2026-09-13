@@ -1,10 +1,6 @@
 export default {
-  // ----- Analysis deep links (dashboard KPI → its analysis page) -----
-  'ops.analysis.clear_drill': 'KPI ఫిల్టర్ తీసివేయి',
-  'ops.analysis.from_dashboard': 'డాష్‌బోర్డ్ నుండి',
+  // ----- KPI tiles → Accounts → Analysis deep link -----
   'ops.analysis.open_kpi': '{range} కోసం {kpi} విశ్లేషణ తెరవండి',
-  'ops.analysis.window_current': 'గత {days} రోజులు',
-  'ops.analysis.window_previous': 'మునుపటి {days} రోజులు',
   // ----- Collections module -----
   'ops.collection.add_notes': 'గమనికలు జోడించండి',
   'ops.collection.after_approval': 'ఆమోదం తర్వాత',

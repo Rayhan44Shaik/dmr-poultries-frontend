@@ -15,7 +15,7 @@ import {
 import { Link } from "react-router-dom";
 
 import { useI18n } from "../../../../i18n";
-import { buildKpiAnalysisPath } from "../../../../shared/kpi/kpiRange";
+import { buildAnalysisPath } from "../../../../shared/kpi/analysisLink";
 
 // ---------- Type Definitions ----------
 export interface DashboardMetrics {
@@ -170,21 +170,10 @@ interface KPICardProps {
   unit?: "KG" | "₹";
   rangeDays?: number;
   breakdown?: { fuel: number; trip: number };
-  /** Analysis page for this KPI, pre-filtered to the dashboard's window. */
+  /** Accounts → Analysis, opened on the dashboard's window with compare on. */
   to?: string | null;
   range?: { from: string; to: string } | null;
 }
-
-/** Which analysis page each KPI drills into (see shared/kpi/kpiRange). */
-const KPI_ANALYSIS_KEY: Record<CardLabel, string> = {
-  "Total Trips": "trips",
-  "Total Birds": "birds",
-  "Total Weight (KG)": "weight",
-  "Total Sales Amount": "sales",
-  "Total Collections": "collections",
-  "Pending Collections": "pending",
-  "Total Expenses": "expenses",
-};
 
 const kpiCardLabel = (label: CardLabel): string => {
   switch (label) {
@@ -482,8 +471,8 @@ const KPICard = memo(function KPICard({
       </div>
     ) : null;
 
-  /* The whole tile is the link: click anywhere on it and the analysis page for
-     that KPI opens on exactly the window the dashboard is showing. */
+  /* The whole tile is the link: click anywhere on it and the Analysis page
+     opens on exactly the window this dashboard is showing. */
   const linkTitle =
     to && range
       ? t("ops.analysis.open_kpi", {
@@ -574,18 +563,15 @@ export default function KPICards({
     ];
   }, [current, previous]);
 
-  /* Every tile deep-links to its own analysis page, pre-filtered to the exact
-     window the dashboard is showing — and that link carries the window before
-     it too, so the analysis page can compare "previous" over the same span. */
+  /* Every tile goes to the same place — Accounts → Analysis, the trip analysis
+     behind all seven figures — carrying the exact window on screen and asking
+     for its "Compare previous" to be on. 7 days here is 7 days there; a custom
+     range arrives as that same range. */
+  const analysisPath = useMemo(() => (range ? buildAnalysisPath(range) : null), [range]);
+
   const finalCards = useMemo(
-    () =>
-      cards.map((card) => ({
-        ...card,
-        rangeDays,
-        range: range ?? null,
-        to: range ? buildKpiAnalysisPath(KPI_ANALYSIS_KEY[card.label], range) : null,
-      })),
-    [cards, rangeDays, range]
+    () => cards.map((card) => ({ ...card, rangeDays, range: range ?? null, to: analysisPath })),
+    [cards, rangeDays, range, analysisPath]
   );
 
   return (
