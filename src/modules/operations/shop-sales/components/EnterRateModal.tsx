@@ -14,9 +14,7 @@ import {
   Users,
   FileText,
   Search,
-  Filter,
   PackageCheck,
-  Zap,
   Calculator,
 } from "lucide-react";
 import AppShellModal from "../../../../ui/AppShellModal";
@@ -32,9 +30,8 @@ import {
   formatRateEntryWeekday,
 } from "../utils/rateEntryDisplay";
 import type { RateEntryMarketRateMasterDto } from "../utils/rateEntryMarketMaster";
-import { Pagination } from "../../../../ui/Pagination";
 
-const DEFAULT_SHOPS_PAGE_SIZE = 10;
+const SHOPS_PAGE_SIZE = 10;
 
 function isValidSellingRate(rate: number | null | undefined): boolean {
   return rate != null && Number.isFinite(rate) && rate >= 50 && rate <= 300;
@@ -80,7 +77,7 @@ function formatInr(n: number): string {
   return n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
-type ShopSortKey = "shopName" | "birds" | "weight" | "rate" | "amount";
+type ShopSortKey = "time" | "shopName" | "birds" | "weight" | "rate" | "amount";
 
 interface Props {
   open: boolean;
@@ -113,10 +110,8 @@ export default function EnterRateModal({
   const [lockError, setLockError] = useState<string | null>(null);
   const [lockAttempted, setLockAttempted] = useState(false);
   const [shopPage, setShopPage] = useState(1);
-  const [shopPageSize, setShopPageSize] = useState(DEFAULT_SHOPS_PAGE_SIZE);
   const [shopSearch, setShopSearch] = useState("");
-  const [bulkRate, setBulkRate] = useState<string>("");
-  const [shopSortKey, setShopSortKey] = useState<ShopSortKey>("shopName");
+  const [shopSortKey, setShopSortKey] = useState<ShopSortKey>("time");
   const [shopSortDir, setShopSortDir] = useState<"asc" | "desc">("asc");
 
   const saving = isSaving || busy;
@@ -130,8 +125,7 @@ export default function EnterRateModal({
     setLockAttempted(false);
     setShopPage(1);
     setShopSearch("");
-    setBulkRate("");
-    setShopSortKey("shopName");
+    setShopSortKey("time");
     setShopSortDir("asc");
     setDeliveries(
       trip.deliveries.map((d) => ({
@@ -231,11 +225,14 @@ export default function EnterRateModal({
         return shopName.includes(q) || assoc.includes(q) || city.includes(q) || String(row.birds).includes(q);
       });
     }
+    // Time-based ordering: by originalIndex (delivery sequence / time)
     list.sort((a, b) => {
       const dir = shopSortDir === "asc" ? 1 : -1;
       const ra = a.row;
       const rb = b.row;
       switch (shopSortKey) {
+        case "time":
+          return (a.originalIndex - b.originalIndex) * dir;
         case "shopName":
           return ra.shopName.localeCompare(rb.shopName) * dir;
         case "birds":
@@ -259,11 +256,11 @@ export default function EnterRateModal({
     return list;
   }, [deliveries, shopSearch, shopSortKey, shopSortDir, shopMasterLookup]);
 
-  const shopPageCount = Math.max(1, Math.ceil(filteredSortedDeliveries.length / shopPageSize));
+  const shopPageCount = Math.max(1, Math.ceil(filteredSortedDeliveries.length / SHOPS_PAGE_SIZE));
   const pagedDeliveries = useMemo(() => {
-    const start = (shopPage - 1) * shopPageSize;
-    return filteredSortedDeliveries.slice(start, start + shopPageSize);
-  }, [filteredSortedDeliveries, shopPage, shopPageSize]);
+    const start = (shopPage - 1) * SHOPS_PAGE_SIZE;
+    return filteredSortedDeliveries.slice(start, start + SHOPS_PAGE_SIZE);
+  }, [filteredSortedDeliveries, shopPage]);
 
   useEffect(() => {
     if (shopPage <= shopPageCount) return;
@@ -304,38 +301,6 @@ export default function EnterRateModal({
     setLockError(null);
   };
 
-  const applyBulkRate = () => {
-    const rateNum = Number(bulkRate);
-    if (!isValidSellingRate(rateNum)) {
-      setLockError(t("ops.rate.modal.rate_range_error"));
-      return;
-    }
-    const q = shopSearch.trim().toLowerCase();
-    const next = deliveries.map((row) => {
-      if (q) {
-        const match = row.shopName.toLowerCase().includes(q);
-        if (!match) return row;
-      }
-      return { ...row, rate: rateNum };
-    });
-    setDeliveries(next);
-    setBulkRate("");
-    setLockError(null);
-  };
-
-  const clearFilteredRates = () => {
-    const q = shopSearch.trim().toLowerCase();
-    const next = deliveries.map((row) => {
-      if (q) {
-        const match = row.shopName.toLowerCase().includes(q);
-        if (!match) return row;
-      }
-      return { ...row, rate: null };
-    });
-    setDeliveries(next);
-    setLockError(null);
-  };
-
   const resetRates = () => {
     if (!trip) return;
     setLockError(null);
@@ -364,9 +329,9 @@ export default function EnterRateModal({
         if (firstMissing >= 0) {
           const idxInFiltered = filteredSortedDeliveries.findIndex((f) => f.originalIndex === firstMissing);
           if (idxInFiltered >= 0) {
-            setShopPage(Math.floor(idxInFiltered / shopPageSize) + 1);
+            setShopPage(Math.floor(idxInFiltered / SHOPS_PAGE_SIZE) + 1);
           } else {
-            setShopPage(Math.floor(firstMissing / shopPageSize) + 1);
+            setShopPage(Math.floor(firstMissing / SHOPS_PAGE_SIZE) + 1);
           }
         }
         return;
@@ -400,13 +365,14 @@ export default function EnterRateModal({
 
   if (!open || !trip) return null;
 
-  // Main modal now uses AppShellModal with gaps from header/sidebar/page edges
   return (
     <>
       <style>{`
         .no-spinner::-webkit-inner-spin-button,
         .no-spinner::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
         .no-spinner { -moz-appearance: textfield; }
+        @keyframes rate-table-in { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+        .rate-table-animate { animation: rate-table-in 0.25s ease-out; }
       `}</style>
 
       {showSuccessToast &&
@@ -474,33 +440,31 @@ export default function EnterRateModal({
 
       <AppShellModal open={open} onClose={onClose} panelClassName="bg-white">
         <div className="bg-white w-full h-full flex flex-col relative overflow-hidden rounded-2xl">
-          {/* Header */}
-          <div className="bg-white border-b border-slate-200 px-5 py-3 flex items-start justify-between shrink-0 rounded-t-2xl">
-            <div className="flex items-center gap-3">
-              <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-sm">
-                <IndianRupee size={18} />
+          {/* Header - Enter shop wise rate with perfect logo same size as table */}
+          <div className="bg-white border-b border-slate-200 px-5 py-4 flex items-center justify-between shrink-0 rounded-t-2xl">
+            <div className="flex items-center gap-3.5">
+              <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-md ring-2 ring-emerald-100 animate-in zoom-in duration-300">
+                <Store size={22} className="drop-shadow-sm" />
               </span>
               <div>
-                <h2 className="text-[16px] font-extrabold tracking-tight text-slate-900">
-                  {rateLocked ? t("ops.rate.modal.title_readonly") : t("ops.rate.modal.title_enter")}
+                <h2 className="text-[19px] font-extrabold tracking-tight text-slate-900 leading-none">
+                  Enter shop wise rate
                 </h2>
+                <p className="mt-1 text-[12px] font-semibold text-slate-500 tracking-wide">
+                  {trip.tripNo} • {formatRateEntryWeekday(trip.tripDate, language)} • Time based ordering
+                </p>
               </div>
             </div>
-            <div className="flex items-center gap-2">
-              <div className="hidden sm:flex items-center gap-2 mr-2">
-                <div className="text-right">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Progress</p>
-                  <p className="text-[12px] font-bold text-slate-800">
-                    {totals.ratedCount}/{deliveries.length} • {totals.progressPct}%
-                  </p>
-                </div>
-                <div className="h-2 w-20 rounded-full bg-slate-100 overflow-hidden">
-                  <div className="h-full bg-emerald-500 transition-all" style={{ width: `${totals.progressPct}%` }} />
-                </div>
+            <div className="flex items-center gap-3">
+              <div className="hidden sm:flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5">
+                <div className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[12px] font-bold text-emerald-800 tabular-nums">
+                  {totals.ratedCount}/{deliveries.length} • {totals.progressPct}%
+                </span>
               </div>
               <button
                 onClick={onClose}
-                className="h-8 w-8 rounded-full hover:bg-slate-100 flex items-center justify-center"
+                className="h-9 w-9 rounded-full hover:bg-slate-100 flex items-center justify-center border border-slate-200 bg-white shadow-sm"
                 aria-label={t("common.close")}
               >
                 <X size={18} className="text-slate-600" />
@@ -508,220 +472,138 @@ export default function EnterRateModal({
             </div>
           </div>
 
-          {/* Trip info cards */}
-          <div className="grid grid-cols-2 lg:grid-cols-5 gap-2.5 px-5 py-3 shrink-0 bg-slate-50/50 border-b border-slate-100">
-            <div className="flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-white px-3 py-2.5 shadow-xs">
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700">
-                <PackageCheck size={14} />
+          {/* Trip info cards - increased size */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 px-5 py-4 shrink-0 bg-slate-50/70 border-b border-slate-100">
+            <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-white px-4 py-3.5 shadow-sm hover:shadow-md transition-shadow">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-100 text-emerald-700 shrink-0">
+                <PackageCheck size={18} />
               </span>
               <div className="min-w-0">
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Trip</p>
-                <p className="text-[12px] font-bold text-emerald-700 truncate">{trip.tripNo}</p>
+                <p className="text-[11px] uppercase tracking-wider text-slate-500 font-bold">Trip No</p>
+                <p className="text-[15px] font-extrabold text-emerald-700 truncate leading-tight">{trip.tripNo}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2.5 rounded-xl border border-sky-100 bg-sky-50 px-3 py-2.5">
-              <div className="h-8 w-8 rounded-lg bg-sky-100 flex items-center justify-center">
-                <Truck size={15} className="text-sky-700" />
+            <div className="flex items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3.5 shadow-sm hover:shadow-md transition-shadow">
+              <div className="h-10 w-10 rounded-xl bg-sky-100 flex items-center justify-center shrink-0">
+                <Truck size={18} className="text-sky-700" />
               </div>
               <div className="min-w-0">
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Vehicle</p>
-                <p className="text-[12px] font-bold text-slate-800 truncate">{formatVehicleNumber(trip.vehicleNo)}</p>
+                <p className="text-[11px] uppercase tracking-wider text-slate-500 font-bold">Vehicle</p>
+                <p className="text-[15px] font-extrabold text-slate-900 truncate leading-tight">{formatVehicleNumber(trip.vehicleNo)}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2.5 rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2.5">
-              <div className="h-8 w-8 rounded-lg bg-emerald-100 flex items-center justify-center">
-                <CalendarDays size={15} className="text-emerald-700" />
+            <div className="flex items-center gap-3 rounded-xl border border-emerald-100 bg-emerald-50 px-4 py-3.5 shadow-sm hover:shadow-md transition-shadow">
+              <div className="h-10 w-10 rounded-xl bg-emerald-100 flex items-center justify-center shrink-0">
+                <CalendarDays size={18} className="text-emerald-700" />
               </div>
               <div className="min-w-0">
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Date</p>
-                <p className="text-[12px] font-bold text-slate-800 truncate">{formatRateEntryTripDate(trip.tripDate)}</p>
+                <p className="text-[11px] uppercase tracking-wider text-slate-500 font-bold">Date</p>
+                <p className="text-[15px] font-extrabold text-slate-900 truncate leading-tight">{formatRateEntryTripDate(trip.tripDate)}</p>
               </div>
             </div>
-            <div className="flex items-center gap-2.5 rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5">
-              <div className="min-w-0">
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Day</p>
-                <p className="text-[12px] font-bold text-slate-800 truncate">
-                  {formatRateEntryWeekday(trip.tripDate, language)}
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2.5 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2.5">
-              <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
-                <Calculator size={14} />
+            <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5 shadow-sm hover:shadow-md transition-shadow">
+              <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-amber-100 text-amber-700 shrink-0">
+                <Calculator size={18} />
               </span>
               <div className="min-w-0">
-                <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Total</p>
-                <p className="text-[12px] font-bold text-slate-800 tabular-nums">
-                  ₹ {formatInr(totals.totalAmount)} • {totals.totalWeight.toFixed(1)} KG
+                <p className="text-[11px] uppercase tracking-wider text-slate-500 font-bold">Total Shops</p>
+                <p className="text-[15px] font-extrabold text-slate-900 tabular-nums leading-tight">
+                  {deliveries.length} shops • {totals.totalWeight.toFixed(1)} KG
                 </p>
               </div>
             </div>
           </div>
 
           {(loadError || lockError) && (
-            <div className="px-5 py-2 border-b border-red-200 bg-red-50 flex items-center gap-2 shrink-0">
-              <AlertCircle size={14} className="text-red-600" />
-              <span className="text-xs font-medium text-red-700">{lockError || loadError}</span>
+            <div className="px-5 py-2.5 border-b border-red-200 bg-red-50 flex items-center gap-2 shrink-0">
+              <AlertCircle size={16} className="text-red-600" />
+              <span className="text-[13px] font-semibold text-red-700">{lockError || loadError}</span>
             </div>
           )}
 
-          {/* Shop rates section — enhanced */}
-          <div className="px-5 py-3 flex-1 min-h-0 flex flex-col overflow-hidden bg-white">
-            <div className="mb-3 flex flex-col gap-2.5">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-orange-100 text-orange-700">
-                    <Store size={17} />
-                  </span>
-                  <div>
-                    <h3 className="text-sm font-extrabold text-slate-900 flex items-center gap-2">
-                      {t("ops.rate.modal.shop_rates")}
-                      <span className="rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-bold text-slate-600">
-                        {filteredSortedDeliveries.length}/{deliveries.length}
-                      </span>
-                    </h3>
-                  </div>
-                </div>
-
-                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-                  <div className="relative flex-1 sm:w-64">
-                    <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                    <input
-                      type="search"
-                      value={shopSearch}
-                      onChange={(e) => setShopSearch(e.target.value)}
-                      placeholder="Search shops, association, city..."
-                      className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-8 pr-3 text-[13px] font-medium text-slate-700 placeholder:text-slate-400 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 outline-none"
-                    />
-                  </div>
-                  <div className="flex items-center gap-1.5">
-                    <div className="relative">
-                      <IndianRupee size={12} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-                      <input
-                        type="number"
-                        value={bulkRate}
-                        onChange={(e) => setBulkRate(e.target.value)}
-                        placeholder="Bulk ₹"
-                        className="h-9 w-28 rounded-xl border border-slate-200 bg-white pl-7 pr-2 text-[13px] font-bold tabular-nums placeholder:text-slate-400 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 outline-none no-spinner"
-                      />
-                    </div>
-                    <button
-                      type="button"
-                      onClick={applyBulkRate}
-                      disabled={saving || !bulkRate}
-                      className="h-9 inline-flex items-center gap-1 rounded-xl bg-slate-900 px-3 text-[12px] font-bold text-white hover:bg-black disabled:opacity-50"
-                    >
-                      <Zap size={12} /> Apply
-                    </button>
-                  </div>
-                </div>
+          {/* Shop table - clean, time based, shop size increased, no extra KPI */}
+          <div className="px-5 py-4 flex-1 min-h-0 flex flex-col overflow-hidden bg-white">
+            {/* Minimal top bar - only search, time based info */}
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-[13px] font-bold text-slate-700">
+                <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-900 text-white">
+                  <Store size={14} />
+                </span>
+                <span className="tracking-tight">Shops • Time based order</span>
+                <span className="rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5 text-[11px] font-bold text-slate-600">
+                  {filteredSortedDeliveries.length} shops
+                </span>
               </div>
-
-              <div className="flex flex-wrap items-center gap-2">
-                <div className="flex items-center gap-2 rounded-xl border border-slate-200 bg-slate-50 px-3 py-1.5">
-                  <span className="text-[11px] font-semibold text-slate-500">Progress</span>
-                  <div className="flex items-center gap-2">
-                    <div className="h-1.5 w-24 rounded-full bg-white border border-slate-200 overflow-hidden">
-                      <div className="h-full bg-emerald-500" style={{ width: `${totals.progressPct}%` }} />
-                    </div>
-                    <span className="text-[11px] font-bold text-slate-700 tabular-nums">
-                      {totals.ratedCount}/{deliveries.length} • {totals.progressPct}%
-                    </span>
-                  </div>
-                </div>
-                <div className="flex items-center gap-1.5 text-[11px] font-medium">
-                  <span className="rounded-full bg-emerald-50 border border-emerald-200 px-2 py-1 font-bold text-emerald-700">
-                    ₹ {formatInr(totals.totalAmount)} total
-                  </span>
-                  <span className="rounded-full bg-sky-50 border border-sky-200 px-2 py-1 font-bold text-sky-700">
-                    {totals.totalWeight.toFixed(2)} KG
-                  </span>
-                  <span className="rounded-full bg-amber-50 border border-amber-200 px-2 py-1 font-bold text-amber-700">
-                    Avg ₹ {totals.avgRate.toFixed(2)}
-                  </span>
-                  {totals.pendingCount > 0 && (
-                    <span className="rounded-full bg-red-50 border border-red-200 px-2 py-1 font-bold text-red-700">
-                      {totals.pendingCount} pending
-                    </span>
-                  )}
-                </div>
-                <div className="ml-auto flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={clearFilteredRates}
-                    disabled={saving || rateLocked}
-                    className="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-                  >
-                    <Filter size={12} /> Clear {shopSearch ? "filtered" : "all"}
-                  </button>
-                </div>
+              <div className="relative w-64">
+                <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="search"
+                  value={shopSearch}
+                  onChange={(e) => setShopSearch(e.target.value)}
+                  placeholder="Search shop..."
+                  className="h-9 w-full rounded-xl border border-slate-200 bg-white pl-8 pr-3 text-[13px] font-medium text-slate-700 placeholder:text-slate-400 focus:border-emerald-300 focus:ring-2 focus:ring-emerald-100 outline-none"
+                />
               </div>
             </div>
 
-            <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="min-h-0 flex-1 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm rate-table-animate">
               <div className="h-full overflow-auto">
                 <table className="min-w-[1050px] w-full text-sm">
                   <thead className="sticky top-0 z-10 bg-slate-50">
                     <tr className="border-b border-slate-200 text-slate-500">
-                      <th className="px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider">
-                        {t("ops.rate.modal.s_no")}
-                      </th>
-                      <th className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider">
+                      <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
                         <button
                           type="button"
-                          onClick={() => toggleShopSort("shopName")}
-                          className="flex items-center gap-1 hover:text-emerald-700"
+                          onClick={() => toggleShopSort("time")}
+                          className="flex items-center justify-center gap-1 w-full hover:text-emerald-700"
                         >
-                          {t("ops.rate.modal.shop_name")}
-                          {shopSortKey === "shopName" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
+                          S.No
+                          {shopSortKey === "time" && <span className="text-emerald-600">{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
-                      <th className="px-3 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider">
-                        {t("ops.rate.modal.association")}
+                      <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
+                        Shop Name
                       </th>
-                      <th className="px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider">
-                        {t("ops.rate.modal.paper_rate")}
-                      </th>
-                      <th className="px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider">
+                      <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
                         <button
                           type="button"
                           onClick={() => toggleShopSort("birds")}
                           className="flex items-center justify-center gap-1 w-full hover:text-emerald-700"
                         >
-                          {t("common.birds")}
+                          Birds
                           {shopSortKey === "birds" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
-                      <th className="px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider">
+                      <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
                         <button
                           type="button"
                           onClick={() => toggleShopSort("weight")}
                           className="flex items-center justify-center gap-1 w-full hover:text-emerald-700"
                         >
-                          {t("ops.trip.weight_kg")}
+                          Weight KG
                           {shopSortKey === "weight" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
-                      <th className="px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider">
-                        {t("ops.rate.modal.market_rate")}
+                      <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
+                        Market Rate
                       </th>
-                      <th className="px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider">
+                      <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
                         <button
                           type="button"
                           onClick={() => toggleShopSort("rate")}
                           className="flex items-center justify-center gap-1 w-full hover:text-emerald-700"
                         >
-                          {t("ops.rate.modal.rate")}
+                          Rate
                           {shopSortKey === "rate" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
-                      <th className="px-3 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider">
+                      <th className="px-3 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
                         <button
                           type="button"
                           onClick={() => toggleShopSort("amount")}
                           className="flex items-center justify-center gap-1 w-full hover:text-emerald-700"
                         >
-                          {t("ops.rate.modal.amount")}
+                          Amount
                           {shopSortKey === "amount" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
@@ -734,9 +616,6 @@ export default function EnterRateModal({
                       const amount = isValid ? Number((delivery.weight * (rate as number)).toFixed(2)) : 0;
                       const marketRateValue = suggestedMarketRate(delivery, tripDateVenRate);
                       const masterShop = resolveShopMaster(delivery, shopMasterLookup);
-                      const association = masterShop?.associationType?.trim() ?? "";
-                      const paperRate = Number(masterShop?.paperRate ?? 0);
-                      const hasPaperRate = Number.isFinite(paperRate) && paperRate > 0;
                       const belowMin = rate != null && rate < 50;
                       const aboveMax = rate != null && rate > 300;
                       const missingForLock = lockAttempted && !isValid;
@@ -744,90 +623,66 @@ export default function EnterRateModal({
                       return (
                         <tr
                           key={delivery.id}
-                          className={`border-b border-slate-100 transition-colors ${
+                          className={`border-b border-slate-100 transition-all duration-200 hover:bg-emerald-50/40 ${
                             missingForLock
                               ? "bg-red-50"
                               : originalIndex % 2 === 0
-                                ? "bg-white hover:bg-emerald-50/30"
-                                : "bg-slate-50/40 hover:bg-emerald-50/30"
+                                ? "bg-white"
+                                : "bg-slate-50/40"
                           }`}
                         >
-                          <td className="px-3 py-3 text-center text-xs font-semibold text-slate-500">
+                          <td className="px-3 py-3.5 text-center text-[13px] font-bold text-slate-600 tabular-nums">
                             {originalIndex + 1}
                           </td>
-                          <td className="min-w-[220px] px-3 py-3 text-xs text-slate-800">
-                            <div className="font-bold text-slate-900">{displayRateEntryShopName(delivery.shopName, language)}</div>
+                          <td className="min-w-[340px] px-4 py-3.5">
+                            <div className="font-extrabold text-[15px] text-slate-900 tracking-tight leading-tight">
+                              {displayRateEntryShopName(delivery.shopName, language)}
+                            </div>
                             {masterShop && (
-                              <div className="mt-0.5 flex items-center gap-1 text-[10px] font-medium text-slate-500">
-                                <span>{masterShop.city}</span>
-                                <span>•</span>
-                                <span className="tabular-nums">Bal ₹ {formatInr(masterShop.currentBalance ?? 0)}</span>
+                              <div className="mt-1 flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
+                                <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5">
+                                  <Users size={10} />
+                                  {displayRateEntryName(masterShop.associationType ?? "", language) || masterShop.city}
+                                </span>
+                                {masterShop.paperRate > 0 && (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-orange-50 border border-orange-200 px-2 py-0.5 text-orange-700">
+                                    <FileText size={10} />{masterShop.paperRate}
+                                  </span>
+                                )}
                               </div>
                             )}
                             {!masterShop && shopsLoading && (
-                              <div className="mt-1 text-[10px] font-semibold text-slate-500">
-                                {t("ops.rate.modal.shop_master_loading")}
-                              </div>
+                              <div className="mt-1 text-[11px] font-semibold text-slate-400">Loading master...</div>
                             )}
                           </td>
-                          <td className="min-w-[150px] px-3 py-3 text-xs">
-                            {association ? (
-                              <span
-                                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold ${
-                                  association === "Association"
-                                    ? "border-violet-200 bg-violet-50 text-violet-700"
-                                    : association === "Non-Association"
-                                      ? "border-slate-200 bg-slate-50 text-slate-600"
-                                      : association === "Direct"
-                                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                                        : "border-amber-200 bg-amber-50 text-amber-700"
-                                }`}
-                              >
-                                <Users size={12} />
-                                {displayRateEntryName(association, language)}
-                              </span>
-                            ) : (
-                              <span className="text-slate-400">—</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-3 text-center text-xs">
-                            {hasPaperRate ? (
-                              <span className="inline-flex items-center justify-center gap-1 rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-[11px] font-bold text-orange-700 tabular-nums">
-                                <FileText size={12} />
-                                {paperRate}
-                              </span>
-                            ) : (
-                              <span className="text-slate-400">—</span>
-                            )}
-                          </td>
-                          <td className="px-3 py-3 text-center text-xs font-semibold text-emerald-600">
+                          <td className="px-3 py-3.5 text-center text-[13px] font-bold text-emerald-700 tabular-nums">
                             {delivery.birds.toLocaleString()}
                           </td>
-                          <td className="px-3 py-3 text-center text-xs font-semibold text-orange-500">
+                          <td className="px-3 py-3.5 text-center text-[13px] font-bold text-orange-600 tabular-nums">
                             {delivery.weight.toFixed(2)}
                           </td>
-                          <td className="px-3 py-3 text-center text-xs font-semibold text-sky-600">
+                          <td className="px-3 py-3.5 text-center">
                             {marketRateValue != null ? (
                               <span className="inline-flex items-center overflow-hidden rounded-full border border-sky-200 bg-sky-50 text-sky-700 shadow-xs">
-                                <span className="px-2 py-1 tabular-nums">₹ {Number(marketRateValue).toFixed(2)}</span>
+                                <span className="px-2.5 py-1 text-[12px] font-bold tabular-nums">₹ {Number(marketRateValue).toFixed(2)}</span>
                                 {!rateLocked && (
                                   <button
                                     type="button"
                                     onClick={() => applyMarketRate(originalIndex, marketRateValue)}
                                     disabled={saving}
-                                    className="border-l border-sky-200 bg-white/80 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700 transition-colors hover:bg-emerald-50 hover:text-emerald-800 disabled:cursor-not-allowed disabled:opacity-50"
+                                    className="border-l border-sky-200 bg-white/80 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-emerald-700 transition-colors hover:bg-emerald-50 hover:text-emerald-800 disabled:opacity-50"
                                   >
-                                    {t("ops.rate.modal.use_market")}
+                                    Use
                                   </button>
                                 )}
                               </span>
                             ) : (
-                              <span className="text-slate-400">—</span>
+                              <span className="text-slate-300">—</span>
                             )}
                           </td>
-                          <td className="px-3 py-3">
+                          <td className="px-3 py-3.5">
                             {rateLocked ? (
-                              <span className="block text-center text-sm font-bold text-slate-600">
+                              <span className="block text-center text-[14px] font-extrabold text-slate-700">
                                 {rate != null ? rate.toFixed(2) : "—"}
                               </span>
                             ) : (
@@ -845,20 +700,20 @@ export default function EnterRateModal({
                                     (updated[originalIndex] as Trip["deliveries"][number]).rate = num;
                                     setDeliveries(updated);
                                   }}
-                                  className={`h-8 w-[92px] rounded-lg border px-2 text-center text-sm font-semibold outline-none no-spinner ${
+                                  className={`h-9 w-[100px] rounded-xl border px-2 text-center text-[14px] font-extrabold outline-none no-spinner transition-all ${
                                     rate == null
                                       ? "border-slate-300 bg-white focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
                                       : isValid
-                                        ? "border-emerald-500 bg-emerald-50 text-emerald-800"
+                                        ? "border-emerald-500 bg-emerald-50 text-emerald-800 shadow-sm"
                                         : "border-red-500 bg-red-50 text-red-700"
                                   }`}
                                 />
-                                {belowMin && <p className="mt-0.5 text-[10px] text-red-500">⚠ {t("ops.rate.modal.min_rate")}</p>}
-                                {aboveMax && <p className="mt-0.5 text-[10px] text-red-500">⚠ {t("ops.rate.modal.max_rate")}</p>}
+                                {belowMin && <p className="mt-0.5 text-[10px] font-bold text-red-500">Min 50</p>}
+                                {aboveMax && <p className="mt-0.5 text-[10px] font-bold text-red-500">Max 300</p>}
                               </div>
                             )}
                           </td>
-                          <td className="px-3 py-3 text-center text-xs font-semibold text-slate-700">
+                          <td className="px-3 py-3.5 text-center text-[13px] font-bold text-slate-800 tabular-nums">
                             ₹ {formatInr(amount)}
                           </td>
                         </tr>
@@ -866,10 +721,10 @@ export default function EnterRateModal({
                     })}
                     {pagedDeliveries.length === 0 && (
                       <tr>
-                        <td colSpan={9} className="py-12 text-center">
+                        <td colSpan={7} className="py-14 text-center">
                           <div className="flex flex-col items-center gap-2 text-slate-400">
-                            <Search size={20} />
-                            <p className="text-xs font-medium">No shops match &quot;{shopSearch}&quot;</p>
+                            <Search size={22} />
+                            <p className="text-[13px] font-semibold">No shops match "{shopSearch}"</p>
                           </div>
                         </td>
                       </tr>
@@ -879,136 +734,125 @@ export default function EnterRateModal({
               </div>
             </div>
 
+            {/* Simple 10 per page - Next / Previous only */}
             {filteredSortedDeliveries.length > 0 && (
-              <Pagination
-                page={shopPage}
-                pageSize={shopPageSize}
-                totalItems={filteredSortedDeliveries.length}
-                onPageChange={setShopPage}
-                onPageSizeChange={(nextPageSize) => {
-                  setShopPageSize(nextPageSize);
-                  setShopPage(1);
-                }}
-                disabled={saving}
-                ariaLabel={t("ops.rate.modal.shop_rates_pagination")}
-                className="mt-3 rounded-xl border border-slate-200 bg-white px-3 py-2"
-              />
+              <div className="mt-3 flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-2.5 shadow-sm">
+                <div className="text-[12px] font-bold text-slate-600 tabular-nums">
+                  Page {shopPage} of {shopPageCount} • {filteredSortedDeliveries.length} shops • 10 per page • Time based
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setShopPage((p) => Math.max(1, p - 1))}
+                    disabled={shopPage <= 1 || saving}
+                    className="h-8 px-3 rounded-lg border border-slate-200 bg-white text-[12px] font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-[12px] font-bold text-slate-500 tabular-nums">
+                    {shopPage} / {shopPageCount}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setShopPage((p) => Math.min(shopPageCount, p + 1))}
+                    disabled={shopPage >= shopPageCount || saving}
+                    className="h-8 px-3 rounded-lg bg-slate-900 text-white text-[12px] font-bold hover:bg-black disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
             )}
           </div>
 
-          {/* Footer — totals & actions, synced */}
-          <div className="bg-slate-50/95 border-t border-slate-200 px-5 py-3 shrink-0 rounded-b-2xl">
-            <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
-              <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4 text-[11px]">
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
-                  <p className="text-[10px] uppercase tracking-wider text-slate-500 font-semibold">Weight</p>
-                  <p className="text-[13px] font-extrabold text-slate-800 tabular-nums">{totals.totalWeight.toFixed(2)} KG</p>
-                </div>
-                <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2">
-                  <p className="text-[10px] uppercase tracking-wider text-emerald-700 font-semibold">Amount</p>
-                  <p className="text-[13px] font-extrabold text-emerald-800 tabular-nums">₹ {formatInr(totals.totalAmount)}</p>
-                </div>
-                <div className="rounded-xl border border-sky-200 bg-sky-50 px-3 py-2">
-                  <p className="text-[10px] uppercase tracking-wider text-sky-700 font-semibold">Avg Rate</p>
-                  <p className="text-[13px] font-extrabold text-sky-800 tabular-nums">₹ {totals.avgRate.toFixed(2)}</p>
-                </div>
-                <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2">
-                  <p className="text-[10px] uppercase tracking-wider text-amber-700 font-semibold">Progress</p>
-                  <p className="text-[13px] font-extrabold text-amber-800 tabular-nums">
-                    {totals.ratedCount}/{deliveries.length} • {totals.progressPct}%
-                  </p>
-                </div>
+          {/* Footer - clean, no KPI cards weight/amount/avg */}
+          <div className="bg-white border-t border-slate-200 px-5 py-3.5 shrink-0 rounded-b-2xl">
+            {rateLocked ? (
+              <div className="flex justify-end">
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="inline-flex items-center justify-center rounded-xl border border-slate-300 bg-white px-5 py-2.5 text-[13px] font-bold text-slate-700 hover:bg-slate-50 transition-colors"
+                >
+                  {t("common.close")}
+                </button>
               </div>
+            ) : (
+              <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={resetRates}
+                    disabled={saving}
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-[13px] font-bold text-slate-700 hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                  >
+                    <RotateCcw size={14} />
+                    Reset
+                  </button>
+                  <button
+                    type="button"
+                    onClick={applyMarketRates}
+                    disabled={saving || !canApplyMarketRates}
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border border-orange-200 bg-orange-50 text-[13px] font-bold text-orange-700 hover:bg-orange-100 disabled:opacity-50 transition-colors"
+                  >
+                    <IndianRupee size={14} />
+                    Apply Market Rates
+                  </button>
+                </div>
 
-              {rateLocked ? (
-                <div className="flex justify-end">
+                <div className="flex items-center justify-end gap-2">
                   <button
                     type="button"
                     onClick={onClose}
-                    className="inline-flex items-center justify-center rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50"
+                    className="px-4 py-2.5 rounded-xl border border-slate-300 bg-white text-[13px] font-bold text-slate-600 hover:bg-slate-50 transition-colors"
                   >
-                    {t("common.close")}
+                    {t("common.cancel")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => confirmSave("save")}
+                    disabled={saving || !isDirty || hasInvalidEnteredRate}
+                    className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl border text-[13px] font-bold transition-all disabled:opacity-50 ${
+                      isDirty
+                        ? "border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100"
+                        : "border-emerald-200 bg-emerald-50 text-emerald-700"
+                    }`}
+                  >
+                    <Save size={14} />
+                    {saving ? t("ops.rate.modal.saving") : t("ops.rate.modal.save_progress")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (saving) return;
+                      setLockAttempted(true);
+                      if (!canLock) {
+                        const firstMissing = deliveries.findIndex(
+                          (row) => !isValidSellingRate(normalizeRate(row.rate))
+                        );
+                        if (firstMissing >= 0) {
+                          const idxInFiltered = filteredSortedDeliveries.findIndex(
+                            (f) => f.originalIndex === firstMissing
+                          );
+                          if (idxInFiltered >= 0) {
+                            setShopPage(Math.floor(idxInFiltered / SHOPS_PAGE_SIZE) + 1);
+                          } else {
+                            setShopPage(Math.floor(firstMissing / SHOPS_PAGE_SIZE) + 1);
+                          }
+                        }
+                        return;
+                      }
+                      setShowConfirm(true);
+                    }}
+                    disabled={saving}
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl bg-emerald-600 text-white text-[13px] font-extrabold shadow-sm hover:bg-emerald-700 disabled:opacity-50 transition-colors"
+                  >
+                    <Lock size={14} className="text-emerald-100" />
+                    {saving ? t("ops.rate.modal.locking") : t("ops.rate.modal.lock_submit")}
                   </button>
                 </div>
-              ) : (
-                <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={resetRates}
-                      disabled={saving}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-sky-300 bg-white text-sm font-semibold text-sky-700 transition-colors hover:bg-sky-50 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <RotateCcw size={14} />
-                      {t("ops.rate.modal.reset_rates")}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={applyMarketRates}
-                      disabled={saving || !canApplyMarketRates}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border border-orange-300 bg-orange-50 text-sm font-semibold text-orange-700 transition-[color,background-color,border-color,box-shadow,transform] duration-150 hover:border-orange-400 hover:bg-orange-100 hover:text-orange-800 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <IndianRupee size={14} />
-                      {t("ops.rate.modal.apply_market_rates")}
-                      {shopSearch && <span className="text-[10px]">(filtered)</span>}
-                    </button>
-                  </div>
-
-                  <div className="flex flex-wrap items-center justify-end gap-2">
-                    <button
-                      type="button"
-                      onClick={onClose}
-                      className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
-                    >
-                      {t("common.cancel")}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => confirmSave("save")}
-                      disabled={saving || !isDirty || hasInvalidEnteredRate}
-                      className={`inline-flex items-center gap-1.5 px-4 py-2 rounded-lg border text-sm font-semibold transition-[color,background-color,border-color,box-shadow,transform] duration-150 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 ${
-                        isDirty
-                          ? "border-amber-400 bg-amber-50 text-amber-800 ring-2 ring-amber-200 hover:bg-amber-100"
-                          : "border-emerald-300 bg-emerald-50 text-emerald-800"
-                      }`}
-                      title={t("ops.rate.modal.save_progress")}
-                    >
-                      <Save size={14} />
-                      {saving ? t("ops.rate.modal.saving") : t("ops.rate.modal.save_progress")}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (saving) return;
-                        setLockAttempted(true);
-                        if (!canLock) {
-                          const firstMissing = deliveries.findIndex(
-                            (row) => !isValidSellingRate(normalizeRate(row.rate))
-                          );
-                          if (firstMissing >= 0) {
-                            const idxInFiltered = filteredSortedDeliveries.findIndex(
-                              (f) => f.originalIndex === firstMissing
-                            );
-                            if (idxInFiltered >= 0) {
-                              setShopPage(Math.floor(idxInFiltered / shopPageSize) + 1);
-                            } else {
-                              setShopPage(Math.floor(firstMissing / shopPageSize) + 1);
-                            }
-                          }
-                          return;
-                        }
-                        setShowConfirm(true);
-                      }}
-                      disabled={saving}
-                      className="inline-flex items-center gap-1.5 px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-bold shadow-sm transition-[color,background-color,box-shadow,transform] duration-150 hover:bg-emerald-700 hover:shadow-md active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <Lock size={14} className="text-orange-200" />
-                      {saving ? t("ops.rate.modal.locking") : t("ops.rate.modal.lock_submit")}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </AppShellModal>
