@@ -311,8 +311,8 @@ export default function EnterRateModal({
         </div>, document.body
       )}
 
-      <AppShellModal open={open} onClose={onClose} panelClassName="bg-white modal-responsive mx-auto my-auto">
-        <div className="bg-white w-full h-full flex flex-col relative overflow-hidden rounded-2xl max-h-[92vh] mx-auto">
+      <AppShellModal open={open} onClose={onClose} panelClassName="bg-white modal-responsive mx-auto">
+        <div className="bg-white w-full h-full flex flex-col relative overflow-hidden rounded-2xl max-h-full mx-auto">
           {/* Header - logo same size as rate entry table */}
           <div className="bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shrink-0 rounded-t-2xl">
             <div className="flex items-center gap-3">
@@ -348,9 +348,9 @@ export default function EnterRateModal({
             </div>
           </div>
 
-          {/* Market Rate - 3 tables side wise like Masters > Market Rates image, only 3 days, today highlighted, no Window texts */}
+          {/* Market Rate - 3 tables side wise like Masters > Market Rates image, only 3 days, today highlighted, no Window texts - with gap */}
           {marketThreeDays.length > 0 && (
-            <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 shrink-0">
+            <div className="px-4 py-3 bg-slate-50 border-b border-slate-200 shrink-0 max-h-[28vh] overflow-auto">
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
                 {/* Company & Association Rates */}
                 <div className="rounded-xl border border-slate-200 bg-white shadow-sm overflow-hidden">
@@ -466,11 +466,11 @@ export default function EnterRateModal({
             </div>
           )}
 
-          {/* Shop table - no colour for S.No/association/paper, birds weight same colour, amount simple, 10 shops, no drag, perfect middle */}
+          {/* Shop table - no colour for S.No/association/paper, birds weight same colour, amount simple, 10 shops, no drag, perfect middle with gaps */}
           <div className="px-5 py-3 flex-1 min-h-0 flex flex-col overflow-hidden bg-white">
-            <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm no-drag-table">
-              <div className="h-full overflow-hidden">
-                <table className="w-full text-sm">
+            <div className="min-h-0 flex-1 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm no-drag-table flex flex-col">
+              <div className="flex-1 min-h-0 overflow-auto">
+                <table className="w-full table-fixed text-sm">
                   <thead className="bg-slate-50">
                     <tr className="border-b border-slate-200">
                       <th className="w-[7%] px-2 py-3 text-center">
