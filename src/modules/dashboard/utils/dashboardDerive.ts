@@ -11,9 +11,14 @@ import {
   Sprout,
   Store,
   TrendingUp,
+  TrendingDown,
   Truck,
   Users,
+  Weight,
+  Scale
 } from "lucide-react";
+import { getDateRanges } from "./dashboardDates";
+import { PeriodId } from "../components/DashboardFilters";
 import type { DashboardData, VehicleRow } from "../services/dashboardService";
 import type { Trip } from "../../operations/vehicle-trips/types/trip";
 import { getMaintenance } from "../../fleet-operations/services/storage";
@@ -118,10 +123,50 @@ function pctChange(current: number, previous: number): number | null {
 /* ------------------------------------------------------------------ */
 const getT = (t?: (key: string, params?: Record<string, string | number>) => string) => t ?? translate;
 
-export function deriveDashboard(data: DashboardData, t?: (key: string, params?: Record<string, string | number>) => string): DerivedDashboard {
+export function deriveDashboard(
+  data: DashboardData,
+  t?: (key: string, params?: Record<string, string | number>) => string,
+  filterOpts?: {
+    period: PeriodId;
+    comparePrevious: boolean;
+    customStart: string;
+    customEnd: string;
+  }
+): DerivedDashboard {
   const tFunc = getT(t);
   const today = todayIso();
   const yesterday = isoDaysAgo(1);
+
+  const period = filterOpts?.period || 'week';
+  const { start, end, prevStart, prevEnd } = getDateRanges(period, filterOpts?.customStart || '', filterOpts?.customEnd || '');
+  
+  const inRange = (dStr: string, s: Date, e: Date) => {
+    const d = new Date(dStr);
+    return d >= s && d <= e;
+  };
+
+  const currTrips = data.trips.filter(t => inRange(t.tripDate, start, end));
+  const currSales = sum(data.shopSales.filter(s => inRange(s.tripDate, start, end)).map(s => Number(s.amount) || 0));
+  const currCollections = sum(data.collections.filter(c => inRange(c.collectionDate, start, end)).map(c => Number(c.amount) || 0));
+  const currFuel = sum(data.fuelExpenses.filter(f => inRange(f.date, start, end)).map(f => Number(f.amount) || 0));
+  const currTripExp = sum(currTrips.map(t => Number(t.expense) || 0));
+  const currExpenses = currFuel + currTripExp;
+  const currBirds = sum(data.shopSales.filter(s => inRange(s.tripDate, start, end)).map(s => Number(s.totalBirds) || 0));
+  const currWeight = sum(data.shopSales.filter(s => inRange(s.tripDate, start, end)).map(s => Number(s.totalWeight) || 0));
+  const currPending = sum(data.pendingCollections.map(p => Number(p.currentPending) || 0));
+
+  const prevTrips = data.trips.filter(t => inRange(t.tripDate, prevStart, prevEnd));
+  const prevSales = sum(data.shopSales.filter(s => inRange(s.tripDate, prevStart, prevEnd)).map(s => Number(s.amount) || 0));
+  const prevCollections = sum(data.collections.filter(c => inRange(c.collectionDate, prevStart, prevEnd)).map(c => Number(c.amount) || 0));
+  const prevFuel = sum(data.fuelExpenses.filter(f => inRange(f.date, prevStart, prevEnd)).map(f => Number(f.amount) || 0));
+  const prevTripExp = sum(prevTrips.map(t => Number(t.expense) || 0));
+  const prevExpenses = prevFuel + prevTripExp;
+  const prevBirds = sum(data.shopSales.filter(s => inRange(s.tripDate, prevStart, prevEnd)).map(s => Number(s.totalBirds) || 0));
+  const prevWeight = sum(data.shopSales.filter(s => inRange(s.tripDate, prevStart, prevEnd)).map(s => Number(s.totalWeight) || 0));
+  
+  const doCompare = filterOpts?.comparePrevious;
+  const getTrend = (curr: number, prev: number) => curr >= prev ? "up" : "down";
+
 
   const todaySales = sum(data.shopSales.filter((s) => s.tripDate === today).map((s) => Number(s.amount) || 0));
   const yesterdaySales = sum(data.shopSales.filter((s) => s.tripDate === yesterday).map((s) => Number(s.amount) || 0));
@@ -312,95 +357,82 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
   /* ----- KPIs ----- */
   const kpis: KpiDatum[] = [
     {
-      key: "shops",
-      label: tFunc("dashboard.kpi.shops"),
-      value: formatNumber(data.shops.length),
-      sub: tFunc("dashboard.kpi.shops_sub", { active: activeShops, inactive: data.shops.length - activeShops }),
-      delta: null,
-      trend: "flat",
-      icon: Store,
-      tone: "brand",
-      spark: series.map((s) => ({ x: s.date, y: data.shops.length })),
-    },
-    {
-      key: "farms",
-      label: tFunc("dashboard.kpi.farms"),
-      value: formatNumber(activeFarms),
-      sub: tFunc("dashboard.kpi.farms_sub", { total: data.farms.length }),
-      delta: null,
-      trend: "flat",
-      icon: Sprout,
-      tone: "violet",
-      spark: series.map((s) => ({ x: s.date, y: activeFarms })),
-    },
-    {
-      key: "vehicles",
-      label: tFunc("dashboard.kpi.vehicles"),
-      value: formatNumber(data.vehicles.length),
-      sub: tFunc("dashboard.kpi.vehicles_sub", { active: activeVehicles }),
-      delta: null,
-      trend: "flat",
+      key: "trips",
+      label: tFunc("dashboard.kpi.trips") || "Trips",
+      value: formatNumber(currTrips.length),
+      sub: doCompare ? tFunc("dashboard.kpi.vs_previous", { value: prevTrips.length }) || `vs ${prevTrips.length}` : "",
+      delta: doCompare ? pctChange(currTrips.length, prevTrips.length) : null,
+      trend: getTrend(currTrips.length, prevTrips.length),
       icon: Truck,
-      tone: "sky",
-      spark: series.map((s) => ({ x: s.date, y: activeVehicles })),
-    },
-    {
-      key: "employees",
-      label: tFunc("dashboard.kpi.employees"),
-      value: formatNumber(data.employees.length),
-      sub: tFunc("dashboard.kpi.employees_sub", { active: activeEmployees }),
-      delta: null,
-      trend: "flat",
-      icon: Users,
-      tone: "amber",
-      spark: series.map((s) => ({ x: s.date, y: activeEmployees })),
-    },
-    {
-      key: "todaySales",
-      label: tFunc("dashboard.kpi.today_sales"),
-      value: formatINRCompact(todaySales),
-      sub: tFunc("dashboard.kpi.today_sales_sub", { yesterday: formatINRCompact(yesterdaySales) }),
-      delta: pctChange(todaySales, yesterdaySales),
-      trend: todaySales >= yesterdaySales ? "up" : "down",
-      icon: IndianRupee,
       tone: "brand",
-      spark: series.map((s) => ({ x: s.date, y: s.sales })),
+      spark: []
     },
     {
-      key: "todayCollections",
-      label: tFunc("dashboard.kpi.today_collections"),
-      value: formatINRCompact(todayCollections),
-      sub: tFunc("dashboard.kpi.today_collections_sub", { yesterday: formatINRCompact(yesterdayCollections) }),
-      delta: pctChange(todayCollections, yesterdayCollections),
-      trend: todayCollections >= yesterdayCollections ? "up" : "down",
-      icon: CreditCard,
+      key: "birds",
+      label: tFunc("dashboard.kpi.birds") || "Birds",
+      value: formatNumber(currBirds),
+      sub: doCompare ? tFunc("dashboard.kpi.vs_previous", { value: prevBirds }) || `vs ${prevBirds}` : "",
+      delta: doCompare ? pctChange(currBirds, prevBirds) : null,
+      trend: getTrend(currBirds, prevBirds),
+      icon: Bird,
       tone: "sky",
-      spark: series.map((s) => ({ x: s.date, y: s.collections })),
+      spark: []
+    },
+    {
+      key: "weight",
+      label: tFunc("dashboard.kpi.weight") || "Weight",
+      value: `${currWeight.toFixed(1)} kg`,
+      sub: doCompare ? tFunc("dashboard.kpi.vs_previous", { value: prevWeight.toFixed(1) }) || `vs ${prevWeight.toFixed(1)} kg` : "",
+      delta: doCompare ? pctChange(currWeight, prevWeight) : null,
+      trend: getTrend(currWeight, prevWeight),
+      icon: Scale,
+      tone: "violet",
+      spark: []
+    },
+    {
+      key: "sales",
+      label: tFunc("dashboard.kpi.sales") || "Amount",
+      value: formatINRCompact(currSales),
+      sub: doCompare ? tFunc("dashboard.kpi.vs_previous", { value: formatINRCompact(prevSales) }) || `vs ${formatINRCompact(prevSales)}` : "",
+      delta: doCompare ? pctChange(currSales, prevSales) : null,
+      trend: getTrend(currSales, prevSales),
+      icon: IndianRupee,
+      tone: "emerald" as any,
+      spark: []
+    },
+    {
+      key: "collections",
+      label: tFunc("dashboard.kpi.today_collections") || "Collections",
+      value: formatINRCompact(currCollections),
+      sub: doCompare ? tFunc("dashboard.kpi.vs_previous", { value: formatINRCompact(prevCollections) }) || `vs ${formatINRCompact(prevCollections)}` : "",
+      delta: doCompare ? pctChange(currCollections, prevCollections) : null,
+      trend: getTrend(currCollections, prevCollections),
+      icon: CreditCard,
+      tone: "teal" as any,
+      spark: []
     },
     {
       key: "pending",
       label: tFunc("dashboard.kpi.pending"),
-      value: formatINRCompact(pendingAmount),
-      sub: overdueCount > 0
-        ? tFunc("dashboard.kpi.pending_sub_overdue", { count: overdueCount })
-        : tFunc("dashboard.kpi.pending_sub_due", { count: data.pendingCollections.length }),
+      value: formatINRCompact(currPending),
+      sub: "",
       delta: null,
       trend: "flat",
       icon: CreditCard,
-      tone: "rose",
-      spark: series.map((s) => ({ x: s.date, y: Math.round(s.sales - s.collections) })),
+      tone: "amber",
+      spark: []
     },
     {
-      key: "profit",
-      label: tFunc("dashboard.kpi.profit"),
-      value: formatINRCompact(todayProfit),
-      sub: tFunc("dashboard.kpi.profit_sub", { yesterday: formatINRCompact(yesterdayProfit) }),
-      delta: pctChange(todayProfit, yesterdayProfit),
-      trend: todayProfit >= yesterdayProfit ? "up" : "down",
-      icon: TrendingUp,
-      tone: "violet",
-      spark: series.map((s) => ({ x: s.date, y: Math.round(s.sales - s.expenses) })),
-    },
+      key: "expenses",
+      label: tFunc("dashboard.kpi.expenses") || "Expenses",
+      value: formatINRCompact(currExpenses),
+      sub: doCompare ? tFunc("dashboard.kpi.vs_previous", { value: formatINRCompact(prevExpenses) }) || `vs ${formatINRCompact(prevExpenses)}` : "",
+      delta: doCompare ? pctChange(currExpenses, prevExpenses) : null,
+      trend: currExpenses <= prevExpenses ? "up" : "down",
+      icon: TrendingDown,
+      tone: "rose",
+      spark: []
+    }
   ];
 
   const hasAnyData =

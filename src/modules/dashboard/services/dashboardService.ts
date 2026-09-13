@@ -69,7 +69,7 @@ export interface DashboardData {
 /*  Quarter sample API — trips + fuel for the Executive dashboard       */
 /* ------------------------------------------------------------------ */
 /** Trips/fuel are read this many days back; enough for every 7-day series. */
-const SAMPLE_WINDOW_DAYS = 30;
+const SAMPLE_WINDOW_DAYS = 120;
 const SAMPLE_ROW_LIMIT = 500;
 
 function isoDaysAgo(days: number): string {
