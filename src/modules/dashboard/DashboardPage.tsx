@@ -157,9 +157,9 @@ function DashboardPage() {
           {/* ------------------------------------------------------ */}
           {/* KPI cards                                               */}
           {/* ------------------------------------------------------ */}
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-3 xl:grid-cols-7">
+          <div className="flex flex-nowrap items-stretch justify-between rounded-xl border border-slate-200/80 bg-white p-1 shadow-sm dark:border-slate-800 dark:bg-slate-900 w-full overflow-hidden">
             {derived.kpis.map((kpi, i) => (
-              <Link key={kpi.key} to={accountSummaryLink} className="block w-full">
+              <Link key={kpi.key} to={accountSummaryLink} className="flex-1 min-w-0 px-2 sm:px-2.5 border-r border-slate-100 last:border-0 dark:border-slate-800 hover:bg-slate-50 transition-colors rounded-lg flex items-center justify-center">
                 <KpiCard kpi={kpi} index={i} />
               </Link>
             ))}

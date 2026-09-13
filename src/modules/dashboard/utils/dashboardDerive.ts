@@ -15,7 +15,11 @@ import {
   Truck,
   Users,
   Weight,
-  Scale
+  Scale,
+  Wallet,
+  Hourglass,
+  ReceiptText,
+  ShoppingBag
 } from "lucide-react";
 import { getDateRanges } from "./dashboardDates";
 import { PeriodId } from "../components/DashboardFilters";
@@ -33,7 +37,7 @@ export interface KpiDatum {
   delta: number | null;
   trend: "up" | "down" | "flat";
   icon: LucideIcon;
-  tone: "brand" | "sky" | "amber" | "rose" | "violet" | "slate";
+  tone: "brand" | "sky" | "amber" | "rose" | "violet" | "slate" | "emerald" | "teal";
   spark: { x: string; y: number }[];
 }
 
@@ -166,6 +170,8 @@ export function deriveDashboard(
   
   const doCompare = filterOpts?.comparePrevious;
   const getTrend = (curr: number, prev: number) => curr >= prev ? "up" : "down";
+  const daysDiff = Math.round((end.getTime() - start.getTime()) / (1000 * 3600 * 24)) + 1;
+  const periodStr = `${daysDiff}d`;
 
 
   const todaySales = sum(data.shopSales.filter((s) => s.tripDate === today).map((s) => Number(s.amount) || 0));
@@ -360,65 +366,65 @@ export function deriveDashboard(
       key: "trips",
       label: tFunc("dashboard.kpi.trips") || "Trips",
       value: formatNumber(currTrips.length),
-      sub: doCompare ? tFunc("dashboard.kpi.vs_previous", { value: prevTrips.length }) || `vs ${prevTrips.length}` : "",
+      sub: doCompare ? periodStr : "",
       delta: doCompare ? pctChange(currTrips.length, prevTrips.length) : null,
       trend: getTrend(currTrips.length, prevTrips.length),
       icon: Truck,
-      tone: "brand",
+      tone: "emerald",
       spark: []
     },
     {
       key: "birds",
       label: tFunc("dashboard.kpi.birds") || "Birds",
       value: formatNumber(currBirds),
-      sub: doCompare ? tFunc("dashboard.kpi.vs_previous", { value: prevBirds }) || `vs ${prevBirds}` : "",
+      sub: doCompare ? periodStr : "",
       delta: doCompare ? pctChange(currBirds, prevBirds) : null,
       trend: getTrend(currBirds, prevBirds),
       icon: Bird,
-      tone: "sky",
+      tone: "amber",
       spark: []
     },
     {
       key: "weight",
-      label: tFunc("dashboard.kpi.weight") || "Weight",
-      value: `${currWeight.toFixed(1)} kg`,
-      sub: doCompare ? tFunc("dashboard.kpi.vs_previous", { value: prevWeight.toFixed(1) }) || `vs ${prevWeight.toFixed(1)} kg` : "",
+      label: tFunc("dashboard.kpi.weight") || "Weight (Kg)",
+      value: formatNumber(currWeight),
+      sub: doCompare ? periodStr : "",
       delta: doCompare ? pctChange(currWeight, prevWeight) : null,
       trend: getTrend(currWeight, prevWeight),
-      icon: Scale,
-      tone: "violet",
+      icon: ShoppingBag,
+      tone: "emerald",
       spark: []
     },
     {
       key: "sales",
       label: tFunc("dashboard.kpi.sales") || "Amount",
       value: formatINRCompact(currSales),
-      sub: doCompare ? tFunc("dashboard.kpi.vs_previous", { value: formatINRCompact(prevSales) }) || `vs ${formatINRCompact(prevSales)}` : "",
+      sub: doCompare ? periodStr : "",
       delta: doCompare ? pctChange(currSales, prevSales) : null,
       trend: getTrend(currSales, prevSales),
       icon: IndianRupee,
-      tone: "emerald" as any,
+      tone: "violet",
+      spark: []
+    },
+    {
+      key: "pending",
+      label: tFunc("dashboard.kpi.pending") || "Pending",
+      value: formatINRCompact(currPending),
+      sub: doCompare ? periodStr : "",
+      delta: doCompare ? 0 : null,
+      trend: "flat",
+      icon: Hourglass,
+      tone: "sky",
       spark: []
     },
     {
       key: "collections",
       label: tFunc("dashboard.kpi.today_collections") || "Collections",
       value: formatINRCompact(currCollections),
-      sub: doCompare ? tFunc("dashboard.kpi.vs_previous", { value: formatINRCompact(prevCollections) }) || `vs ${formatINRCompact(prevCollections)}` : "",
+      sub: doCompare ? periodStr : "",
       delta: doCompare ? pctChange(currCollections, prevCollections) : null,
       trend: getTrend(currCollections, prevCollections),
-      icon: CreditCard,
-      tone: "teal" as any,
-      spark: []
-    },
-    {
-      key: "pending",
-      label: tFunc("dashboard.kpi.pending"),
-      value: formatINRCompact(currPending),
-      sub: "",
-      delta: null,
-      trend: "flat",
-      icon: CreditCard,
+      icon: Wallet,
       tone: "amber",
       spark: []
     },
@@ -426,10 +432,10 @@ export function deriveDashboard(
       key: "expenses",
       label: tFunc("dashboard.kpi.expenses") || "Expenses",
       value: formatINRCompact(currExpenses),
-      sub: doCompare ? tFunc("dashboard.kpi.vs_previous", { value: formatINRCompact(prevExpenses) }) || `vs ${formatINRCompact(prevExpenses)}` : "",
+      sub: doCompare ? periodStr : "",
       delta: doCompare ? pctChange(currExpenses, prevExpenses) : null,
       trend: currExpenses <= prevExpenses ? "up" : "down",
-      icon: TrendingDown,
+      icon: ReceiptText,
       tone: "rose",
       spark: []
     }
@@ -455,13 +461,13 @@ export function deriveDashboard(
     activity,
     hasAnyData,
     totals: {
-      pendingAmount,
+      pendingAmount: currPending,
       overdueCount,
-      todaySales,
-      todayCollections,
-      todayProfit,
-      todayBirds: sum(data.shopSales.filter((s) => s.tripDate === today).map((s) => Number(s.totalBirds) || 0)),
-      todayWeight: sum(data.shopSales.filter((s) => s.tripDate === today).map((s) => Number(s.totalWeight) || 0)),
+      todaySales: currSales,
+      todayCollections: currCollections,
+      todayProfit: currSales - currExpenses,
+      todayBirds: currBirds,
+      todayWeight: currWeight,
     },
   };
 }
