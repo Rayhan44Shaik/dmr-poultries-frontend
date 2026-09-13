@@ -3,15 +3,6 @@ import {
   IndianRupee,
   Pencil,
   Lock,
-  Hash,
-  Calendar,
-  Truck,
-  UserCog,
-  Warehouse,
-  ShoppingBag,
-  Bird,
-  Scale,
-  Settings,
   ArrowUp,
   ArrowDown,
   Check,
@@ -45,13 +36,13 @@ interface Props {
 }
 
 function SortArrows({ active, dir }: { active: boolean; dir?: "asc" | "desc" }) {
-  const base = "h-3 w-3 shrink-0 transition-colors";
+  const base = "h-3.5 w-3.5 shrink-0 transition-colors";
   const on = "text-emerald-600";
   const off = "text-slate-400 group-hover/sort:text-slate-600";
   return (
     <span className="inline-flex items-center gap-0.5 shrink-0" aria-hidden="true">
-      <ArrowUp size={12} strokeWidth={2.7} className={`${base} ${active && dir === "asc" ? on : off}`} />
-      <ArrowDown size={12} strokeWidth={2.7} className={`${base} ${active && dir === "desc" ? on : off}`} />
+      <ArrowUp size={13} strokeWidth={2.7} className={`${base} ${active && dir === "asc" ? on : off}`} />
+      <ArrowDown size={13} strokeWidth={2.7} className={`${base} ${active && dir === "desc" ? on : off}`} />
     </span>
   );
 }
@@ -79,7 +70,7 @@ function CompletedTripsTable({
         onClick={() => onSortChange(key)}
         title={t("common.sort")}
         aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
-        className={`group/sort flex items-center gap-2 w-full uppercase tracking-wider font-bold text-[11px] transition-colors hover:text-emerald-700 ${
+        className={`group/sort flex items-center gap-2 w-full uppercase tracking-wider font-bold text-[12px] transition-colors hover:text-emerald-700 ${
           center ? "justify-center" : ""
         } ${active ? "text-emerald-700" : ""}`}
       >
@@ -91,35 +82,35 @@ function CompletedTripsTable({
 
   return (
     <div className="w-full overflow-x-auto">
-      <table className="min-w-full text-sm text-left border-collapse">
+      <table className="min-w-full text-[13px] text-left border-collapse">
         <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-600">
           <tr className="whitespace-nowrap">
-            <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider w-10">#</th>
-            <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
+            <th className="px-4 py-3.5 text-center text-[12px] font-bold uppercase tracking-wider w-10">#</th>
+            <th className="px-4 py-3.5 text-left text-[12px] font-bold uppercase tracking-wider">
               {sortable("tripNo", <span>{t("operations.trip_no")}</span>)}
             </th>
-            <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
+            <th className="px-4 py-3.5 text-left text-[12px] font-bold uppercase tracking-wider">
               {sortable("tripDate", <span>{t("ops.rate.col.day")}</span>)}
             </th>
-            <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
+            <th className="px-4 py-3.5 text-left text-[12px] font-bold uppercase tracking-wider">
               {sortable("vehicleNo", <span>{t("common.vehicle")}</span>)}
             </th>
-            <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
+            <th className="px-4 py-3.5 text-left text-[12px] font-bold uppercase tracking-wider">
               {sortable("supervisorName", <span>{t("common.supervisor")}</span>)}
             </th>
-            <th className="px-4 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
+            <th className="px-4 py-3.5 text-left text-[12px] font-bold uppercase tracking-wider">
               {sortable("sourceFarm", <span>{t("ops.trip.source_farm")}</span>)}
             </th>
-            <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
+            <th className="px-4 py-3.5 text-center text-[12px] font-bold uppercase tracking-wider">
               {sortable("totalShops", <span>{t("ops.trip.shops")}</span>, true)}
             </th>
-            <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
+            <th className="px-4 py-3.5 text-center text-[12px] font-bold uppercase tracking-wider">
               {sortable("totalBirds", <span>{t("common.birds")}</span>, true)}
             </th>
-            <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
+            <th className="px-4 py-3.5 text-center text-[12px] font-bold uppercase tracking-wider">
               {sortable("totalWeight", <span>{t("ops.trip.weight_kg")}</span>, true)}
             </th>
-            <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
+            <th className="px-4 py-3.5 text-center text-[12px] font-bold uppercase tracking-wider">
               <span>{t("ops.rate.col.action")}</span>
             </th>
           </tr>
@@ -127,7 +118,7 @@ function CompletedTripsTable({
         <tbody className="divide-y divide-slate-100">
           {trips.length === 0 ? (
             <tr>
-              <td colSpan={10} className="py-12 text-center text-slate-400 text-xs font-medium">
+              <td colSpan={10} className="py-12 text-center text-slate-400 text-[13px] font-medium">
                 {t("ops.rate.no_waiting_trips")}
               </td>
             </tr>
@@ -150,28 +141,28 @@ function CompletedTripsTable({
                       : `${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"} hover:bg-slate-50/60`
                   }`}
                 >
-                  <td className="px-4 py-3 text-center text-xs text-slate-500 font-medium w-10">
-                    {isSelected ? <Check size={15} className="inline text-blue-500" /> : serialNo}
+                  <td className="px-4 py-3.5 text-center text-[13px] text-slate-500 font-medium w-10">
+                    {isSelected ? <Check size={16} className="inline text-blue-500" /> : serialNo}
                   </td>
-                  <td className="px-4 py-3 font-bold text-emerald-500 text-xs whitespace-nowrap">{trip.tripNo}</td>
-                  <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">
+                  <td className="px-4 py-3.5 font-bold text-emerald-600 text-[13px] whitespace-nowrap">{trip.tripNo}</td>
+                  <td className="px-4 py-3.5 text-[13px] font-medium text-slate-600 whitespace-nowrap">
                     {formatRateEntryDay(trip.tripDate, language)}
                   </td>
-                  <td className="px-4 py-3 text-xs font-medium text-slate-700 whitespace-nowrap">{formatVehicleNumber(trip.vehicleNo)}</td>
-                  <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">{displayRateEntryName(trip.supervisorName, language)}</td>
-                  <td className="px-4 py-3 text-xs text-slate-600 font-medium whitespace-nowrap">
+                  <td className="px-4 py-3.5 text-[13px] font-medium text-slate-700 whitespace-nowrap">{formatVehicleNumber(trip.vehicleNo)}</td>
+                  <td className="px-4 py-3.5 text-[13px] text-slate-600 whitespace-nowrap">{displayRateEntryName(trip.supervisorName, language)}</td>
+                  <td className="px-4 py-3.5 text-[13px] text-slate-600 font-medium whitespace-nowrap">
                     {displayRateEntryName(trip.sourceFarm, language)}
                   </td>
-                  <td className="px-4 py-3 text-center whitespace-nowrap">
-                    <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-bold text-slate-700">
+                  <td className="px-4 py-3.5 text-center whitespace-nowrap">
+                    <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[12px] font-bold text-slate-700">
                       {totalShops}
                     </span>
                   </td>
-                  <td className="px-4 py-3 text-center text-xs font-bold text-blue-500 whitespace-nowrap">
+                  <td className="px-4 py-3.5 text-center text-[13px] font-bold text-blue-600 whitespace-nowrap">
                     {trip.totalBirds.toLocaleString()}
                   </td>
-                  <td className="px-4 py-3 text-center text-xs font-bold text-amber-500 whitespace-nowrap">{trip.totalWeight.toFixed(2)}</td>
-                  <td className="px-4 py-3 text-center whitespace-nowrap">
+                  <td className="px-4 py-3.5 text-center text-[13px] font-bold text-amber-600 whitespace-nowrap">{trip.totalWeight.toFixed(2)}</td>
+                  <td className="px-4 py-3.5 text-center whitespace-nowrap">
                     {!isLocked ? (
                       <button
                         type="button"
@@ -179,11 +170,11 @@ function CompletedTripsTable({
                           event.stopPropagation();
                           onEnterRate(trip);
                         }}
-                        className="group inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 hover:text-emerald-800 px-3.5 py-1.5 text-xs font-bold shadow-sm transition-all active:scale-95"
+                        className="group inline-flex items-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:border-emerald-300 hover:text-emerald-800 px-3.5 py-2 text-[13px] font-bold shadow-sm transition-all active:scale-95"
                         aria-label={`${t("ops.rate.enter_tooltip")} ${trip.tripNo}`}
                       >
                         <span className={`inline-flex ${uiActionIconMotionClass.edit}`}>
-                          <IndianRupee size={14} />
+                          <IndianRupee size={15} />
                         </span>
                         {t("ops.rate.enter_rates")}
                         <ActionTooltip label={t("ops.rate.enter_tooltip")} />
@@ -195,7 +186,7 @@ function CompletedTripsTable({
                           event.stopPropagation();
                           onModifyRate(trip);
                         }}
-                        className="group inline-flex items-center gap-1.5 rounded-xl border border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100 hover:border-orange-300 px-3.5 py-1.5 text-xs font-bold shadow-sm transition-all active:scale-95"
+                        className="group inline-flex items-center gap-1.5 rounded-xl border border-orange-200 bg-orange-50 text-orange-700 hover:bg-orange-100 hover:border-orange-300 px-3.5 py-2 text-[13px] font-bold shadow-sm transition-all active:scale-95"
                         aria-label={`${t("ops.rate.modify_tooltip")} ${trip.tripNo}`}
                       >
                         <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full bg-orange-100 text-orange-600 ring-1 ring-orange-200 group-hover:bg-orange-200 ${uiActionIconMotionClass.edit}`}>
@@ -205,8 +196,8 @@ function CompletedTripsTable({
                         <ActionTooltip label={t("ops.rate.modify_tooltip")} />
                       </button>
                     ) : isReadOnly ? (
-                      <span className="inline-flex items-center gap-1 rounded-xl bg-slate-100 text-slate-400 px-3 py-1.5 text-xs font-semibold cursor-not-allowed">
-                        <Lock size={14} />
+                      <span className="inline-flex items-center gap-1 rounded-xl bg-slate-100 text-slate-400 px-3 py-2 text-[13px] font-semibold cursor-not-allowed">
+                        <Lock size={15} />
                         {t("ops.rate.locked")}
                       </span>
                     ) : null}
