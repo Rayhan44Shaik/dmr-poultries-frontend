@@ -14,6 +14,7 @@ import {
   Calculator,
   ChevronLeft,
   ChevronRight,
+  Languages,
 } from "lucide-react";
 import AppShellModal from "../../../../ui/AppShellModal";
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
@@ -67,7 +68,7 @@ function formatDdMmYy(iso: string): string {
   return `${m[3]}-${m[2]}-${m[1]}`;
 }
 
-type ShopSortKey = "time" | "shopName" | "birds" | "weight" | "rate" | "amount";
+type ShopSortKey = "shopName" | "paperRate" | "time" | "birds" | "weight" | "rate" | "amount";
 
 interface Props {
   open: boolean;
@@ -100,9 +101,10 @@ export default function EnterRateModal({
   const [lockError, setLockError] = useState<string | null>(null);
   const [lockAttempted, setLockAttempted] = useState(false);
   const [shopPage, setShopPage] = useState(1);
-  const [shopSortKey, setShopSortKey] = useState<ShopSortKey>("time");
+  const [shopSortKey, setShopSortKey] = useState<ShopSortKey>("shopName");
   const [shopSortDir, setShopSortDir] = useState<"asc" | "desc">("asc");
   const [shopSearch, setShopSearch] = useState("");
+  const [localLanguage, setLocalLanguage] = useState(language);
 
   const saving = isSaving || busy;
   const rateLocked = trip?.rateCompleted === true;
@@ -114,11 +116,12 @@ export default function EnterRateModal({
     setLockError(null);
     setLockAttempted(false);
     setShopPage(1);
-    setShopSortKey("time");
+    setShopSortKey("shopName");
     setShopSortDir("asc");
     setShopSearch("");
+    setLocalLanguage(language);
     setDeliveries(trip.deliveries.map((d) => ({ ...d, rate: normalizeRate(d.rate) })));
-  }, [trip]);
+  }, [trip, language]);
 
   const hasInvalidEnteredRate = useMemo(
     () => deliveries.some((row) => { const rate = normalizeRate(row.rate); return rate !== null && !isValidSellingRate(rate); }),
@@ -194,18 +197,38 @@ export default function EnterRateModal({
       const dir = shopSortDir === "asc" ? 1 : -1;
       const ra = a.row;
       const rb = b.row;
+      const masterA = resolveShopMaster(ra, shopMasterLookup);
+      const masterB = resolveShopMaster(rb, shopMasterLookup);
       switch (shopSortKey) {
-        case "time": return (a.originalIndex - b.originalIndex) * dir;
-        case "shopName": return ra.shopName.localeCompare(rb.shopName) * dir;
-        case "birds": return (ra.birds - rb.birds) * dir;
-        case "weight": return (ra.weight - rb.weight) * dir;
-        case "rate": { const av = normalizeRate(ra.rate) ?? -1; const bv = normalizeRate(rb.rate) ?? -1; return (av - bv) * dir; }
-        case "amount": { const ar = normalizeRate(ra.rate) ? ra.weight * (normalizeRate(ra.rate) as number) : 0; const br = normalizeRate(rb.rate) ? rb.weight * (normalizeRate(rb.rate) as number) : 0; return (ar - br) * dir; }
-        default: return 0;
+        case "paperRate": {
+          const pa = Number(masterA?.paperRate ?? 0);
+          const pb = Number(masterB?.paperRate ?? 0);
+          return (pa - pb) * dir;
+        }
+        case "shopName":
+          return ra.shopName.localeCompare(rb.shopName) * dir;
+        case "time":
+          return (a.originalIndex - b.originalIndex) * dir;
+        case "birds":
+          return (ra.birds - rb.birds) * dir;
+        case "weight":
+          return (ra.weight - rb.weight) * dir;
+        case "rate": {
+          const av = normalizeRate(ra.rate) ?? -1;
+          const bv = normalizeRate(rb.rate) ?? -1;
+          return (av - bv) * dir;
+        }
+        case "amount": {
+          const ar = normalizeRate(ra.rate) ? ra.weight * (normalizeRate(ra.rate) as number) : 0;
+          const br = normalizeRate(rb.rate) ? rb.weight * (normalizeRate(rb.rate) as number) : 0;
+          return (ar - br) * dir;
+        }
+        default:
+          return 0;
       }
     });
     return list;
-  }, [deliveries, shopSortKey, shopSortDir]);
+  }, [deliveries, shopSortKey, shopSortDir, shopSearch, shopMasterLookup]);
 
   const shopPageCount = Math.max(1, Math.ceil(filteredSortedDeliveries.length / SHOPS_PAGE_SIZE));
   const pagedDeliveries = useMemo(() => {
@@ -351,13 +374,22 @@ export default function EnterRateModal({
 
       <AppShellModal open={open} onClose={onClose} panelClassName="bg-white modal-responsive mx-auto">
         <div className="bg-white w-full h-full flex flex-col relative overflow-hidden rounded-2xl max-h-full mx-auto animate-fade-in-up">
-          {/* Header - logo with hen dance animation like refresh + trip list search animation */}
+          {/* Header - logo with hen dance + local Telugu toggle for this view only */}
           <div className="bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shrink-0 rounded-t-2xl">
             <div className="flex items-center gap-3 group">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm group-hover:animate-[var(--animate-brand-dance)] motion-safe:group-hover:animate-[var(--animate-brand-dance)]"><Store size={17} className="group-hover:animate-[var(--animate-action-search)]" /></span>
               <h2 className="text-[15px] font-bold tracking-tight text-slate-900">Enter shop wise rate</h2>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setLocalLanguage((prev) => (prev === "te" ? "en" : "te"))}
+                className="group inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-[11px] font-bold text-violet-700 hover:bg-violet-100 hover:border-violet-300 transition-all btn-anim"
+                title="Switch Telugu only for this view"
+              >
+                <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]"><Languages size={12} /></span>
+                {localLanguage === "te" ? "తెలుగు" : "EN"}
+              </button>
               <div className="hidden sm:flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1">
                 <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 <span className="text-[11px] font-bold text-emerald-800 tabular-nums">{totals.ratedCount}/{deliveries.length} • {totals.progressPct}%</span>
@@ -382,7 +414,7 @@ export default function EnterRateModal({
             </div>
             <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm btn-anim">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white border border-amber-200 text-amber-700 shadow-sm"><Calculator size={16} /></span>
-              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-amber-700/70 font-semibold">Total</p><p className="text-[12px] font-bold text-amber-900 tabular-nums leading-tight">{deliveries.length} shops • {totals.totalBirds.toLocaleString()} birds • {totals.totalWeight.toFixed(1)} KG</p></div>
+              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-amber-700/70 font-semibold">Total</p><p className="text-[12px] font-bold text-amber-900 tabular-nums leading-tight">{totals.totalBirds.toLocaleString()} birds • {totals.totalWeight.toFixed(1)} KG</p></div>
             </div>
           </div>
 
@@ -531,38 +563,22 @@ export default function EnterRateModal({
                 <table className="w-full table-fixed text-sm">
                   <thead className="bg-slate-50">
                     <tr className="border-b border-slate-200">
-                      <th className="w-[7%] px-2 py-3 text-center">
-                        <button type="button" onClick={() => toggleShopSort("time")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "time" ? "bg-slate-100 text-slate-700 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-700 hover:bg-slate-100"}`}>
-                          S.No {shopSortKey === "time" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
-                        </button>
-                      </th>
+                      <th className="w-[7%] px-2 py-3 text-center text-[12px] font-bold uppercase tracking-wider text-slate-600">S.No</th>
                       <th className="w-[22%] px-2 py-3 text-left">
                         <button type="button" onClick={() => toggleShopSort("shopName")} className={`flex items-center gap-1 rounded-md px-2 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "shopName" ? "bg-slate-100 text-slate-700 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-700 hover:bg-slate-100"}`}>
                           Shop Name {shopSortKey === "shopName" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
                       <th className="w-[13%] px-2 py-3 text-left text-[12px] font-bold uppercase tracking-wider text-slate-600">Association</th>
-                      <th className="w-[10%] px-2 py-3 text-center text-[12px] font-bold uppercase tracking-wider text-slate-600">Paper Rate</th>
-                      <th className="w-[8%] px-2 py-3 text-center">
-                        <button type="button" onClick={() => toggleShopSort("birds")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "birds" ? "bg-slate-100 text-slate-700 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-700 hover:bg-slate-100"}`}>
-                          Birds {shopSortKey === "birds" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
-                        </button>
-                      </th>
                       <th className="w-[10%] px-2 py-3 text-center">
-                        <button type="button" onClick={() => toggleShopSort("weight")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "weight" ? "bg-slate-100 text-slate-700 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-700 hover:bg-slate-100"}`}>
-                          Weight {shopSortKey === "weight" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
+                        <button type="button" onClick={() => toggleShopSort("paperRate")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "paperRate" ? "bg-sky-100 text-sky-800 ring-1 ring-sky-200" : "text-slate-600 hover:text-slate-700 hover:bg-slate-100"}`}>
+                          Paper Rate {shopSortKey === "paperRate" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
-                      <th className="w-[15%] px-2 py-3 text-center">
-                        <button type="button" onClick={() => toggleShopSort("rate")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "rate" ? "bg-slate-100 text-slate-700 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-700 hover:bg-slate-100"}`}>
-                          Rate {shopSortKey === "rate" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
-                        </button>
-                      </th>
-                      <th className="w-[15%] px-2 py-3 text-center">
-                        <button type="button" onClick={() => toggleShopSort("amount")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "amount" ? "bg-slate-100 text-slate-700 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-700 hover:bg-slate-100"}`}>
-                          Amount {shopSortKey === "amount" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
-                        </button>
-                      </th>
+                      <th className="w-[8%] px-2 py-3 text-center text-[12px] font-bold uppercase tracking-wider text-slate-600">Birds</th>
+                      <th className="w-[10%] px-2 py-3 text-center text-[12px] font-bold uppercase tracking-wider text-slate-600">Weight</th>
+                      <th className="w-[15%] px-2 py-3 text-center text-[12px] font-bold uppercase tracking-wider text-slate-600">Rate</th>
+                      <th className="w-[15%] px-2 py-3 text-center text-[12px] font-bold uppercase tracking-wider text-slate-600">Amount</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -582,10 +598,10 @@ export default function EnterRateModal({
                         <tr key={delivery.id} className={`border-b border-slate-100 ${missingForLock ? "bg-red-50" : originalIndex % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-slate-50/50 hover:bg-slate-50"}`}>
                           <td className="px-2 py-3 text-center text-[13px] font-normal text-slate-700 tabular-nums">{originalIndex + 1}</td>
                           <td className="px-3 py-3">
-                            <div className="text-[14px] font-medium text-slate-700 leading-tight truncate">{displayRateEntryShopName(delivery.shopName, language)}</div>
+                            <div className="text-[14px] font-medium text-slate-700 leading-tight truncate">{displayRateEntryShopName(delivery.shopName, localLanguage)}</div>
                             {masterShop && <div className="text-[11px] font-normal text-slate-500 truncate">{masterShop.city}</div>}
                           </td>
-                          <td className="px-2 py-3"><span className="inline-flex items-center justify-center rounded-lg border bg-violet-50 border-violet-200 text-violet-800 px-2.5 py-1 text-[12px] font-medium truncate max-w-full">{association ? displayRateEntryName(association, language) : "—"}</span></td>
+                          <td className="px-2 py-3"><span className="inline-flex items-center justify-center rounded-lg border bg-violet-50 border-violet-200 text-violet-800 px-2.5 py-1 text-[12px] font-medium truncate max-w-full">{association ? displayRateEntryName(association, localLanguage) : "—"}</span></td>
                           <td className="px-2 py-3 text-center"><span className="inline-flex items-center justify-center rounded-lg border bg-sky-50 border-sky-200 text-sky-800 px-2.5 py-1 text-[12px] font-semibold tabular-nums">{hasPaperRate ? paperRate : "—"}</span></td>
                           <td className="px-2 py-3 text-center text-[13px] font-normal text-slate-700 tabular-nums">{delivery.birds.toLocaleString()}</td>
                           <td className="px-2 py-3 text-center text-[13px] font-normal text-slate-700 tabular-nums">{delivery.weight.toFixed(2)}</td>
@@ -626,15 +642,15 @@ export default function EnterRateModal({
                     )}
                   </tbody>
                   <tfoot>
-                    <tr className="bg-slate-50 border-t-2 border-slate-300">
-                      <td className="px-2 py-3 text-center text-[12px] font-bold text-slate-600">—</td>
-                      <td className="px-3 py-3 text-[13px] font-bold text-slate-800">Total: {deliveries.length} shops • {trip.tripNo}</td>
-                      <td className="px-2 py-3"><span className="inline-flex items-center justify-center rounded-lg border bg-violet-50 border-violet-200 text-violet-800 px-2.5 py-1 text-[12px] font-bold tabular-nums">{totals.totalBirds.toLocaleString()} birds</span></td>
+                    <tr className="bg-gradient-to-r from-emerald-50/80 via-white to-amber-50/60 border-t-2 border-emerald-200">
+                      <td className="px-2 py-3 text-center text-[11px] font-bold text-slate-400">—</td>
+                      <td className="px-3 py-3"><div className="flex flex-col"><span className="text-[13px] font-bold text-slate-800">Total: {deliveries.length} shops • {trip.tripNo}</span><span className="text-[11px] font-medium text-slate-500">{totals.totalBirds.toLocaleString()} birds • {totals.totalWeight.toFixed(2)} KG</span></div></td>
+                      <td className="px-2 py-3"><span className="inline-flex items-center justify-center rounded-lg border bg-violet-50 border-violet-200 text-violet-800 px-2.5 py-1 text-[11px] font-bold">Assoc • {totals.totalBirds.toLocaleString()}</span></td>
+                      <td className="px-2 py-3 text-center"><span className="inline-flex items-center justify-center rounded-lg border bg-sky-50 border-sky-200 text-sky-800 px-2.5 py-1 text-[11px] font-bold tabular-nums">{totals.totalBirds > 0 ? (totals.totalWeight / totals.totalBirds * 1).toFixed(2) : "—"}</span></td>
+                      <td className="px-2 py-3 text-center"><span className="inline-flex items-center justify-center rounded-lg bg-slate-100 border border-slate-200 text-slate-700 px-2.5 py-1 text-[12px] font-bold tabular-nums">{totals.totalBirds.toLocaleString()}</span></td>
+                      <td className="px-2 py-3 text-center"><span className="inline-flex items-center justify-center rounded-lg bg-slate-100 border border-slate-200 text-slate-700 px-2.5 py-1 text-[12px] font-bold tabular-nums">{totals.totalWeight.toFixed(2)}</span></td>
                       <td className="px-2 py-3"></td>
-                      <td className="px-2 py-3 text-center text-[13px] font-bold text-slate-800 tabular-nums">{totals.totalBirds.toLocaleString()}</td>
-                      <td className="px-2 py-3 text-center text-[13px] font-bold text-slate-800 tabular-nums">{totals.totalWeight.toFixed(2)}</td>
-                      <td className="px-2 py-3"></td>
-                      <td className="px-2 py-3 text-center"><span className="inline-flex items-center justify-center rounded-lg bg-emerald-600 text-white px-3 py-1.5 text-[13px] font-bold tabular-nums shadow-sm">₹ {formatInr(totals.totalAmount)}</span></td>
+                      <td className="px-2 py-3 text-center"><span className="inline-flex items-center justify-center rounded-lg bg-emerald-50 border border-emerald-200 text-emerald-800 px-3 py-1.5 text-[13px] font-bold tabular-nums shadow-sm">₹ {formatInr(totals.totalAmount)}</span></td>
                     </tr>
                   </tfoot>
                 </table>
