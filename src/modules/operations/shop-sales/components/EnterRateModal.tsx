@@ -538,32 +538,40 @@ export default function EnterRateModal({
               <div className="h-full overflow-hidden">
                 <table className="w-full table-fixed text-sm">
                   <thead className="bg-slate-50">
-                    <tr className="border-b border-slate-200 text-slate-500">
-                      <th className="w-[7%] px-2 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider">
-                        <button type="button" onClick={() => toggleShopSort("time")} className="w-full flex items-center justify-center gap-1 hover:text-emerald-700">
-                          S.No {shopSortKey === "time" && <span className="text-emerald-600">{shopSortDir === "asc" ? "↑" : "↓"}</span>}
+                    <tr className="border-b border-slate-200 text-slate-600">
+                      <th className="w-[7%] px-2 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
+                        <button type="button" onClick={() => toggleShopSort("time")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 transition-colors ${shopSortKey === "time" ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" : "hover:text-emerald-700 hover:bg-slate-100"}`}>
+                          S.No {shopSortKey === "time" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
-                      <th className="w-[22%] px-2 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider">Shop Name</th>
-                      <th className="w-[13%] px-2 py-2.5 text-left text-[10px] font-semibold uppercase tracking-wider">Association</th>
-                      <th className="w-[10%] px-2 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider">Paper Rate</th>
-                      <th className="w-[8%] px-2 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider">
-                        <button type="button" onClick={() => toggleShopSort("birds")} className="w-full flex items-center justify-center gap-1 hover:text-emerald-700">
+                      <th className="w-[22%] px-2 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
+                        <button type="button" onClick={() => toggleShopSort("shopName")} className={`flex items-center gap-1 rounded-md px-2 py-1 transition-colors ${shopSortKey === "shopName" ? "bg-violet-50 text-violet-700 ring-1 ring-violet-200" : "hover:text-violet-700 hover:bg-violet-50"}`}>
+                          Shop Name {shopSortKey === "shopName" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
+                        </button>
+                      </th>
+                      <th className="w-[13%] px-2 py-3 text-left text-[11px] font-bold uppercase tracking-wider">
+                        <span className="inline-flex items-center rounded-md bg-sky-50 text-sky-700 px-2 py-1 ring-1 ring-sky-200">Association</span>
+                      </th>
+                      <th className="w-[10%] px-2 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
+                        <span className="inline-flex items-center rounded-md bg-orange-50 text-orange-700 px-2 py-1 ring-1 ring-orange-200">Paper Rate</span>
+                      </th>
+                      <th className="w-[8%] px-2 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
+                        <button type="button" onClick={() => toggleShopSort("birds")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 transition-colors ${shopSortKey === "birds" ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" : "hover:text-emerald-700 hover:bg-emerald-50"}`}>
                           Birds {shopSortKey === "birds" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
-                      <th className="w-[10%] px-2 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider">
-                        <button type="button" onClick={() => toggleShopSort("weight")} className="w-full flex items-center justify-center gap-1 hover:text-emerald-700">
+                      <th className="w-[10%] px-2 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
+                        <button type="button" onClick={() => toggleShopSort("weight")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 transition-colors ${shopSortKey === "weight" ? "bg-amber-50 text-amber-700 ring-1 ring-amber-200" : "hover:text-amber-700 hover:bg-amber-50"}`}>
                           Weight {shopSortKey === "weight" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
-                      <th className="w-[15%] px-2 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider">
-                        <button type="button" onClick={() => toggleShopSort("rate")} className="w-full flex items-center justify-center gap-1 hover:text-emerald-700">
+                      <th className="w-[15%] px-2 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
+                        <button type="button" onClick={() => toggleShopSort("rate")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 transition-colors ${shopSortKey === "rate" ? "bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200" : "hover:text-emerald-700 hover:bg-emerald-50"}`}>
                           Rate {shopSortKey === "rate" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
-                      <th className="w-[15%] px-2 py-2.5 text-center text-[10px] font-semibold uppercase tracking-wider">
-                        <button type="button" onClick={() => toggleShopSort("amount")} className="w-full flex items-center justify-center gap-1 hover:text-emerald-700">
+                      <th className="w-[15%] px-2 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
+                        <button type="button" onClick={() => toggleShopSort("amount")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 transition-colors ${shopSortKey === "amount" ? "bg-sky-50 text-sky-700 ring-1 ring-sky-200" : "hover:text-sky-700 hover:bg-sky-50"}`}>
                           Amount {shopSortKey === "amount" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
@@ -585,32 +593,44 @@ export default function EnterRateModal({
                       return (
                         <tr key={delivery.id} className={`border-b border-slate-100 ${missingForLock ? "bg-red-50" : originalIndex % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-slate-50/50 hover:bg-slate-50"}`}>
                           <td className="px-2 py-2.5 text-center text-[12px] font-medium text-slate-600 tabular-nums">{originalIndex + 1}</td>
-                          <td className="px-2 py-2.5">
-                            <div className="text-[13px] font-medium text-slate-800 leading-tight truncate">
+                          <td className="px-3 py-3">
+                            <div className="text-[15px] font-medium text-slate-900 leading-tight truncate">
                               {displayRateEntryShopName(delivery.shopName, language)}
                             </div>
                             {masterShop && <div className="text-[11px] font-normal text-slate-500 truncate">{masterShop.city}</div>}
                           </td>
-                          <td className="px-2 py-2.5">
+                          <td className="px-2 py-3">
                             {association ? (
-                              <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[10px] font-medium text-slate-600 truncate max-w-full">
-                                {displayRateEntryName(association, language)}
+                              <span
+                                className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-bold truncate max-w-full shadow-xs ${
+                                  association === "Association"
+                                    ? "border-violet-200 bg-violet-50 text-violet-700"
+                                    : association === "Non-Association"
+                                      ? "border-slate-200 bg-slate-50 text-slate-600"
+                                      : association === "Direct"
+                                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                                        : "border-amber-200 bg-amber-50 text-amber-700"
+                                }`}
+                              >
+                                <Users size={11} />
+                                <span className="truncate">{displayRateEntryName(association, language)}</span>
                               </span>
                             ) : (
                               <span className="text-slate-400 text-[12px]">—</span>
                             )}
                           </td>
-                          <td className="px-2 py-2.5 text-center">
+                          <td className="px-2 py-3 text-center">
                             {hasPaperRate ? (
-                              <span className="inline-flex items-center rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[11px] font-medium text-orange-700 tabular-nums">
+                              <span className="inline-flex items-center gap-1 rounded-full border border-orange-200 bg-orange-50 px-2.5 py-1 text-[11px] font-bold text-orange-700 tabular-nums shadow-xs">
+                                <FileText size={11} />
                                 {paperRate}
                               </span>
                             ) : (
                               <span className="text-slate-400 text-[12px]">—</span>
                             )}
                           </td>
-                          <td className="px-2 py-2.5 text-center text-[12px] font-medium text-slate-700 tabular-nums">{delivery.birds.toLocaleString()}</td>
-                          <td className="px-2 py-2.5 text-center text-[12px] font-medium text-slate-700 tabular-nums">{delivery.weight.toFixed(2)}</td>
+                          <td className="px-2 py-3 text-center text-[13px] font-semibold text-emerald-700 tabular-nums">{delivery.birds.toLocaleString()}</td>
+                          <td className="px-2 py-3 text-center text-[13px] font-semibold text-amber-700 tabular-nums">{delivery.weight.toFixed(2)}</td>
                           <td className="px-2 py-2.5">
                             {rateLocked ? (
                               <span className="block text-center text-[13px] font-medium text-slate-700">{rate != null ? rate.toFixed(2) : "—"}</span>
