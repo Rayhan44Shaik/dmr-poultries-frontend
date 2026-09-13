@@ -550,14 +550,14 @@ function FuelExpensesPage() {
         {shouldShowPagination(totalCount) && (
           <div className={paginationBarClass}>
             <div className="mr-auto flex items-center gap-2">
-            <PageSizeSelect
+            <span className="text-[13px] font-semibold text-slate-600">Rows Per Page</span>
+                <PageSizeSelect
                 value={pageSize}
                 onChange={(size) => {
                   setPageSize(size);
                   setCurrentPage(1);
                 }}
               />
-            <span className="text-[13px] font-semibold text-slate-600">Rows Per Page</span>
           </div>
             <button
               disabled={currentPage === 1}

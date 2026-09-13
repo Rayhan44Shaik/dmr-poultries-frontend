@@ -1,10 +1,11 @@
 /**
- * AppShellModal — global view, perfectly centered
- * - Blur header as well when open (overlay covers total page)
+ * AppShellModal — global view, perfectly centered, no blur background
+ * - No blur background as requested for trip list view — global level, no blur at all
+ * - Overlay covers total page including header, bg-black/20 no backdrop-blur
  * - View starts below header (panel top = header height + gap)
- * - 5% blur only, blue tint minimal
  * - Exactly middle from total page including navigation/sidebar
- * - Simple perfect fit, global for all pages
+ * - Simple perfect fit, global for all pages, global view size
+ * - Perfect view uses same global size (max-w 96rem, max-h calc 100vh - 64px - 2rem)
  */
 
 import { useEffect, type ReactNode } from "react";
@@ -36,13 +37,11 @@ export default function AppShellModal({ open, onClose, children, panelClassName 
 
   const content = (
     <>
-      {/* Overlay — blurs header as well, 5% only */}
+      {/* Overlay — global level, no blur background as requested for trip list view */}
       <div
-        className="fixed inset-0 animate-fade-in"
+        className="fixed inset-0 animate-fade-in bg-black/20"
         style={{
           zIndex,
-          backgroundColor: "rgba(15,23,42,0.05)",
-          backdropFilter: "blur(2px)",
         }}
         onMouseDown={(e) => {
           if (!closeOnOverlay) return;

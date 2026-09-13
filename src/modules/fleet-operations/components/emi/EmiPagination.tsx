@@ -54,8 +54,8 @@ function EmiPagination({ page, totalPages, totalItems, pageSize, ready, onChange
       </p>
       {onPageSizeChange && (
         <div className="flex items-center gap-2">
-        <PageSizeSelect value={pageSize} onChange={onPageSizeChange} disabled={!ready} />
         <span className="text-[13px] font-semibold text-slate-600">Rows Per Page</span>
+        <PageSizeSelect value={pageSize} onChange={onPageSizeChange} disabled={!ready} />
       </div>
       )}
       <nav aria-label={t('fleet.emi.pagination_label')} className="flex items-center justify-end gap-1.5">

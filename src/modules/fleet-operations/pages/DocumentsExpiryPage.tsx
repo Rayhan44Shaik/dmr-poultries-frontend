@@ -340,6 +340,7 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
           {shouldShowPagination(totalRecords) && (
             <div className={paginationBarClass}>
               <div className="mr-auto flex items-center gap-2">
+                <span className="text-[13px] font-semibold text-slate-600">Rows Per Page</span>
                 <PageSizeSelect
                   value={pageSize}
                   onChange={(size) => {
@@ -347,7 +348,6 @@ const DocumentsExpiryPage = ({ embedded = false }: DocumentsExpiryPageProps) => 
                     setCurrentPage(1);
                   }}
                 />
-                <span className="text-[13px] font-semibold text-slate-600">Rows Per Page</span>
               </div>
               <button
                 type="button"
