@@ -3979,7 +3979,10 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === "/api/staff/leaves" && method === "GET") {
       let rows = LEAVES.slice();
+      // The Leave page no longer offers Cancelled — hide those rows from the
+      // default list (an explicit status=Cancelled request still returns them).
       if (q.get("status") && q.get("status") !== "All") rows = rows.filter((l) => l.status === q.get("status"));
+      else rows = rows.filter((l) => l.status !== "Cancelled");
       if (q.get("month")) rows = rows.filter((l) => monthOf(l.fromDate) === q.get("month"));
       if (q.get("department")) rows = rows.filter((l) => l.department === q.get("department"));
       if (q.get("employeeId")) rows = rows.filter((l) => l.employeeId === Number(q.get("employeeId")));

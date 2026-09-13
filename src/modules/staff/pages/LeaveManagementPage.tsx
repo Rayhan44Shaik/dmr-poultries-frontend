@@ -31,7 +31,6 @@ function LeaveManagementPage() {
     approveLeave,
     rejectLeave,
     deleteLeave,
-    cancelLeave,
     refresh,
     stats,
     page,
@@ -82,6 +81,7 @@ function LeaveManagementPage() {
     (id: string) => deleteLeave(id),
     [deleteLeave]
   );
+
 
   return (
     <div className="min-w-0 max-w-full space-y-4">
@@ -136,7 +136,6 @@ function LeaveManagementPage() {
             onApprove={handleApprove}
             onReject={handleReject}
             onDelete={handleDelete}
-            onCancel={(id) => { void cancelLeave(id); }}
             startIndex={(page - 1) * pageSize}
           />
           <Pagination

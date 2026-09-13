@@ -29,7 +29,6 @@ interface LeaveTableProps {
   onApprove: (id: string) => void;
   onReject: (id: string, reason: string) => void;
   onDelete: (id: string) => void;
-  onCancel: (id: string) => void;
   /** Serial-number offset for the "#" column (page-aware). */
   startIndex?: number;
 }
@@ -39,7 +38,6 @@ function LeaveTable({
   onApprove,
   onReject,
   onDelete,
-  onCancel,
   startIndex = 0,
 }: LeaveTableProps) {
   const { requestDelete, cancel, pendingItems } = usePendingDelete(onDelete);
@@ -240,17 +238,6 @@ function LeaveTable({
                       >
                         <span className={`inline-flex ${uiActionIconMotionClass.approve}`}><CheckCircle size={14} /></span>
                         <ActionTooltip label="Approve" />
-                      </button>
-                    )}
-                    {leave.status === 'Approved' && (
-                      <button
-                        type="button"
-                        onClick={() => { if (window.confirm(`Cancel approved leave for ${leave.employeeName}?`)) onCancel(leave.id); }}
-                        className="group relative flex h-8 w-8 items-center justify-center rounded-xl bg-slate-100 text-slate-500 shadow-sm transition-all hover:bg-slate-500 hover:text-white active:scale-95"
-                        aria-label={`Cancel leave for ${leave.employeeName}`}
-                      >
-                        <span className={`inline-flex ${uiActionIconMotionClass.close}`}><XCircle size={14} /></span>
-                        <ActionTooltip label="Cancel leave" />
                       </button>
                     )}
                     {leave.status === 'Pending' && (

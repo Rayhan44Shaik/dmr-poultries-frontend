@@ -15,7 +15,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  X,
   RotateCcw,
   Plus,
 } from 'lucide-react';
@@ -23,7 +22,6 @@ import {
   uiCardClass,
   uiFilterLabelClass,
   uiInputClass,
-  uiResetButtonClass,
 } from '../../../../shared/ui/uiTokens';
 import { Button } from '../../../../ui';
 import { BrandRefreshButton } from '../../../../ui';
@@ -51,12 +49,13 @@ interface LeaveFiltersProps {
   };
 }
 
-const STATUS_TABS: { label: LeaveFilterState['status']; Icon: typeof Clock }[] = [
+type LeaveStatusTab = 'All' | 'Pending' | 'Approved' | 'Rejected';
+
+const STATUS_TABS: { label: LeaveStatusTab; Icon: typeof Clock }[] = [
   { label: 'All', Icon: LayoutGrid },
   { label: 'Pending', Icon: Clock },
   { label: 'Approved', Icon: CheckCircle2 },
   { label: 'Rejected', Icon: XCircle },
-  { label: 'Cancelled', Icon: X },
 ];
 
 const LEAVE_TYPES = ['Casual', 'Sick', 'Emergency', 'Annual'] as const;
@@ -321,6 +320,14 @@ function LeaveFilters({
           >
             {STATUS_TABS.map(({ label, Icon }) => {
               const isActive = filters.status === label;
+              // Active tab wears its status colour: Pending orange, Approved
+              // the app green, Rejected light red; All stays neutral white.
+              const activeClass = {
+                All: 'bg-white text-slate-700 shadow-sm ring-1 ring-slate-200/60',
+                Pending: 'bg-orange-50 text-orange-700 shadow-sm ring-1 ring-orange-200/70',
+                Approved: 'bg-emerald-50 text-emerald-700 shadow-sm ring-1 ring-emerald-200/70',
+                Rejected: 'bg-rose-50 text-rose-700 shadow-sm ring-1 ring-rose-200/70',
+              }[label];
               return (
                 <button
                   key={label}
@@ -329,7 +336,7 @@ function LeaveFilters({
                   aria-pressed={isActive}
                   className={`flex h-9 min-w-0 flex-1 items-center justify-center gap-1 whitespace-nowrap rounded-md px-1.5 text-[11px] font-semibold transition focus-visible:ring-2 focus-visible:ring-emerald-300 sm:px-2 sm:text-xs lg:flex-none lg:px-2.5 ${
                     isActive
-                      ? 'bg-white text-emerald-700 shadow-sm ring-1 ring-slate-200/60'
+                      ? activeClass
                       : 'text-slate-500 hover:bg-white/70 hover:text-slate-900'
                   }`}
                 >
@@ -365,7 +372,7 @@ function LeaveFilters({
           <button
             type="button"
             onClick={onReset}
-            className={`group relative ${uiResetButtonClass}`}
+            className="group relative inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-xs transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 active:bg-slate-100 focus-visible:ring-2 focus-visible:ring-emerald-300"
             aria-label="Reset filters"
           >
             <span className="inline-flex group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>
