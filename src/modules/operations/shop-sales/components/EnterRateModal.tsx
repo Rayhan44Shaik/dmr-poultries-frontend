@@ -21,6 +21,7 @@ import {
   BarChart3,
   Calculator,
 } from "lucide-react";
+import AppShellModal from "../../../../ui/AppShellModal";
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
 import type { Shop } from "../../../masters/shops/types/shop";
 import { useI18n } from "../../../../i18n";
@@ -185,7 +186,6 @@ export default function EnterRateModal({
     return deliveries.some((row, i) => normalizeRate(row.rate) !== normalizeRate(trip.deliveries[i]?.rate));
   }, [deliveries, trip]);
 
-  // ── Totals & progress — synced with quarter sample data ──
   const totals = useMemo(() => {
     let ratedCount = 0;
     let totalWeight = 0;
@@ -223,11 +223,8 @@ export default function EnterRateModal({
     [deliveries, tripDateVenRate]
   );
 
-  // ── Filtered & sorted deliveries for modal search ──
   const filteredSortedDeliveries = useMemo(() => {
     let list = deliveries.map((row, idx) => ({ row, originalIndex: idx }));
-
-    // Search filter
     if (shopSearch.trim()) {
       const q = shopSearch.toLowerCase().trim();
       list = list.filter(({ row }) => {
@@ -238,8 +235,6 @@ export default function EnterRateModal({
         return shopName.includes(q) || assoc.includes(q) || city.includes(q) || String(row.birds).includes(q);
       });
     }
-
-    // Sort
     list.sort((a, b) => {
       const dir = shopSortDir === "asc" ? 1 : -1;
       const ra = a.row;
@@ -265,7 +260,6 @@ export default function EnterRateModal({
           return 0;
       }
     });
-
     return list;
   }, [deliveries, shopSearch, shopSortKey, shopSortDir, shopMasterLookup]);
 
@@ -298,7 +292,6 @@ export default function EnterRateModal({
       const marketRate = suggestedMarketRate(row, tripDateVenRate);
       const currentRate = normalizeRate(row.rate);
       if (marketRate == null || isValidSellingRate(currentRate)) return row;
-      // Only apply to filtered list if search active, else all
       if (shopSearch.trim()) {
         const q = shopSearch.toLowerCase().trim();
         const match = row.shopName.toLowerCase().includes(q);
@@ -373,7 +366,6 @@ export default function EnterRateModal({
       if (!canLock) {
         const firstMissing = deliveries.findIndex((row) => !isValidSellingRate(normalizeRate(row.rate)));
         if (firstMissing >= 0) {
-          // Find page containing first missing in filtered sorted list
           const idxInFiltered = filteredSortedDeliveries.findIndex((f) => f.originalIndex === firstMissing);
           if (idxInFiltered >= 0) {
             setShopPage(Math.floor(idxInFiltered / shopPageSize) + 1);
@@ -412,7 +404,8 @@ export default function EnterRateModal({
 
   if (!open || !trip) return null;
 
-  return createPortal(
+  // Main modal now uses AppShellModal with gaps from header/sidebar/page edges
+  return (
     <>
       <style>{`
         .no-spinner::-webkit-inner-spin-button,
@@ -420,9 +413,9 @@ export default function EnterRateModal({
         .no-spinner { -moz-appearance: textfield; }
       `}</style>
 
-      <div className="fixed inset-0 z-50 bg-black/40 backdrop-blur-[1px]">
-        {showSuccessToast && (
-          <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/20">
+      {showSuccessToast &&
+        createPortal(
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/20">
             <div className="bg-white rounded-2xl shadow-2xl border border-emerald-100 p-6 flex flex-col items-center gap-3 animate-in zoom-in">
               <div className="h-12 w-12 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center">
                 <CheckCircle2 size={28} />
@@ -432,11 +425,13 @@ export default function EnterRateModal({
                 <p className="text-xs text-slate-500 mt-0.5">{t("ops.rate.modal.saved_desc")}</p>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
-        {showConfirm && (
-          <div className="fixed inset-0 z-[55] flex items-center justify-center bg-black/30">
+      {showConfirm &&
+        createPortal(
+          <div className="fixed inset-0 z-[90] flex items-center justify-center bg-black/30">
             <div className="bg-white rounded-2xl shadow-2xl border border-slate-200 max-w-md w-full mx-4 p-6">
               <div className="flex items-start gap-3">
                 <div className="h-10 w-10 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-amber-600 shrink-0">
@@ -477,12 +472,14 @@ export default function EnterRateModal({
                 </button>
               </div>
             </div>
-          </div>
+          </div>,
+          document.body
         )}
 
-        <div className="bg-white w-full h-full flex flex-col relative overflow-hidden">
+      <AppShellModal open={open} onClose={onClose} panelClassName="bg-white">
+        <div className="bg-white w-full h-full flex flex-col relative overflow-hidden rounded-2xl">
           {/* Header */}
-          <div className="bg-white border-b border-slate-200 px-5 py-3 flex items-start justify-between shrink-0">
+          <div className="bg-white border-b border-slate-200 px-5 py-3 flex items-start justify-between shrink-0 rounded-t-2xl">
             <div className="flex items-center gap-3">
               <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-sm">
                 <IndianRupee size={18} />
@@ -492,7 +489,7 @@ export default function EnterRateModal({
                   {rateLocked ? t("ops.rate.modal.title_readonly") : t("ops.rate.modal.title_enter")}
                 </h2>
                 <p className="text-[11px] font-medium text-slate-500">
-                  Synced with quarter sample • {deliveries.length} shops • Market rates from master
+                  Synced with quarter sample • {deliveries.length} shops • Market rates from master • App shell gaps
                 </p>
               </div>
             </div>
@@ -505,10 +502,7 @@ export default function EnterRateModal({
                   </p>
                 </div>
                 <div className="h-2 w-20 rounded-full bg-slate-100 overflow-hidden">
-                  <div
-                    className="h-full bg-emerald-500 transition-all"
-                    style={{ width: `${totals.progressPct}%` }}
-                  />
+                  <div className="h-full bg-emerald-500 transition-all" style={{ width: `${totals.progressPct}%` }} />
                 </div>
               </div>
               <button
@@ -588,7 +582,7 @@ export default function EnterRateModal({
               <span className="inline-flex items-center gap-1 rounded-full bg-sky-50 border border-sky-200 px-2 py-0.5 text-sky-700">
                 <TrendingUp size={11} /> Market ref from quarter
               </span>
-              <span className="hidden sm:inline">Trip day highlighted</span>
+              <span className="hidden sm:inline">Trip day highlighted • Gaps from shell</span>
             </div>
           </div>
 
@@ -626,7 +620,6 @@ export default function EnterRateModal({
                   </div>
                 </div>
 
-                {/* Bulk actions & search */}
                 <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
                   <div className="relative flex-1 sm:w-64">
                     <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -941,7 +934,7 @@ export default function EnterRateModal({
           </div>
 
           {/* Footer — totals & actions, synced */}
-          <div className="bg-slate-50/95 border-t border-slate-200 px-5 py-3 shrink-0">
+          <div className="bg-slate-50/95 border-t border-slate-200 px-5 py-3 shrink-0 rounded-b-2xl">
             <div className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
               <div className="mb-3 grid grid-cols-2 gap-2 sm:grid-cols-4 text-[11px]">
                 <div className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2">
@@ -1055,8 +1048,7 @@ export default function EnterRateModal({
             </div>
           </div>
         </div>
-      </div>
-    </>,
-    document.body,
+      </AppShellModal>
+    </>
   );
 }
