@@ -1,8 +1,9 @@
 /**
  * AppShellModal — global view, perfectly centered
+ * - Blur header as well when open (overlay covers total page)
+ * - View starts below header (panel top = header height + gap)
+ * - 5% blur only, blue tint minimal
  * - Exactly middle from total page including navigation/sidebar
- * - Header visible (starts below header)
- * - 10% blur only, blue tint minimal
  * - Simple perfect fit, global for all pages
  */
 
@@ -19,6 +20,7 @@ type Props = {
 };
 
 const HEADER_H = 64;
+const GAP = 16;
 
 export default function AppShellModal({ open, onClose, children, panelClassName = "", closeOnOverlay = true, zIndex = 50 }: Props) {
   useEffect(() => {
@@ -33,22 +35,14 @@ export default function AppShellModal({ open, onClose, children, panelClassName 
   if (!open) return null;
 
   const content = (
-    <div
-      className="fixed flex items-center justify-center p-4"
-      style={{
-        zIndex,
-        top: HEADER_H,
-        left: 0,
-        right: 0,
-        bottom: 0,
-      }}
-    >
-      {/* 10% blur only — minimal, header visible below, blue tint */}
+    <>
+      {/* Overlay — blurs header as well, 5% only */}
       <div
-        className="absolute inset-0 animate-fade-in"
+        className="fixed inset-0 animate-fade-in"
         style={{
-          backgroundColor: "rgba(15,23,42,0.10)",
-          backdropFilter: "blur(1px)",
+          zIndex,
+          backgroundColor: "rgba(15,23,42,0.05)",
+          backdropFilter: "blur(2px)",
         }}
         onMouseDown={(e) => {
           if (!closeOnOverlay) return;
@@ -57,20 +51,31 @@ export default function AppShellModal({ open, onClose, children, panelClassName 
         aria-hidden="true"
       />
 
-      {/* Perfectly centered, simple perfect fit, global view perfect */}
+      {/* Panel wrapper — starts below header, total page centered including sidebar */}
       <div
-        className={`relative flex max-h-[calc(100vh-64px-2rem)] w-full max-w-[96rem] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl animate-scale-in dark:border-slate-700 dark:bg-slate-900 ${panelClassName}`}
+        className="fixed flex items-center justify-center p-4"
         style={{
           zIndex: zIndex + 1,
-          maxWidth: "min(96rem, calc(100vw - 2rem))",
-          maxHeight: "min(calc(100vh - 64px - 2rem), 90vh)",
+          top: HEADER_H + GAP,
+          left: GAP,
+          right: GAP,
+          bottom: GAP,
         }}
-        role="dialog"
-        aria-modal="true"
       >
-        {children}
+        <div
+          className={`relative flex w-full max-w-[96rem] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl animate-scale-in dark:border-slate-700 dark:bg-slate-900 ${panelClassName}`}
+          style={{
+            maxWidth: "min(96rem, calc(100vw - 2rem))",
+            maxHeight: "calc(100vh - 64px - 2rem)",
+            width: "100%",
+          }}
+          role="dialog"
+          aria-modal="true"
+        >
+          {children}
+        </div>
       </div>
-    </div>
+    </>
   );
 
   if (typeof document === "undefined") return content;
