@@ -32,7 +32,6 @@ function LeaveManagementPage() {
     rejectLeave,
     deleteLeave,
     refresh,
-    stats,
     page,
     pageSize,
     total,
@@ -101,7 +100,6 @@ function LeaveManagementPage() {
         onNewRequest={() => setShowForm(!showForm)}
         loading={loading}
         showForm={showForm}
-        stats={stats}
       />
 
       {/* New request form */}

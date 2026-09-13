@@ -17,12 +17,14 @@ import {
   MessageSquareText,
   Activity,
   Settings,
+  ArrowRight,
 } from 'lucide-react';
 import type { LeaveRequest } from '../../types/staffDashboard';
 import { usePendingDelete } from '../../../../hooks/usePendingDelete';
 import { PendingDeleteNotification } from '../../../../components/common/PendingDeleteNotification';
 import { ActionTooltip } from '../../../../ui/ActionTooltip';
 import { uiActionIconMotionClass } from '../../../../shared/ui/uiTokens';
+import MasterDropdown from '../../../masters/components/MasterDropdown';
 
 interface LeaveTableProps {
   leaves: LeaveRequest[];
@@ -32,6 +34,22 @@ interface LeaveTableProps {
   /** Serial-number offset for the "#" column (page-aware). */
   startIndex?: number;
 }
+
+const MODAL_MONTHS = [
+  { value: 'all', label: 'All Months' },
+  { value: '0', label: 'January' },
+  { value: '1', label: 'February' },
+  { value: '2', label: 'March' },
+  { value: '3', label: 'April' },
+  { value: '4', label: 'May' },
+  { value: '5', label: 'June' },
+  { value: '6', label: 'July' },
+  { value: '7', label: 'August' },
+  { value: '8', label: 'September' },
+  { value: '9', label: 'October' },
+  { value: '10', label: 'November' },
+  { value: '11', label: 'December' },
+];
 
 function LeaveTable({
   leaves,
@@ -277,59 +295,58 @@ function LeaveTable({
       {viewEmployeeModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50">
-              <div>
-                <h3 className="text-base font-bold text-slate-800">
-                  Leave History: {viewEmployeeModal.employeeName}
-                </h3>
-                <p className="text-xs text-slate-500">
-                  Approved leaves taken for selected year & month
-                </p>
+            {/* Modal Header — Leave Request logo treatment + dismiss twist X */}
+            <div className="flex items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-slate-50 px-6 py-4">
+              <div className="flex min-w-0 items-center gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-sky-100 bg-sky-50/70 shadow-inner">
+                  <span className="inline-flex animate-[var(--animate-brand-hop)]">
+                    <CalendarOff className="text-sky-500" size={17} />
+                  </span>
+                </div>
+                <div className="min-w-0">
+                  <h3 className="truncate text-base font-bold tracking-tight text-slate-800">
+                    Leave History: {viewEmployeeModal.employeeName}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Approved leaves taken for the selected year & month
+                  </p>
+                </div>
               </div>
               <button
+                type="button"
                 onClick={() => setViewEmployeeModal(null)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 rounded-lg transition"
+                aria-label="Close"
+                className="group relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 active:scale-95"
               >
-                <X size={18} />
+                <span className={`inline-flex ${uiActionIconMotionClass.close}`}><X size={18} /></span>
               </button>
             </div>
 
-            {/* Filter Controls */}
-            <div className="p-4 bg-slate-50/50 border-b border-slate-100 flex flex-wrap items-center justify-between gap-3">
+            {/* Filter Controls — trips-list supervisor dropdowns (searchable,
+                five rows visible, same font & colours, rotating chevron). */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/50 p-4">
               <div className="flex items-center gap-2">
                 <Calendar size={16} className="text-slate-500" />
-                <span className="text-xs font-medium text-slate-600">Filter By:</span>
+                <span className="text-xs font-semibold text-slate-600">Filter By:</span>
               </div>
-              <div className="flex items-center gap-2">
-                <select
-                  value={selectedYear}
-                  onChange={(e) => setSelectedYear(Number(e.target.value))}
-                  className="h-9 px-3 rounded-lg border border-slate-300 text-xs font-medium bg-white text-slate-700 outline-none focus:ring-2 focus:ring-blue-400"
-                >
-                  {[2024, 2025, 2026, 2027, 2028].map((y) => (
-                    <option key={y} value={y}>{y}</option>
-                  ))}
-                </select>
-                <select
+              <div className="flex flex-wrap items-center gap-2">
+                <MasterDropdown
+                  hideLabel
+                  label="Year"
+                  value={String(selectedYear)}
+                  options={[2024, 2025, 2026, 2027, 2028].map((y) => ({ value: String(y), label: String(y) }))}
+                  onChange={(next) => setSelectedYear(Number(next))}
+                  className="w-28"
+                />
+                <MasterDropdown
+                  hideLabel
+                  label="Month"
                   value={selectedMonth}
-                  onChange={(e) => setSelectedMonth(e.target.value)}
-                  className="h-9 px-3 rounded-lg border border-slate-300 text-xs font-medium bg-white text-slate-700 outline-none focus:ring-2 focus:ring-blue-400"
-                >
-                  <option value="all">All Months</option>
-                  <option value="0">January</option>
-                  <option value="1">February</option>
-                  <option value="2">March</option>
-                  <option value="3">April</option>
-                  <option value="4">May</option>
-                  <option value="5">June</option>
-                  <option value="6">July</option>
-                  <option value="7">August</option>
-                  <option value="8">September</option>
-                  <option value="9">October</option>
-                  <option value="10">November</option>
-                  <option value="11">December</option>
-                </select>
+                  options={MODAL_MONTHS}
+                  onChange={(next) => setSelectedMonth(next || 'all')}
+                  searchable
+                  className="w-40"
+                />
               </div>
             </div>
 
@@ -351,11 +368,39 @@ function LeaveTable({
                   <table className="min-w-full divide-y divide-slate-200 text-left text-xs">
                     <thead className="bg-slate-50 text-slate-500">
                       <tr>
-                        <th className="px-3 py-2 font-medium">Type</th>
-                        <th className="px-3 py-2 font-medium">From → To</th>
-                        <th className="px-3 py-2 font-medium text-center">Days</th>
-                        <th className="px-3 py-2 font-medium text-center">Status</th>
-                        <th className="px-3 py-2 font-medium">Reason</th>
+                        <th className="px-3 py-2 font-medium">
+                          <span className="flex items-center gap-1.5">
+                            <CalendarOff size={12} className="shrink-0 text-purple-500" />
+                            <span>Type</span>
+                          </span>
+                        </th>
+                        <th className="px-3 py-2 font-medium">
+                          <span className="flex items-center gap-1">
+                            <Calendar size={12} className="shrink-0 text-blue-500" />
+                            <span>From</span>
+                            <ArrowRight size={10} className="shrink-0 text-slate-400" />
+                            <CalendarRange size={12} className="shrink-0 text-cyan-500" />
+                            <span>To</span>
+                          </span>
+                        </th>
+                        <th className="px-3 py-2 font-medium text-center">
+                          <span className="flex items-center justify-center gap-1.5">
+                            <Sun size={12} className="shrink-0 text-amber-500" />
+                            <span>Days</span>
+                          </span>
+                        </th>
+                        <th className="px-3 py-2 font-medium text-center">
+                          <span className="flex items-center justify-center gap-1.5">
+                            <Activity size={12} className="shrink-0 text-sky-500" />
+                            <span>Status</span>
+                          </span>
+                        </th>
+                        <th className="px-3 py-2 font-medium">
+                          <span className="flex items-center gap-1.5">
+                            <MessageSquareText size={12} className="shrink-0 text-slate-400" />
+                            <span>Reason</span>
+                          </span>
+                        </th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 bg-white text-slate-700">
@@ -387,12 +432,13 @@ function LeaveTable({
             </div>
 
             {/* Modal Footer */}
-            <div className="px-6 py-3 border-t border-slate-100 bg-slate-50 flex justify-end">
+            <div className="flex justify-end border-t border-slate-100 bg-slate-50 px-6 py-3">
               <button
                 type="button"
                 onClick={() => setViewEmployeeModal(null)}
-                className="px-4 py-2 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-semibold transition"
+                className="group relative inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 shadow-xs transition hover:border-slate-300 hover:bg-slate-50 active:bg-slate-100"
               >
+                <span className={`inline-flex ${uiActionIconMotionClass.close}`}><X size={14} /></span>
                 Close
               </button>
             </div>

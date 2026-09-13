@@ -35,13 +35,6 @@ interface LeaveFiltersProps {
   onNewRequest: () => void;
   loading: boolean;
   showForm: boolean;
-  stats: {
-    approved: number;
-    pending: number;
-    rejected: number;
-    approvedDays: number;
-    onLeaveToday: number;
-  };
 }
 
 const LEAVE_TYPES = ['Casual', 'Sick', 'Emergency', 'Annual'] as const;
@@ -189,7 +182,6 @@ function LeaveFilters({
   onNewRequest,
   loading,
   showForm,
-  stats,
 }: LeaveFiltersProps) {
   const departmentOptions = departments.map((d) => ({ value: d, label: d }));
 
@@ -326,21 +318,6 @@ function LeaveFilters({
         </div>
       </div>
 
-      {/* Row 3 — KPI stats */}
-      <div className="flex flex-wrap items-center gap-2 border-t border-slate-100 pt-3">
-        <span className="inline-flex items-center gap-1 rounded-lg bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-700">
-          Total <span className="font-bold text-slate-900">{stats.approved + stats.pending + stats.rejected}</span>
-        </span>
-        <span className="inline-flex items-center gap-1 rounded-lg border border-emerald-200/60 bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-          Approved <span className="font-bold">{stats.approved}</span>
-        </span>
-        <span className="inline-flex items-center gap-1 rounded-lg border border-amber-200/60 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-700">
-          Pending <span className="font-bold">{stats.pending}</span>
-        </span>
-        <span className="inline-flex items-center gap-1 rounded-lg border border-rose-200/60 bg-rose-50 px-2.5 py-1 text-xs font-semibold text-rose-700">
-          Rejected <span className="font-bold">{stats.rejected}</span>
-        </span>
-      </div>
     </div>
   );
 }
