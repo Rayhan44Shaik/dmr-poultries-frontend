@@ -297,8 +297,8 @@ export default function EnterRateModal({
         .save-anim::after{content:'';position:absolute;top:0;left:-100%;width:100%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,0.5),transparent);transition:left 0.5s}
         .save-anim:hover::after{left:100%}
         /* save & lock big lock animation - more enhanced */
-        @keyframes lock-bounce{0%,100%{transform:translateY(0) rotate(0deg)}35%{transform:translateY(-4px) rotate(-12deg)}70%{transform:translateY(0) rotate(0deg)}}10%{transform:scale(1.4) translateY(-4px) rotate(-15deg)}20%{transform:scale(1.35) translateY(-2px) rotate(5deg)}30%{transform:scale(1.5) translateY(-6px) rotate(15deg)}40%{transform:scale(1.3) translateY(0) rotate(-12deg)}50%{transform:scale(1.2) translateY(0) rotate(0deg)}60%{transform:scale(1.4) translateY(-3px) rotate(12deg)}70%{transform:scale(1.3) translateY(-1px) rotate(-8deg)}80%{transform:scale(1.25) translateY(0) rotate(6deg)}90%{transform:scale(1.15) translateY(0) rotate(0deg)}}
-        @keyframes lock-open-close{0%,100%{transform:translateY(0) rotate(0deg)}35%{transform:translateY(-5px) rotate(-14deg)}70%{transform:translateY(0) rotate(0deg)}}10%{transform:scale(1.4) translateY(-6px) rotate(-18deg)}20%{transform:scale(1.3) translateY(-2px) rotate(0deg)}30%{transform:scale(1.5) translateY(-5px) rotate(18deg)}40%{transform:scale(1.2) translateY(0) rotate(-10deg)}50%{transform:scale(1) translateY(0) rotate(0deg)}60%{transform:scale(1.35) translateY(-4px) rotate(10deg)}70%{transform:scale(1.2) translateY(-1px) rotate(-8deg)}80%{transform:scale(1.15) translateY(0) rotate(5deg)}90%{transform:scale(1.1) translateY(0) rotate(0deg)}100%{transform:scale(1) translateY(0) rotate(0deg)}}
+        @keyframes lock-bounce{0%,100%{transform:translateY(0) rotate(0deg)}35%{transform:translateY(-5px) rotate(-14deg)}70%{transform:translateY(0) rotate(0deg)}}35%{transform:translateY(-4px) rotate(-12deg)}70%{transform:translateY(0) rotate(0deg)}}10%{transform:scale(1.4) translateY(-4px) rotate(-15deg)}20%{transform:scale(1.35) translateY(-2px) rotate(5deg)}30%{transform:scale(1.5) translateY(-6px) rotate(15deg)}40%{transform:scale(1.3) translateY(0) rotate(-12deg)}50%{transform:scale(1.2) translateY(0) rotate(0deg)}60%{transform:scale(1.4) translateY(-3px) rotate(12deg)}70%{transform:scale(1.3) translateY(-1px) rotate(-8deg)}80%{transform:scale(1.25) translateY(0) rotate(6deg)}90%{transform:scale(1.15) translateY(0) rotate(0deg)}}
+        @keyframes lock-open-close{0%,100%{transform:translateY(0) rotate(0deg)}35%{transform:translateY(-5px) rotate(-14deg)}70%{transform:translateY(0) rotate(0deg)}}35%{transform:translateY(-5px) rotate(-14deg)}70%{transform:translateY(0) rotate(0deg)}}10%{transform:scale(1.4) translateY(-6px) rotate(-18deg)}20%{transform:scale(1.3) translateY(-2px) rotate(0deg)}30%{transform:scale(1.5) translateY(-5px) rotate(18deg)}40%{transform:scale(1.2) translateY(0) rotate(-10deg)}50%{transform:scale(1) translateY(0) rotate(0deg)}60%{transform:scale(1.35) translateY(-4px) rotate(10deg)}70%{transform:scale(1.2) translateY(-1px) rotate(-8deg)}80%{transform:scale(1.15) translateY(0) rotate(5deg)}90%{transform:scale(1.1) translateY(0) rotate(0deg)}100%{transform:scale(1) translateY(0) rotate(0deg)}}
         .lock-anim{transition:all 0.3s cubic-bezier(0.4,0,0.2,1);position:relative;overflow:hidden}
         .lock-anim:hover{transform:translateY(-3px) scale(1.05);box-shadow:0 12px 28px rgba(249,115,22,0.35)}
         .lock-anim:active{transform:scale(0.96)}
@@ -311,7 +311,7 @@ export default function EnterRateModal({
         .rate-input-market.valid{border-color:#10b981;background:#ecfdf5;color:#065f46}
         .rate-input-market.invalid{border-color:#ef4444;background:#fef2f2;color:#991b1b}
         /* perf scroll - fix freezing */
-        @keyframes lock-pulse{0%,100%{box-shadow:0 0 0 0 rgba(249,115,22,0.45)}50%{box-shadow:0 0 0 8px rgba(249,115,22,0)}}
+        @keyframes lock-pulse{0%,100%{box-shadow:0 0 0 0 rgba(249,115,22,0.45)}50%{box-shadow:0 0 0 8px rgba(249,115,22,0)}}50%{box-shadow:0 0 0 8px rgba(249,115,22,0)}}
                 .scroll-perf{-webkit-overflow-scrolling:touch;overscroll-behavior:contain;transform:translateZ(0);will-change:scroll-position}
         .no-drag-table{overflow:hidden;transform:translateZ(0)}
         .no-drag-table table{width:100%;table-layout:fixed}
@@ -343,7 +343,7 @@ export default function EnterRateModal({
             </div>
             <div className="mt-6 flex justify-end gap-3">
               <button onClick={() => setShowConfirm(false)} className="group relative inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 cancel-anim"><span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-close)]"><X size={14} /></span> Cancel</button>
-              <button onClick={() => confirmSave("lock")} disabled={saving} className="px-4 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-sm font-medium text-white shadow-sm lock-anim">Lock</button>
+              <button onClick={() => confirmSave("lock")} disabled={saving} className="group relative inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-orange-50 border border-orange-300 text-orange-800 text-sm font-bold shadow-sm hover:bg-orange-100 hover:shadow-md lock-anim"><span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-white border border-orange-200 text-orange-600 shadow-sm lock-icon-wrap"><Lock size={16} /></span> Lock</button>
             </div>
           </div>
         </div>, document.body
@@ -677,9 +677,9 @@ export default function EnterRateModal({
                       setShowConfirm(true);
                     }}
                     disabled={saving}
-                    className="inline-flex items-center justify-center gap-2.5 px-8 py-3.5 rounded-xl bg-emerald-600 text-white text-[15px] font-extrabold shadow-xl hover:shadow-2xl disabled:opacity-50 lock-anim min-w-[180px]"
+                    className="group relative inline-flex items-center justify-center gap-2.5 px-8 py-3.5 rounded-xl bg-orange-50 border border-orange-300 text-orange-800 text-[15px] font-extrabold shadow-lg hover:bg-orange-100 hover:shadow-xl hover:border-orange-400 disabled:opacity-50 lock-anim min-w-[190px]"
                   >
-                    <Lock size={18} className="text-emerald-100" /> Save & Lock
+                    <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-white border border-orange-200 text-orange-600 shadow-sm lock-icon-wrap"><Lock size={20} /></span> Save & Lock
                   </button>
                 </div>
               </div>
