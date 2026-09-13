@@ -65,7 +65,9 @@ function PendingDutiesPanel({ pending, unassignedCount, canEdit, saving = false,
                   <span aria-hidden="true" className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white text-[11px] font-bold text-amber-700 ring-1 ring-inset ring-amber-200">{initials(row.employeeName)}</span>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-semibold leading-tight text-slate-900">{row.employeeName}</p>
-                    <p className="truncate text-[10px] font-medium leading-tight text-slate-400">{dutyDisplayValue(row.role, language)}</p>
+                    <p className="truncate text-[10px] font-medium leading-tight text-slate-400">
+                      {dutyDisplayValue(row.role, language)}{row.department ? ` · ${dutyDisplayValue(row.department, language)}` : ''}
+                    </p>
                   </div>
                   <span title={t('missingDays')} className="inline-flex h-5 shrink-0 items-center justify-center rounded-full bg-amber-100 px-1.5 text-[10px] font-bold tabular-nums text-amber-700">{row.missingDays.length}</span>
                 </div>

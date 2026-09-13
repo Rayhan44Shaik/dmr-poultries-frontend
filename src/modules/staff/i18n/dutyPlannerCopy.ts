@@ -31,7 +31,7 @@ export const dutyEnglish = {
   weeklyOff: 'Weekly Off', off: 'Off', noEntry: 'No Entry', dutyCount: 'Duty Count', future: 'Future date',
   approvedLeave: 'Approved leave', approvedOverrides: 'Approved leave takes precedence over this assignment.',
   automatic: 'Automatic', recorded: 'Recorded', automaticHint: 'Automatically assigned for this role.',
-  supervisor: 'Supervisor', helper: 'Helper', loader: 'Loader', collector: 'Collector', accountant: 'Accountant',
+  supervisor: 'Supervisor', helper: 'Helper', loader: 'Loader', collector: 'Collector', accountant: 'Accountant', mechanic: 'Mechanic',
   cashier: 'Cashier', manager: 'Manager', admin: 'Admin', officeStaff: 'Office staff',
   operations: 'Operations', fleet: 'Fleet', farm: 'Farm', warehouse: 'Warehouse', accounts: 'Accounts', administration: 'Administration',
   open: 'Open', draft: 'Draft', submitted: 'Submitted', locked: 'Locked', closed: 'Closed', readOnly: 'Read-only',
@@ -92,7 +92,7 @@ export const dutyTelugu: Record<keyof typeof dutyEnglish, string> = {
   weeklyOff: 'వారపు సెలవు', off: 'ఆఫ్', noEntry: 'నమోదు లేదు', dutyCount: 'డ్యూటీ రోజులు', future: 'రాబోయే తేదీ',
   approvedLeave: 'ఆమోదించిన సెలవు', approvedOverrides: 'ఈ తేదీన కేటాయించిన డ్యూటీ బదులు ఆమోదించిన సెలవు వర్తిస్తుంది.',
   automatic: 'ఆటోమేటిక్', recorded: 'నమోదైనది', automaticHint: 'ఈ హోదా ప్రకారం ఆటోమేటిక్‌గా కేటాయించబడింది.',
-  supervisor: 'సూపర్‌వైజర్', helper: 'సహాయకుడు', loader: 'లోడర్', collector: 'వసూలుదారు', accountant: 'అకౌంటెంట్',
+  supervisor: 'సూపర్‌వైజర్', helper: 'సహాయకుడు', loader: 'లోడర్', collector: 'వసూలుదారు', accountant: 'అకౌంటెంట్', mechanic: 'మెకానిక్',
   cashier: 'క్యాషియర్', manager: 'మేనేజర్', admin: 'అడ్మిన్', officeStaff: 'ఆఫీస్ సిబ్బంది',
   operations: 'కార్యకలాపాలు', fleet: 'వాహన విభాగం', farm: 'ఫారం', warehouse: 'గోదాం', accounts: 'ఖాతాలు', administration: 'పరిపాలన',
   open: 'తెరిచి ఉంది', draft: 'ముసాయిదా', submitted: 'సమర్పించారు', locked: 'లాక్ అయింది', closed: 'ముగిసింది', readOnly: 'చూడటానికి మాత్రమే',
@@ -136,7 +136,7 @@ export function dutyTranslator(language: DutyLanguage) {
 export function dutyLocale(language: DutyLanguage): string { return language === 'te' ? 'te-IN' : 'en-IN'; }
 
 const DISPLAY_KEYS: Record<string, DutyTextKey> = {
-  supervisor: 'supervisor', driver: 'driver', helper: 'helper', loader: 'loader', collector: 'collector',
+  supervisor: 'supervisor', driver: 'driver', helper: 'helper', loader: 'loader', collector: 'collector', mechanic: 'mechanic',
   collection: 'collection', collections: 'collection', accountant: 'accountant', cashier: 'cashier', manager: 'manager',
   admin: 'admin', administrator: 'admin', administration: 'administration', office: 'office', 'office staff': 'officeStaff',
   operations: 'operations', fleet: 'fleet', farm: 'farm', warehouse: 'warehouse', accounts: 'accounts',
