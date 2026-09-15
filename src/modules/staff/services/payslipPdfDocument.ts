@@ -385,19 +385,22 @@ export function drawPayslipPdf(
   doc.rect(MARGIN, boxTop, contentWidth, y - boxTop);
   y += 6;
 
-  /* ── Signature (single, right-aligned) ─────────────────────────────── */
+  /* ── Signature (single, right-aligned) ───────────────────────────────
+   * Leaves open signing space above the rule (same as the on-screen sheet)
+   * so a handwritten signature fits neatly between the body and the line. */
   const sigRight = pageWidth - MARGIN;
+  const sigLineY = y + 27;
   doc.setDrawColor(RULE[0], RULE[1], RULE[2]);
   doc.setLineWidth(0.18);
-  doc.line(sigRight - 42, y + 13, sigRight, y + 13);
+  doc.line(sigRight - 42, sigLineY, sigRight, sigLineY);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.5);
   doc.setTextColor(INK[0], INK[1], INK[2]);
-  doc.text("D. Srinivas Chakrapani", sigRight, y + 17, { align: "right" });
+  doc.text("D. Srinivas Chakrapani", sigRight, sigLineY + 4, { align: "right" });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
-  doc.text("Authorised Signatory", sigRight, y + 21, { align: "right" });
+  doc.text("Authorised Signatory", sigRight, sigLineY + 8, { align: "right" });
 
   /* ── Footer — thin line + small centered note ──────────────────────── */
   const generatedStr = new Date().toLocaleString("en-IN", {

@@ -20,7 +20,7 @@ import { useSalaryRegister } from "../hooks/useSalaryRegister";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
 import { todayBusinessDate } from "../../../utils/businessDate";
 import { loadEmployees } from "../../masters/employees/services/employeeService";
-import { getSalaryMonthSummary, downloadPayslipPdf, updateSalary, emailSalaryPayslips, whatsappSalaryPayslips, bulkUpdateSalaryStatus } from "../services/salaryService";
+import { downloadPayslipPdf, updateSalary, emailSalaryPayslips, whatsappSalaryPayslips, bulkUpdateSalaryStatus } from "../services/salaryService";
 import {
   ArrowUpDown,
   Building2,
@@ -34,15 +34,13 @@ import {
   ClipboardCheck,
   Plus,
   FileText,
-  Lock,
   RotateCcw,
   Search,
   UserRound,
-  Wallet,
 } from "lucide-react";
 import { BrandRefreshButton, Button, ConfirmDialog, EmptyState } from "../../../ui";
 import MasterDropdown from "../../masters/components/MasterDropdown";
-import { uiBadgeClass, uiButton, type StatusTone } from "../../../shared/ui/uiTokens";
+import { uiButton } from "../../../shared/ui/uiTokens";
 import {
   opsFilterCardClass,
   opsFilterLabelClass,
@@ -57,7 +55,7 @@ import { SalaryReviewModal } from "../components/salary/SalaryReviewModal";
 import { EmailPayslipsModal } from "../components/salary/EmailPayslipsModal";
 import { WhatsAppPayslipsModal } from "../components/salary/WhatsAppPayslipsModal";
 import { SAMPLE_EMPLOYEE_LIST } from "../services/staffSampleData";
-import type { SalaryMonthSummary, SalaryRecord } from "../types/staffDashboard";
+import type { SalaryRecord } from "../types/staffDashboard";
 
 function formatMonthName(monthStr: string): string {
   if (!monthStr) return "";
@@ -128,8 +126,6 @@ function SalaryRegisterPage() {
     message: string;
     onConfirm: () => void;
   } | null>(null);
-  const [monthSummary, setMonthSummary] = useState<SalaryMonthSummary | null>(null);
-
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const [pickerYear, setPickerYear] = useState<number>(() => Number(getCurrentYearMonth().split("-")[0]));
   const [currentPage, setCurrentPage] = useState(1);
@@ -209,21 +205,6 @@ function SalaryRegisterPage() {
       mounted = false;
     };
   }, []);
-
-  // Month-level lifecycle status comes only from the backend.
-  useEffect(() => {
-    let cancelled = false;
-    getSalaryMonthSummary(month)
-      .then((summary) => {
-        if (!cancelled) setMonthSummary(summary);
-      })
-      .catch(() => {
-        if (!cancelled) setMonthSummary(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [month, records]);
 
   const departments = useMemo(() => {
     const set = new Set<string>();
@@ -485,19 +466,6 @@ function SalaryRegisterPage() {
     [updateRecord, showNotification]
   );
 
-  // Month lifecycle badge — rendered with the global badge tokens so the
-  // tone vocabulary (success / warning / info / neutral) matches every other
-  // status pill in the application.
-  const monthStatus = useMemo(() => {
-    if (!monthSummary) return null;
-    if (monthSummary.closed) return { label: "Closed", tone: "neutral" as StatusTone };
-    if (monthSummary.employees === 0) return { label: "Draft", tone: "neutral" as StatusTone };
-    if (monthSummary.paid === monthSummary.employees) return { label: "Paid", tone: "success" as StatusTone };
-    if (monthSummary.paid > 0) return { label: "Partially Paid", tone: "warning" as StatusTone };
-    if (monthSummary.submitted > 0) return { label: "Submitted", tone: "info" as StatusTone };
-    return { label: "Pending", tone: "warning" as StatusTone };
-  }, [monthSummary]);
-
   // The payment date for the register heading. Shown only when the ENTIRE
   // month's register is Paid AND every paid record shares one payment date.
   // Individual payment dates still appear in each employee's payslip view.
@@ -533,37 +501,6 @@ function SalaryRegisterPage() {
 
   return (
     <div className="space-y-4 w-full">
-      {/* Header — icon tile + title, the same treatment as the Trip List card header */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <div className="h-9 w-9 rounded-xl bg-emerald-50/70 border border-emerald-100 flex items-center justify-center text-emerald-500 shadow-inner">
-            <Wallet className="w-5 h-5" />
-          </div>
-          <h1 className="text-xl font-semibold tracking-tight text-slate-900">
-            Salary Register
-          </h1>
-          {monthStatus && (
-            <span className={uiBadgeClass(monthStatus.tone)}>
-              {monthStatus.label === "Closed" || monthStatus.label === "Paid" ? <Lock size={11} /> : null}
-              {monthStatus.label}
-            </span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          {!hasRecords && !loading && (
-            <Button
-              variant="primary"
-              size="md"
-              onClick={handleGenerate}
-              loading={saving}
-              icon={<Plus size={14} />}
-            >
-              Generate Register
-            </Button>
-          )}
-        </div>
-      </div>
-
       {/* Filter bar — the Trip List filter treatment: `opsFilterCardClass`
           surface, icon-led `opsFilterLabelClass` labels, shared dropdowns,
           then a Sort / Search / actions row with the animated Reset and the

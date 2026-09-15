@@ -350,6 +350,8 @@ export function ClassicPayslipSheet({
       {/* ── Signature ────────────────────────────────────────────────── */}
       <div className="px-6 pb-4">
         <div className="ml-auto w-[200px] text-center">
+          {/* Open signing space above the rule so the signature fits neatly. */}
+          <div aria-hidden="true" style={{ height: 64 }} />
           <div style={{ borderTop: `1px solid ${INK}` }} />
           <div className="mt-1.5 font-bold" style={{ color: INK, fontSize: 12.5 }}>
             D. Srinivas Chakrapani

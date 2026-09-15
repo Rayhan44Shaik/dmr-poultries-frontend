@@ -125,7 +125,6 @@ export function SalaryTable({
   paidOnDate,
 }: SalaryTableProps) {
   const selectable = Boolean(selectedIds && onToggleSelect && onToggleSelectAll);
-  const hasQuickActions = Boolean(onEmail || onWhatsApp);
   const formatVal = formatCurrency || ((amount: number) =>
     new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount || 0));
 
@@ -152,6 +151,8 @@ export function SalaryTable({
     pending: records.filter((r) => r.status === "Pending").length,
     submitted: records.filter((r) => r.status === "Submitted").length,
     paid: records.filter((r) => r.status === "Paid").length,
+    emailsSent: records.reduce((s, r) => s + (r.emailsSent ?? 0), 0),
+    whatsappsSent: records.reduce((s, r) => s + (r.whatsappsSent ?? 0), 0),
   };
 
   if (records.length === 0) {
@@ -194,20 +195,21 @@ export function SalaryTable({
             three day-count columns share one width (data centred under the
             header), the three money columns share one width (amounts start at
             the left of the column, leaving a clean gap before Status), and
-            the mail / WhatsApp quick actions live under the employee name —
-            no separate Actions column. */}
-        <table className="w-full min-w-[1000px] table-fixed text-[13px] text-left border-collapse">
+            the Mail + WhatsApp payslip counts share ONE small column AFTER
+            Status — two neat mini pills side by side, each clickable to send. */}
+        <table className="w-full min-w-[1060px] table-fixed text-[13px] text-left border-collapse">
           <colgroup>
             {selectable && <col className="w-10" />}
             <col className="w-11" />
-            <col className="w-[20%]" />
-            <col className="w-[9%]" />
-            <col className="w-[9%]" />
-            <col className="w-[9%]" />
+            <col className="w-[19%]" />
+            <col className="w-[8%]" />
+            <col className="w-[8%]" />
+            <col className="w-[8%]" />
+            <col className="w-[11%]" />
+            <col className="w-[11%]" />
+            <col className="w-[11%]" />
+            <col className="w-[11%]" />
             <col className="w-[13%]" />
-            <col className="w-[13%]" />
-            <col className="w-[13%]" />
-            <col className="w-[12%]" />
           </colgroup>
           <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-600">
             <tr className="whitespace-nowrap">
@@ -251,6 +253,15 @@ export function SalaryTable({
               <th className={`${TH_CLASS} text-left`}>
                 <ColHead icon={<ShieldCheck size={14} className="text-purple-500 flex-shrink-0" />} label="Status" />
               </th>
+              <th className={`${TH_CLASS} text-center`}>
+                <div className="flex items-center justify-center gap-1.5">
+                  <span className="inline-flex items-center gap-1">
+                    <Mail size={14} className="text-blue-500 flex-shrink-0" />
+                    <WhatsAppBrandIcon size={14} className="text-[#1DA851] flex-shrink-0" />
+                  </span>
+                  <span>Sent</span>
+                </div>
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -284,44 +295,9 @@ export function SalaryTable({
                   <td className="px-3 py-4 text-center text-[13px] text-slate-500 font-medium">{serialNo}</td>
                   <td className="px-3 py-4 min-w-0">
                     <div className="truncate text-[13px] font-bold text-slate-800">{record.employeeName}</div>
-                    <div className="mt-0.5 flex items-center gap-2 min-w-0">
-                      {record.department ? (
-                        <span className="truncate text-[11px] font-medium text-slate-500">{record.department}</span>
-                      ) : null}
-                      {/* Mail / WhatsApp quick actions sit beside the department,
-                          under the name — plain glyphs, no filled background. */}
-                      {hasQuickActions && (
-                        <span
-                          className="flex items-center gap-2 shrink-0"
-                          onClick={(e) => e.stopPropagation()}
-                        >
-                          {onEmail && (
-                            <button
-                              type="button"
-                              aria-label={`Email payslip to ${record.employeeName}`}
-                              onClick={() => onEmail(record)}
-                              disabled={saving}
-                              className="group inline-flex items-center gap-0.5 text-slate-400 transition hover:text-blue-600 disabled:opacity-40"
-                            >
-                              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-mail)]"><Mail size={13} /></span>
-                              <span className="text-[10px] font-bold tabular-nums">{record.emailsSent ?? 0}</span>
-                            </button>
-                          )}
-                          {onWhatsApp && (
-                            <button
-                              type="button"
-                              aria-label={`WhatsApp payslip to ${record.employeeName}`}
-                              onClick={() => onWhatsApp(record)}
-                              disabled={saving}
-                              className="group inline-flex items-center gap-0.5 text-[#1DA851] transition hover:text-[#128C3E] disabled:opacity-40"
-                            >
-                              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-whatsapp)]"><WhatsAppBrandIcon size={13} /></span>
-                              <span className="text-[10px] font-bold tabular-nums">{record.whatsappsSent ?? 0}</span>
-                            </button>
-                          )}
-                        </span>
-                      )}
-                    </div>
+                    {record.department ? (
+                      <div className="mt-0.5 truncate text-[11px] font-medium text-slate-500">{record.department}</div>
+                    ) : null}
                   </td>
                   <td className="px-3 py-4 text-center text-[13px] font-medium tabular-nums text-slate-600 whitespace-nowrap">{record.workingDays ?? "—"}</td>
                   <td className="px-3 py-4 text-center text-[13px] font-medium tabular-nums text-slate-600 whitespace-nowrap">{record.presentDays ?? "—"}</td>
@@ -336,6 +312,50 @@ export function SalaryTable({
                         {record.correctionWindowDaysRemaining}d
                       </span>
                     )}
+                  </td>
+                  {/* Payslip sent-counts — ONE small column AFTER Status holding
+                      both the Mail and WhatsApp mini pills side by side. Each
+                      pill is clickable (sends the payslip) when its handler is
+                      wired, otherwise a plain count pill. */}
+                  <td className="px-3 py-4 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                    <span className="inline-flex items-center justify-center gap-1.5">
+                      {onEmail ? (
+                        <button
+                          type="button"
+                          title={`Email payslip to ${record.employeeName}`}
+                          aria-label={`Email payslip to ${record.employeeName}`}
+                          onClick={() => onEmail(record)}
+                          disabled={saving}
+                          className="group inline-flex items-center gap-1 rounded-full border border-blue-200/80 bg-blue-50/70 px-2 py-0.5 text-blue-700 transition hover:border-blue-300 hover:bg-blue-100/70 disabled:opacity-40"
+                        >
+                          <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-mail)]"><Mail size={12} /></span>
+                          <span className="text-[11px] font-bold tabular-nums">{record.emailsSent ?? 0}</span>
+                        </button>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-blue-200/80 bg-blue-50/70 px-2 py-0.5 text-blue-700">
+                          <Mail size={12} />
+                          <span className="text-[11px] font-bold tabular-nums">{record.emailsSent ?? 0}</span>
+                        </span>
+                      )}
+                      {onWhatsApp ? (
+                        <button
+                          type="button"
+                          title={`WhatsApp payslip to ${record.employeeName}`}
+                          aria-label={`WhatsApp payslip to ${record.employeeName}`}
+                          onClick={() => onWhatsApp(record)}
+                          disabled={saving}
+                          className="group inline-flex items-center gap-1 rounded-full border border-emerald-200/80 bg-emerald-50/70 px-2 py-0.5 text-[#128C3E] transition hover:border-emerald-300 hover:bg-emerald-100/70 disabled:opacity-40"
+                        >
+                          <span className="inline-flex text-[#1DA851] motion-safe:group-hover:animate-[var(--animate-action-whatsapp)]"><WhatsAppBrandIcon size={12} /></span>
+                          <span className="text-[11px] font-bold tabular-nums">{record.whatsappsSent ?? 0}</span>
+                        </button>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200/80 bg-emerald-50/70 px-2 py-0.5 text-[#128C3E]">
+                          <WhatsAppBrandIcon size={12} className="text-[#1DA851]" />
+                          <span className="text-[11px] font-bold tabular-nums">{record.whatsappsSent ?? 0}</span>
+                        </span>
+                      )}
+                    </span>
                   </td>
                 </tr>
               );
@@ -354,6 +374,16 @@ export function SalaryTable({
               <td className="px-3 py-4 text-left text-[13px] tabular-nums font-bold text-emerald-700 whitespace-nowrap">{formatVal(footer.netSalary)}</td>
               <td className="px-3 py-4 text-[11px] tabular-nums font-semibold text-slate-600 whitespace-nowrap">
                 {footer.pending} Pending · {footer.submitted} Submitted · {footer.paid} Paid
+              </td>
+              <td className="px-3 py-4 text-center whitespace-nowrap">
+                <span className="inline-flex items-center justify-center gap-2.5">
+                  <span className="inline-flex items-center gap-1 text-[12px] tabular-nums font-bold text-blue-700">
+                    <Mail size={12} className="text-blue-500" />{footer.emailsSent}
+                  </span>
+                  <span className="inline-flex items-center gap-1 text-[12px] tabular-nums font-bold text-[#128C3E]">
+                    <WhatsAppBrandIcon size={12} className="text-[#1DA851]" />{footer.whatsappsSent}
+                  </span>
+                </span>
               </td>
             </tr>
           </tfoot>
