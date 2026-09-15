@@ -804,7 +804,11 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
               calendarTitle={t("ops.dashboard.trend.back_to_calendar")}
             />
           </div>
-          <div className="flex w-full flex-1 flex-col overflow-hidden">
+          {/* minHeight: overflow-hidden zeroes a flex item's auto min-size, so
+              without this floor the grid row (sized by content) can collapse
+              and clip the whole chart — the inline value makes the floor
+              independent of the CSS class. */}
+          <div className="flex w-full flex-1 flex-col overflow-hidden" style={{ minHeight: 340 }}>
             <OperationalTrendsChart
               trends={trendsQuery.trends}
               granularity={trendGranularity}

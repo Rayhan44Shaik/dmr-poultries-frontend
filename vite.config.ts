@@ -66,6 +66,27 @@ const dmrInstanceStamp = {
     }
     return null
   },
+  // Stamps the served HTML with this instance and adds a tiny inline check:
+  // the app records the instance it is running (sessionStorage). When a tab
+  // reloads and the HTML's instance differs from the recorded one, the
+  // recorded value is updated and the page is reloaded once more — so a
+  // reload can never land on a mix of a new document and old app code.
+  // One extra load maximum (the stored value always converges to the meta).
+  transformIndexHtml() {
+    return [
+      {
+        tag: 'meta',
+        attrs: { name: 'dmr-instance', content: DMR_INSTANCE_ID },
+        injectTo: 'head-prepend',
+      },
+      {
+        tag: 'script',
+        attrs: {},
+        children: `(function(){try{var m=document.querySelector('meta[name="dmr-instance"]');var id=m&&m.content;if(!id)return;var K="dmr:instance";var p=null;try{p=sessionStorage.getItem(K)}catch(e){}if(p===null){try{sessionStorage.setItem(K,id)}catch(e){}return}if(p!==id){try{sessionStorage.setItem(K,id)}catch(e){}location.replace(location.href)}}catch(e){}})()`,
+        injectTo: 'head-prepend',
+      },
+    ]
+  },
   configureServer(server: { middlewares: { use: (path: string, handler: (req: import('node:http').IncomingHttpMessage, res: import('node:http').ServerResponse) => void) => void } }) {
     server.middlewares.use('/__dmr/ping', (_req, res) => {
       res.setHeader('Content-Type', 'application/json')

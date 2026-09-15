@@ -318,7 +318,7 @@ export default function OperationalTrendsChart({
   return (
     <div className="flex w-full flex-1 flex-col">
       {/* ── Plot ─────────────────────────────────────────────────────── */}
-      <div className="min-h-[268px] w-full flex-1">
+      <div className="min-h-[268px] w-full flex-1" style={{ minHeight: 268 }}>
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 10, right: 2, bottom: 0, left: -8 }}>
             <defs>

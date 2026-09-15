@@ -23,10 +23,25 @@ const PING_URL = '/__dmr/ping';
 const POLL_MS = 15_000;
 const RELOAD_SECONDS = 3;
 
+const INSTANCE_STORAGE_KEY = 'dmr:instance';
+
 export default function InstanceWatchdog() {
   const myId = INSTANCE_ID;
   const [stale, setStale] = useState(false);
   const [countdown, setCountdown] = useState(RELOAD_SECONDS);
+
+  // Record which server instance this running tab belongs to. The inline
+  // script injected into index.html (see vite.config.ts) compares the next
+  // reload's HTML stamp against this value and forces one clean reload when
+  // they differ — so a reload can never mix a new document with old code.
+  useEffect(() => {
+    if (!import.meta.env.DEV || !myId) return;
+    try {
+      sessionStorage.setItem(INSTANCE_STORAGE_KEY, myId);
+    } catch {
+      // storage unavailable — the poll-based detection below still covers us
+    }
+  }, [myId]);
 
   // Detect: poll the live instance id, re-check on focus/visibility.
   useEffect(() => {
