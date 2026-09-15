@@ -31,7 +31,7 @@ import {
 import { te as teDateLocale } from "date-fns/locale";
 import type { Locale } from "date-fns";
 
-import { makeT, useI18n, type Language } from "../../../i18n";
+import { makeT, translateStatus, useI18n, type Language } from "../../../i18n";
 import { useStaffPerformance } from "../hooks/useStaffPerformance";
 import { usePerformanceDetail } from "../hooks/usePerformanceDetail";
 import { useStaffDirectory } from "../hooks/useStaffDirectory";
@@ -70,6 +70,7 @@ import WeeklyPerformanceChart, {
   type WeeklyChartPoint,
   type WeeklyChartSeries,
 } from "../components/performance/WeeklyPerformanceChart";
+import { personNameLabel } from "../utils/leaveDisplay";
 import PerformanceDrawer from "../components/performance/PerformanceDrawer";
 import RecentTripsTable from "../components/performance/RecentTripsTable";
 import Pagination from "../components/common/Pagination";
@@ -148,6 +149,15 @@ const DriverPerformancePage = () => {
 
   const handleClear = useCallback(() => {
     perf.clearFilters();
+    /* Reset clears the *draft* too, not just the applied query: a driver picked
+       in the dropdown but never searched would otherwise stay on screen after
+       Reset (the hook's early-return path changes nothing to re-seed from). */
+    setDraft({
+      fromDate: perf.defaultFilters.fromDate,
+      toDate: perf.defaultFilters.toDate,
+      personId: perf.defaultFilters.personId,
+      search: perf.defaultFilters.search,
+    });
   }, [perf]);
 
   const handleRefresh = useCallback(() => {
@@ -622,7 +632,9 @@ const DriverPerformancePage = () => {
                       <tr
                         key={row.driverId}
                         tabIndex={0}
-                        aria-label={t("staff.perf.table.row_aria", { name: row.driverName })}
+                        aria-label={t("staff.perf.table.row_aria", {
+                          name: personNameLabel(t, language, row.driverName),
+                        })}
                         onClick={toggle}
                         onKeyDown={(event) => {
                           if (event.key === "Enter" || event.key === " ") {
@@ -641,10 +653,10 @@ const DriverPerformancePage = () => {
                           {rank}
                         </td>
                         <td className={`${uiTableTdClass} whitespace-nowrap text-[13px] font-semibold text-slate-900`}>
-                          {row.driverName}
+                          {personNameLabel(t, language, row.driverName)}
                         </td>
                         <td className={`${uiTableTdClass} whitespace-nowrap text-xs text-slate-500`}>
-                          {row.employeeStatus}
+                          {translateStatus(t, row.employeeStatus)}
                         </td>
                         <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatCount(row.trips)}</td>
                         <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatCount(row.distance)}</td>
@@ -698,7 +710,7 @@ const DriverPerformancePage = () => {
       <PerformanceDrawer
         open={selectedEntry != null}
         onClose={closeDrawer}
-        title={selectedEntry?.row.driverName ?? ""}
+        title={personNameLabel(t, language, selectedEntry?.row.driverName ?? "")}
         subtitle={`${drawerT("staff.perf.drawer.period")}: ${drawerRangeLabel}`}
         rankBadge={
           selectedEntry ? (

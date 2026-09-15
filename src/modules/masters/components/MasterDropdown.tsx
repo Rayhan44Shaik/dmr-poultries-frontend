@@ -16,6 +16,12 @@ import { useI18n } from "../../../i18n";
 export interface MasterDropdownOption {
   value: string;
   label: string;
+  /**
+   * Stored text the option must keep matching while its label is translated —
+   * e.g. the Telugu name shows, but typing "anil" still finds him. Matching is
+   * always case-insensitive.
+   */
+  keywords?: string;
   disabled?: boolean;
   icon?: ReactNode;
 }
@@ -115,7 +121,8 @@ export default function MasterDropdown({
       if (!keyword) return true;
       return (
         option.label.toLocaleLowerCase().includes(keyword) ||
-        option.value.toLocaleLowerCase().includes(keyword)
+        option.value.toLocaleLowerCase().includes(keyword) ||
+        (option.keywords?.toLocaleLowerCase().includes(keyword) ?? false)
       );
     });
   }, [items, query, allowClear]);
@@ -375,7 +382,8 @@ export default function MasterDropdown({
                     (allowClear && option.value === "") ||
                     !keyword ||
                     option.label.toLocaleLowerCase().includes(keyword) ||
-                    option.value.toLocaleLowerCase().includes(keyword),
+                    option.value.toLocaleLowerCase().includes(keyword) ||
+                    (option.keywords?.toLocaleLowerCase().includes(keyword) ?? false),
                 );
                 setActive(
                   matches.findIndex(

@@ -2020,7 +2020,21 @@ function driverPerformance(params) {
   const from = params.get("fromDate") || QUARTER.fromDate;
   const to = params.get("toDate") || QUARTER.toDate;
   const driverId = params.get("driverId") ? Number(params.get("driverId")) : null;
-  const trips = tripsIn(from, to);
+  /* Free-text filter, applied the same way the list pages do it: match the
+     driver's name or any vehicle he drove, case-insensitively. Without this the
+     Driver Performance filter bar's Search field asked for something the API
+     never honoured, so "Search" looked broken. */
+  const search = (params.get("search") || "").trim().toLowerCase();
+  const allTrips = tripsIn(from, to);
+  const matchesSearch = (trip) => {
+    if (!search) return true;
+    const name = EMP_BY_ID.get(trip.driverId)?.employeeName ?? "";
+    if (name.toLowerCase().includes(search)) return true;
+    return (trip.vehicleNo ?? "").toLowerCase().includes(search);
+  };
+  const trips = allTrips.filter(
+    (t) => (!driverId || t.driverId === driverId) && matchesSearch(t),
+  );
   const perDriver = new Map();
   for (const t of trips) {
     const e =
@@ -2150,7 +2164,17 @@ function supervisorPerformance(params) {
   const from = params.get("fromDate") || QUARTER.fromDate;
   const to = params.get("toDate") || QUARTER.toDate;
   const supervisorId = params.get("supervisorId") ? Number(params.get("supervisorId")) : null;
-  const trips = tripsIn(from, to).filter((t) => t.deliveryStepSubmitted);
+  /* Same contract as the driver endpoint: a name search narrows the whole
+     payload (rows, KPIs and the weekly series), not just the detail block. */
+  const search = (params.get("search") || "").trim().toLowerCase();
+  const trips = tripsIn(from, to)
+    .filter((t) => t.deliveryStepSubmitted)
+    .filter((t) => !supervisorId || t.supervisorId === supervisorId)
+    .filter((t) => {
+      if (!search) return true;
+      const name = EMP_BY_ID.get(t.supervisorId)?.employeeName ?? "";
+      return name.toLowerCase().includes(search);
+    });
   const per = new Map();
   for (const t of trips) {
     const e = per.get(t.supervisorId) ?? { trips: 0, shops: 0, birds: 0, weight: 0, mortality: 0, weightLoss: 0 };

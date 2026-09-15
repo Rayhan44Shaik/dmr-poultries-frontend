@@ -20,11 +20,10 @@ import {
 } from 'lucide-react';
 import {
   uiCardClass,
-  uiDisabled,
   uiFilterLabelClass,
-  uiFocusInset,
+  uiFilterResetButtonClass,
+  uiFilterSearchFieldClass,
   uiIconButton,
-  uiTransition,
 } from '../../../../shared/ui/uiTokens';
 import { Button } from '../../../../ui';
 import { BrandRefreshButton } from '../../../../ui';
@@ -66,20 +65,13 @@ interface LeaveFiltersProps {
 }
 
 /**
- * Search field: one step taller (44px) than the 40px filter controls, with the
- * 18px glyph and 11px inset of the Trip List search. Finding a request is the
- * main thing anyone does on this page, so it is the biggest control in the card
- * and it sits on the left, where the eye starts.
+ * Search field: one step taller (44px) than the filter controls, with the 18px
+ * glyph and 11px inset of the Trip List search. Finding a request is the main
+ * thing anyone does on this page, so it is the biggest control in the card and
+ * it sits on the left, where the eye starts. The styling itself is the shared
+ * `uiFilterSearchFieldClass`, so every filter card in the app matches.
  */
-const searchInputClass = [
-  'h-11 w-full min-w-0 rounded-lg border border-slate-300 bg-white pl-11 pr-10',
-  'text-sm font-medium text-slate-800',
-  'placeholder:font-normal placeholder:text-slate-400',
-  uiFocusInset,
-  uiTransition,
-  uiDisabled,
-  'shadow-xs',
-].join(' ');
+const searchInputClass = uiFilterSearchFieldClass;
 
 const viewIconButtonClass = `${uiIconButton('view', 'lg')} group`;
 const approveIconButtonClass = `${uiIconButton('success', 'lg')} group`;
@@ -251,7 +243,7 @@ function LeaveFilters({
      i18n lookup per name word) per character was the page's one real stall.
      They only change when the source data or the language does. */
   const departmentOptions = useMemo(
-    () => departments.map((d) => ({ value: d, label: departmentLabel(t, d) })),
+    () => departments.map((d) => ({ value: d, label: departmentLabel(t, d), keywords: d })),
     [departments, t]
   );
 
@@ -263,6 +255,8 @@ function LeaveFilters({
         .map((e) => ({
           value: String(e.id),
           label: personNameLabel(t, language, e.employeeName),
+          // The label is Telugu; the stored name keeps the English search working.
+          keywords: e.employeeName,
         })),
     [employees, t, language]
   );
@@ -272,6 +266,7 @@ function LeaveFilters({
       LEAVE_TYPES.map((type) => ({
         value: type,
         label: leaveTypeLabel(t, type),
+        keywords: type,
       })),
     [t]
   );
@@ -473,7 +468,7 @@ function LeaveFilters({
           <button
             type="button"
             onClick={onReset}
-            className="group relative inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-xs transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 active:bg-slate-100 focus-visible:ring-2 focus-visible:ring-emerald-300"
+            className={uiFilterResetButtonClass}
             aria-label={`${t('common.reset')} — ${t('common.filter')}`}
           >
             <span className="inline-flex group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>
