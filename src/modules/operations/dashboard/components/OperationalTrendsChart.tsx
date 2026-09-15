@@ -61,7 +61,9 @@ interface OperationalTrendsChartProps {
 const COLOR = {
   trips: "#6366f1",
   farmWeight: "#0ea5e9",
-  delivered: "#10b981",
+  // Cyan-teal separates delivered weight from the indigo trips line without
+  // relying on the harsh green that made the movement chart feel noisy.
+  delivered: "#0891b2",
   mortality: "#f43f5e",
   weightLoss: "#f59e0b",
 } as const;

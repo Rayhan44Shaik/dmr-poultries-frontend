@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Cell, Pie, PieChart, ResponsiveContainer, Sector, type PieSectorShapeProps } from "recharts";
+import { Cell, Pie, PieChart, ResponsiveContainer, Sector, Tooltip, type PieSectorShapeProps } from "recharts";
 import { useI18n } from "../../../../i18n";
 import { formatINRCompact } from "../../../../utils/format";
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
-const PIE_TRACK = { radius: 102.5, strokeWidth: 41 } as const;
-/** One extremely slow ambient revolution — 20 minutes per lap, always on. */
-const ORBIT_MS = 1200_000;
+const PIE_TRACK = { radius: 109.5, strokeWidth: 45 } as const;
+/** A barely perceptible ambient revolution — 40 minutes per lap. */
+const ORBIT_MS = 2400_000;
 
 /** Stable id fragment for a mode name (gradient ids never depend on order). */
 function slug(name: string): string {
@@ -89,6 +89,33 @@ function CollectionStat({
   );
 }
 
+function CollectionTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload?: unknown }>;
+}) {
+  if (!active) return null;
+  const item = payload?.[0]?.payload as Partial<EnrichedMode> | undefined;
+  if (!item || typeof item.name !== "string") return null;
+
+  const value = Number(item.value) || 0;
+  const percent = Number(item.percent) || 0;
+  const color = typeof item.color === "string" ? item.color : "#64748b";
+
+  return (
+    <div className="min-w-[190px] rounded-xl border border-slate-200 bg-white/95 px-3 py-2.5 shadow-xl shadow-slate-900/10 backdrop-blur-sm">
+      <div className="flex items-center gap-2 border-b border-slate-100 pb-1.5">
+        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
+        <p className="text-[11px] font-black uppercase tracking-wider text-slate-500">{item.name}</p>
+      </div>
+      <p className="mt-2 text-[16px] font-black tabular-nums text-slate-800">{formatINRCompact(value)}</p>
+      <p className="mt-0.5 text-[11px] font-semibold text-slate-400">{percent.toFixed(1)}% of collection streams</p>
+    </div>
+  );
+}
+
 /**
  * Collection Streams — payment-mode donut for the Operations dashboard.
  *
@@ -103,8 +130,8 @@ function CollectionStat({
  *  • Every load / range change replays a choreographed entrance: the donut
  *    fades in, the slices sweep in, and the centre total counts up while the
  *    KPI values remain directly bound to the same data signature.
- *  • One very slow ambient revolution of the ring (8 min per lap, off with
- *    reduced-motion); hovering a slice lifts it out, the others stay solid.
+ *  • One barely noticeable ambient revolution of the ring (40 min per lap,
+ *    off with reduced-motion); hovering a slice lifts it out, the others stay solid.
  *  • Slice colours are bound to the slice's own name (stable gradient ids),
  *    never to its array position.
  */
@@ -225,9 +252,9 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
   if (chartData.length === 0) {
     return (
       <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col" aria-busy="true">
-        <div className="min-h-[300px] w-full flex-1" style={{ minHeight: 300 }}>
+        <div className="min-h-[320px] w-full flex-1" style={{ minHeight: 320 }}>
           <div className="flex h-full w-full items-center justify-center">
-          <div className="relative aspect-square w-full max-w-[520px]" style={{ aspectRatio: "1 / 1" }}>
+          <div className="relative aspect-square w-full max-w-[560px]" style={{ aspectRatio: "1 / 1" }}>
             <svg viewBox="0 0 400 400" className="h-full w-full" aria-hidden="true">
               <circle
                 cx="200"
@@ -275,11 +302,11 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
     <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
       {/* The donut stays centered in the available chart stage. Its KPI row
           follows underneath with the same spacing used by Trip Movement. */}
-      <div className="min-h-[300px] w-full flex-1" style={{ minHeight: 300 }}>
+      <div className="min-h-[320px] w-full flex-1" style={{ minHeight: 320 }}>
         <div className="flex h-full w-full items-center justify-center">
           <div
             key={signature}
-            className="relative aspect-square max-h-full w-full max-w-[520px] animate-fade-in"
+            className="relative aspect-square max-h-full w-full max-w-[560px] animate-fade-in"
             style={{ aspectRatio: "1 / 1" }}
           >
           {/* Soft background track behind the enlarged ring (82–123 band).
@@ -328,6 +355,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
                     <Cell key={d.gid} fill={`url(#cs-grad-${d.gid})`} />
                   ))}
                 </Pie>
+                <Tooltip content={<CollectionTooltip />} cursor={false} />
               </PieChart>
               </ResponsiveContainer>
             </div>
