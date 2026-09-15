@@ -1,5 +1,7 @@
 // src/modules/accounts/components/common/Pagination.tsx
 
+import { useI18n } from "../../../../i18n";
+
 import {
   paginationBarClass,
   paginationNavBtnClass,
@@ -24,6 +26,8 @@ export function Pagination({
   onPageChange,
   className = "",
 }: PaginationProps) {
+  const { t } = useI18n();
+
   if (!shouldShowPagination(totalItems)) return null;
 
   const startItem = (currentPage - 1) * itemsPerPage + 1;
@@ -55,8 +59,9 @@ export function Pagination({
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
         className={paginationNavBtnClass}
+        aria-label={t("common.previous_page")}
       >
-        Previous
+        {t("common.previous")}
       </button>
 
       {getPageNumbers().map((page, idx) =>
@@ -81,8 +86,9 @@ export function Pagination({
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
         className={paginationNavBtnClass}
+        aria-label={t("common.next_page")}
       >
-        Next
+        {t("common.next")}
       </button>
     </div>
   );

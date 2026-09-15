@@ -1,6 +1,6 @@
 // src/modules/staff/components/leave/LeaveFilters.tsx
 
-import { memo, useState, useRef, useEffect, useCallback } from 'react';
+import { memo, useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import {
   Search,
   UsersRound,
@@ -245,20 +245,36 @@ function LeaveFilters({
   onDeleteSelected,
 }: LeaveFiltersProps) {
   const { t, language } = useI18n();
-  const departmentOptions = departments.map((d) => ({ value: d, label: departmentLabel(t, d) }));
+
+  /* The three option lists are memoized because this component re-renders on
+     every keystroke in the search box: rebuilding 150 employee labels (each an
+     i18n lookup per name word) per character was the page's one real stall.
+     They only change when the source data or the language does. */
+  const departmentOptions = useMemo(
+    () => departments.map((d) => ({ value: d, label: departmentLabel(t, d) })),
+    [departments, t]
+  );
 
   // Alphabetical from the first word, so the dropdown reads A → Z.
-  const employeeOptions = [...employees]
-    .sort((a, b) => a.employeeName.localeCompare(b.employeeName, undefined, { numeric: true }))
-    .map((e) => ({
-      value: String(e.id),
-      label: personNameLabel(t, language, e.employeeName),
-    }));
+  const employeeOptions = useMemo(
+    () =>
+      [...employees]
+        .sort((a, b) => a.employeeName.localeCompare(b.employeeName, undefined, { numeric: true }))
+        .map((e) => ({
+          value: String(e.id),
+          label: personNameLabel(t, language, e.employeeName),
+        })),
+    [employees, t, language]
+  );
 
-  const leaveTypeOptions = LEAVE_TYPES.map((type) => ({
-    value: type,
-    label: leaveTypeLabel(t, type),
-  }));
+  const leaveTypeOptions = useMemo(
+    () =>
+      LEAVE_TYPES.map((type) => ({
+        value: type,
+        label: leaveTypeLabel(t, type),
+      })),
+    [t]
+  );
 
   const handleEmployeeChange = useCallback(
     (val: string) => {

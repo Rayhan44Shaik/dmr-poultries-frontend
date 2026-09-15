@@ -1,4 +1,5 @@
 import React from "react";
+import { useI18n } from "../../../../i18n";
 import { PageSizeSelect } from "../../../../shared/ui/PageSizeSelect";
 import {
   paginationBarClass,
@@ -16,6 +17,7 @@ interface Props {
 }
 
 function ShopSalesPagination({ currentPage, totalPages, onPageChange, pageSize, onPageSizeChange }: Props) {
+  const { t } = useI18n();
 
   // Build a window of up to 10 pages around the current page
   const getPageNumbers = () => {
@@ -41,7 +43,7 @@ function ShopSalesPagination({ currentPage, totalPages, onPageChange, pageSize, 
     <div className={paginationBarClass}>
       {onPageSizeChange && pageSize != null && (
         <div className="mr-auto flex items-center gap-2">
-          <span className="text-[13px] font-semibold text-slate-600">Rows Per Page</span>
+          <span className="text-[13px] font-semibold text-slate-600">{t("common.rows_per_page")}</span>
           <PageSizeSelect value={pageSize} onChange={onPageSizeChange} />
         </div>
       )}
@@ -50,8 +52,9 @@ function ShopSalesPagination({ currentPage, totalPages, onPageChange, pageSize, 
         disabled={currentPage === 1}
         onClick={() => onPageChange(currentPage - 1)}
         className={paginationNavBtnClass}
+        aria-label={t("common.previous_page")}
       >
-        Previous
+        {t("common.previous")}
       </button>
 
       {showFirstEllipsis && (
@@ -88,8 +91,9 @@ function ShopSalesPagination({ currentPage, totalPages, onPageChange, pageSize, 
         disabled={currentPage === totalPages}
         onClick={() => onPageChange(currentPage + 1)}
         className={paginationNavBtnClass}
+        aria-label={t("common.next_page")}
       >
-        Next
+        {t("common.next")}
       </button>
     </div>
   );

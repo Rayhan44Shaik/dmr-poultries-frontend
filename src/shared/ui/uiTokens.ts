@@ -560,7 +560,7 @@ export const uiPaginationSummaryClass =
 export const uiPaginationNavButtonClass = [
   controlHeight.sm,
   "inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white",
-  "px-2.5 text-xs font-semibold text-slate-700",
+  "px-2.5 text-xs font-semibold text-slate-700 whitespace-nowrap",
   uiTransition,
   "transition-[color,background-color,border-color,box-shadow,transform] duration-150 ease-out",
   "hover:-translate-y-px hover:bg-slate-50 hover:border-slate-300 hover:shadow-sm active:translate-y-0 active:scale-[0.98]",

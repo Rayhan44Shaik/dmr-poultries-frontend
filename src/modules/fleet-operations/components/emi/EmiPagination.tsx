@@ -15,7 +15,7 @@ import {
  * instead of the global focus ring, and its own 32px button metrics. It now
  * renders from the same tokens as every other pager in the ERP.
  */
-const navButtonClass = `${uiPaginationNavButtonClass} w-8 sm:w-auto`;
+const navButtonClass = uiPaginationNavButtonClass;
 
 interface Props {
   page: number;
@@ -59,9 +59,9 @@ function EmiPagination({ page, totalPages, totalItems, pageSize, ready, onChange
       </div>
       )}
       <nav aria-label={t('fleet.emi.pagination_label')} className="flex items-center justify-end gap-1.5">
-        <button type="button" aria-label={t('common.previous')} disabled={!canNavigate || currentPage === 1} onClick={() => choosePage(currentPage - 1)} className={navButtonClass}>
-          <ChevronLeft size={14} aria-hidden="true" className="sm:hidden" />
-          <span className="hidden sm:inline">{t('common.previous')}</span>
+        <button type="button" aria-label={t('common.previous_page')} disabled={!canNavigate || currentPage === 1} onClick={() => choosePage(currentPage - 1)} className={navButtonClass}>
+          <ChevronLeft size={14} aria-hidden="true" />
+          <span>{t('common.previous')}</span>
         </button>
         {pages.map((number) => {
           const selected = canNavigate && currentPage === number;
@@ -80,9 +80,9 @@ function EmiPagination({ page, totalPages, totalItems, pageSize, ready, onChange
             </button>
           );
         })}
-        <button type="button" aria-label={t('common.next')} disabled={!canNavigate || currentPage === pageCount} onClick={() => choosePage(currentPage + 1)} className={navButtonClass}>
-          <ChevronRight size={14} aria-hidden="true" className="sm:hidden" />
-          <span className="hidden sm:inline">{t('common.next')}</span>
+        <button type="button" aria-label={t('common.next_page')} disabled={!canNavigate || currentPage === pageCount} onClick={() => choosePage(currentPage + 1)} className={navButtonClass}>
+          <ChevronRight size={14} aria-hidden="true" />
+          <span>{t('common.next')}</span>
         </button>
       </nav>
     </div>

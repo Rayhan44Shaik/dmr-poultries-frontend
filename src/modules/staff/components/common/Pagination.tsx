@@ -51,6 +51,10 @@ interface PaginationProps {
  *     users get a Telugu summary.
  *   • VISUAL — 36px `h-9 w-9` buttons with `text-sm` replaced by the shared
  *     32px compact pager tokens, matching every other pager in the ERP.
+ *   • CLARITY — Previous / Next used to be bare chevrons, so the pager read as
+ *     `‹ 1 2 ›` and the way out of page 1 was easy to miss. They now carry their
+ *     names at every width (the other pagers in the app do the same), while the
+ *     accessible names stay the longer "Previous page" / "Next page".
  *
  * The hide threshold now comes from the shared `shouldShowPagination` (fewer than
  * 10 records) instead of a local `totalPages <= 1`, so short result sets behave
@@ -107,6 +111,7 @@ const Pagination: React.FC<PaginationProps> = ({
           aria-label={t('common.previous_page')}
         >
           <ChevronLeft size={16} aria-hidden="true" />
+          <span>{t('common.previous')}</span>
         </button>
         {pageWindow(safePage, safeTotal).map((page, idx) =>
           page === null ? (
@@ -138,6 +143,7 @@ const Pagination: React.FC<PaginationProps> = ({
           className={paginationNavBtnClass}
           aria-label={t('common.next_page')}
         >
+          <span>{t('common.next')}</span>
           <ChevronRight size={16} aria-hidden="true" />
         </button>
       </nav>

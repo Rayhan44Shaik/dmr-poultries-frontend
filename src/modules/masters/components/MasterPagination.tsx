@@ -119,9 +119,10 @@ export default function MasterPagination({
           onClick={() => goTo(page - 1)}
           disabled={disabled || page <= 1}
           className={uiPaginationNavButtonClass}
+          aria-label={t("common.previous_page")}
         >
           <ChevronLeft aria-hidden="true" />
-          <span className="hidden sm:inline">{t("common.previous")}</span>
+          <span>{t("common.previous")}</span>
         </button>
         {pages.map((number) => (
           <button
@@ -146,8 +147,9 @@ export default function MasterPagination({
           onClick={() => goTo(page + 1)}
           disabled={disabled || page >= totalPages}
           className={uiPaginationNavButtonClass}
+          aria-label={t("common.next_page")}
         >
-          <span className="hidden sm:inline">{t("common.next")}</span>
+          <span>{t("common.next")}</span>
           <ChevronRight aria-hidden="true" />
         </button>
       </nav>
