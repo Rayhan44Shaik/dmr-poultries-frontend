@@ -3,10 +3,13 @@
 // Salary Register — standardised on the GLOBAL UI kit so the page shares the
 // exact same typography, control chrome and rhythm as every other module:
 //
-//   • Filter bar   → `uiFilterBarClass` surface + the shared `MasterDropdown`
-//                    (the app-wide dropdown: 36px control, 12px corners,
-//                    keyboard nav, portalled menu) + the global `SearchInput`
-//                    (40px, 13px type, leading icon, clear button).
+//   • Filter bar   → the Trip List filter treatment (`opsFilterCardClass` +
+//                    icon-led `opsFilterLabelClass` labels + the shared
+//                    `MasterDropdown`), with the same action row: animated
+//                    Reset, the DMR hen `BrandRefreshButton`, and the page's
+//                    primary action (Review and Submit) — a 1:1 match with
+//                    Operations → Trip List so every filter section in the
+//                    app reads identically.
 //   • Buttons      → the global `Button` system (one height/radius/font scale).
 //   • Month status → `uiBadgeClass` tones — the one badge system project-wide.
 //   • Confirm      → the global `ConfirmDialog` (replaces the local modal).
@@ -19,22 +22,32 @@ import { todayBusinessDate } from "../../../utils/businessDate";
 import { loadEmployees } from "../../masters/employees/services/employeeService";
 import { getSalaryMonthSummary, downloadPayslipPdf, updateSalary, emailSalaryPayslips, whatsappSalaryPayslips, bulkUpdateSalaryStatus } from "../services/salaryService";
 import {
+  ArrowUpDown,
+  Building2,
   Calendar,
   ChevronLeft,
   ChevronRight,
   Clock,
   LayoutGrid,
-  RefreshCw,
+  ListFilter,
   CheckCircle,
   ClipboardCheck,
   Plus,
   FileText,
   Lock,
-  FilterX,
+  RotateCcw,
+  Search,
+  UserRound,
 } from "lucide-react";
-import { Button, ConfirmDialog, EmptyState, SearchInput } from "../../../ui";
+import { BrandRefreshButton, Button, ConfirmDialog, EmptyState } from "../../../ui";
 import MasterDropdown from "../../masters/components/MasterDropdown";
-import { uiBadgeClass, uiFilterBarClass, type StatusTone } from "../../../shared/ui/uiTokens";
+import { uiBadgeClass, type StatusTone } from "../../../shared/ui/uiTokens";
+import {
+  opsFilterCardClass,
+  opsFilterLabelClass,
+  opsInputClass,
+  opsSecondaryButtonClass,
+} from "../../../shared/ui/operationsStyles";
 import TableLoading from "../components/common/TableLoading";
 import { useI18n } from "../../../i18n";
 import { SalaryTable } from "../components/salary/salaryTable";
@@ -58,11 +71,6 @@ const formatCurrency = (amount: number) =>
     currency: "INR",
     minimumFractionDigits: 2,
   }).format(amount || 0);
-
-/** Filter micro-label — identical to `MasterDropdown`'s own filter label so
- *  every label in one filter row renders on the same type scale. */
-const filterLabelClass =
-  "mb-1 block text-xs font-semibold uppercase tracking-wider text-slate-500";
 
 const MONTHS = [
   { name: "Jan", value: "01" },
@@ -481,8 +489,7 @@ function SalaryRegisterPage() {
     if (monthSummary.employees === 0) return { label: "Draft", tone: "neutral" as StatusTone };
     if (monthSummary.paid === monthSummary.employees) return { label: "Paid", tone: "success" as StatusTone };
     if (monthSummary.paid > 0) return { label: "Partially Paid", tone: "warning" as StatusTone };
-    if (monthSummary.submitted > 0 && monthSummary.pending === 0) return { label: "Submitted", tone: "info" as StatusTone };
-    if (monthSummary.submitted > 0) return { label: "Partially Submitted", tone: "info" as StatusTone };
+    if (monthSummary.submitted > 0) return { label: "Submitted", tone: "info" as StatusTone };
     return { label: "Pending", tone: "warning" as StatusTone };
   }, [monthSummary]);
 
@@ -508,7 +515,7 @@ function SalaryRegisterPage() {
       type="button"
       onClick={() => handleFilterChange(key)}
       aria-pressed={filter === key}
-      className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-semibold transition whitespace-nowrap ${
+      className={`flex flex-1 items-center justify-center gap-1 px-2.5 py-1 h-full rounded-md text-xs font-semibold transition whitespace-nowrap ${
         filter === key
           ? "bg-white text-brand-700 shadow-sm border border-slate-200/60"
           : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
@@ -549,11 +556,17 @@ function SalaryRegisterPage() {
         </div>
       </div>
 
-      {/* Filter bar — the global filter-bar surface + shared dropdown/search */}
-      <div className={`${uiFilterBarClass} space-y-3 overflow-visible relative z-10`}>
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="relative w-full sm:w-44" ref={monthPickerRef}>
-            <label className={filterLabelClass}>Month</label>
+      {/* Filter bar — the Trip List filter treatment: `opsFilterCardClass`
+          surface, icon-led `opsFilterLabelClass` labels, shared dropdowns,
+          then a Sort / Search / actions row with the animated Reset and the
+          DMR hen refresh — a 1:1 match with Operations → Trip List. */}
+      <div className={`${opsFilterCardClass} overflow-visible relative z-10`}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          <div className="relative" ref={monthPickerRef}>
+            <label className={opsFilterLabelClass}>
+              <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
+              <span>Month</span>
+            </label>
             <button
               type="button"
               onClick={() => {
@@ -564,10 +577,10 @@ function SalaryRegisterPage() {
               aria-haspopup="dialog"
               aria-expanded={isMonthPickerOpen}
               aria-label={`Select month, currently ${formatMonthName(month)}`}
-              className="flex h-9 w-full items-center justify-between gap-2 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-700 outline-none transition hover:border-slate-300 focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20"
+              className={`${opsInputClass} flex items-center justify-between gap-2 text-left`}
             >
               <span>{formatMonthName(month)}</span>
-              <Calendar size={14} className="text-blue-500" />
+              <Calendar size={15} className="text-emerald-500 flex-shrink-0" />
             </button>
 
             {isMonthPickerOpen && (
@@ -598,7 +611,7 @@ function SalaryRegisterPage() {
                         }}
                         className={`py-2.5 rounded-xl text-xs font-semibold transition ${
                           isSelected
-                            ? "bg-blue-600 text-white shadow-sm"
+                            ? "bg-emerald-600 text-white shadow-sm"
                             : "bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-100"
                         }`}
                       >
@@ -616,7 +629,7 @@ function SalaryRegisterPage() {
                       setPickerYear(Number(cur.split("-")[0]));
                       setIsMonthPickerOpen(false);
                     }}
-                    className="text-blue-600 font-semibold hover:underline"
+                    className="text-emerald-600 font-semibold hover:underline"
                   >
                     This Month
                   </button>
@@ -628,93 +641,125 @@ function SalaryRegisterPage() {
             )}
           </div>
 
-          <MasterDropdown
-            label="Department"
-            value={department}
-            placeholder="All Departments"
-            options={departments}
-            onChange={handleDepartmentChange}
-            allowClear
-            disabled={loading}
-            className="w-full sm:w-56"
-          />
-
-          <MasterDropdown
-            label="Employee"
-            value={employeeName}
-            placeholder="All Employees"
-            options={employeeNames}
-            onChange={handleEmployeeNameChange}
-            searchable
-            allowClear
-            disabled={loading}
-            className="w-full sm:w-56"
-          />
+          <div>
+            <label className={opsFilterLabelClass}>
+              <Building2 size={17} className="text-emerald-500 flex-shrink-0" />
+              <span>Department</span>
+            </label>
+            <MasterDropdown
+              hideLabel
+              label="Department"
+              value={department}
+              placeholder="All Departments"
+              options={departments}
+              onChange={handleDepartmentChange}
+              allowClear
+              disabled={loading}
+              className="w-full"
+            />
+          </div>
 
           <div>
-            <span className={filterLabelClass}>Status</span>
+            <label className={opsFilterLabelClass}>
+              <UserRound size={17} className="text-emerald-500 flex-shrink-0" />
+              <span>Employee</span>
+            </label>
+            <MasterDropdown
+              hideLabel
+              label="Employee"
+              value={employeeName}
+              placeholder="All Employees"
+              options={employeeNames}
+              onChange={handleEmployeeNameChange}
+              searchable
+              allowClear
+              disabled={loading}
+              className="w-full"
+            />
+          </div>
+
+          <div>
+            <label className={opsFilterLabelClass}>
+              <ListFilter size={17} className="text-amber-500 flex-shrink-0" />
+              <span>Status</span>
+            </label>
             <div
               role="group"
               aria-label="Filter by status"
-              className="inline-flex bg-slate-100/80 p-1 rounded-xl border border-slate-200/60 h-9 items-center"
+              className="inline-flex h-10 w-full items-center bg-slate-100/80 p-1 rounded-lg border border-slate-200/60"
             >
               {statusTab("All", "All", <LayoutGrid size={12} className="text-slate-400" />)}
               {statusTab("Pending", "Pending", <Clock size={12} className="text-slate-400" />)}
               {statusTab("Paid", "Paid", <CheckCircle size={12} className="text-slate-400" />)}
             </div>
           </div>
-
-          <MasterDropdown
-            label="Sort by"
-            value={sortKey}
-            placeholder="Name A–Z"
-            searchable
-            allowClear={false}
-            options={[
-              { value: "name-asc", label: "Name A–Z" },
-              { value: "name-desc", label: "Name Z–A" },
-              { value: "status-pending-first", label: "Status: Pending first" },
-              { value: "status-paid-first", label: "Status: Paid first" },
-              { value: "salary-asc", label: "Salary: Low to High" },
-              { value: "salary-desc", label: "Salary: High to Low" },
-              { value: "deduction-asc", label: "Deductions: Low to High" },
-              { value: "deduction-desc", label: "Deductions: High to Low" },
-              { value: "working-asc", label: "Working days: Low to High" },
-              { value: "working-desc", label: "Working days: High to Low" },
-              { value: "leave-asc", label: "Leaves: Low to High" },
-              { value: "leave-desc", label: "Leaves: High to Low" },
-            ]}
-            onChange={(value) => {
-              setSortKey(value as typeof sortKey);
-              setCurrentPage(1);
-            }}
-            className="w-full sm:w-56"
-          />
         </div>
 
-        <div className="flex flex-wrap items-end gap-3">
-          <div className="flex-1 min-w-[200px] max-w-sm">
-            <label htmlFor="salary-register-search" className={filterLabelClass}>
-              Search Employee
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-end pt-1">
+          <div className="lg:col-span-3">
+            <label className={opsFilterLabelClass}>
+              <ArrowUpDown size={17} className="text-violet-500 flex-shrink-0" />
+              <span>Sort By</span>
             </label>
-            <SearchInput
-              id="salary-register-search"
-              value={searchQuery}
-              onChange={handleSearchChange}
-              placeholder="Search by employee name..."
-              disabled={loading}
+            <MasterDropdown
+              hideLabel
+              label="Sort By"
+              value={sortKey}
+              placeholder="Name A–Z"
+              searchable
+              allowClear={false}
+              options={[
+                { value: "name-asc", label: "Name — A to Z" },
+                { value: "name-desc", label: "Name — Z to A" },
+                { value: "status-pending-first", label: "Status — Pending first" },
+                { value: "status-paid-first", label: "Status — Paid first" },
+                { value: "salary-asc", label: "Salary — Low to high" },
+                { value: "salary-desc", label: "Salary — High to low" },
+                { value: "deduction-asc", label: "Deductions — Low to high" },
+                { value: "deduction-desc", label: "Deductions — High to low" },
+                { value: "working-asc", label: "Working days — Low to high" },
+                { value: "working-desc", label: "Working days — High to low" },
+                { value: "leave-asc", label: "Leaves — Low to high" },
+                { value: "leave-desc", label: "Leaves — High to low" },
+              ]}
+              onChange={(value) => {
+                setSortKey(value as typeof sortKey);
+                setCurrentPage(1);
+              }}
+              className="w-full"
             />
           </div>
-          <div className="ml-auto flex items-end gap-2">
-            <Button
-              variant="secondary"
-              size="md"
+
+          <div className="lg:col-span-4">
+            <label htmlFor="salary-register-search" className={opsFilterLabelClass}>
+              <Search size={17} className="text-slate-400 flex-shrink-0" />
+              <span>Search</span>
+            </label>
+            <div className="relative">
+              <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                id="salary-register-search"
+                value={searchQuery}
+                onChange={(event) => handleSearchChange(event.target.value)}
+                placeholder="Search by employee name..."
+                disabled={loading}
+                className={`${opsInputClass} pl-10`}
+              />
+            </div>
+          </div>
+
+          <div className="lg:col-span-5 flex items-center gap-2 justify-end flex-wrap">
+            <button
+              type="button"
               onClick={handleClearFilters}
               disabled={loading}
-              icon={<FilterX size={14} />}
+              className={`group relative ${opsSecondaryButtonClass}`}
+              aria-label={t("common.reset")}
             >
-              Clear
-            </Button>
+              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>
+              {t("common.reset")}
+            </button>
+            <BrandRefreshButton onClick={handleRefresh} loading={refreshing} disabled={saving} />
             <Button
               variant="success"
               size="md"
@@ -724,15 +769,6 @@ function SalaryRegisterPage() {
             >
               Review and Submit
             </Button>
-            <Button
-              variant="secondary"
-              size="md"
-              iconOnly
-              onClick={handleRefresh}
-              disabled={refreshing || saving}
-              aria-label="Refresh"
-              icon={<RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />}
-            />
           </div>
         </div>
       </div>
