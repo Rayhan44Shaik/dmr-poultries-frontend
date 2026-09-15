@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Cell, Pie, PieChart, ResponsiveContainer, Sector, Tooltip, type PieSectorShapeProps } from "recharts";
+import { Cell, Pie, PieChart, ResponsiveContainer, Sector, type PieSectorShapeProps } from "recharts";
 import { useI18n } from "../../../../i18n";
-import { formatINR, formatINRCompact } from "../../../../utils/format";
+import { formatINRCompact } from "../../../../utils/format";
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 /** Lighten a hex colour toward white (for the slice gradient top stop). */
@@ -49,38 +49,16 @@ function useCountUp(target: number, duration = 900): number {
   return value;
 }
 
-interface ModeTooltipProps {
-  active?: boolean;
-  payload?: Array<{ name?: string; value?: number; payload?: EnrichedMode }>;
-}
-
-/** Floating detail chip: mode, exact amount and share of the total. */
-function ModeTooltip({ active, payload }: ModeTooltipProps) {
-  if (!active || !payload?.length) return null;
-  const row = payload[0];
-  const value = Number(row.value ?? 0);
-  const percent = row.payload?.percent ?? 0;
-  const color = row.payload?.color ?? COLORS[0];
-  return (
-    <div className="rounded-lg bg-slate-900/95 px-3 py-2 text-xs text-white shadow-xl backdrop-blur-sm">
-      <div className="flex items-center gap-1.5 font-bold">
-        <span className="h-2 w-2 rounded-full" style={{ background: color }} />
-        {row.name}
-      </div>
-      <div className="mt-0.5 text-[13px] font-black tabular-nums">{formatINR(value)}</div>
-      <div className="tabular-nums text-slate-300">{percent.toFixed(1)}% of total</div>
-    </div>
-  );
-}
-
 /**
  * Collection Streams — payment-mode donut for the Operations dashboard.
  *
  * A fixed 240 px square stage keeps the ring a perfect circle at every window
  * size, with generous white space on all sides. Slices sweep in on mount /
- * range change, lift and dim on hover, carry their own % label, sit on a soft
- * background track, and the legend below lists every mode with exact amount
- * and share. The card title links to the Collection Report.
+ * range change, and on hover a % badge springs in right at that slice's own
+ * mid-angle (while it lifts and the rest dim). Every slice keeps a quiet
+ * rounded % label, sits on a soft background track, and the legend below
+ * lists every mode with exact amount and share. The card title links to the
+ * Collection Report.
  */
 export default function CollectionsPie({ data }: CollectionsPieProps) {
   const { t } = useI18n();
@@ -140,20 +118,43 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
             cornerRadius={6}
             fill={`url(#cs-grad-${index})`}
           />
-          {showLabel && (
-            <text
-              x={lx}
-              y={ly}
-              textAnchor="middle"
-              dominantBaseline="central"
-              fontSize={11}
-              fontWeight={700}
-              fill="#ffffff"
-              style={{ pointerEvents: "none" }}
-            >
-              {mode!.percent.toFixed(0)}%
-            </text>
-          )}
+          {showLabel &&
+            (isActive ? (
+              /* Pop badge — springs in right on the hovered slice's own spot
+                 (its mid-angle), showing the exact share. */
+              <g transform={`translate(${lx}, ${ly})`} style={{ pointerEvents: "none" }}>
+                <g
+                  className="animate-pop-in"
+                  style={{ transformBox: "fill-box", transformOrigin: "center" }}
+                >
+                  <rect x={-27} y={-12.5} width={54} height={25} rx={12.5} fill="rgba(15, 23, 42, 0.92)" />
+                  <text
+                    x={0}
+                    y={0.5}
+                    textAnchor="middle"
+                    dominantBaseline="central"
+                    fontSize={11.5}
+                    fontWeight={800}
+                    fill="#ffffff"
+                  >
+                    {mode!.percent.toFixed(1)}%
+                  </text>
+                </g>
+              </g>
+            ) : (
+              <text
+                x={lx}
+                y={ly}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={11}
+                fontWeight={700}
+                fill="#ffffff"
+                style={{ pointerEvents: "none" }}
+              >
+                {mode!.percent.toFixed(0)}%
+              </text>
+            ))}
         </g>
       );
     },
@@ -209,7 +210,6 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
                     <Cell key={d.name} fill={d.color} />
                   ))}
                 </Pie>
-                <Tooltip content={<ModeTooltip />} />
               </PieChart>
             </ResponsiveContainer>
           </div>
