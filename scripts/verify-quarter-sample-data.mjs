@@ -487,6 +487,108 @@ async function run() {
   assert.equal(round(oneShop.openingBalance), round(carryShop.openingBalance));
   assert.equal(oneShop.previousWeekEnd, carryShop.previousWeekEnd);
 
+  // ── Staff module — every page reads the same books ────────────────────────
+  const currentMonth = today.slice(0, 7);
+  const employees = await request("/masters/employees");
+  const activeEmployees = employees.filter((e) => e.status === "Active");
+
+  // Duty Planner: the week grid covers Mon–Sun and rosters the active staff.
+  const mondayOf = (iso) => {
+    const d = new Date(`${iso}T00:00:00Z`);
+    d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7));
+    return d.toISOString().slice(0, 10);
+  };
+  const week = await request(`/staff/duty-planner?weekStart=${mondayOf(today)}`);
+  assert.equal(week.days.length, 7, "duty week must render Monday through Sunday");
+  assert.equal(week.employees.length, activeEmployees.length, "duty roster must list every active employee");
+  assert.ok(week.assignments.length > 0 && week.saturday && week.validation, "duty week must ship assignments, Saturday panel and validation");
+  assert.ok(
+    week.assignments.every((a) => a.id && a.employeeId && a.date && a.dutyType),
+    "every duty assignment must satisfy the planner's mapper contract",
+  );
+
+  // Salary Register ↔ Duty/Attendance ↔ Leaves: one attendance rule everywhere.
+  const salaries = await request(`/staff/salaries?month=${currentMonth}`);
+  assert.ok(salaries.length >= activeEmployees.length, "current month register must cover the active staff");
+  assert.ok(
+    salaries.every(
+      (s) =>
+        s.id && s.employeeId && Number.isFinite(s.totalGross) && Number.isFinite(s.netSalary) &&
+        Number.isFinite(s.workingDays) && Number.isFinite(s.presentDays) &&
+        Number.isFinite(s.leaveDays) && Number.isFinite(s.emailsSent ?? 0),
+    ),
+    "every salary row must satisfy the register's mapper contract",
+  );
+  const attendance = new Map(
+    (await request(`/staff/attendance/summary?month=${currentMonth}`)).rows.map((r) => [r.employeeId, r]),
+  );
+  for (const s of salaries) {
+    const a = attendance.get(s.employeeId);
+    if (!a) continue; // attendance covers active staff; inactive history stays frozen
+    for (const key of ["workingDays", "presentDays", "leaveDays", "weeklyOffDays"]) {
+      assert.equal(s[key], a[key], `salary ${s.employeeId} ${key} must match the attendance summary`);
+    }
+  }
+  const leaveReport = await request(`/staff/leaves/report?month=${currentMonth}`);
+  for (const item of leaveReport.items) {
+    const s = salaries.find((row) => row.employeeId === item.employeeId);
+    if (!s) continue;
+    assert.equal(s.leaveDays, item.approvedLeaveDays, `salary leaveDays must equal the leave report for employee ${item.employeeId}`);
+  }
+  const monthSummary = await request(`/staff/salaries/month-summary?month=${currentMonth}`);
+  assert.equal(monthSummary.employees, salaries.length);
+  assert.equal(
+    monthSummary.pending + monthSummary.submitted + monthSummary.paid,
+    salaries.length,
+    "month lifecycle counts must partition the register",
+  );
+
+  // Live hand-off: approving a leave re-derives the open month's salary row
+  // and the attendance summary together; rejecting it restores both.
+  const pendingSalary = salaries.find((s) => s.status === "Pending" && s.leaveDays === 0 && attendance.has(s.employeeId));
+  assert.ok(pendingSalary, "expected a Pending salary row without leave for the hand-off check");
+  const leaveDay = `${currentMonth}-08`;
+  const createdLeave = await request("/staff/leaves", {
+    method: "POST",
+    body: JSON.stringify({ employeeId: pendingSalary.employeeId, type: "Sick", fromDate: leaveDay, toDate: leaveDay, days: 1, reason: "verify" }),
+  });
+  assert.equal(createdLeave.status, "Pending", "a new leave request must start Pending");
+  await request(`/staff/leaves/${createdLeave.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "Approved" }) });
+  const afterApprove = (await request(`/staff/salaries?month=${currentMonth}`)).find((s) => s.id === pendingSalary.id);
+  assert.equal(afterApprove.leaveDays, 1, "an approved leave must appear on the salary row");
+  assert.equal(afterApprove.presentDays, pendingSalary.presentDays - 1, "present days must drop with the approved leave");
+  await request(`/staff/leaves/${createdLeave.id}/status`, { method: "PATCH", body: JSON.stringify({ status: "Rejected", rejectionReason: "verify" }) });
+  const afterReject = (await request(`/staff/salaries?month=${currentMonth}`)).find((s) => s.id === pendingSalary.id);
+  assert.equal(afterReject.leaveDays, 0, "rejecting the leave must restore the salary row");
+  assert.equal(afterReject.netSalary, pendingSalary.netSalary, "net pay must return to its pre-leave figure");
+
+  // Payslip Email / WhatsApp queues update the per-row delivery counters.
+  const mailTarget = (await request(`/staff/salaries?month=${currentMonth}`)).find((s) => s.status !== "Pending");
+  assert.ok(mailTarget, "expected a submitted/paid salary row for the payslip dispatch check");
+  const beforeMail = { email: mailTarget.emailsSent ?? 0, whatsapp: mailTarget.whatsappsSent ?? 0 };
+  const emailResult = await request("/staff/salaries/email", { method: "POST", body: JSON.stringify({ ids: [mailTarget.id], language: "en" }) });
+  assert.equal(emailResult.sent, 1);
+  const whatsappResult = await request("/staff/salaries/whatsapp", { method: "POST", body: JSON.stringify({ ids: [mailTarget.id], language: "en" }) });
+  assert.equal(whatsappResult.sent, 1);
+  const afterMail = (await request(`/staff/salaries?month=${currentMonth}`)).find((s) => s.id === mailTarget.id);
+  assert.equal(afterMail.emailsSent, beforeMail.email + 1, "a queued payslip email must increment the row's emailsSent");
+  assert.equal(afterMail.whatsappsSent, beforeMail.whatsapp + 1, "a queued payslip WhatsApp must increment the row's whatsappsSent");
+
+  // Driver / Supervisor Performance aggregate the very same trips.
+  const drivers = await request(`/staff/performance/drivers?fromDate=${manifest.quarter.fromDate}&toDate=${manifest.quarter.toDate}`);
+  assert.equal(
+    sum(drivers.rows, "trips"),
+    drivers.kpis.trips,
+    "driver performance rows must sum to the KPI trip count",
+  );
+  assert.ok(drivers.weekly.length > 0 && drivers.rows.length > 0);
+  const supervisors = await request(`/staff/performance/supervisors?fromDate=${manifest.quarter.fromDate}&toDate=${manifest.quarter.toDate}`);
+  assert.equal(sum(supervisors.rows, "trips"), supervisors.kpis.trips);
+  const detail = await request(
+    `/staff/performance/drivers?fromDate=${manifest.quarter.fromDate}&toDate=${manifest.quarter.toDate}&driverId=${drivers.rows[0].driverId}`,
+  );
+  assert.ok(detail.detail && Array.isArray(detail.detail.vehicles) && Array.isArray(detail.detail.recentTrips), "the drawer detail must carry vehicles and recent trips");
+
   console.log(`✓ Quarter data sync verified: ${calls.length} API checks passed.`);
   console.log(`  ${manifest.quarter.label} · ${manifest.shops} shops · ${manifest.trips} trips · ${manifest.deliveries} deliveries`);
 }

@@ -94,6 +94,11 @@ function mapSalary(raw: Record<string, unknown>): SalaryRecord {
       raw.correctionWindowDaysRemaining == null
         ? null
         : num(raw.correctionWindowDaysRemaining),
+    // Payslip delivery counters — pass through when the backend supplies them
+    // (the quarter sample API and the payslip email/WhatsApp queue do); the
+    // table renders `?? 0`, so absent values keep rendering exactly as before.
+    emailsSent: maybeNum(raw.emailsSent ?? raw.emails_sent),
+    whatsappsSent: maybeNum(raw.whatsappsSent ?? raw.whatsapps_sent),
   };
 }
 

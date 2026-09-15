@@ -20,12 +20,13 @@ npm run verify:quarter-data
 ```
 
 The command starts a separate in-memory sample API on port `4301`, runs the
-contract and reconciliation audit, then stops it. It never changes the API used
-by `npm run dev`. Set `SAMPLE_VERIFY_PORT` if that port is unavailable.
+contract and reconciliation audit (93 checks), then stops it. It never changes
+the API used by `npm run dev`. Set `SAMPLE_VERIFY_PORT` if that port is
+unavailable.
 
 The audit checks the dashboard/manifest quarter, canonical Shop Sales fields,
-weekly Collection Entry and Pending Collections summaries, and the live
-Operations hand-offs below:
+weekly Collection Entry and Pending Collections summaries, the Staff module
+sync (see below), and the live Operations hand-offs below:
 
 - **Collection:** save → approve → amend → delete updates the master balance,
   pending total, shop ledger and dashboard collections together.
@@ -35,6 +36,31 @@ Operations hand-offs below:
   and removes that trip from the rate-entry queue.
 - **Fuel:** a pending bill affects dashboard expense only after approval and is
   removed from the totals on delete.
+- **Staff:** the current-week duty grid rosters every active employee; the
+  Salary Register's Working / Present / Leave / Weekly-Off columns equal the
+  attendance summary and the Leaves monthly report; approving a leave during
+  the session re-derives the open month's salary row (Pending money recomputes,
+  Submitted/Paid rows stay frozen) and rejecting restores it; queueing a
+  payslip Email/WhatsApp increments the row's per-channel delivery counter;
+  Driver/Supervisor Performance rows sum exactly to their KPI trip counts.
+
+### Staff-module quarter-data sync pass
+
+A dedicated sweep of the five Staff pages against the running sample API found
+three places where the dataset and the pages had drifted apart. All are data /
+pass-through fixes — no business rule, layout or validation was touched.
+
+| Where | Was | Now |
+|---|---|---|
+| `staff/services/salaryService.ts` · `mapSalary()` | The mapper dropped `emailsSent` / `whatsappsSent`, so the register's per-row Email / WhatsApp delivery indicators always rendered `0` even though the API supplied real counts | Both fields pass through (`maybeNum`, camel + snake spellings); rows without them render exactly as before (`?? 0`) |
+| `scripts/quarter-sample-data.mjs` · `/staff/salaries/email` + `/whatsapp` + `/submit-month` | The queue endpoints answered `{ sent, failed }` but never touched the rows, so a successful send disappeared on the next refresh, and unknown ids were still counted as `sent` | Each queued payslip increments the row's `emailsSent` / `whatsappsSent` (Submit & Send queues one email per newly submitted row); unknown ids are reported in `failed` |
+| `scripts/quarter-sample-data.mjs` · `/staff/salaries` (GET) + `/salaries/summary` | Salary day-counts were frozen at generation time, so a leave approved during the session updated the attendance summary and Leaves report but not the register — the three Staff pages disagreed | The open month re-derives Working / Present / Leave / Weekly-Off from the live attendance summary on every read; Pending rows also recompute the leave deduction and net (first leave day free, same rule as generation), Submitted/Paid money stays frozen per the lifecycle, and closed months are never touched |
+
+Verification (live): salary ↔ attendance ↔ leave-report tie out for all three
+months with zero mismatches; approve → reject a leave round-trips the salary
+row; performance rows sum to their KPIs; the duty grid covers Mon–Sun for all
+active staff across all 13 quarter weeks (the current + next week intentionally
+keep a few unassigned cells for the auto-assign demo).
 
 ### Initial frontend wiring fixes
 
