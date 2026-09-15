@@ -3,6 +3,8 @@ import { X, Save, Eye, Calendar, User, CreditCard, Hash, IndianRupee, FileText, 
 import type { Collection, CollectionApiEntry } from "../../types/collection";
 import { collectionService } from "../../services/collectionService";
 import { useI18n } from "../../../../../i18n";
+import AppShellModal from "../../../../../ui/AppShellModal";
+import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 import { notify as globalNotify } from "../../../../../ui/notifications/notificationStore";
 
 const formatCurrency = (amount: number) =>
@@ -224,38 +226,58 @@ export function EditCollectionModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
-      <div className="w-full max-w-2xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-        {/* Header */}
-        <div className="border-b border-slate-200 px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-600">
-                {isView ? <Eye size={20} /> : <Save size={20} />}
+    // Same shell as the Trip List view: one global panel size
+    // (max-w 96rem, max-h 100vh − header − gaps), centred against the whole
+    // page including the sidebar, with no backdrop blur.
+    <AppShellModal open={isOpen} onClose={onClose} panelClassName="bg-white">
+      <div className="bg-white w-full h-full overflow-hidden flex flex-col rounded-2xl">
+        {/* Header — matches the Trip view: gradient strip, gradient icon tile,
+          * title + status line, circular close button. */}
+        <div className="border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/80 rounded-t-2xl">
+          <div className="px-6 md:px-8 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div className="flex items-center gap-4 min-w-0 flex-1 sm:flex-none">
+              <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-400 to-teal-400 flex items-center justify-center shadow-lg shadow-emerald-400/20 text-white shrink-0">
+                {isView ? <Eye className="w-6 h-6" /> : <Save className="w-6 h-6" />}
               </div>
-              <div>
-                <h3 className="text-lg font-semibold text-slate-800">
+              <div className="min-w-0">
+                <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight truncate">
                   {isView ? t("ops.collection.view_collection") : t("ops.collection.edit_collection")}
-                </h3>
-                <p className="text-sm text-slate-500">{shopName}</p>
+                </h2>
+                <div className="flex items-center gap-2 flex-wrap mt-1.5">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500 text-white px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider shrink-0">
+                    {shopName}
+                  </span>
+                  {isView && (
+                    <span className="text-xs font-medium text-slate-400">{t("ops.collection.read_only")}</span>
+                  )}
+                </div>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              className="rounded-full p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600"
-            >
-              <X size={18} />
-            </button>
+
+            <div className="flex items-center gap-2 flex-wrap justify-end shrink-0 w-full sm:w-auto">
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label={t("common.close")}
+                className="group relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:-translate-y-0.5 hover:border-red-100 hover:bg-red-50 hover:text-red-500 active:scale-95"
+              >
+                <X size={18} className={uiActionIconMotionClass.close} />
+              </button>
+            </div>
           </div>
         </div>
 
-        {/* Body */}
-        <div className="p-6 max-h-[70vh] overflow-y-auto">
+        {/* Body — scrolls inside the panel, which is what makes the modal the
+          * same height regardless of content, exactly like the Trip view. */}
+        <div className="py-6 md:py-8 px-4 md:px-8 overflow-y-auto flex-1">
           {isView ? (
             <>
-              {/* Selected Collection Details */}
-              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4">
-                <h4 className="mb-2 text-sm font-semibold text-slate-700">{t("ops.collection.selected_details")}</h4>
+              {/* Selected Collection Details. Laid out on a responsive grid so
+                * the fields use the panel's full width instead of forming one
+                * thin column in a 96rem shell. */}
+              <div className="rounded-xl border border-slate-200 bg-slate-50/50 p-4 md:p-5">
+                <h4 className="mb-3 text-sm font-semibold text-slate-700">{t("ops.collection.selected_details")}</h4>
+                <div className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2 xl:grid-cols-3">
                 {renderField({
                   label: t("ops.collection.collection_no_label"),
                   value: formData.collectionNo || "-",
@@ -292,6 +314,7 @@ export function EditCollectionModal({
                   value: formData.remarks || "-",
                   icon: FileText,
                 })}
+                </div>
               </div>
 
               {/* Recent 10 Shop Credits — backend-sourced, newest first */}
@@ -376,8 +399,8 @@ export function EditCollectionModal({
             </>
           ) : (
             // Edit mode – unchanged
-            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
-              <div className="sm:col-span-2">
+            <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 xl:grid-cols-3">
+              <div className="sm:col-span-2 xl:col-span-3">
                 {renderField({
                   label: t("operations.collection_date"),
                   value: formData.collectionDate,
@@ -423,7 +446,7 @@ export function EditCollectionModal({
                   type: "number",
                 })}
               </div>
-              <div className="sm:col-span-2">
+              <div className="sm:col-span-2 xl:col-span-3">
                 <div>
                   <label className="mb-1 flex items-center gap-1.5 text-xs font-medium text-slate-600">
                     <FileText size={14} className="text-slate-400" />
@@ -442,34 +465,32 @@ export function EditCollectionModal({
           )}
         </div>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 border-t border-slate-100 px-6 py-4">
+        {/* Footer — same gradient bar and pill buttons as the Trip view. */}
+        <div className="px-6 md:px-8 py-5 border-t border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 flex items-center justify-end gap-3 rounded-b-2xl">
           <button
+            type="button"
             onClick={onClose}
-            className="rounded-lg border border-slate-300 px-5 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+            className="group relative inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-semibold text-xs transition-all active:scale-95"
           >
+            <span className={`inline-flex ${uiActionIconMotionClass.close}`}>
+              <X size={15} />
+            </span>
             {isView ? t("common.close") : t("common.cancel")}
           </button>
           {!isView && (
             <button
+              type="button"
               onClick={handleSave}
-              className="inline-flex items-center gap-2 rounded-lg bg-slate-800 px-5 py-2 text-sm font-medium text-white transition hover:bg-slate-700"
+              className="group relative inline-flex items-center gap-2 px-6 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs transition-all active:scale-95"
             >
-              <Save size={16} />
+              <span className="inline-flex transition-transform duration-200 group-hover:-translate-y-0.5">
+                <Save size={15} />
+              </span>
               {t("ops.collection.save_changes")}
-            </button>
-          )}
-          {isView && (
-            <button
-              disabled
-              className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-5 py-2 text-sm font-medium text-slate-500"
-            >
-              <Eye size={16} />
-              {t("ops.collection.read_only")}
             </button>
           )}
         </div>
       </div>
-    </div>
+    </AppShellModal>
   );
 }
