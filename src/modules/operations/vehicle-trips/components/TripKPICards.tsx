@@ -1,7 +1,7 @@
 import React from "react";
 import { Truck, Bird, Scale, HeartPulse, Store } from "lucide-react";
 import { useI18n } from "../../../../i18n";
-import { KpiCardGrid, type KpiCardItem } from "../../../../ui";
+import { compactKpiValue, KpiCardGrid, KpiMetricValue, type KpiCardItem } from "../../../../ui";
 
 interface Props {
   totalTrips: number;
@@ -14,14 +14,20 @@ interface Props {
 /** Filter-result summary for Trip List, rendered through the global KPI surface. */
 function TripKPICards({ totalTrips, totalBirds, totalWeight, totalMortality, totalShops }: Props) {
   const { t } = useI18n();
+  const trips = compactKpiValue(totalTrips);
+  const shops = compactKpiValue(totalShops);
+  const birds = compactKpiValue(totalBirds);
+  const weight = compactKpiValue(totalWeight, 2);
+  const mortality = compactKpiValue(totalMortality);
+
   // Keep the operational reading order consistent with the Trip List table:
   // trips → shops → birds → weight → mortality.
   const cards: KpiCardItem[] = [
-    { id: "trips", label: t("ops.trip.total_trips"), value: totalTrips.toLocaleString(), Icon: Truck, tone: "blue" },
-    { id: "shops", label: t("ops.trip.total_shops"), value: totalShops.toLocaleString(), Icon: Store, tone: "amber" },
-    { id: "birds", label: t("ops.trip.total_birds"), value: totalBirds.toLocaleString(), Icon: Bird, tone: "emerald" },
-    { id: "weight", label: t("ops.trip.total_weight_kg"), value: totalWeight.toFixed(2), Icon: Scale, tone: "violet" },
-    { id: "mortality", label: t("operations.total_mortality"), value: totalMortality.toLocaleString(), Icon: HeartPulse, tone: "rose" },
+    { id: "trips", label: t("ops.trip.total_trips"), value: <KpiMetricValue metric={trips} />, tooltip: `${t("ops.trip.total_trips")}: ${trips.exact}`, Icon: Truck, tone: "blue" },
+    { id: "shops", label: t("ops.trip.total_shops"), value: <KpiMetricValue metric={shops} />, tooltip: `${t("ops.trip.total_shops")}: ${shops.exact}`, Icon: Store, tone: "amber" },
+    { id: "birds", label: t("ops.trip.total_birds"), value: <KpiMetricValue metric={birds} />, tooltip: `${t("ops.trip.total_birds")}: ${birds.exact}`, Icon: Bird, tone: "emerald" },
+    { id: "weight", label: t("ops.trip.total_weight_kg"), value: <KpiMetricValue metric={weight} unit="KG" />, tooltip: `${t("ops.trip.total_weight_kg")}: ${weight.exact} KG`, Icon: Scale, tone: "violet" },
+    { id: "mortality", label: t("operations.total_mortality"), value: <KpiMetricValue metric={mortality} />, tooltip: `${t("operations.total_mortality")}: ${mortality.exact}`, Icon: HeartPulse, tone: "rose" },
   ];
 
   return <KpiCardGrid items={cards} gridClassName="lg:grid-cols-5" ariaLabel={t("ops.trip.trip_list")} />;

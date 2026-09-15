@@ -73,7 +73,14 @@ export { confirmDialog, type ConfirmOptions, type ConfirmTone } from "./confirm/
 
 /* --- data display -------------------------------------------------------- */
 export { Tabs, type TabItem, type TabsProps } from "./Tabs";
-export { KpiCardGrid, type KpiCardItem, type KpiTone } from "./KpiCardGrid";
+export {
+  KpiCardGrid,
+  KpiMetricValue,
+  compactKpiValue,
+  type CompactKpiValue,
+  type KpiCardItem,
+  type KpiTone,
+} from "./KpiCardGrid";
 export { Pagination, type PaginationProps } from "./Pagination";
 export { StatusBadge, type StatusBadgeProps } from "./StatusBadge";
 export { EmptyState, type EmptyStateProps, type EmptyVariant } from "./EmptyState";

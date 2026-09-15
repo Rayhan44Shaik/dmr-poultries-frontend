@@ -7,8 +7,59 @@ export interface KpiCardItem {
   id: string;
   label: string;
   value: ReactNode;
+  /** Full, unshortened metric displayed when the operator hovers the card. */
+  tooltip?: string;
   Icon: LucideIcon;
   tone: KpiTone;
+}
+
+export type CompactKpiValue = {
+  /** Visible, compact Indian-number figure (for example `2.18`). */
+  compact: string;
+  /** `L` at one lakh and `Cr` at one crore; blank below one lakh. */
+  suffix: "" | "L" | "Cr";
+  /** Exact Indian-formatted value for the card tooltip. */
+  exact: string;
+};
+
+/**
+ * Formats an operational KPI in Indian units. The full figure remains
+ * available as `exact`, while values from 1,00,000 upward stay compact:
+ * `2,18,000` → `2.18 L`, `2,19,00,000` → `2.19 Cr`.
+ */
+export function compactKpiValue(value: number, fractionDigits = 0): CompactKpiValue {
+  const safeValue = Number.isFinite(value) ? value : 0;
+  const exact = new Intl.NumberFormat("en-IN", {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits,
+  }).format(safeValue);
+  const absolute = Math.abs(safeValue);
+  if (absolute >= 10_000_000) {
+    return { compact: (safeValue / 10_000_000).toFixed(2), suffix: "Cr", exact };
+  }
+  if (absolute >= 100_000) {
+    return { compact: (safeValue / 100_000).toFixed(2), suffix: "L", exact };
+  }
+  return { compact: exact, suffix: "", exact };
+}
+
+/** Renders a compact KPI value while keeping its unit visually secondary. */
+export function KpiMetricValue({
+  metric,
+  prefix = "",
+  unit,
+}: {
+  metric: CompactKpiValue;
+  prefix?: string;
+  unit?: string;
+}) {
+  return (
+    <>
+      {prefix}{metric.compact}
+      {metric.suffix ? <span className="ml-1 text-[11px] font-bold tracking-normal">{metric.suffix}</span> : null}
+      {unit ? <span className="ml-1 text-[11px] font-bold tracking-normal">{unit}</span> : null}
+    </>
+  );
 }
 
 interface Props {
@@ -70,12 +121,13 @@ export function KpiCardGrid({ items, gridClassName = "", ariaLabel }: Props) {
       aria-label={ariaLabel}
       aria-live="polite"
     >
-      {items.map(({ id, label, value, Icon, tone }) => {
+      {items.map(({ id, label, value, tooltip, Icon, tone }) => {
         const classes = toneClasses[tone];
         return (
           <div
             key={id}
-            className="group relative isolate min-h-[108px] overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+            title={tooltip}
+            className={`group relative isolate min-h-[108px] overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md ${tooltip ? "cursor-help" : ""}`}
           >
             <span className={`pointer-events-none absolute -right-7 -top-7 h-24 w-24 rounded-full ${classes.glow}`} aria-hidden="true" />
             <span className={`absolute inset-x-0 bottom-0 h-1 ${classes.accent}`} aria-hidden="true" />
