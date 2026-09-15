@@ -5,8 +5,8 @@ import { formatINRCompact } from "../../../../utils/format";
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 const PIE_TRACK = { radius: 112, strokeWidth: 48 } as const;
-/** A barely perceptible ambient revolution — 40 minutes per lap. */
-const ORBIT_MS = 2400_000;
+/** An almost imperceptible ambient revolution — 60 minutes per lap. */
+const ORBIT_MS = 3600_000;
 
 /** Stable id fragment for a mode name (gradient ids never depend on order). */
 function slug(name: string): string {
@@ -81,7 +81,10 @@ function CollectionStat({
         <span className="block truncate text-[15px] font-black tabular-nums text-slate-800">
           {formatINRCompact(value)}
         </span>
-        <span className="shrink-0 text-[10px] font-bold tabular-nums text-slate-500">
+        <span
+          className="shrink-0 rounded-md bg-white/90 px-1.5 py-0.5 text-[12px] font-black tabular-nums shadow-sm ring-1 ring-inset ring-white"
+          style={{ color }}
+        >
           {`${percent.toFixed(1)}%`}
         </span>
       </span>
@@ -117,7 +120,9 @@ function CollectionTooltip({
         <p className="text-[11px] font-black uppercase tracking-wider text-slate-500">{item.name}</p>
       </div>
       <p className="mt-2 text-[16px] font-black tabular-nums text-slate-800">{formatINRCompact(value)}</p>
-      <p className="mt-0.5 text-[11px] font-semibold text-slate-400">{percent.toFixed(1)}% of collection streams</p>
+      <p className="mt-0.5 text-[12px] font-black tabular-nums" style={{ color }}>
+        {percent.toFixed(1)}% of collection streams
+      </p>
     </div>
   );
 }
@@ -136,7 +141,7 @@ function CollectionTooltip({
  *  • Every load / range change replays a choreographed entrance: the donut
  *    fades in, the slices sweep in, and the centre total counts up while the
  *    KPI values remain directly bound to the same data signature.
- *  • One barely noticeable ambient revolution of the ring (40 min per lap,
+ *  • One almost imperceptible ambient revolution of the ring (60 min per lap,
  *    off with reduced-motion); hovering a slice lifts it out, the others stay solid.
  *  • Slice colours are bound to the slice's own name (stable gradient ids),
  *    never to its array position.
