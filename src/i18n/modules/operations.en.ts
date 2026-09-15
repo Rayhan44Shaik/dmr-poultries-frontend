@@ -267,7 +267,7 @@ export default {
   'ops.shop_sales.kpi.total_weight': 'Total Weight',
   'ops.shop_sales.kpi.total_amount': 'Total Amount',
   'ops.shop_sales.kpi.average_rate': 'Average Rate',
-  'ops.shop_sales.kpi.average_weight_per_bird': 'Average Weight / Bird',
+  'ops.shop_sales.kpi.average_weight_per_bird': 'AVG WT/BIRDS',
   'ops.shop_sales.title': 'Shop Sales',
 
   // ----- Vehicle trips -----
