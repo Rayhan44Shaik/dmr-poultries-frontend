@@ -3406,6 +3406,35 @@ function recomputeSalary(row) {
   return row;
 }
 
+/**
+ * Live Roster/Leaves → Salary sync (current month only).
+ *
+ * The frontend contract says the register's Working / Present / Leave /
+ * Weekly-Off columns are "derived at read time by the backend from the
+ * authoritative Duty Planner attendance summary — never computed in the
+ * frontend". The generated rows already match that summary at startup, but a
+ * leave approved (or deleted) during the session changes the summary — so the
+ * open month's rows are re-derived from it on every list read. Money is only
+ * recomputed while the row is still Pending: Submitted and Paid rows are
+ * frozen by the lifecycle rule (un-submit to edit), exactly like production.
+ * Closed months are history and are never touched.
+ */
+function syncSalaryWithLiveAttendance(row, att) {
+  if (!att || row.month !== CURRENT_MONTH) return row;
+  row.workingDays = att.workingDays;
+  row.presentDays = att.presentDays;
+  row.leaveDays = att.leaveDays;
+  row.weeklyOffDays = att.weeklyOffDays;
+  if (row.status === "Pending") {
+    // Same first-leave-day-free rule used when the register was generated.
+    row.leaveDeduction = Math.round(
+      ((row.basicSalary ?? 0) / Math.max(1, att.workingDays)) * Math.max(0, att.leaveDays - 1)
+    );
+    recomputeSalary(row);
+  }
+  return row;
+}
+
 /** Upsert a salary row keyed on (employeeId, month) — the review-modal edit. */
 function upsertSalaryRow(body) {
   const employeeId = Number(body.employeeId);
@@ -5011,6 +5040,15 @@ const server = http.createServer(async (req, res) => {
       const month = q.get("month");
       let rows = SALARIES.filter((s) => !month || s.month === month);
       if (q.get("department")) rows = rows.filter((s) => s.department === q.get("department"));
+      // Cross-module hand-off: leaves approved/removed THIS session update the
+      // attendance summary, and the open month's register re-derives its
+      // day-count columns (and Pending money) from that same summary.
+      if (!month || month === CURRENT_MONTH) {
+        const att = new Map(attendanceSummary(CURRENT_MONTH).map((r) => [r.employeeId, r]));
+        rows = rows.map((s) =>
+          s.month === CURRENT_MONTH ? syncSalaryWithLiveAttendance(s, att.get(s.employeeId)) : s
+        );
+      }
       return send(200, rows);
     }
     // Salary review-modal edit: upsert keyed on (employeeId, month).
@@ -5033,7 +5071,12 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === "/api/staff/salaries/summary") {
       const month = q.get("month") || CURRENT_MONTH;
-      const rows = SALARIES.filter((s) => s.month === month);
+      let rows = SALARIES.filter((s) => s.month === month);
+      if (month === CURRENT_MONTH) {
+        // totalNet must equal the sum of the rows the register renders.
+        const att = new Map(attendanceSummary(CURRENT_MONTH).map((r) => [r.employeeId, r]));
+        rows = rows.map((s) => syncSalaryWithLiveAttendance(s, att.get(s.employeeId)));
+      }
       return send(200, {
         month,
         employees: rows.length,
@@ -5057,6 +5100,9 @@ const server = http.createServer(async (req, res) => {
         row.status = "Submitted";
         row.submittedAt = nowIso();
         row.submittedBy = body?.submittedBy ?? "user";
+        // Submit & Send queues a payslip email per newly submitted row — keep
+        // the per-row `emailsSent` counter (rendered by the register) in step.
+        row.emailsSent = (row.emailsSent ?? 0) + 1;
       }
       return send(200, {
         month,
@@ -5071,13 +5117,33 @@ const server = http.createServer(async (req, res) => {
     }
     if (p === "/api/staff/salaries/email" && method === "POST") {
       const body = await readBody(req);
-      const count = Array.isArray(body?.ids) ? body.ids.length : 0;
-      return send(200, { sent: count, failed: 0, sample: true });
+      const ids = Array.isArray(body?.ids) ? body.ids.map(String) : [];
+      // Keep the per-row delivery counters in sync with the queue result:
+      // the Salary Register renders `emailsSent` next to each row, so a
+      // successful send must be visible after the page refreshes.
+      let sent = 0;
+      for (const id of ids) {
+        const row = findSalaryRow(id);
+        if (!row) continue;
+        row.emailsSent = (row.emailsSent ?? 0) + 1;
+        row.updatedAt = nowIso();
+        sent += 1;
+      }
+      return send(200, { sent, failed: ids.length - sent, sample: true });
     }
     if (p === "/api/staff/salaries/whatsapp" && method === "POST") {
       const body = await readBody(req);
-      const count = Array.isArray(body?.ids) ? body.ids.length : 0;
-      return send(200, { sent: count, failed: 0, sample: true });
+      const ids = Array.isArray(body?.ids) ? body.ids.map(String) : [];
+      // Mirror of /salaries/email — the register renders `whatsappsSent`.
+      let sent = 0;
+      for (const id of ids) {
+        const row = findSalaryRow(id);
+        if (!row) continue;
+        row.whatsappsSent = (row.whatsappsSent ?? 0) + 1;
+        row.updatedAt = nowIso();
+        sent += 1;
+      }
+      return send(200, { sent, failed: ids.length - sent, sample: true });
     }
     if (p === "/api/staff/salaries/bulk-status" && method === "POST") {
       const body = await readBody(req);

@@ -10,9 +10,10 @@
 // Read-only lifecycle notices (paid / correction window / month closed) are
 // listed below the sheet — they are UI state, not part of the formal document.
 
-import { Lock, Info, Download, CheckCircle2 } from "lucide-react";
+import { Lock, Info, FileText, CheckCircle2, X, Loader2 } from "lucide-react";
 import type { SalaryRecord } from "../../types/staffDashboard";
-import { Button, Modal } from "../../../../ui";
+import { Modal } from "../../../../ui";
+import { uiButton } from "../../../../shared/ui/uiTokens";
 import { ClassicPayslipSheet } from "./ClassicPayslipSheet";
 import { computePayslipTotals, toAmountValues } from "./payslipModel";
 
@@ -64,23 +65,40 @@ export function SalaryView({
       isOpen
       onClose={onClose}
       size="xl"
+      overlayClassName="backdrop-blur-none bg-black/20"
       aria-label={`Payslip — ${record.employeeName}`}
       title={`Payslip — ${record.employeeName}`}
       description={`${monthLabel}${record.employeeId != null ? ` · Employee #${record.employeeId}` : ""}`}
       footer={
         <>
-          <Button variant="secondary" onClick={onClose}>
+          {/* Close and Download PDF carry the same hover "logo animation"
+              language as the register toolbar (Reset / Refresh / Review). */}
+          <button
+            type="button"
+            onClick={onClose}
+            className={`group relative ${uiButton("secondary", "md")}`}
+          >
+            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-close)]">
+              <X size={14} />
+            </span>
             Close
-          </Button>
+          </button>
           {onDownload && (
-            <Button
-              variant="primary"
+            <button
+              type="button"
               onClick={onDownload}
-              loading={downloading}
-              icon={<Download size={14} />}
+              disabled={downloading}
+              className={`group relative ${uiButton("primary", "md")}`}
             >
+              {downloading ? (
+                <Loader2 size={14} className="animate-spin" />
+              ) : (
+                <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-pdf)]">
+                  <FileText size={14} />
+                </span>
+              )}
               {downloading ? "Downloading…" : "Download PDF"}
-            </Button>
+            </button>
           )}
         </>
       }
