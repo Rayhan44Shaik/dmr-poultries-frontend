@@ -59,19 +59,19 @@ function Row({ title, value, iconBg, iconColor, icon, subtitle, isPositive, isNe
     : "text-slate-800";
 
   return (
-    <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all hover:shadow-md">
-      <div className="flex items-center gap-3">
-        <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${iconBg} ${iconColor}`}>
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all hover:shadow-md">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${iconBg} ${iconColor}`}>
           {icon}
         </div>
-        <div>
+        <div className="min-w-0">
           <span className="text-sm font-medium text-slate-700">{title}</span>
           {subtitle && (
             <div className="text-[10px] text-slate-400 mt-0.5">{subtitle}</div>
           )}
         </div>
       </div>
-      <span className={`text-base font-bold tabular-nums ${valueColor}`}>
+      <span className={`shrink-0 text-base font-bold tabular-nums ${valueColor}`}>
         {inr(value)}
       </span>
     </div>
@@ -205,12 +205,12 @@ export default function OutstandingSummary({
 
         <div className="mt-auto border-t border-dashed border-slate-200" />
 
-        <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm">
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 shadow-sm">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm">
               <Calculator size={20} />
             </div>
-            <div className="flex flex-col">
+            <div className="flex min-w-0 flex-col">
               <span className="text-sm font-bold text-slate-800">
                 {t("ops.collection.current_outstanding")}
               </span>
@@ -219,7 +219,7 @@ export default function OutstandingSummary({
               </span>
             </div>
           </div>
-          <span className="text-xl font-extrabold tabular-nums text-emerald-700">
+          <span className="shrink-0 text-xl font-extrabold tabular-nums text-emerald-700">
             {inr(displayCurrentOutstanding)}
           </span>
         </div>
