@@ -182,7 +182,12 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
   if (chartData.length === 0) {
     return (
       <div className="flex w-full min-w-0 flex-1 flex-col" aria-busy="true">
-        <div className="flex min-h-0 w-full flex-1 items-center justify-center">
+        <div className="grid w-full shrink-0 grid-cols-3 gap-2 border-b border-slate-100 pb-3">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-[52px] animate-pulse rounded-xl bg-slate-100/80" />
+          ))}
+        </div>
+        <div className="flex min-h-0 w-full flex-1 items-center justify-center pt-4">
           <div className="relative aspect-square w-full max-w-[430px]" style={{ aspectRatio: "1 / 1" }}>
             <svg viewBox="0 0 400 400" className="h-full w-full" aria-hidden="true">
               {/* soft track */}
@@ -212,21 +217,47 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
             </div>
           </div>
         </div>
-        <div className="grid w-full shrink-0 grid-cols-3 gap-2 border-t border-slate-100 pt-3">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="h-[52px] animate-pulse rounded-xl bg-slate-100/80" />
-          ))}
-        </div>
       </div>
     );
   }
 
   return (
     <div className="flex w-full min-w-0 flex-1 flex-col">
+      {/* KPI strip — right below the card title, where it can always be
+          seen (top of the card is never clipped). shrink-0 so it can never
+          be squeezed out. One simple box per mode, same visual language as
+          the Trips chart's KPI row; re-keyed on data change so the staggered
+          rise replays for each new range. */}
+      <div key={`kpi-${signature}`} className="grid w-full shrink-0 grid-cols-3 gap-2 border-b border-slate-100 pb-3">
+        {enrichedData.map((d, index) => (
+          <div
+            key={d.name}
+            className="group min-w-0 animate-fade-in-up cursor-default rounded-xl px-2.5 py-2 ring-1 ring-inset ring-slate-100 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+            style={{ backgroundColor: `${d.color}0f`, animationDelay: `${260 + index * 90}ms` }}
+          >
+              <span className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full transition-transform duration-200 group-hover:scale-150"
+                  style={{ backgroundColor: d.color }}
+                />
+                <span className="truncate">{d.name}</span>
+              </span>
+              <span className="mt-0.5 flex items-baseline justify-between gap-1">
+                <span className="block truncate text-[14px] font-black tabular-nums text-slate-800">
+                  {formatINRCompact(d.value)}
+                </span>
+                <span className="shrink-0 text-[10px] font-bold tabular-nums text-slate-500">
+                  {`${d.percent.toFixed(1)}%`}
+                </span>
+              </span>
+          </div>
+        ))}
+      </div>
+
       {/* The donut FILLS the card's free space and sits exactly in the
           middle of the chart box. Re-keyed on every data change so the
           entrance (fade + slice sweep) replays for each new range. */}
-      <div className="flex min-h-0 w-full flex-1 items-center justify-center">
+      <div className="flex min-h-0 w-full flex-1 items-center justify-center pt-4">
         <div
           key={signature}
           className="relative aspect-square max-h-full w-full max-w-[430px] animate-fade-in"
@@ -286,36 +317,6 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
             </span>
           </div>
         </div>
-      </div>
-
-      {/* KPI strip — pinned to the bottom of the card (shrink-0, so it can
-          never be squeezed out of view). One simple box per mode, in the
-          same visual language as the Trips chart's KPI row. Re-keyed on
-          data change so the staggered rise replays for each new range. */}
-      <div key={`kpi-${signature}`} className="grid w-full shrink-0 grid-cols-3 gap-2 border-t border-slate-100 pt-3">
-        {enrichedData.map((d, index) => (
-          <div
-            key={d.name}
-            className="group min-w-0 animate-fade-in-up cursor-default rounded-xl px-2.5 py-2 ring-1 ring-inset ring-slate-100 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-            style={{ backgroundColor: `${d.color}0f`, animationDelay: `${260 + index * 90}ms` }}
-          >
-              <span className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">
-                <span
-                  className="h-1.5 w-1.5 shrink-0 rounded-full transition-transform duration-200 group-hover:scale-150"
-                  style={{ backgroundColor: d.color }}
-                />
-                <span className="truncate">{d.name}</span>
-              </span>
-              <span className="mt-0.5 flex items-baseline justify-between gap-1">
-                <span className="block truncate text-[14px] font-black tabular-nums text-slate-800">
-                  {formatINRCompact(d.value)}
-                </span>
-                <span className="shrink-0 text-[10px] font-bold tabular-nums text-slate-500">
-                  {`${d.percent.toFixed(1)}%`}
-                </span>
-              </span>
-          </div>
-        ))}
       </div>
     </div>
   );
