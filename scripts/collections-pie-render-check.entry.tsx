@@ -23,10 +23,21 @@ export async function runPieRenderCheck(): Promise<void> {
   // "svg" is not asserted: ResponsiveContainer renders the <svg> only once a
   // real container is measured, which never happens in SSR.
   const mustNot = ["Payment Breakdown", "Collections Summary", "3D pie"];
-  const must = ["Total", "recharts-responsive-container", "%", "33.7%", "cs-badge-shadow"];
+  const must = [
+    "Total",
+    "recharts-responsive-container",
+    "%",
+    "33.7%",
+    "cs-badge-shadow",
+    "cs-pie-spin", // the slow donut revolution
+    "cs-badge-orbit", // one orbiting badge per slice
+    "cs-badge-counter", // horizontal counter-rotation
+  ];
   // The badge overlay must render one badge (rect) per visible mode.
-  const badgeRects = (html.match(/cs-badge-shadow"|x="-26"/g) || []).filter((s) => s === 'x="-26"').length;
+  const badgeRects = (html.match(/x="-26"/g) || []).length;
   if (badgeRects !== data.length) absent.push(`badge rects ${badgeRects} != modes ${data.length}`);
+  const orbits = (html.match(/cs-badge-orbit/g) || []).length;
+  if (orbits !== data.length) absent.push(`orbit groups ${orbits} != modes ${data.length}`);
   const missing = [...mustNot.filter((s) => html.includes(s))].map((s) => `"${s}" still present`);
   const absent = must.filter((s) => !html.includes(s)).map((s) => `"${s}" missing`);
   const modes = data.map((d) => d.name).filter((n) => !html.includes(n)).map((n) => `mode "${n}" missing`);

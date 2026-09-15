@@ -12,6 +12,9 @@ function lighten(hex: string, amt = 0.22): string {
   return `rgb(${f(c[0])}, ${f(c[1])}, ${f(c[2])})`;
 }
 
+/** Springy easing for the hover lift / badge nudge. */
+const SPRING = "cubic-bezier(0.34, 1.4, 0.64, 1)";
+
 interface CollectionsPieProps {
   data: { name: string; value: number }[];
 }
@@ -55,9 +58,12 @@ function useCountUp(target: number, duration = 900): number {
  * A fixed 256 px square stage keeps the ring a perfect circle at every window
  * size, with generous white space on all sides. Slices sweep in on mount /
  * range change, and EVERY slice carries a small white pop badge with its
- * exact share, riding just OUTSIDE the ring with its inner edge touching the
- * slice's outer edge (rotated to follow the ring, soft drop shadow). The
- * badges live in an overlay layer above the chart so all of them always
+ * exact share, riding just OUTSIDE the ring, centred exactly on the sector's
+ * mid-angle, with its inner edge touching the slice's outer edge. The whole
+ * donut (and the badges, orbiting with their own slices) makes one very slow
+ * ambient revolution — 3 minutes per lap, off with reduced-motion — while
+ * the pills counter-rotate so they stay perfectly horizontal at all times.
+ * The badges live in an overlay layer above the chart so all of them always
  * show. Hovering a slice lifts it out and pushes its badge along; the other
  * slices stay fully solid (no fading). The centre shows the total with a
  * count-up, the legend lists every mode with exact amount and share, and the
@@ -136,7 +142,8 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
           {/* Soft background track behind the ring (matches the 58%–84% band). */}
           <div className="absolute left-1/2 top-1/2 h-[215px] w-[215px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[33px] border-slate-100/80" />
 
-          <div className="h-full w-full [filter:drop-shadow(0_18px_26px_-16px_rgba(15,23,42,0.35))]">
+          <div className="cs-pie-spin h-full w-full">
+            <div className="h-full w-full [filter:drop-shadow(0_18px_26px_-16px_rgba(15,23,42,0.35))]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <defs>
@@ -170,7 +177,8 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
                   ))}
                 </Pie>
               </PieChart>
-            </ResponsiveContainer>
+              </ResponsiveContainer>
+            </div>
           </div>
 
           {/* White pop badges — a separate layer ABOVE the chart, so every
@@ -187,43 +195,54 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
               {enrichedData.map((d, i) => {
                 if (d.percent < 4) return null;
                 const a = (sliceMids[i] * Math.PI) / 180;
-                // Ring outer edge is 107.5; badge half-height is 11, so its
-                // inner edge sits at r-11 = 108 — just outside, touching the ring.
-                const r = 119 + (hoverIndex === i ? 8 : 0);
-                const px = 128 + r * Math.sin(a);
-                const py = 128 - r * Math.cos(a);
-                // Clock-face flip: on the left/bottom half the pill is turned
-                // 180° so the text always reads upright (the pill is
-                // symmetric, so only the text orientation changes).
-                const mid = sliceMids[i];
-                const rot = mid > 90 && mid < 270 ? mid + 180 : mid;
+                // Badge centre sits EXACTLY at its sector's mid-angle, just
+                // outside the ring's outer edge (107.5) — touching it.
+                const px = 128 + 119 * Math.sin(a);
+                const py = 128 - 119 * Math.cos(a);
+                // The orbit group rotates with the pie; the counter group
+                // turns the same amount the other way about the badge's own
+                // centre, so the pill stays perfectly horizontal always.
+                const hovered = hoverIndex === i;
+                const nx = hovered ? 8 * Math.sin(a) : 0;
+                const ny = hovered ? -8 * Math.cos(a) : 0;
                 return (
-                  <g
-                    key={d.name}
-                    transform={`translate(${px.toFixed(2)}, ${py.toFixed(2)}) rotate(${rot.toFixed(2)})`}
-                  >
-                    <rect
-                      x={-26}
-                      y={-11}
-                      width={52}
-                      height={22}
-                      rx={11}
-                      fill="#ffffff"
-                      stroke="rgba(15,23,42,0.08)"
-                      strokeWidth={1}
-                      filter="url(#cs-badge-shadow)"
-                    />
-                    <text
-                      x={0}
-                      y={0.5}
-                      textAnchor="middle"
-                      dominantBaseline="central"
-                      fontSize={11}
-                      fontWeight={800}
-                      fill="#1e293b"
-                    >
-                      {`${d.percent.toFixed(1)}%`}
-                    </text>
+                  <g key={d.name} className="cs-badge-orbit">
+                    <g transform={`translate(${px.toFixed(2)}, ${py.toFixed(2)})`}>
+                      <g
+                        style={{
+                          transform: `translate(${nx.toFixed(2)}px, ${ny.toFixed(2)}px)`,
+                          transition: `transform 300ms ${SPRING}`,
+                        }}
+                      >
+                        <g
+                          className="cs-badge-counter"
+                          style={{ transformOrigin: `${px.toFixed(2)}px ${py.toFixed(2)}px` }}
+                        >
+                          <rect
+                            x={-26}
+                            y={-11}
+                            width={52}
+                            height={22}
+                            rx={11}
+                            fill="#ffffff"
+                            stroke="rgba(15,23,42,0.08)"
+                            strokeWidth={1}
+                            filter="url(#cs-badge-shadow)"
+                          />
+                          <text
+                            x={0}
+                            y={0.5}
+                            textAnchor="middle"
+                            dominantBaseline="central"
+                            fontSize={11}
+                            fontWeight={800}
+                            fill="#1e293b"
+                          >
+                            {`${d.percent.toFixed(1)}%`}
+                          </text>
+                        </g>
+                      </g>
+                    </g>
                   </g>
                 );
               })}
