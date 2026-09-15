@@ -219,6 +219,7 @@ export default {
   'staff.leave.all_employees': 'All Employees',
   'staff.leave.all_types': 'All Types',
   'staff.leave.search_label': 'Search',
+  'staff.leave.search_live': 'searches as you type',
   'staff.leave.search_placeholder': 'Search employee, type or reason (English)…',
   'staff.leave.search_aria': 'Search leave requests',
   'staff.leave.new_request': 'New Request',

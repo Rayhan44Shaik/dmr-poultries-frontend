@@ -219,6 +219,7 @@ export default {
   'staff.leave.all_employees': 'అందరు ఉద్యోగులు',
   'staff.leave.all_types': 'అన్ని రకాలు',
   'staff.leave.search_label': 'వెతకండి',
+  'staff.leave.search_live': 'టైప్ చేసిన వెంటనే వెతుకుతుంది',
   'staff.leave.search_placeholder': 'ఉద్యోగి పేరు, రకం, కారణం (English) వెతకండి…',
   'staff.leave.search_aria': 'సెలవు అభ్యర్థనలను వెతకండి',
   'staff.leave.new_request': 'కొత్త అభ్యర్థన',

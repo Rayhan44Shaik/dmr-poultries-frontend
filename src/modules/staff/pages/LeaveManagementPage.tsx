@@ -133,10 +133,13 @@ function LeaveManagementPage() {
     [setFilter]
   );
 
-  const handleSearch = useCallback(() => {
-    setSelectedRowId(null);
-    commitSearch();
-  }, [commitSearch]);
+  const handleSearch = useCallback(
+    (value?: string) => {
+      setSelectedRowId(null);
+      commitSearch(value);
+    },
+    [commitSearch]
+  );
 
   const handleReset = useCallback(() => {
     setSelectedRowId(null);

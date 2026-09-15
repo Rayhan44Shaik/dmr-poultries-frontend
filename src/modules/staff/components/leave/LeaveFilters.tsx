@@ -16,9 +16,9 @@ import {
   CheckCircle,
   XCircle,
   Trash2,
+  X,
 } from 'lucide-react';
 import {
-  uiButton,
   uiCardClass,
   uiDisabled,
   uiFilterLabelClass,
@@ -46,8 +46,12 @@ interface LeaveFiltersProps {
   employees: Employee[];
   departments: string[];
   onFilterChange: <K extends keyof LeaveFilterState>(key: K, value: LeaveFilterState[K]) => void;
-  /** Commit the typed search immediately (Enter / the Search button). */
-  onSearch: () => void;
+  /**
+   * Commit a search term immediately instead of waiting out the typing pause —
+   * used by Enter and by the field's clear button. Omit it to commit whatever is
+   * currently typed (clearing does the opposite: it commits the empty term).
+   */
+  onSearch: (value?: string) => void;
   onReset: () => void;
   onRefresh: () => void;
   onNewRequest: () => void;
@@ -68,7 +72,7 @@ interface LeaveFiltersProps {
  * and it sits on the left, where the eye starts.
  */
 const searchInputClass = [
-  'h-11 w-full min-w-0 rounded-lg border border-slate-300 bg-white pl-11 pr-3',
+  'h-11 w-full min-w-0 rounded-lg border border-slate-300 bg-white pl-11 pr-10',
   'text-sm font-medium text-slate-800',
   'placeholder:font-normal placeholder:text-slate-400',
   uiFocusInset,
@@ -77,7 +81,6 @@ const searchInputClass = [
   'shadow-xs',
 ].join(' ');
 
-const searchButtonClass = `${uiButton('primary', 'lg')} group`;
 const viewIconButtonClass = `${uiIconButton('view', 'lg')} group`;
 const approveIconButtonClass = `${uiIconButton('success', 'lg')} group`;
 const rejectIconButtonClass = `${uiIconButton('destructiveOutline', 'lg')} group`;
@@ -337,6 +340,13 @@ function LeaveFilters({
           <label className={uiFilterLabelClass} htmlFor="leave-search">
             <Search size={17} className="shrink-0 text-slate-400" />
             <span>{t('staff.leave.search_label')}</span>
+            {/* No Search button: the term is applied as it is typed (300 ms
+                pause), so the label says so instead of leaving people hunting
+                for a button that no longer exists. */}
+            <span className="text-[11px] font-normal text-slate-400">
+              {' · '}
+              {t('staff.leave.search_live')}
+            </span>
           </label>
           <div className="relative">
             <Search size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -354,6 +364,20 @@ function LeaveFilters({
               }}
               className={searchInputClass}
             />
+            {filters.search !== '' && (
+              <button
+                type="button"
+                onClick={() => {
+                  onFilterChange('search', '');
+                  onSearch('');
+                }}
+                aria-label={`${t('common.clear')} — ${t('common.search')}`}
+                className="group absolute right-2.5 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:ring-2 focus-visible:ring-emerald-300"
+              >
+                <X size={15} aria-hidden="true" />
+                <ActionTooltip label={`${t('common.clear')} — ${t('common.search')}`} />
+              </button>
+            )}
           </div>
         </div>
 
@@ -429,17 +453,6 @@ function LeaveFilters({
           {selected && (
             <span aria-hidden="true" className="mx-0.5 hidden h-6 w-px shrink-0 bg-slate-200 sm:block" />
           )}
-
-          <button
-            type="button"
-            onClick={onSearch}
-            className={searchButtonClass}
-            aria-label={t('common.search')}
-          >
-            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-search)]"><Search size={15} /></span>
-            {t('common.search')}
-            <ActionTooltip label={t('common.search')} />
-          </button>
 
           <button
             type="button"
