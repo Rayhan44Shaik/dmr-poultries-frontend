@@ -1,7 +1,9 @@
 import { useMemo, useState } from "react";
-import { Search, X } from "lucide-react";
+import { Search, X, History, CheckCircle, Clock, AlertCircle, Eye, Pencil, Trash2 } from "lucide-react";
 import type { RecentCollection } from "../../types/collection";
 import { useI18n } from "../../../../../i18n";
+import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocalization";
+import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 
 interface Props {
   collections: RecentCollection[];
@@ -24,26 +26,25 @@ const inr = (n: number) =>
 function getStatusBadgeClass(status: string): string {
   switch (status) {
     case "Approved":
-      return "bg-green-100 text-green-700 border-green-200";
+      return "bg-emerald-50 text-emerald-700 border-emerald-200";
     case "Pending Approval":
-      return "bg-orange-100 text-orange-700 border-orange-200";
+      return "bg-orange-50 text-orange-700 border-orange-200";
     case "Rejected":
-      return "bg-red-100 text-red-700 border-red-200";
     case "Deleted":
-      return "bg-red-100 text-red-700 border-red-200";
+      return "bg-rose-50 text-rose-700 border-rose-200";
     default:
-      return "bg-slate-100 text-slate-700 border-slate-200";
+      return "bg-slate-50 text-slate-700 border-slate-200";
   }
 }
 
 function getRowStyle(rawStatus: string): string {
   switch (rawStatus) {
     case "Pending Approval":
-      return "bg-orange-50/50";
+      return "bg-orange-50/40";
     case "Approved":
-      return "bg-green-50/50";
+      return "bg-emerald-50/40";
     case "Deleted":
-      return "bg-red-50/50 opacity-60";
+      return "bg-rose-50/40 opacity-60";
     default:
       return "";
   }
@@ -55,69 +56,84 @@ export default function RecentCollectionsTable({
   pendingApprovalCount,
   onStatusChange,
   onApprove,
-  onReject,
   onEdit,
   onDelete,
   onViewShop,
 }: Props) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [searchQuery, setSearchQuery] = useState("");
 
-  // Filter collections by search query (collection no, shop name, collector name)
+  /** Shop and collector names are data, not i18n keys, so they are transliterated
+    * for Telugu using the same helper the Trip screens use. */
+  const localize = (value: string) => localizeTripViewText(value, language);
+
+  /**
+   * Search matches the English source AND the Telugu rendering of every field,
+   * so a user reading the page in Telugu can still type in English (and vice
+   * versa) and find the row. Whitespace is squashed so "SriBalaji" matches
+   * "Sri Balaji", mirroring Trip List behaviour.
+   */
   const filteredBySearch = useMemo(() => {
-    if (!searchQuery.trim()) return collections;
-    const q = searchQuery.toLowerCase().trim();
-    return collections.filter(
-      (col) =>
-        col.collectionNo.toLowerCase().includes(q) ||
-        col.shopName.toLowerCase().includes(q) ||
-        col.collectorName.toLowerCase().includes(q)
-    );
-  }, [collections, searchQuery]);
-
-  // Compute displayed data based on status filter
-  const displayedData = useMemo(() => {
-    let filtered: RecentCollection[] = [];
-
-    if (statusFilter === "Pending") {
-      // Pending tab: show all pending approval collections
-      filtered = filteredBySearch.filter((col) => col.rawStatus === "Pending Approval");
-    } else if (statusFilter === "Approved") {
-      // Approved tab: show ONLY the latest approved collection per shop
-      const approvedCollections = filteredBySearch.filter((col) => col.rawStatus === "Approved");
-      const shopMap = new Map<string, RecentCollection>();
-
-      approvedCollections.forEach((col) => {
-        const existing = shopMap.get(col.shopName);
-        if (!existing) {
-          shopMap.set(col.shopName, col);
-        } else {
-          // Compare by approvedDate first, then by collectionDate, then by numericId as tiebreaker
-          const existingDate = existing.approvedDate || existing.collectionDate;
-          const currentDate = col.approvedDate || col.collectionDate;
-
-          if (currentDate > existingDate) {
-            shopMap.set(col.shopName, col);
-          } else if (currentDate === existingDate) {
-            // Tiebreaker: use numericId (higher = newer)
-            const existingId = existing.numericId ?? 0;
-            const currentId = col.numericId ?? 0;
-            if (currentId > existingId) {
-              shopMap.set(col.shopName, col);
-            }
-          }
-        }
+    const lower = searchQuery.trim().toLowerCase();
+    if (!lower) return collections;
+    const squashed = lower.replace(/\s+/g, "");
+    return collections.filter((col) => {
+      const rawStatus = col.rawStatus || col.status;
+      const statusKey = "status." + String(rawStatus).toLowerCase().replace(/\s+/g, "_");
+      const translatedStatus = t(statusKey);
+      const candidates = [
+        col.collectionNo,
+        col.shopName,
+        col.collectorName,
+        col.collectionDate,
+        String(col.amount ?? ""),
+        rawStatus,
+        translatedStatus === statusKey ? "" : translatedStatus,
+        localize(col.shopName),
+        localize(col.collectorName),
+      ];
+      return candidates.some((value) => {
+        const text = String(value ?? "").toLowerCase();
+        return text.includes(lower) || text.replace(/\s+/g, "").includes(squashed);
       });
+    });
+  // `localize` is derived from `language`; listing it would re-create the
+  // closure every render without changing the result.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [collections, searchQuery, t, language]);
 
-      filtered = Array.from(shopMap.values());
-    } else if (statusFilter === "Deleted") {
-      // Deleted tab: show all deleted collections
-      filtered = filteredBySearch.filter((col) => col.rawStatus === "Deleted");
+  /** Row buckets per tab — computed once so the toggle can show live counts. */
+  const buckets = useMemo(() => {
+    const pending = filteredBySearch.filter((col) => col.rawStatus === "Pending Approval");
+    const deleted = filteredBySearch.filter((col) => col.rawStatus === "Deleted");
+
+    // Approved tab shows only the latest approved collection per shop.
+    const shopMap = new Map<string, RecentCollection>();
+    for (const col of filteredBySearch.filter((row) => row.rawStatus === "Approved")) {
+      const existing = shopMap.get(col.shopName);
+      if (!existing) {
+        shopMap.set(col.shopName, col);
+        continue;
+      }
+      const existingDate = existing.approvedDate || existing.collectionDate;
+      const currentDate = col.approvedDate || col.collectionDate;
+      if (currentDate > existingDate) shopMap.set(col.shopName, col);
+      else if (currentDate === existingDate && (col.numericId ?? 0) > (existing.numericId ?? 0)) {
+        shopMap.set(col.shopName, col);
+      }
     }
 
-    // Sort by collection date descending (newest first)
-    return filtered.sort((a, b) => b.collectionDate.localeCompare(a.collectionDate));
-  }, [filteredBySearch, statusFilter]);
+    const sort = (rows: RecentCollection[]) =>
+      [...rows].sort((a, b) => b.collectionDate.localeCompare(a.collectionDate));
+
+    return {
+      Pending: sort(pending),
+      Approved: sort(Array.from(shopMap.values())),
+      Deleted: sort(deleted),
+    };
+  }, [filteredBySearch]);
+
+  const displayedData = buckets[statusFilter];
 
   const clearSearch = () => setSearchQuery("");
 
@@ -134,193 +150,201 @@ export default function RecentCollectionsTable({
     }
   };
 
-  // Status tab classes - soft/light backgrounds with proper spacing
-  const getTabClass = (status: "Pending" | "Approved" | "Deleted", isActive: boolean): string => {
-    const base = "px-4 py-1.5 text-xs font-medium transition-colors whitespace-nowrap rounded-lg border";
-    if (isActive) {
-      switch (status) {
-        case "Pending":
-          return `${base} bg-orange-100 text-orange-700 border-orange-200 shadow-sm`;
-        case "Approved":
-          return `${base} bg-green-100 text-green-700 border-green-200 shadow-sm`;
-        case "Deleted":
-          return `${base} bg-red-100 text-red-700 border-red-200 shadow-sm`;
-      }
-    }
-    return `${base} bg-white text-slate-600 hover:bg-slate-50 border-slate-200`;
-  };
-
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-      {/* Table Header - Title + Search + Status Tabs on top row, week range below title */}
-      <div className="px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80">
-        {/* Top row: Title area | Search | Status Tabs */}
-        <div className="flex flex-col sm:flex-row sm:items-center gap-3">
-          {/* Left: Title + Pending Count */}
-          <div className="flex flex-col gap-1 flex-shrink-0 min-w-[220px]">
-            <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold text-slate-800 tracking-tight">{t("ops.collection.recent_collections")}</h3>
-              <span className="rounded-full bg-blue-100 px-2.5 py-0.5 text-[10px] font-semibold text-blue-700">
-                {t("common.pending")}: {pendingApprovalCount}
-              </span>
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xl shadow-slate-100 overflow-hidden mt-8 transition-all duration-300">
+      {/* Header — mirrors Recent Trip Activity: icon + title, selected-tab count
+        * beside the name, segmented status toggle, then the search box. */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-slate-50">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-blue-50/70 border border-blue-100 flex items-center justify-center text-blue-500 shadow-inner">
+              <History className="w-5 h-5" />
             </div>
+            <h3 className="text-base font-bold text-slate-800 tracking-tight">
+              {t("ops.collection.recent_collections")}
+            </h3>
           </div>
 
-          {/* Middle: Search - expands to fill available space */}
-          <div className="relative flex-1 min-w-[200px] max-w-md">
-            <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+          {/* Count follows the selected tab, exactly like Trip List. */}
+          <span className="inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 rounded-full shadow-sm tabular-nums">
+            {displayedData.length}
+          </span>
+
+          <div className="flex items-center p-0.5 ml-2 border border-slate-200/80 rounded-lg overflow-hidden bg-slate-50 shadow-sm">
+            {(["Pending", "Approved", "Deleted"] as const).map((tab) => {
+              const isActive = statusFilter === tab;
+              // Colours match the meaning of each tab and the row/badge tints.
+              const activeClass =
+                tab === "Approved"
+                  ? "bg-emerald-50/80 text-emerald-500 shadow-sm"
+                  : tab === "Pending"
+                  ? "bg-orange-50/80 text-orange-500 shadow-sm"
+                  : "bg-rose-50/80 text-rose-500 shadow-sm";
+              const key = `status.${tab.toLowerCase()}`;
+              const label = t(key) === key ? tab : t(key);
+              return (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => onStatusChange(tab)}
+                  aria-pressed={isActive}
+                  className={`inline-flex items-center px-5 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                    isActive ? activeClass : "bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-200/50"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+
+          {pendingApprovalCount > 0 && (
+            <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-2.5 py-0.5 text-[11px] font-semibold text-orange-700">
+              <Clock size={11} />
+              {t("common.pending")}: <span className="tabular-nums">{pendingApprovalCount}</span>
+            </span>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
+          <div className="relative flex-1 sm:flex-none">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder={t("ops.collection.search_collections_placeholder")}
-              className="h-8 w-full rounded-lg border border-slate-300 pl-8 pr-8 text-sm outline-none focus:border-emerald-500 focus:ring-2 focus:ring-emerald-200"
+              className="w-full sm:w-64 pl-8 pr-8 py-1.5 text-sm border border-slate-200 rounded-xl bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-400/20 outline-none transition-all"
             />
             {searchQuery && (
               <button
+                type="button"
                 onClick={clearSearch}
-                className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                aria-label={t("common.clear")}
+                className="group absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
               >
-                <X size={14} />
+                <X size={14} className={uiActionIconMotionClass.close} />
               </button>
             )}
-          </div>
-
-          {/* Right: Status Tabs - soft/light backgrounds with gap between */}
-          <div className="flex gap-2 flex-shrink-0">
-            {(["Pending", "Approved", "Deleted"] as const).map((status) => (
-              <button
-                key={status}
-                onClick={() => onStatusChange(status)}
-                className={getTabClass(status, statusFilter === status)}
-              >
-                {status}
-              </button>
-            ))}
           </div>
         </div>
       </div>
 
-      {/* Table */}
+      {/* Table — column sizing and type scale match Recent Trip Activity. */}
       <div className="overflow-x-auto">
-        <table className="min-w-full text-xs md:text-sm">
-          <thead className="bg-slate-50/80 border-b border-slate-200/70">
-            <tr className="text-slate-700 whitespace-nowrap">
-              <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                <div className="flex items-center justify-center gap-1.5">
-                  {t("table.s_no")}
-                </div>
-              </th>
-              <th className="px-3.5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                {t("table.collection_no")}
-              </th>
-              <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                {t("table.date")}
-              </th>
-              <th className="px-3.5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                {t("table.shop")}
-              </th>
-              <th className="px-3.5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                {t("table.collector")}
-              </th>
-              <th className="px-3.5 py-3 text-right text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                {t("table.amount")}
-              </th>
-              <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                {t("table.status")}
-              </th>
-              <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                {t("table.actions")}
-              </th>
+        <table className="min-w-full text-sm text-left border-collapse">
+          <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-600">
+            <tr>
+              <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("table.s_no")}</th>
+              <th className="px-4 py-3 text-sm font-bold uppercase tracking-wider">{t("table.collection_no")}</th>
+              <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("table.date")}</th>
+              <th className="px-4 py-3 text-sm font-bold uppercase tracking-wider">{t("table.shop")}</th>
+              <th className="px-4 py-3 text-sm font-bold uppercase tracking-wider">{t("table.collector")}</th>
+              <th className="px-4 py-3 text-right text-sm font-bold uppercase tracking-wider">{t("table.amount")}</th>
+              <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("table.status")}</th>
+              <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("table.actions")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
             {displayedData.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-12 text-center text-sm text-slate-400">
-                  <div className="flex flex-col items-center gap-2">
-                    <span className="text-2xl">📋</span>
-                    <span>{getEmptyStateMessage()}</span>
-                  </div>
+                <td colSpan={8} className="py-16 text-center text-slate-400">
+                  <History size={24} className="mx-auto mb-2" />
+                  {getEmptyStateMessage()}
                 </td>
               </tr>
             ) : (
               displayedData.map((col, index) => {
-                const isPending = col.rawStatus === "Pending Approval";
-                const isDeleted = col.rawStatus === "Deleted";
-                const rowStyle = getRowStyle(col.rawStatus || col.status);
+                const rawStatus = col.rawStatus || col.status;
+                const isPending = rawStatus === "Pending Approval";
+                const isDeleted = rawStatus === "Deleted";
+                const statusKey = "status." + String(rawStatus).toLowerCase().replace(/\s+/g, "_");
+                const statusLabel = t(statusKey) === statusKey ? rawStatus : t(statusKey);
+                const statusIcon = isDeleted ? (
+                  <AlertCircle size={12} />
+                ) : isPending ? (
+                  <Clock size={12} />
+                ) : (
+                  <CheckCircle size={12} />
+                );
 
                 return (
                   <tr
                     key={`${col.id}-${index}`}
-                    className={`transition-colors hover:bg-slate-50/80 ${
-                      index % 2 === 0 ? "bg-white" : "bg-slate-50/30"
-                    } ${rowStyle}`}
+                    className={`transition-colors hover:bg-slate-50/80 ${getRowStyle(rawStatus)}`}
                   >
-                    <td className="px-3.5 py-3 text-center text-xs font-semibold text-slate-500">
+                    <td className="px-4 py-3 text-center text-xs font-semibold text-slate-500 tabular-nums">
                       {index + 1}
                     </td>
-                    <td className="px-3.5 py-3 font-semibold text-slate-800 text-xs whitespace-nowrap">
+                    <td className="px-4 py-3 text-xs font-semibold text-slate-800 whitespace-nowrap">
                       {col.collectionNo}
                     </td>
-                    <td className="px-3.5 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wide">
+                    <td className="px-4 py-3 text-center text-xs font-bold text-slate-600 tabular-nums whitespace-nowrap">
                       {col.collectionDate}
                     </td>
-                    <td className="px-3.5 py-3 text-xs font-semibold text-slate-700">
-                      {col.shopName}
-                    </td>
-                    <td className="px-3.5 py-3 text-xs font-medium text-slate-700">
-                      {col.collectorName}
-                    </td>
-                    <td className="px-3.5 py-3 text-right text-xs font-bold text-slate-700">
+                    <td className="px-4 py-3 text-xs font-semibold text-slate-700">{localize(col.shopName)}</td>
+                    <td className="px-4 py-3 text-xs font-medium text-slate-600">{localize(col.collectorName)}</td>
+                    <td className="px-4 py-3 text-right text-xs font-bold text-slate-700 tabular-nums whitespace-nowrap">
                       {inr(col.amount)}
                     </td>
-                    <td className="px-3.5 py-3 text-center">
+                    <td className="px-4 py-3 text-center">
                       <span
-                        className={`inline-block rounded-full px-3 py-1 text-[10px] font-medium border ${getStatusBadgeClass(col.rawStatus || col.status)}`}
+                        className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm border ${getStatusBadgeClass(rawStatus)}`}
                       >
-                        {(() => {
-                          const k = "status." + String(col.rawStatus || col.status).toLowerCase().replace(/\s+/g, "_");
-                          const label = t(k);
-                          return label === k ? col.rawStatus || col.status : label;
-                        })()}
+                        {statusIcon}
+                        {statusLabel}
                       </span>
                     </td>
-                    <td className="px-3.5 py-3 text-center">
+                    <td className="px-4 py-3 text-center">
+                      {/* Icon buttons matching the Trip List action vocabulary.
+                        * No title attributes — the page is tooltip-free, so each
+                        * control carries an aria-label for assistive tech only. */}
                       <div className="flex items-center justify-center gap-1.5">
                         {isPending ? (
                           <>
                             <button
+                              type="button"
                               onClick={() => onApprove(col.id)}
-                              className="rounded-lg bg-green-100 px-3 py-1 text-[10px] font-medium text-green-700 transition hover:bg-green-200"
-                              title={t("common.approve")}
+                              aria-label={t("common.approve")}
+                              className="group h-8 w-8 rounded-xl bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95"
                             >
-                              {t("common.approve")}
+                              <span className={`inline-flex ${uiActionIconMotionClass.approve}`}>
+                                <CheckCircle size={14} />
+                              </span>
                             </button>
                             <button
+                              type="button"
                               onClick={() => onEdit(col)}
-                              className="rounded-lg bg-blue-100 px-3 py-1 text-[10px] font-medium text-blue-700 transition hover:bg-blue-200"
-                              title={t("common.edit")}
+                              aria-label={t("common.edit")}
+                              className="group h-8 w-8 rounded-xl bg-blue-50 hover:bg-blue-500 text-blue-600 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95"
                             >
-                              {t("common.edit")}
+                              <span className={`inline-flex ${uiActionIconMotionClass.edit}`}>
+                                <Pencil size={14} />
+                              </span>
                             </button>
                             <button
+                              type="button"
                               onClick={() => onDelete(col.id)}
-                              className="rounded-lg bg-red-100 px-3 py-1 text-[10px] font-medium text-red-700 transition hover:bg-red-200"
-                              title={t("common.delete")}
+                              aria-label={t("common.delete")}
+                              className="group h-8 w-8 rounded-xl bg-rose-50 hover:bg-rose-500 text-rose-600 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95"
                             >
-                              {t("common.delete")}
+                              <span className={`inline-flex ${uiActionIconMotionClass.delete}`}>
+                                <Trash2 size={14} />
+                              </span>
                             </button>
                           </>
                         ) : isDeleted ? (
-                          <span className="text-xs text-slate-400 font-medium">{t("status.deleted")}</span>
+                          <span className="text-xs font-medium text-slate-400">{t("status.deleted")}</span>
                         ) : (
                           <button
+                            type="button"
                             onClick={() => onViewShop(col.shopName)}
-                            className="rounded-lg bg-blue-100 px-4 py-1 text-[10px] font-medium text-blue-700 transition hover:bg-blue-200"
-                            title={t("common.view")}
+                            aria-label={t("common.view")}
+                            className="group h-8 w-8 rounded-xl bg-violet-50 hover:bg-violet-500 text-violet-600 hover:text-white flex items-center justify-center mx-auto transition-all shadow-sm active:scale-95"
                           >
-                            {t("common.view")}
+                            <span className={`inline-flex ${uiActionIconMotionClass.view}`}>
+                              <Eye size={14} />
+                            </span>
                           </button>
                         )}
                       </div>

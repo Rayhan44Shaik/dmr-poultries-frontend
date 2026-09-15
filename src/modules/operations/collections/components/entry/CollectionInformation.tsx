@@ -185,19 +185,21 @@ function CollectionInformation({
           type="button"
           onClick={onViewLedger}
           disabled={!isLedgerEnabled || ledgerLoading}
-          title={
-            !isLedgerEnabled
-              ? t("ops.collection.select_shop_collector_mode")
-              : ledgerLoading
-                ? t("common.loading")
-                : ""
-          }
           className={`group relative inline-flex h-9 items-center gap-2 rounded-lg px-4 text-sm font-semibold text-white shadow-sm transition ${
             isLedgerEnabled && !ledgerLoading
               ? "bg-emerald-600 hover:bg-emerald-700"
               : "cursor-not-allowed bg-slate-400"
           }`}
-          aria-label={t("ops.collection.view_shop_ledger")}
+          // No hover tooltip on this page by design. The accessible name still
+          // explains WHY the button is unavailable, so the reason reaches
+          // assistive tech even though nothing pops up on hover.
+          aria-label={
+            !isLedgerEnabled
+              ? t("ops.collection.select_shop_collector_mode")
+              : ledgerLoading
+                ? t("common.loading")
+                : t("ops.collection.view_shop_ledger")
+          }
         >
           {ledgerLoading ? (
             <>

@@ -2561,6 +2561,28 @@ function materializeTripSales(trip) {
 }
 
 /**
+ * Withdraws a trip's sales from the ledger — the exact inverse of
+ * materializeTripSales. Used when an approved trip is moved back to
+ * Draft/Pending: only an approved trip may carry a shop balance, so the money
+ * must come back off the moment approval is revoked.
+ *
+ * Rows are soft-deleted rather than spliced, so Shop Sales history keeps its
+ * audit trail. Balances are then rebuilt from the ledger, which makes repeated
+ * calls idempotent.
+ */
+function dematerializeTripSales(trip) {
+  const affectedShopIds = new Set();
+  for (const sale of SHOP_SALES) {
+    if (Number(sale.tripId) !== Number(trip.id) || sale.deleted === true) continue;
+    sale.deleted = true;
+    sale.deletedReason = "Trip approval revoked";
+    sale.updatedAt = nowIso();
+    affectedShopIds.add(sale.shopId);
+  }
+  for (const shopId of affectedShopIds) syncShopCurrentBalance(shopId);
+}
+
+/**
  * The Shop Sales edit limit is calculated at request time from the entire
  * source trip. It therefore cannot be bypassed by paging, filtering, a stale
  * tab, or a crafted request: delivered birds plus all mortality must never be
@@ -4049,6 +4071,10 @@ const server = http.createServer(async (req, res) => {
       }
       if (method === "DELETE") {
         trip.deleted = true;
+        trip.deletedAt = nowIso();
+        // A deleted trip is no longer a sale, so its money must leave every
+        // shop's outstanding balance immediately.
+        dematerializeTripSales(trip);
         return send(200, { id: tripId, deleted: true, sample: true });
       }
       return send(200, trip);
@@ -4096,10 +4122,36 @@ const server = http.createServer(async (req, res) => {
     // Status transition: PATCH /api/trips/:id/status
     if (m(/^\/api\/trips\/(\d+)\/status$/) && method === "PATCH") {
       const body = await readBody(req);
+      const nextStatus = body?.status;
       const trip = mergeTripBody(m(/^\/api\/trips\/(\d+)\/status$/)[1], {
-        ...(body?.status ? { status: body.status } : {}),
+        ...(nextStatus ? { status: nextStatus } : {}),
       });
-      return trip ? send(200, trip) : send(404, { error: "trip_not_found" });
+      if (!trip) return send(404, { error: "trip_not_found" });
+      // Approving a trip is the financial hand-off: its deliveries become Shop
+      // Sales and must hit the shop's outstanding balance straight away. Only
+      // an APPROVED (Completed) trip may do so — Draft/Pending/Deleted trips
+      // must never touch a balance. Previously only the Rate Entry lock route
+      // materialised sales, so a trip approved from the Trip List left Masters,
+      // Shop Ledger and Collection Entry showing a stale outstanding figure.
+      if (nextStatus === "Completed" && trip.deleted !== true) {
+        trip.approvedBy = body?.approvedBy ?? trip.approvedBy ?? "Owner";
+        trip.approvedAt = nowIso();
+        if (!COMPLETED_TRIPS.some((completed) => completed.id === trip.id)) {
+          COMPLETED_TRIPS.push(trip);
+        }
+        // Idempotent: materializeTripSales upserts by delivery id and then
+        // rebuilds each affected shop balance from the full ledger, so a
+        // repeated approve cannot double-count.
+        materializeTripSales(trip);
+        materializeFarmPayment(trip);
+      }
+      // Un-approving (back to Draft/Pending) or deleting must withdraw the
+      // sales again, otherwise the balance would keep money the business no
+      // longer considers sold.
+      if (nextStatus && nextStatus !== "Completed") {
+        dematerializeTripSales(trip);
+      }
+      return send(200, trip);
     }
 
     // ── Operations ────────────────────────────────────────────────────────

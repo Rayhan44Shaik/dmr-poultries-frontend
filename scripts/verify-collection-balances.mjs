@@ -999,6 +999,72 @@ describe("sales, cross-module sync and contract", () => {
     money(end.approvedCollections, start.approvedCollections);
   });
 
+  test("099b approving a trip posts its sales to shop outstanding immediately", async () => {
+    const trips = await get("/trips");
+    const rows = Array.isArray(trips) ? trips : (trips.data ?? []);
+    const trip = rows.find(
+      (row) =>
+        row.status === "Pending" &&
+        row.deleted !== true &&
+        (row.deliveries ?? []).some((d) => Number(d.amount) > 0),
+    );
+    assert.ok(trip, "expected a pending trip carrying rated deliveries");
+
+    const expected = new Map();
+    for (const d of trip.deliveries) {
+      expected.set(d.shopId, round((expected.get(d.shopId) ?? 0) + Number(d.amount ?? 0)));
+    }
+    const balances = async () => {
+      const shops = await get("/masters/shops");
+      const list = Array.isArray(shops) ? shops : shops.data;
+      return new Map(list.map((s) => [s.id, s.currentBalance]));
+    };
+
+    const before = await balances();
+    await req(`/trips/${trip.id}/status`, { method: "PATCH", body: { status: "Completed" } });
+    const after = await balances();
+    for (const [shopId, amount] of expected) {
+      money(after.get(shopId), before.get(shopId) + amount, `shop ${shopId} did not receive the trip sale`);
+    }
+
+    // Re-approving must not double-count.
+    await req(`/trips/${trip.id}/status`, { method: "PATCH", body: { status: "Completed" } });
+    const again = await balances();
+    for (const [shopId] of expected) money(again.get(shopId), after.get(shopId), `shop ${shopId} double-counted`);
+
+    // Only approved trips carry a balance: revoking must withdraw the money.
+    await req(`/trips/${trip.id}/status`, { method: "PATCH", body: { status: "Pending" } });
+    const reverted = await balances();
+    for (const [shopId] of expected) {
+      money(reverted.get(shopId), before.get(shopId), `shop ${shopId} kept revoked trip money`);
+    }
+  });
+
+  test("099c an approved trip's sales flow into the Collection Entry summary", async () => {
+    const trips = await get("/trips");
+    const rows = Array.isArray(trips) ? trips : (trips.data ?? []);
+    const trip = rows.find(
+      (row) =>
+        row.status === "Pending" &&
+        row.deleted !== true &&
+        (row.deliveries ?? []).some((d) => Number(d.amount) > 0),
+    );
+    assert.ok(trip);
+    const shopId = trip.deliveries.find((d) => Number(d.amount) > 0).shopId;
+
+    await req(`/trips/${trip.id}/status`, { method: "PATCH", body: { status: "Completed" } });
+    const summary = await summaryFor(shopId, TODAY);
+    const shops = await get("/masters/shops");
+    const list = Array.isArray(shops) ? shops : shops.data;
+    money(summary.balance, list.find((s) => s.id === shopId).currentBalance, "summary drifted from master");
+    money(
+      summary.openingBalance + summary.weeklySales - summary.approvedCollections,
+      summary.balance,
+      "identity broken after trip approval",
+    );
+    await req(`/trips/${trip.id}/status`, { method: "PATCH", body: { status: "Pending" } });
+  });
+
   test("100 after every case above, all 200 shops still reconcile", async () => {
     const rows = await summariesFor(TODAY);
     assert.equal(rows.length, 200);
