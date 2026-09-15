@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   X, Save, Eye, Calendar, User, CreditCard, Hash, IndianRupee, FileText, Loader2,
-  FileDown, Trash2, Store, Activity, Wallet, ShieldAlert, Clock, UserCog, Search,
+  FileDown, Trash2, Store, Activity, Wallet, ShieldAlert, Clock, UserCog, Search, Settings2,
 } from "lucide-react";
 import type { Collection, CollectionApiEntry } from "../../types/collection";
 import { collectionService } from "../../services/collectionService";
@@ -244,7 +244,10 @@ export function EditCollectionModal({
    * Confirming starts a visible countdown instead of deleting straight away,
    * which gives an undo window for a destructive, balance-changing action.
    * ------------------------------------------------------------------ */
-  const deleteWindow = getDeleteWindowForStatus(formData.collectionDate, selected?.status);
+  const deleteWindow = getDeleteWindowForStatus(
+    selected?.collectionDate ?? formData.collectionDate,
+    selected?.status,
+  );
   const isPendingEntry = String(selected?.status ?? "").toLowerCase().startsWith("pending");
   const canDelete = Boolean(selected) && deleteWindow.canDelete && selected?.status !== "Deleted";
 
@@ -450,26 +453,6 @@ export function EditCollectionModal({
                     )}
                   </button>
 
-                  {/* Delete is shown only when the selected entry is currently
-                    * eligible. An ineligible entry has no misleading disabled
-                    * trash icon at all. */}
-                  {canDelete && (
-                    <button
-                      type="button"
-                      onClick={startDeleteCountdown}
-                      disabled={confirmingDelete || deleting}
-                      aria-label={`${t("ops.collection.delete_collection")} — ${deleteHint}`}
-                      className="group relative inline-flex items-center justify-center rounded-xl border border-rose-100 bg-rose-50/70 p-2 text-rose-500 shadow-sm transition-all hover:bg-rose-50/90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      {deleting ? (
-                        <Loader2 size={16} className="animate-spin" />
-                      ) : (
-                        <span className={`inline-flex ${uiActionIconMotionClass.delete}`}>
-                          <Trash2 size={16} />
-                        </span>
-                      )}
-                    </button>
-                  )}
                 </>
               )}
               <button
@@ -525,7 +508,7 @@ export function EditCollectionModal({
                 {/* Every selected-entry field is a self-contained, colour-coded
                   * box. The uniform grid makes the value scan one field at a
                   * time without the old amount/metadata spacing imbalance. */}
-                <div className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="grid grid-cols-1 gap-2.5 p-4 sm:grid-cols-2 xl:grid-cols-4">
                   {[
                     {
                       key: "amount",
@@ -602,16 +585,16 @@ export function EditCollectionModal({
                   ].map(({ key, label, value, icon: Icon, surface, iconClass, valueClass }) => (
                     <div
                       key={key}
-                      className={`flex min-h-24 min-w-0 items-start gap-3 rounded-xl border p-3.5 shadow-sm ${surface}`}
+                      className={`flex min-h-[76px] min-w-0 items-start gap-2.5 rounded-xl border p-3 shadow-sm ${surface}`}
                     >
-                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 ring-inset ${iconClass}`}>
-                        <Icon size={17} strokeWidth={2.25} />
+                      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset ${iconClass}`}>
+                        <Icon size={16} strokeWidth={2.25} />
                       </span>
-                      <div className="min-w-0 pt-0.5">
-                        <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                      <div className="min-w-0">
+                        <p className="text-[9.5px] font-extrabold uppercase tracking-wider text-slate-500">
                           {label}
                         </p>
-                        <p className={`mt-1 break-words text-sm font-bold leading-snug ${valueClass}`}>
+                        <p className={`mt-0.5 break-words text-[13px] font-bold leading-snug ${valueClass}`}>
                           {value}
                         </p>
                       </div>
@@ -649,13 +632,13 @@ export function EditCollectionModal({
 
               {/* Recent 10 Shop Credits — backend-sourced, newest first */}
               <div className="mt-5">
-                <div className="mb-3 flex items-center justify-between">
-                  <h4 className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+                <div className="mb-3 flex flex-col gap-3 rounded-xl border border-slate-200/80 bg-gradient-to-r from-slate-50 via-white to-emerald-50/40 px-4 py-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+                  <h4 className="flex items-center gap-2 text-sm font-extrabold tracking-tight text-slate-800">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 ring-1 ring-inset ring-emerald-200">
                       <FileText size={15} />
                     </span>
                     {t("ops.collection.recent_10_credits")}
-                    <span className="hidden rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:inline">
+                    <span className="hidden rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700 sm:inline">
                       {t("ops.collection.click_row_to_view")}
                     </span>
                   </h4>
@@ -701,63 +684,70 @@ export function EditCollectionModal({
                 ) : (
                   <div className="overflow-x-auto rounded-lg border border-slate-200">
                     {/* Same leading order as Recent Collections: S.No,
-                      * Collection No, Day. Widths are balanced around the real
-                      * values so all seven columns remain neat and readable. */}
-                    <table className="min-w-[980px] w-full table-fixed divide-y divide-slate-200">
+                      * Collection No, Day. Amount and Collector get equal room;
+                      * the final Actions cell belongs to the selected row. */}
+                    <table className="min-w-[1080px] w-full table-fixed divide-y divide-slate-200">
                       <colgroup>
-                        <col className="w-[7%]" />
-                        <col className="w-[18%]" />
+                        <col className="w-[6%]" />
                         <col className="w-[17%]" />
                         <col className="w-[17%]" />
-                        <col className="w-[16%]" />
                         <col className="w-[14%]" />
-                        <col className="w-[11%]" />
+                        <col className="w-[14%]" />
+                        <col className="w-[13%]" />
+                        <col className="w-[10%]" />
+                        <col className="w-[9%]" />
                       </colgroup>
                       {/* Header icons use the same vocabulary as every other
                         * operations table (Trip List, Shop Sales, Recent
                         * Collections) so the columns read identically. */}
-                      <thead className="bg-slate-50">
+                      <thead className="border-b border-slate-200 bg-slate-50/75 text-slate-600">
                         <tr>
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
                             <span className="inline-flex items-center gap-1.5">
                               <Hash size={14} className="shrink-0 text-slate-400" />
                               {t("table.s_no")}
                             </span>
                           </th>
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
                             <span className="inline-flex items-center gap-1.5">
                               <FileText size={14} className="shrink-0 text-emerald-500" />
                               {t("table.collection_no")}
                             </span>
                           </th>
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
                             <span className="inline-flex items-center gap-1.5">
                               <Calendar size={14} className="shrink-0 text-blue-500" />
                               {t("common.day")}
                             </span>
                           </th>
-                          <th className="px-4 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
                             <span className="inline-flex w-full items-center justify-end gap-1.5">
                               <IndianRupee size={14} className="shrink-0 text-emerald-600" />
                               {t("table.amount")}
                             </span>
                           </th>
-                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
                             <span className="inline-flex items-center gap-1.5">
                               <UserCog size={14} className="shrink-0 text-violet-500" />
                               {t("table.collector")}
                             </span>
                           </th>
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
                             <span className="inline-flex items-center gap-1.5">
                               <CreditCard size={14} className="shrink-0 text-sky-500" />
                               {t("operations.payment_mode")}
                             </span>
                           </th>
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
                             <span className="inline-flex items-center gap-1.5">
                               <Activity size={14} className="shrink-0 text-orange-500" />
                               {t("table.status")}
+                            </span>
+                          </th>
+                          <th className="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
+                            <span className="inline-flex items-center justify-center gap-1.5">
+                              <Settings2 size={14} className="shrink-0 text-slate-400" />
+                              {t("table.actions")}
                             </span>
                           </th>
                         </tr>
@@ -785,26 +775,46 @@ export function EditCollectionModal({
                                 : "hover:bg-slate-50/80"
                             }`}
                           >
-                            <td className="px-3 py-2.5 text-xs font-semibold tabular-nums text-slate-500">
+                            <td className="px-4 py-3 text-xs font-semibold tabular-nums text-slate-500">
                               {index + 1}
                             </td>
-                            <td className="px-3 py-2.5 text-xs font-medium text-slate-700">
+                            <td className="px-4 py-3 text-xs font-medium text-slate-700">
                               {col.collectionNo || "-"}
                             </td>
-                            <td className="px-3 py-2.5 text-xs text-slate-600 tabular-nums whitespace-nowrap">
+                            <td className="px-4 py-3 text-xs text-slate-600 tabular-nums whitespace-nowrap">
                               {formatTripListDay(col.collectionDate, language)}
                             </td>
-                            <td className="px-4 py-2.5 text-right text-xs font-bold tabular-nums text-slate-800 whitespace-nowrap">
+                            <td className="px-4 py-3 text-right text-xs font-bold tabular-nums text-slate-800 whitespace-nowrap">
                               {formatCurrency(Number(col.amount) || 0)}
                             </td>
-                            <td className="px-4 py-2.5 text-xs font-medium text-slate-600 truncate">
+                            <td className="px-4 py-3 text-xs font-medium text-slate-600 truncate">
                               {tr(col.collector) || "-"}
                             </td>
-                            <td className="px-3 py-2.5 text-xs text-slate-600">
+                            <td className="px-4 py-3 text-xs text-slate-600">
                               {tr(col.paymentMode) || "-"}
                             </td>
-                            <td className="px-3 py-2.5 text-xs text-slate-600">
+                            <td className="px-4 py-3 text-xs font-medium text-slate-600">
                               {collectionStatusLabel(col.status, t) || "-"}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              {isRowSelected && canDelete ? (
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    startDeleteCountdown();
+                                  }}
+                                  disabled={confirmingDelete || deleting}
+                                  aria-label={`${t("ops.collection.delete_collection")} — ${deleteHint}`}
+                                  className="group inline-flex h-8 w-8 items-center justify-center rounded-xl border border-rose-100 bg-rose-50 text-rose-500 shadow-sm transition-all hover:bg-rose-500 hover:text-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  {deleting ? (
+                                    <Loader2 size={14} className="animate-spin" />
+                                  ) : (
+                                    <Trash2 size={14} className={uiActionIconMotionClass.delete} />
+                                  )}
+                                </button>
+                              ) : null}
                             </td>
                           </tr>
                           );

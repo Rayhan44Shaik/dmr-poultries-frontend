@@ -414,11 +414,11 @@ export default function RecentCollectionsTable({
             <col className="w-[6%]" />
             <col className="w-[15%]" />
             <col className="w-[16%]" />
-            <col className="w-[17%]" />
-            <col className="w-[15%]" />
+            <col className="w-[18%]" />
             <col className="w-[12%]" />
-            <col className="w-[9%]" />
+            <col className="w-[12%]" />
             <col className="w-[10%]" />
+            <col className="w-[11%]" />
           </colgroup>
           <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-600">
             <tr>
@@ -455,7 +455,7 @@ export default function RecentCollectionsTable({
                 </span>
               </th>
               <th className="px-4 py-3 text-right text-sm font-bold uppercase tracking-wider">
-                <span className="inline-flex items-center justify-end gap-1.5">
+                <span className="inline-flex w-full items-center justify-end gap-1.5">
                   <IndianRupee size={14} className="shrink-0 text-emerald-600" />
                   {t("table.amount")}
                 </span>
