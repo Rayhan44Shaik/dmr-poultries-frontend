@@ -17,6 +17,8 @@ try {
   const mod = await server.ssrLoadModule("/scripts/dashboard-sync-check.entry.ts");
   await mod.runDashboardSyncCheck();
 } finally {
+  // server.close() already shuts the HMR websocket down; closing it again
+  // makes Vite emit an unhandled "The server is not running" error.
+  server.ws.on("error", () => {});
   await server.close();
-  await server.ws.close();
 }

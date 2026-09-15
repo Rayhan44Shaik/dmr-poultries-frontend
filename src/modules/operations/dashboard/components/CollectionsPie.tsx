@@ -1,167 +1,152 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Cell, Pie, PieChart, ResponsiveContainer, Sector, type PieSectorShapeProps } from "recharts";
+import { useMemo, useState } from "react";
 import { useI18n } from "../../../../i18n";
 import { formatINRCompact } from "../../../../utils/format";
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
-/** Lighten a hex colour toward white (for the slice gradient top stop). */
-function lighten(hex: string, amt = 0.22): string {
+
+/* ------------------------------------------------------------------ *
+ * 3D pie geometry — fixed viewBox stage (pure SVG, no chart library).
+ *
+ * The pie is an ellipse (top face) extruded straight down by DEPTH,
+ * like a classic infographic 3D pie: a gradient top face, darker
+ * extruded side walls on the front (lower) half, a soft ground
+ * shadow, and a big colour-matched % label floating outside every
+ * slice at its own mid-angle.
+ * ------------------------------------------------------------------ */
+const W = 480;
+const H = 330;
+const CX = W / 2;
+const CY = 139; // top-face centre
+const RX = 148; // top-face horizontal radius
+const RY = 66; // top-face vertical radius (flattened = perspective)
+const DEPTH = 52; // vertical extrusion
+const GAP_DEG = 3.5; // angular gap between slices
+const LABEL_GAP = 14; // label distance outside the pie edge
+
+const rad = (deg: number) => (deg * Math.PI) / 180;
+const f = (n: number) => n.toFixed(2);
+
+/** amt in [-1, 1]: negative darkens toward black, positive lightens toward white. */
+function shade(hex: string, amt: number): string {
   const n = hex.replace("#", "");
   const c = [0, 2, 4].map((i) => parseInt(n.slice(i, i + 2), 16));
-  const f = (v: number) => Math.round(v + (255 - v) * amt);
-  return `rgb(${f(c[0])}, ${f(c[1])}, ${f(c[2])})`;
+  const target = amt < 0 ? 0 : 255;
+  const p = Math.abs(amt);
+  const mix = (v: number) => Math.round(v + (target - v) * p);
+  return `rgb(${mix(c[0])}, ${mix(c[1])}, ${mix(c[2])})`;
 }
+
+/** Point on the top-face ellipse at angle `deg` (0 = 3 o'clock, clockwise). */
+function ellPoint(deg: number, dy = 0) {
+  return { x: CX + RX * Math.cos(rad(deg)), y: CY + RY * Math.sin(rad(deg)) + dy };
+}
+
+/** Top-face sector path (a full 100% slice is split into two arcs). */
+function topFacePath(a0: number, a1: number): string {
+  const s = ellPoint(a0);
+  if (a1 - a0 >= 359.9) {
+    const m = ellPoint(a0 + 180);
+    return `M ${f(CX)} ${f(CY)} L ${f(s.x)} ${f(s.y)} A ${RX} ${RY} 0 1 1 ${f(m.x)} ${f(m.y)} A ${RX} ${RY} 0 1 1 ${f(s.x)} ${f(s.y)} Z`;
+  }
+  const e = ellPoint(a1);
+  const large = a1 - a0 > 180 ? 1 : 0;
+  return `M ${f(CX)} ${f(CY)} L ${f(s.x)} ${f(s.y)} A ${RX} ${RY} 0 ${large} 1 ${f(e.x)} ${f(e.y)} Z`;
+}
+
+/** Extruded side wall for the front (lower-half) part of the slice's outer arc. */
+function wallPath(a0: number, a1: number): string | null {
+  const vs = Math.max(a0, 0);
+  const ve = Math.min(a1, 180);
+  if (ve - vs < 0.5) return null;
+  const t0 = ellPoint(vs);
+  const t1 = ellPoint(ve);
+  const b1 = ellPoint(ve, DEPTH);
+  const b0 = ellPoint(vs, DEPTH);
+  const large = ve - vs > 180 ? 1 : 0;
+  return (
+    `M ${f(t0.x)} ${f(t0.y)} A ${RX} ${RY} 0 ${large} 1 ${f(t1.x)} ${f(t1.y)} ` +
+    `L ${f(b1.x)} ${f(b1.y)} A ${RX} ${RY} 0 ${large} 0 ${f(b0.x)} ${f(b0.y)} Z`
+  );
+}
+
+/** Big % label position — just outside the slice's mid-angle edge. */
+function labelPoint(mid: number) {
+  const below = Math.sin(rad(mid)) > 0;
+  return {
+    x: CX + (RX + LABEL_GAP) * Math.cos(rad(mid)),
+    y: CY + (RY + (below ? DEPTH : 0) + LABEL_GAP) * Math.sin(rad(mid)),
+  };
+}
+
+/** Hover "explode": push the slice outward along its mid-angle and lift it. */
+function liftTransform(mid: number) {
+  const dx = 9 * Math.cos(rad(mid));
+  const dy = 9 * Math.sin(rad(mid)) - 12;
+  return `translate(${f(dx)}px, ${f(dy)}px)`;
+}
+
+const SPRING = "cubic-bezier(0.34, 1.4, 0.64, 1)";
 
 interface CollectionsPieProps {
   data: { name: string; value: number }[];
 }
 
-interface EnrichedMode {
+interface Slice {
   name: string;
   value: number;
   percent: number;
   color: string;
-}
-
-/** Ease-out count-up for the centre total (rAF driven, ~900 ms). */
-function useCountUp(target: number, duration = 900): number {
-  const [value, setValue] = useState(0);
-  const anim = useRef({ target: 0, start: 0, frame: 0 });
-
-  useEffect(() => {
-    const s = anim.current;
-    s.target = target;
-    s.start = performance.now();
-    cancelAnimationFrame(s.frame);
-    const tick = (now: number) => {
-      if (s.target <= 0) {
-        setValue(0);
-        return;
-      }
-      const p = Math.min(1, (now - s.start) / duration);
-      setValue(s.target * (1 - Math.pow(1 - p, 3)));
-      if (p < 1) s.frame = requestAnimationFrame(tick);
-    };
-    s.frame = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(s.frame);
-  }, [target, duration]);
-
-  return value;
+  a0: number;
+  a1: number;
+  mid: number;
 }
 
 /**
- * Collection Streams — payment-mode donut for the Operations dashboard.
+ * Collection Streams — payment-mode 3D pie for the Operations dashboard.
  *
- * A fixed 240 px square stage keeps the ring a perfect circle at every window
- * size, with generous white space on all sides. Slices sweep in on mount /
- * range change, and on hover a % badge springs in right at that slice's own
- * mid-angle (while it lifts and the rest dim). Every slice keeps a quiet
- * rounded % label, sits on a soft background track, and the legend below
- * lists every mode with exact amount and share. The card title links to the
- * Collection Report.
+ * A solid extruded 3D pie (top face + front side walls + ground shadow)
+ * with a large colour-matched % label floating outside every slice at its
+ * own mid-angle. Hovering a slice lifts it outward, grows its label, and
+ * dims the rest. The legend below lists every mode with exact amount and
+ * share; the card title links to the Collection Report.
  */
 export default function CollectionsPie({ data }: CollectionsPieProps) {
   const { t } = useI18n();
-  const chartData = useMemo(() => data ?? [], [data]);
   const [hoverIndex, setHoverIndex] = useState(-1);
+  const chartData = useMemo(() => data ?? [], [data]);
 
-  const enrichedData = useMemo<EnrichedMode[]>(() => {
+  const slices = useMemo<Slice[]>(() => {
     const total = chartData.reduce((sum, d) => sum + (Number(d.value) || 0), 0);
-    return chartData.map((d, i) => ({
-      name: d.name,
-      value: Number(d.value) || 0,
-      percent: total > 0 ? ((Number(d.value) || 0) / total) * 100 : 0,
-      color: COLORS[i % COLORS.length],
-    }));
+    if (total <= 0) return [];
+    let angle = -90; // start at 12 o'clock, sweep clockwise
+    return chartData.map((d, i) => {
+      const value = Number(d.value) || 0;
+      const span = (value / total) * 360;
+      const a0 = angle;
+      const a1 = angle + span;
+      angle = a1;
+      return {
+        name: d.name,
+        value,
+        percent: (value / total) * 100,
+        color: COLORS[i % COLORS.length],
+        a0,
+        a1,
+        mid: (a0 + a1) / 2,
+      };
+    });
   }, [chartData]);
 
-  const total = useMemo(
-    () => enrichedData.reduce((sum, d) => sum + d.value, 0),
-    [enrichedData]
-  );
-  const animatedTotal = useCountUp(total);
-
-  // recharts v3: the per-sector shape gets `isActive` for the hovered slice —
-  // lift it (bigger outer radius), dim the rest, and paint the % label at the
-  // slice's own mid-angle while it is settled (not mid-sweep).
-  const renderSector = useCallback(
-    (props: PieSectorShapeProps) => {
-      const {
-        cx,
-        cy,
-        innerRadius,
-        outerRadius,
-        startAngle,
-        endAngle,
-        isActive,
-        index,
-        midAngle,
-        middleRadius,
-        isAnimating,
-      } = props;
-      const mode = enrichedData[index];
-      const oR = isActive ? (outerRadius ?? 0) + 8 : outerRadius;
-      const dimmed = hoverIndex !== -1 && !isActive;
-      const showLabel = !isAnimating && (mode?.percent ?? 0) >= 6 && midAngle != null && middleRadius != null;
-      const rad = ((midAngle ?? 0) * Math.PI) / 180;
-      const lx = (cx ?? 0) + (middleRadius ?? 0) * Math.cos(rad) + (isActive ? 4 : 0);
-      const ly = (cy ?? 0) + (middleRadius ?? 0) * Math.sin(rad) + (isActive ? 4 : 0);
-      return (
-        <g opacity={dimmed ? 0.35 : 1} style={{ transition: "opacity 180ms ease" }}>
-          <Sector
-            cx={cx}
-            cy={cy}
-            innerRadius={innerRadius}
-            outerRadius={oR}
-            startAngle={startAngle}
-            endAngle={endAngle}
-            cornerRadius={6}
-            fill={`url(#cs-grad-${index})`}
-          />
-          {showLabel &&
-            (isActive ? (
-              /* Pop badge — springs in right on the hovered slice's own spot
-                 (its mid-angle), showing the exact share. */
-              <g transform={`translate(${lx}, ${ly})`} style={{ pointerEvents: "none" }}>
-                <g
-                  className="animate-pop-in"
-                  style={{ transformBox: "fill-box", transformOrigin: "center" }}
-                >
-                  <rect x={-27} y={-12.5} width={54} height={25} rx={12.5} fill="rgba(15, 23, 42, 0.92)" />
-                  <text
-                    x={0}
-                    y={0.5}
-                    textAnchor="middle"
-                    dominantBaseline="central"
-                    fontSize={11.5}
-                    fontWeight={800}
-                    fill="#ffffff"
-                  >
-                    {mode!.percent.toFixed(1)}%
-                  </text>
-                </g>
-              </g>
-            ) : (
-              <text
-                x={lx}
-                y={ly}
-                textAnchor="middle"
-                dominantBaseline="central"
-                fontSize={11}
-                fontWeight={700}
-                fill="#ffffff"
-                style={{ pointerEvents: "none" }}
-              >
-                {mode!.percent.toFixed(0)}%
-              </text>
-            ))}
-        </g>
-      );
-    },
-    [enrichedData, hoverIndex]
+  // Back-to-front paint order (by the slice mid-angle's screen y).
+  const drawOrder = useMemo(
+    () =>
+      slices
+        .map((s, i) => ({ s, i }))
+        .sort((a, b) => Math.sin(rad(a.s.mid)) - Math.sin(rad(b.s.mid))),
+    [slices]
   );
 
-  if (chartData.length === 0) {
+  if (slices.length === 0) {
     return (
       <div className="flex w-full min-w-0 flex-1 items-center justify-center py-10 text-center text-sm text-slate-400">
         {t("empty.no_data")}
@@ -171,79 +156,135 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
 
   return (
     <div className="flex w-full min-w-0 flex-1 flex-col">
-      {/* Donut — fixed square stage, generous white space on all sides. */}
-      <div className="flex min-h-0 flex-1 items-center justify-center py-3">
-        <div className="relative h-64 w-64">
-          {/* Soft background track behind the ring (matches the 58%–84% band). */}
-          <div className="absolute left-1/2 top-1/2 h-[215px] w-[215px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[33px] border-slate-100/80" />
-
-          <div className="h-full w-full [filter:drop-shadow(0_18px_26px_-16px_rgba(15,23,42,0.35))]">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <defs>
-                  {enrichedData.map((d, i) => (
-                    <linearGradient key={d.name} id={`cs-grad-${i}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" stopColor={lighten(d.color)} />
-                      <stop offset="100%" stopColor={d.color} />
-                    </linearGradient>
-                  ))}
-                </defs>
-                <Pie
-                  data={enrichedData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius="58%"
-                  outerRadius="84%"
-                  paddingAngle={3}
-                  cornerRadius={6}
-                  stroke="none"
-                  shape={renderSector}
-                  onMouseOver={(_entry, index) => setHoverIndex(index)}
-                  onMouseOut={() => setHoverIndex(-1)}
-                  animationBegin={150}
-                  animationDuration={900}
-                  animationEasing="ease-out"
+      {/* 3D pie — fixed viewBox stage, generous white space on all sides. */}
+      <div className="flex min-h-0 flex-1 items-center justify-center py-2">
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          className="w-full max-w-[450px]"
+          role="img"
+          aria-label={`Collection streams: ${slices.map((s) => `${s.name} ${Math.round(s.percent)}%`).join(", ")}`}
+        >
+          <defs>
+            {slices.map((s, i) => (
+              <g key={s.name}>
+                <linearGradient
+                  id={`cs3d-top-${i}`}
+                  gradientUnits="userSpaceOnUse"
+                  x1={CX}
+                  y1={CY - RY}
+                  x2={CX}
+                  y2={CY + RY}
                 >
-                  {enrichedData.map((d) => (
-                    <Cell key={d.name} fill={d.color} />
-                  ))}
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+                  <stop offset="0%" stopColor={shade(s.color, 0.24)} />
+                  <stop offset="100%" stopColor={s.color} />
+                </linearGradient>
+                <linearGradient
+                  id={`cs3d-wall-${i}`}
+                  gradientUnits="userSpaceOnUse"
+                  x1={CX}
+                  y1={CY + 8}
+                  x2={CX}
+                  y2={CY + RY + DEPTH}
+                >
+                  <stop offset="0%" stopColor={shade(s.color, -0.16)} />
+                  <stop offset="100%" stopColor={shade(s.color, -0.36)} />
+                </linearGradient>
+              </g>
+            ))}
+          </defs>
 
-          {/* Centre total — count-up on load / range change. */}
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-              {t("ops.dashboard.collection_streams_total")}
-            </span>
-            <span className="mt-1 text-[24px] font-black leading-none tracking-tight text-slate-800 tabular-nums">
-              {formatINRCompact(animatedTotal)}
-            </span>
-          </div>
-        </div>
+          {/* Soft ground shadow under the pie. */}
+          <ellipse cx={CX} cy={CY + RY + DEPTH + 7} rx={RX * 0.99} ry={13} fill="rgba(15,23,42,0.07)" />
+
+          {/* Slices, back to front: side wall + gradient top face. */}
+          {drawOrder.map(({ s, i }) => {
+            const dimmed = hoverIndex !== -1 && hoverIndex !== i;
+            const gA0 = s.a0 + GAP_DEG / 2;
+            const gA1 = Math.max(s.a1 - GAP_DEG / 2, gA0 + 0.4);
+            const wall = wallPath(gA0, gA1);
+            return (
+              <g
+                key={s.name}
+                style={{
+                  opacity: dimmed ? 0.4 : 1,
+                  transform: hoverIndex === i ? liftTransform(s.mid) : "translate(0px, 0px)",
+                  transition: `opacity 200ms ease, transform 300ms ${SPRING}`,
+                }}
+              >
+                {wall && <path d={wall} fill={`url(#cs3d-wall-${i})`} />}
+                <path
+                  d={topFacePath(gA0, gA1)}
+                  fill={`url(#cs3d-top-${i})`}
+                  stroke="rgba(255,255,255,0.7)"
+                  strokeWidth={1}
+                  strokeLinejoin="round"
+                />
+              </g>
+            );
+          })}
+
+          {/* Big colour-matched % labels, floating outside each slice. */}
+          {slices.map((s, i) => {
+            if (s.percent < 4) return null;
+            const p = labelPoint(s.mid);
+            const active = hoverIndex === i;
+            return (
+              <g
+                key={s.name}
+                pointerEvents="none"
+                style={{
+                  transform: active ? liftTransform(s.mid) : "translate(0px, 0px)",
+                  transition: `transform 300ms ${SPRING}`,
+                }}
+              >
+                <text
+                  x={f(p.x)}
+                  y={f(p.y)}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontSize={active ? 30 : 27}
+                  fontWeight={800}
+                  fill={s.color}
+                  style={{ transition: "font-size 200ms ease" }}
+                >
+                  {Math.round(s.percent)}%
+                </text>
+              </g>
+            );
+          })}
+
+          {/* Stable hover targets (full, gap-free top faces) — above everything. */}
+          <g onMouseLeave={() => setHoverIndex(-1)}>
+            {slices.map((s, i) => (
+              <path
+                key={s.name}
+                d={topFacePath(s.a0, s.a1)}
+                fill="transparent"
+                style={{ cursor: "pointer" }}
+                onMouseEnter={() => setHoverIndex(i)}
+              />
+            ))}
+          </g>
+        </svg>
       </div>
 
-      {/* Legend — every mode with exact amount and share, tight & staggered. */}
-      <ul className="mt-2 w-full flex-shrink-0 space-y-1 border-t border-slate-100 pt-2.5">
-        {enrichedData.map((d, index) => (
+      {/* Legend — numbered, every mode with exact amount and share. */}
+      <ul className="mt-1 w-full flex-shrink-0 space-y-1 border-t border-slate-100 pt-3">
+        {slices.map((s, i) => (
           <li
-            key={d.name}
+            key={s.name}
             className="flex animate-fade-in-up items-center gap-2"
-            style={{ animationDelay: `${260 + index * 90}ms` }}
+            style={{ animationDelay: `${180 + i * 90}ms` }}
           >
-            <span
-              className="h-2 w-2 flex-shrink-0 rounded-[3px]"
-              style={{ background: `linear-gradient(180deg, ${lighten(d.color)}, ${d.color})` }}
-            />
-            <span className="truncate text-[11.5px] font-semibold text-slate-600">{d.name}</span>
-            <span className="ml-auto text-[11.5px] font-bold tabular-nums text-slate-700">
-              {formatINRCompact(d.value)}
+            <span className="w-5 flex-shrink-0 text-[10px] font-black tabular-nums" style={{ color: s.color }}>
+              {String(i + 1).padStart(2, "0")}
             </span>
-            <span className="w-10 text-right text-[10.5px] font-semibold tabular-nums text-slate-400">
-              {d.percent.toFixed(1)}%
+            <span className="truncate text-[12px] font-semibold text-slate-600">{s.name}</span>
+            <span className="ml-auto text-[12px] font-bold tabular-nums text-slate-700">
+              {formatINRCompact(s.value)}
+            </span>
+            <span className="w-11 flex-shrink-0 text-right text-[11px] font-semibold tabular-nums text-slate-400">
+              {s.percent.toFixed(1)}%
             </span>
           </li>
         ))}

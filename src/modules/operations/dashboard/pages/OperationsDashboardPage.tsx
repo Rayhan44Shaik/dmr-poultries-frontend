@@ -9,6 +9,7 @@ import OperationalTrendsChart from "../components/OperationalTrendsChart";
 import { useOperationalTrends } from "../hooks/useOperationalTrends";
 import { granularityForRange, type Granularity } from "../utils/trendSeries";
 import CollectionsPie from "../components/CollectionsPie";
+import { formatINRCompact } from "../../../../utils/format";
 import RecentTripsTable from "../components/RecentTripsTable";
 import ActiveCounts from "../components/ActiveCounts";
 import PendingCollectionsByShop from "../components/PendingCollectionsByShop";
@@ -594,6 +595,12 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
     [calendarFrom, calendarTo]
   );
 
+  // Collection Streams header total — the same modes the pie below slices.
+  const collectionTotal = useMemo(
+    () => (data?.collectionsByMode ?? []).reduce((sum, d) => sum + (Number(d.value) || 0), 0),
+    [data]
+  );
+
   const calendarKey = `${calendarFrom}:${calendarTo}`;
   const [lastCalendarKey, setLastCalendarKey] = useState(calendarKey);
   if (calendarKey !== lastCalendarKey) {
@@ -816,20 +823,30 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
         </div>
         
         <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/60 p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-5 w-full min-w-0">
-          <Link
-            to="/operations?tab=collection-report"
-            title={t("nav.collectionReport")}
-            className="group/title -mt-1 inline-flex w-fit items-center gap-1.5"
-          >
-            <h3 className="text-sm font-black text-slate-800 transition-colors group-hover/title:text-emerald-600">
-              {t("ops.dashboard.collection_streams")}
-            </h3>
-            <ArrowUpRight
-              size={13}
-              strokeWidth={2.6}
-              className="text-slate-300 transition-all duration-150 group-hover/title:-translate-y-[1px] group-hover/title:translate-x-[1px] group-hover/title:text-emerald-600"
-            />
-          </Link>
+          <div className="-mt-1 flex w-full items-start justify-between gap-3">
+            <Link
+              to="/operations?tab=collection-report"
+              title={t("nav.collectionReport")}
+              className="group/title inline-flex w-fit items-center gap-1.5"
+            >
+              <h3 className="text-sm font-black text-slate-800 transition-colors group-hover/title:text-emerald-600">
+                {t("ops.dashboard.collection_streams")}
+              </h3>
+              <ArrowUpRight
+                size={13}
+                strokeWidth={2.6}
+                className="text-slate-300 transition-all duration-150 group-hover/title:-translate-y-[1px] group-hover/title:translate-x-[1px] group-hover/title:text-emerald-600"
+              />
+            </Link>
+            <div className="text-right">
+              <div className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                {t("ops.dashboard.collection_streams_total")}
+              </div>
+              <div className="mt-0.5 text-base font-black tracking-tight text-slate-800 tabular-nums">
+                {formatINRCompact(collectionTotal)}
+              </div>
+            </div>
+          </div>
           <CollectionsPie data={data?.collectionsByMode || []} />
         </div>
       </div>
