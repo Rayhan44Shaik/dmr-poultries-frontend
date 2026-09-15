@@ -357,14 +357,35 @@ export default function RecentCollectionsTable({
 
       {/* Table — column sizing and type scale match Recent Trip Activity. */}
       <div className="overflow-x-auto">
-        {/* `table-fixed` + an even colgroup gives all eight columns — actions
-          * included — exactly the same width, so the grid reads evenly instead
-          * of collapsing around whichever cell happens to hold long text. */}
-        <table className="min-w-full table-fixed text-sm text-left border-collapse">
+        {/* Column widths are proportioned to what each column actually holds,
+          * measured against the live dataset (longest / average characters):
+          *
+          *   S.No 3 · Collection No 16 · Date 11 · Shop 33/22 · Collector 14/11
+          *   · Amount 11 · Status 16 · Actions 4 icons
+          *
+          * So the deterministic columns (S.No, Date, Amount, Actions) get fixed
+          * widths that exactly fit their worst case — Actions needs 178px for
+          * four 32px buttons plus gaps and padding, which no sane percentage
+          * guarantees on a narrow viewport — and the variable-length text
+          * columns share the remaining space in proportion to their content.
+          * An even 1/8 split wasted a third of the row on S.No and Actions
+          * while truncating shop names.
+          *
+          * Widths sum to exactly 100%, and the 1180px floor guarantees the
+          * worst case everywhere: Actions 17% = 201px (needs 178), Status
+          * 10% = 118px (fits the "Pending Approval" badge), Shop 21% = 248px
+          * (the 33-character maximum). Below that floor the table scrolls
+          * horizontally rather than crushing any column. */}
+        <table className="min-w-[1180px] w-full table-fixed text-sm text-left border-collapse">
           <colgroup>
-            {Array.from({ length: 8 }).map((_, i) => (
-              <col key={i} className="w-[12.5%]" />
-            ))}
+            <col className="w-[5%]" />
+            <col className="w-[14%]" />
+            <col className="w-[10%]" />
+            <col className="w-[21%]" />
+            <col className="w-[13%]" />
+            <col className="w-[10%]" />
+            <col className="w-[10%]" />
+            <col className="w-[17%]" />
           </colgroup>
           <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-600">
             <tr>

@@ -576,12 +576,18 @@ export function EditCollectionModal({
                   <p className="text-sm text-slate-500">{t("ops.collection.no_collections_for_shop")}</p>
                 ) : (
                   <div className="overflow-x-auto rounded-lg border border-slate-200">
-                    {/* Equal columns, same rule as the Collection Entry table. */}
-                    <table className="min-w-full table-fixed divide-y divide-slate-200">
+                    {/* Proportioned to content, same rule as the Collection
+                      * Entry table: the serial number needs a sliver, the
+                      * collection number and status need real room. */}
+                    <table className="min-w-[720px] w-full table-fixed divide-y divide-slate-200">
                       <colgroup>
-                        {Array.from({ length: 7 }).map((_, i) => (
-                          <col key={i} className="w-[14.28%]" />
-                        ))}
+                        <col className="w-[5%]" />
+                        <col className="w-[12%]" />
+                        <col className="w-[19%]" />
+                        <col className="w-[13%]" />
+                        <col className="w-[17%]" />
+                        <col className="w-[16%]" />
+                        <col className="w-[18%]" />
                       </colgroup>
                       {/* Header icons use the same vocabulary as every other
                         * operations table (Trip List, Shop Sales, Recent
