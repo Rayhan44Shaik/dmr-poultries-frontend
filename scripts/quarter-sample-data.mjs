@@ -501,6 +501,15 @@ const RATE_BY_DATE = new Map(MARKET_RATES.map((m) => [m.businessDate, m]));
 // ═══════════════════════════════════════════════════════════════════════════
 
 const TRIPS_PER_DAY = 8;
+/**
+ * Trips that close end-to-end (stage 5 + Completed) on each of the most recent
+ * days, TODAY included. Completed is the only status that emits Shop Sales, so
+ * this is the floor that keeps the Overview Dashboard's today / yesterday /
+ * 7-day money and volume views in sync with the rest of the quarter instead of
+ * flat-lining on the newest days. The remaining trips of those days stay
+ * Pending / mid-wizard so every lifecycle state is still demonstrable.
+ */
+const CLOSED_PER_RECENT_DAY = 3;
 const TRIPS = [];
 const DELIVERY_ROWS = []; // flattened shop-sale lines for downstream modules
 const VEHICLE_METER = new Map(ACTIVE_VEHICLES.map((v) => [v.id, 40000 + v.id * 1500]));
@@ -532,6 +541,16 @@ for (const date of OP_DATES) {
 
     // ── Lifecycle mix: past days are Completed; the last few days hold the
     //    Draft/Pending/Deleted variety so every wizard state is reachable.
+    //
+    //    Every day — including TODAY — must also close at least a couple of
+    //    trips end-to-end (stage 5 + Completed). A Completed trip is what
+    //    produces Shop Sales, and Shop Sales are what the Overview Dashboard's
+    //    "Today's Sales" / profit tiles, the 7-day Sales-vs-Collections series
+    //    and the Delivery Volume chart read. When the newest days carried only
+    //    Draft/Pending trips the dataset had no sale newer than T-4, so those
+    //    dashboard tiles read ₹0 and the charts flat-lined for the right-hand
+    //    half of the window while every other module rendered the same quarter
+    //    fully populated. `CLOSED_PER_RECENT_DAY` is that guaranteed floor.
     const daysFromToday = dayDiff(date, TODAY);
     let status = "Completed";
     let stage = 5; // 1..5 = last submitted wizard step
@@ -539,11 +558,14 @@ for (const date of OP_DATES) {
       status = "Draft";
       stage = 1;
     } else if (daysFromToday === 0) {
-      stage = [1, 2, 3, 4, 5, 5, 4, 3][k];
-      status = stage === 5 ? "Pending" : "Draft";
+      // Today: k 0..2 close fully (real sales on the dashboard's business
+      // date), k 3 waits at Pending for approval, k 4..7 sit mid-wizard so
+      // every Trip Wizard resume state is still reachable in the UI.
+      stage = [5, 5, 5, 5, 4, 3, 2, 1][k];
+      status = stage === 5 ? (k < CLOSED_PER_RECENT_DAY ? "Completed" : "Pending") : "Draft";
     } else if (daysFromToday <= 3) {
-      stage = [5, 5, 4, 3, 2, 1, 5, 5][k];
-      status = stage === 5 ? (k % 2 ? "Pending" : "Completed") : "Draft";
+      stage = [5, 5, 5, 5, 4, 3, 2, 1][k];
+      status = stage === 5 ? (k < CLOSED_PER_RECENT_DAY ? "Completed" : "Pending") : "Draft";
     } else if (tripSeq % 61 === 0) {
       status = "Deleted";
     }
@@ -668,8 +690,16 @@ for (const date of OP_DATES) {
     const expense = deliveryTolls + pickupTolls + meals + loading + vehicleMaintenance;
 
     // ── Rate Entry sample enrichment: last 20 days have 60% pending for rate entry ──
+    // The guaranteed-closed trips of the most recent days (see
+    // CLOSED_PER_RECENT_DAY) are exempt: sending them back to "Pending rate
+    // entry" would strip their rates and amounts, which is exactly what left
+    // the newest days with no Shop Sales and the dashboard's today / 7-day
+    // money tiles reading zero. The other Completed trips in the window still
+    // feed the Rate Entry queue, so that screen stays fully populated.
     const isRecentForRate = OP_DATES.indexOf(date) >= OP_DATES.length - 20;
-    const makePendingForRateEntry = isRecentForRate && status === "Completed" && r() < 0.6;
+    const isGuaranteedClosed = daysFromToday >= 0 && daysFromToday <= 3 && k < CLOSED_PER_RECENT_DAY;
+    const makePendingForRateEntry =
+      isRecentForRate && status === "Completed" && !isGuaranteedClosed && r() < 0.6;
     const effectiveStatus = makePendingForRateEntry ? "Pending" : status;
     const effectiveRateLockedAt = makePendingForRateEntry ? null : (status === "Completed" ? ts(date, "20:10:00") : null);
     const effectiveRateCompleted = makePendingForRateEntry ? false : status === "Completed";
@@ -1028,6 +1058,41 @@ for (const date of OP_DATES) {
     });
   }
 }
+// ── Reconcile: a shop can never have collected more than it owes ───────────
+// Collection amounts are drawn independently of each shop's sales, so a few
+// low-volume shops used to over-collect and finish the quarter with a CREDIT
+// (negative) balance. That is not a real business state, and it desynced the
+// money views: the Operations Dashboard clamps each shop at zero
+// (`Math.max(0, currentBalance)`) while Pending Collections and the Overview
+// Dashboard's "Pending Collections" tile sum the raw per-shop rows, so the two
+// screens reported different quarter outstanding totals from one dataset.
+// Trimming the surplus off the newest approved collections fixes it at the
+// source — every consumer now sums the same non-negative rows and agrees,
+// with no clamping needed anywhere.
+for (const shop of SHOPS) {
+  const sales = SALES_BY_SHOP.get(shop.id) ?? 0;
+  const owed = Number(shop.openingBalance || 0) + sales;
+  const approved = COLLECTIONS.filter(
+    (c) => c.shopId === shop.id && c.deleted !== true && c.status === "Approved",
+  );
+  let surplus = round(approved.reduce((total, c) => total + c.amount, 0) - owed, 2);
+  if (surplus <= 0) continue;
+  // Newest first: the excess is shaved off the most recent receipts, leaving
+  // the shop's earlier ledger history untouched.
+  for (const c of approved.sort((a, b) => b.collectionDate.localeCompare(a.collectionDate))) {
+    if (surplus <= 0) break;
+    const cut = Math.min(c.amount, surplus);
+    c.amount = round(c.amount - cut, 2);
+    c.amountCollected = c.amount;
+    surplus = round(surplus - cut, 2);
+  }
+}
+// A receipt trimmed to nothing is not a receipt — drop those rows so no
+// screen renders a ₹0 collection line.
+for (let i = COLLECTIONS.length - 1; i >= 0; i -= 1) {
+  if (COLLECTIONS[i].amount <= 0) COLLECTIONS.splice(i, 1);
+}
+
 const COLLECTED_BY_SHOP = new Map();
 for (const c of COLLECTIONS) {
   if (c.status !== "Approved") continue;
@@ -1781,8 +1846,12 @@ function operationsDashboard(from = QUARTER.fromDate, to = QUARTER.toDate) {
     totalWeight: round(trips.reduce((a, t) => a + t.totalDeliveredWeight, 0), 2),
     totalSales: round(sales.reduce((a, s) => a + s.amount, 0), 2),
     totalCollections: round(cols.reduce((a, c) => a + c.amount, 0), 2),
+    // Summed raw, exactly like Pending Collections and the Overview
+    // Dashboard's pending tile. Balances are reconciled to be non-negative
+    // when the quarter is seeded, so clamping here would only re-introduce a
+    // silent disagreement between the three screens.
     pendingCollections: round(
-      SHOPS.reduce((a, s) => a + Math.max(0, s.currentBalance), 0),
+      SHOPS.reduce((a, s) => a + s.currentBalance, 0),
       2
     ),
     fuelExpenses,
@@ -4353,9 +4422,19 @@ const server = http.createServer(async (req, res) => {
       const from = q.get("fromDate");
       const to = q.get("toDate");
       const search = (q.get("search") || "").toLowerCase();
+      // `shopId` / `tripId` are part of the Shop Sales query contract — the
+      // Shop Ledger, the per-shop drill-downs and the collection-balance
+      // cross-checks all narrow this endpoint that way. They were accepted but
+      // never applied, so a per-shop request silently returned the whole
+      // quarter for all 200 shops and any consumer that trusted the filter
+      // read another shop's money as its own.
+      const shopIdFilter = q.get("shopId");
+      const tripIdFilter = q.get("tripId");
       let rows = SHOP_SALES.filter(
         (sale) => sale.deleted !== true && inRange(sale.saleDate ?? sale.tripDate, from, to),
       );
+      if (shopIdFilter) rows = rows.filter((sale) => String(sale.shopId) === String(shopIdFilter));
+      if (tripIdFilter) rows = rows.filter((sale) => String(sale.tripId) === String(tripIdFilter));
       if (search)
         rows = rows.filter(
           (s) =>

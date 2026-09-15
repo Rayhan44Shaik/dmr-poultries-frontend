@@ -120,6 +120,33 @@ function sum(arr: number[]): number {
   return arr.reduce((acc, n) => acc + (Number.isFinite(n) ? n : 0), 0);
 }
 
+/**
+ * A rejected fuel bill was never an expense — it is a refused claim, and the
+ * Fuel Expenses module excludes it from every total it renders. Counting it
+ * here inflated the dashboard's cost base and understated the profit tile
+ * against the very rows that module shows. Pending bills are kept: the money
+ * is spent, only the approval is outstanding.
+ */
+function isBookableFuel(expense: { status?: string }): boolean {
+  return expense.status !== "Rejected";
+}
+
+/**
+ * Only an APPROVED receipt is money in hand.
+ *
+ * Every backend aggregate draws this same line — the Operations Dashboard's
+ * `totalCollections`, the shop balance formula behind Pending Collections
+ * (`opening + sales − approved collections`) and the Shop Ledger all ignore
+ * rows still sitting at "Pending Approval". The Overview Dashboard summed them
+ * regardless, so its "Today's Collections" tile read higher than the
+ * Collections module's own total for the same day, and the money never
+ * reconciled against the pending tile beside it. `Collection.status` is the
+ * mapped legacy state, where anything not yet approved is "Pending".
+ */
+function isBookedCollection(collection: { status?: string }): boolean {
+  return collection.status === "Approved";
+}
+
 function pctChange(current: number, previous: number): number | null {
   if (previous <= 0) return current > 0 ? 100 : null;
   return Math.round(((current - previous) / previous) * 100);
@@ -135,14 +162,25 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
   const today = dashboardToday(data.sampleQuarter?.today);
   const yesterday = businessDaysBefore(today, 1);
 
-  const todaySales = sum(data.shopSales.filter((s) => s.tripDate === today).map((s) => Number(s.amount) || 0));
-  const yesterdaySales = sum(data.shopSales.filter((s) => s.tripDate === yesterday).map((s) => Number(s.amount) || 0));
-  const todayCollections = sum(data.collections.filter((c) => c.collectionDate === today).map((c) => Number(c.amount) || 0));
-  const yesterdayCollections = sum(data.collections.filter((c) => c.collectionDate === yesterday).map((c) => Number(c.amount) || 0));
-  const todayFuel = sum(data.fuelExpenses.filter((f) => f.date === today).map((f) => Number(f.amount) || 0));
-  const todayTripExpense = sum(data.trips.filter((t) => t.tripDate === today).map((t) => Number(t.expense) || 0));
-  const yesterdayFuel = sum(data.fuelExpenses.filter((f) => f.date === yesterday).map((f) => Number(f.amount) || 0));
-  const yesterdayTripExpense = sum(data.trips.filter((t) => t.tripDate === yesterday).map((t) => Number(t.expense) || 0));
+  // Cancelled dispatches are excluded up front, exactly as every other module
+  // and the backend's own aggregates do (`tripsIn()` filters `deleted` before
+  // anything is summed). Leaving them in charged their trip expense to the
+  // profit tile and listed them in Today's Trips / Fleet Status as if they had
+  // run, so the dashboard disagreed with the Trip List showing them cancelled.
+  const liveTrips = data.trips.filter((tr) => !(tr as { deleted?: boolean }).deleted && tr.status !== "Deleted");
+  // Deleted sales are likewise never revenue.
+  const liveSales = data.shopSales.filter((s) => !(s as { deleted?: boolean }).deleted);
+  // Receipts that actually count toward collected money (see isBookedCollection).
+  const bookedCollections = data.collections.filter(isBookedCollection);
+
+  const todaySales = sum(liveSales.filter((s) => s.tripDate === today).map((s) => Number(s.amount) || 0));
+  const yesterdaySales = sum(liveSales.filter((s) => s.tripDate === yesterday).map((s) => Number(s.amount) || 0));
+  const todayCollections = sum(bookedCollections.filter((c) => c.collectionDate === today).map((c) => Number(c.amount) || 0));
+  const yesterdayCollections = sum(bookedCollections.filter((c) => c.collectionDate === yesterday).map((c) => Number(c.amount) || 0));
+  const todayFuel = sum(data.fuelExpenses.filter((f) => f.date === today && isBookableFuel(f)).map((f) => Number(f.amount) || 0));
+  const todayTripExpense = sum(liveTrips.filter((t) => t.tripDate === today).map((t) => Number(t.expense) || 0));
+  const yesterdayFuel = sum(data.fuelExpenses.filter((f) => f.date === yesterday && isBookableFuel(f)).map((f) => Number(f.amount) || 0));
+  const yesterdayTripExpense = sum(liveTrips.filter((t) => t.tripDate === yesterday).map((t) => Number(t.expense) || 0));
   const todayProfit = todaySales - todayFuel - todayTripExpense;
   const yesterdayProfit = yesterdaySales - yesterdayFuel - yesterdayTripExpense;
 
@@ -157,12 +195,12 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
   /* ----- 7-day series (ends on the dashboard's business date) ----- */
   const series = Array.from({ length: 7 }, (_, i) => {
     const date = businessDaysBefore(today, 6 - i);
-    const sales = sum(data.shopSales.filter((s) => s.tripDate === date).map((s) => Number(s.amount) || 0));
-    const collections = sum(data.collections.filter((c) => c.collectionDate === date).map((c) => Number(c.amount) || 0));
-    const birds = sum(data.shopSales.filter((s) => s.tripDate === date).map((s) => Number(s.totalBirds) || 0));
-    const weight = sum(data.shopSales.filter((s) => s.tripDate === date).map((s) => Number(s.totalWeight) || 0));
-    const fuel = sum(data.fuelExpenses.filter((f) => f.date === date).map((f) => Number(f.amount) || 0));
-    const tripExpense = sum(data.trips.filter((t) => t.tripDate === date).map((t) => Number(t.expense) || 0));
+    const sales = sum(liveSales.filter((s) => s.tripDate === date).map((s) => Number(s.amount) || 0));
+    const collections = sum(bookedCollections.filter((c) => c.collectionDate === date).map((c) => Number(c.amount) || 0));
+    const birds = sum(liveSales.filter((s) => s.tripDate === date).map((s) => Number(s.totalBirds) || 0));
+    const weight = sum(liveSales.filter((s) => s.tripDate === date).map((s) => Number(s.totalWeight) || 0));
+    const fuel = sum(data.fuelExpenses.filter((f) => f.date === date && isBookableFuel(f)).map((f) => Number(f.amount) || 0));
+    const tripExpense = sum(liveTrips.filter((t) => t.tripDate === date).map((t) => Number(t.expense) || 0));
     const label = new Date(date + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short" });
     return { date: label, iso: date, sales, collections, birds, weight, expenses: fuel + tripExpense };
   });
@@ -176,8 +214,8 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
   const deliveryVolume = series.map((s) => ({ date: s.date, birds: s.birds, weight: Math.round(s.weight * 10) / 10 }));
 
   /* ----- Today's trips ----- */
-  const todaysTrips = data.trips.filter((t) => t.tripDate === today);
-  const latestTrips = todaysTrips.length > 0 ? todaysTrips : data.trips.slice(0, 5);
+  const todaysTrips = liveTrips.filter((t) => t.tripDate === today);
+  const latestTrips = todaysTrips.length > 0 ? todaysTrips : liveTrips.slice(0, 5);
 
   const toTripView = (t: Trip): TripView => ({
     tripNo: t.tripNo || "—",
@@ -195,7 +233,7 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
   const todayTripViews = todaysTrips.map(toTripView);
 
   /* ----- Fleet status ----- */
-  const todayPendingTrips = data.trips.filter((t) => t.tripDate === today && (t.status === "Pending" || t.status === "Draft"));
+  const todayPendingTrips = liveTrips.filter((t) => t.tripDate === today && (t.status === "Pending" || t.status === "Draft"));
   // Fleet jobs: the synced API rows win when the quarter sample API is the data
   // source; otherwise keep the existing localStorage (fleet storage) read. A
   // copy is taken because the activity timeline below sorts in place.
@@ -211,7 +249,7 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
         })();
 
   const fleet: FleetVehicleView[] = data.vehicles.map((v) => {
-    const vehicleTrips = data.trips.filter((t) => t.vehicleNo === v.number);
+    const vehicleTrips = liveTrips.filter((t) => t.vehicleNo === v.number);
     const latestTrip = vehicleTrips.sort((a, b) => b.tripDate.localeCompare(a.tripDate))[0];
     const onTrip = todayPendingTrips.find((t) => t.vehicleNo === v.number);
     const recentMaintenance = maintenanceRecords
@@ -258,7 +296,7 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
   /* ----- Activity timeline ----- */
   const activity: ActivityItem[] = [];
 
-  data.trips
+  liveTrips
     .filter((t) => t.tripDate === today && t.status === "Completed")
     .slice(0, 3)
     .forEach((t) => {
@@ -276,7 +314,7 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
       });
     });
 
-  data.collections
+  bookedCollections
     .filter((c) => c.collectionDate === today)
     .slice(0, 3)
     .forEach((c) => {
@@ -448,8 +486,8 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
       todaySales,
       todayCollections,
       todayProfit,
-      todayBirds: sum(data.shopSales.filter((s) => s.tripDate === today).map((s) => Number(s.totalBirds) || 0)),
-      todayWeight: sum(data.shopSales.filter((s) => s.tripDate === today).map((s) => Number(s.totalWeight) || 0)),
+      todayBirds: sum(liveSales.filter((s) => s.tripDate === today).map((s) => Number(s.totalBirds) || 0)),
+      todayWeight: sum(liveSales.filter((s) => s.tripDate === today).map((s) => Number(s.totalWeight) || 0)),
     },
   };
 }
