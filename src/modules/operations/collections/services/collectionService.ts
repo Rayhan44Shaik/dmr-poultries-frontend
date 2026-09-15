@@ -228,12 +228,15 @@ function mapRawSale(raw: Record<string, unknown>): ShopSale {
     id: String(raw.id),
     tripId: raw.tripId != null ? String(raw.tripId) : (raw.trip_id != null ? String(raw.trip_id) : ""),
     tripNo: String(raw.tripNo ?? raw.trip_no ?? ""),
+    // Production exposes saleDate/birds/weight. The explicit fallbacks keep
+    // the cache compatible with the rolling-quarter API during upgrades, so
+    // collection totals never silently become zero while Shop Sales is full.
     tripDate: String(raw.saleDate ?? raw.tripDate ?? raw.trip_date ?? ""),
     shopId: raw.shopId != null ? String(raw.shopId) : (raw.shop_id != null ? String(raw.shop_id) : ""),
     shopName: String(raw.shopName ?? raw.shop_name ?? ""),
     birdType: String(raw.birdType ?? raw.bird_type ?? ""),
-    totalBirds: Number(raw.birds ?? 0),
-    totalWeight: Number(raw.weight ?? 0),
+    totalBirds: Number(raw.birds ?? raw.totalBirds ?? 0),
+    totalWeight: Number(raw.weight ?? raw.totalWeight ?? 0),
     rate: raw.rate == null ? null : Number(raw.rate),
     amount: Number(raw.amount ?? 0),
     remark: String(raw.remarks ?? raw.remark ?? ""),

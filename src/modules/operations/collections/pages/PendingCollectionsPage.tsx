@@ -243,7 +243,7 @@ export default function PendingCollectionsPage() {
         data.sort((a, b) => b.balance - a.balance);
         break;
       case "lowestBalance":
-        data.sort((a, b) => a.balance - a.balance);
+        data.sort((a, b) => a.balance - b.balance);
         break;
       case "alphabeticalAZ":
         data.sort((a, b) => a.shopName.localeCompare(b.shopName));
@@ -255,7 +255,7 @@ export default function PendingCollectionsPage() {
         data.sort((a, b) => (b.lastCollectionDate ?? "").localeCompare(a.lastCollectionDate ?? ""));
         break;
       case "oldestCollection":
-        data.sort((a, b) => (a.lastCollectionDate ?? "").localeCompare(a.lastCollectionDate ?? ""));
+        data.sort((a, b) => (a.lastCollectionDate ?? "").localeCompare(b.lastCollectionDate ?? ""));
         break;
       default:
         break;

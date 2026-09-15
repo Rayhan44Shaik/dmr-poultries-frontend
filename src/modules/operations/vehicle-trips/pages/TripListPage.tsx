@@ -21,18 +21,19 @@ import {
   listCompletedTrips,
   loadTripById,
   uniqueTripsById,
-  type PaginatedTripListResult,
 } from "../services/tripHeaderApiService";
 import { isCanceledError } from "../../../../api/errors";
 import { useI18n } from "../../../../i18n";
+import { filterTripListTrips, sortTripListTrips } from "../utils/filterTripList";
+import { formatVehicleNumber } from "../../../../utils/format";
 
 type TripListPageProps = { embedded?: boolean };
-type FilterOption = { value: string; label: string };
+type FilterOption = { value: string; label: string; searchText?: string };
 
 const ALL_VEHICLES = "All Vehicles";
 const ALL_SUPERVISORS = "All Supervisors";
 const ALL_SOURCES = "All Sources";
-const SEARCH_DEBOUNCE_MS = 300;
+const TRIP_LIST_FETCH_PAGE_SIZE = 200;
 
 function numericFilter(value: string, sentinel: string): number | undefined {
   if (value === sentinel) return undefined;
@@ -68,11 +69,11 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   const { showNotification } = useSafeNotification();
 
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  /** True only once the current filter request has supplied its final totals. */
+  const [filterResultsReady, setFilterResultsReady] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalTrips, setTotalTrips] = useState(0);
   const [search, setSearch] = useState("");
-  const [appliedSearch, setAppliedSearch] = useState("");
-  const lastAppliedSearchRef = useRef("");
   const [vehicle, setVehicle] = useState(ALL_VEHICLES);
   const [supervisor, setSupervisor] = useState(ALL_SUPERVISORS);
   const [farm, setFarm] = useState(ALL_SOURCES);
@@ -95,27 +96,51 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     listAbortRef.current?.abort();
     const controller = new AbortController();
     listAbortRef.current = controller;
+    // Do not leave the previous filter's totals on screen while this request
+    // is in flight — they can be dramatically different from the next result.
+    setFilterResultsReady(false);
+    setIsLoading(true);
 
     try {
-      const result: PaginatedTripListResult = await listCompletedTrips({
+      const filters = {
         fromDate: fromDate || undefined,
         toDate: toDate || undefined,
         vehicleId: numericFilter(vehicle, ALL_VEHICLES),
         supervisorId: numericFilter(supervisor, ALL_SUPERVISORS),
         farmId: numericFilter(farm, ALL_SOURCES),
-        search: appliedSearch || undefined,
-        page: currentPage,
-        limit: pageSize,
         sortBy: sortBy ?? undefined,
         sortDir: sortBy ? sortDir : undefined,
         signal: controller.signal,
-      });
-      if (controller.signal.aborted || requestSeq !== listRequestSeqRef.current) return false;
-      const uniqueTrips = uniqueTripsById(result.data);
-      setTrips(uniqueTrips);
-      setTotalTrips(result.meta.total);
+      };
+
+      // Retrieve every matching page before applying the visible filters. Some
+      // deployed API versions accept the filter query but return all records;
+      // the client-side pass below prevents that response from leaking into the
+      // table, totals, exports, or paginator.
+      const fetchedTrips: Trip[] = [];
+      let page = 1;
+      let totalPages = 1;
+      do {
+        const result = await listCompletedTrips({
+          ...filters,
+          page,
+          limit: TRIP_LIST_FETCH_PAGE_SIZE,
+        });
+        if (controller.signal.aborted || requestSeq !== listRequestSeqRef.current) return false;
+        fetchedTrips.push(...result.data);
+        totalPages = Math.max(1, result.meta.totalPages);
+        page += 1;
+      } while (page <= totalPages);
+
+      const matchingTrips = sortTripListTrips(
+        filterTripListTrips(uniqueTripsById(fetchedTrips), filters),
+        sortBy,
+        sortDir,
+      );
+      setTrips(matchingTrips);
+      setFilterResultsReady(true);
       setSelectedRowId((selectedId) =>
-        selectedId != null && !uniqueTrips.some((trip) => trip.id === selectedId) ? null : selectedId
+        selectedId != null && !matchingTrips.some((trip) => trip.id === selectedId) ? null : selectedId
       );
       return true;
     } catch (error) {
@@ -123,9 +148,12 @@ function TripListPage({ embedded = false }: TripListPageProps) {
       showNotification(t("ops.trip.unable_load_trips"), "error");
       return false;
     } finally {
-      if (requestSeq === listRequestSeqRef.current) listAbortRef.current = null;
+      if (requestSeq === listRequestSeqRef.current) {
+        listAbortRef.current = null;
+        setIsLoading(false);
+      }
     }
-  }, [showNotification, t, currentPage, pageSize, fromDate, toDate, vehicle, supervisor, farm, appliedSearch, sortBy, sortDir]);
+  }, [showNotification, t, fromDate, toDate, vehicle, supervisor, farm, sortBy, sortDir]);
 
   useEffect(() => {
     let cancelled = false;
@@ -139,9 +167,8 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   }, [refreshTrips]);
 
   const resetFilters = () => {
+    setFilterResultsReady(false);
     setSearch("");
-    lastAppliedSearchRef.current = "";
-    setAppliedSearch("");
     setVehicle(ALL_VEHICLES);
     setSupervisor(ALL_SUPERVISORS);
     setFarm(ALL_SOURCES);
@@ -155,40 +182,33 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const viewButtonRef = useRef<HTMLButtonElement>(null);
 
-  const commitSearch = useCallback((value = search) => {
-    const normalized = value.trim();
-    if (lastAppliedSearchRef.current === normalized) return;
-    lastAppliedSearchRef.current = normalized;
-    setAppliedSearch(normalized);
-    setCurrentPage(1);
-  }, [search]);
-
-  const handleSearchChange = useCallback((value: string) => {
+  const setFilterSearch = useCallback((value: string) => {
     setSearch(value);
+    setSelectedRowId(null);
+    setCurrentPage(1);
   }, []);
-
-  useEffect(() => {
-    const timer = window.setTimeout(() => commitSearch(search), SEARCH_DEBOUNCE_MS);
-    return () => window.clearTimeout(timer);
-  }, [commitSearch, search]);
-
   const setFilterFromDate = useCallback((value: string) => {
+    setFilterResultsReady(false);
     setFromDate(value);
     setCurrentPage(1);
   }, []);
   const setFilterToDate = useCallback((value: string) => {
+    setFilterResultsReady(false);
     setToDate(value);
     setCurrentPage(1);
   }, []);
   const setFilterVehicle = useCallback((value: string) => {
+    setFilterResultsReady(false);
     setVehicle(value || ALL_VEHICLES);
     setCurrentPage(1);
   }, []);
   const setFilterSupervisor = useCallback((value: string) => {
+    setFilterResultsReady(false);
     setSupervisor(value || ALL_SUPERVISORS);
     setCurrentPage(1);
   }, []);
   const setFilterFarm = useCallback((value: string) => {
+    setFilterResultsReady(false);
     setFarm(value || ALL_SOURCES);
     setCurrentPage(1);
   }, []);
@@ -224,7 +244,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
       const active = String(vehicleRecord.status ?? "Active") !== "Inactive";
       if (!value || !label || !active || seen.has(value)) return [];
       seen.add(value);
-      return [{ value, label }];
+      return [{ value, label: formatVehicleNumber(label), searchText: label }];
     });
   }, [masterVehicles]);
 
@@ -258,10 +278,12 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   const selectedSupervisorLabel = selectedOptionLabel(supervisorOptions, supervisor, supervisor);
   const selectedFarmLabel = selectedOptionLabel(farmOptions, farm, farm);
 
-  // Server-side pagination - trips are already filtered and paginated by the API.
-  // Dedupe one more time on the page boundary so a repeated backend row can
-  // never render twice in Trip List.
-  const completedTrips = useMemo(() => uniqueTripsById(Array.isArray(trips) ? trips : []), [trips]);
+  // The full matching result is held locally so visible filters stay reliable
+  // even against API versions that ignore a filter query parameter.
+  const completedTrips = useMemo(
+    () => filterTripListTrips(uniqueTripsById(Array.isArray(trips) ? trips : []), { search }),
+    [trips, search],
+  );
 
   const hasFilters =
     search.trim() !== "" ||
@@ -272,12 +294,12 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     toDate !== "";
 
   const totals = useMemo(() => ({
-    totalCompletedTrips: totalTrips,
+    totalCompletedTrips: completedTrips.length,
     totalCompletedShops: completedTrips.reduce((sum, trip) => sum + trip.totalShops, 0),
     totalCompletedBirds: completedTrips.reduce((sum, trip) => sum + trip.totalBirds, 0),
     totalCompletedWeight: completedTrips.reduce((sum, trip) => sum + trip.totalWeight, 0),
     totalCompletedMortality: completedTrips.reduce((sum, trip) => sum + trip.totalMortality, 0),
-  }), [completedTrips, totalTrips]);
+  }), [completedTrips]);
 
   const {
     totalCompletedTrips,
@@ -287,7 +309,10 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     totalCompletedMortality,
   } = totals;
 
-  const paginatedTrips = completedTrips;
+  const paginatedTrips = useMemo(
+    () => completedTrips.slice((currentPage - 1) * pageSize, currentPage * pageSize),
+    [completedTrips, currentPage, pageSize],
+  );
 
   useEffect(() => {
     const maxPage = Math.max(1, Math.ceil(totalCompletedTrips / pageSize));
@@ -318,21 +343,24 @@ function TripListPage({ embedded = false }: TripListPageProps) {
       });
   };
 
+  /** Applies the explicit Trip List Sort By selection and reloads its rows. */
+  const setFilterSort = useCallback((nextSortBy: TripSortKey | null, nextSortDir: "asc" | "desc") => {
+    setFilterResultsReady(false);
+    setSortBy(nextSortBy);
+    setSortDir(nextSortBy ? nextSortDir : "asc");
+    setCurrentPage(1);
+  }, []);
+
   /** First click sorts ascending; second flips to descending; a third click on
    *  the active column clears the sort entirely (deselect). */
   const handleSortChange = (key: TripSortKey) => {
-    if (sortBy === key) {
-      if (sortDir === "asc") {
-        setSortDir("desc");
-      } else {
-        setSortBy(null);
-        setSortDir("asc");
-      }
+    if (sortBy !== key) {
+      setFilterSort(key, "asc");
+    } else if (sortDir === "asc") {
+      setFilterSort(key, "desc");
     } else {
-      setSortBy(key);
-      setSortDir("asc");
+      setFilterSort(null, "asc");
     }
-    setCurrentPage(1);
   };
 
   const handleRowClick = (trip: Trip) => {
@@ -348,21 +376,9 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     }
   };
 
-  const fetchAllFilteredTrips = useCallback(async (): Promise<Trip[]> => {
-    const result = await listCompletedTrips({
-      fromDate: fromDate || undefined,
-      toDate: toDate || undefined,
-      vehicleId: numericFilter(vehicle, ALL_VEHICLES),
-      supervisorId: numericFilter(supervisor, ALL_SUPERVISORS),
-      farmId: numericFilter(farm, ALL_SOURCES),
-      search: search.trim() || appliedSearch || undefined,
-      page: 1,
-      limit: Math.max(totalTrips, pageSize, 1),
-      sortBy: sortBy ?? undefined,
-      sortDir: sortBy ? sortDir : undefined,
-    });
-    return uniqueTripsById(result.data);
-  }, [fromDate, toDate, vehicle, supervisor, farm, search, appliedSearch, totalTrips, pageSize, sortBy, sortDir]);
+  // `completedTrips` is already the full locally verified filtered result;
+  // export it directly so exports always agree with the displayed filter total.
+  const fetchAllFilteredTrips = useCallback(async (): Promise<Trip[]> => completedTrips, [completedTrips]);
 
   const handleExportPDF = async () => {
     if (exportBusyRef.current) return;
@@ -405,7 +421,6 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         vehicle !== ALL_VEHICLES ? { label: t("common.vehicle"), value: selectedVehicleLabel } : null,
         supervisor !== ALL_SUPERVISORS ? { label: t("common.supervisor"), value: selectedSupervisorLabel } : null,
         farm !== ALL_SOURCES ? { label: t("ops.trip.source_farm"), value: selectedFarmLabel } : null,
-        search.trim() ? { label: t("common.search"), value: search.trim() } : null,
       ].filter((filter): filter is { label: string; value: string } => filter !== null);
 
       exportToPDF(t("ops.trip.trip_list"), headers, rows, filename, {
@@ -471,6 +486,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   };
 
   const handleRefreshClick = () => {
+    setFilterResultsReady(false);
     void refreshTrips().then((ok) => {
       if (ok) showNotification(t("notification.data_refreshed"), "success");
     });
@@ -491,14 +507,16 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         vehicle={vehicle}
         supervisor={supervisor}
         farm={farm}
+        sortBy={sortBy}
+        sortDir={sortDir}
         search={search}
         setFromDate={setFilterFromDate}
         setToDate={setFilterToDate}
         setVehicle={setFilterVehicle}
         setSupervisor={setFilterSupervisor}
         setFarm={setFilterFarm}
-        setSearch={handleSearchChange}
-        onSearch={() => commitSearch()}
+        setSort={setFilterSort}
+        setSearch={setFilterSearch}
         onReset={handleResetFilters}
         vehicles={vehicleOptions}
         supervisors={supervisorOptions}
@@ -512,7 +530,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         viewButtonRef={viewButtonRef}
       />
 
-      {hasFilters && (
+      {hasFilters && filterResultsReady && !isLoading && (
         <TripKPICards
           totalTrips={totalCompletedTrips}
           totalBirds={totalCompletedBirds}
@@ -529,14 +547,16 @@ function TripListPage({ embedded = false }: TripListPageProps) {
             <div className="h-9 w-9 rounded-xl bg-blue-50/70 border border-blue-100 flex items-center justify-center text-blue-500 shadow-inner">
               <History className="w-5 h-5" />
             </div>
-            <h3 className="text-base font-bold text-slate-800 tracking-tight">Trip List</h3>
+            <h3 className="text-base font-bold text-slate-800 tracking-tight">{t("ops.trip.trip_list")}</h3>
           </div>
         </div>
 
         <TripMasterTable
           trips={paginatedTrips}
+          isLoading={isLoading}
           selectedRowId={selectedRowId}
           onRowClick={handleRowClick}
+          onRowSelect={(trip) => setSelectedRowId(trip.id)}
           startIndex={(currentPage - 1) * pageSize}
           sortBy={sortBy}
           sortDir={sortDir}

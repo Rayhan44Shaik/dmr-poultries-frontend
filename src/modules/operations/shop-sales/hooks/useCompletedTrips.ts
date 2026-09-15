@@ -85,7 +85,9 @@ export default function useCompletedTrips() {
   const [sortBy, setSortBy] = useState<RateEntrySortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  // Start true so the first paint never looks like a confirmed empty Rate
+  // Entry queue while its server request is still queued.
+  const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const loadSeqRef = useRef(0);
   const loadAbortRef = useRef<AbortController | null>(null);

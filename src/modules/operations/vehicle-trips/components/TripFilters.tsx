@@ -1,11 +1,10 @@
 import React from "react";
-import { FileText, FileSpreadsheet, Search, Eye, Calendar, Truck, UserCog, Warehouse, RotateCcw } from "lucide-react";
+import { FileText, FileSpreadsheet, Search, Eye, Calendar, Truck, UserCog, Warehouse, RotateCcw, ArrowUpDown } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import {
   opsFilterCardClass,
   opsFilterLabelClass,
   opsInputClass,
-  opsPrimaryButtonClass,
   opsSecondaryButtonClass,
   opsPdfButtonClass,
   opsExcelButtonClass,
@@ -13,8 +12,9 @@ import {
 } from "../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../i18n";
 import { BrandRefreshButton } from "../../../../ui";
-import { ActionTooltip } from "../../../../ui/ActionTooltip";
 import MasterDropdown, { type MasterDropdownOption } from "../../../masters/components/MasterDropdown";
+import type { TripSortKey } from "./TripMasterTable";
+import { localizeTripViewText } from "../utils/tripViewLocalization";
 
 interface Props {
   fromDate: string;
@@ -22,14 +22,16 @@ interface Props {
   vehicle: string;
   supervisor: string;
   farm: string;
+  sortBy: TripSortKey | null;
+  sortDir: "asc" | "desc";
   search: string;
   setFromDate: (v: string) => void;
   setToDate: (v: string) => void;
   setVehicle: (v: string) => void;
   setSupervisor: (v: string) => void;
   setFarm: (v: string) => void;
+  setSort: (sortBy: TripSortKey | null, sortDir: "asc" | "desc") => void;
   setSearch: (v: string) => void;
-  onSearch: () => void;
   onReset: () => void;
   vehicles?: readonly (string | MasterDropdownOption)[];
   supervisors?: readonly (string | MasterDropdownOption)[];
@@ -50,14 +52,16 @@ function TripFilters({
   vehicle,
   supervisor,
   farm,
+  sortBy,
+  sortDir,
   search,
   setFromDate,
   setToDate,
   setVehicle,
   setSupervisor,
   setFarm,
+  setSort,
   setSearch,
-  onSearch,
   onReset,
   vehicles = [],
   supervisors = [],
@@ -70,7 +74,7 @@ function TripFilters({
   hasFilters = false,
   viewButtonRef,
 }: Props) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   // Option lists may be either legacy strings or id-backed dropdown options.
   // The "All ..." sentinels are represented as an empty value so the dropdown
   // shows its placeholder and the clear affordance behaves correctly.
@@ -78,9 +82,48 @@ function TripFilters({
     options: readonly (string | MasterDropdownOption)[],
     sentinel: string
   ) => options.filter((option) => (typeof option === "string" ? option !== sentinel : option.value !== sentinel));
-  const vehicleOptions = withoutSentinel(vehicles || [], "All Vehicles");
-  const supervisorOptions = withoutSentinel(supervisors || [], "All Supervisors");
-  const farmOptions = withoutSentinel(farms || [], "All Sources");
+  const localizeOptions = (options: readonly (string | MasterDropdownOption)[]) => options.map((option) => {
+    const raw = typeof option === "string" ? option : option.label;
+    return typeof option === "string"
+      ? { value: option, label: localizeTripViewText(raw, language), searchText: raw }
+      : { ...option, label: localizeTripViewText(raw, language), searchText: option.searchText || raw };
+  });
+  const vehicleOptions = localizeOptions(withoutSentinel(vehicles || [], "All Vehicles"));
+  const supervisorOptions = localizeOptions(withoutSentinel(supervisors || [], "All Supervisors"));
+  const farmOptions = localizeOptions(withoutSentinel(farms || [], "All Sources"));
+  const sortOptions: MasterDropdownOption[] = [
+    { value: "tripNo:asc", label: `${t("operations.trip_no")} — A to Z` },
+    { value: "tripNo:desc", label: `${t("operations.trip_no")} — Z to A` },
+    { value: "tripDate:asc", label: `${t("ops.trip.day")} — Oldest first` },
+    { value: "tripDate:desc", label: `${t("ops.trip.day")} — Latest first` },
+    { value: "vehicleNo:asc", label: `${t("common.vehicle")} — A to Z` },
+    { value: "vehicleNo:desc", label: `${t("common.vehicle")} — Z to A` },
+    { value: "driverName:asc", label: `${t("common.driver")} — A to Z` },
+    { value: "driverName:desc", label: `${t("common.driver")} — Z to A` },
+    { value: "supervisorName:asc", label: `${t("common.supervisor")} — A to Z` },
+    { value: "supervisorName:desc", label: `${t("common.supervisor")} — Z to A` },
+    { value: "sourceFarm:asc", label: `${t("ops.trip.source_farm")} — A to Z` },
+    { value: "sourceFarm:desc", label: `${t("ops.trip.source_farm")} — Z to A` },
+    { value: "totalShops:asc", label: `${t("ops.trip.shops")} — Low to high` },
+    { value: "totalShops:desc", label: `${t("ops.trip.shops")} — High to low` },
+    { value: "totalBirds:asc", label: `${t("common.birds")} — Low to high` },
+    { value: "totalBirds:desc", label: `${t("common.birds")} — High to low` },
+    { value: "totalWeight:asc", label: `${t("ops.trip.weight_kg")} — Low to high` },
+    { value: "totalWeight:desc", label: `${t("ops.trip.weight_kg")} — High to low` },
+    { value: "totalMortality:asc", label: `${t("operations.mortality_count")} — Low to high` },
+    { value: "totalMortality:desc", label: `${t("operations.mortality_count")} — High to low` },
+  ];
+  const sortValue = sortBy ? `${sortBy}:${sortDir}` : "";
+  const setSortValue = (value: string) => {
+    if (!value) {
+      setSort(null, "asc");
+      return;
+    }
+    const [key, direction] = value.split(":");
+    const selected = sortOptions.some((option) => option.value === value);
+    if (!selected) return;
+    setSort(key as TripSortKey, direction === "desc" ? "desc" : "asc");
+  };
 
   return (
     <div className={opsFilterCardClass}>
@@ -167,6 +210,24 @@ function TripFilters({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-end pt-1">
+        <div className="lg:col-span-3">
+          <label className={opsFilterLabelClass}>
+            <ArrowUpDown size={17} className="text-violet-500 flex-shrink-0" />
+            <span>Sort By</span>
+          </label>
+          <MasterDropdown
+            hideLabel
+            label="Sort By"
+            value={sortValue}
+            options={sortOptions}
+            onChange={setSortValue}
+            placeholder="No sorting"
+            searchable
+            allowClear
+            className="w-full"
+          />
+        </div>
+
         <div className="lg:col-span-5">
           <label className={opsFilterLabelClass}>
             <Search size={17} className="text-slate-400 flex-shrink-0" />
@@ -176,14 +237,14 @@ function TripFilters({
             <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               value={search}
-              onChange={(e) => setSearch(e.target.value)}
+              onChange={(event) => setSearch(event.target.value)}
               placeholder={t("ops.trip.search_trips_placeholder")}
               className={`${opsInputClass} pl-10`}
             />
           </div>
         </div>
 
-        <div className="lg:col-span-7 flex items-center gap-2 justify-end flex-wrap">
+        <div className="lg:col-span-4 flex items-center gap-2 justify-end flex-wrap">
           {showViewButton && onViewSelected && (
             <button
               ref={viewButtonRef}
@@ -194,32 +255,23 @@ function TripFilters({
             >
               <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]"><Eye size={15} /></span>
               {t("ops.trip.view_selected")}
-              <ActionTooltip label={t("ops.trip.view_selected")} />
             </button>
           )}
-          <button type="button" onClick={onSearch} className={`group relative ${opsPrimaryButtonClass}`} aria-label={t("common.search")}>
-            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-search)]"><Search size={15} /></span>
-            {t("common.search")}
-            <ActionTooltip label={t("common.search")} />
-          </button>
           <button type="button" onClick={onReset} className={`group relative ${opsSecondaryButtonClass}`} aria-label={t("common.reset")}>
             <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>
             {t("common.reset")}
-            <ActionTooltip label={t("common.reset")} />
           </button>
           {onRefresh && <BrandRefreshButton onClick={onRefresh} />}
           {onExportPDF && (
             <button type="button" onClick={onExportPDF} disabled={!hasFilters} className={`group relative ${opsPdfButtonClass}`} aria-label={t("reports.export_pdf") || "PDF"}>
               <span className={`inline-flex ${hasFilters ? "motion-safe:group-hover:animate-[var(--animate-action-pdf)]" : ""}`}><FileText size={15} /></span>
               PDF
-              <ActionTooltip label={t("reports.export_pdf") || "PDF"} />
             </button>
           )}
           {onExportExcel && (
             <button type="button" onClick={onExportExcel} disabled={!hasFilters} className={`group relative ${opsExcelButtonClass}`} aria-label={t("reports.export_excel") || "Excel"}>
               <span className={`inline-flex ${hasFilters ? "motion-safe:group-hover:animate-[var(--animate-action-excel)]" : ""}`}><FileSpreadsheet size={15} /></span>
               Excel
-              <ActionTooltip label={t("reports.export_excel") || "Excel"} />
             </button>
           )}
         </div>

@@ -12,7 +12,6 @@ import { TripNoBadge } from "../TripNoBadge";
 import GeneralExpensesTable from "./GeneralExpensesTable";
 import DieselExpensesTable from "./DieselExpensesTable";
 import { useI18n } from "../../../../../i18n";
-import { ActionTooltip } from "../../../../../ui/ActionTooltip";
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 import { useStep5DurableDraft } from "../../hooks/useStep5DurableDraft";
 import { performStep5Save } from "../../services/tripHeaderApiService";
@@ -685,7 +684,6 @@ export default function StepEnd({
                   aria-label={t("ops.trip.edit_step")}
                 >
                   <Pencil size={14} className={uiActionIconMotionClass.edit} />
-                  <ActionTooltip label={t("ops.trip.edit_step")} />
                 </button>
               )}
               <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-[13px] font-semibold whitespace-nowrap">

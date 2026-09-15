@@ -1,26 +1,22 @@
-import React from "react";
+import React, { useCallback, useRef } from "react";
 import { Check, Hash, Calendar, Truck, User, UserCog, Warehouse, ShoppingBag, Bird, Scale, HeartPulse, ArrowUp, ArrowDown } from "lucide-react";
 import type { Trip } from "../types/trip";
+import type { TripListSortKey } from "../utils/filterTripList";
 import { formatTripListDay } from "../utils/formatTripListDay";
+import { localizeTripViewText } from "../utils/tripViewLocalization";
 import { formatVehicleNumber } from "../../../../utils/format";
 import { useI18n } from "../../../../i18n";
 
-export type TripSortKey =
-  | "tripNo"
-  | "tripDate"
-  | "vehicleNo"
-  | "driverName"
-  | "supervisorName"
-  | "sourceFarm"
-  | "totalShops"
-  | "totalBirds"
-  | "totalWeight"
-  | "totalMortality";
+export type TripSortKey = TripListSortKey;
 
 interface Props {
   trips: Trip[];
+  /** Keep the table surface informative while its server records are loading. */
+  isLoading?: boolean;
   selectedRowId?: number | null;
   onRowClick: (trip: Trip) => void;
+  /** Select without toggling, used by keyboard row navigation. */
+  onRowSelect?: (trip: Trip) => void;
   startIndex?: number;
   sortBy?: TripSortKey | null;
   sortDir?: "asc" | "desc";
@@ -41,14 +37,43 @@ function SortArrows({ active, dir }: { active: boolean; dir?: "asc" | "desc" }) 
 
 function TripMasterTable({
   trips,
+  isLoading = false,
   selectedRowId,
   onRowClick,
+  onRowSelect,
   startIndex = 0,
   sortBy = null,
   sortDir = "asc",
   onSortChange,
 }: Props) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  const rowRefs = useRef(new Map<number, HTMLTableRowElement>());
+
+  const selectRow = useCallback(
+    (trip: Trip) => (onRowSelect ? onRowSelect(trip) : onRowClick(trip)),
+    [onRowClick, onRowSelect],
+  );
+
+  const handleRowKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLTableRowElement>, rowIndex: number) => {
+      // Let controls inside a row keep their normal keyboard behaviour.
+      if (event.target !== event.currentTarget) return;
+      const currentTrip = trips[rowIndex];
+      if (!currentTrip) return;
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        selectRow(currentTrip);
+        return;
+      }
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+      event.preventDefault();
+      const nextTrip = trips[rowIndex + (event.key === "ArrowDown" ? 1 : -1)];
+      if (!nextTrip) return;
+      selectRow(nextTrip);
+      requestAnimationFrame(() => rowRefs.current.get(nextTrip.id)?.focus());
+    },
+    [selectRow, trips],
+  );
 
   const sortable = (key: TripSortKey, content: React.ReactNode, center = false) => {
     if (!onSortChange) return content;
@@ -57,7 +82,6 @@ function TripMasterTable({
       <button
         type="button"
         onClick={() => onSortChange(key)}
-        title={t("common.sort")}
         aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
         className={`group/sort flex items-center gap-2 w-full uppercase tracking-wider font-bold text-[12px] transition-colors hover:text-emerald-700 ${
           center ? "justify-center" : ""
@@ -137,7 +161,16 @@ function TripMasterTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {trips.length === 0 ? (
+            {isLoading ? (
+              <tr>
+                <td colSpan={11} className="py-16 text-center text-sm font-medium text-slate-400">
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600" aria-hidden="true" />
+                    {t("ops.trip.loading_trip_list")}
+                  </span>
+                </td>
+              </tr>
+            ) : trips.length === 0 ? (
               <tr>
                 <td colSpan={11} className="py-12 text-center text-slate-400 text-[13px] font-medium">
                   {t("ops.trip.no_completed_trips")}
@@ -150,8 +183,15 @@ function TripMasterTable({
                 return (
                   <tr
                     key={trip.id}
+                    ref={(element) => {
+                      if (element) rowRefs.current.set(trip.id, element);
+                      else rowRefs.current.delete(trip.id);
+                    }}
+                    tabIndex={0}
                     onClick={() => onRowClick(trip)}
-                    className={`cursor-pointer transition-colors duration-150 ${
+                    onKeyDown={(event) => handleRowKeyDown(event, index)}
+                    aria-selected={isSelected}
+                    className={`cursor-pointer outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
                       isSelected
                         ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200"
                         : `hover:bg-slate-50/60 ${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"}`
@@ -161,12 +201,12 @@ function TripMasterTable({
                       {isSelected ? <Check size={16} className="text-blue-500 inline" /> : serialNo}
                     </td>
                     {/* Keep logo in header, but working start from name of columns — S for Supervisor etc. */}
-                    <td className="px-4 py-5 pl-9 font-bold text-emerald-600 text-[13px] whitespace-nowrap">{trip.tripNo}</td>
-                    <td className="px-4 py-5 pl-9 text-[13px] font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(trip.tripDate)}</td>
-                    <td className="px-4 py-5 pl-9 text-[13px] font-medium text-slate-700 whitespace-nowrap">{formatVehicleNumber(trip.vehicleNo)}</td>
-                    <td className="px-4 py-5 pl-9 text-[13px] text-slate-600 whitespace-nowrap">{trip.driverName || "-"}</td>
-                    <td className="px-4 py-5 pl-9 text-[13px] text-slate-600 whitespace-nowrap">{trip.supervisorName}</td>
-                    <td className="px-4 py-5 pl-9 text-[13px] text-slate-600 font-medium whitespace-nowrap">{trip.sourceFarm}</td>
+                    <td className="px-4 py-5 pl-9 font-bold text-emerald-600 text-[13px] whitespace-nowrap">{localizeTripViewText(trip.tripNo, language)}</td>
+                    <td className="px-4 py-5 pl-9 text-[13px] font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(trip.tripDate, language)}</td>
+                    <td className="px-4 py-5 pl-9 text-[13px] font-medium text-slate-700 whitespace-nowrap">{localizeTripViewText(formatVehicleNumber(trip.vehicleNo), language)}</td>
+                    <td className="px-4 py-5 pl-9 text-[13px] text-slate-600 whitespace-nowrap">{localizeTripViewText(trip.driverName, language) || "-"}</td>
+                    <td className="px-4 py-5 pl-9 text-[13px] text-slate-600 whitespace-nowrap">{localizeTripViewText(trip.supervisorName, language)}</td>
+                    <td className="px-4 py-5 pl-9 text-[13px] text-slate-600 font-medium whitespace-nowrap">{localizeTripViewText(trip.sourceFarm, language)}</td>
                     <td className="px-4 py-5 text-center text-[13px] font-bold text-slate-700 whitespace-nowrap">{trip.totalShops}</td>
                     <td className="px-4 py-5 text-center text-[13px] font-bold text-blue-600 whitespace-nowrap">{trip.totalBirds.toLocaleString()}</td>
                     <td className="px-4 py-5 text-center text-[13px] font-bold text-amber-600 whitespace-nowrap">{trip.totalWeight.toFixed(2)}</td>

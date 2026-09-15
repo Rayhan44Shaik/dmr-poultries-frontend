@@ -2,7 +2,7 @@
 
 import { useEffect, useCallback, useState } from "react";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
-import { handleApiError } from "../../../../api";
+import { toApiError } from "../../../../api";
 
 import useShopSales from "../hooks/useShopSales";
 import { useShops } from "../../../masters/shops/hooks/useShops";
@@ -10,9 +10,10 @@ import ShopSalesFilters from "../components/ShopSalesFilters";
 import ShopSalesSummary from "../components/ShopSalesSummary";
 import ShopSalesTable from "../components/ShopSalesTable";
 import ShopSalesPagination from "../components/ShopSalesPagination";
-import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import type { ShopSale } from "../types/shopSale";
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
+import { notifyTripDataChanged } from "../../../../shared/events/tripDataEvents";
+import { useI18n } from "../../../../i18n";
 
 interface ShopSalesPageProps {
   initialTrip?: Trip | null;
@@ -20,10 +21,12 @@ interface ShopSalesPageProps {
 }
 
 function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
+  const { t } = useI18n();
   const { showNotification } = useSafeNotification();
   const [searchInput, setSearchInput] = useState("");
 
   const {
+    sales,
     filteredSales,
     paginatedSales,
     summary,
@@ -43,10 +46,12 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
 
   const { shops, refreshShops } = useShops();
 
+  // `useShopSales` owns the Shop Sales request lifecycle. This page only loads
+  // its Shop-master labels; calling both here caused duplicate list requests
+  // whenever a filter changed.
   useEffect(() => {
-    refreshSales();
-    refreshShops();
-  }, [refreshSales, refreshShops]);
+    void refreshShops();
+  }, [refreshShops]);
 
   useEffect(() => {
     if (initialTrip && initialTrip.tripNo) {
@@ -56,9 +61,9 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
         search: tripNo,
       }));
       setSearchInput(tripNo);
-      showNotification(`Loaded sales for Trip #${tripNo}`, "success");
+      showNotification(t("ops.shop_sales.loaded_trip", { trip: tripNo }), "success");
     }
-  }, [initialTrip, setFilter, showNotification]);
+  }, [initialTrip, setFilter, showNotification, t]);
 
   const shopNames = Array.from(
     new Set([
@@ -67,30 +72,70 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
     ])
   ).filter(Boolean);
 
-  const handleSearch = useCallback(() => {
-    const query = searchInput.trim();
-    setFilter((prev) => ({ ...prev, search: query }));
+  // The global Search field filters as the operator types; no separate Search
+  // button is needed. The hook's request-sequence guard keeps only the latest
+  // backend response when input changes quickly.
+  const handleSearchInputChange = useCallback((value: string) => {
+    setSearchInput(value);
+    setFilter((prev) => ({ ...prev, search: value.trim() }));
     setCurrentPage(1);
-  }, [searchInput, setFilter, setCurrentPage]);
+  }, [setFilter, setCurrentPage]);
 
   const handleResetFilters = useCallback(() => {
     resetFilters();
     setSearchInput("");
-    showNotification("Filters have been reset.", "info");
-  }, [resetFilters, showNotification]);
+    showNotification(t("ops.shop_sales.filters_reset"), "info");
+  }, [resetFilters, showNotification, t]);
+
+  const handleRefresh = useCallback(async () => {
+    const refreshed = await refreshSales();
+    if (refreshed) showNotification(t("ops.shop_sales.refreshed"), "success");
+  }, [refreshSales, showNotification, t]);
 
   const handleUpdateSale = useCallback(
     async (updatedSale: ShopSale) => {
       try {
-        await updateSale(updatedSale);
-        showNotification("Sale updated successfully", "success");
+        const saved = await updateSale(updatedSale);
+        // The server has updated the source Trip delivery/totals too. Notify
+        // an already-mounted Trip List to refetch that same authoritative row.
+        notifyTripDataChanged({ tripId: updatedSale.tripId, source: "shop-sales" });
         await refreshSales({ silent: true });
+        if ((saved.unassignedBirds ?? 0) > 0) {
+          showNotification(
+            t("ops.shop_sales.reassignment_required", {
+              count: saved.unassignedBirds ?? 0,
+              trip: saved.tripNo,
+            }),
+            "info",
+          );
+        } else {
+          showNotification(t("ops.shop_sales.updated_success"), "success");
+        }
       } catch (error) {
-        showNotification(handleApiError(error), "error");
+        const apiError = toApiError(error);
+        const details = apiError.details as { error?: string; assignmentLockTripNo?: string; unassignedBirds?: number } | undefined;
+        if (details?.error === "trip_assignment_incomplete") {
+          showNotification(
+            t("ops.shop_sales.other_trips_locked", {
+              trip: details.assignmentLockTripNo ?? "",
+              count: details.unassignedBirds ?? 0,
+            }),
+            "error",
+          );
+        } else {
+          showNotification(t("ops.shop_sales.update_failed"), "error");
+        }
       }
     },
-    [updateSale, showNotification, refreshSales]
+    [updateSale, showNotification, refreshSales, t]
   );
+
+  // The API returns this trip-wide state on every related sale. Surface it
+  // only once beside Search (rather than repeating the same warning per row).
+  const sourceTripWithGap = sales.find((sale) => Number(sale.unassignedBirds) > 0) ?? null;
+  const assignmentLock = sourceTripWithGap ?? sales.find((sale) => sale.assignmentLockTripId != null) ?? null;
+  const assignmentNoticeBirds = sourceTripWithGap?.unassignedBirds ?? assignmentLock?.assignmentLockUnassignedBirds ?? null;
+  const assignmentNoticeTripNo = sourceTripWithGap?.tripNo ?? assignmentLock?.assignmentLockTripNo ?? null;
 
   const hasActiveFilters =
     filter.fromDate !== "" ||
@@ -106,30 +151,28 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
         shopName={filter.shopName}
         sortBy={filter.sortBy}
         shopNames={shopNames}
-        totalEntries={filteredSales.length}
         searchQuery={searchInput}
-        setSearchQuery={setSearchInput}
-        setFromDate={(v) => {
-          setFilter({ ...filter, fromDate: v });
-          if (v) showNotification(`From date set to ${v}`, "info");
+        setSearchQuery={handleSearchInputChange}
+        setFromDate={(v) => setFilter({ ...filter, fromDate: v })}
+        setToDate={(v) => setFilter({ ...filter, toDate: v })}
+        setShopName={(v) => {
+          setFilter({ ...filter, shopName: v });
+          setCurrentPage(1);
         }}
-        setToDate={(v) => {
-          setFilter({ ...filter, toDate: v });
-          if (v) showNotification(`To date set to ${v}`, "info");
+        setSortBy={(v) => {
+          setFilter({ ...filter, sortBy: v });
+          setCurrentPage(1);
         }}
-        setShopName={(v) => setFilter({ ...filter, shopName: v })}
-        setSortBy={(v) => setFilter({ ...filter, sortBy: v })}
-        onSearch={handleSearch}
         onReset={handleResetFilters}
-        hasFilters={hasActiveFilters}
+        onRefresh={() => void handleRefresh()}
+        refreshing={isLoading}
+        unassignedBirds={assignmentNoticeBirds}
+        assignmentTripNo={assignmentNoticeTripNo == null ? null : String(assignmentNoticeTripNo)}
       />
 
       {hasActiveFilters && (
         <ShopSalesSummary
           summary={summary}
-          fromDate={filter.fromDate}
-          toDate={filter.toDate}
-          shopName={filter.shopName}
           isLoading={isLoading}
         />
       )}
@@ -138,9 +181,15 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
         <ShopSalesTable
           sales={paginatedSales}
           isLoading={isLoading}
+          startIndex={(currentPage - 1) * pageSize}
+          sortBy={filter.sortBy}
+          onSortChange={(sortBy) => {
+            setFilter((current) => ({ ...current, sortBy }));
+            setCurrentPage(1);
+          }}
           onUpdateSale={handleUpdateSale}
         />
-        {shouldShowPagination(filteredSales.length) && (
+        {filteredSales.length > 0 && (
           <ShopSalesPagination
             currentPage={currentPage}
             totalPages={totalPages}

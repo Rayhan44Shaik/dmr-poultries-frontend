@@ -33,8 +33,8 @@ import {
   TRIP_FIELD_DEFINITIONS,
 } from "../../../../shared/trip/definitions";
 import { useI18n } from "../../../../i18n";
-import { ActionTooltip } from "../../../../ui/ActionTooltip";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
+import { localizeTripViewText } from "../utils/tripViewLocalization";
 
 type VehicleOption = { id: number; vehicleNumber: string };
 type EmployeeOption = { id: number; employeeName: string; department: string };
@@ -201,10 +201,10 @@ const VehicleField = React.memo(function VehicleField({
   invalid?: boolean;
   onSelect: (vehicleId: number, vehicleNo: string) => void;
 }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const dropdownOptions = useMemo<DropdownOption[]>(
-    () => options.map((option) => ({ value: String(option.id), label: option.vehicleNumber || "" })),
-    [options]
+    () => options.map((option) => ({ value: String(option.id), label: localizeTripViewText(option.vehicleNumber, language), searchText: option.vehicleNumber || "" })),
+    [options, language]
   );
   const handleChange = useCallback(
     (value: string) => {
@@ -249,10 +249,10 @@ const SupervisorField = React.memo(function SupervisorField({
   invalid?: boolean;
   onSelect: (supervisorId: number, supervisorName: string) => void;
 }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const dropdownOptions = useMemo<DropdownOption[]>(
-    () => options.map((option) => ({ value: String(option.id), label: option.employeeName || "" })),
-    [options]
+    () => options.map((option) => ({ value: String(option.id), label: localizeTripViewText(option.employeeName, language), searchText: option.employeeName || "" })),
+    [options, language]
   );
   const handleChange = useCallback(
     (value: string) => {
@@ -297,10 +297,10 @@ const DriverField = React.memo(function DriverField({
   invalid?: boolean;
   onSelect: (driverId: number, driverName: string) => void;
 }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const dropdownOptions = useMemo<DropdownOption[]>(
-    () => options.map((option) => ({ value: String(option.id), label: option.employeeName || "" })),
-    [options]
+    () => options.map((option) => ({ value: String(option.id), label: localizeTripViewText(option.employeeName, language), searchText: option.employeeName || "" })),
+    [options, language]
   );
   const handleChange = useCallback(
     (value: string) => {
@@ -345,10 +345,10 @@ const HelpersField = React.memo(function HelpersField({
   invalid?: boolean;
   onChange: (helpers: string[]) => void;
 }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const dropdownOptions = useMemo<DropdownOption[]>(
-    () => options.map((option) => ({ value: option.employeeName, label: option.employeeName || "" })),
-    [options]
+    () => options.map((option) => ({ value: option.employeeName, label: localizeTripViewText(option.employeeName, language), searchText: option.employeeName || "" })),
+    [options, language]
   );
 
   return (
@@ -385,10 +385,10 @@ const LoadersField = React.memo(function LoadersField({
   invalid?: boolean;
   onChange: (loaders: string[]) => void;
 }) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const dropdownOptions = useMemo<DropdownOption[]>(
-    () => options.map((option) => ({ value: option.employeeName, label: option.employeeName || "" })),
-    [options]
+    () => options.map((option) => ({ value: option.employeeName, label: localizeTripViewText(option.employeeName, language), searchText: option.employeeName || "" })),
+    [options, language]
   );
 
   return (
@@ -555,7 +555,7 @@ function StepStart({
   clearForm,
   headerLoading = false,
 }: Props) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [form, setForm] = useState<Step1FormState>(() => tripToForm(loadSnapshot));
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLocalEditing, setIsLocalEditing] = useState(Boolean(editable));
@@ -848,7 +848,6 @@ function StepStart({
                 aria-label={t("ops.trip.edit_step")}
               >
                 <Pencil size={14} className={uiActionIconMotionClass.edit} />
-                <ActionTooltip label={t("ops.trip.edit_step")} />
               </button>
             )}
             <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
@@ -881,31 +880,31 @@ function StepStart({
             icon={Truck}
             tone="bg-blue-50/70 text-blue-500"
             label={t("operations.vehicle_no")}
-            value={loadSnapshot.vehicleNo || "--"}
+            value={localizeTripViewText(loadSnapshot.vehicleNo, language) || "--"}
           />
           <StepKpiCard
             icon={User}
             tone="bg-indigo-50/70 text-indigo-500"
             label={t("common.supervisor")}
-            value={loadSnapshot.supervisorName || "--"}
+            value={localizeTripViewText(loadSnapshot.supervisorName, language) || "--"}
           />
           <StepKpiCard
             icon={User}
             tone="bg-emerald-50/70 text-emerald-500"
             label={t("common.driver")}
-            value={loadSnapshot.driverName || "--"}
+            value={localizeTripViewText(loadSnapshot.driverName, language) || "--"}
           />
           <StepKpiCard
             icon={Users}
             tone="bg-teal-50/70 text-teal-500"
             label={t("ops.trip.field.helpers")}
-            value={loadSnapshot.helpers?.join(", ") || "--"}
+            value={localizeTripViewText(loadSnapshot.helpers?.join(", "), language) || "--"}
           />
           <StepKpiCard
             icon={Users}
             tone="bg-amber-50/70 text-amber-500"
             label={t("ops.trip.field.loaders")}
-            value={loadSnapshot.loaders?.join(", ") || "--"}
+            value={localizeTripViewText(loadSnapshot.loaders?.join(", "), language) || "--"}
           />
           <StepKpiCard
             icon={Gauge}

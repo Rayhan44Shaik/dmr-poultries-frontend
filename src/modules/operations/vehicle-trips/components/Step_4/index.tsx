@@ -19,7 +19,7 @@ import type { AssignmentSheetRow } from "../../../orders/ordersUtils";
 import { pendingBoxesFromRows, shopIdsFromRows } from "./remainingBoxes";
 import { computeDeliveryKpiTotals } from "./deliveryKpis";
 import { formatIstStamp } from "../../services/tripHeaderApiService";
-import { formatTripViewStamp } from "../../utils/tripViewLocalization";
+import { formatTripViewStamp, localizeTripViewText } from "../../utils/tripViewLocalization";
 import type { DeliveriesBalanceError } from "../../../../../shared/trip/validation";
 import type { ShopDelivery, BoxDetail, Trip } from "../../types/trip";
 import type { DeliveryEmailStatusValue } from "../../services/deliveryEmailService";
@@ -27,7 +27,6 @@ import type { DeliveryWhatsAppStatusValue } from "../../services/deliveryWhatsAp
 import { WizardActionBar, WizardStepNotice } from "../WizardStepUI";
 import { useI18n } from "../../../../../i18n";
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
-import { ActionTooltip } from "../../../../../ui/ActionTooltip";
 import { TripTimestampDisplay } from "../TripTimestampDisplay";
 
 interface Props {
@@ -259,7 +258,6 @@ function DeliveryBalanceErrorPanel({
             aria-label={t("common.close")}
           >
             <X size={15} className={uiActionIconMotionClass.close} />
-            <ActionTooltip label={t("common.close")} />
           </button>
         )}
       </div>
@@ -442,7 +440,7 @@ export default function UnLoadingTable({
       const delivered = (id > 0 && ids.has(id)) || (Boolean(name) && names.has(name));
       return !delivered;
     }).length;
-  }, [safeShops, safeRows]);
+  }, [safeShops, safeRows, language]);
 
   const remainingBoxesCount = useMemo(
     () => pendingBoxesFromRows(safeBoxDetails, safeRows).length,
@@ -869,8 +867,9 @@ export default function UnLoadingTable({
       })
       .map((shop: any) => {
         const value = shop.id ?? shop.shopId ?? 0;
-        const label = shop.shopName ?? shop.name ?? `Shop ${value}`;
-        return { value, label, isDisabled: false };
+        const searchText = shop.shopName ?? shop.name ?? `Shop ${value}`;
+        const label = localizeTripViewText(searchText, language);
+        return { value, label, searchText, isDisabled: false };
       })
       .filter((opt: { value: number; label: string; isDisabled: boolean }) => opt.value > 0);
 
@@ -906,7 +905,7 @@ export default function UnLoadingTable({
       }
     );
     return opts;
-  }, [safeShops, safeRows]);
+  }, [safeShops, safeRows, language]);
 
   const birdOptions = useMemo(() => {
     // If tripBirdTypeId is provided (from Step 2), restrict to only that bird type
@@ -925,11 +924,12 @@ export default function UnLoadingTable({
       })
       .map((bird: any) => {
         const value = bird.id ?? bird.birdTypeId ?? 0;
-        const label = bird.birdType ?? bird.name ?? `Bird ${value}`;
-        return { value, label, isDisabled: false };
+        const searchText = bird.birdType ?? bird.name ?? `Bird ${value}`;
+        const label = localizeTripViewText(searchText, language);
+        return { value, label, searchText, isDisabled: false };
       })
       .filter((opt: { value: number; label: string; isDisabled: boolean }) => opt.value > 0);
-  }, [safeBirdTypes, tripBirdTypeId]);
+  }, [safeBirdTypes, tripBirdTypeId, language]);
 
   const isFormValid = useMemo<boolean>(() => {
     if (mode === "box") {
@@ -1091,7 +1091,6 @@ export default function UnLoadingTable({
                 className="group absolute inset-y-0 right-0 pr-2.5 flex items-center text-slate-400 hover:text-slate-600"
               >
                 <X size={13} className={uiActionIconMotionClass.close} />
-                <ActionTooltip label={t("ops.trip.clear_search")} />
               </button>
             )}
           </div>
@@ -1107,7 +1106,6 @@ export default function UnLoadingTable({
           >
             <span className={`inline-flex ${uiActionIconMotionClass.pdf}`}><FileText size={15} className="text-blue-500" /></span>
             <span>{t("ops.trip.shops")} ({pendingShopsCount})</span>
-            <ActionTooltip label={t("ops.trip.shops_pdf_title")} side="bottom" />
           </button>
 
           <button
@@ -1118,7 +1116,6 @@ export default function UnLoadingTable({
           >
             <span className={`inline-flex ${uiActionIconMotionClass.pdf}`}><Box size={15} className="text-emerald-500" /></span>
             <span>{t("ops.trip.boxes")} ({remainingBoxesCount})</span>
-            <ActionTooltip label={t("ops.trip.boxes_pdf_title")} side="bottom" />
           </button>
 
           {!readOnly && !showForm && (
@@ -1130,7 +1127,6 @@ export default function UnLoadingTable({
             >
               <Plus size={15} className="text-emerald-100" />
               <span>{t("ops.trip.add_shop")}</span>
-              <ActionTooltip label={t("ops.trip.add_shop")} side="bottom" />
             </button>
           )}
         </div>
@@ -1158,11 +1154,11 @@ export default function UnLoadingTable({
             <span className="truncate">{t("ops.trip.shops")}</span>
           </span>
           <div className="flex items-center gap-3">
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-500" title={t("ops.trip.box_mode")}>
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-blue-500">
               <Box size={13} className="text-blue-500" /> {boxModeCount}
             </span>
             <span className="h-4 w-px bg-slate-200" aria-hidden />
-            <span className="inline-flex items-center gap-1 text-xs font-semibold text-purple-500" title={t("ops.trip.weight_mode")}>
+            <span className="inline-flex items-center gap-1 text-xs font-semibold text-purple-500">
               <Scale size={13} className="text-purple-500" /> {weightModeCount}
             </span>
             <span className="text-sm font-bold text-slate-800 ml-auto">{boxModeCount + weightModeCount}</span>

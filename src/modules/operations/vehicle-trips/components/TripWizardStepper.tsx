@@ -151,7 +151,6 @@ export default function TripWizardStepper({
                 className={pillClasses}
                 aria-current={isActive ? "step" : undefined}
                 aria-label={t("ops.trip.step_aria", { step: index + 1, label: stepLabel }) + (isLocked ? ` (${t("ops.trip.locked")})` : "")}
-                title={isLocked ? t("ops.trip.complete_previous_first") : undefined}
               >
                 {content}
               </button>

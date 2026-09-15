@@ -1,25 +1,21 @@
-// src/modules/operations/shop-sales/components/ShopSalesTable.tsx
-//
-// Final Shop Sales table — exactly these columns:
-//   S.NO | SHOP SALES NO | DAY | SHOP NAME | WEIGHT | RATE | AMOUNT | REMARK
-//
-// No Trip No / Shop No / Date / Birds / Rate Lock / Action columns and no
-// per-row edit buttons. Rows are selected by clicking; the top-right action
-// area of the table header then shows [✎ Edit] when the backend says the
-// selected sale is editable, or [🔒 Locked] with the backend lock reason
-// when it is not. The backend's `editable` flag is the only authority.
+// Shop Sales table. Rows are backend-authoritative: the edit/lock state comes
+// exclusively from the API response, and the table only presents that state.
 
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
-  Hash,
-  FileText,
-  Scale,
-  IndianRupee,
-  Edit2,
-  Lock,
-  Check,
-  X,
+  ArrowDown,
+  ArrowUp,
   Bird,
+  Calendar,
+  Check,
+  Pencil,
+  FileText,
+  Hash,
+  IndianRupee,
+  Lock,
+  Scale,
+  Store,
+  X,
 } from "lucide-react";
 import type { ShopSale } from "../types/shopSale";
 import { notify as globalNotify } from "../../../../ui/notifications/notificationStore";
@@ -29,38 +25,98 @@ import {
   formatSaleRemark,
   formatSaleWeight,
   shopSaleLockState,
-  weekdayShort,
 } from "../utils/shopSaleFormat";
+import { formatTripListDay } from "../../vehicle-trips/utils/formatTripListDay";
+import { cleanDeliveryShopName } from "../../vehicle-trips/utils/shopDisplayName";
+import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
+import { useI18n } from "../../../../i18n";
 
 interface Props {
   sales: ShopSale[];
   isLoading?: boolean;
+  /** Number of rows before this page, so serial numbers do not restart at 1. */
+  startIndex?: number;
+  sortBy?: string;
+  onSortChange?: (sortBy: string) => void;
   onUpdateSale?: (updatedSale: ShopSale) => void | Promise<void>;
 }
 
-const RATE_MIN = 50;
-const RATE_MAX = 300;
+type SortColumn = "saleNo" | "tripDate" | "shopName" | "birds" | "weight" | "rate" | "amount" | "remark";
 
-function ShopSalesTable({ sales, isLoading = false, onUpdateSale }: Props) {
+const SORT_VALUES: Record<SortColumn, { asc: string; desc: string }> = {
+  saleNo: { asc: "sale_asc", desc: "sale_desc" },
+  tripDate: { asc: "oldest", desc: "latest" },
+  shopName: { asc: "shop_asc", desc: "shop_desc" },
+  birds: { asc: "birds_asc", desc: "birds_desc" },
+  weight: { asc: "weight_asc", desc: "weight_desc" },
+  rate: { asc: "rate_asc", desc: "rate_desc" },
+  amount: { asc: "amount_asc", desc: "amount_desc" },
+  remark: { asc: "remark_asc", desc: "remark_desc" },
+};
+
+function SortArrows({ active, direction }: { active: boolean; direction?: "asc" | "desc" }) {
+  const base = "h-3.5 w-3.5 shrink-0 transition-colors";
+  const on = "text-emerald-600";
+  const off = "text-slate-400 group-hover/sort:text-slate-600";
+  return (
+    <span className="inline-flex shrink-0 items-center gap-0.5" aria-hidden="true">
+      <ArrowUp size={13} strokeWidth={2.7} className={`${base} ${active && direction === "asc" ? on : off}`} />
+      <ArrowDown size={13} strokeWidth={2.7} className={`${base} ${active && direction === "desc" ? on : off}`} />
+    </span>
+  );
+}
+
+function ShopSalesTable({
+  sales,
+  isLoading = false,
+  startIndex = 0,
+  sortBy = "latest",
+  onSortChange,
+  onUpdateSale,
+}: Props) {
+  const { t } = useI18n();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<ShopSale>>({});
   const [saving, setSaving] = useState(false);
+  const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
 
-  const selectedSale = sales.find((s) => s.id === selectedId) ?? null;
-  const selectedLock = selectedSale
-    ? shopSaleLockState(selectedSale)
-    : null;
+  const selectedSale = sales.find((sale) => sale.id === selectedId) ?? null;
+  const selectedLock = selectedSale ? shopSaleLockState(selectedSale) : null;
+  const selectedBirdLimit = Number(selectedSale?.maxEditableBirds);
+  const hasSelectedBirdLimit = Number.isSafeInteger(selectedBirdLimit) && selectedBirdLimit >= 0;
+
+  const currentSort = (column: SortColumn): "asc" | "desc" | undefined => {
+    const values = SORT_VALUES[column];
+    if (sortBy === values.asc) return "asc";
+    if (sortBy === values.desc) return "desc";
+    return undefined;
+  };
+
+  const sortable = (column: SortColumn, content: React.ReactNode, center = false) => {
+    const direction = currentSort(column);
+    if (!onSortChange) return content;
+    return (
+      <button
+        type="button"
+        onClick={() => onSortChange(direction === "asc" ? SORT_VALUES[column].desc : SORT_VALUES[column].asc)}
+        aria-sort={direction === "asc" ? "ascending" : direction === "desc" ? "descending" : "none"}
+        className={`group/sort flex w-full items-center gap-2 text-[11px] font-bold uppercase tracking-wider transition-colors hover:text-emerald-700 ${
+          center ? "justify-center" : ""
+        } ${direction ? "text-emerald-700" : "text-slate-700"}`}
+      >
+        {content}
+        <SortArrows active={Boolean(direction)} direction={direction} />
+      </button>
+    );
+  };
 
   const startEditing = useCallback(() => {
-    // Only the backend's `editable` flag can open the edit flow — never
-    // re-derived from a frontend date check.
     if (!selectedSale || !selectedSale.editable || saving) return;
     setEditingId(selectedSale.id);
     setEditData({
       totalBirds: selectedSale.totalBirds,
       totalWeight: selectedSale.totalWeight,
-      rate: selectedSale.rate ?? 0,
     });
   }, [selectedSale, saving]);
 
@@ -70,289 +126,232 @@ function ShopSalesTable({ sales, isLoading = false, onUpdateSale }: Props) {
   }, []);
 
   const handleInputChange = useCallback((field: keyof ShopSale, value: number) => {
-    setEditData((prev) => ({ ...prev, [field]: value }));
+    setEditData((previous) => ({ ...previous, [field]: value }));
   }, []);
 
   const saveEditing = useCallback(async () => {
     if (!onUpdateSale || !editingId || saving) return;
-    const originalSale = sales.find((s) => s.id === editingId);
+    const originalSale = sales.find((sale) => sale.id === editingId);
     if (!originalSale) return;
 
     const newBirds = editData.totalBirds ?? originalSale.totalBirds ?? 0;
     const newWeight = editData.totalWeight ?? originalSale.totalWeight ?? 0;
-    const newRate = editData.rate ?? originalSale.rate ?? 0;
-    if (newRate < RATE_MIN || newRate > RATE_MAX) {
-      // Was window.alert: a blocking native dialog for an inline validation
-      // error. The early-return guard is unchanged, so nothing is still saved.
-      globalNotify.error(`Rate must be between ₹${RATE_MIN} and ₹${RATE_MAX}.`);
+    if (!Number.isInteger(newBirds) || newBirds < 0) {
+      globalNotify.error(t("ops.shop_sales.birds_integer"));
       return;
     }
-    if (newBirds < 0 || newWeight < 0) {
-      globalNotify.error("Birds and Weight cannot be negative.");
+    if (newWeight < 0) {
+      globalNotify.error(t("ops.shop_sales.invalid_weight"));
       return;
     }
-
-    // Amount is intentionally NOT included — the backend recomputes it from
-    // weight × rate and returns it as authoritative. The updated row below
-    // (after save) uses whatever the backend returned.
-    const updatedSale: ShopSale = {
-      ...originalSale,
-      totalBirds: newBirds,
-      totalWeight: newWeight,
-      rate: newRate,
-    };
+    const maximumBirds = Number(originalSale.maxEditableBirds);
+    if (Number.isSafeInteger(maximumBirds) && maximumBirds >= 0 && newBirds > maximumBirds) {
+      globalNotify.error(t("ops.shop_sales.max_birds_error", { maximum: maximumBirds }));
+      return;
+    }
 
     setSaving(true);
     try {
-      await onUpdateSale(updatedSale);
+      await onUpdateSale({
+        ...originalSale,
+        totalBirds: newBirds,
+        totalWeight: newWeight,
+      });
       setEditingId(null);
       setEditData({});
     } catch {
-      // The page surfaces the backend's rejection via notification and the
-      // hook refreshes the authoritative record — exit the edit panel so the
-      // reverted values are visible.
+      // The parent reloads the backend-authoritative data after a failed edit.
       setEditingId(null);
       setEditData({});
     } finally {
       setSaving(false);
     }
-  }, [onUpdateSale, editingId, saving, sales, editData]);
+  }, [editData, editingId, onUpdateSale, sales, saving, t]);
 
-  const handleRowSelect = useCallback(
-    (sale: ShopSale) => {
-      // While a row is being edited, clicking other rows just moves the
-      // selection focus (edit state is discarded — the header panel
-      // mirrors whichever row is selected/edited).
-      if (saving) return;
-      setSelectedId(sale.id);
-      if (editingId && editingId !== sale.id) {
-        setEditingId(null);
-        setEditData({});
-      }
-    },
-    [editingId, saving]
+  const handleRowSelect = useCallback((sale: ShopSale) => {
+    if (saving) return;
+    setSelectedId(sale.id);
+    if (editingId && editingId !== sale.id) {
+      setEditingId(null);
+      setEditData({});
+    }
+  }, [editingId, saving]);
+
+  const handleRowKeyDown = useCallback((event: React.KeyboardEvent<HTMLTableRowElement>, rowIndex: number) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      const sale = sales[rowIndex];
+      if (sale) handleRowSelect(sale);
+      return;
+    }
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+
+    event.preventDefault();
+    const nextIndex = event.key === "ArrowDown" ? rowIndex + 1 : rowIndex - 1;
+    const nextSale = sales[nextIndex];
+    if (!nextSale) return;
+    handleRowSelect(nextSale);
+    // Keep keyboard navigation visual and predictable even after React applies
+    // the new selected-row state.
+    requestAnimationFrame(() => rowRefs.current.get(nextSale.id)?.focus());
+  }, [handleRowSelect, sales]);
+
+  const canEditSelectedSale = Boolean(selectedSale && selectedLock?.editable && !saving);
+  const selectedBlockedByAssignment = Boolean(
+    selectedSale &&
+      selectedSale.assignmentLockTripId != null &&
+      selectedSale.numericTripId !== selectedSale.assignmentLockTripId,
   );
-
-  if (isLoading) {
-    return (
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-12 text-center">
-        <div className="inline-flex items-center gap-2 text-slate-400 text-sm font-medium">
-          <div className="w-4 h-4 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin" />
-          Loading shop sales...
-        </div>
-      </div>
-    );
-  }
 
   return (
     <>
-      {/* Header / action area */}
-      <div className="px-5 py-3.5 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 flex items-center justify-between flex-wrap gap-3">
-        <h3 className="text-sm font-bold text-slate-800 tracking-tight">
-          Shop Sales
+      {/* Same static title treatment as the Trip List table. */}
+      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-emerald-50/60 via-white to-emerald-50/40 px-5 py-3 sm:px-6">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-600 shadow-inner">
+            <Store className="h-5 w-5" />
+          </div>
+          <h3 className="truncate text-base font-bold tracking-tight text-slate-800">Shop Sales</h3>
           {selectedSale && (
-            <span className="ml-2 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/70 px-2 py-0.5 rounded-full align-middle">
-              {selectedSale.saleNo || "Selected"}
+            <span
+              className="inline-flex whitespace-nowrap rounded-full border border-emerald-200/70 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700"
+              title={selectedSale.saleNo || ""}
+            >
+              {selectedSale.saleNo || "—"}
             </span>
           )}
-        </h3>
+        </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex flex-wrap items-center gap-2">
           {editingId ? (
             <>
               <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
                 <Bird size={13} className="text-cyan-600" />
                 <input
                   type="number"
-                  aria-label="Birds"
+                  aria-label={t("ops.shop_sales.birds")}
                   value={editData.totalBirds ?? 0}
-                  onChange={(e) => handleInputChange("totalBirds", parseFloat(e.target.value) || 0)}
-                  className="w-20 h-9 text-center border border-blue-300 rounded-lg px-2 text-xs font-bold text-blue-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-2xs outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  onChange={(event) => handleInputChange("totalBirds", parseFloat(event.target.value) || 0)}
+                  className="h-9 w-20 rounded-lg border border-blue-300 bg-white px-2 text-center text-xs font-bold text-blue-700 shadow-2xs outline-none transition-all [appearance:textfield] focus:border-blue-500 focus:ring-2 focus:ring-blue-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                   min={0}
+                  max={hasSelectedBirdLimit ? selectedBirdLimit : undefined}
                   step={1}
-                  title="Birds"
                 />
+                {hasSelectedBirdLimit ? (
+                  <span className="hidden whitespace-nowrap text-[10px] font-medium text-slate-500 lg:inline">{t("ops.shop_sales.max_birds", { maximum: selectedBirdLimit })}</span>
+                ) : null}
                 <Scale size={13} className="text-orange-600" />
                 <input
                   type="number"
-                  aria-label="Weight"
+                  aria-label={t("ops.shop_sales.weight")}
                   value={editData.totalWeight ?? 0}
-                  onChange={(e) => handleInputChange("totalWeight", parseFloat(e.target.value) || 0)}
-                  className="w-20 h-9 text-center border border-blue-300 rounded-lg px-2 text-xs font-bold text-orange-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-2xs outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                  onChange={(event) => handleInputChange("totalWeight", parseFloat(event.target.value) || 0)}
+                  className="h-9 w-20 rounded-lg border border-blue-300 bg-white px-2 text-center text-xs font-bold text-orange-600 shadow-2xs outline-none transition-all [appearance:textfield] focus:border-blue-500 focus:ring-2 focus:ring-blue-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                   min={0}
                   step={0.01}
-                  title="Weight (kg)"
-                />
-                <IndianRupee size={13} className="text-violet-600" />
-                <input
-                  type="number"
-                  aria-label="Rate"
-                  value={editData.rate ?? 0}
-                  onChange={(e) => handleInputChange("rate", parseFloat(e.target.value) || 0)}
-                  className="w-20 h-9 text-center border border-blue-300 rounded-lg px-2 text-xs font-bold text-violet-600 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 bg-white shadow-2xs outline-none transition-all [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                  min={0}
-                  step={0.01}
-                  title="Rate (₹)"
                 />
               </div>
-              <span className="text-xs text-blue-700 font-semibold bg-blue-50/80 px-2.5 py-1 rounded-full border border-blue-200/60">
-                Editing {selectedSale?.saleNo || "row"}
-              </span>
-              <button
-                type="button"
-                onClick={saveEditing}
-                disabled={saving}
-                className="p-2 rounded-lg bg-green-600 hover:bg-green-700 text-white transition-all inline-flex items-center justify-center shadow-xs cursor-pointer disabled:opacity-50"
-                title="Save"
-              >
-                <Check size={14} />
+              <button type="button" onClick={saveEditing} disabled={saving} aria-label={t("ops.shop_sales.save_sale")} className="group inline-flex items-center justify-center rounded-lg bg-emerald-600 p-2 text-white shadow-xs transition-all hover:bg-emerald-700 disabled:opacity-50">
+                <span className={`inline-flex ${uiActionIconMotionClass.approve}`}><Check size={14} /></span>
               </button>
-              <button
-                type="button"
-                onClick={cancelEditing}
-                disabled={saving}
-                className="p-2 rounded-lg bg-red-100 hover:bg-red-200 text-red-700 transition-all inline-flex items-center justify-center shadow-xs cursor-pointer disabled:opacity-50"
-                title="Cancel"
-              >
-                <X size={14} />
+              <button type="button" onClick={cancelEditing} disabled={saving} aria-label={t("ops.shop_sales.cancel_editing")} className="group inline-flex items-center justify-center rounded-lg bg-rose-100 p-2 text-rose-700 transition-all hover:bg-rose-200 disabled:opacity-50">
+                <span className={`inline-flex ${uiActionIconMotionClass.reject}`}><X size={14} /></span>
               </button>
             </>
-          ) : selectedSale && selectedLock ? (
-            selectedLock.editable ? (
+          ) : (
+            <>
+              {/* Always present, exactly like Recent Trip Activity. It becomes
+                  active only after an editable row is selected. */}
               <button
                 type="button"
                 onClick={startEditing}
-                className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white px-3.5 py-2 text-xs font-semibold shadow-sm transition-all active:scale-95 cursor-pointer"
-                title={`Edit ${selectedSale.saleNo || "selected sale"}`}
+                disabled={!canEditSelectedSale}
+                aria-label={t("ops.shop_sales.edit_selected")}
+                className={`group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${
+                  canEditSelectedSale
+                    ? "bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-500 border border-emerald-200/60 active:scale-95"
+                    : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"
+                }`}
               >
-                <Edit2 size={14} />
-                Edit
+                <span className={`inline-flex ${canEditSelectedSale ? uiActionIconMotionClass.edit : ""}`}><Pencil size={13} /></span>
+                <span className="hidden md:inline">{t("common.edit")}</span>
               </button>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-slate-100 text-slate-500 border border-slate-200 px-3 py-2 text-xs font-semibold"
-                  title={selectedLock.message}
-                >
-                  <Lock size={14} />
-                  {selectedLock.label}
-                </span>
-                <span className="hidden md:inline text-xs text-slate-500 font-medium max-w-xs">
-                  {selectedLock.message}
-                </span>
-              </div>
-            )
-          ) : (
-            <span className="text-xs text-slate-400 font-medium">
-              Select a row to view Edit / Locked status
-            </span>
+              {selectedSale && selectedLock && !selectedLock.editable ? (
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">
+                    <Lock size={14} /> {selectedBlockedByAssignment ? t("ops.shop_sales.assignment_locked") : selectedLock.label}
+                  </span>
+                  <span className="hidden max-w-xs text-xs font-medium text-slate-500 md:inline">
+                    {selectedBlockedByAssignment
+                      ? t("ops.shop_sales.other_trips_locked", {
+                          trip: selectedSale.assignmentLockTripNo ?? "",
+                          count: selectedSale.assignmentLockUnassignedBirds ?? 0,
+                        })
+                      : selectedLock.message}
+                  </span>
+                </div>
+              ) : null}
+            </>
           )}
         </div>
       </div>
 
       <div className="overflow-x-auto">
-        <table className="min-w-full text-xs md:text-sm">
-          <thead className="bg-slate-50/80 border-b border-slate-200/70">
-            <tr className="text-slate-700 whitespace-nowrap">
-              <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                <div className="flex items-center justify-center gap-1.5">
-                  <Hash size={14} className="text-slate-400" />
-                  S.No
-                </div>
+        <table className="min-w-full text-[13px] text-left border-collapse">
+          <thead className="border-b border-slate-200 bg-slate-50/80">
+            <tr className="whitespace-nowrap text-slate-700">
+              <th className="px-4 py-4 text-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <div className="flex items-center justify-center gap-1.5"><Hash size={14} className="text-slate-400" /> S.No</div>
               </th>
-              <th className="px-3.5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                Shop Sales No
-              </th>
-              <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                Day
-              </th>
-              <th className="px-3.5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                Shop Name
-              </th>
-              <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                <div className="flex items-center justify-center gap-1.5">
-                  <Scale size={14} className="text-orange-600" />
-                  Weight
-                </div>
-              </th>
-              <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                <div className="flex items-center justify-center gap-1.5">
-                  <IndianRupee size={14} className="text-violet-600" />
-                  Rate
-                </div>
-              </th>
-              <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                Amount
-              </th>
-              <th className="px-3.5 py-3 text-left text-[11px] font-bold uppercase tracking-wider text-slate-700">
-                <div className="flex items-center gap-1.5">
-                  <FileText size={14} className="text-slate-400" />
-                  Remark
-                </div>
-              </th>
+              <th className="px-4 py-4 text-left">{sortable("saleNo", <div className="flex items-center gap-1.5"><FileText size={14} className="shrink-0 text-emerald-500" /><span>Shop Sale No.</span></div>)}</th>
+              <th className="px-4 py-4 text-left">{sortable("tripDate", <div className="flex items-center gap-1.5"><Calendar size={14} className="shrink-0 text-blue-500" /><span>Day</span></div>)}</th>
+              <th className="px-4 py-4 text-left">{sortable("shopName", <div className="flex items-center gap-1.5"><Store size={14} className="shrink-0 text-amber-500" /><span>Shop Name</span></div>)}</th>
+              <th className="px-4 py-4 text-center">{sortable("birds", <div className="flex items-center justify-center gap-1.5"><Bird size={14} className="shrink-0 text-cyan-600" /><span>Birds</span></div>, true)}</th>
+              <th className="px-4 py-4 text-center">{sortable("weight", <div className="flex items-center justify-center gap-1.5"><Scale size={14} className="shrink-0 text-orange-600" /><span>Weight</span></div>, true)}</th>
+              <th className="px-4 py-4 text-center">{sortable("rate", <div className="flex items-center justify-center gap-1.5"><IndianRupee size={14} className="shrink-0 text-violet-600" /><span>Rate</span></div>, true)}</th>
+              <th className="px-4 py-4 text-center">{sortable("amount", <span>Amount</span>, true)}</th>
+              <th className="px-4 py-4 text-left">{sortable("remark", <div className="flex items-center gap-1.5"><FileText size={14} className="shrink-0 text-slate-400" /><span>Remark</span></div>)}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {sales.length === 0 ? (
-              <tr>
-                <td colSpan={8} className="py-12 text-center text-slate-400 text-sm font-medium">
-                  No Shop Sales available until Rate Entry is locked.
-                </td>
-              </tr>
-            ) : (
-              sales.map((sale, index) => {
-                const isSelected = selectedId === sale.id;
-                const isEditing = editingId === sale.id;
-                const lock = shopSaleLockState(sale);
-
-                return (
-                  <tr
-                    key={sale.id}
-                    onClick={() => handleRowSelect(sale)}
-                    aria-selected={isSelected}
-                    className={`transition-colors cursor-pointer group ${
-                      isEditing
-                        ? "bg-emerald-50/50 shadow-[inset_3px_0_0_0_#10b981]"
-                        : isSelected
-                          ? "bg-emerald-50/70 shadow-[inset_3px_0_0_0_#10b981] hover:bg-emerald-50"
-                          : "hover:bg-slate-50/80"
-                    } ${!lock.editable && !isSelected ? "opacity-80" : ""}`}
-                  >
-                    <td className="px-3.5 py-3 text-center text-xs font-semibold text-slate-500">
-                      {isSelected && (
-                        <span className="mr-1 inline-flex items-center justify-center">
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                        </span>
-                      )}
-                      {index + 1}
-                    </td>
-                    <td className="px-3.5 py-3 font-semibold text-slate-800 text-xs whitespace-nowrap">
-                      {sale.saleNo || "—"}
-                    </td>
-                    <td className="px-3.5 py-3 text-center text-xs font-bold text-slate-600 uppercase tracking-wide">
-                      {weekdayShort(sale.tripDate)}
-                    </td>
-                    <td className="px-3.5 py-3 text-xs font-semibold text-slate-700">
-                      {sale.shopName}
-                    </td>
-                    <td className="px-3.5 py-3 text-center text-xs font-bold text-orange-600">
-                      {formatSaleWeight(sale.totalWeight)}
-                    </td>
-                    <td className="px-3.5 py-3 text-center text-xs font-bold text-violet-600">
-                      {formatSaleRate(sale.rate)}
-                    </td>
-                    <td className="px-3.5 py-3 text-center text-xs font-bold text-slate-700">
-                      {formatSaleAmount(sale.amount)}
-                    </td>
-                    <td className="px-3.5 py-3 text-xs text-slate-600">
-                      <span className="text-slate-700 font-medium">
-                        {formatSaleRemark(sale.remark)}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
+            {isLoading ? (
+              <tr><td colSpan={9} className="py-12 text-center text-sm font-medium text-slate-400"><span className="inline-flex items-center gap-2"><span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600" />{t("ops.shop_sales.loading")}</span></td></tr>
+            ) : sales.length === 0 ? (
+              <tr><td colSpan={9} className="py-12 text-center text-sm font-medium text-slate-400">{t("ops.shop_sales.no_sales")}</td></tr>
+            ) : sales.map((sale, index) => {
+              const isSelected = selectedId === sale.id;
+              const isEditing = editingId === sale.id;
+              const lock = shopSaleLockState(sale);
+              return (
+                <tr
+                  key={sale.id}
+                  ref={(element) => {
+                    if (element) rowRefs.current.set(sale.id, element);
+                    else rowRefs.current.delete(sale.id);
+                  }}
+                  tabIndex={0}
+                  onFocus={() => handleRowSelect(sale)}
+                  onClick={() => handleRowSelect(sale)}
+                  onKeyDown={(event) => handleRowKeyDown(event, index)}
+                  aria-selected={isSelected}
+                  className={`cursor-pointer outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
+                    isEditing ? "bg-emerald-50/50 shadow-[inset_3px_0_0_0_#10b981]" : isSelected ? "bg-emerald-50/70 shadow-[inset_3px_0_0_0_#10b981] hover:bg-emerald-50" : "hover:bg-slate-50/80"
+                  } ${!lock.editable && !isSelected ? "opacity-80" : ""}`}
+                >
+                  <td className="px-4 py-5 text-center text-[13px] font-semibold text-slate-500">{startIndex + index + 1}</td>
+                  <td className="px-4 py-5 text-[13px] font-semibold text-emerald-600 whitespace-nowrap">
+                    <div>{sale.saleNo || sale.tripNo || "—"}</div>
+                  </td>
+                  <td className="px-4 py-5 text-[13px] font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(sale.tripDate)}</td>
+                  <td className="px-4 py-5 text-[13px] font-semibold text-slate-700">{cleanDeliveryShopName(sale.shopName) || "—"}</td>
+                  <td className="px-4 py-5 text-center text-[13px] font-bold text-cyan-700">{Number(sale.totalBirds || 0).toLocaleString()}</td>
+                  <td className="px-4 py-5 text-center text-[13px] font-bold text-orange-600">{formatSaleWeight(sale.totalWeight)}</td>
+                  <td className="px-4 py-5 text-center text-[13px] font-bold text-violet-600">{formatSaleRate(sale.rate)}</td>
+                  <td className="px-4 py-5 text-center text-[13px] font-bold text-slate-700">{formatSaleAmount(sale.amount)}</td>
+                  <td className="whitespace-nowrap px-4 py-5 text-[13px] text-slate-600"><span className="font-medium text-slate-700">{formatSaleRemark(sale.remark)}</span></td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

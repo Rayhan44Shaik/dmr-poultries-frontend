@@ -3,6 +3,8 @@ import {
   paginationBarClass,
   paginationNavBtnClass,
   paginationPageBtnClass,
+  paginationSummaryClass,
+  pageRecordRange,
 } from "../../../../shared/ui/paginationStyles";
 import { PageSizeSelect } from "../../../../shared/ui/PageSizeSelect";
 import { useI18n } from "../../../../i18n";
@@ -10,6 +12,8 @@ import { useI18n } from "../../../../i18n";
 interface Props {
   currentPage: number;
   totalPages: number;
+  /** Number of records after the active filters. */
+  totalItems?: number;
   onPageChange: (page: number) => void;
   hidePageInfo?: boolean; // when true, only render navigation buttons
   /** Current rows-per-page. Pass with onPageSizeChange to show the control. */
@@ -18,8 +22,9 @@ interface Props {
   onPageSizeChange?: (pageSize: number) => void;
 }
 
-function TripPagination({ currentPage, totalPages, onPageChange, hidePageInfo = false, pageSize, onPageSizeChange }: Props) {
+function TripPagination({ currentPage, totalPages, totalItems, onPageChange, hidePageInfo = false, pageSize, onPageSizeChange }: Props) {
   const { t } = useI18n();
+  const { from, to } = pageRecordRange(currentPage, pageSize ?? 1, totalItems ?? 0);
   const hasMultiplePages = totalPages > 1;
 
   const getPageNumbers = () => {
@@ -113,7 +118,7 @@ function TripPagination({ currentPage, totalPages, onPageChange, hidePageInfo = 
       <div className="flex items-center justify-end flex-wrap gap-1.5">
         {onPageSizeChange && pageSize != null && (
           <div className="flex items-center gap-2">
-          <span className="text-[13px] font-semibold text-slate-600">Rows Per Page</span>
+          <span className="text-[13px] font-semibold text-slate-600">{t("common.rows_per_page")}</span>
           <PageSizeSelect value={pageSize} onChange={onPageSizeChange} />
         </div>
         )}
@@ -124,9 +129,16 @@ function TripPagination({ currentPage, totalPages, onPageChange, hidePageInfo = 
 
   return (
     <div className={paginationBarClass}>
+      {totalItems != null && (
+        <p className={paginationSummaryClass} aria-live="polite">
+          {totalItems === 0
+            ? t("common.no_records")
+            : `${t("common.showing")} ${from}–${to} ${t("common.of")} ${totalItems}`}
+        </p>
+      )}
       {onPageSizeChange && pageSize != null && (
-        <div className="mr-auto flex items-center gap-2">
-          <span className="text-[13px] font-semibold text-slate-600">Rows Per Page</span>
+        <div className="flex items-center gap-2">
+          <span className="text-[13px] font-semibold text-slate-600">{t("common.rows_per_page")}</span>
           <PageSizeSelect value={pageSize} onChange={onPageSizeChange} />
         </div>
       )}

@@ -1,6 +1,7 @@
 import React from "react";
 import { Truck, Bird, Scale, HeartPulse, Store } from "lucide-react";
 import { useI18n } from "../../../../i18n";
+import { compactKpiValue, KpiCardGrid, KpiMetricValue, type KpiCardItem } from "../../../../ui";
 
 interface Props {
   totalTrips: number;
@@ -10,71 +11,26 @@ interface Props {
   totalShops: number;
 }
 
+/** Filter-result summary for Trip List, rendered through the global KPI surface. */
 function TripKPICards({ totalTrips, totalBirds, totalWeight, totalMortality, totalShops }: Props) {
   const { t } = useI18n();
-  const cards = [
-    {
-      title: t("ops.trip.total_trips"),
-      value: totalTrips.toLocaleString(),
-      icon: <Truck size={20} />,
-      bg: "bg-blue-50/70",
-      iconBg: "bg-blue-50/80",
-      text: "text-blue-500",
-    },
-    {
-      title: t("ops.trip.total_birds"),
-      value: totalBirds.toLocaleString(),
-      icon: <Bird size={20} />,
-      bg: "bg-green-50/70",
-      iconBg: "bg-green-50/80",
-      text: "text-green-500",
-    },
-    {
-      title: t("ops.trip.total_weight_kg"),
-      value: totalWeight.toFixed(2),
-      icon: <Scale size={20} />,
-      bg: "bg-purple-50/70",
-      iconBg: "bg-purple-50/80",
-      text: "text-purple-500",
-    },
-    {
-      title: t("operations.total_mortality"),
-      value: totalMortality.toLocaleString(),
-      icon: <HeartPulse size={20} />,
-      bg: "bg-red-50/70",
-      iconBg: "bg-red-50/80",
-      text: "text-red-500",
-    },
-    {
-      title: t("ops.trip.total_shops"),
-      value: totalShops.toLocaleString(),
-      icon: <Store size={20} />,
-      bg: "bg-orange-50/70",
-      iconBg: "bg-orange-50/80",
-      text: "text-orange-500",
-    },
+  const trips = compactKpiValue(totalTrips);
+  const shops = compactKpiValue(totalShops);
+  const birds = compactKpiValue(totalBirds);
+  const weight = compactKpiValue(totalWeight, 2);
+  const mortality = compactKpiValue(totalMortality);
+
+  // Keep the operational reading order consistent with the Trip List table:
+  // trips → shops → birds → weight → mortality.
+  const cards: KpiCardItem[] = [
+    { id: "trips", label: t("ops.trip.total_trips"), value: <KpiMetricValue metric={trips} />, tooltip: `${t("ops.trip.total_trips")}: ${trips.exact}`, Icon: Truck, tone: "blue" },
+    { id: "shops", label: t("ops.trip.total_shops"), value: <KpiMetricValue metric={shops} />, tooltip: `${t("ops.trip.total_shops")}: ${shops.exact}`, Icon: Store, tone: "amber" },
+    { id: "birds", label: t("ops.trip.total_birds"), value: <KpiMetricValue metric={birds} />, tooltip: `${t("ops.trip.total_birds")}: ${birds.exact}`, Icon: Bird, tone: "emerald" },
+    { id: "weight", label: t("ops.trip.total_weight_kg"), value: <KpiMetricValue metric={weight} unit="KG" />, tooltip: `${t("ops.trip.total_weight_kg")}: ${weight.exact} KG`, Icon: Scale, tone: "violet" },
+    { id: "mortality", label: t("operations.total_mortality"), value: <KpiMetricValue metric={mortality} />, tooltip: `${t("operations.total_mortality")}: ${mortality.exact}`, Icon: HeartPulse, tone: "rose" },
   ];
 
-  return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
-      {cards.map((card) => (
-        <div
-          key={card.title}
-          className={`${card.bg} rounded-lg border border-slate-200 px-3 py-3 flex items-center justify-between hover:shadow-sm transition-all`}
-        >
-          <div>
-            <div className="text-xs font-medium text-slate-500">{card.title}</div>
-            <div className={`text-lg font-bold mt-0.5 ${card.text}`}>{card.value}</div>
-          </div>
-          <div
-            className={`h-10 w-10 rounded-full flex items-center justify-center ${card.iconBg} ${card.text}`}
-          >
-            {card.icon}
-          </div>
-        </div>
-      ))}
-    </div>
-  );
+  return <KpiCardGrid items={cards} gridClassName="lg:grid-cols-5" ariaLabel={t("ops.trip.trip_list")} />;
 }
 
 export default React.memo(TripKPICards);

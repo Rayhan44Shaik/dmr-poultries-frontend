@@ -16,6 +16,8 @@ import { useI18n } from "../../../i18n";
 export interface MasterDropdownOption {
   value: string;
   label: string;
+  /** Raw/source label retained for type-ahead when the displayed text is localized. */
+  searchText?: string;
   disabled?: boolean;
   icon?: ReactNode;
 }
@@ -115,6 +117,7 @@ export default function MasterDropdown({
       if (!keyword) return true;
       return (
         option.label.toLocaleLowerCase().includes(keyword) ||
+        option.searchText?.toLocaleLowerCase().includes(keyword) ||
         option.value.toLocaleLowerCase().includes(keyword)
       );
     });

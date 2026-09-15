@@ -10,6 +10,7 @@ import { clearStep5Draft } from "../../../../shared/trip/step5DraftStore";
 import { sendTripDeliveryEmails } from "../services/deliveryEmailService";
 import { translate } from "../../../../i18n";
 import { notify as globalNotify } from "../../../../ui/notifications/notificationStore";
+import { TRIP_DATA_CHANGED_EVENT } from "../../../../shared/events/tripDataEvents";
 
 type NotificationFn = (message: string, type?: "success" | "error" | "info") => void;
 
@@ -43,6 +44,7 @@ export default function useTrips(
   const [toDate, setToDate] = useState("");
 
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
@@ -53,10 +55,16 @@ export default function useTrips(
   const mountedRef = useRef(true);
   const operationLocksRef = useRef<Set<string>>(new Set());
 
-  useEffect(() => () => {
-    mountedRef.current = false;
-    refreshSeqRef.current += 1;
-    refreshAbortRef.current?.abort();
+  // React Strict Mode replays effects during development. Resetting this flag in
+  // the setup is essential: otherwise the first cleanup leaves it false and all
+  // later successful refreshes are deliberately discarded as if unmounted.
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      refreshSeqRef.current += 1;
+      refreshAbortRef.current?.abort();
+    };
   }, []);
 
   const refreshTrips = useCallback(async (): Promise<boolean> => {
@@ -65,6 +73,7 @@ export default function useTrips(
     refreshAbortRef.current?.abort();
     const controller = new AbortController();
     refreshAbortRef.current = controller;
+    if (mountedRef.current) setIsLoading(true);
     try {
       const nextTrips = await listTrips({ includeDeleted, signal: controller.signal });
       if (!mountedRef.current || controller.signal.aborted || requestSeq !== refreshSeqRef.current) return false;
@@ -75,7 +84,10 @@ export default function useTrips(
       notify(translate("ops.trip.unable_load_trips"), "error");
       return false;
     } finally {
-      if (requestSeq === refreshSeqRef.current) refreshAbortRef.current = null;
+      if (requestSeq === refreshSeqRef.current) {
+        refreshAbortRef.current = null;
+        if (mountedRef.current) setIsLoading(false);
+      }
     }
   }, [includeDeleted, notify]);
 
@@ -88,6 +100,17 @@ export default function useTrips(
       cancelled = true;
       refreshAbortRef.current?.abort();
     };
+  }, [refreshTrips]);
+
+  // Shop Sales corrections mutate the corresponding Trip delivery and its
+  // calculated totals on the backend. Refresh an already-mounted Trip List
+  // immediately instead of leaving a stale, client-side copy on screen.
+  useEffect(() => {
+    const handleTripDataChanged = () => {
+      void refreshTrips();
+    };
+    window.addEventListener(TRIP_DATA_CHANGED_EVENT, handleTripDataChanged);
+    return () => window.removeEventListener(TRIP_DATA_CHANGED_EVENT, handleTripDataChanged);
   }, [refreshTrips]);
 
   const acquireOperationLock = (key: string) => {
@@ -235,6 +258,7 @@ export default function useTrips(
   return {
     trips: paginatedTrips || [],
     allTrips: allTrips,
+    isLoading,
     filteredTrips: filteredTrips || [],
     recentTrips: recentTrips || [],
     refreshTrips,

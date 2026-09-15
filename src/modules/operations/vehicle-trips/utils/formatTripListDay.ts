@@ -1,6 +1,8 @@
 const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"] as const;
 const WEEKDAYS_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+const WEEKDAYS_SHORT_TE = ["ఆది", "సోమ", "మంగళ", "బుధ", "గురు", "శుక్ర", "శని"] as const;
 const MONTHS_SHORT = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"] as const;
+const MONTHS_SHORT_TE = ["జన", "ఫిబ్ర", "మార్చి", "ఏప్రి", "మే", "జూన్", "జూలై", "ఆగ", "సెప్టెం", "అక్టో", "నవం", "డిసెం"] as const;
 
 function parseUtcDate(tripDate: string | null | undefined): Date | null {
   if (tripDate == null) return null;
@@ -28,11 +30,11 @@ function parseUtcDate(tripDate: string | null | undefined): Date | null {
  * Uses UTC calendar parts so the weekday/date is never shifted by the
  * browser timezone.
  */
-export function formatTripListDay(tripDate: string | null | undefined): string {
+export function formatTripListDay(tripDate: string | null | undefined, language: "en" | "te" = "en"): string {
   const utc = parseUtcDate(tripDate);
   if (!utc) return "—";
-  const day = WEEKDAYS_SHORT[utc.getUTCDay()];
-  const month = MONTHS_SHORT[utc.getUTCMonth()];
+  const day = language === "te" ? WEEKDAYS_SHORT_TE[utc.getUTCDay()] : WEEKDAYS_SHORT[utc.getUTCDay()];
+  const month = language === "te" ? MONTHS_SHORT_TE[utc.getUTCMonth()] : MONTHS_SHORT[utc.getUTCMonth()];
   return `${day}, ${utc.getUTCDate()} ${month} ${utc.getUTCFullYear()}`;
 }
 

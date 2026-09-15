@@ -51,7 +51,12 @@ export async function listShopSales(filters: {
   if (filters.fromDate) params.fromDate = filters.fromDate;
   if (filters.toDate) params.toDate = filters.toDate;
   if (filters.search && filters.search.trim() !== "") params.search = filters.search.trim();
-  if (filters.sortBy) params.sortBy = filters.sortBy;
+  // The server supports the original coarse sort set. The table additionally
+  // offers instant client-side sorts (sale number, birds, weight, rate and remarks),
+  // which must not be sent as an unknown server enum during a manual refresh.
+  if (["latest", "oldest", "shop_asc", "shop_desc", "amount_desc", "amount_asc"].includes(filters.sortBy || "")) {
+    params.sortBy = filters.sortBy!;
+  }
 
   const { data } = await apiGet<ApiShopSale[] | ShopSalesPageResult>(
     SHOP_SALES_PATH,
@@ -73,13 +78,8 @@ export interface ShopSalePatch {
   remarks?: string;
   birdTypeId?: number | null;
   birdType?: string;
-  /** Only ever included when the caller genuinely intends to attempt a
-   * change to a locked field — the backend will reject it with 409. Never
-   * sent just because the row happens to still carry its old value. */
-  rate?: number;
-  shopId?: number;
-  shopName?: string;
-  tripId?: number;
+  // Rate, amount, shop and trip identity are intentionally not patchable
+  // client-side after Rate Entry locks the sale.
 }
 
 /** PUT /operations/shop-sales/:id */

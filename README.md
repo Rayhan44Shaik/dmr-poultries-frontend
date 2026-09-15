@@ -36,9 +36,10 @@ prints that and exits without failing the dev command.
   leaves, duty roster, payments and farm payments). Anchoring on today keeps the
   today/this-week/this-month dashboard tiles populated; `SAMPLE_TODAY=YYYY-MM-DD`
   pins the anchor when you need a byte-identical dataset.
-  `GET /api/quarter-summary` returns the row-count manifest. Writes return
-  `200 {ok:true}` so UI flows complete, but the dataset stays immutable and
-  byte-identical on restart.
+  `GET /api/quarter-summary` returns the row-count manifest. Writes are held
+  in memory for the current demo session, and the related Operations, ledger,
+  Masters and dashboard endpoints re-aggregate immediately; restarting the
+  sample API restores the original deterministic quarter.
 - `.env.development` sets `VITE_DEMO_MODE=1`, so `npm run dev` skips the login
   gate and signs you in as the demo Owner. `VITE_DEMO_MODE` is only honoured when
   `import.meta.env.DEV` is true, so a production build can never bypass auth —
@@ -52,6 +53,9 @@ prints that and exits without failing the dev command.
   sample API); `npm run mock:trips` serves the older, trip-wizard-focused sample
   (`scripts/dev-mock-backend.mjs`) with in-memory wizard save/submit support.
 - Auth is stubbed by the sample API, so any credentials work too.
+- Run `npm run verify:quarter-data` to launch an isolated sample API and audit
+  the Operations data hand-offs (collections, rates, shop sales, fuel, ledger
+  and dashboard). It stops automatically and never touches the running preview.
 - To work against the real backend instead, run it on port 4000 and start the
   frontend alone with `npm run dev:web`.
 
