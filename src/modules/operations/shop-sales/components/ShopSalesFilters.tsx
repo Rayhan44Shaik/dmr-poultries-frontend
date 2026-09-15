@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { ArrowUpDown, Calendar, RotateCcw, Search, Store } from "lucide-react";
+import { AlertTriangle, ArrowUpDown, Calendar, RotateCcw, Search, Store } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import {
   opsFilterCardClass,
@@ -12,6 +12,7 @@ import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import { BrandRefreshButton } from "../../../../ui";
 import MasterDropdown, { type MasterDropdownOption } from "../../../masters/components/MasterDropdown";
 import { cleanDeliveryShopName } from "../../vehicle-trips/utils/shopDisplayName";
+import { useI18n } from "../../../../i18n";
 
 interface Props {
   fromDate: string;
@@ -29,6 +30,9 @@ interface Props {
   onReset: () => void;
   onRefresh: () => void;
   refreshing?: boolean;
+  /** One active trip-level reassignment notice, if an allocation is incomplete. */
+  unassignedBirds?: number | null;
+  assignmentTripNo?: string | null;
 }
 
 /**
@@ -52,7 +56,12 @@ function ShopSalesFilters({
   onReset,
   onRefresh,
   refreshing = false,
+  unassignedBirds = null,
+  assignmentTripNo = null,
 }: Props) {
+  const { t } = useI18n();
+  const assignmentCount = Number(unassignedBirds);
+  const hasAssignmentNotice = Number.isSafeInteger(assignmentCount) && assignmentCount > 0 && Boolean(assignmentTripNo);
   const shopOptions = useMemo<MasterDropdownOption[]>(() => {
     // Use the clean visible shop name as the filter value too. The client
     // filter intentionally uses contains(), so it still matches a legacy
@@ -170,7 +179,16 @@ function ShopSalesFilters({
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-end gap-2 lg:col-span-7">
+        {hasAssignmentNotice && (
+          <div className="flex min-w-0 items-center lg:col-span-3">
+            <span className="inline-flex max-w-full items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 whitespace-nowrap">
+              <AlertTriangle size={14} className="shrink-0" aria-hidden="true" />
+              {t("ops.shop_sales.unassigned_for_trip", { count: assignmentCount, trip: assignmentTripNo ?? "" })}
+            </span>
+          </div>
+        )}
+
+        <div className={`flex flex-wrap items-center justify-end gap-2 ${hasAssignmentNotice ? "lg:col-span-4" : "lg:col-span-7"}`}>
           <button type="button" onClick={onSearch} className={`group relative ${opsPrimaryButtonClass}`} aria-label="Search shop sales">
             <span className={`inline-flex ${uiActionIconMotionClass.search}`}><Search size={15} /></span>
             Search

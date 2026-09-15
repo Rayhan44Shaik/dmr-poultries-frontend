@@ -26,6 +26,7 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
   const [searchInput, setSearchInput] = useState("");
 
   const {
+    sales,
     filteredSales,
     paginatedSales,
     summary,
@@ -126,6 +127,13 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
     [updateSale, showNotification, refreshSales, t]
   );
 
+  // The API returns this trip-wide state on every related sale. Surface it
+  // only once beside Search (rather than repeating the same warning per row).
+  const sourceTripWithGap = sales.find((sale) => Number(sale.unassignedBirds) > 0) ?? null;
+  const assignmentLock = sourceTripWithGap ?? sales.find((sale) => sale.assignmentLockTripId != null) ?? null;
+  const assignmentNoticeBirds = sourceTripWithGap?.unassignedBirds ?? assignmentLock?.assignmentLockUnassignedBirds ?? null;
+  const assignmentNoticeTripNo = sourceTripWithGap?.tripNo ?? assignmentLock?.assignmentLockTripNo ?? null;
+
   const hasActiveFilters =
     filter.fromDate !== "" ||
     filter.toDate !== "" ||
@@ -156,6 +164,8 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
         onReset={handleResetFilters}
         onRefresh={() => void handleRefresh()}
         refreshing={isLoading}
+        unassignedBirds={assignmentNoticeBirds}
+        assignmentTripNo={assignmentNoticeTripNo == null ? null : String(assignmentNoticeTripNo)}
       />
 
       {hasActiveFilters && (

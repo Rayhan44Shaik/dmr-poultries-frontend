@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useRef } from "react";
 import { Check, Hash, Calendar, Truck, User, UserCog, Warehouse, ShoppingBag, Bird, Scale, HeartPulse, ArrowUp, ArrowDown } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { formatTripListDay } from "../utils/formatTripListDay";
@@ -22,10 +22,10 @@ interface Props {
   trips: Trip[];
   /** Keep the table surface informative while its server records are loading. */
   isLoading?: boolean;
-  /** A searched trip/reference, when the caller has one, for useful context. */
-  loadingReference?: string;
   selectedRowId?: number | null;
   onRowClick: (trip: Trip) => void;
+  /** Select without toggling, used by keyboard row navigation. */
+  onRowSelect?: (trip: Trip) => void;
   startIndex?: number;
   sortBy?: TripSortKey | null;
   sortDir?: "asc" | "desc";
@@ -47,15 +47,42 @@ function SortArrows({ active, dir }: { active: boolean; dir?: "asc" | "desc" }) 
 function TripMasterTable({
   trips,
   isLoading = false,
-  loadingReference,
   selectedRowId,
   onRowClick,
+  onRowSelect,
   startIndex = 0,
   sortBy = null,
   sortDir = "asc",
   onSortChange,
 }: Props) {
   const { t, language } = useI18n();
+  const rowRefs = useRef(new Map<number, HTMLTableRowElement>());
+
+  const selectRow = useCallback(
+    (trip: Trip) => (onRowSelect ? onRowSelect(trip) : onRowClick(trip)),
+    [onRowClick, onRowSelect],
+  );
+
+  const handleRowKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLTableRowElement>, rowIndex: number) => {
+      // Let controls inside a row keep their normal keyboard behaviour.
+      if (event.target !== event.currentTarget) return;
+      const currentTrip = trips[rowIndex];
+      if (!currentTrip) return;
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        selectRow(currentTrip);
+        return;
+      }
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+      event.preventDefault();
+      const nextTrip = trips[rowIndex + (event.key === "ArrowDown" ? 1 : -1)];
+      if (!nextTrip) return;
+      selectRow(nextTrip);
+      requestAnimationFrame(() => rowRefs.current.get(nextTrip.id)?.focus());
+    },
+    [selectRow, trips],
+  );
 
   const sortable = (key: TripSortKey, content: React.ReactNode, center = false) => {
     if (!onSortChange) return content;
@@ -145,18 +172,11 @@ function TripMasterTable({
           <tbody className="divide-y divide-slate-100">
             {isLoading ? (
               <tr>
-                <td colSpan={11} className="px-4 py-14 text-center">
-                  <div className="inline-flex flex-col items-center gap-2 text-slate-500">
-                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-emerald-100 bg-emerald-50 text-emerald-600">
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-200 border-t-emerald-600" aria-hidden="true" />
-                    </span>
-                    <p className="text-sm font-bold text-slate-700">{t("ops.trip.loading_trip_list")}</p>
-                    <p className="text-xs font-medium text-slate-500">
-                      {loadingReference
-                        ? t("ops.trip.loading_reference", { reference: loadingReference })
-                        : t("ops.trip.loading_trip_list_hint")}
-                    </p>
-                  </div>
+                <td colSpan={11} className="py-16 text-center text-sm font-medium text-slate-400">
+                  <span className="inline-flex items-center gap-2">
+                    <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600" aria-hidden="true" />
+                    {t("ops.trip.loading_trip_list")}
+                  </span>
                 </td>
               </tr>
             ) : trips.length === 0 ? (
@@ -172,8 +192,15 @@ function TripMasterTable({
                 return (
                   <tr
                     key={trip.id}
+                    ref={(element) => {
+                      if (element) rowRefs.current.set(trip.id, element);
+                      else rowRefs.current.delete(trip.id);
+                    }}
+                    tabIndex={0}
                     onClick={() => onRowClick(trip)}
-                    className={`cursor-pointer transition-colors duration-150 ${
+                    onKeyDown={(event) => handleRowKeyDown(event, index)}
+                    aria-selected={isSelected}
+                    className={`cursor-pointer outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
                       isSelected
                         ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200"
                         : `hover:bg-slate-50/60 ${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"}`

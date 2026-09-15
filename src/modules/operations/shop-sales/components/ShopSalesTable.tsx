@@ -5,7 +5,6 @@ import React, { useCallback, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
-  AlertTriangle,
   Bird,
   Calendar,
   Check,
@@ -198,8 +197,6 @@ function ShopSalesTable({
   }, [handleRowSelect, sales]);
 
   const canEditSelectedSale = Boolean(selectedSale && selectedLock?.editable && !saving);
-  const selectedUnassignedBirds = Number(selectedSale?.unassignedBirds);
-  const hasSelectedUnassignedBirds = Number.isSafeInteger(selectedUnassignedBirds) && selectedUnassignedBirds > 0;
   const selectedBlockedByAssignment = Boolean(
     selectedSale &&
       selectedSale.assignmentLockTripId != null &&
@@ -218,12 +215,6 @@ function ShopSalesTable({
           {selectedSale && (
             <span className="hidden truncate rounded-full border border-emerald-200/70 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 sm:inline">
               {selectedSale.tripNo}
-            </span>
-          )}
-          {hasSelectedUnassignedBirds && selectedSale && (
-            <span className="hidden items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-800 lg:inline-flex">
-              <AlertTriangle size={12} aria-hidden="true" />
-              {t("ops.shop_sales.unassigned_birds", { count: selectedUnassignedBirds })}
             </span>
           )}
         </div>
@@ -328,11 +319,6 @@ function ShopSalesTable({
               const isSelected = selectedId === sale.id;
               const isEditing = editingId === sale.id;
               const lock = shopSaleLockState(sale);
-              const unassignedBirds = Number(sale.unassignedBirds);
-              const hasUnassignedBirds = Number.isSafeInteger(unassignedBirds) && unassignedBirds > 0;
-              const blockedByAssignment = Boolean(
-                sale.assignmentLockTripId != null && sale.numericTripId !== sale.assignmentLockTripId,
-              );
               return (
                 <tr
                   key={sale.id}
@@ -352,23 +338,9 @@ function ShopSalesTable({
                   <td className="px-3.5 py-3 text-center text-xs font-semibold text-slate-500">{startIndex + index + 1}</td>
                   <td className="px-3.5 py-3 text-xs font-semibold text-emerald-600 whitespace-nowrap">
                     <div>{sale.saleNo || sale.tripNo || "—"}</div>
-                    {blockedByAssignment && (
-                      <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500">
-                        <Lock size={10} aria-hidden="true" />
-                        {t("ops.shop_sales.assignment_locked")}
-                      </span>
-                    )}
                   </td>
                   <td className="px-3.5 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(sale.tripDate)}</td>
-                  <td className="px-3.5 py-3 text-xs font-semibold text-slate-700">
-                    <div>{cleanDeliveryShopName(sale.shopName) || "—"}</div>
-                    {hasUnassignedBirds && (
-                      <span className="mt-1 inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 whitespace-nowrap">
-                        <AlertTriangle size={10} aria-hidden="true" />
-                        {t("ops.shop_sales.unassigned_for_trip", { count: unassignedBirds, trip: sale.tripNo })}
-                      </span>
-                    )}
-                  </td>
+                  <td className="px-3.5 py-3 text-xs font-semibold text-slate-700">{cleanDeliveryShopName(sale.shopName) || "—"}</td>
                   <td className="px-3.5 py-3 text-center text-xs font-bold text-cyan-700">{Number(sale.totalBirds || 0).toLocaleString()}</td>
                   <td className="px-3.5 py-3 text-center text-xs font-bold text-orange-600">{formatSaleWeight(sale.totalWeight)}</td>
                   <td className="px-3.5 py-3 text-center text-xs font-bold text-violet-600">{formatSaleRate(sale.rate)}</td>

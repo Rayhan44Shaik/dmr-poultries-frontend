@@ -541,9 +541,9 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         <TripMasterTable
           trips={paginatedTrips}
           isLoading={isLoading}
-          loadingReference={appliedSearch || undefined}
           selectedRowId={selectedRowId}
           onRowClick={handleRowClick}
+          onRowSelect={(trip) => setSelectedRowId(trip.id)}
           startIndex={(currentPage - 1) * pageSize}
           sortBy={sortBy}
           sortDir={sortDir}

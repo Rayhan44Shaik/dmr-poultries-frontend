@@ -86,6 +86,7 @@ function TripRecentTable({
   });
 
   const tableRef = useRef<HTMLDivElement>(null);
+  const rowRefs = useRef(new Map<number, HTMLTableRowElement>());
 
   // ✅ Get current user name (or fallback to "Admin")
   const getCurrentUser = () => {
@@ -213,6 +214,34 @@ function TripRecentTable({
     if (isPending(Number(trip.id))) return;
     setSelectedTripId(trip.id === selectedTripId ? null : trip.id);
   };
+
+  const selectRowFromKeyboard = useCallback((trip: Trip) => {
+    if (trip.deleted || isPending(Number(trip.id))) return;
+    setSelectedTripId(trip.id);
+  }, [isPending]);
+
+  const handleRowKeyDown = useCallback((event: React.KeyboardEvent<HTMLTableRowElement>, rowIndex: number) => {
+    // Do not hijack arrow/Enter keys from a row's select or View button.
+    if (event.target !== event.currentTarget) return;
+    const currentTrip = paginatedTrips[rowIndex];
+    if (!currentTrip) return;
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      selectRowFromKeyboard(currentTrip);
+      return;
+    }
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    event.preventDefault();
+    const step = event.key === "ArrowDown" ? 1 : -1;
+    let nextIndex = rowIndex + step;
+    while (nextIndex >= 0 && nextIndex < paginatedTrips.length && paginatedTrips[nextIndex]?.deleted) {
+      nextIndex += step;
+    }
+    const nextTrip = paginatedTrips[nextIndex];
+    if (!nextTrip) return;
+    selectRowFromKeyboard(nextTrip);
+    requestAnimationFrame(() => rowRefs.current.get(nextTrip.id)?.focus());
+  }, [paginatedTrips, selectRowFromKeyboard]);
 
   const handleEditClick = () => {
     if (selectedTrip) onEdit(selectedTrip);
@@ -372,24 +401,32 @@ function TripRecentTable({
             <tbody className="divide-y divide-slate-100">
               {isLoading ? (
                 <tr>
-                  <td colSpan={12} className="px-4 py-14 text-center">
-                    <div className="inline-flex flex-col items-center gap-2 text-slate-500">
-                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 text-blue-600">
-                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" aria-hidden="true" />
-                      </span>
-                      <p className="text-sm font-bold text-slate-700">{t("ops.trip.loading_recent")}</p>
-                      <p className="text-xs font-medium text-slate-500">{t("ops.trip.loading_recent_hint")}</p>
-                    </div>
+                  <td colSpan={12} className="py-16 text-center text-sm font-medium text-slate-400">
+                    <span className="inline-flex items-center gap-2">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600" aria-hidden="true" />
+                      {t("ops.trip.loading_recent")}
+                    </span>
                   </td>
                 </tr>
               ) : paginatedTrips.length === 0 ? (
                 <tr><td colSpan={12} className="py-16 text-center text-slate-400"><History size={24} className="mx-auto mb-2" /> {t("empty.no_trips")}</td></tr>
               ) : (
-                paginatedTrips.map((trip) => {
+                paginatedTrips.map((trip, index) => {
                   const isSelected = trip.id === selectedTripId;
                   const isDeleted = trip.deleted === true;
                   return (
-                    <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-colors duration-150 ${isDeleted ? "bg-red-50/50 hover:bg-red-50/80 border-l-4 border-l-red-400" : isSelected ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200" : "hover:bg-slate-50/80"}`}>
+                    <tr
+                      key={trip.id}
+                      ref={(element) => {
+                        if (element) rowRefs.current.set(trip.id, element);
+                        else rowRefs.current.delete(trip.id);
+                      }}
+                      tabIndex={isDeleted ? -1 : 0}
+                      onClick={() => handleRowClick(trip)}
+                      onKeyDown={(event) => handleRowKeyDown(event, index)}
+                      aria-selected={isSelected}
+                      className={`cursor-pointer outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${isDeleted ? "bg-red-50/50 hover:bg-red-50/80 border-l-4 border-l-red-400" : isSelected ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200" : "hover:bg-slate-50/80"}`}
+                    >
                       <td className={`px-4 py-3 font-bold text-emerald-500 text-xs whitespace-nowrap ${isDeleted ? "opacity-60 line-through" : ""}`}>
                         {localizeTripViewText(trip.tripNo, language)}
                       </td>

@@ -235,16 +235,11 @@ export default function RatesEntryPage({ embedded = false }: Props) {
         </div>
 
         {isLoading ? (
-          <div className="flex min-h-52 flex-col items-center justify-center gap-2 px-6 py-12 text-center">
-            <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-emerald-100 bg-emerald-50 text-emerald-600">
-              <LoaderCircle size={21} className="animate-spin" aria-hidden="true" />
+          <div className="py-16 text-center text-sm font-medium text-slate-400">
+            <span className="inline-flex items-center gap-2">
+              <LoaderCircle size={16} className="animate-spin text-emerald-600" aria-hidden="true" />
+              {t("ops.rate.loading_table")}
             </span>
-            <p className="font-semibold text-slate-700">{t("ops.rate.loading_table")}</p>
-            <p className="text-xs font-medium text-slate-500">
-              {filter.search
-                ? t("ops.rate.loading_reference", { reference: filter.search })
-                : t("ops.rate.loading_table_hint")}
-            </p>
           </div>
         ) : filteredTrips.length === 0 && !loadError ? (
           <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
@@ -263,6 +258,7 @@ export default function RatesEntryPage({ embedded = false }: Props) {
               startIndex={startIndex}
               selectedRowId={selectedRowId}
               onRowClick={(trip) => setSelectedRowId((current) => (current === trip.id ? null : trip.id))}
+              onRowSelect={(trip) => setSelectedRowId(trip.id)}
               sortBy={sortBy}
               sortDir={sortDir}
               onSortChange={handleSortChange}

@@ -1,4 +1,4 @@
-import React, { type ReactNode } from "react";
+import React, { useCallback, useRef, type ReactNode } from "react";
 import {
   IndianRupee,
   Pencil,
@@ -36,6 +36,8 @@ interface Props {
   children?: ReactNode;
   selectedRowId?: number | null;
   onRowClick?: (trip: Trip) => void;
+  /** Select without toggling, used by keyboard row navigation. */
+  onRowSelect?: (trip: Trip) => void;
   startIndex?: number;
   sortBy?: RateEntrySortKey | null;
   sortDir?: "asc" | "desc";
@@ -61,12 +63,40 @@ function CompletedTripsTable({
   children,
   selectedRowId = null,
   onRowClick,
+  onRowSelect,
   startIndex = 0,
   sortBy = null,
   sortDir = "asc",
   onSortChange,
 }: Props) {
   const { t, language } = useI18n();
+  const rowRefs = useRef(new Map<number, HTMLTableRowElement>());
+
+  const selectRow = useCallback(
+    (trip: Trip) => onRowSelect?.(trip) ?? onRowClick?.(trip),
+    [onRowClick, onRowSelect],
+  );
+
+  const handleRowKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLTableRowElement>, rowIndex: number) => {
+      // Let the Enter Rates / Modify Rates button keep its own keyboard action.
+      if (event.target !== event.currentTarget) return;
+      const currentTrip = trips[rowIndex];
+      if (!currentTrip) return;
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        selectRow(currentTrip);
+        return;
+      }
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+      event.preventDefault();
+      const nextTrip = trips[rowIndex + (event.key === "ArrowDown" ? 1 : -1)];
+      if (!nextTrip) return;
+      selectRow(nextTrip);
+      requestAnimationFrame(() => rowRefs.current.get(nextTrip.id)?.focus());
+    },
+    [selectRow, trips],
+  );
 
   const sortable = (key: RateEntrySortKey, content: React.ReactNode, center = false) => {
     if (!onSortChange) return content;
@@ -140,8 +170,15 @@ function CompletedTripsTable({
               return (
                 <tr
                   key={trip.id}
+                  ref={(element) => {
+                    if (element) rowRefs.current.set(trip.id, element);
+                    else rowRefs.current.delete(trip.id);
+                  }}
+                  tabIndex={onRowClick || onRowSelect ? 0 : undefined}
                   onClick={() => onRowClick?.(trip)}
-                  className={`${onRowClick ? "cursor-pointer" : ""} border-t transition-colors duration-150 ${
+                  onKeyDown={(event) => handleRowKeyDown(event, index)}
+                  aria-selected={isSelected}
+                  className={`${onRowClick || onRowSelect ? "cursor-pointer" : ""} outline-none border-t transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
                     isSelected
                       ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200"
                       : `${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"} hover:bg-slate-50/60`
