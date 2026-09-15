@@ -58,18 +58,51 @@ function useCountUp(target: number, duration = 900): number {
  * 8 minutes per lap, barely noticeable, off with reduced-motion.
  *
  * A white pop badge with the exact share appears ONLY for the checked
- * (hovered) slice: it springs in outside the ring, centred exactly on that
- * sector's mid-angle, touching the slice's outer edge, orbits with the pie
- * while counter-rotating to stay perfectly horizontal — and disappears
- * when the slice is un-checked. No badges show at any other time. Hovering
- * lifts the slice out; the other slices stay fully solid (no fading). The
- * centre shows the total with a count-up, the legend lists every mode with
- * exact amount and share, and the card title links to the Collection Report.
+ * (hovered) slice: it springs in outside the ring, its inner edge touching
+ * the ring's outer side at that sector's exact mid-angle, and disappears
+ * when the slice is un-checked. No badges show at any other time.
+ *
+ * The badge joins the pie's own rotation clock via a negative
+ * animation-delay captured at hover time, so it is always locked to its
+ * slice's mid-angle (never drifting or rotating separately) while the
+ * donut keeps its one very slow ambient revolution (8 min per lap, off
+ * with reduced-motion); a counter-rotation keeps the pill perfectly
+ * horizontal at all times. Hovering lifts the slice out; the other
+ * slices stay fully solid (no fading). The centre shows the total with a
+ * count-up, the legend lists every mode with exact amount and share, and
+ * the card title links to the Collection Report.
  */
 export default function CollectionsPie({ data }: CollectionsPieProps) {
   const { t } = useI18n();
   const chartData = useMemo(() => data ?? [], [data]);
   const [hoverIndex, setHoverIndex] = useState(-1);
+
+  // One shared clock for the ambient orbit. A badge mounts on hover, so at
+  // that moment we read the donut's CURRENT rotation from its computed
+  // transform and join the badge to the exact same phase via a negative
+  // animation-delay — it orbits locked to its own slice's mid-angle, never
+  // separately from the pie.
+  const ORBIT_SECONDS = 480; // keep in sync with .cs-* animations in tokens.css
+  const spinRef = useRef<HTMLDivElement | null>(null);
+  const [orbitDelay, setOrbitDelay] = useState("-0s");
+  const handleSliceOver = useCallback(
+    (index?: number) => {
+      if (index === undefined || index === hoverIndex) return;
+      let phase = 0;
+      const el = spinRef.current;
+      if (el) {
+        const tr = getComputedStyle(el).transform;
+        if (tr && tr !== "none") {
+          const m = tr.slice(7, -1).split(",").map(Number);
+          phase = (Math.atan2(m[1], m[0]) * 180) / Math.PI;
+        }
+      }
+      const sec = (((((phase % 360) + 360) % 360) / 360) * ORBIT_SECONDS).toFixed(3);
+      setOrbitDelay(`-${sec}s`);
+      setHoverIndex(index);
+    },
+    [hoverIndex]
+  );
 
   const enrichedData = useMemo<EnrichedMode[]>(() => {
     const total = chartData.reduce((sum, d) => sum + (Number(d.value) || 0), 0);
@@ -139,7 +172,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
           {/* Soft background track behind the ring (matches the 58%–84% band). */}
           <div className="absolute left-1/2 top-1/2 h-[215px] w-[215px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[33px] border-slate-100/80" />
 
-          <div className="cs-pie-spin h-full w-full">
+          <div ref={spinRef} className="cs-pie-spin h-full w-full">
             <div className="h-full w-full [filter:drop-shadow(0_18px_26px_-16px_rgba(15,23,42,0.35))]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -163,7 +196,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
                   cornerRadius={6}
                   stroke="none"
                   shape={renderSector}
-                  onMouseOver={(_entry, index) => setHoverIndex(index)}
+                  onMouseOver={(_entry, index) => handleSliceOver(index)}
                   onMouseOut={() => setHoverIndex(-1)}
                   animationBegin={150}
                   animationDuration={900}
@@ -196,16 +229,19 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
                 (() => {
                   const d = enrichedData[hoverIndex];
                   const a = (sliceMids[hoverIndex] * Math.PI) / 180;
-                  // Badge centre sits EXACTLY at its sector's mid-angle, just
-                  // outside the ring's outer edge (107.5) — touching it.
-                  const px = 128 + 119 * Math.sin(a);
-                  const py = 128 - 119 * Math.cos(a);
-                  // Orbit group rotates with the pie (same 480s clock); the
-                  // counter group turns the same amount the other way about
-                  // the badge's own centre, so the pill stays perfectly
-                  // horizontal while it circles with its slice.
+                  // The pill (52×22) sits so its inner edge touches the ring's
+                  // outer side (107.5) at ANY angle: the centre is pushed out
+                  // by the pill's radial half-extent in this direction.
+                  const support = 26 * Math.abs(Math.sin(a)) + 11 * Math.abs(Math.cos(a));
+                  const r = 107.5 + support + 1;
+                  const px = 128 + r * Math.sin(a);
+                  const py = 128 - r * Math.cos(a);
+                  // Orbit + counter both run on the pie's own clock (joined
+                  // via the shared negative delay): the badge stays locked at
+                  // its sector's mid-angle while circling, and the pill
+                  // counter-rotates to stay perfectly horizontal.
                   return (
-                    <g key={d.name} className="cs-badge-orbit">
+                    <g key={d.name} className="cs-badge-orbit" style={{ animationDelay: orbitDelay }}>
                       <g transform={`translate(${px.toFixed(2)}, ${py.toFixed(2)})`}>
                         <g
                           className="animate-pop-in"
@@ -213,7 +249,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
                         >
                           <g
                             className="cs-badge-counter"
-                            style={{ transformOrigin: `${px.toFixed(2)}px ${py.toFixed(2)}px` }}
+                            style={{ transformOrigin: `${px.toFixed(2)}px ${py.toFixed(2)}px`, animationDelay: orbitDelay }}
                           >
                             <rect
                               x={-26}
