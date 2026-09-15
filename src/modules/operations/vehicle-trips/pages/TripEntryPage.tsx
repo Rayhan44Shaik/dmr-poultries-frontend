@@ -81,7 +81,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const { birdTypes } = useBirdTypes();
 
   const { showNotification } = useSafeNotification();
-  const { allTrips, refreshTrips, deleteTrip, changeStatus } = useTrips(showNotification, {
+  const { allTrips, isLoading: tripsLoading, refreshTrips, deleteTrip, changeStatus } = useTrips(showNotification, {
     includeDeleted: true,
   });
 
@@ -723,6 +723,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
 
       <TripRecentTable
         trips={allTrips}
+        isLoading={tripsLoading}
         onRefresh={handleRefresh}
         onView={handleView}
         onEdit={handleEdit}

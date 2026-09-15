@@ -20,6 +20,10 @@ export type TripSortKey =
 
 interface Props {
   trips: Trip[];
+  /** Keep the table surface informative while its server records are loading. */
+  isLoading?: boolean;
+  /** A searched trip/reference, when the caller has one, for useful context. */
+  loadingReference?: string;
   selectedRowId?: number | null;
   onRowClick: (trip: Trip) => void;
   startIndex?: number;
@@ -42,6 +46,8 @@ function SortArrows({ active, dir }: { active: boolean; dir?: "asc" | "desc" }) 
 
 function TripMasterTable({
   trips,
+  isLoading = false,
+  loadingReference,
   selectedRowId,
   onRowClick,
   startIndex = 0,
@@ -137,7 +143,23 @@ function TripMasterTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {trips.length === 0 ? (
+            {isLoading ? (
+              <tr>
+                <td colSpan={11} className="px-4 py-14 text-center">
+                  <div className="inline-flex flex-col items-center gap-2 text-slate-500">
+                    <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-emerald-100 bg-emerald-50 text-emerald-600">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-emerald-200 border-t-emerald-600" aria-hidden="true" />
+                    </span>
+                    <p className="text-sm font-bold text-slate-700">{t("ops.trip.loading_trip_list")}</p>
+                    <p className="text-xs font-medium text-slate-500">
+                      {loadingReference
+                        ? t("ops.trip.loading_reference", { reference: loadingReference })
+                        : t("ops.trip.loading_trip_list_hint")}
+                    </p>
+                  </div>
+                </td>
+              </tr>
+            ) : trips.length === 0 ? (
               <tr>
                 <td colSpan={11} className="py-12 text-center text-slate-400 text-[13px] font-medium">
                   {t("ops.trip.no_completed_trips")}

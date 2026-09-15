@@ -24,6 +24,13 @@ function row(overrides: Partial<ApiShopSale> = {}): ApiShopSale {
     mortality: 0,
     tripPickupBirds: 600,
     maxEditableBirds: 84,
+    tripDeliveredBirds: 596,
+    tripMortalityBirds: 0,
+    unassignedBirds: 4,
+    assignmentComplete: false,
+    assignmentLockTripId: 9,
+    assignmentLockTripNo: "TR-20260820-001",
+    assignmentLockUnassignedBirds: 4,
     remarks: "Urgent delivery",
     status: "Approved",
     deleted: false,
@@ -69,6 +76,17 @@ describe("mapApiSaleToShopSale", () => {
     assert.equal(mapped.numericId, 42);
     assert.equal(mapped.numericTripId, 9);
     assert.equal(mapped.numericShopId, 7);
+  });
+
+  it("maps the server-authoritative reassignment workflow facts", () => {
+    const mapped = mapApiSaleToShopSale(row());
+    assert.equal(mapped.tripDeliveredBirds, 596);
+    assert.equal(mapped.tripMortalityBirds, 0);
+    assert.equal(mapped.unassignedBirds, 4);
+    assert.equal(mapped.assignmentComplete, false);
+    assert.equal(mapped.assignmentLockTripId, 9);
+    assert.equal(mapped.assignmentLockTripNo, "TR-20260820-001");
+    assert.equal(mapped.assignmentLockUnassignedBirds, 4);
   });
 
   it("maps editable + tripDeleted + lockReason", () => {

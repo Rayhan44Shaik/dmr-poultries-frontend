@@ -68,6 +68,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   const { showNotification } = useSafeNotification();
 
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalTrips, setTotalTrips] = useState(0);
   const [search, setSearch] = useState("");
@@ -95,6 +96,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     listAbortRef.current?.abort();
     const controller = new AbortController();
     listAbortRef.current = controller;
+    setIsLoading(true);
 
     try {
       const result: PaginatedTripListResult = await listCompletedTrips({
@@ -123,7 +125,10 @@ function TripListPage({ embedded = false }: TripListPageProps) {
       showNotification(t("ops.trip.unable_load_trips"), "error");
       return false;
     } finally {
-      if (requestSeq === listRequestSeqRef.current) listAbortRef.current = null;
+      if (requestSeq === listRequestSeqRef.current) {
+        listAbortRef.current = null;
+        setIsLoading(false);
+      }
     }
   }, [showNotification, t, currentPage, pageSize, fromDate, toDate, vehicle, supervisor, farm, appliedSearch, sortBy, sortDir]);
 
@@ -535,6 +540,8 @@ function TripListPage({ embedded = false }: TripListPageProps) {
 
         <TripMasterTable
           trips={paginatedTrips}
+          isLoading={isLoading}
+          loadingReference={appliedSearch || undefined}
           selectedRowId={selectedRowId}
           onRowClick={handleRowClick}
           startIndex={(currentPage - 1) * pageSize}

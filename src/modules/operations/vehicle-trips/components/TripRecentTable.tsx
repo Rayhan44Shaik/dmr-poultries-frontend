@@ -21,6 +21,8 @@ import { isOrderContainer } from "../../orders/ordersUtils";
 
 interface Props {
   trips?: Trip[];
+  /** True while the server-backed Recent Trip Activity data is refreshing. */
+  isLoading?: boolean;
   onRefresh: () => void;
   onView: (trip: Trip) => void;
   onEdit: (trip: Trip) => void;
@@ -32,6 +34,7 @@ interface Props {
 
 function TripRecentTable({
   trips = [],
+  isLoading = false,
   onRefresh,
   onView,
   onEdit,
@@ -367,7 +370,19 @@ function TripRecentTable({
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
-              {paginatedTrips.length === 0 ? (
+              {isLoading ? (
+                <tr>
+                  <td colSpan={12} className="px-4 py-14 text-center">
+                    <div className="inline-flex flex-col items-center gap-2 text-slate-500">
+                      <span className="inline-flex h-10 w-10 items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 text-blue-600">
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600" aria-hidden="true" />
+                      </span>
+                      <p className="text-sm font-bold text-slate-700">{t("ops.trip.loading_recent")}</p>
+                      <p className="text-xs font-medium text-slate-500">{t("ops.trip.loading_recent_hint")}</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : paginatedTrips.length === 0 ? (
                 <tr><td colSpan={12} className="py-16 text-center text-slate-400"><History size={24} className="mx-auto mb-2" /> {t("empty.no_trips")}</td></tr>
               ) : (
                 paginatedTrips.map((trip) => {
@@ -407,7 +422,7 @@ function TripRecentTable({
                             validOptions.includes("Completed");
                           if (showDropdown) {
                             return (
-                              <div className="relative inline-block w-[8.5rem]">
+                              <div className="group relative inline-block w-[8.5rem]">
                                 <select
                                   value="Pending"
                                   onChange={(e) => handleStatusChange(trip, e.target.value as TripStatus)}
@@ -420,7 +435,8 @@ function TripRecentTable({
                                     ✅ {tSafe("status.completed") || "Completed"}
                                   </option>
                                 </select>
-                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2.5 text-slate-500">
+                                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center gap-0.5 px-2 text-slate-500">
+                                  <span className={`inline-flex text-emerald-600 ${uiActionIconMotionClass.approve}`} aria-hidden="true"><CheckCircle size={13} /></span>
                                   <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M19 9l-7 7-7-7" />
                                   </svg>

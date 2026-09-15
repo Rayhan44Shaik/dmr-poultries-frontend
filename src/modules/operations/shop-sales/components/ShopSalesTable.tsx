@@ -5,6 +5,7 @@ import React, { useCallback, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
+  AlertTriangle,
   Bird,
   Calendar,
   Check,
@@ -29,6 +30,7 @@ import {
 import { formatTripListDay } from "../../vehicle-trips/utils/formatTripListDay";
 import { cleanDeliveryShopName } from "../../vehicle-trips/utils/shopDisplayName";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
+import { useI18n } from "../../../../i18n";
 
 interface Props {
   sales: ShopSale[];
@@ -73,6 +75,7 @@ function ShopSalesTable({
   onSortChange,
   onUpdateSale,
 }: Props) {
+  const { t } = useI18n();
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<ShopSale>>({});
@@ -135,18 +138,16 @@ function ShopSalesTable({
     const newBirds = editData.totalBirds ?? originalSale.totalBirds ?? 0;
     const newWeight = editData.totalWeight ?? originalSale.totalWeight ?? 0;
     if (!Number.isInteger(newBirds) || newBirds < 0) {
-      globalNotify.error("Birds must be a whole, non-negative number.");
+      globalNotify.error(t("ops.shop_sales.birds_integer"));
       return;
     }
     if (newWeight < 0) {
-      globalNotify.error("Weight cannot be negative.");
+      globalNotify.error(t("ops.shop_sales.invalid_weight"));
       return;
     }
     const maximumBirds = Number(originalSale.maxEditableBirds);
     if (Number.isSafeInteger(maximumBirds) && maximumBirds >= 0 && newBirds > maximumBirds) {
-      globalNotify.error(
-        `Birds cannot exceed ${maximumBirds.toLocaleString()} for this shop. Total delivered birds plus mortality must stay within the trip pickup count.`
-      );
+      globalNotify.error(t("ops.shop_sales.max_birds_error", { maximum: maximumBirds }));
       return;
     }
 
@@ -166,7 +167,7 @@ function ShopSalesTable({
     } finally {
       setSaving(false);
     }
-  }, [editData, editingId, onUpdateSale, sales, saving]);
+  }, [editData, editingId, onUpdateSale, sales, saving, t]);
 
   const handleRowSelect = useCallback((sale: ShopSale) => {
     if (saving) return;
@@ -197,6 +198,13 @@ function ShopSalesTable({
   }, [handleRowSelect, sales]);
 
   const canEditSelectedSale = Boolean(selectedSale && selectedLock?.editable && !saving);
+  const selectedUnassignedBirds = Number(selectedSale?.unassignedBirds);
+  const hasSelectedUnassignedBirds = Number.isSafeInteger(selectedUnassignedBirds) && selectedUnassignedBirds > 0;
+  const selectedBlockedByAssignment = Boolean(
+    selectedSale &&
+      selectedSale.assignmentLockTripId != null &&
+      selectedSale.numericTripId !== selectedSale.assignmentLockTripId,
+  );
 
   return (
     <>
@@ -212,6 +220,12 @@ function ShopSalesTable({
               {selectedSale.tripNo}
             </span>
           )}
+          {hasSelectedUnassignedBirds && selectedSale && (
+            <span className="hidden items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 text-[11px] font-bold text-amber-800 lg:inline-flex">
+              <AlertTriangle size={12} aria-hidden="true" />
+              {t("ops.shop_sales.unassigned_birds", { count: selectedUnassignedBirds })}
+            </span>
+          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -221,7 +235,7 @@ function ShopSalesTable({
                 <Bird size={13} className="text-cyan-600" />
                 <input
                   type="number"
-                  aria-label="Birds"
+                  aria-label={t("ops.shop_sales.birds")}
                   value={editData.totalBirds ?? 0}
                   onChange={(event) => handleInputChange("totalBirds", parseFloat(event.target.value) || 0)}
                   className="h-9 w-20 rounded-lg border border-blue-300 bg-white px-2 text-center text-xs font-bold text-blue-700 shadow-2xs outline-none transition-all [appearance:textfield] focus:border-blue-500 focus:ring-2 focus:ring-blue-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
@@ -230,12 +244,12 @@ function ShopSalesTable({
                   step={1}
                 />
                 {hasSelectedBirdLimit ? (
-                  <span className="hidden whitespace-nowrap text-[10px] font-medium text-slate-500 lg:inline">Max {selectedBirdLimit.toLocaleString()}</span>
+                  <span className="hidden whitespace-nowrap text-[10px] font-medium text-slate-500 lg:inline">{t("ops.shop_sales.max_birds", { maximum: selectedBirdLimit })}</span>
                 ) : null}
                 <Scale size={13} className="text-orange-600" />
                 <input
                   type="number"
-                  aria-label="Weight"
+                  aria-label={t("ops.shop_sales.weight")}
                   value={editData.totalWeight ?? 0}
                   onChange={(event) => handleInputChange("totalWeight", parseFloat(event.target.value) || 0)}
                   className="h-9 w-20 rounded-lg border border-blue-300 bg-white px-2 text-center text-xs font-bold text-orange-600 shadow-2xs outline-none transition-all [appearance:textfield] focus:border-blue-500 focus:ring-2 focus:ring-blue-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
@@ -243,11 +257,11 @@ function ShopSalesTable({
                   step={0.01}
                 />
               </div>
-              <button type="button" onClick={saveEditing} disabled={saving} aria-label="Save sale" className="inline-flex items-center justify-center rounded-lg bg-emerald-600 p-2 text-white shadow-xs transition-all hover:bg-emerald-700 disabled:opacity-50">
-                <Check size={14} />
+              <button type="button" onClick={saveEditing} disabled={saving} aria-label={t("ops.shop_sales.save_sale")} className="group inline-flex items-center justify-center rounded-lg bg-emerald-600 p-2 text-white shadow-xs transition-all hover:bg-emerald-700 disabled:opacity-50">
+                <span className={`inline-flex ${uiActionIconMotionClass.approve}`}><Check size={14} /></span>
               </button>
-              <button type="button" onClick={cancelEditing} disabled={saving} aria-label="Cancel editing" className="inline-flex items-center justify-center rounded-lg bg-red-100 p-2 text-red-700 transition-all hover:bg-red-200 disabled:opacity-50">
-                <X size={14} />
+              <button type="button" onClick={cancelEditing} disabled={saving} aria-label={t("ops.shop_sales.cancel_editing")} className="group inline-flex items-center justify-center rounded-lg bg-rose-100 p-2 text-rose-700 transition-all hover:bg-rose-200 disabled:opacity-50">
+                <span className={`inline-flex ${uiActionIconMotionClass.reject}`}><X size={14} /></span>
               </button>
             </>
           ) : (
@@ -258,7 +272,7 @@ function ShopSalesTable({
                 type="button"
                 onClick={startEditing}
                 disabled={!canEditSelectedSale}
-                aria-label="Edit selected shop sale"
+                aria-label={t("ops.shop_sales.edit_selected")}
                 className={`group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${
                   canEditSelectedSale
                     ? "bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-500 border border-emerald-200/60 active:scale-95"
@@ -266,14 +280,21 @@ function ShopSalesTable({
                 }`}
               >
                 <span className={`inline-flex ${canEditSelectedSale ? uiActionIconMotionClass.edit : ""}`}><Pencil size={13} /></span>
-                <span className="hidden md:inline">Edit</span>
+                <span className="hidden md:inline">{t("common.edit")}</span>
               </button>
               {selectedSale && selectedLock && !selectedLock.editable ? (
                 <div className="flex items-center gap-2">
                   <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">
-                    <Lock size={14} /> {selectedLock.label}
+                    <Lock size={14} /> {selectedBlockedByAssignment ? t("ops.shop_sales.assignment_locked") : selectedLock.label}
                   </span>
-                  <span className="hidden max-w-xs text-xs font-medium text-slate-500 md:inline">{selectedLock.message}</span>
+                  <span className="hidden max-w-xs text-xs font-medium text-slate-500 md:inline">
+                    {selectedBlockedByAssignment
+                      ? t("ops.shop_sales.other_trips_locked", {
+                          trip: selectedSale.assignmentLockTripNo ?? "",
+                          count: selectedSale.assignmentLockUnassignedBirds ?? 0,
+                        })
+                      : selectedLock.message}
+                  </span>
                 </div>
               ) : null}
             </>
@@ -300,13 +321,18 @@ function ShopSalesTable({
           </thead>
           <tbody className="divide-y divide-slate-100">
             {isLoading ? (
-              <tr><td colSpan={9} className="py-12 text-center text-sm font-medium text-slate-400"><span className="inline-flex items-center gap-2"><span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600" />Loading shop sales...</span></td></tr>
+              <tr><td colSpan={9} className="py-12 text-center text-sm font-medium text-slate-400"><span className="inline-flex items-center gap-2"><span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600" />{t("ops.shop_sales.loading")}</span></td></tr>
             ) : sales.length === 0 ? (
-              <tr><td colSpan={9} className="py-12 text-center text-sm font-medium text-slate-400">No Shop Sales available until Rate Entry is locked.</td></tr>
+              <tr><td colSpan={9} className="py-12 text-center text-sm font-medium text-slate-400">{t("ops.shop_sales.no_sales")}</td></tr>
             ) : sales.map((sale, index) => {
               const isSelected = selectedId === sale.id;
               const isEditing = editingId === sale.id;
               const lock = shopSaleLockState(sale);
+              const unassignedBirds = Number(sale.unassignedBirds);
+              const hasUnassignedBirds = Number.isSafeInteger(unassignedBirds) && unassignedBirds > 0;
+              const blockedByAssignment = Boolean(
+                sale.assignmentLockTripId != null && sale.numericTripId !== sale.assignmentLockTripId,
+              );
               return (
                 <tr
                   key={sale.id}
@@ -324,9 +350,25 @@ function ShopSalesTable({
                   } ${!lock.editable && !isSelected ? "opacity-80" : ""}`}
                 >
                   <td className="px-3.5 py-3 text-center text-xs font-semibold text-slate-500">{startIndex + index + 1}</td>
-                  <td className="px-3.5 py-3 text-xs font-semibold text-emerald-600 whitespace-nowrap">{sale.saleNo || sale.tripNo || "—"}</td>
+                  <td className="px-3.5 py-3 text-xs font-semibold text-emerald-600 whitespace-nowrap">
+                    <div>{sale.saleNo || sale.tripNo || "—"}</div>
+                    {blockedByAssignment && (
+                      <span className="mt-1 inline-flex items-center gap-1 text-[10px] font-semibold text-slate-500">
+                        <Lock size={10} aria-hidden="true" />
+                        {t("ops.shop_sales.assignment_locked")}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3.5 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(sale.tripDate)}</td>
-                  <td className="px-3.5 py-3 text-xs font-semibold text-slate-700">{cleanDeliveryShopName(sale.shopName) || "—"}</td>
+                  <td className="px-3.5 py-3 text-xs font-semibold text-slate-700">
+                    <div>{cleanDeliveryShopName(sale.shopName) || "—"}</div>
+                    {hasUnassignedBirds && (
+                      <span className="mt-1 inline-flex items-center gap-1 rounded-md border border-amber-200 bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-800 whitespace-nowrap">
+                        <AlertTriangle size={10} aria-hidden="true" />
+                        {t("ops.shop_sales.unassigned_for_trip", { count: unassignedBirds, trip: sale.tripNo })}
+                      </span>
+                    )}
+                  </td>
                   <td className="px-3.5 py-3 text-center text-xs font-bold text-cyan-700">{Number(sale.totalBirds || 0).toLocaleString()}</td>
                   <td className="px-3.5 py-3 text-center text-xs font-bold text-orange-600">{formatSaleWeight(sale.totalWeight)}</td>
                   <td className="px-3.5 py-3 text-center text-xs font-bold text-violet-600">{formatSaleRate(sale.rate)}</td>

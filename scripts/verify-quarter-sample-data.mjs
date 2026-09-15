@@ -147,6 +147,57 @@ async function run() {
   const overLimitBody = await overLimit.json();
   assert.equal(overLimitBody.error, "trip_bird_limit_exceeded");
 
+  // Reducing one shop allocation opens a visible unassigned-birds workflow.
+  // It is not enough to show a client warning: the API must make this source
+  // trip the only editable one until those birds are assigned again.
+  assert.ok(sequencedSale.birds > 0, "expected an allocation that can be reduced");
+  const reduced = await request(`/operations/shop-sales/${sequencedSale.id}`, {
+    method: "PUT",
+    body: JSON.stringify({ birds: sequencedSale.birds - 1 }),
+  });
+  assert.equal(reduced.unassignedBirds, 1);
+  assert.equal(reduced.assignmentComplete, false);
+  assert.equal(reduced.assignmentLockTripId, sequencedSale.tripId);
+  assert.equal(reduced.assignmentLockTripNo, sequencedSale.tripNo);
+
+  const otherTripRow = sales.find((sale) => sale.editable && sale.tripId !== sequencedSale.tripId);
+  assert.ok(otherTripRow, "expected an otherwise editable Shop Sale on another trip");
+  const lockedRows = await request("/operations/shop-sales");
+  const sameTripRow = lockedRows.find((sale) => sale.tripId === sequencedSale.tripId && sale.id !== sequencedSale.id);
+  const lockedOtherTripRow = lockedRows.find((sale) => sale.id === otherTripRow.id);
+  assert.ok(sameTripRow?.editable, "the incomplete source trip must remain editable");
+  assert.ok(lockedOtherTripRow, "expected the other trip row after lock refresh");
+  assert.equal(lockedOtherTripRow.editable, false);
+  assert.equal(lockedOtherTripRow.assignmentLockTripId, sequencedSale.tripId);
+  assert.equal(lockedOtherTripRow.assignmentLockUnassignedBirds, 1);
+
+  const crossTripBypass = await fetch(`${api}/operations/shop-sales/${otherTripRow.id}`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ weight: otherTripRow.weight }),
+  });
+  calls.push(`PUT /operations/shop-sales/${otherTripRow.id} → ${crossTripBypass.status}`);
+  assert.equal(crossTripBypass.status, 409, "a direct API call must not bypass the reassignment lock");
+  const crossTripBody = await crossTripBypass.json();
+  assert.equal(crossTripBody.error, "trip_assignment_incomplete");
+  assert.equal(crossTripBody.assignmentLockTripId, sequencedSale.tripId);
+
+  const reassigned = await request(`/operations/shop-sales/${sequencedSale.id}`, {
+    method: "PUT",
+    body: JSON.stringify({ birds: sequencedSale.birds }),
+  });
+  assert.equal(reassigned.unassignedBirds, 0);
+  assert.equal(reassigned.assignmentComplete, true);
+  const unlockedRows = await request("/operations/shop-sales");
+  const unlockedOtherTripRow = unlockedRows.find((sale) => sale.id === otherTripRow.id);
+  assert.equal(unlockedOtherTripRow.editable, true, "other trips unlock after same-trip reassignment");
+  const reconciledTrip = await request(`/trips/${sequencedSale.tripId}`);
+  assert.equal(
+    sum(reconciledTrip.deliveries, "birds") + sum(reconciledTrip.deliveries, "mortality"),
+    reconciledTrip.totalBirds,
+    "same-trip reassignment must restore the Trip List totals",
+  );
+
   // Pending Collections and Collection Entry read different views over the
   // exact same weekly aggregate. Check all totals and a selected shop.
   const pending = await request(`/operations/collection-entry/pending-summary?date=${manifest.quarter.today}`);

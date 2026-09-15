@@ -44,6 +44,7 @@ export default function useTrips(
   const [toDate, setToDate] = useState("");
 
   const [trips, setTrips] = useState<Trip[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [selectedTrip, setSelectedTrip] = useState<Trip | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const pageSize = 10;
@@ -72,6 +73,7 @@ export default function useTrips(
     refreshAbortRef.current?.abort();
     const controller = new AbortController();
     refreshAbortRef.current = controller;
+    if (mountedRef.current) setIsLoading(true);
     try {
       const nextTrips = await listTrips({ includeDeleted, signal: controller.signal });
       if (!mountedRef.current || controller.signal.aborted || requestSeq !== refreshSeqRef.current) return false;
@@ -82,7 +84,10 @@ export default function useTrips(
       notify(translate("ops.trip.unable_load_trips"), "error");
       return false;
     } finally {
-      if (requestSeq === refreshSeqRef.current) refreshAbortRef.current = null;
+      if (requestSeq === refreshSeqRef.current) {
+        refreshAbortRef.current = null;
+        if (mountedRef.current) setIsLoading(false);
+      }
     }
   }, [includeDeleted, notify]);
 
@@ -253,6 +258,7 @@ export default function useTrips(
   return {
     trips: paginatedTrips || [],
     allTrips: allTrips,
+    isLoading,
     filteredTrips: filteredTrips || [],
     recentTrips: recentTrips || [],
     refreshTrips,

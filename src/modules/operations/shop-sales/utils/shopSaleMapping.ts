@@ -31,6 +31,13 @@ export interface ApiShopSale {
   /** Server-computed trip-wide bird validation facts for Shop Sales editing. */
   tripPickupBirds?: number | null;
   maxEditableBirds?: number | null;
+  tripDeliveredBirds?: number | null;
+  tripMortalityBirds?: number | null;
+  unassignedBirds?: number | null;
+  assignmentComplete?: boolean | null;
+  assignmentLockTripId?: number | null;
+  assignmentLockTripNo?: string | null;
+  assignmentLockUnassignedBirds?: number | null;
   remarks: string;
   status: string;
   deleted: boolean;
@@ -84,6 +91,13 @@ export function mapApiSaleToShopSale(row: ApiShopSale): ShopSale {
     mortality: num(row.mortality),
     tripPickupBirds: row.tripPickupBirds ?? null,
     maxEditableBirds: row.maxEditableBirds ?? null,
+    tripDeliveredBirds: row.tripDeliveredBirds ?? null,
+    tripMortalityBirds: row.tripMortalityBirds ?? null,
+    unassignedBirds: row.unassignedBirds ?? null,
+    assignmentComplete: row.assignmentComplete ?? null,
+    assignmentLockTripId: row.assignmentLockTripId ?? null,
+    assignmentLockTripNo: row.assignmentLockTripNo ?? null,
+    assignmentLockUnassignedBirds: row.assignmentLockUnassignedBirds ?? null,
     birdTypeId: row.birdTypeId,
     editable: row.editable,
     windowExpiresAt: row.windowExpiresAt,

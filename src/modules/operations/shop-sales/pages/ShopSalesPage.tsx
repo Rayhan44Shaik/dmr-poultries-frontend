@@ -2,7 +2,7 @@
 
 import { useEffect, useCallback, useState } from "react";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
-import { handleApiError } from "../../../../api";
+import { toApiError } from "../../../../api";
 
 import useShopSales from "../hooks/useShopSales";
 import { useShops } from "../../../masters/shops/hooks/useShops";
@@ -13,6 +13,7 @@ import ShopSalesPagination from "../components/ShopSalesPagination";
 import type { ShopSale } from "../types/shopSale";
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
 import { notifyTripDataChanged } from "../../../../shared/events/tripDataEvents";
+import { useI18n } from "../../../../i18n";
 
 interface ShopSalesPageProps {
   initialTrip?: Trip | null;
@@ -20,6 +21,7 @@ interface ShopSalesPageProps {
 }
 
 function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
+  const { t } = useI18n();
   const { showNotification } = useSafeNotification();
   const [searchInput, setSearchInput] = useState("");
 
@@ -58,9 +60,9 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
         search: tripNo,
       }));
       setSearchInput(tripNo);
-      showNotification(`Loaded sales for Trip #${tripNo}`, "success");
+      showNotification(t("ops.shop_sales.loaded_trip", { trip: tripNo }), "success");
     }
-  }, [initialTrip, setFilter, showNotification]);
+  }, [initialTrip, setFilter, showNotification, t]);
 
   const shopNames = Array.from(
     new Set([
@@ -78,28 +80,50 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
   const handleResetFilters = useCallback(() => {
     resetFilters();
     setSearchInput("");
-    showNotification("Filters have been reset.", "info");
-  }, [resetFilters, showNotification]);
+    showNotification(t("ops.shop_sales.filters_reset"), "info");
+  }, [resetFilters, showNotification, t]);
 
   const handleRefresh = useCallback(async () => {
     const refreshed = await refreshSales();
-    if (refreshed) showNotification("Shop sales refreshed.", "success");
-  }, [refreshSales, showNotification]);
+    if (refreshed) showNotification(t("ops.shop_sales.refreshed"), "success");
+  }, [refreshSales, showNotification, t]);
 
   const handleUpdateSale = useCallback(
     async (updatedSale: ShopSale) => {
       try {
-        await updateSale(updatedSale);
+        const saved = await updateSale(updatedSale);
         // The server has updated the source Trip delivery/totals too. Notify
         // an already-mounted Trip List to refetch that same authoritative row.
         notifyTripDataChanged({ tripId: updatedSale.tripId, source: "shop-sales" });
-        showNotification("Sale updated successfully", "success");
         await refreshSales({ silent: true });
+        if ((saved.unassignedBirds ?? 0) > 0) {
+          showNotification(
+            t("ops.shop_sales.reassignment_required", {
+              count: saved.unassignedBirds ?? 0,
+              trip: saved.tripNo,
+            }),
+            "info",
+          );
+        } else {
+          showNotification(t("ops.shop_sales.updated_success"), "success");
+        }
       } catch (error) {
-        showNotification(handleApiError(error), "error");
+        const apiError = toApiError(error);
+        const details = apiError.details as { error?: string; assignmentLockTripNo?: string; unassignedBirds?: number } | undefined;
+        if (details?.error === "trip_assignment_incomplete") {
+          showNotification(
+            t("ops.shop_sales.other_trips_locked", {
+              trip: details.assignmentLockTripNo ?? "",
+              count: details.unassignedBirds ?? 0,
+            }),
+            "error",
+          );
+        } else {
+          showNotification(t("ops.shop_sales.update_failed"), "error");
+        }
       }
     },
-    [updateSale, showNotification, refreshSales]
+    [updateSale, showNotification, refreshSales, t]
   );
 
   const hasActiveFilters =

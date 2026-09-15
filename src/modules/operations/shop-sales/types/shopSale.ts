@@ -53,6 +53,16 @@ amount: number;
   /** Server-computed maximum birds for this shop after all other deliveries
    * and the trip's total mortality are accounted for. */
   maxEditableBirds?: number | null;
+  /** Server-authoritative allocation facts. When `unassignedBirds` is above
+   * zero, this source trip is the only trip whose Shop Sales rows can be
+   * corrected until its remaining birds are allocated. */
+  tripDeliveredBirds?: number | null;
+  tripMortalityBirds?: number | null;
+  unassignedBirds?: number | null;
+  assignmentComplete?: boolean | null;
+  assignmentLockTripId?: number | null;
+  assignmentLockTripNo?: string | null;
+  assignmentLockUnassignedBirds?: number | null;
   birdTypeId?: number | null;
   /** Whether the backend currently allows editing/deleting this sale
    * (Rate Entry locked + within the 10-day window). Backend remains the

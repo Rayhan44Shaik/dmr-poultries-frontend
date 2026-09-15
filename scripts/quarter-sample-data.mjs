@@ -2594,14 +2594,67 @@ function shopSaleBirdCapacity(trip, saleId, proposedBirds, proposedMortality) {
   };
 }
 
-/** Public Shop Sales shape enriched with backend-authoritative edit limits. */
-function publicShopSale(sale) {
+/**
+ * Every completed Trip starts reconciled: pickup birds equal delivered birds
+ * plus mortality. A permitted Shop Sales reduction can deliberately open an
+ * allocation gap. That gap is a workflow state, not merely an informational
+ * value: it must be filled by a shop on the same source trip before a sale on
+ * any other trip may be corrected.
+ */
+function shopSaleAssignment(trip) {
+  const pickupBirds = Number(trip?.totalBirds);
+  if (!Number.isSafeInteger(pickupBirds) || pickupBirds < 0) return null;
+  const deliveries = Array.isArray(trip?.deliveries) ? trip.deliveries : [];
+  const deliveredBirds = deliveries.reduce((total, delivery) => total + Number(delivery.birds || 0), 0);
+  const mortalityBirds = deliveries.reduce((total, delivery) => total + Number(delivery.mortality || 0), 0);
+  return {
+    pickupBirds,
+    deliveredBirds,
+    mortalityBirds,
+    unassignedBirds: Math.max(0, pickupBirds - deliveredBirds - mortalityBirds),
+  };
+}
+
+/** Returns the one Trip that currently owns the reassignment workflow. */
+function currentShopSaleAssignmentLock() {
+  const tripIdsWithSales = new Set(
+    SHOP_SALES.filter((sale) => sale.deleted !== true).map((sale) => Number(sale.tripId)),
+  );
+  return [...TRIP_BY_ID.values()]
+    .filter((trip) => !trip.deleted && tripIdsWithSales.has(Number(trip.id)))
+    .map((trip) => ({ trip, assignment: shopSaleAssignment(trip) }))
+    .filter(({ assignment }) => assignment && assignment.unassignedBirds > 0)
+    .sort((a, b) => String(a.trip.tripDate).localeCompare(String(b.trip.tripDate)) || Number(a.trip.id) - Number(b.trip.id))[0] ?? null;
+}
+
+function assignmentLockMessage(lock) {
+  return `Assign the remaining ${lock.assignment.unassignedBirds} bird${lock.assignment.unassignedBirds === 1 ? "" : "s"} to shops in trip ${lock.trip.tripNo} before editing another trip.`;
+}
+
+/** Public Shop Sales shape enriched with backend-authoritative edit limits and
+ * reassignment workflow facts. The response, rather than a client-side date or
+ * local calculation, is the sole authority for whether a row can be edited. */
+function publicShopSale(sale, assignmentLock = currentShopSaleAssignmentLock()) {
   const trip = TRIP_BY_ID.get(Number(sale.tripId));
   const capacity = shopSaleBirdCapacity(trip, sale.id);
+  const assignment = shopSaleAssignment(trip);
+  const blockedByAssignment = Boolean(
+    assignmentLock && Number(assignmentLock.trip.id) !== Number(sale.tripId),
+  );
+  const baseEditable = Boolean(sale.editable && !sale.tripDeleted);
   return {
     ...sale,
+    editable: baseEditable && !blockedByAssignment,
+    lockReason: blockedByAssignment ? assignmentLockMessage(assignmentLock) : sale.lockReason,
     tripPickupBirds: capacity?.pickupBirds ?? null,
     maxEditableBirds: capacity?.maximumBirds ?? null,
+    tripDeliveredBirds: assignment?.deliveredBirds ?? null,
+    tripMortalityBirds: assignment?.mortalityBirds ?? null,
+    unassignedBirds: assignment?.unassignedBirds ?? null,
+    assignmentComplete: assignment ? assignment.unassignedBirds === 0 : null,
+    assignmentLockTripId: assignmentLock?.trip.id ?? null,
+    assignmentLockTripNo: assignmentLock?.trip.tripNo ?? null,
+    assignmentLockUnassignedBirds: assignmentLock?.assignment.unassignedBirds ?? null,
   };
 }
 
@@ -3921,7 +3974,10 @@ const server = http.createServer(async (req, res) => {
             s.tripNo.toLowerCase().includes(search) ||
             (s.saleNo ?? "").toLowerCase().includes(search)
         );
-      const publicRows = rows.map(publicShopSale);
+      // Resolve the single reassignment lock once for the response rather
+      // than recalculating it for every Shop Sales row.
+      const assignmentLock = currentShopSaleAssignmentLock();
+      const publicRows = rows.map((sale) => publicShopSale(sale, assignmentLock));
       return send(200, q.get("page") ? paginate(publicRows, q) : publicRows);
     }
     if (m(/^\/api\/operations\/shop-sales\/(\d+)$/)) {
@@ -3938,8 +3994,22 @@ const server = http.createServer(async (req, res) => {
         if (immutableFields.some((field) => Object.hasOwn(body, field))) {
           return send(409, { error: "shop_sale_locked", message: "Rate, amount, shop and trip are locked after Rate Entry." });
         }
-        if (!sale.editable) {
+        if (!sale.editable || sale.tripDeleted) {
           return send(409, { error: "correction_window_closed", message: sale.lockReason || "Editing period has expired." });
+        }
+        // A reduction can leave birds unassigned. Once that happens, only
+        // deliveries on the source trip may be edited until the exact gap is
+        // allocated again. Enforce before applying any mutation so direct API
+        // calls cannot bypass the Shop Sales table's disabled controls.
+        const assignmentLock = currentShopSaleAssignmentLock();
+        if (assignmentLock && Number(assignmentLock.trip.id) !== Number(sale.tripId)) {
+          return send(409, {
+            error: "trip_assignment_incomplete",
+            message: assignmentLockMessage(assignmentLock),
+            assignmentLockTripId: assignmentLock.trip.id,
+            assignmentLockTripNo: assignmentLock.trip.tripNo,
+            unassignedBirds: assignmentLock.assignment.unassignedBirds,
+          });
         }
         const nextBirds = body.birds != null ? Number(body.birds) : Number(sale.birds);
         const nextMortality = body.mortality != null ? Number(body.mortality) : Number(sale.mortality);
