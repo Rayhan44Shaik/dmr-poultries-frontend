@@ -46,23 +46,21 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
   // Content matching the exact vertical layout and structure of RatesEntryPage
   const content = (
     <div className="w-full space-y-5">
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 md:p-6">
-        <CollectionInformation
-          entry={vm.entry}
-          errors={vm.errors}
-          shops={vm.shops}
-          collectors={vm.collectors}
-          paymentModes={vm.paymentModes}
-          onDateChange={vm.changeCollectionDate}
-          onShopChange={vm.changeShop}
-          onCollectorChange={vm.changeCollector}
-          onPaymentModeChange={vm.changePaymentMode}
-          onReferenceChange={vm.changeReference}
-          onViewLedger={vm.viewLedger}
-          onReset={vm.resetEntry}
-          ledgerLoading={vm.ledgerLoading}
-        />
-      </div>
+      <CollectionInformation
+        entry={vm.entry}
+        errors={vm.errors}
+        shops={vm.shops}
+        collectors={vm.collectors}
+        paymentModes={vm.paymentModes}
+        onDateChange={vm.changeCollectionDate}
+        onShopChange={vm.changeShop}
+        onCollectorChange={vm.changeCollector}
+        onPaymentModeChange={vm.changePaymentMode}
+        onReferenceChange={vm.changeReference}
+        onViewLedger={vm.viewLedger}
+        onReset={vm.resetEntry}
+        ledgerLoading={vm.ledgerLoading}
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-10 gap-6 items-stretch">
         <div className="lg:col-span-5 min-w-0">
