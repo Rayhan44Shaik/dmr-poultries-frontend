@@ -58,7 +58,7 @@ export default {
   'ops.collection.latest_10_transactions': 'తాజా 10 లావాదేవీలు',
   'ops.collection.latest_collection_details': 'తాజా కలెక్షన్ వివరాలు',
   'ops.collection.loading_pending': 'పెండింగ్ కలెక్షన్లు లోడ్ అవుతున్నాయి…',
-  'ops.collection.loading_recent': 'ఇటీవలి కలెక్షన్లు లోడ్ అవుతున్నాయి…',
+  'ops.collection.loading_recent': 'ఇటీవలి కలెక్షన్ నమోదులు లోడ్ అవుతున్నాయి…',
   'ops.collection.loading_summary': 'సారాంశం లోడ్ అవుతోంది…',
   'ops.collection.mobile': 'మొబైల్',
   'ops.collection.mobile_label': 'మొబైల్ నంబర్',

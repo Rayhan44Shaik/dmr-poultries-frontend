@@ -108,8 +108,8 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
 
       <RecentCollectionsTable
         collections={vm.recentCollections}
+        isLoading={vm.loading}
         statusFilter={vm.statusFilter}
-        pendingApprovalCount={vm.pendingApprovalCount}
         onStatusChange={vm.changeStatusFilter}
         onApprove={vm.approveCollection}
         onReject={vm.rejectCollection}

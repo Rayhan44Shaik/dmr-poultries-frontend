@@ -7,8 +7,9 @@ import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 
 interface Props {
   collections: RecentCollection[];
+  /** True while the Recent Collections feed is refreshing. */
+  isLoading?: boolean;
   statusFilter: "Pending" | "Approved" | "Deleted";
-  pendingApprovalCount: number;
   onStatusChange: (status: "Pending" | "Approved" | "Deleted") => void;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
@@ -37,23 +38,10 @@ function getStatusBadgeClass(status: string): string {
   }
 }
 
-function getRowStyle(rawStatus: string): string {
-  switch (rawStatus) {
-    case "Pending Approval":
-      return "bg-orange-50/40";
-    case "Approved":
-      return "bg-emerald-50/40";
-    case "Deleted":
-      return "bg-rose-50/40 opacity-60";
-    default:
-      return "";
-  }
-}
-
 export default function RecentCollectionsTable({
   collections,
+  isLoading = false,
   statusFilter,
-  pendingApprovalCount,
   onStatusChange,
   onApprove,
   onEdit,
@@ -197,13 +185,6 @@ export default function RecentCollectionsTable({
               );
             })}
           </div>
-
-          {pendingApprovalCount > 0 && (
-            <span className="inline-flex items-center gap-1.5 rounded-full border border-orange-200 bg-orange-50 px-2.5 py-0.5 text-[11px] font-semibold text-orange-700">
-              <Clock size={11} />
-              {t("common.pending")}: <span className="tabular-nums">{pendingApprovalCount}</span>
-            </span>
-          )}
         </div>
 
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
@@ -246,7 +227,19 @@ export default function RecentCollectionsTable({
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {displayedData.length === 0 ? (
+            {isLoading ? (
+              <tr>
+                <td colSpan={8} className="py-16 text-center text-sm font-medium text-slate-400">
+                  <span className="inline-flex items-center gap-2">
+                    <span
+                      className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600"
+                      aria-hidden="true"
+                    />
+                    {t("ops.collection.loading_recent")}
+                  </span>
+                </td>
+              </tr>
+            ) : displayedData.length === 0 ? (
               <tr>
                 <td colSpan={8} className="py-16 text-center text-slate-400">
                   <History size={24} className="mx-auto mb-2" />
@@ -271,7 +264,7 @@ export default function RecentCollectionsTable({
                 return (
                   <tr
                     key={`${col.id}-${index}`}
-                    className={`transition-colors hover:bg-slate-50/80 ${getRowStyle(rawStatus)}`}
+                    className="transition-colors hover:bg-slate-50/80"
                   >
                     <td className="px-4 py-3 text-center text-xs font-semibold text-slate-500 tabular-nums">
                       {index + 1}
