@@ -71,6 +71,11 @@ import WeeklyPerformanceChart, {
   type WeeklyChartSeries,
 } from "../components/performance/WeeklyPerformanceChart";
 import { personNameLabel } from "../utils/leaveDisplay";
+import {
+  perfTdClass,
+  perfTdNumericClass,
+  perfThClass,
+} from "../components/performance/tableRhythm";
 import PerformanceDrawer from "../components/performance/PerformanceDrawer";
 import RecentTripsTable from "../components/performance/RecentTripsTable";
 import Pagination from "../components/common/Pagination";
@@ -338,9 +343,19 @@ const DriverPerformancePage = () => {
   /* ------------------------------- chart -------------------------------- */
 
   const chartRows = useMemo(
-    () => toWeeklyAxisRows(data.weekly, dateLocale),
+    () =>
+      toWeeklyAxisRows(data.weekly, dateLocale).map((row) => ({
+        ...row,
+        /* Weekly mileage = the week's real distance ÷ its real fuel (the same
+           derivation the tooltip always used). A week without fuel stays blank
+           instead of pretending to be 0 km/L. */
+        mileage: row.fuelLitres > 0 ? row.distance / row.fuelLitres : undefined,
+      })),
     [data.weekly, dateLocale],
   );
+  /* Three metrics, three panels — Distance, Fuel and Mileage each get their
+     own clean scale on the same weeks (a shared axis would flatten fuel to a
+     sliver and a dual axis would compare two unrelated rulers). */
   const chartSeries = useMemo<WeeklyChartSeries[]>(
     () => [
       {
@@ -356,28 +371,26 @@ const DriverPerformancePage = () => {
         label: t("staff.perf.weekly.fuel"),
         color: "#f59e0b",
         kind: "bar",
-        axis: "right",
+        axis: "left",
         format: (value) => formatLitres(value),
+      },
+      {
+        key: "mileage",
+        label: t("staff.perf.weekly.mileage"),
+        color: "#059669",
+        kind: "line",
+        axis: "left",
+        format: (value) => `${formatDecimal(value, 2)} km/L`,
       },
     ],
     [t],
   );
+  /* Mileage is a series of its own now, so the tooltip only adds what the
+     series cannot carry: the week's trip count. */
   const chartTooltipExtras = useCallback(
-    (point: WeeklyChartPoint) => {
-      const extraRows: Array<{ label: string; value: string }> = [
-        { label: t("staff.perf.weekly.trips"), value: formatCount(Number(point.trips ?? 0)) },
-      ];
-      const distance = Number(point.distance ?? 0);
-      const fuel = Number(point.fuelLitres ?? 0);
-      // Derived from the same real values — never fabricated.
-      if (distance > 0 && fuel > 0) {
-        extraRows.push({
-          label: t("staff.perf.weekly.mileage"),
-          value: `${formatDecimal(distance / fuel, 2)} km/L`,
-        });
-      }
-      return extraRows;
-    },
+    (point: WeeklyChartPoint) => [
+      { label: t("staff.perf.weekly.trips"), value: formatCount(Number(point.trips ?? 0)) },
+    ],
     [t],
   );
 
@@ -569,6 +582,7 @@ const DriverPerformancePage = () => {
             weekTrips={chartWeekTrips}
             emptyText={t("staff.perf.weekly.empty")}
             loading={initialLoading}
+            variant="panels"
             ariaLabel={t("staff.perf.weekly.aria_driver", { range: appliedRangeLabel })}
           />
         </div>
@@ -619,7 +633,7 @@ const DriverPerformancePage = () => {
               <table className="min-w-full border-collapse text-left">
                 <thead className={uiTableHeadClass}>
                   <tr>
-                    <th scope="col" className={`${uiTableThClass} w-12 text-left`}>
+                    <th scope="col" className={`${perfThClass} w-12 text-left`}>
                       {t("staff.perf.table.rank")}
                     </th>
                     <SortableHeader
@@ -674,26 +688,26 @@ const DriverPerformancePage = () => {
                           selected && uiTableRowSelectedClass,
                         )}
                       >
-                        <td className={`${uiTableTdClass} text-center text-xs font-bold tabular-nums text-slate-500`}>
+                        <td className={`${perfTdClass} text-center text-xs font-bold tabular-nums text-slate-500`}>
                           {rank}
                         </td>
-                        <td className={`${uiTableTdClass} whitespace-nowrap text-[13px] font-semibold text-slate-900`}>
+                        <td className={`${perfTdClass} whitespace-nowrap text-[13px] font-semibold text-slate-900`}>
                           {personNameLabel(t, language, row.driverName)}
                         </td>
-                        <td className={`${uiTableTdClass} whitespace-nowrap text-xs text-slate-500`}>
+                        <td className={`${perfTdClass} whitespace-nowrap text-xs text-slate-500`}>
                           {translateStatus(t, row.employeeStatus)}
                         </td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatCount(row.trips)}</td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatCount(row.distance)}</td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatDecimal(row.avgDistancePerTrip, 1)}</td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatCount(row.vehicles)}</td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatDecimal(row.fuelLitres, 1)}</td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap font-bold`}>{formatMoney(row.totalCost)}</td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatCount(row.trips)}</td>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatCount(row.distance)}</td>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatDecimal(row.avgDistancePerTrip, 1)}</td>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatCount(row.vehicles)}</td>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatDecimal(row.fuelLitres, 1)}</td>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap font-bold`}>{formatMoney(row.totalCost)}</td>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>
                           {isMeasurable(row.costPerKm) ? formatDecimal(row.costPerKm, 1) : "—"}
                         </td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatMileage(row.mileage)}</td>
-                        <td className={`${uiTableTdClass} text-center`}>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatMileage(row.mileage)}</td>
+                        <td className={`${perfTdClass} text-center`}>
                           {grade == null ? (
                             <span
                               className="text-xs font-semibold text-slate-300"

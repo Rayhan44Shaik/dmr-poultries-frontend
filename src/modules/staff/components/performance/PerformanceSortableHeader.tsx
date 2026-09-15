@@ -12,7 +12,7 @@
 
 import { memo } from "react";
 import { ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react";
-import { uiTableThClass } from "../../../../shared/ui/uiTokens";
+import { perfThClass } from "./tableRhythm";
 
 export type SortDirection = "asc" | "desc";
 
@@ -73,7 +73,7 @@ function SortableHeaderImpl({
     <th
       scope="col"
       aria-sort={active ? (dir === "asc" ? "ascending" : "descending") : undefined}
-      className={`${uiTableThClass} ${alignClass} ${className}`}
+      className={`${perfThClass} ${alignClass} ${className}`}
     >
       <button
         type="button"

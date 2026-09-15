@@ -236,10 +236,10 @@ function useStaffPerformanceImpl(kind: StaffPerformanceKind) {
       };
       if (filtersEqual(appliedRef.current, candidate)) return;
       appliedRef.current = candidate;
-      // Flags are set here (event handler), not in the fetch effect, so the
-      // effect body itself never calls setState synchronously.
-      if (hasData.current) setRefreshing(true);
-      else setLoading(true);
+      // A filter change is NOT a refresh: the previous dataset simply stays on
+      // screen until the new one lands, so no pill dances and no "refreshed"
+      // toast fires (that is reserved for the explicit Refresh action).
+      if (!hasData.current) setLoading(true);
       setFilters(candidate);
     },
     [],
@@ -254,8 +254,8 @@ function useStaffPerformanceImpl(kind: StaffPerformanceKind) {
       return;
     }
     appliedRef.current = restored;
-    if (hasData.current) setRefreshing(true);
-    else setLoading(true);
+    // Reset is a filter change too — quiet, exactly like the other filters.
+    if (!hasData.current) setLoading(true);
     setFilters(restored);
     setSelectedId(null);
   }, [defaultFilters]);
@@ -265,7 +265,11 @@ function useStaffPerformanceImpl(kind: StaffPerformanceKind) {
     setSelectedId((current) => (current === id ? current : id));
   }, []);
 
-  /** Single-flight refresh: invalidate cache, then re-request current filters. */
+  /**
+   * Single-flight refresh: invalidate cache, then re-request current filters.
+   * This is the ONLY path that raises `refreshing`, so the Refresh pill (and
+   * the "refreshed" toast) marks a deliberate refresh and nothing else.
+   */
   const refresh = useCallback(() => {
     if (inFlight.current) return;
     cacheInvalidate("staff-perf:");

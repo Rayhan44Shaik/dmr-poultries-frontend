@@ -10,9 +10,9 @@
 //     One grouped bar chart: Distance (km) + Fuel (L) on a shared axis;
 //     weekly mileage derived in the tooltip from the same real values.
 //
-//   variant="panels" (Supervisor)
+//   variant="panels" (Driver + Supervisor)
 //     Small multiples — one clean mini-chart per metric, each with its OWN
-//     scale (no misleading dual-axis overlays):
+//     scale (no misleading dual-axis overlays), all sharing the same weeks:
 //       Birds (emerald bars) · Mortality (red area) · Weight loss kg (violet
 //       area). Panels make the volume and the loss trends independently
 //     readable while staying visually one quiet row.
@@ -126,6 +126,12 @@ interface TipCardProps {
   label: unknown;
   payload: ReadonlyArray<{ dataKey?: unknown; value?: unknown }>;
   series: readonly WeeklyChartSeries[];
+  /**
+   * Panels mode: the panel's own chart carries one series, but the card always
+   * lists EVERY series of the hovered week (Distance, Fuel, Mileage …) so the
+   * reader never has to hover three charts to see one week in full.
+   */
+  allSeries?: readonly WeeklyChartSeries[];
   tooltipExtras?: (point: WeeklyChartPoint) => WeeklyTooltipRow[];
   point?: WeeklyChartPoint;
 }
@@ -134,38 +140,65 @@ function TooltipCard({
   label,
   payload,
   series,
+  allSeries,
   tooltipExtras,
   weekTrips,
   point,
 }: TipCardProps & { weekTrips?: (point: WeeklyChartPoint) => WeekTripRow[] }) {
   const extras = point ? (tooltipExtras?.(point) ?? []) : [];
   const trips = point ? (weekTrips?.(point) ?? []) : [];
+  /* One row per series: panels read the week straight off the data point, the
+     grouped chart keeps recharts' own payload (it knows what it drew). */
+  const rows: Array<{ key: string; label: string; color?: string; isLine: boolean; value: string }> =
+    allSeries && point
+      ? allSeries.map((config) => {
+          const raw = point[config.key];
+          const value = typeof raw === "number" && Number.isFinite(raw) ? raw : null;
+          return {
+            key: config.key,
+            label: config.label,
+            color: config.color,
+            isLine: config.kind === "line",
+            value:
+              value == null
+                ? "—"
+                : config.format
+                  ? config.format(value)
+                  : value.toLocaleString("en-IN"),
+          };
+        })
+      : payload.map((entry) => {
+          const config = series.find((s) => s.key === entry.dataKey);
+          const raw = typeof entry.value === "number" ? entry.value : 0;
+          return {
+            key: String(entry.dataKey),
+            label: config?.label ?? String(entry.dataKey),
+            color: config?.color,
+            isLine: config?.kind === "line",
+            value: config?.format ? config.format(raw) : raw.toLocaleString("en-IN"),
+          };
+        });
   return (
     <div className="min-w-[190px] rounded-xl border border-slate-200 bg-white/95 px-3.5 py-3 shadow-xl backdrop-blur">
       <div className="mb-2 border-b border-slate-100 pb-1.5 text-xs font-bold tracking-tight text-slate-900">
         {String(label ?? "")}
       </div>
       <div className="space-y-1.5">
-        {payload.map((entry) => {
-          const config = series.find((s) => s.key === entry.dataKey);
-          const raw = typeof entry.value === "number" ? entry.value : 0;
-          const isLine = config?.kind === "line";
-          return (
-            <div key={String(entry.dataKey)} className="flex items-center justify-between gap-5">
-              <span className="flex items-center gap-2 text-[11px] font-medium text-slate-500">
-                <span
-                  className={`h-2 w-2 shrink-0 ${isLine ? "rounded-full" : "rounded-[3px]"}`}
-                  style={{ backgroundColor: config?.color ?? "#94a3b8" }}
-                  aria-hidden="true"
-                />
-                {config?.label ?? String(entry.dataKey)}
-              </span>
-              <span className="text-xs font-bold tabular-nums text-slate-900">
-                {config?.format ? config.format(raw) : raw.toLocaleString("en-IN")}
-              </span>
-            </div>
-          );
-        })}
+        {rows.map((row) => (
+          <div key={row.key} className="flex items-center justify-between gap-5">
+            <span className="flex items-center gap-2 text-[11px] font-medium text-slate-500">
+              <span
+                className={`h-2 w-2 shrink-0 ${row.isLine ? "rounded-full" : "rounded-[3px]"}`}
+                style={{ backgroundColor: row.color ?? "#94a3b8" }}
+                aria-hidden="true"
+              />
+              {row.label}
+            </span>
+            <span className="text-xs font-bold tabular-nums text-slate-900">
+              {row.value}
+            </span>
+          </div>
+        ))}
         {extras.length > 0 && (
           <div className="space-y-1.5 border-t border-dashed border-slate-200 pt-1.5">
             {extras.map((row) => (
@@ -396,6 +429,7 @@ function PanelsChart({
                             label={label}
                             payload={payload}
                             series={[config]}
+                            allSeries={series}
                             tooltipExtras={tooltipExtras}
                             weekTrips={weekTrips}
                             point={payload[0]?.payload as WeeklyChartPoint | undefined}

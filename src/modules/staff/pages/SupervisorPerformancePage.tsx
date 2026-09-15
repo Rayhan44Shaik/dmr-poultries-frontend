@@ -68,6 +68,11 @@ import WeeklyPerformanceChart, {
   type WeeklyChartSeries,
 } from "../components/performance/WeeklyPerformanceChart";
 import { personNameLabel } from "../utils/leaveDisplay";
+import {
+  perfTdClass,
+  perfTdNumericClass,
+  perfThClass,
+} from "../components/performance/tableRhythm";
 import PerformanceDrawer from "../components/performance/PerformanceDrawer";
 import RecentTripsTable from "../components/performance/RecentTripsTable";
 import Pagination from "../components/common/Pagination";
@@ -80,9 +85,6 @@ import {
   uiTableRowClass,
   uiTableRowFocusableClass,
   uiTableRowSelectedClass,
-  uiTableTdClass,
-  uiTableTdNumericClass,
-  uiTableThClass,
 } from "../../../shared/ui/uiTokens";
 
 /** Typing pause before the search reaches the API (Leave page parity). */
@@ -338,11 +340,11 @@ const SupervisorPerformancePage = () => {
     () => toWeeklyAxisRows(data.weekly, dateLocale),
     [data.weekly, dateLocale],
   );
-  // Three-series view per product decision: the Birds bar carries the weekly
-  // volume (left axis); Mortality and Weight-loss are the two loss trends on
-  // the compact right axis. Lines can never visually overpower the volume
-  // they belong to. (Delivered weight remains in the KPIs, the table and the
-  // tooltip's derived average — it is only dropped as a chart series.)
+  // Three metrics, three panels: the Birds bars carry the weekly volume;
+  // Mortality and Weight-loss are the two loss trends. Each panel owns its
+  // scale, so a red line can never be squashed against a 5,000-bird bar.
+  // (Delivered weight remains in the KPIs, the table and the tooltip's derived
+  // average — it is only dropped as a chart series.)
   const chartSeries = useMemo<WeeklyChartSeries[]>(
     () => [
       {
@@ -582,7 +584,7 @@ const SupervisorPerformancePage = () => {
             weekTrips={chartWeekTrips}
             emptyText={t("staff.perf.weekly.empty")}
             loading={initialLoading}
-            heightClass="h-72 sm:h-80"
+            variant="panels"
             ariaLabel={t("staff.perf.weekly.aria_supervisor", { range: appliedRangeLabel })}
           />
         </div>
@@ -633,7 +635,7 @@ const SupervisorPerformancePage = () => {
               <table className="min-w-full border-collapse text-left">
                 <thead className={uiTableHeadClass}>
                   <tr>
-                    <th scope="col" className={`${uiTableThClass} w-12 text-left`}>
+                    <th scope="col" className={`${perfThClass} w-12 text-left`}>
                       {t("staff.perf.table.rank")}
                     </th>
                     <SortableHeader
@@ -687,23 +689,23 @@ const SupervisorPerformancePage = () => {
                           selected && uiTableRowSelectedClass,
                         )}
                       >
-                        <td className={`${uiTableTdClass} text-center text-xs font-bold tabular-nums text-slate-500`}>
+                        <td className={`${perfTdClass} text-center text-xs font-bold tabular-nums text-slate-500`}>
                           {rank}
                         </td>
-                        <td className={`${uiTableTdClass} whitespace-nowrap text-[13px] font-semibold text-slate-900`}>
+                        <td className={`${perfTdClass} whitespace-nowrap text-[13px] font-semibold text-slate-900`}>
                           {personNameLabel(t, language, row.supervisorName)}
                         </td>
-                        <td className={`${uiTableTdClass} whitespace-nowrap text-xs text-slate-500`}>
+                        <td className={`${perfTdClass} whitespace-nowrap text-xs text-slate-500`}>
                           {translateStatus(t, row.employeeStatus)}
                         </td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatCount(row.trips)}</td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatCount(row.shops)}</td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatCount(row.birds)}</td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatCount(row.weight)}</td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatCount(row.mortality)}</td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatPercent(row.mortalityRate)}</td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatDecimal(row.weightLoss, 1)}</td>
-                        <td className={`${uiTableTdClass} text-center`}>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatCount(row.trips)}</td>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatCount(row.shops)}</td>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatCount(row.birds)}</td>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatCount(row.weight)}</td>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatCount(row.mortality)}</td>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatPercent(row.mortalityRate)}</td>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatDecimal(row.weightLoss, 1)}</td>
+                        <td className={`${perfTdClass} text-center`}>
                           {grade == null ? (
                             <span
                               className="text-xs font-semibold text-slate-300"

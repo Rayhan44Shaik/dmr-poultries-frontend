@@ -2094,6 +2094,17 @@ function driverPerformance(params) {
     e.distance += t.totalKm;
     weeks.set(w, e);
   }
+  /* Weekly fuel was never aggregated here, so the chart's fuel/mileage series
+     was 0 for every week. Bucket the SAME fuel rows the row totals use (the
+     drivers already selected by the filter) by the bill date's week. */
+  for (const f of FUEL_EXPENSES) {
+    if (!inRange(f.billDate, from, to) || !f.driverId) continue;
+    if (!perDriver.has(f.driverId)) continue;
+    const w = weekKey(f.billDate);
+    const e = weeks.get(w) ?? { trips: 0, distance: 0, fuelLitres: 0 };
+    e.fuelLitres += f.liters;
+    weeks.set(w, e);
+  }
   const selected = driverId ? rows.find((r) => r.driverId === driverId) : null;
   return {
     fromDate: from,

@@ -66,7 +66,10 @@ export function lastWeekPeriods(
   today: Date | string = new Date(),
 ): WeekPeriod[] {
   const total = Math.max(1, Math.trunc(count));
-  const anchor = mondayOf(parseOrToday(typeof today === "string" ? today : "", new Date()));
+  // `mondayOf` already understands both a business-date string and a Date —
+  // passing the reference straight through keeps an explicit `today` honest
+  // (the old Date branch silently fell back to the real current day).
+  const anchor = mondayOf(today);
   const periods: WeekPeriod[] = [];
   for (let offset = total - 1; offset >= 0; offset -= 1) {
     const monday = subWeeks(anchor, offset);
