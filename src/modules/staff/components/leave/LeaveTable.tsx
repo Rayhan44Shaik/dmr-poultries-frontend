@@ -15,7 +15,13 @@ import {
 } from 'lucide-react';
 import type { LeaveRequest } from '../../types/staffDashboard';
 import { useI18n } from '../../../../i18n';
-import { departmentLabel, leaveStatusLabel, leaveTypeBadge } from '../../utils/leaveDisplay';
+import {
+  departmentLabel,
+  leaveReasonLabel,
+  leaveStatusLabel,
+  leaveTypeBadge,
+  personNameLabel,
+} from '../../utils/leaveDisplay';
 
 interface LeaveTableProps {
   leaves: LeaveRequest[];
@@ -55,7 +61,7 @@ function LeaveTable({
   onOpenRow,
   startIndex = 0,
 }: LeaveTableProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   /** Row elements by leave id — lets ↑/↓ move real DOM focus with the selection. */
   const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
 
@@ -224,7 +230,7 @@ function LeaveTable({
                 aria-selected={isSelected}
                 aria-label={t('staff.leave.row_aria', {
                   no: leaveNumber(leave),
-                  name: leave.employeeName,
+                  name: personNameLabel(t, language, leave.employeeName),
                   status: leaveStatusLabel(t, leave.status),
                 })}
                 onClick={(event) => {
@@ -251,7 +257,9 @@ function LeaveTable({
                 <td className="whitespace-nowrap px-4 py-3 text-xs font-bold text-slate-900 tabular-nums">
                   {leaveNumber(leave)}
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-700">{leave.employeeName}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-700">
+                  {personNameLabel(t, language, leave.employeeName)}
+                </td>
                 <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600">{leave.department ? departmentLabel(t, leave.department) : t('staff.leave.no_reason')}</td>
                 <td className="px-4 py-3">
                   <span className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${getTypeColor(leave.type)}`}>
@@ -261,8 +269,11 @@ function LeaveTable({
                 <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-600">{leave.fromDate}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-600">{leave.toDate}</td>
                 <td className="px-4 py-3 text-center text-xs font-bold text-slate-700">{leave.days}</td>
-                <td className="max-w-[160px] truncate px-4 py-3 text-xs text-slate-500" title={leave.reason}>
-                  {leave.reason || t('staff.leave.no_reason')}
+                <td
+                  className="max-w-[160px] truncate px-4 py-3 text-xs text-slate-500"
+                  title={leave.reason ? leaveReasonLabel(t, language, leave.reason) : undefined}
+                >
+                  {leave.reason ? leaveReasonLabel(t, language, leave.reason) : t('staff.leave.no_reason')}
                 </td>
                 <td className="px-4 py-3 text-center">
                   <span className={`inline-block whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium ${getStatusBadge(leave.status)}`}>

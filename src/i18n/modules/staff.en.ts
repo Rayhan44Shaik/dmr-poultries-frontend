@@ -315,4 +315,10 @@ export default {
   'staff.department.owner': 'Owner',
   'staff.department.farm': 'Farm',
   'staff.department.general': 'General',
+  // Leave reasons used by the seeded requests (free text falls through unchanged).
+  'staff.leave.reason.medical': 'Medical',
+  'staff.leave.reason.health_checkup': 'Health checkup',
+  'staff.leave.reason.personal_work': 'Personal work',
+  'staff.leave.reason.family_function': 'Family function',
+  'staff.leave.reason.village_visit': 'Village visit',
 };

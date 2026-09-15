@@ -15,8 +15,10 @@ import type { LeaveRequest } from '../../types/staffDashboard';
 import { useI18n, type Language } from '../../../../i18n';
 import {
   leaveMonthName,
+  leaveReasonLabel,
   leaveStatusLabel,
   leaveTypeBadge,
+  personNameLabel,
   type LeaveTranslator,
 } from '../../utils/leaveDisplay';
 import { ActionTooltip } from '../../../../ui/ActionTooltip';
@@ -147,7 +149,9 @@ function LeaveHistoryModal({ leave, leaves, onClose }: LeaveHistoryModalProps) {
             </div>
             <div className="min-w-0">
               <h3 id="leave-history-title" className="truncate text-base font-bold tracking-tight text-slate-800">
-                {t('staff.leave.history_title', { name: leave.employeeName })}
+                {t('staff.leave.history_title', {
+                  name: personNameLabel(t, language, leave.employeeName),
+                })}
               </h3>
               <p className="text-xs text-slate-500">{t('staff.leave.history_subtitle')}</p>
             </div>
@@ -262,7 +266,7 @@ function LeaveHistoryModal({ leave, leaves, onClose }: LeaveHistoryModalProps) {
                         </span>
                       </td>
                       <td className="max-w-[180px] truncate px-4 py-3 text-xs italic text-slate-500">
-                        {item.reason || t('staff.leave.no_reason')}
+                        {item.reason ? leaveReasonLabel(t, language, item.reason) : t('staff.leave.no_reason')}
                       </td>
                     </tr>
                   ))}

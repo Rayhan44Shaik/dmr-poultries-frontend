@@ -19,11 +19,12 @@ import LeaveRejectDialog from '../components/leave/LeaveRejectDialog';
 import Pagination from '../components/common/Pagination';
 import type { LeaveRequest } from '../types/staffDashboard';
 import type { LeaveFilters as LeaveFilterState } from '../hooks/useLeaveManagement';
+import { personNameLabel } from '../utils/leaveDisplay';
 
 const REFRESH_TOAST_DURATION = 5000;
 
 function LeaveManagementPage() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const { showNotification } = useSafeNotification();
   const [searchParams] = useSearchParams();
   /* Read once: the hook seeds its state with these, so a later change of the
@@ -187,9 +188,11 @@ function LeaveManagementPage() {
   const handleDeleteSelected = useCallback(() => {
     if (!selectedLeave) return;
     requestDelete(selectedLeave.id, {
-      label: t('staff.leave.deleting_label', { name: selectedLeave.employeeName }),
+      label: t('staff.leave.deleting_label', {
+        name: personNameLabel(t, language, selectedLeave.employeeName),
+      }),
     });
-  }, [requestDelete, selectedLeave, t]);
+  }, [requestDelete, selectedLeave, t, language]);
 
   return (
     <div className="min-w-0 max-w-full space-y-4">

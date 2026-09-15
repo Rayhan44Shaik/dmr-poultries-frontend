@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { XCircle } from 'lucide-react';
 import type { LeaveRequest } from '../../types/staffDashboard';
 import { useI18n } from '../../../../i18n';
+import { personNameLabel } from '../../utils/leaveDisplay';
 
 interface LeaveRejectDialogProps {
   /** The selected row. The page mounts this dialog only while rejecting, so the
@@ -27,7 +28,7 @@ interface LeaveRejectDialogProps {
  * opened it — normally the selected table row.
  */
 function LeaveRejectDialog({ leave, onCancel, onConfirm }: LeaveRejectDialogProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [reason, setReason] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
@@ -69,7 +70,12 @@ function LeaveRejectDialog({ leave, onCancel, onConfirm }: LeaveRejectDialogProp
                 leave.days === 1
                   ? 'staff.leave.request_summary_one'
                   : 'staff.leave.request_summary_many',
-                { name: leave.employeeName, from: leave.fromDate, to: leave.toDate, days: leave.days },
+                {
+                  name: personNameLabel(t, language, leave.employeeName),
+                  from: leave.fromDate,
+                  to: leave.toDate,
+                  days: leave.days,
+                },
               )}
             </p>
           </div>

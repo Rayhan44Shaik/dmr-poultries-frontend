@@ -231,7 +231,7 @@ export default {
   'staff.leave.reject_aria': '{name} సెలవును తిరస్కరించండి',
   'staff.leave.delete_aria': '{name} సెలవును తొలగించండి',
   'staff.leave.select_first': 'ముందు ఒక సెలవు అభ్యర్థనను ఎంచుకోండి.',
-  'staff.leave.hint': 'వరుసపై క్లిక్ చేయండి · ↑ ↓ తో కదలండి · తెరవడానికి Enter',
+  'staff.leave.hint': 'వరుసపై క్లిక్ చేయండి · ↑ ↓ తో కదలండి · తెరవడానికి ఎంటర్',
   'staff.leave.col_no': 'సెలవు నంబర్',
   'staff.leave.col_period': 'నుండి → వరకు',
   'staff.leave.empty_title': 'సెలవు అభ్యర్థనలు లేవు',
@@ -314,4 +314,10 @@ export default {
   'staff.department.owner': 'యజమాని',
   'staff.department.farm': 'ఫారం',
   'staff.department.general': 'సాధారణం',
+  // Leave reasons used by the seeded requests (free text falls through unchanged).
+  'staff.leave.reason.medical': 'వైద్యం',
+  'staff.leave.reason.health_checkup': 'ఆరోగ్య పరీక్ష',
+  'staff.leave.reason.personal_work': 'వ్యక్తిగత పని',
+  'staff.leave.reason.family_function': 'కుటుంబ వేడుక',
+  'staff.leave.reason.village_visit': 'గ్రామ సందర్శన',
 };

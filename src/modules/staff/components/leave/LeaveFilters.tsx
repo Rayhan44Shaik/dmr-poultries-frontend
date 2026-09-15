@@ -32,7 +32,12 @@ import { ActionTooltip } from '../../../../ui/ActionTooltip';
 import MasterDropdown from '../../../masters/components/MasterDropdown';
 import type { LeaveFilters as LeaveFilterState } from '../../hooks/useLeaveManagement';
 import { useI18n } from '../../../../i18n';
-import { departmentLabel, leaveMonthName, leaveTypeLabel } from '../../utils/leaveDisplay';
+import {
+  departmentLabel,
+  leaveMonthName,
+  leaveTypeLabel,
+  personNameLabel,
+} from '../../utils/leaveDisplay';
 import type { LeaveRequest } from '../../types/staffDashboard';
 import type { Employee } from '../../../masters/employees/types/employee';
 
@@ -233,7 +238,7 @@ function LeaveFilters({
   onRejectSelected,
   onDeleteSelected,
 }: LeaveFiltersProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const departmentOptions = departments.map((d) => ({ value: d, label: departmentLabel(t, d) }));
 
   // Alphabetical from the first word, so the dropdown reads A → Z.
@@ -241,7 +246,7 @@ function LeaveFilters({
     .sort((a, b) => a.employeeName.localeCompare(b.employeeName, undefined, { numeric: true }))
     .map((e) => ({
       value: String(e.id),
-      label: e.employeeName,
+      label: personNameLabel(t, language, e.employeeName),
     }));
 
   const leaveTypeOptions = LEAVE_TYPES.map((type) => ({
@@ -355,17 +360,21 @@ function LeaveFilters({
           {selected && (
             <div
               role="group"
-              aria-label={t('staff.leave.actions_for', { name: selected.employeeName })}
+              aria-label={t('staff.leave.actions_for', {
+                name: personNameLabel(t, language, selected.employeeName),
+              })}
               className="flex max-w-full flex-wrap items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50/80 p-1"
             >
               <span className="hidden max-w-[8.5rem] truncate px-1.5 text-xs font-semibold text-slate-600 2xl:inline">
-                {selected.employeeName}
+                {personNameLabel(t, language, selected.employeeName)}
               </span>
               <button
                 type="button"
                 onClick={onViewSelected}
                 className={viewIconButtonClass}
-                aria-label={t('staff.leave.view_aria', { name: selected.employeeName })}
+                aria-label={t('staff.leave.view_aria', {
+                  name: personNameLabel(t, language, selected.employeeName),
+                })}
               >
                 <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]"><Eye /></span>
                 <ActionTooltip label={t('staff.leave.view_history')} />
@@ -376,7 +385,9 @@ function LeaveFilters({
                     type="button"
                     onClick={onApproveSelected}
                     className={approveIconButtonClass}
-                    aria-label={t('staff.leave.approve_aria', { name: selected.employeeName })}
+                    aria-label={t('staff.leave.approve_aria', {
+                      name: personNameLabel(t, language, selected.employeeName),
+                    })}
                   >
                     <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-approve)]"><CheckCircle /></span>
                     <ActionTooltip label={t('common.approve')} />
@@ -385,7 +396,9 @@ function LeaveFilters({
                     type="button"
                     onClick={onRejectSelected}
                     className={rejectIconButtonClass}
-                    aria-label={t('staff.leave.reject_aria', { name: selected.employeeName })}
+                    aria-label={t('staff.leave.reject_aria', {
+                      name: personNameLabel(t, language, selected.employeeName),
+                    })}
                   >
                     <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reject)]"><XCircle /></span>
                     <ActionTooltip label={t('common.reject')} />
@@ -394,7 +407,9 @@ function LeaveFilters({
                     type="button"
                     onClick={onDeleteSelected}
                     className={deleteIconButtonClass}
-                    aria-label={t('staff.leave.delete_aria', { name: selected.employeeName })}
+                    aria-label={t('staff.leave.delete_aria', {
+                      name: personNameLabel(t, language, selected.employeeName),
+                    })}
                   >
                     <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-delete)]"><Trash2 /></span>
                     <ActionTooltip label={t('common.delete')} />

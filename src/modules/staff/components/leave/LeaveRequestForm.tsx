@@ -6,7 +6,7 @@ import { useSafeNotification } from '../../../../hooks/useSafeNotification';
 import { DatePicker } from '../../../../components/common/DatePicker';
 import type { Employee } from '../../../masters/employees/types/employee';
 import { useI18n } from '../../../../i18n';
-import { departmentLabel, leaveTypeLabel } from '../../utils/leaveDisplay';
+import { departmentLabel, leaveTypeLabel, personNameLabel } from '../../utils/leaveDisplay';
 
 export interface LeaveRequestInput {
   employeeId: number;
@@ -318,7 +318,9 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
                   setEmployeeSearch(form.employeeName);
                 }
               }}
-              placeholder={t('staff.leave.form_employee_search', { department: selectedDepartment })}
+              placeholder={t('staff.leave.form_employee_search', {
+                department: departmentLabel(t, selectedDepartment),
+              })}
               aria-label={t('staff.leave.form_employee_aria')}
               className="w-full h-11 px-3.5 pr-10 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-slate-50/50 hover:bg-slate-50 transition text-slate-700 font-medium"
             />
@@ -355,7 +357,7 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
                         form.employeeId === empId ? 'bg-blue-50 font-bold text-blue-700' : ''
                       }`}
                     >
-                      <span>{empName}</span>
+                      <span>{personNameLabel(t, language, empName)}</span>
                       <span className="text-[10px] text-slate-400 font-normal bg-slate-100 px-2 py-0.5 rounded-md">
                         {t('staff.leave.form_id', { id: empId })}
                       </span>
@@ -364,7 +366,9 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
                 })
               ) : (
                 <div className="px-3 py-2 text-xs text-slate-400 text-center">
-                  {t('staff.leave.form_no_employees', { department: selectedDepartment })}
+                  {t('staff.leave.form_no_employees', {
+                    department: departmentLabel(t, selectedDepartment),
+                  })}
                 </div>
               )}
             </div>

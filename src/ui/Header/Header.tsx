@@ -32,6 +32,7 @@ import {
 import { QUICK_ACTIONS, resolveRoute } from "../../routes/navigation";
 import { useTheme } from "../../providers/ThemeProvider";
 import { translateRole, useI18n } from "../../i18n";
+import { personNameLabel } from "../../i18n/displayNames";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { getPendingCollectionSnapshot, subscribePendingCollectionSnapshot } from "../../modules/operations/collections/services/collectionSnapshot";
 import { usePendingApprovals } from "../../modules/approvals/hooks/usePendingApprovals";
@@ -152,9 +153,11 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
   const route = useMemo(() => resolveRoute(location.pathname + location.search), [location.pathname, location.search]);
 
   const user = getCurrentUser();
-  const displayName = "Owner";
+  /* The account chip follows the language too: the demo account is the Owner,
+     so the name reads యజమాని in Telugu and the avatar initial follows it. */
+  const displayName = personNameLabel(t, language, "Owner");
   const displayRole = "Owner";
-  const initials = "O";
+  const initials = displayName.charAt(0).toUpperCase();
 
   /* ----- Browser/page title from route metadata (translated) ----- */
   useEffect(() => {

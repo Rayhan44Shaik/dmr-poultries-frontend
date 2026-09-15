@@ -11,6 +11,7 @@
 // -----------------------------------------------------------------------------
 
 import { translateStatus, type Language } from '../../../i18n';
+import { personNameLabel } from '../../../i18n/displayNames';
 
 export type LeaveTranslator = (key: string, params?: Record<string, string | number>) => string;
 
@@ -61,6 +62,21 @@ export function departmentLabel(t: Translator, department: string): string {
   const label = t(key);
   return label === key ? department : label;
 }
+
+/**
+ * Seeded leave reasons ("Health checkup", "Family function", …) have dictionary
+ * copy; anything typed by hand that has no entry is shown exactly as typed.
+ */
+export function leaveReasonLabel(t: Translator, language: Language, reason: string): string {
+  if (language !== 'te' || !reason) return reason;
+  const slug = reason.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '');
+  const key = `staff.leave.reason.${slug}`;
+  const translated = t(key);
+  return translated === key ? reason : translated;
+}
+
+/** Re-exported so the Leave components import every label helper from one place. */
+export { personNameLabel };
 
 /** Intl locale for month names and dates inside the Leave page. */
 export function leaveLocale(language: Language): string {
