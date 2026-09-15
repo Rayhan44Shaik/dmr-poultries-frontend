@@ -25,9 +25,10 @@ import {
 import { isCanceledError } from "../../../../api/errors";
 import { useI18n } from "../../../../i18n";
 import { filterTripListTrips } from "../utils/filterTripList";
+import { formatVehicleNumber } from "../../../../utils/format";
 
 type TripListPageProps = { embedded?: boolean };
-type FilterOption = { value: string; label: string };
+type FilterOption = { value: string; label: string; searchText?: string };
 
 const ALL_VEHICLES = "All Vehicles";
 const ALL_SUPERVISORS = "All Supervisors";
@@ -70,7 +71,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   const [trips, setTrips] = useState<Trip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [currentPage, setCurrentPage] = useState(1);
-  const [totalTrips, setTotalTrips] = useState(0);
+  const [search, setSearch] = useState("");
   const [vehicle, setVehicle] = useState(ALL_VEHICLES);
   const [supervisor, setSupervisor] = useState(ALL_SUPERVISORS);
   const [farm, setFarm] = useState(ALL_SOURCES);
@@ -128,7 +129,6 @@ function TripListPage({ embedded = false }: TripListPageProps) {
 
       const matchingTrips = filterTripListTrips(uniqueTripsById(fetchedTrips), filters);
       setTrips(matchingTrips);
-      setTotalTrips(matchingTrips.length);
       setSelectedRowId((selectedId) =>
         selectedId != null && !matchingTrips.some((trip) => trip.id === selectedId) ? null : selectedId
       );
@@ -157,6 +157,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   }, [refreshTrips]);
 
   const resetFilters = () => {
+    setSearch("");
     setVehicle(ALL_VEHICLES);
     setSupervisor(ALL_SUPERVISORS);
     setFarm(ALL_SOURCES);
@@ -170,6 +171,11 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   const tableContainerRef = useRef<HTMLDivElement>(null);
   const viewButtonRef = useRef<HTMLButtonElement>(null);
 
+  const setFilterSearch = useCallback((value: string) => {
+    setSearch(value);
+    setSelectedRowId(null);
+    setCurrentPage(1);
+  }, []);
   const setFilterFromDate = useCallback((value: string) => {
     setFromDate(value);
     setCurrentPage(1);
@@ -222,7 +228,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
       const active = String(vehicleRecord.status ?? "Active") !== "Inactive";
       if (!value || !label || !active || seen.has(value)) return [];
       seen.add(value);
-      return [{ value, label }];
+      return [{ value, label: formatVehicleNumber(label), searchText: label }];
     });
   }, [masterVehicles]);
 
@@ -258,9 +264,13 @@ function TripListPage({ embedded = false }: TripListPageProps) {
 
   // The full matching result is held locally so visible filters stay reliable
   // even against API versions that ignore a filter query parameter.
-  const completedTrips = useMemo(() => uniqueTripsById(Array.isArray(trips) ? trips : []), [trips]);
+  const completedTrips = useMemo(
+    () => filterTripListTrips(uniqueTripsById(Array.isArray(trips) ? trips : []), { search }),
+    [trips, search],
+  );
 
   const hasFilters =
+    search.trim() !== "" ||
     vehicle !== ALL_VEHICLES ||
     supervisor !== ALL_SUPERVISORS ||
     farm !== ALL_SOURCES ||
@@ -268,12 +278,12 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     toDate !== "";
 
   const totals = useMemo(() => ({
-    totalCompletedTrips: totalTrips,
+    totalCompletedTrips: completedTrips.length,
     totalCompletedShops: completedTrips.reduce((sum, trip) => sum + trip.totalShops, 0),
     totalCompletedBirds: completedTrips.reduce((sum, trip) => sum + trip.totalBirds, 0),
     totalCompletedWeight: completedTrips.reduce((sum, trip) => sum + trip.totalWeight, 0),
     totalCompletedMortality: completedTrips.reduce((sum, trip) => sum + trip.totalMortality, 0),
-  }), [completedTrips, totalTrips]);
+  }), [completedTrips]);
 
   const {
     totalCompletedTrips,
@@ -477,11 +487,13 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         vehicle={vehicle}
         supervisor={supervisor}
         farm={farm}
+        search={search}
         setFromDate={setFilterFromDate}
         setToDate={setFilterToDate}
         setVehicle={setFilterVehicle}
         setSupervisor={setFilterSupervisor}
         setFarm={setFilterFarm}
+        setSearch={setFilterSearch}
         onReset={handleResetFilters}
         vehicles={vehicleOptions}
         supervisors={supervisorOptions}

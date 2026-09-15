@@ -66,8 +66,8 @@ function trip(id: number, overrides: Partial<Trip> = {}): Trip {
 
 const rows = [
   trip(1),
-  trip(2, { tripDate: "2026-09-16", vehicleId: 2, supervisorId: 21, sourceFarmId: 31 }),
-  trip(3, { tripDate: "2026-09-17", vehicleId: 2, supervisorId: 20, sourceFarmId: 30 }),
+  trip(2, { tripDate: "2026-09-16", vehicleId: 2, vehicleNo: "TS07UB1222", supervisorId: 21, sourceFarmId: 31 }),
+  trip(3, { tripDate: "2026-09-17", vehicleId: 2, vehicleNo: "TS08UB1037", supervisorId: 20, sourceFarmId: 30 }),
 ];
 
 test("Trip List applies vehicle, supervisor and source-farm filters together", () => {
@@ -82,6 +82,18 @@ test("Trip List date filters use inclusive date-only boundaries", () => {
     filterTripListTrips(rows, { fromDate: "2026-09-16", toDate: "2026-09-16" }).map(({ id }) => id),
     [2],
   );
+});
+
+test("Trip List applies the selected vehicle filter", () => {
+  assert.deepEqual(filterTripListTrips(rows, { vehicleId: 2 }).map(({ id }) => id), [2, 3]);
+});
+
+test("Trip List global search matches vehicle plates with or without spaces", () => {
+  assert.deepEqual(
+    filterTripListTrips(rows, { search: "TS 07 UB 1222" }).map(({ id }) => id),
+    [2],
+  );
+  assert.deepEqual(filterTripListTrips(rows, { search: "ts07ub1222" }).map(({ id }) => id), [2]);
 });
 
 test("Trip List leaves every record visible when no filter is selected", () => {
