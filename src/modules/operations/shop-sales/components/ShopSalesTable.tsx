@@ -348,7 +348,7 @@ function ShopSalesTable({
                   <td className="px-4 py-5 text-center text-[13px] font-bold text-orange-600">{formatSaleWeight(sale.totalWeight)}</td>
                   <td className="px-4 py-5 text-center text-[13px] font-bold text-violet-600">{formatSaleRate(sale.rate)}</td>
                   <td className="px-4 py-5 text-center text-[13px] font-bold text-slate-700">{formatSaleAmount(sale.amount)}</td>
-                  <td className="px-4 py-5 text-[13px] text-slate-600"><span className="font-medium text-slate-700">{formatSaleRemark(sale.remark)}</span></td>
+                  <td className="whitespace-nowrap px-4 py-5 text-[13px] text-slate-600"><span className="font-medium text-slate-700">{formatSaleRemark(sale.remark)}</span></td>
                 </tr>
               );
             })}
