@@ -811,7 +811,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
               calendarTitle={t("ops.dashboard.trend.back_to_calendar")}
             />
           </div>
-          <div className="w-full overflow-hidden">
+          <div className="flex w-full flex-1 flex-col overflow-hidden">
             <OperationalTrendsChart
               trends={trendsQuery.trends}
               granularity={trendGranularity}
