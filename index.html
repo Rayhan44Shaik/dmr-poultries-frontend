@@ -18,7 +18,55 @@
     <style>
       html, body { background: #f8fafc; }
       #root { background: #f8fafc; min-height: 100vh; }
+
+      /* ------------------------------------------------------------------
+         Global accessibility scale
+         ------------------------------------------------------------------
+         The application has many intentionally dense ERP controls, including
+         charts, tables, calendar vendors and existing pixel-based utilities.
+         Scaling the application root keeps text, controls, icons and data
+         visualisations in lock-step instead of letting text grow out of its
+         existing boxes. The supported product range is 100%–150%; the normal
+         13px body scale therefore tops out at 19.5px (~20px).
+
+         The value is applied before React mounts so a saved preference never
+         flashes at the default size. FontSizeProvider owns subsequent changes.
+      */
+      html {
+        --ds-font-scale: 1;
+        zoom: var(--ds-font-scale);
+        width: calc(100% / var(--ds-font-scale));
+        overflow-x: hidden;
+      }
+
+      /* Dark/light mode is intentionally disabled in the current UI.
+         The existing ThemeProvider and theme implementation are retained for
+         a future release; only the header/settings controls are hidden for now. */
+      button[title="Switch to light mode"],
+      button[title="Switch to dark mode"],
+      button[title="లైట్ మోడ్‌కి మార్చండి"],
+      button[title="డార్క్ మోడ్‌కి మార్చండి"] {
+        display: none !important;
+      }
     </style>
+    <script>
+      (() => {
+        try {
+          const allowed = [1, 1.1, 1.2, 1.3, 1.4, 1.5];
+          const stored = Number.parseFloat(localStorage.getItem('dmr_font_scale') || '');
+          const legacy = localStorage.getItem('dmr_font_size');
+          const legacyScale = legacy === 'Large' ? 1.2 : 1;
+          const value = Number.isFinite(stored) ? stored : legacyScale;
+          const scale = allowed.reduce((best, step) =>
+            Math.abs(step - value) < Math.abs(best - value) ? step : best,
+            1,
+          );
+          document.documentElement.style.setProperty('--ds-font-scale', String(scale));
+        } catch {
+          /* Use the default scale when storage is unavailable. */
+        }
+      })();
+    </script>
     <!-- Inter is bundled locally via @fontsource/inter (src/index.css) — no
          external font request; the app is self-contained and deterministic. -->
     <style>
