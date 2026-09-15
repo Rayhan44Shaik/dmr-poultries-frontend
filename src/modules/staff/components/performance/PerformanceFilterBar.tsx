@@ -172,7 +172,7 @@ function PerformanceFilterBarImpl({
         <div className="min-w-[9.5rem] flex-1 basis-[9.5rem]">
           <label htmlFor={`${fieldId}-from`} className={`${uiFilterLabelClass} cursor-pointer`}>
             <Calendar size={13} className="shrink-0 text-emerald-500" />
-            <span>{t("staff.perf.filter.start_date")}</span>
+            <span>{t("staff.perf.filter.from_date")}</span>
           </label>
           <DatePicker
             id={`${fieldId}-from`}
@@ -186,7 +186,7 @@ function PerformanceFilterBarImpl({
         <div className="min-w-[9.5rem] flex-1 basis-[9.5rem]">
           <label htmlFor={`${fieldId}-to`} className={`${uiFilterLabelClass} cursor-pointer`}>
             <CalendarCheck size={13} className="shrink-0 text-emerald-500" />
-            <span>{t("staff.perf.filter.end_date")}</span>
+            <span>{t("staff.perf.filter.to_date")}</span>
           </label>
           <DatePicker
             id={`${fieldId}-to`}

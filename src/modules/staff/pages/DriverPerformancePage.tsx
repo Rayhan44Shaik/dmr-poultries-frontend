@@ -553,7 +553,7 @@ const DriverPerformancePage = () => {
       {/* Driver Weekly Performance */}
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card">
         <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-slate-200 px-4 py-3 sm:px-5">
-          <h2 className="text-[13px] font-bold tracking-tight text-slate-800">
+          <h2 className="text-base font-bold text-slate-800 tracking-tight">
             {t("staff.perf.weekly.driver_header")}
           </h2>
           <p className="text-[11px] font-medium tabular-nums text-slate-500">
@@ -577,7 +577,7 @@ const DriverPerformancePage = () => {
       {/* Driver Performance table */}
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card">
         <header className="flex flex-wrap items-baseline gap-x-2 border-b border-slate-200 px-4 py-3 sm:px-5">
-          <h2 className="text-[13px] font-bold tracking-tight text-slate-800">
+          <h2 className="text-base font-bold text-slate-800 tracking-tight">
             {t("staff.perf.driver_title")}
           </h2>
           <span className="min-w-0 text-[11px] font-medium text-slate-500">

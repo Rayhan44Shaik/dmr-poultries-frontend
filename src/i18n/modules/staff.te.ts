@@ -8,8 +8,8 @@ export default {
   'staff.perf.supervisor_title': 'సూపర్వైజర్ పనితీరు',
 
   // Filter bar --------------------------------------------------------------
-  'staff.perf.filter.start_date': 'ప్రారంభ తేదీ',
-  'staff.perf.filter.end_date': 'ముగింపు తేదీ',
+  'staff.perf.filter.from_date': 'నుండి తేదీ',
+  'staff.perf.filter.to_date': 'వరకు తేదీ',
   'staff.perf.filter.driver': 'డ్రైవర్',
   'staff.perf.filter.supervisor': 'సూపర్వైజర్',
   'staff.perf.filter.all_drivers': 'అందరు డ్రైవర్లు',

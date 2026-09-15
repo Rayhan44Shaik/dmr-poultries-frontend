@@ -8,8 +8,8 @@ export default {
   'staff.perf.supervisor_title': 'Supervisor Performance',
 
   // Filter bar --------------------------------------------------------------
-  'staff.perf.filter.start_date': 'Start date',
-  'staff.perf.filter.end_date': 'End date',
+  'staff.perf.filter.from_date': 'From date',
+  'staff.perf.filter.to_date': 'To date',
   'staff.perf.filter.driver': 'Driver',
   'staff.perf.filter.supervisor': 'Supervisor',
   'staff.perf.filter.all_drivers': 'All Drivers',
