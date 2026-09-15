@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { Home, RefreshCw, ShieldCheck, Unplug, Wrench } from 'lucide-react';
+import { ExternalLink, Home, RefreshCw, ShieldCheck, Unplug, Wrench } from 'lucide-react';
 import { translate } from '../../i18n';
 import {
   ChunkLoadError,
@@ -268,8 +268,18 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
               <RefreshCw size={16} />
               Reload now
             </button>
+            <a
+              href="/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-2 inline-flex h-10 w-full items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50"
+            >
+              <ExternalLink size={16} />
+              Open in a fresh tab
+            </a>
             <p className="mt-4 text-[11px] leading-relaxed text-slate-400">
-              If this keeps happening, close this tab and open the latest preview link again.
+              A fresh tab starts a brand-new connection to the preview server — use it if the reload
+              above keeps looping.
             </p>
           </div>
         </div>
