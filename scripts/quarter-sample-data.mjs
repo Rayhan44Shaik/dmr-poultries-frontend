@@ -247,7 +247,9 @@ const SHOPS = Array.from({ length: 200 }, (_, i) => {
     id: n,
     shopNo: n,
     shopNumber: `SHP-${String(n).padStart(3, "0")}`,
-    shopName: `${name} ${String(n).padStart(3, "0")}`,
+    // 25 bases x 8 kinds keeps all 200 names unique on their own, so no
+    // numeric suffix is needed — shops read like real trading names.
+    shopName: name,
     ownerName: `${FIRST[i % FIRST.length]} ${LAST[(i * 3) % LAST.length]}`,
     phoneNumber: mobile,
     secondaryPhoneNumber: String(9700000000 + n * 91),

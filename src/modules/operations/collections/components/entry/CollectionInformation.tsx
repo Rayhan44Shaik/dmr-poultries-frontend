@@ -66,8 +66,10 @@ function CollectionInformation({
 
   return (
     <div className={opsFilterCardClass}>
-      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-5">
-        <div>
+      {/* Shop Name carries long trading names, so it gets double width; the
+        * date / collector / mode / reference controls stay compact beside it. */}
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-6">
+        <div className="lg:col-span-2">
           <label className={opsFilterLabelClass}>
             <Store size={17} className="text-amber-500 flex-shrink-0" />
             <span>
