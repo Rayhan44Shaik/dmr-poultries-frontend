@@ -12,6 +12,13 @@ import {
   ArrowRight,
 } from 'lucide-react';
 import type { LeaveRequest } from '../../types/staffDashboard';
+import { useI18n, type Language } from '../../../../i18n';
+import {
+  leaveMonthName,
+  leaveStatusLabel,
+  leaveTypeBadge,
+  type LeaveTranslator,
+} from '../../utils/leaveDisplay';
 import { ActionTooltip } from '../../../../ui/ActionTooltip';
 import { uiActionIconMotionClass } from '../../../../shared/ui/uiTokens';
 import MasterDropdown from '../../../masters/components/MasterDropdown';
@@ -32,20 +39,17 @@ const MODAL_YEARS = (() => {
   return Array.from({ length: 6 }, (_, i) => current - 4 + i);
 })();
 
-const MODAL_MONTHS = [
-  { value: 'all', label: 'All Months' },
-  { value: '0', label: 'January' },
-  { value: '1', label: 'February' },
-  { value: '2', label: 'March' },
-  { value: '3', label: 'April' },
-  { value: '4', label: 'May' },
-  { value: '5', label: 'June' },
-  { value: '6', label: 'July' },
-  { value: '7', label: 'August' },
-  { value: '8', label: 'September' },
-  { value: '9', label: 'October' },
-  { value: '10', label: 'November' },
-  { value: '11', label: 'December' },
+/**
+ * Month options for the history filter. The VALUE stays the raw 0-based month
+ * index the filter above compares against; only the label follows the language
+ * (జనవరి, ఫిబ్రవరి, … in Telugu, January, February, … in English).
+ */
+const modalMonthOptions = (t: LeaveTranslator, language: Language) => [
+  { value: 'all', label: t('staff.leave.all_months') },
+  ...Array.from({ length: 12 }, (_, index) => ({
+    value: String(index),
+    label: leaveMonthName(language, index, 'long'),
+  })),
 ];
 
 function getStatusBadge(status: string) {
@@ -78,8 +82,10 @@ function getTypeColor(type: string) {
  * open, returns to the row that opened it on close, and Escape dismisses it.
  */
 function LeaveHistoryModal({ leave, leaves, onClose }: LeaveHistoryModalProps) {
+  const { t, language } = useI18n();
   const [selectedYear, setSelectedYear] = useState<number>(new Date().getFullYear());
   const [selectedMonth, setSelectedMonth] = useState<string>('all');
+  const monthOptions = useMemo(() => modalMonthOptions(t, language), [t, language]);
   const closeButtonRef = useRef<HTMLButtonElement>(null);
   /** Whatever had focus before the dialog opened — the table row, normally. */
   const openerRef = useRef<HTMLElement | null>(null);
@@ -141,16 +147,16 @@ function LeaveHistoryModal({ leave, leaves, onClose }: LeaveHistoryModalProps) {
             </div>
             <div className="min-w-0">
               <h3 id="leave-history-title" className="truncate text-base font-bold tracking-tight text-slate-800">
-                Leave History: {leave.employeeName}
+                {t('staff.leave.history_title', { name: leave.employeeName })}
               </h3>
-              <p className="text-xs text-slate-500">Approved leaves taken for the selected year &amp; month</p>
+              <p className="text-xs text-slate-500">{t('staff.leave.history_subtitle')}</p>
             </div>
           </div>
           <button
             type="button"
             ref={closeButtonRef}
             onClick={onClose}
-            aria-label="Close"
+            aria-label={t('common.close')}
             className="group relative flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-slate-400 transition hover:bg-rose-50 hover:text-rose-600 active:scale-95"
           >
             <span className={`inline-flex ${uiActionIconMotionClass.close}`}><X size={18} /></span>
@@ -162,12 +168,12 @@ function LeaveHistoryModal({ leave, leaves, onClose }: LeaveHistoryModalProps) {
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-slate-50/50 px-6 py-3.5">
           <div className="flex items-center gap-1.5">
             <Calendar size={13} className="shrink-0 text-emerald-500" />
-            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">Filter By</span>
+            <span className="text-[11px] font-bold uppercase tracking-wider text-slate-500">{t('staff.leave.filter_by')}</span>
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <MasterDropdown
               hideLabel
-              label="Year"
+              label={t('common.year')}
               value={String(selectedYear)}
               options={MODAL_YEARS.map((y) => ({ value: String(y), label: String(y) }))}
               onChange={(next) => setSelectedYear(Number(next))}
@@ -175,9 +181,9 @@ function LeaveHistoryModal({ leave, leaves, onClose }: LeaveHistoryModalProps) {
             />
             <MasterDropdown
               hideLabel
-              label="Month"
+              label={t('common.month')}
               value={selectedMonth}
-              options={MODAL_MONTHS}
+              options={monthOptions}
               onChange={(next) => setSelectedMonth(next || 'all')}
               searchable
               className="w-40"
@@ -188,15 +194,15 @@ function LeaveHistoryModal({ leave, leaves, onClose }: LeaveHistoryModalProps) {
         {/* Modal Body / Table */}
         <div className="flex-1 space-y-4 overflow-y-auto p-6">
           <div className="flex items-center justify-between rounded-xl border border-blue-100 bg-blue-50 p-3">
-            <span className="text-xs font-semibold text-blue-800">Total Approved Leave Days:</span>
+            <span className="text-xs font-semibold text-blue-800">{t('staff.leave.total_approved_days')}</span>
             <span className="rounded-md bg-white px-2.5 py-1 text-sm font-bold text-blue-900 shadow-xs">
-              {totalDaysTaken} Days
+              {t('staff.leave.days_count', { days: totalDaysTaken })}
             </span>
           </div>
 
           {employeeLeaveHistory.length === 0 ? (
             <div className="py-8 text-center text-sm text-slate-400">
-              No leave requests found for the selected year and month.
+              {t('staff.leave.history_empty')}
             </div>
           ) : (
             <div className="overflow-hidden rounded-xl border border-slate-200">
@@ -206,34 +212,34 @@ function LeaveHistoryModal({ leave, leaves, onClose }: LeaveHistoryModalProps) {
                     <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">
                       <span className="flex items-center gap-1.5">
                         <CalendarOff size={12} className="shrink-0 text-purple-500" />
-                        <span>Type</span>
+                        <span>{t('common.type')}</span>
                       </span>
                     </th>
                     <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">
                       <span className="flex items-center gap-1">
                         <Calendar size={12} className="shrink-0 text-blue-500" />
-                        <span>From</span>
+                        <span>{t('common.from')}</span>
                         <ArrowRight size={10} className="shrink-0 text-slate-400" />
                         <CalendarRange size={12} className="shrink-0 text-cyan-500" />
-                        <span>To</span>
+                        <span>{t('common.to')}</span>
                       </span>
                     </th>
                     <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
                       <span className="flex items-center justify-center gap-1.5">
                         <Sun size={12} className="shrink-0 text-amber-500" />
-                        <span>Days</span>
+                        <span>{t('common.days')}</span>
                       </span>
                     </th>
                     <th className="px-4 py-3 text-center text-[11px] font-bold uppercase tracking-wider">
                       <span className="flex items-center justify-center gap-1.5">
                         <Activity size={12} className="shrink-0 text-sky-500" />
-                        <span>Status</span>
+                        <span>{t('common.status')}</span>
                       </span>
                     </th>
                     <th className="px-4 py-3 text-[11px] font-bold uppercase tracking-wider">
                       <span className="flex items-center gap-1.5">
                         <MessageSquareText size={12} className="shrink-0 text-slate-400" />
-                        <span>Reason</span>
+                        <span>{t('staff.leave_reason')}</span>
                       </span>
                     </th>
                   </tr>
@@ -243,7 +249,7 @@ function LeaveHistoryModal({ leave, leaves, onClose }: LeaveHistoryModalProps) {
                     <tr key={item.id} className="hover:bg-slate-50">
                       <td className="px-4 py-3">
                         <span className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${getTypeColor(item.type)}`}>
-                          {item.type}
+                          {leaveTypeBadge(t, item.type)}
                         </span>
                       </td>
                       <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-600">
@@ -252,11 +258,11 @@ function LeaveHistoryModal({ leave, leaves, onClose }: LeaveHistoryModalProps) {
                       <td className="px-4 py-3 text-center text-xs font-bold text-slate-700">{item.days}</td>
                       <td className="px-4 py-3 text-center">
                         <span className={`inline-block whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium ${getStatusBadge(item.status)}`}>
-                          {item.status}
+                          {leaveStatusLabel(t, item.status)}
                         </span>
                       </td>
                       <td className="max-w-[180px] truncate px-4 py-3 text-xs italic text-slate-500">
-                        {item.reason || 'N/A'}
+                        {item.reason || t('staff.leave.no_reason')}
                       </td>
                     </tr>
                   ))}
@@ -276,8 +282,8 @@ function LeaveHistoryModal({ leave, leaves, onClose }: LeaveHistoryModalProps) {
             <span className={`inline-flex text-slate-500 group-hover:text-rose-600 ${uiActionIconMotionClass.close}`}>
               <X size={14} />
             </span>
-            Close
-            <ActionTooltip label="Close" />
+            {t('common.close')}
+            <ActionTooltip label={t('common.close')} />
           </button>
         </div>
       </div>

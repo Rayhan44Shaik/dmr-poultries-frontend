@@ -14,6 +14,8 @@ import {
   Activity,
 } from 'lucide-react';
 import type { LeaveRequest } from '../../types/staffDashboard';
+import { useI18n } from '../../../../i18n';
+import { leaveStatusLabel, leaveTypeBadge } from '../../utils/leaveDisplay';
 
 interface LeaveTableProps {
   leaves: LeaveRequest[];
@@ -53,6 +55,7 @@ function LeaveTable({
   onOpenRow,
   startIndex = 0,
 }: LeaveTableProps) {
+  const { t } = useI18n();
   /** Row elements by leave id — lets ↑/↓ move real DOM focus with the selection. */
   const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
 
@@ -133,7 +136,7 @@ function LeaveTable({
   if (leaves.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-slate-200 p-8 text-center">
-        <p className="text-sm font-medium text-slate-500">No leave requests found</p>
+        <p className="text-sm font-medium text-slate-500">{t('staff.leave.empty_title')}</p>
       </div>
     );
   }
@@ -151,55 +154,55 @@ function LeaveTable({
             <th className={`${th} text-left`}>
               <span className="flex items-center gap-1.5">
                 <Hash size={13} className="shrink-0 text-slate-400" />
-                <span>Leave No.</span>
+                <span>{t('staff.leave.col_no')}</span>
               </span>
             </th>
             <th className={`${th} text-left`}>
               <span className="flex items-center gap-1.5">
                 <User size={13} className="shrink-0 text-emerald-500" />
-                <span>Employee</span>
+                <span>{t('common.employee')}</span>
               </span>
             </th>
             <th className={`${th} text-left`}>
               <span className="flex items-center gap-1.5">
                 <Building2 size={13} className="shrink-0 text-indigo-500" />
-                <span>Department</span>
+                <span>{t('staff.department')}</span>
               </span>
             </th>
             <th className={`${th} text-left`}>
               <span className="flex items-center gap-1.5">
                 <CalendarOff size={13} className="shrink-0 text-purple-500" />
-                <span>Leave Type</span>
+                <span>{t('staff.leave_type')}</span>
               </span>
             </th>
             <th className={`${th} text-left`}>
               <span className="flex items-center gap-1.5">
                 <Calendar size={13} className="shrink-0 text-blue-500" />
-                <span>From</span>
+                <span>{t('common.from')}</span>
               </span>
             </th>
             <th className={`${th} text-left`}>
               <span className="flex items-center gap-1.5">
                 <CalendarRange size={13} className="shrink-0 text-cyan-500" />
-                <span>To</span>
+                <span>{t('common.to')}</span>
               </span>
             </th>
             <th className={`${th} text-center`}>
               <span className="flex items-center justify-center gap-1.5">
                 <Sun size={13} className="shrink-0 text-amber-500" />
-                <span>Days</span>
+                <span>{t('common.days')}</span>
               </span>
             </th>
             <th className={`${th} text-left`}>
               <span className="flex items-center gap-1.5">
                 <MessageSquareText size={13} className="shrink-0 text-slate-400" />
-                <span>Reason</span>
+                <span>{t('staff.leave_reason')}</span>
               </span>
             </th>
             <th className={`${th} text-center`}>
               <span className="flex items-center justify-center gap-1.5">
                 <Activity size={13} className="shrink-0 text-sky-500" />
-                <span>Status</span>
+                <span>{t('common.status')}</span>
               </span>
             </th>
           </tr>
@@ -216,7 +219,11 @@ function LeaveTable({
                 }}
                 tabIndex={0}
                 aria-selected={isSelected}
-                aria-label={`${leaveNumber(leave)} — ${leave.employeeName}, ${leave.status}`}
+                aria-label={t('staff.leave.row_aria', {
+                  no: leaveNumber(leave),
+                  name: leave.employeeName,
+                  status: leaveStatusLabel(t, leave.status),
+                })}
                 onClick={(event) => {
                   // Focus follows the click so ↑/↓ work immediately after a mouse pick.
                   event.currentTarget.focus({ preventScroll: true });
@@ -242,21 +249,21 @@ function LeaveTable({
                   {leaveNumber(leave)}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-700">{leave.employeeName}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600">{leave.department || '—'}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600">{leave.department || t('staff.leave.no_reason')}</td>
                 <td className="px-4 py-3">
                   <span className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${getTypeColor(leave.type)}`}>
-                    {leave.type}
+                    {leaveTypeBadge(t, leave.type)}
                   </span>
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-600">{leave.fromDate}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-600">{leave.toDate}</td>
                 <td className="px-4 py-3 text-center text-xs font-bold text-slate-700">{leave.days}</td>
                 <td className="max-w-[160px] truncate px-4 py-3 text-xs text-slate-500" title={leave.reason}>
-                  {leave.reason || '—'}
+                  {leave.reason || t('staff.leave.no_reason')}
                 </td>
                 <td className="px-4 py-3 text-center">
                   <span className={`inline-block whitespace-nowrap rounded-full border px-2 py-0.5 text-xs font-medium ${getStatusBadge(leave.status)}`}>
-                    {leave.status}
+                    {leaveStatusLabel(t, leave.status)}
                   </span>
                 </td>
               </tr>

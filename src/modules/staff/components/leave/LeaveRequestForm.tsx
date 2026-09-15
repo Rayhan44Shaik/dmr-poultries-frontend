@@ -5,6 +5,8 @@ import { Plus, X, ChevronDown, User, Briefcase, FileText, Layers, Hash, Search }
 import { useSafeNotification } from '../../../../hooks/useSafeNotification';
 import { DatePicker } from '../../../../components/common/DatePicker';
 import type { Employee } from '../../../masters/employees/types/employee';
+import { useI18n } from '../../../../i18n';
+import { leaveTypeLabel } from '../../utils/leaveDisplay';
 
 export interface LeaveRequestInput {
   employeeId: number;
@@ -35,6 +37,7 @@ function FormDropdown({
   searchable?: boolean;
   onChange: (value: string) => void;
 }) {
+  const { t } = useI18n();
   const [open, setOpen] = useState(false);
   const [search, setSearch] = useState('');
   const ref = useRef<HTMLDivElement>(null);
@@ -80,8 +83,8 @@ function FormDropdown({
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search..."
-                  aria-label={`Search ${label}`}
+                  placeholder={t('staff.leave.form_search_placeholder')}
+                  aria-label={t('staff.leave.form_search_aria', { label })}
                   autoFocus
                   className="w-full h-8 pl-7 pr-2 rounded-lg border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-slate-50/50 text-slate-700 placeholder-slate-400"
                 />
@@ -90,7 +93,7 @@ function FormDropdown({
           )}
           <div className="max-h-[200px] overflow-y-auto p-1">
             {filtered.length === 0 ? (
-              <div className="px-3 py-2 text-xs text-slate-400 text-center">No matches</div>
+              <div className="px-3 py-2 text-xs text-slate-400 text-center">{t('staff.leave.form_no_matches')}</div>
             ) : (
               filtered.map((o) => (
                 <button
@@ -122,6 +125,7 @@ function FormDropdown({
 
 function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: LeaveRequestFormProps) {
   const { showNotification } = useSafeNotification();
+  const { t, language } = useI18n();
 
   const employees = propEmployees ?? [];
 
@@ -130,7 +134,7 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
   };
 
   const getEmpName = (emp: Employee): string => {
-    return emp.employeeName || 'Unnamed Employee';
+    return emp.employeeName || t('staff.leave.form_unnamed_employee');
   };
 
   const getEmpId = (emp: Employee): number => {
@@ -217,7 +221,7 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
 
   const handleToDateChange = (date: string) => {
     if (form.fromDate && date && date < form.fromDate) {
-      showNotification('To date cannot be earlier than from date.', 'error');
+      showNotification(t('staff.leave.err_to_before_from'), 'error');
       return;
     }
     setForm((prev) => ({ ...prev, toDate: date }));
@@ -226,15 +230,15 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!form.fromDate || !form.toDate) {
-      showNotification('Please select both from and to dates.', 'error');
+      showNotification(t('staff.leave.err_dates_required'), 'error');
       return;
     }
     if (days <= 0 || form.toDate < form.fromDate) {
-      showNotification('Invalid date range. To date cannot be earlier than from date.', 'error');
+      showNotification(t('staff.leave.err_invalid_range'), 'error');
       return;
     }
     if (!form.employeeId) {
-      showNotification('Please select a valid employee.', 'error');
+      showNotification(t('staff.leave.err_employee_required'), 'error');
       return;
     }
     if (isSubmitting) return;
@@ -247,12 +251,13 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
   };
 
   const departmentOptions = uniqueDepartments.map((d) => ({ value: d, label: d }));
-  const leaveTypeOptions = [
-    { value: 'Casual', label: 'Casual Leave' },
-    { value: 'Sick', label: 'Sick Leave' },
-    { value: 'Emergency', label: 'Emergency Leave' },
-    { value: 'Annual', label: 'Annual Leave' },
-  ];
+  /** Values stay the API's English leave types — only the labels translate. */
+  const leaveTypeOptions: { value: LeaveRequestInput['type']; label: string }[] = [
+    'Casual',
+    'Sick',
+    'Emergency',
+    'Annual',
+  ].map((type) => ({ value: type as LeaveRequestInput['type'], label: leaveTypeLabel(t, type) }));
 
   return (
     <form onSubmit={handleSubmit} className="bg-white rounded-2xl border border-slate-200/80 p-5 sm:p-6 shadow-sm space-y-5 transition-all">
@@ -262,15 +267,15 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
             <Plus size={18} />
           </div>
           <div>
-            <h3 className="text-base font-bold text-slate-800">New Leave Request</h3>
-            <p className="text-xs text-slate-500">Select department first to load respective staff members</p>
+            <h3 className="text-base font-bold text-slate-800">{t('staff.leave.form_title')}</h3>
+            <p className="text-xs text-slate-500">{t('staff.leave.form_subtitle')}</p>
           </div>
         </div>
         <button
           type="button"
           onClick={onCancel}
           disabled={isSubmitting}
-          aria-label="Close leave request form"
+          aria-label={t('staff.leave.form_close_aria')}
           className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-xl transition"
         >
           <X size={18} />
@@ -280,7 +285,7 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Line 1 - Department */}
         <FormDropdown
-          label="Department"
+          label={t('staff.department')}
           icon={<Briefcase size={13} className="text-blue-500" />}
           value={selectedDepartment}
           options={departmentOptions}
@@ -291,7 +296,7 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
         {/* Line 1 - Employee */}
         <div className="relative" ref={employeeDropdownRef}>
           <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
-            <User size={13} className="text-blue-500" /> Respective Employee
+            <User size={13} className="text-blue-500" /> {t('staff.leave.form_employee')}
           </label>
           <div className="relative">
             <input
@@ -310,13 +315,13 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
                   setEmployeeSearch(form.employeeName);
                 }
               }}
-              placeholder={`Search in ${selectedDepartment}...`}
-              aria-label="Employee"
+              placeholder={t('staff.leave.form_employee_search', { department: selectedDepartment })}
+              aria-label={t('staff.leave.form_employee_aria')}
               className="w-full h-11 px-3.5 pr-10 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-slate-50/50 hover:bg-slate-50 transition text-slate-700 font-medium"
             />
             <button
               type="button"
-              aria-label="Show employees"
+              aria-label={t('staff.leave.form_show_employees')}
               onClick={() => {
                 setEmployeeSearch('');
                 setIsEmployeeDropdownOpen(!isEmployeeDropdownOpen);
@@ -349,14 +354,14 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
                     >
                       <span>{empName}</span>
                       <span className="text-[10px] text-slate-400 font-normal bg-slate-100 px-2 py-0.5 rounded-md">
-                        ID: {empId}
+                        {t('staff.leave.form_id', { id: empId })}
                       </span>
                     </button>
                   );
                 })
               ) : (
                 <div className="px-3 py-2 text-xs text-slate-400 text-center">
-                  No employees found in &quot;{selectedDepartment}&quot;
+                  {t('staff.leave.form_no_employees', { department: selectedDepartment })}
                 </div>
               )}
             </div>
@@ -366,7 +371,8 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
         {/* Line 2 - From Date */}
         <div>
           <DatePicker
-            label="From Date"
+            label={t('staff.leave.form_from_date')}
+            language={language}
             value={form.fromDate}
             onChange={handleFromDateChange}
             required
@@ -377,7 +383,8 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
         {/* Line 2 - To Date */}
         <div>
           <DatePicker
-            label="To Date"
+            label={t('staff.leave.form_to_date')}
+            language={language}
             value={form.toDate}
             onChange={handleToDateChange}
             required
@@ -387,7 +394,7 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
 
         {/* Line 3 - Leave Type */}
         <FormDropdown
-          label="Leave Type"
+          label={t('staff.leave_type')}
           icon={<Layers size={13} className="text-blue-500" />}
           value={form.type}
           options={leaveTypeOptions}
@@ -397,18 +404,18 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
         {/* Line 3 - Days Counter */}
         <div>
           <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
-            <Hash size={13} className="text-blue-500" /> Calculated Days
+            <Hash size={13} className="text-blue-500" /> {t('staff.leave.form_calculated_days')}
           </label>
           <div className="relative">
             <input
               type="number"
               value={days}
               readOnly
-              aria-label="Calculated days"
+              aria-label={t('staff.leave.form_calculated_days_aria')}
               className="w-full h-11 px-3.5 rounded-xl border border-slate-200 text-sm bg-blue-50/40 text-blue-900 font-bold cursor-not-allowed"
             />
             <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-semibold text-blue-600">
-              Days
+              {t('staff.leave.form_days_suffix')}
             </span>
           </div>
         </div>
@@ -416,15 +423,15 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
         {/* Line 4: Reason */}
         <div className="sm:col-span-2">
           <label className="block text-xs font-semibold text-slate-700 mb-1.5 flex items-center gap-1.5">
-            <FileText size={13} className="text-blue-500" /> Reason (Optional)
+            <FileText size={13} className="text-blue-500" /> {t('staff.leave.form_reason')}
           </label>
           <textarea
             value={form.reason}
             onChange={(e) => setForm((prev) => ({ ...prev, reason: e.target.value }))}
             rows={2.5}
             className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-slate-50/50 hover:bg-slate-50 transition text-slate-700 placeholder-slate-400 font-medium resize-none"
-            placeholder="Provide a brief explanation for your leave request..."
-            aria-label="Reason"
+            placeholder={t('staff.leave.form_reason_placeholder')}
+            aria-label={t('staff.leave.form_reason_aria')}
           />
         </div>
       </div>
@@ -435,7 +442,7 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
           onClick={onCancel}
           className="px-5 py-2.5 text-xs font-semibold text-slate-600 hover:bg-slate-100 rounded-xl transition"
         >
-          Cancel
+          {t('common.cancel')}
         </button>
         <button
           type="submit"
@@ -443,7 +450,7 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
           className="px-5 py-2.5 text-xs font-semibold bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-sm transition active:scale-95 flex items-center gap-1.5"
         >
           <Plus size={15} />
-          {isSubmitting ? 'Submitting…' : 'Submit Request'}
+          {isSubmitting ? t('staff.leave.form_submitting') : t('staff.leave.form_submit')}
         </button>
       </div>
     </form>

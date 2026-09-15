@@ -1,5 +1,8 @@
 import { memo } from 'react';
 import { CalendarOff, MousePointerClick } from 'lucide-react';
+import { useI18n } from '../../../../i18n';
+import LanguageMiniToggle from '../performance/LanguageMiniToggle';
+import { leaveStatusLabel } from '../../utils/leaveDisplay';
 import type { LeaveFilters } from '../../hooks/useLeaveManagement';
 
 type LeaveStatusTab = 'All' | 'Pending' | 'Approved' | 'Rejected';
@@ -11,7 +14,20 @@ interface Props {
   count: number;
 }
 
+/**
+ * The status values are the API's own (`All | Pending | Approved | Rejected`)
+ * and are never translated — the LABEL is. That keeps the filter, the deep
+ * links and the query string working identically in both languages.
+ */
 const STATUS_TABS: LeaveStatusTab[] = ['All', 'Pending', 'Approved', 'Rejected'];
+
+/** Tab → dictionary key. `All` reuses the generic "All" copy. */
+const TAB_KEY: Record<LeaveStatusTab, string> = {
+  All: 'common.all',
+  Pending: 'status.pending',
+  Approved: 'status.approved',
+  Rejected: 'status.rejected',
+};
 
 /**
  * "Leave Request" table header — the Leave Management twin of the Duty Assign
@@ -25,10 +41,13 @@ const STATUS_TABS: LeaveStatusTab[] = ['All', 'Pending', 'Approved', 'Rejected']
  * colour (Pending orange, Approved green, Rejected light red), plus the
  * selected-status count chip beside the title.
  *
- * The right-hand hint names the row-selection keyboard model once, where the
- * user is looking, instead of leaving ArrowUp/ArrowDown to be discovered.
+ * Everything here follows the project language switch, and the EN / తెలుగు
+ * toggle sits in this bar so the page can be read in either language without
+ * leaving it.
  */
 function LeaveTableHeader({ status, onStatusChange, count }: Props) {
+  const { t } = useI18n();
+
   return (
     <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-b border-slate-100 px-4 py-2.5">
       <div className="flex min-w-0 flex-wrap items-center gap-3">
@@ -36,13 +55,13 @@ function LeaveTableHeader({ status, onStatusChange, count }: Props) {
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sky-100">
             <CalendarOff className="text-sky-600" size={16} />
           </div>
-          <h3 className="text-sm font-semibold text-slate-700">Leave Request</h3>
+          <h3 className="text-sm font-semibold text-slate-700">{t('staff.leave.header_title')}</h3>
         </div>
 
         {/* Selected-status count beside the title (updates with the toggle). */}
         <span
           className="inline-flex items-center justify-center rounded-full border border-slate-200/80 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-slate-600 shadow-sm"
-          title={String(status)}
+          title={status === 'All' ? t('common.all') : leaveStatusLabel(t, status)}
         >
           {count}
         </span>
@@ -71,23 +90,23 @@ function LeaveTableHeader({ status, onStatusChange, count }: Props) {
                     : 'bg-transparent text-slate-500 hover:bg-slate-200/50 hover:text-slate-800'
                 }`}
               >
-                {tab}
+                {t(TAB_KEY[tab])}
               </button>
             );
           })}
         </div>
       </div>
 
-      {/* Row-selection keyboard hint — click a row, then ArrowUp/ArrowDown to
-          move, Enter to open, Escape to clear. */}
-      <span className="hidden items-center gap-1.5 text-[11px] font-medium text-slate-400 lg:inline-flex">
-        <MousePointerClick size={13} className="shrink-0" />
-        <span>
-          Click a row · <kbd className="font-sans font-semibold text-slate-500">↑</kbd>
-          <kbd className="ml-0.5 font-sans font-semibold text-slate-500">↓</kbd> to move ·
-          <kbd className="ml-1 font-sans font-semibold text-slate-500">Enter</kbd> to open
+      <div className="flex flex-wrap items-center justify-end gap-3">
+        {/* Row-selection keyboard hint — click a row, then ArrowUp/ArrowDown to
+            move, Enter to open. */}
+        <span className="hidden items-center gap-1.5 text-[11px] font-medium text-slate-400 xl:inline-flex">
+          <MousePointerClick size={13} className="shrink-0" />
+          <span>{t('staff.leave.hint')}</span>
         </span>
-      </span>
+        {/* Language — flips the whole project, exactly like the header menu. */}
+        <LanguageMiniToggle />
+      </div>
     </div>
   );
 }

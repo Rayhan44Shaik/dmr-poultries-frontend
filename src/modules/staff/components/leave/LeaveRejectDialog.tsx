@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { XCircle } from 'lucide-react';
 import type { LeaveRequest } from '../../types/staffDashboard';
+import { useI18n } from '../../../../i18n';
 
 interface LeaveRejectDialogProps {
   /** The selected row. The page mounts this dialog only while rejecting, so the
@@ -26,6 +27,7 @@ interface LeaveRejectDialogProps {
  * opened it — normally the selected table row.
  */
 function LeaveRejectDialog({ leave, onCancel, onConfirm }: LeaveRejectDialogProps) {
+  const { t } = useI18n();
   const [reason, setReason] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
@@ -60,18 +62,22 @@ function LeaveRejectDialog({ leave, onCancel, onConfirm }: LeaveRejectDialogProp
           </div>
           <div className="min-w-0">
             <h3 id="leave-reject-title" className="text-sm font-bold text-slate-800">
-              Reject leave request
+              {t('staff.leave.reject_title')}
             </h3>
             <p className="truncate text-xs text-slate-500">
-              {leave.employeeName} · {leave.fromDate} → {leave.toDate} · {leave.days} day
-              {leave.days === 1 ? '' : 's'}
+              {t(
+                leave.days === 1
+                  ? 'staff.leave.request_summary_one'
+                  : 'staff.leave.request_summary_many',
+                { name: leave.employeeName, from: leave.fromDate, to: leave.toDate, days: leave.days },
+              )}
             </p>
           </div>
         </div>
 
         <div className="space-y-2 px-5 py-4">
           <label htmlFor="leave-reject-reason" className="block text-xs font-semibold text-slate-600">
-            Rejection reason
+            {t('staff.leave.reject_reason_label')}
           </label>
           <textarea
             id="leave-reject-reason"
@@ -79,7 +85,7 @@ function LeaveRejectDialog({ leave, onCancel, onConfirm }: LeaveRejectDialogProp
             value={reason}
             onChange={(event) => setReason(event.target.value)}
             rows={3}
-            placeholder="Why is this request being rejected?"
+            placeholder={t('staff.leave.reject_reason_placeholder')}
             className="w-full min-w-0 resize-y rounded-lg border border-slate-300 bg-white px-3 py-2 text-[13px] font-medium text-slate-800 shadow-xs outline-none transition placeholder:font-normal placeholder:text-slate-400 focus:border-rose-300 focus:ring-2 focus:ring-rose-200"
           />
         </div>
@@ -90,7 +96,7 @@ function LeaveRejectDialog({ leave, onCancel, onConfirm }: LeaveRejectDialogProp
             onClick={onCancel}
             className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-xs font-semibold text-slate-700 shadow-xs transition hover:border-slate-300 hover:bg-slate-50 active:bg-slate-100"
           >
-            Cancel
+            {t('common.cancel')}
           </button>
           <button
             type="button"
@@ -98,7 +104,7 @@ function LeaveRejectDialog({ leave, onCancel, onConfirm }: LeaveRejectDialogProp
             onClick={() => onConfirm(trimmed)}
             className="inline-flex h-9 items-center justify-center rounded-lg bg-rose-600 px-4 text-xs font-semibold text-white shadow-xs transition hover:bg-rose-700 active:bg-rose-800 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Reject request
+            {t('staff.leave.reject_confirm')}
           </button>
         </div>
       </div>

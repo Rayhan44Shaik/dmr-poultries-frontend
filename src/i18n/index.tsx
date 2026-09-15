@@ -1,5 +1,6 @@
 import {
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -97,6 +98,16 @@ export const I18nProvider = ({ children }: I18nProviderProps) => {
   };
 
   const toggleLanguage = () => setLanguage(language === 'en' ? 'te' : 'en');
+
+  /**
+   * Keep `<html lang>` in step with the active language — including the case
+   * where Telugu comes from `localStorage` rather than the switcher. The
+   * attribute decides which font the browser picks for Telugu script, so it has
+   * to be right on the first paint, not only after someone flips the toggle.
+   */
+  useEffect(() => {
+    document.documentElement.lang = language === 'te' ? 'te' : 'en';
+  }, [language]);
 
   const t = useMemo(
     () =>

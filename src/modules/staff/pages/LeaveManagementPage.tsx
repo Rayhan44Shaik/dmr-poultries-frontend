@@ -6,6 +6,7 @@ import { CheckCircle2, X } from 'lucide-react';
 import { useLeaveManagement } from '../hooks/useLeaveManagement';
 import { leaveFiltersFromSearch } from '../utils/leaveDeepLink';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
+import { useI18n } from '../../../i18n';
 import { usePendingDelete } from '../../../hooks/usePendingDelete';
 import { PendingDeleteNotification } from '../../../components/common/PendingDeleteNotification';
 import LeaveFilters from '../components/leave/LeaveFilters';
@@ -22,6 +23,7 @@ import type { LeaveFilters as LeaveFilterState } from '../hooks/useLeaveManageme
 const REFRESH_TOAST_DURATION = 5000;
 
 function LeaveManagementPage() {
+  const { t } = useI18n();
   const { showNotification } = useSafeNotification();
   const [searchParams] = useSearchParams();
   /* Read once: the hook seeds its state with these, so a later change of the
@@ -150,11 +152,11 @@ function LeaveManagementPage() {
 
   const handleViewSelected = useCallback(() => {
     if (!selectedLeave) {
-      showNotification('Select a leave request first.', 'info');
+      showNotification(t('staff.leave.select_first'), 'info');
       return;
     }
     setHistoryFor(selectedLeave);
-  }, [selectedLeave, showNotification]);
+  }, [selectedLeave, showNotification, t]);
 
   const handleApproveSelected = useCallback(() => {
     if (!selectedLeave) return;
@@ -185,9 +187,9 @@ function LeaveManagementPage() {
   const handleDeleteSelected = useCallback(() => {
     if (!selectedLeave) return;
     requestDelete(selectedLeave.id, {
-      label: `Deleting leave for ${selectedLeave.employeeName}`,
+      label: t('staff.leave.deleting_label', { name: selectedLeave.employeeName }),
     });
-  }, [requestDelete, selectedLeave]);
+  }, [requestDelete, selectedLeave, t]);
 
   return (
     <div className="min-w-0 max-w-full space-y-4">
@@ -224,7 +226,9 @@ function LeaveManagementPage() {
       {error && (
         <div className="bg-rose-50 border border-rose-200 rounded-xl p-4 text-sm text-rose-700">
           {error}
-          <button onClick={handleRefresh} className="ml-2 font-semibold underline">Retry</button>
+          <button onClick={handleRefresh} className="ml-2 font-semibold underline">
+            {t('common.retry')}
+          </button>
         </div>
       )}
 
@@ -245,8 +249,8 @@ function LeaveManagementPage() {
 
           {leaves.length === 0 ? (
             <div className="p-8 text-center">
-              <p className="text-sm font-medium text-slate-500">No leave requests found</p>
-              <p className="text-xs text-slate-400 mt-1">Try adjusting your filters or create a new request.</p>
+              <p className="text-sm font-medium text-slate-500">{t('staff.leave.empty_title')}</p>
+              <p className="text-xs text-slate-400 mt-1">{t('staff.leave.empty_hint')}</p>
             </div>
           ) : (
             <>
@@ -298,11 +302,11 @@ function LeaveManagementPage() {
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
             <CheckCircle2 size={16} />
           </span>
-          <span className="text-sm font-semibold text-emerald-800">Leave Management Refreshed</span>
+          <span className="text-sm font-semibold text-emerald-800">{t('staff.leave.refreshed')}</span>
           <button
             type="button"
             onClick={() => setRefreshToast(false)}
-            aria-label="Close notification"
+            aria-label={t('staff.leave.close_notification')}
             className="ml-2 p-1 text-emerald-600 hover:text-emerald-800 hover:bg-emerald-100 rounded-lg transition"
           >
             <X size={16} />

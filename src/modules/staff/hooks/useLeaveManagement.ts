@@ -14,6 +14,7 @@ import {
   getLeaveReport,
 } from '../services/leaveService';
 import { loadEmployees } from '../../masters/employees/services/employeeService';
+import { useI18n } from '../../../i18n';
 import type { Employee } from '../../masters/employees/types/employee';
 import type {
   LeaveRequest,
@@ -76,6 +77,8 @@ export function useLeaveManagement(
   options: UseLeaveManagementOptions = {}
 ) {
   const { includeReport = true } = options;
+  /* Messages and API-failure copy follow the language switch like the UI. */
+  const { t } = useI18n();
   const notify = useMemo(
     () => showNotification || ((msg: string) => console.log(msg)),
     [showNotification]
@@ -154,7 +157,7 @@ export function useLeaveManagement(
         if (!cancelled && seq === listSeqRef.current) setList(data);
       } catch (e) {
         if (!cancelled && seq === listSeqRef.current) {
-          setError(e instanceof Error ? e.message : 'Failed to load leave requests.');
+          setError(e instanceof Error ? e.message : t('staff.leave.err_load'));
           setList({ items: [], total: 0, page, limit: pageSize, totalPages: 0 });
         }
       } finally {
@@ -180,7 +183,7 @@ export function useLeaveManagement(
         if (!cancelled) setReport(data);
       } catch (e) {
         if (!cancelled) {
-          setReportError(e instanceof Error ? e.message : 'Failed to load leave report.');
+          setReportError(e instanceof Error ? e.message : t('staff.leave.err_report'));
           setReport({ month: filters.month, items: [] });
         }
       } finally {
@@ -221,7 +224,7 @@ export function useLeaveManagement(
       })
       .catch((e) => {
         if (seq !== listSeqRef.current) return;
-        setError(e instanceof Error ? e.message : 'Failed to load leave requests.');
+        setError(e instanceof Error ? e.message : t('staff.leave.err_load'));
         setList({ items: [], total: 0, page, limit: pageSize, totalPages: 0 });
       })
       .finally(() => {
@@ -236,11 +239,11 @@ export function useLeaveManagement(
     fetchReport()
       .then((data) => setReport(data))
       .catch((e) => {
-        setReportError(e instanceof Error ? e.message : 'Failed to load leave report.');
+        setReportError(e instanceof Error ? e.message : t('staff.leave.err_report'));
         setReport({ month: filters.month, items: [] });
       })
       .finally(() => setReportLoading(false));
-  }, [fetchList, fetchReport, filters.month, page, pageSize, includeReport]);
+  }, [fetchList, fetchReport, filters.month, page, pageSize, includeReport, t]);
 
   const setFilter = useCallback(<K extends keyof LeaveFilters>(key: K, value: LeaveFilters[K]) => {
     // Typing in the search box must not re-fetch per character: the page is
@@ -299,15 +302,15 @@ export function useLeaveManagement(
     }) => {
       try {
         await createLeave(input);
-        notify('Leave request submitted successfully!', 'success');
+        notify(t('staff.leave.msg_submitted'), 'success');
         refresh();
         return true;
       } catch (e) {
-        notify(e instanceof Error ? e.message : 'Could not submit leave request.', 'error');
+        notify(e instanceof Error ? e.message : t('staff.leave.err_submit'), 'error');
         return false;
       }
     },
-    [notify, refresh]
+    [notify, refresh, t]
   );
 
   const approveLeave = useCallback(
@@ -316,40 +319,40 @@ export function useLeaveManagement(
       mutations.current.add(id);
       try {
         await updateLeaveStatus(id, 'Approved', approvedBy ? { approvedBy } : {});
-        notify('Leave approved!', 'success');
+        notify(t('staff.leave.msg_approved'), 'success');
         refresh();
         return true;
       } catch (e) {
-        notify(e instanceof Error ? e.message : 'Could not approve leave.', 'error');
+        notify(e instanceof Error ? e.message : t('staff.leave.err_approve'), 'error');
         return false;
       } finally {
         mutations.current.delete(id);
       }
     },
-    [notify, refresh]
+    [notify, refresh, t]
   );
 
   const rejectLeave = useCallback(
     async (id: string, rejectionReason: string) => {
       if (!rejectionReason.trim()) {
-        notify('Please provide a rejection reason.', 'error');
+        notify(t('staff.leave.err_reason_required'), 'error');
         return false;
       }
       if (mutations.current.has(id)) return false;
       mutations.current.add(id);
       try {
         await updateLeaveStatus(id, 'Rejected', { rejectionReason });
-        notify('Leave rejected.', 'info');
+        notify(t('staff.leave.msg_rejected'), 'info');
         refresh();
         return true;
       } catch (e) {
-        notify(e instanceof Error ? e.message : 'Could not reject leave.', 'error');
+        notify(e instanceof Error ? e.message : t('staff.leave.err_reject'), 'error');
         return false;
       } finally {
         mutations.current.delete(id);
       }
     },
-    [notify, refresh]
+    [notify, refresh, t]
   );
 
   const deleteLeave = useCallback(
@@ -358,17 +361,17 @@ export function useLeaveManagement(
       mutations.current.add(id);
       try {
         await deleteLeaveApi(id);
-        notify('Leave request deleted.', 'info');
+        notify(t('staff.leave.msg_deleted'), 'info');
         refresh();
         return true;
       } catch (e) {
-        notify(e instanceof Error ? e.message : 'Could not delete leave.', 'error');
+        notify(e instanceof Error ? e.message : t('staff.leave.err_delete'), 'error');
         return false;
       } finally {
         mutations.current.delete(id);
       }
     },
-    [notify, refresh]
+    [notify, refresh, t]
   );
 
   const cancelLeave = useCallback(async (id: string) => {
@@ -376,16 +379,16 @@ export function useLeaveManagement(
     mutations.current.add(id);
     try {
       await updateLeaveStatus(id, 'Cancelled');
-      notify('Leave cancelled.', 'info');
+      notify(t('staff.leave.msg_cancelled'), 'info');
       refresh();
       return true;
     } catch (e) {
-      notify(e instanceof Error ? e.message : 'Could not cancel leave.', 'error');
+      notify(e instanceof Error ? e.message : t('staff.leave.err_cancel'), 'error');
       return false;
     } finally {
       mutations.current.delete(id);
     }
-  }, [notify, refresh]);
+  }, [notify, refresh, t]);
 
   return {
     leaves: list.items,
