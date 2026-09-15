@@ -11,6 +11,7 @@ import { granularityForRange, type Granularity } from "../utils/trendSeries";
 import CollectionsPie from "../components/CollectionsPie";
 import RecentTripsTable from "../components/RecentTripsTable";
 import ActiveCounts from "../components/ActiveCounts";
+import QuarterOperationsCoverage from "../components/QuarterOperationsCoverage";
 import PendingCollectionsByShop from "../components/PendingCollectionsByShop";
 import PendingApprovalsPanel from "../components/PendingApprovalsPanel";
 import {
@@ -39,16 +40,14 @@ const formatSampleDate = (value: string, locale = "en-IN"): string => {
     : date.toLocaleDateString(locale, { day: "2-digit", month: "short", year: "numeric" });
 };
 
-// -------- Helper: get previous Monday–Sunday --------
-const getPreviousWeekRange = () => {
-  const today = new Date();
-  const day = today.getDay();
-  const diffToMonday = (day === 0 ? 6 : day - 1) + 7;
-  const prevMonday = new Date(today);
-  prevMonday.setDate(today.getDate() - diffToMonday);
-  const prevSunday = new Date(prevMonday);
-  prevSunday.setDate(prevMonday.getDate() + 6);
-  return { startDate: prevMonday, endDate: prevSunday };
+// -------- Helper: rolling quarter ending today ---------------------------
+// This is the same 92-day window advertised by the in-repo sample API. Making
+// it the initial Operations scope means the overview opens on the complete
+// quarter rather than presenting a small previous-week slice of that dataset.
+const getQuarterRange = () => {
+  const endDate = new Date();
+  endDate.setHours(0, 0, 0, 0);
+  return { startDate: addDays(endDate, -91), endDate };
 };
 
 // -------- Helper: today at local midnight (quick-range anchor) --------
@@ -177,8 +176,8 @@ function RangeDatePicker({
       },
     },
     {
-      key: "qtr", label: "QTR", word: "Last quarter", Icon: Layers,
-      start: () => addDays(subMonths(todayMidnight(), 3), 1),
+      key: "qtr", label: "QTR", word: "Rolling 92-day quarter", Icon: Layers,
+      start: () => addDays(todayMidnight(), -91),
       theme: {
         from: "#f59e0b", to: "#d97706", soft: "#fffbeb", text: "#b45309", ring: "#fde68a",
         hoverText: "hover:text-amber-700", hoverIcon: "group-hover/opt:text-amber-600", hoverBg: "hover:bg-amber-100/70",
@@ -530,7 +529,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   const { t, language: uiLanguage } = useI18n();
   const trendLocale = uiLanguage === "te" ? "te-IN" : "en-IN";
   const { showNotification } = useSafeNotification();
-  const initialRange = getPreviousWeekRange();
+  const initialRange = getQuarterRange();
   const [startDate, setStartDate] = useState<Date | undefined>(initialRange.startDate);
   const [endDate, setEndDate] = useState<Date | undefined>(initialRange.endDate);
   const [comparisonPeriod] = useState<"7d" | "15d" | "30d">("7d");
@@ -761,6 +760,15 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
         actions={headerActions}
       />
 
+      {data.sampleQuarter && data.moduleCounts && calendarFrom && calendarTo ? (
+        <QuarterOperationsCoverage
+          quarter={data.sampleQuarter}
+          counts={data.moduleCounts}
+          fromDate={calendarFrom}
+          toDate={calendarTo}
+        />
+      ) : null}
+
       <div className="relative z-10">
         <KPICards
           current={data}
@@ -882,6 +890,11 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
           helpers={data?.activeHelpers || 0}
           shops={data?.totalShops || 0}
           farms={data?.totalFarms || 0}
+          usedVehicles={data?.usedVehicles || 0}
+          usedDrivers={data?.usedDrivers || 0}
+          usedHelpers={data?.usedHelpers || 0}
+          usedShops={data?.usedShops || 0}
+          usedFarms={data?.usedFarms || 0}
         />
       </div>
     </div>

@@ -449,28 +449,26 @@ export function EditCollectionModal({
                     )}
                   </button>
 
-                  {/* Delete — enabled only inside the 10-day window. Outside
-                    * it the icon is disabled and says why; there is no
-                    * override anywhere in the UI. */}
-                  <button
-                    type="button"
-                    onClick={startDeleteCountdown}
-                    disabled={!canDelete || confirmingDelete || deleting}
-                    aria-label={`${t("ops.collection.delete_collection")} — ${deleteHint}`}
-                    className={
-                      canDelete && !confirmingDelete && !deleting
-                        ? "group relative inline-flex items-center justify-center rounded-xl border border-rose-100 bg-rose-50/70 hover:bg-rose-50/90 p-2 text-rose-500 shadow-sm transition-all active:scale-95"
-                        : "inline-flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50 p-2 text-slate-300 cursor-not-allowed"
-                    }
-                  >
-                    {deleting ? (
-                      <Loader2 size={16} className="animate-spin" />
-                    ) : (
-                      <span className={canDelete ? `inline-flex ${uiActionIconMotionClass.delete}` : "inline-flex"}>
-                        <Trash2 size={16} />
-                      </span>
-                    )}
-                  </button>
+                  {/* Delete is shown only when the selected entry is currently
+                    * eligible. An ineligible entry has no misleading disabled
+                    * trash icon at all. */}
+                  {canDelete && (
+                    <button
+                      type="button"
+                      onClick={startDeleteCountdown}
+                      disabled={confirmingDelete || deleting}
+                      aria-label={`${t("ops.collection.delete_collection")} — ${deleteHint}`}
+                      className="group relative inline-flex items-center justify-center rounded-xl border border-rose-100 bg-rose-50/70 p-2 text-rose-500 shadow-sm transition-all hover:bg-rose-50/90 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                    >
+                      {deleting ? (
+                        <Loader2 size={16} className="animate-spin" />
+                      ) : (
+                        <span className={`inline-flex ${uiActionIconMotionClass.delete}`}>
+                          <Trash2 size={16} />
+                        </span>
+                      )}
+                    </button>
+                  )}
                 </>
               )}
               <button
@@ -542,14 +540,14 @@ export function EditCollectionModal({
 
                   <div className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2 xl:grid-cols-3 lg:col-span-9">
                     {renderField({
-                      label: t("ops.collection.collection_no_label"),
-                      value: formData.collectionNo || "-",
-                      icon: Hash,
-                    })}
-                    {renderField({
                       label: t("operations.collection_date"),
                       value: formatDate(formData.collectionDate, dateLocale),
                       icon: Calendar,
+                    })}
+                    {renderField({
+                      label: t("ops.collection.collection_no_label"),
+                      value: formData.collectionNo || "-",
+                      icon: Hash,
                     })}
                     {renderField({
                       label: t("common.collector"),
@@ -655,30 +653,23 @@ export function EditCollectionModal({
                   </p>
                 ) : (
                   <div className="overflow-x-auto rounded-lg border border-slate-200">
-                    {/* Proportioned to content, same rule as the Collection
-                      * Entry table: the serial number needs a sliver, the
-                      * collection number and status need real room. */}
-                    <table className="min-w-[720px] w-full table-fixed divide-y divide-slate-200">
+                    {/* Six business columns share the table evenly. Date leads
+                      * the row in both this history and the parent Collection
+                      * Entry table; no synthetic serial column is rendered. */}
+                    <table className="min-w-[840px] w-full table-fixed divide-y divide-slate-200">
                       <colgroup>
-                        <col className="w-[5%]" />
-                        <col className="w-[12%]" />
-                        <col className="w-[19%]" />
-                        <col className="w-[13%]" />
-                        <col className="w-[17%]" />
-                        <col className="w-[16%]" />
-                        <col className="w-[18%]" />
+                        <col className="w-1/6" />
+                        <col className="w-1/6" />
+                        <col className="w-1/6" />
+                        <col className="w-1/6" />
+                        <col className="w-1/6" />
+                        <col className="w-1/6" />
                       </colgroup>
                       {/* Header icons use the same vocabulary as every other
                         * operations table (Trip List, Shop Sales, Recent
                         * Collections) so the columns read identically. */}
                       <thead className="bg-slate-50">
                         <tr>
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                            <span className="inline-flex items-center gap-1.5">
-                              <Hash size={14} className="shrink-0 text-slate-400" />
-                              {t("table.s_no")}
-                            </span>
-                          </th>
                           <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
                             <span className="inline-flex items-center gap-1.5">
                               <Calendar size={14} className="shrink-0 text-blue-500" />
@@ -718,7 +709,7 @@ export function EditCollectionModal({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 bg-white">
-                        {filteredCredits.slice(0, 10).map((col, index) => {
+                        {filteredCredits.slice(0, 10).map((col) => {
                           const isRowSelected = selected != null && String(selected.id) === String(col.id);
                           return (
                           <tr
@@ -740,7 +731,6 @@ export function EditCollectionModal({
                                 : "hover:bg-slate-50/80"
                             }`}
                           >
-                            <td className="px-3 py-2.5 text-xs tabular-nums text-slate-400">{index + 1}</td>
                             <td className="px-3 py-2.5 text-xs text-slate-600">
                               {formatDate(col.collectionDate, dateLocale)}
                             </td>

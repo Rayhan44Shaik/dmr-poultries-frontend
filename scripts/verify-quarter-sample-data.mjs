@@ -99,6 +99,30 @@ async function run() {
   assert.equal(dashboard.sample, true);
   assert.equal(dashboard.quarter.code, manifest.quarter.code);
   assert.ok(dashboard.totalTrips > 600);
+  assert.ok(dashboard.moduleCounts, "dashboard must expose the Operations quarter map");
+  assert.equal(
+    dashboard.moduleCounts.tripRecords + dashboard.moduleCounts.orders,
+    manifest.trips,
+    "Trip List rows + Order day containers must cover the trip manifest exactly",
+  );
+  assert.equal(dashboard.moduleCounts.shopSales, manifest.deliveries);
+  assert.equal(dashboard.moduleCounts.collections, manifest.collections);
+  assert.equal(dashboard.moduleCounts.fuelBills, manifest.fuelBills);
+  assert.ok(dashboard.moduleCounts.rateEntries > 0);
+  assert.ok(dashboard.moduleCounts.pendingShops > 0);
+  assert.ok(dashboard.moduleCounts.mortalityTrips > 500);
+  assert.ok(dashboard.moduleCounts.orders > 0);
+  assert.equal(dashboard.usedFarms, manifest.farms, "the Operations quarter must exercise every farm");
+
+  const mortalityNewest = await request(
+    "/operations/mortality-analysis?sortBy=tripDate&sortDir=desc&page=1&limit=25",
+  );
+  assert.equal(mortalityNewest.meta.total, dashboard.moduleCounts.mortalityTrips);
+  assert.deepEqual(
+    mortalityNewest.data.map((row) => row.tripDate),
+    mortalityNewest.data.map((row) => row.tripDate).sort().reverse(),
+    "Mortality page sorting must happen before quarter pagination",
+  );
 
   // Shop Sales uses the production API field names. This prevents the common
   // failure where its table receives rows but renders blank birds/weight/date.
@@ -314,6 +338,23 @@ async function run() {
     round(beforeRateLock.totalSales + sum(rateTrip.deliveries.map((delivery) => ({ amount: delivery.weight * 120 })), "amount")),
   );
   assert.ok(!(await request("/operations/rate-entry")).some((row) => row.id === rateTrip.id));
+
+  // Fuel page KPIs must describe every filtered row, not only page 1.
+  const fuelPageOne = await request("/operations/fuel-expenses?page=1&limit=10");
+  const fuelPageTwo = await request("/operations/fuel-expenses?page=2&limit=10");
+  assert.equal(fuelPageOne.data.length, 10);
+  assert.equal(fuelPageOne.meta.total, manifest.fuelBills);
+  assert.deepEqual(
+    fuelPageTwo.summary,
+    fuelPageOne.summary,
+    "fuel totals must stay stable while the table paginates",
+  );
+  assert.ok(fuelPageOne.summary.totalLitres > 0);
+  assert.ok(fuelPageOne.summary.totalAmount > 0);
+  assert.ok(
+    fuelPageOne.summary.pendingCount + fuelPageOne.summary.approvedCount <= manifest.fuelBills,
+  );
+  assert.ok(fuelPageOne.summary.avgMileage > 0);
 
   // Fuel approval is the other Operations input in the dashboard expense card.
   const beforeFuel = await request("/operations/dashboard");

@@ -1,13 +1,15 @@
 import { useMemo, useRef, useState } from "react";
 import {
-  Search, X, History, CheckCircle, Clock, AlertCircle, Eye, Pencil,
-  Hash, FileText, Calendar, Store, UserCog, IndianRupee, Activity, Settings2,
+  Search, X, History, CheckCircle, Clock, AlertCircle, Eye, Pencil, RotateCcw,
+  FileText, Calendar, Store, UserCog, IndianRupee, Activity, Settings2,
 } from "lucide-react";
 import TripPagination from "../../../vehicle-trips/components/TripPagination";
 import type { RecentCollection } from "../../types/collection";
 import { useI18n } from "../../../../../i18n";
 import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocalization";
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
+import { opsSecondaryButtonClass } from "../../../../../shared/ui/operationsStyles";
+import { BrandRefreshButton } from "../../../../../ui";
 import { collectionStatusKey, collectionStatusLabel } from "../../utils/collectionStatusLabel";
 
 interface Props {
@@ -20,6 +22,8 @@ interface Props {
   onReject: (id: string) => void;
   onEdit: (collection: RecentCollection) => void;
   onViewShop: (shopName: string) => void;
+  /** Reloads the recent feed from the backend without changing the active view. */
+  onRefresh: () => void | Promise<void>;
   /** Fires whenever the highlighted row changes, so the page can mirror it. */
   onSelectionChange?: (collection: RecentCollection | null) => void;
 }
@@ -52,6 +56,7 @@ export default function RecentCollectionsTable({
   onApprove,
   onEdit,
   onViewShop,
+  onRefresh,
   onSelectionChange,
 }: Props) {
   const { t, language } = useI18n();
@@ -278,13 +283,27 @@ export default function RecentCollectionsTable({
   /** The roving tabstop: the selected row, else the first row. */
   const activeRowIndex = Math.max(0, paginatedData.findIndex((row) => row.id === selectedId));
 
-  /** Any change to the result set returns to page 1, so the view can never be
-    * stranded on a page that no longer exists. */
+  /** Any search/reset change returns to page 1 and clears the old selection,
+    * so an action can never target a row that is no longer visible. */
   const updateSearch = (value: string) => {
     setSearchQuery(value);
     setCurrentPage(1);
+    selectRow(null);
   };
   const clearSearch = () => updateSearch("");
+  const resetTable = () => updateSearch("");
+
+  const refreshTable = () => {
+    setCurrentPage(1);
+    selectRow(null);
+    void onRefresh();
+  };
+
+  /** Approved actions always select first, then open that exact entry. */
+  const viewApprovedCollection = (collection: RecentCollection) => {
+    selectRow(collection);
+    onViewShop(collection.shopName);
+  };
 
   const getEmptyStateMessage = (): string => {
     switch (statusFilter) {
@@ -337,6 +356,7 @@ export default function RecentCollectionsTable({
                   key={tab}
                   type="button"
                   onClick={() => {
+                    selectRow(null);
                     onStatusChange(tab);
                     setCurrentPage(1);
                   }}
@@ -373,37 +393,43 @@ export default function RecentCollectionsTable({
               </button>
             )}
           </div>
+
+          <button
+            type="button"
+            onClick={resetTable}
+            className={`group relative ${opsSecondaryButtonClass}`}
+            aria-label={t("common.reset")}
+          >
+            <span className={`inline-flex ${uiActionIconMotionClass.reset}`}>
+              <RotateCcw size={14} />
+            </span>
+            {t("common.reset")}
+          </button>
+
+          <BrandRefreshButton
+            onClick={refreshTable}
+            loading={isLoading}
+            ariaLabel={t("common.refresh")}
+          >
+            {t("common.refresh")}
+          </BrandRefreshButton>
+
         </div>
       </div>
 
-      {/* Table — column sizing and type scale match Recent Trip Activity. */}
+      {/* Table — begins with the business date in every Recent Collections
+        * view; there is no synthetic serial-number column competing with the
+        * actual collection data. */}
       <div className="overflow-x-auto">
-        {/* Column widths are proportioned to what each column actually holds,
-          * measured against the live dataset (longest / average characters):
-          *
-          *   S.No 3 · Collection No 16 · Date 11 · Shop 33/22 · Collector 14/11
-          *   · Amount 11 · Status "Pending" · Actions 4 icons
-          *
-          * 8/14/10/19/14/10/9/16, summing to exactly 100%. The 1180px floor
-          * guarantees every worst case: Actions 16% = 189px against the 178px
-          * four 32px buttons plus gaps and padding need, Status 9% = 106px for
-          * the short "Pending" badge, Shop 19% = 224px. Below the floor the
-          * table scrolls horizontally rather than crushing a column.
-          *
-          * S.No, Date and their headers are left-aligned like every other text
-          * column. They were previously centred, which floated the value away
-          * from its own heading and read as uneven gaps either side of
-          * Collection No — an alignment problem that no width change fixes. */}
-        <table className="min-w-[1180px] w-full table-fixed text-sm text-left border-collapse">
+        <table className="min-w-[1080px] w-full table-fixed text-sm text-left border-collapse">
           <colgroup>
-            <col className="w-[8%]" />
-            <col className="w-[14%]" />
-            <col className="w-[10%]" />
-            <col className="w-[19%]" />
-            <col className="w-[14%]" />
-            <col className="w-[10%]" />
-            <col className="w-[9%]" />
+            <col className="w-[12%]" />
             <col className="w-[16%]" />
+            <col className="w-[20%]" />
+            <col className="w-[15%]" />
+            <col className="w-[12%]" />
+            <col className="w-[11%]" />
+            <col className="w-[14%]" />
           </colgroup>
           <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-600">
             <tr>
@@ -411,20 +437,14 @@ export default function RecentCollectionsTable({
                 * uses, so a column means the same thing across the product. */}
               <th className="px-4 py-3 text-left text-sm font-bold uppercase tracking-wider">
                 <span className="inline-flex items-center gap-1.5">
-                  <Hash size={14} className="shrink-0 text-slate-400" />
-                  {t("table.s_no")}
+                  <Calendar size={14} className="shrink-0 text-blue-500" />
+                  {t("table.date")}
                 </span>
               </th>
               <th className="px-4 py-3 text-sm font-bold uppercase tracking-wider">
                 <span className="inline-flex items-center gap-1.5">
                   <FileText size={14} className="shrink-0 text-emerald-500" />
                   {t("table.collection_no")}
-                </span>
-              </th>
-              <th className="px-4 py-3 text-left text-sm font-bold uppercase tracking-wider">
-                <span className="inline-flex items-center gap-1.5">
-                  <Calendar size={14} className="shrink-0 text-blue-500" />
-                  {t("table.date")}
                 </span>
               </th>
               <th className="px-4 py-3 text-sm font-bold uppercase tracking-wider">
@@ -462,7 +482,7 @@ export default function RecentCollectionsTable({
           <tbody className="divide-y divide-slate-100">
             {isLoading ? (
               <tr>
-                <td colSpan={8} className="py-16 text-center text-sm font-medium text-slate-400">
+                <td colSpan={7} className="py-16 text-center text-sm font-medium text-slate-400">
                   <span className="inline-flex items-center gap-2">
                     <span
                       className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600"
@@ -474,7 +494,7 @@ export default function RecentCollectionsTable({
               </tr>
             ) : displayedData.length === 0 ? (
               <tr>
-                <td colSpan={8} className="py-16 text-center text-slate-400">
+                <td colSpan={7} className="py-16 text-center text-slate-400">
                   <History size={24} className="mx-auto mb-2" />
                   {getEmptyStateMessage()}
                 </td>
@@ -515,14 +535,11 @@ export default function RecentCollectionsTable({
                         : "hover:bg-slate-50/80"
                     }`}
                   >
-                    <td className="px-4 py-3 text-left text-xs font-semibold text-slate-500 tabular-nums">
-                      {startIndex + index + 1}
+                    <td className="px-4 py-3 text-left text-xs font-bold text-slate-600 tabular-nums whitespace-nowrap">
+                      {localizeDate(col.collectionDate)}
                     </td>
                     <td className="px-4 py-3 text-xs font-semibold text-slate-800 truncate">
                       {col.collectionNo}
-                    </td>
-                    <td className="px-4 py-3 text-left text-xs font-bold text-slate-600 tabular-nums whitespace-nowrap">
-                      {localizeDate(col.collectionDate)}
                     </td>
                     <td className="px-4 py-3 text-xs font-semibold text-slate-700 truncate">{localize(col.shopName)}</td>
                     <td className="px-4 py-3 text-xs font-medium text-slate-600 truncate">{localize(col.collectorName)}</td>
@@ -573,13 +590,14 @@ export default function RecentCollectionsTable({
                         {!isDeleted && !isPending && (
                           <button
                             type="button"
-                            onClick={() => onViewShop(col.shopName)}
-                            aria-label={t("common.view")}
-                            className="group h-8 w-8 rounded-xl bg-violet-50 hover:bg-violet-500 text-violet-600 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95"
+                            onClick={() => viewApprovedCollection(col)}
+                            aria-label={`${t("common.view")} ${col.collectionNo}`}
+                            className="group inline-flex h-8 items-center justify-center gap-1.5 rounded-xl bg-violet-50 px-3 text-xs font-bold text-violet-600 shadow-sm transition-all hover:bg-violet-500 hover:text-white active:scale-95"
                           >
                             <span className={`inline-flex ${uiActionIconMotionClass.view}`}>
                               <Eye size={14} />
                             </span>
+                            {t("common.view")}
                           </button>
                         )}
 

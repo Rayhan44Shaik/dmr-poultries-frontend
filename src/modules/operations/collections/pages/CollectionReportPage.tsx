@@ -46,6 +46,7 @@ import {
   opsEmptyStateClass,
 } from "../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../i18n";
+import { getQuarterSampleInfo } from "../../../../sample/quarterSample";
 import VehicleAnalyticsPage from "../../../fleet-operations/pages/VehicleAnalyticsPage";
 
 const formatCurrency = (amount: number) =>
@@ -177,7 +178,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
 
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
-  const [weekBounds, setWeekBounds] = useState({ from: "", to: "" });
+  const [defaultBounds, setDefaultBounds] = useState({ from: "", to: "" });
   const [shopName, setShopName] = useState("");
   const [collector, setCollector] = useState("");
   const [paymentMode, setPaymentMode] = useState("");
@@ -204,12 +205,20 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
   const [reportError, setReportError] = useState<string | null>(null);
 
   const loadWeekBounds = useCallback(() => {
-    return collectionService
-      .fetchWeekBounds()
-      .then((bounds) => {
-        setWeekBounds({ from: bounds.weekStart, to: bounds.weekEnd });
-        setFromDate((prev) => prev || bounds.weekStart);
-        setToDate((prev) => prev || bounds.weekEnd);
+    return Promise.all([
+      collectionService.fetchWeekBounds(),
+      getQuarterSampleInfo(),
+    ])
+      .then(([bounds, sampleInfo]) => {
+        // Production keeps the established Monday–Sunday report. The sample
+        // preview opens on its complete rolling quarter so the Collection
+        // Report and Operations Overview describe the same dataset by default.
+        const defaults = sampleInfo
+          ? { from: sampleInfo.quarter.fromDate, to: sampleInfo.quarter.toDate }
+          : { from: bounds.weekStart, to: bounds.weekEnd };
+        setDefaultBounds(defaults);
+        setFromDate((prev) => prev || defaults.from);
+        setToDate((prev) => prev || defaults.to);
       })
       .catch(() => {
         // Backend unreachable: resolve the initial loading state and surface
@@ -545,14 +554,14 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
   }, [report, paymentModeSummary, collectorSummary, showNotification, fromDate, toDate, t, shopName, shops]);
 
   const resetFilters = useCallback(() => {
-    setFromDate(weekBounds.from);
-    setToDate(weekBounds.to);
+    setFromDate(defaultBounds.from);
+    setToDate(defaultBounds.to);
     setShopName("");
     setCollector("");
     setPaymentMode("");
     setExportOpen(false);
     showNotification(t("ops.collection.filters_reset_default"), "info");
-  }, [weekBounds, showNotification, t]);
+  }, [defaultBounds, showNotification, t]);
 
   // Manual Search: re-run the report for the current filters. If the date
   // range is not set yet (week bounds never loaded), re-fetch bounds first —

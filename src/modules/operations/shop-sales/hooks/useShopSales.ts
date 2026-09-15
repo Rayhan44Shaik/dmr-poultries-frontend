@@ -7,6 +7,7 @@ import {
   filterShopSales,
   paginateSales,
 } from "../utils/shopSaleCalculation";
+import { PAGINATION_DEFAULT_PAGE_SIZE } from "../../../../shared/ui/paginationStyles";
 
 const DEFAULT_FILTER: ShopSaleFilter = {
   fromDate: "",
@@ -28,7 +29,7 @@ function useShopSales() {
   const [isLoading, setIsLoading] = useState(true);
   const [filter, setFilter] = useState<ShopSaleFilter>({ ...DEFAULT_FILTER });
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
+  const [pageSize, setPageSize] = useState(PAGINATION_DEFAULT_PAGE_SIZE);
   const mountedRef = useRef(false);
   const requestSequenceRef = useRef(0);
 

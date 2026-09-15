@@ -10,9 +10,20 @@ export interface FuelListMeta {
   totalPages: number;
 }
 
+export interface FuelListSummary {
+  /** Totals over every filtered row, never only the visible page. */
+  totalLitres: number;
+  totalAmount: number;
+  pendingCount: number;
+  approvedCount: number;
+  avgMileage: number | null;
+  recentTripMileage: number | null;
+}
+
 export interface FuelListResult {
   data: FuelExpense[];
   meta: FuelListMeta;
+  summary: FuelListSummary;
 }
 
 export interface FuelListFilters {
@@ -26,6 +37,12 @@ export interface FuelListFilters {
   tripNo?: string;
   billNo?: string;
   search?: string;
+}
+
+interface ApiFuelListResult {
+  data: ApiFuel[];
+  meta: FuelListMeta;
+  summary?: Partial<FuelListSummary>;
 }
 
 interface ApiFuel {
@@ -103,6 +120,42 @@ function mapRow(row: ApiFuel): FuelExpense {
   };
 }
 
+function summarizeRows(rows: FuelExpense[]): FuelListSummary {
+  return {
+    totalLitres: rows.reduce((sum, row) => sum + row.litres, 0),
+    totalAmount: rows.reduce((sum, row) => sum + row.amount, 0),
+    pendingCount: rows.filter((row) => row.status === "Pending").length,
+    approvedCount: rows.filter((row) => row.status === "Approved").length,
+    avgMileage: null,
+    recentTripMileage: null,
+  };
+}
+
+function mapSummary(
+  summary: Partial<FuelListSummary> | null | undefined,
+  visibleRows: FuelExpense[]
+): FuelListSummary {
+  const fallback = summarizeRows(visibleRows);
+  if (!summary) return fallback;
+  const finite = (value: unknown, otherwise: number): number => {
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : otherwise;
+  };
+  const nullableFinite = (value: unknown): number | null => {
+    if (value == null) return null;
+    const parsed = Number(value);
+    return Number.isFinite(parsed) ? parsed : null;
+  };
+  return {
+    totalLitres: finite(summary.totalLitres, fallback.totalLitres),
+    totalAmount: finite(summary.totalAmount, fallback.totalAmount),
+    pendingCount: finite(summary.pendingCount, fallback.pendingCount),
+    approvedCount: finite(summary.approvedCount, fallback.approvedCount),
+    avgMileage: nullableFinite(summary.avgMileage),
+    recentTripMileage: nullableFinite(summary.recentTripMileage),
+  };
+}
+
 function toBody(draft: FuelExpenseDraft | Partial<FuelExpense>) {
   return {
     billDate: draft.date,
@@ -130,7 +183,7 @@ let listCache: FuelExpense[] = [];
 
 async function list(filters: FuelListFilters = {}): Promise<FuelListResult> {
   try {
-    const { data } = await apiGet<FuelListResult | ApiFuel[]>(PATH, {
+    const { data } = await apiGet<ApiFuelListResult | ApiFuel[]>(PATH, {
       params: {
         page: filters.page ?? 1,
         limit: filters.limit ?? 10,
@@ -150,6 +203,7 @@ async function list(filters: FuelListFilters = {}): Promise<FuelListResult> {
       return {
         data: mapped,
         meta: { total: mapped.length, page: 1, limit: mapped.length || 10, totalPages: 1 },
+        summary: summarizeRows(mapped),
       };
     }
     const mapped = (data.data ?? []).map((row) => mapRow(row as unknown as ApiFuel));
@@ -157,6 +211,9 @@ async function list(filters: FuelListFilters = {}): Promise<FuelListResult> {
     return {
       data: mapped,
       meta: data.meta,
+      // Newer/sample APIs aggregate over the whole filtered register. Older
+      // backends remain compatible: their visible page is used as a fallback.
+      summary: mapSummary(data.summary, mapped),
     };
   } catch (err) {
     throwApiError(err);
