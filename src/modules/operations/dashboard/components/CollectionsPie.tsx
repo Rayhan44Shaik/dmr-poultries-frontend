@@ -209,11 +209,13 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
 
   return (
     <div className="flex w-full min-w-0 flex-1 flex-col">
-      {/* Big donut centred in the middle of the card — the stage fills the
-          space between the title and the legend (HDFC / Cash / Union sit
-          directly below it). */}
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4">
-        <div className="relative aspect-square w-full max-w-[310px] shrink-0" style={{ aspectRatio: "1 / 1" }}>
+      {/* The donut FILLS the card's free space: the stage wrapper takes
+          whatever height is left (title + legend aside) and the square
+          scene grows to the largest size that fits — no leftover white
+          space, on any card size. */}
+      <div className="flex min-h-0 flex-1 flex-col items-center gap-4">
+        <div className="flex min-h-0 w-full flex-1 items-center justify-center">
+          <div className="relative aspect-square max-h-full w-full" style={{ aspectRatio: "1 / 1" }}>
           {/* Soft background track behind the ring (same 74.24–107.5 band).
               SVG circle so it scales with the scene at every card width. */}
           <svg viewBox="0 0 400 400" className="absolute inset-0 h-full w-full" aria-hidden="true">
@@ -338,6 +340,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
               {formatINRCompact(animatedTotal)}
             </span>
           </div>
+        </div>
         </div>
 
       {/* Legend — every mode with exact amount and share, tight & staggered.
