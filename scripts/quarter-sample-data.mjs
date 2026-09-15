@@ -3286,15 +3286,15 @@ function generateSalaryMonth(month) {
   return { month, requested: employees.length, generated, skippedExisting: skipped };
 }
 
-// ── Staff: payslip PDF ─────────────────────────────────────────────────────
+// ── Printable document placeholders (payslips, permit scans) ───────────────
 
-/** Minimal, valid one-page A4 PDF with centred text lines (no dependencies). */
-function samplePdf(title, lines) {
+/** Minimal, valid one-page A4 PDF with stacked text lines (no dependencies). */
+function samplePdf(title, lines, subtitle = "Sample payslip - quarter sample data") {
   const esc = (s) => String(s).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
   const content = [
     "BT",
     "/F1 18 Tf 50 792 Td (DMR POULTRIES) Tj",
-    "/F1 10 Tf 0 -22 Td (Sample payslip - quarter sample data) Tj",
+    `/F1 10 Tf 0 -22 Td (${esc(subtitle)}) Tj`,
     `/F1 14 Tf 0 -34 Td (${esc(title)}) Tj`,
     ...lines.map((line, i) => `/F1 11 Tf 0 ${-24 - i * 18} Td (${esc(line)}) Tj`),
     "ET",
@@ -3318,6 +3318,98 @@ function samplePdf(title, lines) {
     offsets.map((o) => `${String(o).padStart(10, "0")} 00000 n \n`).join("") +
     `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
   return Buffer.from(pdf, "latin1");
+}
+
+// ── Trips: per-delivery dispatch (Email / WhatsApp) ────────────────────────
+//
+// Trip View shows one Email and one WhatsApp chip per shop delivery. The
+// status lives server-side so it survives a refresh; here it is kept in an
+// in-memory map keyed by `tripId:deliveryId:channel`, seeded lazily from the
+// deterministic dataset so completed trips already show a realistic mix of
+// sent / pending rows the first time a trip is opened.
+
+const DELIVERY_DISPATCH = new Map();
+
+const dispatchKey = (tripId, deliveryId, channel) => `${tripId}:${deliveryId}:${channel}`;
+
+/** Shop contact for a delivery, falling back to the shop master record. */
+function deliveryRecipient(delivery, channel) {
+  const shop = SHOP_BY_ID.get(Number(delivery.shopId));
+  if (channel === "email") return delivery.shopEmail ?? shop?.email ?? null;
+  return delivery.shopWhatsApp ?? shop?.whatsappNumber ?? shop?.phoneNumber ?? null;
+}
+
+/** Create (once) and return the stored dispatch state for one delivery. */
+function dispatchState(trip, delivery, channel) {
+  const key = dispatchKey(trip.id, delivery.id, channel);
+  const existing = DELIVERY_DISPATCH.get(key);
+  if (existing) return existing;
+
+  const recipient = deliveryRecipient(delivery, channel);
+  // Seed only finished trips, and only where a contact exists: ~2 of every 3
+  // eligible deliveries read as already sent, the rest stay pending so both
+  // states (and the "Send all" action) are visible on a fresh dataset.
+  const seedSent =
+    trip.status === "Completed" && Boolean(recipient) && (Number(delivery.id) + trip.id) % 3 !== 0;
+  const state = {
+    status: seedSent ? "sent" : "pending",
+    recipient: seedSent ? recipient : null,
+    sentAt: seedSent ? ts(trip.tripDate, "20:30:00") : null,
+    failureReason: null,
+    sendCount: seedSent ? 1 : 0,
+    attemptCount: seedSent ? 1 : 0,
+  };
+  DELIVERY_DISPATCH.set(key, state);
+  return state;
+}
+
+/** Full status list for one trip — the GET /delivery-emails|whatsapp payload. */
+function deliveryDispatchRows(trip, channel) {
+  return (trip.deliveries ?? []).map((delivery) => {
+    const state = dispatchState(trip, delivery, channel);
+    const contactKey = channel === "email" ? "shopEmail" : "shopWhatsApp";
+    return {
+      tripId: trip.id,
+      deliveryId: delivery.id,
+      shopId: delivery.shopId ?? null,
+      shopName: delivery.shopName ?? "",
+      deliveryNo: `${trip.tripNo}-S${pad2(delivery.serialNo ?? 0)}`,
+      [contactKey]: deliveryRecipient(delivery, channel),
+      status: state.status,
+      recipient: state.recipient,
+      sentAt: state.sentAt,
+      failureReason: state.failureReason,
+      sendCount: state.sendCount,
+      attemptCount: state.attemptCount,
+    };
+  });
+}
+
+/** Record one send attempt. Missing contact = a deterministic failure. */
+function recordDeliveryDispatch(trip, delivery, channel) {
+  const state = dispatchState(trip, delivery, channel);
+  const recipient = deliveryRecipient(delivery, channel);
+  state.attemptCount += 1;
+  if (!recipient) {
+    state.status = "failed";
+    state.failureReason =
+      channel === "email"
+        ? "No email address on the shop master record."
+        : "No WhatsApp number on the shop master record.";
+    return { success: false, status: state.status, message: state.failureReason, sendCount: state.sendCount, attemptCount: state.attemptCount };
+  }
+  state.status = "sent";
+  state.recipient = recipient;
+  state.sentAt = nowIso();
+  state.failureReason = null;
+  state.sendCount += 1;
+  return {
+    success: true,
+    status: state.status,
+    message: `Sent to ${recipient}.`,
+    sendCount: state.sendCount,
+    attemptCount: state.attemptCount,
+  };
 }
 
 // ── Trips: wizard writes ───────────────────────────────────────────────────
@@ -3884,6 +3976,26 @@ const server = http.createServer(async (req, res) => {
       const trip = mergeTripBody(m(/^\/api\/trips\/(\d+)\/diesel(\/[^/]+)?$/)[1], await readBody(req));
       return trip ? send(200, trip) : send(404, { error: "trip_not_found" });
     }
+    // Per-delivery dispatch status (Trip View → Email / WhatsApp columns).
+    // GET  /api/trips/:id/delivery-emails    | /delivery-whatsapp
+    // POST /api/trips/:id/deliveries/:d/email | /whatsapp
+    if (m(/^\/api\/trips\/(\d+)\/delivery-(emails|whatsapp)$/) && method === "GET") {
+      const [, rawTripId, channel] = m(/^\/api\/trips\/(\d+)\/delivery-(emails|whatsapp)$/);
+      const trip = TRIP_BY_ID.get(Number(rawTripId));
+      if (!trip) return send(404, { error: "trip_not_found" });
+      return send(200, deliveryDispatchRows(trip, channel === "emails" ? "email" : "whatsapp"));
+    }
+    if (m(/^\/api\/trips\/(\d+)\/deliveries\/(\d+)\/(email|whatsapp)$/) && method === "POST") {
+      const [, rawTripId, rawDeliveryId, channel] = m(
+        /^\/api\/trips\/(\d+)\/deliveries\/(\d+)\/(email|whatsapp)$/
+      );
+      await readBody(req);
+      const trip = TRIP_BY_ID.get(Number(rawTripId));
+      if (!trip) return send(404, { error: "trip_not_found" });
+      const delivery = (trip.deliveries ?? []).find((d) => Number(d.id) === Number(rawDeliveryId));
+      if (!delivery) return send(404, { error: "delivery_not_found" });
+      return send(200, recordDeliveryDispatch(trip, delivery, channel));
+    }
     // Status transition: PATCH /api/trips/:id/status
     if (m(/^\/api\/trips\/(\d+)\/status$/) && method === "PATCH") {
       const body = await readBody(req);
@@ -4082,9 +4194,14 @@ const server = http.createServer(async (req, res) => {
       // ~4.7k rows). Backends that ignore the filter are still handled: the
       // caller re-checks the status itself.
       const status = (q.get("status") || "").trim().toLowerCase();
+      // `includeDeleted=false` is sent explicitly by the register loader; the
+      // deleted rows only ever surface when it asks for them.
+      const includeDeleted = String(q.get("includeDeleted")) === "true";
+      const shopId = Number(q.get("shopId")) || 0;
       const rows = COLLECTIONS.filter(
         (c) =>
-          c.deleted !== true &&
+          (includeDeleted || c.deleted !== true) &&
+          (!shopId || c.shopId === shopId) &&
           inRange(c.collectionDate, q.get("fromDate"), q.get("toDate")) &&
           (!status || String(c.status || "").toLowerCase() === status)
       );
@@ -4220,7 +4337,10 @@ const server = http.createServer(async (req, res) => {
       const from = q.get("fromDate");
       const to = q.get("toDate");
       let rows = FUEL_EXPENSES.filter((f) => inRange(f.billDate, from, to));
+      if (q.get("vehicleId")) rows = rows.filter((f) => f.vehicleId === Number(q.get("vehicleId")));
       if (q.get("vehicleNo")) rows = rows.filter((f) => f.vehicleNo === q.get("vehicleNo"));
+      if (q.get("tripNo")) rows = rows.filter((f) => f.tripNo === q.get("tripNo"));
+      if (q.get("billNo")) rows = rows.filter((f) => f.billNo === q.get("billNo"));
       if (q.get("sourceType")) rows = rows.filter((f) => f.sourceType === q.get("sourceType"));
       if (q.get("status") && q.get("status") !== "All") rows = rows.filter((f) => f.status === q.get("status"));
       if (q.get("search")) {
@@ -4368,18 +4488,38 @@ const server = http.createServer(async (req, res) => {
 
     // ── Fleet ─────────────────────────────────────────────────────────────
     if (p === "/api/fleet/maintenance" && method === "GET") {
-      let rows = MAINTENANCE.filter((x) => !x.deleted && inRange(x.date.slice(0, 10), q.get("fromDate"), q.get("toDate")));
+      // The Maintenance History page asks for deleted rows explicitly (the
+      // "Deleted" / "all" status tabs); every other view wants them hidden.
+      const includeDeleted = String(q.get("includeDeleted")) === "true";
+      let rows = MAINTENANCE.filter(
+        (x) =>
+          (includeDeleted || !x.deleted) &&
+          inRange(x.date.slice(0, 10), q.get("fromDate"), q.get("toDate"))
+      );
       if (q.get("vehicleId")) rows = rows.filter((x) => x.vehicleId === Number(q.get("vehicleId")));
-      if (q.get("status")) rows = rows.filter((x) => x.paymentStatus === q.get("status"));
+      if (q.get("driverId")) rows = rows.filter((x) => x.driverId === Number(q.get("driverId")));
+      // The UI sends title-case statuses ("Approved"), the rows store
+      // lower-case ones — compare case-insensitively so neither side has to
+      // know about the other's casing.
+      const status = (q.get("status") || "").trim().toLowerCase();
+      if (status) rows = rows.filter((x) => String(x.paymentStatus || "").toLowerCase() === status);
+      if (q.get("search")) {
+        const needle = q.get("search").toLowerCase();
+        rows = rows.filter((x) =>
+          [x.billNo, x.vehicleNo, x.garage, x.mechanic, x.driverName, x.maintenanceType]
+            .some((field) => String(field ?? "").toLowerCase().includes(needle))
+        );
+      }
       if (String(q.get("latestApproved")) === "true") {
         const latest = new Map();
         for (const row of rows.filter((x) => x.paymentStatus === "approved")) {
-          const prev = latest.get(x.vehicleId);
-          if (!prev || String(prev.date) < String(row.date)) latest.set(x.vehicleId, row);
+          const prev = latest.get(row.vehicleId);
+          if (!prev || String(prev.date) < String(row.date)) latest.set(row.vehicleId, row);
         }
         rows = [...latest.values()];
       }
-      return send(200, rows);
+      rows = [...rows].sort((a, b) => String(b.date).localeCompare(String(a.date)));
+      return send(200, q.get("page") ? paginate(rows, q) : rows);
     }
     // Maintenance entry (multipart): create with bill/spare-part documents.
     if (p === "/api/fleet/maintenance" && method === "POST") {
@@ -4402,6 +4542,10 @@ const server = http.createServer(async (req, res) => {
       row.approvedAt = nowIso();
       row.updatedAt = nowIso();
       return send(200, row);
+    }
+    if (m(/^\/api\/fleet\/maintenance\/(\d+)$/) && method === "GET") {
+      const row = MAINTENANCE.find((x) => Number(x.id) === Number(m(/^\/api\/fleet\/maintenance\/(\d+)$/)[1]));
+      return row ? send(200, row) : send(404, { error: "not_found" });
     }
     if (m(/^\/api\/fleet\/maintenance\/(\d+)$/) && ["PUT", "PATCH"].includes(method)) {
       const row = MAINTENANCE.find((x) => Number(x.id) === Number(m(/^\/api\/fleet\/maintenance\/(\d+)$/)[1]));
@@ -4451,7 +4595,101 @@ const server = http.createServer(async (req, res) => {
       }
       return send(200, { total: PERMITS.length, byType });
     }
-    if (p === "/api/fleet/emis") return send(200, EMIS);
+    // Per-vehicle document record: GET / PUT (upsert) / DELETE, keyed by
+    // vehicleId + docType exactly like the Documents page calls it.
+    if (m(/^\/api\/fleet\/permits\/(\d+)\/([A-Za-z]+)$/)) {
+      const [, rawVehicleId, rawDocType] = m(/^\/api\/fleet\/permits\/(\d+)\/([A-Za-z]+)$/);
+      const vehicleId = Number(rawVehicleId);
+      const docType = rawDocType.toLowerCase();
+      const index = PERMITS.findIndex((x) => x.vehicleId === vehicleId && x.docType === docType);
+      const existing = index >= 0 ? PERMITS[index] : null;
+
+      if (method === "PUT") {
+        const isMultipart = String(req.headers["content-type"] ?? "").includes("multipart/form-data");
+        const { fields, documents } = isMultipart
+          ? await parseMultipart(req, req.headers["content-type"])
+          : { fields: await readBody(req), documents: [] };
+        const upload = documents[0] ?? null;
+        const removeDocument = String(fields.removeDocument ?? "") === "true";
+        const vehicle = VEHICLES.find((v) => v.id === vehicleId);
+        const row = {
+          ...(existing ?? {
+            id: PERMITS.length ? Math.max(...PERMITS.map((x) => x.id)) + 1 : 1,
+            createdAt: nowIso(),
+            createdBy: fields.createdBy ?? "web-user",
+          }),
+          vehicleId,
+          vehicleNo: vehicle?.vehicleNumber ?? existing?.vehicleNo ?? "",
+          docType,
+          documentNumber: fields.documentNumber ?? existing?.documentNumber ?? "",
+          validFrom: fields.validFrom ?? existing?.validFrom ?? null,
+          expiryDate: fields.expiryDate ?? existing?.expiryDate ?? TODAY,
+          remarks: fields.remarks ?? existing?.remarks ?? "",
+          updatedAt: nowIso(),
+        };
+        if (upload) {
+          Object.assign(row, {
+            hasDocument: true,
+            fileName: upload.fileName,
+            mimeType: upload.mimeType,
+            fileSize: upload.fileSize,
+          });
+        } else if (removeDocument) {
+          Object.assign(row, { hasDocument: false, fileName: null, mimeType: null, fileSize: null });
+        }
+        if (index >= 0) PERMITS[index] = row;
+        else PERMITS.push(row);
+        return send(index >= 0 ? 200 : 201, row);
+      }
+
+      if (method === "DELETE") {
+        if (index < 0) return send(404, { error: "not_found" });
+        PERMITS.splice(index, 1);
+        return send(200, { ok: true, deleted: true, sample: true });
+      }
+
+      return existing ? send(200, existing) : send(404, { error: "not_found" });
+    }
+    // Binary scan for <img> / <iframe> / download links. The sample dataset has
+    // no real scans, so a valid one-page PDF placeholder is streamed back and
+    // the viewer/download flows work end to end.
+    if (m(/^\/api\/fleet\/permits\/(\d+)\/([A-Za-z]+)\/document$/) && method === "GET") {
+      const [, rawVehicleId, rawDocType] = m(/^\/api\/fleet\/permits\/(\d+)\/([A-Za-z]+)\/document$/);
+      const row = PERMITS.find(
+        (x) => x.vehicleId === Number(rawVehicleId) && x.docType === rawDocType.toLowerCase()
+      );
+      if (!row || !row.hasDocument) return send(404, { error: "not_found" });
+      const pdf = samplePdf(
+        `${row.docType.toUpperCase()} - ${row.vehicleNo}`,
+        [
+          `Document No: ${row.documentNumber || "-"}`,
+          `Valid From: ${row.validFrom || "-"}`,
+          `Expiry Date: ${row.expiryDate || "-"}`,
+        ],
+        "Sample vehicle document - quarter sample data"
+      );
+      res.writeHead(200, {
+        "Content-Type": row.mimeType || "application/pdf",
+        "Content-Disposition": `inline; filename="${row.fileName || `${row.docType}.pdf`}"`,
+        "Access-Control-Allow-Origin": "*",
+      });
+      return res.end(pdf);
+    }
+    if (p === "/api/fleet/emis") {
+      const vehicleId = q.get("vehicleId");
+      const status = (q.get("status") || "").trim().toLowerCase();
+      let rows = EMIS;
+      if (vehicleId) rows = rows.filter((e) => e.vehicleId === Number(vehicleId));
+      if (status && status !== "all")
+        rows = rows.filter((e) => String(e.status || "").toLowerCase() === status);
+      if (q.get("search")) {
+        const needle = q.get("search").toLowerCase();
+        rows = rows.filter((e) =>
+          [e.vehicleNo, e.financeCompany].some((f) => String(f ?? "").toLowerCase().includes(needle))
+        );
+      }
+      return send(200, rows);
+    }
     if (m(/^\/api\/fleet\/emis\/(\d+)\/schedule$/)) {
       const id = Number(m(/^\/api\/fleet\/emis\/(\d+)\/schedule$/)[1]);
       const emi = EMIS.find((e) => e.id === id);
