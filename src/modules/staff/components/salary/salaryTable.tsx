@@ -1,14 +1,34 @@
 // src/modules/staff/components/salary/salaryTable.tsx
+//
+// The Salary Register master table, laid out in the SAME visual language as
+// the Trip List (`TripMasterTable`) and the Rate Entry masters:
+//   - one rounded-2xl card with a gradient header band and a 2D icon tile,
+//   - icon-led, colour-coded uppercase column headers,
+//   - 13px zebra rows with colour-coded money columns,
+//   - hover-animated row-action logos (view / email / WhatsApp).
+// Behaviour (row click → payslip view, selection, totals footer, pagination)
+// is unchanged.
 
-import { CheckCircle2, Eye, Lock, Mail } from "lucide-react";
+import type { ReactNode } from "react";
+import {
+  Calendar,
+  CheckCircle2,
+  CircleMinus,
+  Clock,
+  Eye,
+  IndianRupee,
+  Lock,
+  Mail,
+  Settings2,
+  ShieldCheck,
+  User,
+  UserCheck,
+  Wallet,
+} from "lucide-react";
 import { Pagination } from "../../../../ui";
 import { WhatsAppBrandIcon } from "../../../../ui/WhatsAppBrandIcon";
 import type { SalaryRecord } from "../../types/staffDashboard";
-import {
-  uiBadgeClass,
-  uiCheckClass,
-  uiTableWrapClass,
-} from "../../../../shared/ui/uiTokens";
+import { uiBadgeClass, uiCheckClass } from "../../../../shared/ui/uiTokens";
 
 /** Render "YYYY-MM-DD" (or ISO) as a readable "28 Sep 2026" string. */
 function formatDisplayDate(raw: string): string {
@@ -68,6 +88,28 @@ function StatusBadge({ record }: { record: SalaryRecord }) {
   );
 }
 
+/** Icon-led column header content — the Trip List column-header format. */
+function ColHead({
+  icon,
+  label,
+  center = false,
+  right = false,
+}: {
+  icon?: ReactNode;
+  label: string;
+  center?: boolean;
+  right?: boolean;
+}) {
+  return (
+    <div className={`flex items-center gap-1.5 ${center ? "justify-center" : right ? "justify-end" : ""}`}>
+      {icon}
+      <span>{label}</span>
+    </div>
+  );
+}
+
+const TH_CLASS = "px-4 py-4 text-[12px] font-bold uppercase tracking-wider whitespace-nowrap";
+
 export function SalaryTable({
   records,
   currentPage,
@@ -123,95 +165,124 @@ export function SalaryTable({
   }
 
   return (
-    <div className={uiTableWrapClass}>
-      {/* Table title — "Salary Register — <month>" above the employee columns */}
-      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 border-b border-slate-200 bg-slate-50 px-4 py-2.5">
-        <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
-          <h3 className="text-sm font-bold tracking-tight text-slate-800 whitespace-nowrap">
-            Salary Register
-            {monthLabel ? <span className="font-semibold text-slate-700"> — {monthLabel}</span> : null}
-          </h3>
-          {paidOnDate && (
-            <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-emerald-700 tabular-nums">
-              <CheckCircle2 size={12} />
-              Paid on {formatDisplayDate(paidOnDate)}
-            </span>
-          )}
+    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden text-xs md:text-sm">
+      {/* Header band — icon tile + title, the Trip List card-header treatment */}
+      <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-emerald-50/60 via-white to-emerald-50/40">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="h-9 w-9 rounded-xl bg-emerald-50/70 border border-emerald-100 flex items-center justify-center text-emerald-500 shadow-inner">
+            <Wallet className="w-5 h-5" />
+          </div>
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
+            <h3 className="text-base font-bold text-slate-800 tracking-tight whitespace-nowrap">
+              Salary Register
+              {monthLabel ? <span className="font-semibold text-slate-600"> — {monthLabel}</span> : null}
+            </h3>
+            {paidOnDate && (
+              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 tabular-nums">
+                <CheckCircle2 size={12} />
+                Paid on {formatDisplayDate(paidOnDate)}
+              </span>
+            )}
+          </div>
         </div>
-        <span className="shrink-0 text-[11px] font-medium text-slate-500 tabular-nums">
+        <span className="shrink-0 text-[11px] font-semibold text-slate-500 tabular-nums">
           {records.length} employee{records.length === 1 ? "" : "s"}
         </span>
       </div>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-full table-fixed border-separate border-spacing-0">
-          <thead className="bg-slate-50">
-            <tr>
+
+      <div className="w-full overflow-x-auto">
+        <table className="min-w-full text-[13px] text-left border-collapse">
+          <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-600">
+            <tr className="whitespace-nowrap">
               {selectable && (
-              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-left">
-                <input
-                  type="checkbox"
-                  aria-label="Select all visible salaries"
-                  checked={allPageSelected}
-                  ref={(el) => {
-                    if (el) el.indeterminate = somePageSelected && !allPageSelected;
-                  }}
-                  disabled={saving}
-                  onChange={() => onToggleSelectAll?.(pageIds)}
-                  className={uiCheckClass + " disabled:opacity-50"}
-                />
-              </th>
+                <th className="px-4 py-4 text-left w-10">
+                  <input
+                    type="checkbox"
+                    aria-label="Select all visible salaries"
+                    checked={allPageSelected}
+                    ref={(el) => {
+                      if (el) el.indeterminate = somePageSelected && !allPageSelected;
+                    }}
+                    disabled={saving}
+                    onChange={() => onToggleSelectAll?.(pageIds)}
+                    className={uiCheckClass + " disabled:opacity-50"}
+                  />
+                </th>
               )}
-              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Employee</th>
-              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Working</th>
-              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Present</th>
-              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Leave</th>
-              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Basic</th>
-              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Deductions</th>
-              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-right text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Net</th>
-              <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-left text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Status</th>
+              <th className={`${TH_CLASS} text-center w-10`}>#</th>
+              <th className={`${TH_CLASS} text-left`}>
+                <ColHead icon={<User size={14} className="text-emerald-500 flex-shrink-0" />} label="Employee" />
+              </th>
+              <th className={`${TH_CLASS} text-right`}>
+                <ColHead right icon={<Calendar size={14} className="text-blue-500 flex-shrink-0" />} label="Working" />
+              </th>
+              <th className={`${TH_CLASS} text-right`}>
+                <ColHead right icon={<UserCheck size={14} className="text-cyan-500 flex-shrink-0" />} label="Present" />
+              </th>
+              <th className={`${TH_CLASS} text-right`}>
+                <ColHead right icon={<Clock size={14} className="text-amber-500 flex-shrink-0" />} label="Leave" />
+              </th>
+              <th className={`${TH_CLASS} text-right`}>
+                <ColHead right icon={<Wallet size={14} className="text-indigo-500 flex-shrink-0" />} label="Basic" />
+              </th>
+              <th className={`${TH_CLASS} text-right`}>
+                <ColHead right icon={<CircleMinus size={14} className="text-rose-500 flex-shrink-0" />} label="Deductions" />
+              </th>
+              <th className={`${TH_CLASS} text-right`}>
+                <ColHead right icon={<IndianRupee size={14} className="text-emerald-600 flex-shrink-0" />} label="Net" />
+              </th>
+              <th className={`${TH_CLASS} text-left`}>
+                <ColHead icon={<ShieldCheck size={14} className="text-purple-500 flex-shrink-0" />} label="Status" />
+              </th>
               {hasRowActions && (
-                <th className="sticky top-0 bg-slate-50 px-3 py-2.5 text-center text-[11px] font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">Actions</th>
+                <th className={`${TH_CLASS} text-center`}>
+                  <ColHead center icon={<Settings2 size={14} className="text-slate-400 flex-shrink-0" />} label="Actions" />
+                </th>
               )}
             </tr>
           </thead>
-          <tbody>
-            {currentRecords.map((record) => {
+          <tbody className="divide-y divide-slate-100">
+            {currentRecords.map((record, index) => {
               const windowOpen =
                 record.status === "Paid" &&
                 record.correctionWindowDaysRemaining != null &&
                 record.correctionWindowDaysRemaining > 0;
+              const serialNo = startIndex + index + 1;
 
               return (
                 <tr
                   key={record.id}
                   onClick={() => onView(record)}
-                  className="border-t border-slate-100 hover:bg-slate-50/80 transition-colors cursor-pointer"
+                  className={`cursor-pointer transition-colors duration-150 hover:bg-slate-50/60 ${
+                    index % 2 === 0 ? "bg-white" : "bg-slate-50/20"
+                  }`}
                 >
                   {selectable && (
-                  <td className="px-3 py-2.5" onClick={(e) => e.stopPropagation()}>
-                    <input
-                      type="checkbox"
-                      aria-label={`Select ${record.employeeName}`}
-                      checked={selectedIds!.has(record.id)}
-                      disabled={saving}
-                      onChange={() => onToggleSelect?.(record.id)}
-                      className={uiCheckClass + " disabled:opacity-50"}
-                    />
-                  </td>
+                    <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                      <input
+                        type="checkbox"
+                        aria-label={`Select ${record.employeeName}`}
+                        checked={selectedIds!.has(record.id)}
+                        disabled={saving}
+                        onChange={() => onToggleSelect?.(record.id)}
+                        className={uiCheckClass + " disabled:opacity-50"}
+                      />
+                    </td>
                   )}
-                  <td className="px-3 py-2.5 min-w-0">
-                    <div className="truncate text-sm font-semibold text-slate-800">{record.employeeName}</div>
+                  <td className="px-4 py-4 text-center text-[13px] text-slate-500 font-medium w-10">{serialNo}</td>
+                  <td className="px-4 py-4 min-w-0">
+                    <div className="truncate text-[13px] font-bold text-slate-800">{record.employeeName}</div>
                     {record.department ? (
-                      <div className="truncate text-[11px] text-slate-500 mt-0.5">{record.department}</div>
+                      <div className="truncate text-[11px] font-medium text-slate-500 mt-0.5">{record.department}</div>
                     ) : null}
                   </td>
-                  <td className="px-3 py-2.5 text-right text-sm tabular-nums text-slate-700 whitespace-nowrap">{record.workingDays ?? "—"}</td>
-                  <td className="px-3 py-2.5 text-right text-sm tabular-nums text-slate-700 whitespace-nowrap">{record.presentDays ?? "—"}</td>
-                  <td className="px-3 py-2.5 text-right text-sm tabular-nums text-slate-700 whitespace-nowrap">{record.leaveDays ?? "—"}</td>
-                  <td className="px-3 py-2.5 text-right text-sm tabular-nums text-slate-700 whitespace-nowrap">{formatVal(record.basicSalary)}</td>
-                  <td className="px-3 py-2.5 text-right text-sm tabular-nums text-rose-600 whitespace-nowrap">{formatVal(record.totalDeductions)}</td>
-                  <td className="px-3 py-2.5 text-right text-sm tabular-nums font-semibold text-slate-900 whitespace-nowrap">{formatVal(record.netSalary)}</td>
-                  <td className="px-3 py-2.5 whitespace-nowrap">
+                  <td className="px-4 py-4 text-right text-[13px] font-medium tabular-nums text-slate-600 whitespace-nowrap">{record.workingDays ?? "—"}</td>
+                  <td className="px-4 py-4 text-right text-[13px] font-medium tabular-nums text-slate-600 whitespace-nowrap">{record.presentDays ?? "—"}</td>
+                  <td className="px-4 py-4 text-right text-[13px] font-medium tabular-nums text-amber-600 whitespace-nowrap">{record.leaveDays ?? "—"}</td>
+                  <td className="px-4 py-4 text-right text-[13px] font-medium tabular-nums text-slate-700 whitespace-nowrap">{formatVal(record.basicSalary)}</td>
+                  <td className="px-4 py-4 text-right text-[13px] font-bold tabular-nums text-rose-600 whitespace-nowrap">{formatVal(record.totalDeductions)}</td>
+                  <td className="px-4 py-4 text-right text-[13px] font-bold tabular-nums text-emerald-700 whitespace-nowrap">{formatVal(record.netSalary)}</td>
+                  <td className="px-4 py-4 whitespace-nowrap">
                     <StatusBadge record={record} />
                     {record.status === "Paid" && windowOpen && (
                       <span className="ml-1 text-[10px] text-amber-600">
@@ -221,39 +292,39 @@ export function SalaryTable({
                   </td>
                   {hasRowActions && (
                     <td
-                      className="px-3 py-2.5 text-center"
+                      className="px-4 py-4 text-center"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex items-center justify-center gap-1.5">
                         <button
                           type="button"
-                                          aria-label={`View payslip for ${record.employeeName}`}
+                          aria-label={`View payslip for ${record.employeeName}`}
                           onClick={() => onView(record)}
-                          className="inline-flex h-7 items-center justify-center rounded-lg border border-slate-200 bg-white px-1.5 text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:opacity-40"
+                          className="group inline-flex h-7 items-center justify-center rounded-lg border border-violet-200 bg-white px-1.5 text-violet-500 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-40"
                         >
-                          <Eye size={13} />
+                          <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]"><Eye size={13} /></span>
                         </button>
                         {onEmail && (
                           <button
                             type="button"
-                                            aria-label={`Email payslip to ${record.employeeName}`}
+                            aria-label={`Email payslip to ${record.employeeName}`}
                             onClick={() => onEmail(record)}
                             disabled={saving}
-                            className="inline-flex h-7 items-center gap-1 rounded-lg border border-slate-200 bg-white px-1.5 text-slate-500 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 disabled:opacity-40"
+                            className="group inline-flex h-7 items-center gap-1 rounded-lg border border-slate-200 bg-white px-1.5 text-slate-500 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 disabled:opacity-40"
                           >
-                            <Mail size={13} />
+                            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-mail)]"><Mail size={13} /></span>
                             <span className="text-[10px] font-bold tabular-nums">{record.emailsSent ?? 0}</span>
                           </button>
                         )}
                         {onWhatsApp && (
                           <button
                             type="button"
-                                            aria-label={`WhatsApp payslip to ${record.employeeName}`}
+                            aria-label={`WhatsApp payslip to ${record.employeeName}`}
                             onClick={() => onWhatsApp(record)}
                             disabled={saving}
-                            className="inline-flex h-7 items-center gap-1 rounded-lg bg-[#25D366]/15 px-1.5 text-[#1DA851] transition hover:bg-[#25D366] hover:text-white disabled:opacity-40"
+                            className="group inline-flex h-7 items-center gap-1 rounded-lg bg-[#25D366]/15 px-1.5 text-[#1DA851] transition hover:bg-[#25D366] hover:text-white disabled:opacity-40"
                           >
-                            <WhatsAppBrandIcon size={13} />
+                            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-whatsapp)]"><WhatsAppBrandIcon size={13} /></span>
                             <span className="text-[10px] font-bold tabular-nums">{record.whatsappsSent ?? 0}</span>
                           </button>
                         )}
@@ -266,18 +337,19 @@ export function SalaryTable({
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-slate-200 bg-slate-50">
-              {selectable && <td className="px-3 py-2.5" />}
-              <td className="px-3 py-2.5 text-sm font-bold text-slate-800 whitespace-nowrap">Total ({footer.count})</td>
-              <td className="px-3 py-2.5 text-right text-sm tabular-nums font-semibold text-slate-800 whitespace-nowrap">{footer.workingDays}</td>
-              <td className="px-3 py-2.5 text-right text-sm tabular-nums font-semibold text-slate-800 whitespace-nowrap">{footer.presentDays}</td>
-              <td className="px-3 py-2.5 text-right text-sm tabular-nums font-semibold text-slate-800 whitespace-nowrap">{footer.leaveDays}</td>
-              <td className="px-3 py-2.5 text-right text-sm tabular-nums font-semibold text-slate-800 whitespace-nowrap">{formatVal(footer.basicSalary)}</td>
-              <td className="px-3 py-2.5 text-right text-sm tabular-nums font-semibold text-rose-700 whitespace-nowrap">{formatVal(footer.totalDeductions)}</td>
-              <td className="px-3 py-2.5 text-right text-sm tabular-nums font-bold text-slate-900 whitespace-nowrap">{formatVal(footer.netSalary)}</td>
-              <td className="px-3 py-2.5 text-sm tabular-nums text-slate-600 whitespace-nowrap">
+              {selectable && <td className="px-4 py-4" />}
+              <td className="px-4 py-4" />
+              <td className="px-4 py-4 text-[13px] font-bold text-slate-800 whitespace-nowrap">Total ({footer.count})</td>
+              <td className="px-4 py-4 text-right text-[13px] tabular-nums font-bold text-slate-700 whitespace-nowrap">{footer.workingDays}</td>
+              <td className="px-4 py-4 text-right text-[13px] tabular-nums font-bold text-slate-700 whitespace-nowrap">{footer.presentDays}</td>
+              <td className="px-4 py-4 text-right text-[13px] tabular-nums font-bold text-amber-700 whitespace-nowrap">{footer.leaveDays}</td>
+              <td className="px-4 py-4 text-right text-[13px] tabular-nums font-bold text-slate-700 whitespace-nowrap">{formatVal(footer.basicSalary)}</td>
+              <td className="px-4 py-4 text-right text-[13px] tabular-nums font-bold text-rose-700 whitespace-nowrap">{formatVal(footer.totalDeductions)}</td>
+              <td className="px-4 py-4 text-right text-[13px] tabular-nums font-bold text-emerald-700 whitespace-nowrap">{formatVal(footer.netSalary)}</td>
+              <td className="px-4 py-4 text-[12px] tabular-nums font-semibold text-slate-600 whitespace-nowrap">
                 {footer.pending} Pending · {footer.submitted} Submitted · {footer.paid} Paid
               </td>
-              {hasRowActions && <td className="px-3 py-2.5" />}
+              {hasRowActions && <td className="px-4 py-4" />}
             </tr>
           </tfoot>
         </table>

@@ -38,10 +38,11 @@ import {
   RotateCcw,
   Search,
   UserRound,
+  Wallet,
 } from "lucide-react";
 import { BrandRefreshButton, Button, ConfirmDialog, EmptyState } from "../../../ui";
 import MasterDropdown from "../../masters/components/MasterDropdown";
-import { uiBadgeClass, type StatusTone } from "../../../shared/ui/uiTokens";
+import { uiBadgeClass, uiButton, type StatusTone } from "../../../shared/ui/uiTokens";
 import {
   opsFilterCardClass,
   opsFilterLabelClass,
@@ -528,9 +529,12 @@ function SalaryRegisterPage() {
 
   return (
     <div className="space-y-4 w-full">
-      {/* Header */}
+      {/* Header — icon tile + title, the same treatment as the Trip List card header */}
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex min-w-0 items-center gap-3">
+          <div className="h-9 w-9 rounded-xl bg-emerald-50/70 border border-emerald-100 flex items-center justify-center text-emerald-500 shadow-inner">
+            <Wallet className="w-5 h-5" />
+          </div>
           <h1 className="text-xl font-semibold tracking-tight text-slate-900">
             Salary Register
           </h1>
@@ -760,15 +764,15 @@ function SalaryRegisterPage() {
               {t("common.reset")}
             </button>
             <BrandRefreshButton onClick={handleRefresh} loading={refreshing} disabled={saving} />
-            <Button
-              variant="success"
-              size="md"
+            <button
+              type="button"
               onClick={() => setSubmitMonthOpen(true)}
               disabled={saving || refreshing || allRecords.length === 0}
-              icon={<ClipboardCheck size={15} />}
+              className={`group relative ${uiButton("success", "md")}`}
             >
+              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-approve)]"><ClipboardCheck size={15} /></span>
               Review and Submit
-            </Button>
+            </button>
           </div>
         </div>
       </div>

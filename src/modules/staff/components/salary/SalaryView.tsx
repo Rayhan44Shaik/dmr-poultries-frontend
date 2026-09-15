@@ -64,6 +64,7 @@ export function SalaryView({
       isOpen
       onClose={onClose}
       size="xl"
+      overlayClassName="backdrop-blur-none bg-black/20"
       aria-label={`Payslip — ${record.employeeName}`}
       title={`Payslip — ${record.employeeName}`}
       description={`${monthLabel}${record.employeeId != null ? ` · Employee #${record.employeeId}` : ""}`}
