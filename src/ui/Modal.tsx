@@ -189,11 +189,15 @@ export function Modal({
               <button
                 type="button"
                 onClick={onClose}
-                className={uiDialogCloseClass}
+                className={`group ${uiDialogCloseClass}`}
                 aria-label="Close dialog"
                 title="Close dialog"
               >
-                <X aria-hidden="true" />
+                {/* The X plays the shared dismiss twist on hover — the same
+                    action-glyph language as the toolbar Reset / PDF buttons. */}
+                <span className="inline-flex group-hover:animate-[var(--animate-action-close)]">
+                  <X aria-hidden="true" />
+                </span>
               </button>
             ) : null}
           </div>
