@@ -19,7 +19,6 @@ import {
   CalendarDays,
   CalendarRange,
   ChevronDown,
-  DatabaseZap,
   Layers,
   ArrowRightLeft,
   ArrowUpRight,
@@ -32,8 +31,8 @@ import { getQuarterSampleInfo, type SampleQuarter } from "../../../../sample/qua
 import { kickApprovalSnapshot } from "../../../approvals/services/approvalSnapshot";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 
-// -------- Helper: render a sample-dataset YYYY-MM-DD as "12 Sep 2026" --------
-const formatSampleDate = (value: string, locale = "en-IN"): string => {
+// -------- Helper: render a dashboard date as "12 Sep 2026" --------
+const formatDashboardDate = (value: string, locale = "en-IN"): string => {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
   const date = new Date(`${value}T00:00:00`);
   return Number.isNaN(date.getTime())
@@ -429,9 +428,9 @@ const GRANULARITY_BY_VIEW: Record<TrendPreset, Granularity> = {
 /** "6 Sep – 12 Sep 2026", or a single day when the window is one day. */
 const windowLabel = (from: string, to: string, locale = "en-IN"): string => {
   if (!from || !to) return "";
-  if (from === to) return formatSampleDate(from, locale);
-  const start = formatSampleDate(from, locale);
-  const end = formatSampleDate(to, locale);
+  if (from === to) return formatDashboardDate(from, locale);
+  const start = formatDashboardDate(from, locale);
+  const end = formatDashboardDate(to, locale);
   return from.slice(0, 4) === to.slice(0, 4)
     ? `${start.replace(/\s*\d{4}$/, "")} – ${end}`
     : `${start} – ${end}`;
@@ -728,38 +727,9 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
     </>
   );
 
-  const sampleBanner = dashboardQuarter ? (
-    <div
-      role="status"
-      className="flex flex-col gap-2 rounded-2xl border border-sky-200/80 bg-gradient-to-r from-sky-50 via-white to-emerald-50/70 px-4 py-3 shadow-sm sm:flex-row sm:items-center sm:justify-between"
-    >
-      <div className="flex min-w-0 items-start gap-3">
-        <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white text-sky-600 shadow-sm ring-1 ring-inset ring-sky-200">
-          <DatabaseZap size={16} />
-        </span>
-        <div className="min-w-0">
-          <p className="text-xs font-black uppercase tracking-[0.12em] text-sky-700">
-            {t("ops.dashboard.sample_data")}
-          </p>
-          <p className="mt-0.5 truncate text-sm font-bold text-slate-700">
-            {t("ops.dashboard.sample_data_window", {
-              label: dashboardQuarter.label,
-              from: formatSampleDate(dashboardQuarter.fromDate, trendLocale),
-              to: formatSampleDate(dashboardQuarter.toDate, trendLocale),
-            })}
-          </p>
-        </div>
-      </div>
-      <p className="max-w-xl text-xs font-medium leading-relaxed text-slate-500 sm:text-right">
-        {t("ops.dashboard.sample_data_hint")}
-      </p>
-    </div>
-  ) : null;
-
   if (!isRangeSelected) {
     return (
       <div className={`min-w-0 space-y-4 ${embedded ? "" : "p-4 sm:p-5 lg:p-6"}`}>
-        {sampleBanner}
         <PendingApprovalsPanel
           actions={headerActions}
         />
@@ -781,7 +751,6 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   if (isLoading) {
     return (
       <div className={`min-w-0 space-y-5 ${embedded ? "" : "p-4 sm:p-5 lg:p-6"}`}>
-        {sampleBanner}
         <PendingApprovalsPanel
           actions={headerActions}
         />
@@ -801,7 +770,6 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   if (error) {
     return (
       <div className={`min-w-0 space-y-4 ${embedded ? "" : "p-4 sm:p-5 lg:p-6"}`}>
-        {sampleBanner}
         <PendingApprovalsPanel
           actions={headerActions}
         />
@@ -822,7 +790,6 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   return (
     <div className={`min-w-0 space-y-5 ${embedded ? "" : "p-4 sm:p-5 lg:p-6"}`}>
       {/* Pending-approval KPIs and date-range filter on one slim row. */}
-      {sampleBanner}
       <PendingApprovalsPanel
         actions={headerActions}
       />
@@ -885,12 +852,9 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
           </div>
         </div>
         
-        {/* No overflow-hidden on the card itself (same structure as the
-            Trips card): the donut is bounded by its own flex stage
-            (flex-1 + min-h-0 + max-h-full), so nothing can bleed — and
-            the shrink-0 KPI strip below the chart can never be clipped.
-            It always shows, fully, whether the space is reduced or
-            increased. */}
+        {/* No overflow-hidden on the card itself: the donut and its
+            shrink-0 KPI panel share one responsive stage, so the values stay
+            visible beside the chart without clipping. */}
         <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-5 w-full min-w-0 xl:h-[530px]">
           <Link
             to="/operations?tab=collection-report"
