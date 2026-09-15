@@ -1,4 +1,4 @@
-import { Wallet, ShoppingCart, Download, Calculator, Clock, ArrowRight, AlertTriangle } from "lucide-react";
+import { Wallet, ShoppingCart, Download, Calculator, ArrowRight, AlertTriangle, Hourglass } from "lucide-react";
 import { useI18n } from "../../../../../i18n";
 
 interface OutstandingSummaryProps {
@@ -12,7 +12,24 @@ interface OutstandingSummaryProps {
   shopName?: string;
   periodLabel: string;
   periodType: "daily" | "weekly";
+  /** Last day of the previous week — dates the carried-forward opening balance. */
+  previousWeekEnd?: string;
+  /** Sales awaiting approval this week. Context only — never part of the balance. */
+  pendingSales?: number;
+  /** Row counts behind each amount, so the figures are auditable at a glance. */
+  salesCount?: number;
+  approvedCollectionsCount?: number;
+  pendingCollectionsCount?: number;
+  /** This week's own boundaries, used to label the in-week rows. */
+  weekStart?: string;
+  weekEnd?: string;
 }
+
+/** YYYY-MM-DD → DD-MM-YYYY, matching the date format used across Operations. */
+const fmtDate = (iso: string) => {
+  const [y, m, d] = String(iso).split("-");
+  return y && m && d ? `${d}-${m}-${y}` : String(iso);
+};
 
 const inr = (n: number) =>
   "₹ " + Number(n || 0).toLocaleString("en-IN", {
@@ -42,19 +59,19 @@ function Row({ title, value, iconBg, iconColor, icon, subtitle, isPositive, isNe
     : "text-slate-800";
 
   return (
-    <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all hover:shadow-md">
-      <div className="flex items-center gap-3">
-        <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${iconBg} ${iconColor}`}>
+    <div className="flex items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm transition-all hover:shadow-md">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${iconBg} ${iconColor}`}>
           {icon}
         </div>
-        <div>
+        <div className="min-w-0">
           <span className="text-sm font-medium text-slate-700">{title}</span>
           {subtitle && (
             <div className="text-[10px] text-slate-400 mt-0.5">{subtitle}</div>
           )}
         </div>
       </div>
-      <span className={`text-base font-bold tabular-nums ${valueColor}`}>
+      <span className={`shrink-0 text-base font-bold tabular-nums ${valueColor}`}>
         {inr(value)}
       </span>
     </div>
@@ -72,6 +89,13 @@ export default function OutstandingSummary({
   shopName,
   periodLabel,
   periodType,
+  previousWeekEnd,
+  pendingSales = 0,
+  salesCount = 0,
+  approvedCollectionsCount = 0,
+  pendingCollectionsCount = 0,
+  weekStart,
+  weekEnd,
 }: OutstandingSummaryProps) {
   const { t } = useI18n();
 
@@ -83,8 +107,16 @@ export default function OutstandingSummary({
 
   const periodSubtitle = periodLabel || (periodType === "weekly" ? t("ops.collection.mon_sun_week") : t("ops.collection.daily_period"));
 
+  // "12 Sep 2026 - 18 Sep 2026" style range for the rows that are scoped to
+  // this week, so Opening (before the week) and the in-week rows read as
+  // clearly different periods rather than one undifferentiated list.
+  const weekRange = ledgerLoaded && weekStart && weekEnd ? `${fmtDate(weekStart)} to ${fmtDate(weekEnd)}` : "";
+  const inWeekSubtitle = weekRange || periodSubtitle;
+  const countLabel = (count: number, subtitle: string) =>
+    ledgerLoaded && count > 0 ? `${subtitle} - ${count} ${count === 1 ? "entry" : "entries"}` : subtitle;
+
   return (
-    <div className="h-full w-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="flex h-full w-full flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       {/* Header section */}
       <div className="mb-5 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5">
@@ -105,15 +137,27 @@ export default function OutstandingSummary({
         {periodSubtitle}
       </div>
 
-      {/* Financial rows */}
-      <div className="space-y-3 animate-in fade-in duration-500">
+      {/* Financial rows sit on one even gap-2.5 rhythm. They are deliberately
+        * NOT stretched to fill the card: pushing the total to the bottom left a
+        * large dead gap above Current Outstanding. The card still matches its
+        * neighbour's height via the page grid's items-stretch. */}
+      <div className="flex flex-col gap-2.5 animate-in fade-in duration-500">
+        {/* Opening Balance is last week's CLOSING balance, carried forward.
+          * When the backend supplies the previous week's end date we show it,
+          * so the figure is traceable to a specific closing day. */}
         <Row
           title={t("ops.collection.opening_balance")}
           value={displayOpeningBalance}
           iconBg="bg-violet-100"
           iconColor="text-violet-600"
           icon={<Wallet size={18} />}
-          subtitle={periodType === "weekly" ? t("ops.collection.brought_forward_week") : t("ops.collection.brought_forward_day")}
+          subtitle={
+            periodType === "weekly"
+              ? ledgerLoaded && previousWeekEnd
+                ? `${t("ops.collection.brought_forward_week")} (${fmtDate(previousWeekEnd)})`
+                : t("ops.collection.brought_forward_week")
+              : t("ops.collection.brought_forward_day")
+          }
         />
         <Row
           title={t("ops.collection.approved_sales")}
@@ -121,20 +165,33 @@ export default function OutstandingSummary({
           iconBg="bg-blue-100"
           iconColor="text-blue-600"
           icon={<ShoppingCart size={18} />}
-          subtitle={periodSubtitle}
+          subtitle={countLabel(salesCount, inWeekSubtitle)}
           isPositive
         />
+        {/* Sales still awaiting approval. Rendered only when some exist, so
+          * the panel stays compact in the common all-approved case. */}
+        {ledgerLoaded && pendingSales > 0 && (
+          <Row
+            title={t("ops.collection.pending_sales")}
+            value={pendingSales}
+            iconBg="bg-orange-100"
+            iconColor="text-orange-600"
+            icon={<Hourglass size={18} />}
+            subtitle={t("ops.collection.informational_only")}
+            isInfo
+          />
+        )}
         <Row
           title={t("ops.collection.approved_collections")}
           value={displayApprovedCollections}
           iconBg="bg-green-100"
           iconColor="text-green-600"
           icon={<Download size={18} />}
-          subtitle={periodSubtitle}
+          subtitle={countLabel(approvedCollectionsCount, inWeekSubtitle)}
           isNegative
         />
 
-        <div className="my-2 border-t border-dashed border-slate-200" />
+        <div className="border-t border-dashed border-slate-200" />
 
         <Row
           title={t("operations.pending_approval")}
@@ -142,18 +199,21 @@ export default function OutstandingSummary({
           iconBg="bg-amber-100"
           iconColor="text-amber-700"
           icon={<AlertTriangle size={18} />}
-          subtitle={t("ops.collection.informational_only")}
+          subtitle={countLabel(pendingCollectionsCount, t("ops.collection.informational_only"))}
           isInfo
         />
 
-        <div className="my-3 border-t border-dashed border-slate-200" />
+        <div className="border-t border-dashed border-slate-200" />
 
-        <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 shadow-sm">
-          <div className="flex items-center gap-3">
-            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm">
-              <Calculator size={20} />
+        {/* Current Outstanding uses the same row geometry as the rows above
+          * (h-10 icon tile, px-4 py-3) so the column reads as one consistent
+          * list; only the colour weight marks it as the total. */}
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm">
+          <div className="flex min-w-0 items-center gap-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm">
+              <Calculator size={18} />
             </div>
-            <div className="flex flex-col">
+            <div className="flex min-w-0 flex-col">
               <span className="text-sm font-bold text-slate-800">
                 {t("ops.collection.current_outstanding")}
               </span>
@@ -162,14 +222,14 @@ export default function OutstandingSummary({
               </span>
             </div>
           </div>
-          <span className="text-xl font-extrabold tabular-nums text-emerald-700">
+          <span className="shrink-0 text-base font-extrabold tabular-nums text-emerald-700">
             {inr(displayCurrentOutstanding)}
           </span>
         </div>
 
         {/* Calculation hint */}
         {ledgerLoaded && showSummary && (
-          <div className="mt-3 pt-3 border-t border-dashed border-slate-200 text-xs text-slate-500">
+          <div className="pt-3 border-t border-dashed border-slate-200 text-xs text-slate-500">
             <div className="flex items-center gap-1.5 text-violet-600">
               <ArrowRight size={12} />
               <span>{t("ops.collection.calculation_hint")}</span>

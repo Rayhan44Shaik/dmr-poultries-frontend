@@ -339,6 +339,154 @@ async function run() {
   assert.equal(restoredFuel.fuelExpenses, beforeFuel.fuelExpenses);
   assert.equal(restoredFuel.totalExpenses, beforeFuel.totalExpenses);
 
+  // ── Fleet → Maintenance History ───────────────────────────────────────────
+  // The page drives four distinct queries off one endpoint. Each filter must
+  // actually narrow the rows, otherwise every tab renders the same list.
+  const allMaintenance = await request("/fleet/maintenance");
+  assert.ok(allMaintenance.length > 100);
+  assert.ok(
+    allMaintenance.every((row) => !row.deleted),
+    "the default maintenance list must hide soft-deleted rows",
+  );
+  const approvedMaintenance = await request("/fleet/maintenance?status=Approved&limit=500");
+  assert.ok(approvedMaintenance.length > 0, "the Approved tab sends title-case status and must match");
+  assert.ok(approvedMaintenance.every((row) => row.paymentStatus === "approved"));
+  const latestApproved = await request("/fleet/maintenance?status=Approved&latestApproved=true&limit=500");
+  assert.ok(latestApproved.length > 0 && latestApproved.length < approvedMaintenance.length);
+  assert.equal(
+    new Set(latestApproved.map((row) => row.vehicleId)).size,
+    latestApproved.length,
+    "latestApproved must return at most one record per vehicle",
+  );
+  const maintenanceDetail = await request(`/fleet/maintenance/${allMaintenance[0].id}`);
+  assert.equal(maintenanceDetail.id, allMaintenance[0].id);
+
+  // ── Fleet → Documents (permits) ───────────────────────────────────────────
+  // Records are addressed by vehicleId + docType, and the viewer streams the
+  // scan binary rather than JSON.
+  const permits = await request("/fleet/permits");
+  const permitWithScan = permits.find((row) => row.hasDocument);
+  assert.ok(permitWithScan, "expected at least one permit carrying a scan");
+  const permitDetail = await request(`/fleet/permits/${permitWithScan.vehicleId}/${permitWithScan.docType}`);
+  assert.equal(permitDetail.id, permitWithScan.id);
+  const scan = await fetch(`${api}/fleet/permits/${permitWithScan.vehicleId}/${permitWithScan.docType}/document`);
+  assert.ok(scan.ok, "permit scan download must succeed");
+  assert.ok(
+    (await scan.text()).startsWith("%PDF"),
+    "permit scan must stream a real PDF, not a JSON body",
+  );
+  const renewal = await request(`/fleet/permits/${permitWithScan.vehicleId}/${permitWithScan.docType}`, {
+    method: "PUT",
+    body: JSON.stringify({ documentNumber: "VERIFY-0001", expiryDate: "2030-01-01" }),
+  });
+  assert.equal(renewal.documentNumber, "VERIFY-0001");
+  assert.equal(
+    (await request(`/fleet/permits/${permitWithScan.vehicleId}/${permitWithScan.docType}`)).expiryDate,
+    "2030-01-01",
+    "a permit renewal must persist for the next read",
+  );
+
+  // ── Fleet → EMI ───────────────────────────────────────────────────────────
+  const emis = await request("/fleet/emis");
+  const emiVehicleId = emis[0].vehicleId;
+  const emisForVehicle = await request(`/fleet/emis?vehicleId=${emiVehicleId}`);
+  assert.ok(emisForVehicle.length > 0 && emisForVehicle.length < emis.length);
+  assert.ok(emisForVehicle.every((row) => row.vehicleId === emiVehicleId));
+  assert.ok((await request(`/fleet/emis/${emis[0].id}/schedule`)).length > 0);
+
+  // ── Trip View → per-delivery Email / WhatsApp dispatch ────────────────────
+  const dispatchTrip = await request(`/trips/${sequencedSale.tripId}`);
+  for (const channel of ["delivery-emails", "delivery-whatsapp"]) {
+    const rows = await request(`/trips/${dispatchTrip.id}/${channel}`);
+    assert.equal(rows.length, dispatchTrip.deliveries.length, `${channel} must cover every delivery`);
+    assert.ok(
+      rows.every((row) => ["pending", "sending", "sent", "failed"].includes(row.status)),
+      `${channel} rows must carry a status the Trip View can render`,
+    );
+  }
+  const emailRows = await request(`/trips/${dispatchTrip.id}/delivery-emails`);
+  const target = emailRows.find((row) => row.status !== "sent") ?? emailRows[0];
+  const sendResult = await request(`/trips/${dispatchTrip.id}/deliveries/${target.deliveryId}/email`, {
+    method: "POST",
+    body: JSON.stringify({ pdfBase64: "", fileName: "verify.pdf" }),
+  });
+  assert.equal(sendResult.status, "sent");
+  const afterSend = (await request(`/trips/${dispatchTrip.id}/delivery-emails`)).find(
+    (row) => row.deliveryId === target.deliveryId,
+  );
+  assert.equal(afterSend.status, "sent", "a sent delivery email must survive the next status reload");
+  assert.ok(afterSend.sendCount >= 1 && afterSend.sentAt);
+
+  // ── Per-shop / per-vehicle scoping used across Operations ─────────────────
+  const scopedShopId = masters[0].id;
+  const shopCollections = await request(`/operations/collection-entry?shopId=${scopedShopId}`);
+  assert.ok(shopCollections.length > 0);
+  assert.ok(
+    shopCollections.every((row) => row.shopId === scopedShopId),
+    "collection-entry must honour the shopId filter instead of returning the whole register",
+  );
+  const scopedVehicleId = (await request("/operations/fuel-expenses")).data[0].vehicleId;
+  const vehicleFuel = await request(`/operations/fuel-expenses?vehicleId=${scopedVehicleId}`);
+  assert.ok(vehicleFuel.data.length > 0);
+  assert.ok(vehicleFuel.data.every((row) => row.vehicleId === scopedVehicleId));
+
+  // ── Collection Entry → Outstanding Summary carry-forward ─────────────────
+  // Opening Balance must be the PREVIOUS week's closing balance so the panel
+  // reads: opening + weekly sales − weekly approved collections = outstanding.
+  const dayMs = 86_400_000;
+  const shiftDays = (iso, days) =>
+    new Date(new Date(`${iso}T00:00:00Z`).getTime() + days * dayMs).toISOString().slice(0, 10);
+
+  const today = manifest.quarter.today;
+  const carryRows = await request(`/operations/collection-entry/weekly-summaries?date=${today}`);
+  assert.ok(carryRows.length > 0);
+  assert.ok(
+    carryRows.every(
+      (row) => Number.isFinite(row.openingBalance) && typeof row.previousWeekEnd === "string" && row.previousWeekEnd,
+    ),
+    "every weekly summary must carry an openingBalance and the previous week's end date",
+  );
+  for (const row of carryRows) {
+    assert.equal(row.previousWeekEnd, shiftDays(row.weekStart, -1), "previousWeekEnd must be the day before weekStart");
+    // `balance` is the live all-time balance, so it only equals the week's
+    // closing figure for the current week (nothing has happened after it yet).
+    if (row.isCurrentWeek) {
+      assert.equal(
+        round(row.openingBalance + row.weeklySales - row.approvedCollections),
+        round(row.balance),
+        `shop ${row.shopId}: opening + sales − collections must equal the current outstanding`,
+      );
+    }
+  }
+
+  // Walk consecutive weeks: each week's opening equals the prior week's close.
+  const carryShop = carryRows.find((row) => row.openingBalance > 0);
+  assert.ok(carryShop, "expected a shop carrying a balance into the current week");
+  const currentWeekStart = carryShop.weekStart;
+  let priorClose = null;
+  for (let back = 4; back >= 0; back -= 1) {
+    const probe = shiftDays(currentWeekStart, -7 * back);
+    const summary = (await request(`/operations/collection-entry/weekly-summaries?date=${probe}`)).find(
+      (row) => row.shopId === carryShop.shopId,
+    );
+    assert.ok(summary, `expected a weekly summary for shop ${carryShop.shopId} on ${probe}`);
+    if (priorClose != null) {
+      assert.equal(
+        round(summary.openingBalance),
+        priorClose,
+        `shop ${carryShop.shopId} week ${summary.weekStart}: opening must equal the previous week's closing balance`,
+      );
+    }
+    priorClose = round(summary.openingBalance + summary.weeklySales - summary.approvedCollections);
+  }
+
+  // The single-shop endpoint the page actually calls exposes the same fields.
+  const oneShop = await request(
+    `/operations/collection-entry/weekly-summary?shopId=${carryShop.shopId}&date=${today}`,
+  );
+  assert.equal(round(oneShop.openingBalance), round(carryShop.openingBalance));
+  assert.equal(oneShop.previousWeekEnd, carryShop.previousWeekEnd);
+
   console.log(`✓ Quarter data sync verified: ${calls.length} API checks passed.`);
   console.log(`  ${manifest.quarter.label} · ${manifest.shops} shops · ${manifest.trips} trips · ${manifest.deliveries} deliveries`);
 }

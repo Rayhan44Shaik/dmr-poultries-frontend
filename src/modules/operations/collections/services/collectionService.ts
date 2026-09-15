@@ -666,10 +666,24 @@ function mapWeeklySummary(data: CollectionWeeklySummary): CollectionWeeklySummar
     shopName: String(data.shopName ?? ""),
     weekStart: String(data.weekStart),
     weekEnd: String(data.weekEnd),
+    previousWeekEnd: String(data.previousWeekEnd ?? ""),
+    openingBalance: Number(data.openingBalance ?? 0),
     balance: Number(data.balance ?? 0),
+    // Backends that predate `closingBalance` still reconcile: fall back to the
+    // same arithmetic the panel displays.
+    closingBalance: Number(
+      data.closingBalance ??
+        Number(data.openingBalance ?? 0) +
+          Number(data.weeklySales ?? 0) -
+          Number(data.approvedCollections ?? 0),
+    ),
     weeklySales: Number(data.weeklySales ?? 0),
+    pendingSales: Number(data.pendingSales ?? 0),
+    salesCount: Number(data.salesCount ?? 0),
     approvedCollections: Number(data.approvedCollections ?? 0),
     pendingCollections: Number(data.pendingCollections ?? 0),
+    approvedCollectionsCount: Number(data.approvedCollectionsCount ?? 0),
+    pendingCollectionsCount: Number(data.pendingCollectionsCount ?? 0),
     isCurrentWeek: Boolean(data.isCurrentWeek),
   };
 }

@@ -23,10 +23,17 @@ const EMPTY_WEEKLY: CollectionWeeklySummary = {
   shopName: "",
   weekStart: "",
   weekEnd: "",
+  previousWeekEnd: "",
+  openingBalance: 0,
   balance: 0,
+  closingBalance: 0,
   weeklySales: 0,
+  pendingSales: 0,
+  salesCount: 0,
   approvedCollections: 0,
   pendingCollections: 0,
+  approvedCollectionsCount: 0,
+  pendingCollectionsCount: 0,
   isCurrentWeek: false,
 };
 
@@ -86,12 +93,15 @@ export default function useCollectionEntry() {
       .then(() => {
         const shopNames = shopService.getAll().map((s) => s.shopName).sort();
         setShops(shopNames);
-        const allEmployees = getEmployees();
-        const collectorNames = allEmployees
+        // Collector is strictly the Collection department from the Employee
+        // master. There is deliberately NO fallback to the full employee list:
+        // offering drivers/loaders here would let a collection be booked
+        // against someone who never collects money.
+        const collectorNames = getEmployees()
           .filter((emp) => (emp.department ?? "").toLowerCase() === "collection")
           .map((emp) => emp.employeeName)
           .sort();
-        setCollectors(collectorNames.length > 0 ? collectorNames : allEmployees.map((e) => e.employeeName).sort());
+        setCollectors(collectorNames);
         const modes: PaymentMode[] = [{ id: "cash", name: "Cash" }];
         getBanks()
           .slice()
@@ -280,16 +290,25 @@ export default function useCollectionEntry() {
     ? `${fmtWeekDate(weeklySummary.weekStart)} to ${fmtWeekDate(weeklySummary.weekEnd)}`
     : "";
 
-  // Only show financial data if ledger is loaded
-  // weeklySummary.balance = Current Outstanding (closing balance)
-  // Opening Balance = Current Outstanding - Approved Sales + Approved Collections
+  // Only show financial data if ledger is loaded.
+  //   openingBalance = last week's closing balance, carried forward
+  //   balance        = Current Outstanding (live shop balance)
+  // Opening Balance is read straight from the backend rather than back-solved
+  // from the closing balance: the arithmetic form broke whenever a back-dated
+  // sale or collection landed outside the current week.
   const currentOutstanding = ledgerLoaded ? weeklySummary.balance : 0;
   const approvedSales = ledgerLoaded ? weeklySummary.weeklySales : 0;
   const approvedCollections = ledgerLoaded ? weeklySummary.approvedCollections : 0;
   const pendingApproval = ledgerLoaded ? weeklySummary.pendingCollections : 0;
-  const openingBalance = ledgerLoaded
-    ? weeklySummary.balance - weeklySummary.weeklySales + weeklySummary.approvedCollections
-    : 0;
+  const openingBalance = ledgerLoaded ? weeklySummary.openingBalance : 0;
+  const previousWeekEnd = ledgerLoaded ? weeklySummary.previousWeekEnd : "";
+  // Context figures: shown to explain the balance, never part of it.
+  const pendingSales = ledgerLoaded ? weeklySummary.pendingSales : 0;
+  const salesCount = ledgerLoaded ? weeklySummary.salesCount : 0;
+  const approvedCollectionsCount = ledgerLoaded ? weeklySummary.approvedCollectionsCount : 0;
+  const pendingCollectionsCount = ledgerLoaded ? weeklySummary.pendingCollectionsCount : 0;
+  const weekStart = ledgerLoaded ? weeklySummary.weekStart : "";
+  const weekEnd = ledgerLoaded ? weeklySummary.weekEnd : "";
 
   const todayCollection = useMemo(() => Number(entry.amount || 0), [entry.amount]);
 
@@ -676,6 +695,13 @@ export default function useCollectionEntry() {
     resetEntry,
     // New correct naming for balance calculations
     openingBalance,
+    previousWeekEnd,
+    pendingSales,
+    salesCount,
+    approvedCollectionsCount,
+    pendingCollectionsCount,
+    weekStart,
+    weekEnd,
     approvedSales,
     approvedCollections,
     pendingApproval,
