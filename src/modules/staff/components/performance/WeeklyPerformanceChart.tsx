@@ -9,11 +9,13 @@
 //   Driver      Distance (km) bars · Fuel (L) bars · Mileage (km/L) line
 //   Supervisor  Birds bars · Mortality line · Weight loss (kg) line
 //
-// Every y-axis is tinted with the colour of the series it measures, so which
-// ruler belongs to which shape is obvious at a glance. Volumes (bars) keep 0
-// as their floor — a bar must never start from a cropped baseline — while
-// ratios/trends (`zeroFloor: false`) get a tight axis so a 4.24 → 4.36 km/L
-// week is actually visible instead of flat-lining.
+// Quiet by design: bars fall from a soft tone gradient into a pale foot, lines
+// are hairline-thin with white-centred dots, the grid is a whisper, and each
+// ruler tints its own tick labels with a diluted share of its series colour —
+// so which ruler belongs to which shape stays obvious without any shape
+// shouting. Volumes (bars) keep 0 as their floor — a bar must never start from
+// a cropped baseline — while ratios/trends (`zeroFloor: false`) get a tight
+// axis so a 4.24 → 4.36 km/L week is actually visible instead of flat-lining.
 //
 // Series carry `kind: "bar" | "line"` and the chart only ever renders the
 // buckets the API returned, in the API's order, with the API's own numbers —
@@ -21,7 +23,7 @@
 // fabricated; a line breaks where a week has no value instead of drawing a
 // fake zero.
 //
-// Tooltip: one polished card — bold period header over a hairline, shape-coded
+// Tooltip: one polished card — period header over a hairline, shape-coded
 // swatch rows for EVERY series of that week with right-aligned bold tabular
 // values, derived metrics below a dashed divider in muted style.
 //
@@ -108,6 +110,21 @@ const compactAxis = (value: number): string => {
   return String(Math.round(value * 10) / 10);
 };
 
+/** `#rrggbb` at the given alpha (anything else is passed through untouched). */
+function withAlpha(color: string, alpha: number): string {
+  const hex = color.trim();
+  if (/^#[0-9a-f]{6}$/i.test(hex)) {
+    const r = parseInt(hex.slice(1, 3), 16);
+    const g = parseInt(hex.slice(3, 5), 16);
+    const b = parseInt(hex.slice(5, 7), 16);
+    return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+  }
+  return hex;
+}
+
+/** Gradient paint server for a bar series (soft top → pale foot). */
+const barGradientId = (key: string) => `wpc-bar-${key}`;
+
 function hasAnyValue(rows: readonly WeeklyChartPoint[], series: readonly WeeklyChartSeries[]): boolean {
   return rows.some((row) =>
     series.some((s) => {
@@ -132,8 +149,8 @@ function TooltipCard({ label, payload, series, tooltipExtras, weekTrips, point }
   const extras = point ? (tooltipExtras?.(point) ?? []) : [];
   const trips = point ? (weekTrips?.(point) ?? []) : [];
   return (
-    <div className="min-w-[210px] rounded-xl border border-slate-200 bg-white/95 px-3.5 py-3 shadow-xl backdrop-blur">
-      <div className="mb-2 border-b border-slate-100 pb-1.5 text-xs font-bold tracking-tight text-slate-900">
+    <div className="min-w-[216px] rounded-xl border border-slate-200 bg-white/95 px-3.5 py-3 shadow-xl shadow-slate-900/10 backdrop-blur-sm">
+      <div className="mb-2 border-b border-slate-100 pb-1.5 text-[12.5px] font-bold tracking-tight text-slate-800">
         {String(label ?? "")}
       </div>
       <div className="space-y-1.5">
@@ -143,7 +160,7 @@ function TooltipCard({ label, payload, series, tooltipExtras, weekTrips, point }
           const isLine = config?.kind === "line";
           return (
             <div key={String(entry.dataKey)} className="flex items-center justify-between gap-5">
-              <span className="flex items-center gap-2 text-[11px] font-medium text-slate-500">
+              <span className="flex items-center gap-2 text-[11.5px] font-medium text-slate-500">
                 <span
                   className={`h-2 w-2 shrink-0 ${isLine ? "rounded-full" : "rounded-[3px]"}`}
                   style={{ backgroundColor: config?.color ?? "#94a3b8" }}
@@ -151,14 +168,14 @@ function TooltipCard({ label, payload, series, tooltipExtras, weekTrips, point }
                 />
                 {config?.label ?? String(entry.dataKey)}
               </span>
-              <span className="text-xs font-bold tabular-nums text-slate-900">
+              <span className="text-[12px] font-bold tabular-nums text-slate-800">
                 {config?.format ? config.format(raw) : raw.toLocaleString("en-IN")}
               </span>
             </div>
           );
         })}
         {extras.length > 0 && (
-          <div className="space-y-1.5 border-t border-dashed border-slate-200 pt-1.5">
+          <div className="space-y-1 border-t border-dashed border-slate-200 pt-1.5">
             {extras.map((row) => (
               <div key={row.label} className="flex items-center justify-between gap-5">
                 <span className="text-[11px] text-slate-400">{row.label}</span>
@@ -176,7 +193,7 @@ function TooltipCard({ label, payload, series, tooltipExtras, weekTrips, point }
             </div>
             {trips.map((trip) => (
               <div key={trip.tripNo} className="flex items-center justify-between gap-5">
-                <span className="font-mono text-[10px] font-semibold text-slate-600">
+                <span className="font-mono text-[10px] font-semibold text-slate-500">
                   {trip.tripNo}
                 </span>
                 <span className="text-[10px] font-medium tabular-nums text-slate-500">
@@ -191,8 +208,7 @@ function TooltipCard({ label, payload, series, tooltipExtras, weekTrips, point }
   );
 }
 
-const axisTick = { fontSize: 11, fontWeight: 500 } as const;
-const axisTickSmall = { fontSize: 10, fontWeight: 500 } as const;
+const xTick = { fontSize: 10.5, fontWeight: 600, fill: "#94a3b8" } as const;
 
 /** Axis domain: bars start at 0, ratios/trends hug their own data. */
 type AxisDomainTuple = [(dataMin: number) => number, "auto"] | ["auto", "auto"];
@@ -214,11 +230,20 @@ function ComboChart({
   ariaLabel: string;
   heightClass: string;
 }) {
-  const hasBars = series.some((s) => (s.kind ?? "bar") === "bar");
-  const barCount = series.filter((s) => (s.kind ?? "bar") === "bar").length;
+  const barSeries = series.filter((s) => (s.kind ?? "bar") === "bar");
+  const lineSeries = series.filter((s) => s.kind === "line");
+  const barCount = barSeries.length;
+
   const axisSeries = (axis: WeeklyAxisId) => series.find((s) => s.axis === axis);
   const rightSeries = axisSeries("right");
   const thirdSeries = axisSeries("third");
+
+  /** Tick text keeps the series hue, diluted so the axis stays quiet. */
+  const axisTick = (axis: WeeklyAxisId) => ({
+    fontSize: 10,
+    fontWeight: 600,
+    fill: withAlpha(axisSeries(axis)?.color ?? "#94a3b8", 0.72),
+  });
 
   /* Tick colour = series colour, so each ruler is bound to its own shape. */
   const axisDomain = (axis: WeeklyAxisId): AxisDomainTuple => {
@@ -236,23 +261,40 @@ function ComboChart({
         <ComposedChart
           data={rows}
           margin={{ top: 10, right: 10, left: -6, bottom: 4 }}
-          barGap={barCount > 1 ? 5 : 0}
-          barCategoryGap={barCount > 1 ? "30%" : "45%"}
+          barGap={barCount > 1 ? 6 : 0}
+          barCategoryGap={barCount > 1 ? "34%" : "46%"}
         >
-          <CartesianGrid strokeDasharray="4 4" stroke="#f1f5f9" vertical={false} />
+          <defs>
+            {barSeries.map((config) => (
+              <linearGradient
+                key={config.key}
+                id={barGradientId(config.key)}
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="1"
+              >
+                <stop offset="0%" stopColor={config.color} stopOpacity={0.92} />
+                <stop offset="100%" stopColor={config.color} stopOpacity={0.38} />
+              </linearGradient>
+            ))}
+          </defs>
+
+          <CartesianGrid stroke="#eef2f7" strokeDasharray="4 8" vertical={false} />
           <XAxis
             dataKey="label"
-            tick={axisTick}
+            tick={xTick}
             axisLine={false}
             tickLine={false}
-            tickMargin={10}
+            tickMargin={12}
             interval={0}
           />
           {/* Left ruler (also the axis the bars sit on). */}
           <YAxis
             yAxisId="left"
-            tick={{ ...axisTick, fill: axisSeries("left")?.color ?? "#94a3b8" }}
+            tick={axisTick("left")}
             tickFormatter={compactAxis}
+            tickCount={5}
             axisLine={false}
             tickLine={false}
             width={52}
@@ -262,8 +304,9 @@ function ComboChart({
             <YAxis
               yAxisId="right"
               orientation="right"
-              tick={{ ...axisTick, fill: rightSeries.color }}
+              tick={axisTick("right")}
               tickFormatter={compactAxis}
+              tickCount={5}
               axisLine={false}
               tickLine={false}
               width={50}
@@ -274,8 +317,9 @@ function ComboChart({
             <YAxis
               yAxisId="third"
               orientation="right"
-              tick={{ ...axisTickSmall, fill: thirdSeries.color }}
+              tick={axisTick("third")}
               tickFormatter={compactAxis}
+              tickCount={5}
               axisLine={false}
               tickLine={false}
               width={46}
@@ -283,7 +327,7 @@ function ComboChart({
             />
           )}
           <Tooltip
-            cursor={{ fill: "rgba(15, 23, 42, 0.045)" }}
+            cursor={{ fill: "rgba(15, 23, 42, 0.035)", radius: 8 }}
             content={({ active, payload, label }) =>
               active && payload?.length ? (
                 <TooltipCard
@@ -300,46 +344,54 @@ function ComboChart({
           <Legend
             verticalAlign="top"
             align="left"
-            height={30}
-            iconType="circle"
-            iconSize={8}
-            formatter={(value) => (
-              <span className="text-[11px] font-semibold text-slate-500">{String(value)}</span>
-            )}
+            height={28}
+            iconSize={0}
+            formatter={(value) => {
+              const config = series.find((s) => s.label === value);
+              return (
+                <span className="mr-4 inline-flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  <span
+                    aria-hidden="true"
+                    className={`inline-block h-2 w-2 ${
+                      config?.kind === "line" ? "rounded-full" : "rounded-[2px]"
+                    }`}
+                    style={{ backgroundColor: config?.color ?? "#94a3b8" }}
+                  />
+                  {String(value)}
+                </span>
+              );
+            }}
           />
           {/* Bars first, lines on top — a trend never hides behind a bar. */}
-          {series
-            .filter((config) => (config.kind ?? "bar") === "bar")
-            .map((config) => (
-              <Bar
-                key={config.key}
-                yAxisId={config.axis}
-                dataKey={config.key}
-                name={config.label}
-                fill={config.color}
-                radius={[4, 4, 0, 0]}
-                maxBarSize={hasBars && barCount > 1 ? 34 : 46}
-                isAnimationActive={false}
-              />
-            ))}
-          {series
-            .filter((config) => config.kind === "line")
-            .map((config) => (
-              <Line
-                key={config.key}
-                yAxisId={config.axis}
-                type="monotone"
-                dataKey={config.key}
-                name={config.label}
-                stroke={config.color}
-                strokeWidth={2.5}
-                dot={{ r: 3.5, fill: config.color, stroke: "#ffffff", strokeWidth: 1.5 }}
-                activeDot={{ r: 5, fill: config.color, stroke: "#ffffff", strokeWidth: 2 }}
-                legendType="circle"
-                connectNulls={false}
-                isAnimationActive={false}
-              />
-            ))}
+          {barSeries.map((config) => (
+            <Bar
+              key={config.key}
+              yAxisId={config.axis}
+              dataKey={config.key}
+              name={config.label}
+              fill={`url(#${barGradientId(config.key)})`}
+              radius={[5, 5, 0, 0]}
+              maxBarSize={barCount > 1 ? 24 : 40}
+              isAnimationActive={false}
+            />
+          ))}
+          {lineSeries.map((config) => (
+            <Line
+              key={config.key}
+              yAxisId={config.axis}
+              type="monotone"
+              dataKey={config.key}
+              name={config.label}
+              stroke={config.color}
+              strokeWidth={2}
+              strokeLinecap="round"
+              dot={{ r: 2.6, fill: "#ffffff", stroke: config.color, strokeWidth: 1.6 }}
+              activeDot={{ r: 4.6, fill: config.color, stroke: "#ffffff", strokeWidth: 2 }}
+              legendType="circle"
+              connectNulls={false}
+              isAnimationActive={false}
+            />
+          ))}
         </ComposedChart>
       </ResponsiveContainer>
       {/* Screen-reader summary of the rulers (the SVG itself is decorative). */}
