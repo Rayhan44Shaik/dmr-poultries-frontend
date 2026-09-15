@@ -3,6 +3,8 @@
 
 import React, { useCallback, useRef, useState } from "react";
 import {
+  ArrowDown,
+  ArrowUp,
   Bird,
   Calendar,
   Check,
@@ -34,13 +36,42 @@ interface Props {
   isLoading?: boolean;
   /** Number of rows before this page, so serial numbers do not restart at 1. */
   startIndex?: number;
+  sortBy?: string;
+  onSortChange?: (sortBy: string) => void;
   onUpdateSale?: (updatedSale: ShopSale) => void | Promise<void>;
+}
+
+type SortColumn = "saleNo" | "tripDate" | "shopName" | "birds" | "weight" | "rate" | "amount" | "remark";
+
+const SORT_VALUES: Record<SortColumn, { asc: string; desc: string }> = {
+  saleNo: { asc: "sale_asc", desc: "sale_desc" },
+  tripDate: { asc: "oldest", desc: "latest" },
+  shopName: { asc: "shop_asc", desc: "shop_desc" },
+  birds: { asc: "birds_asc", desc: "birds_desc" },
+  weight: { asc: "weight_asc", desc: "weight_desc" },
+  rate: { asc: "rate_asc", desc: "rate_desc" },
+  amount: { asc: "amount_asc", desc: "amount_desc" },
+  remark: { asc: "remark_asc", desc: "remark_desc" },
+};
+
+function SortArrows({ active, direction }: { active: boolean; direction?: "asc" | "desc" }) {
+  const base = "h-3.5 w-3.5 shrink-0 transition-colors";
+  const on = "text-emerald-600";
+  const off = "text-slate-400 group-hover/sort:text-slate-600";
+  return (
+    <span className="inline-flex shrink-0 items-center gap-0.5" aria-hidden="true">
+      <ArrowUp size={13} strokeWidth={2.7} className={`${base} ${active && direction === "asc" ? on : off}`} />
+      <ArrowDown size={13} strokeWidth={2.7} className={`${base} ${active && direction === "desc" ? on : off}`} />
+    </span>
+  );
 }
 
 function ShopSalesTable({
   sales,
   isLoading = false,
   startIndex = 0,
+  sortBy = "latest",
+  onSortChange,
   onUpdateSale,
 }: Props) {
   const { t } = useI18n();
@@ -55,6 +86,30 @@ function ShopSalesTable({
   const selectedBirdLimit = Number(selectedSale?.maxEditableBirds);
   const hasSelectedBirdLimit = Number.isSafeInteger(selectedBirdLimit) && selectedBirdLimit >= 0;
 
+  const currentSort = (column: SortColumn): "asc" | "desc" | undefined => {
+    const values = SORT_VALUES[column];
+    if (sortBy === values.asc) return "asc";
+    if (sortBy === values.desc) return "desc";
+    return undefined;
+  };
+
+  const sortable = (column: SortColumn, content: React.ReactNode, center = false) => {
+    const direction = currentSort(column);
+    if (!onSortChange) return content;
+    return (
+      <button
+        type="button"
+        onClick={() => onSortChange(direction === "asc" ? SORT_VALUES[column].desc : SORT_VALUES[column].asc)}
+        aria-sort={direction === "asc" ? "ascending" : direction === "desc" ? "descending" : "none"}
+        className={`group/sort flex w-full items-center gap-2 text-[11px] font-bold uppercase tracking-wider transition-colors hover:text-emerald-700 ${
+          center ? "justify-center" : ""
+        } ${direction ? "text-emerald-700" : "text-slate-700"}`}
+      >
+        {content}
+        <SortArrows active={Boolean(direction)} direction={direction} />
+      </button>
+    );
+  };
 
   const startEditing = useCallback(() => {
     if (!selectedSale || !selectedSale.editable || saving) return;
@@ -158,11 +213,8 @@ function ShopSalesTable({
           </div>
           <h3 className="truncate text-base font-bold tracking-tight text-slate-800">Shop Sales</h3>
           {selectedSale && (
-            <span
-              className="inline-flex whitespace-nowrap rounded-full border border-emerald-200/70 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700"
-              title={selectedSale.saleNo || selectedSale.shopNo || ""}
-            >
-              {selectedSale.saleNo || selectedSale.shopNo || "—"}
+            <span className="hidden truncate rounded-full border border-emerald-200/70 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 sm:inline">
+              {selectedSale.tripNo}
             </span>
           )}
         </div>
@@ -248,14 +300,14 @@ function ShopSalesTable({
               <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 <div className="flex items-center justify-center gap-1.5"><Hash size={14} className="text-slate-400" /> S.No</div>
               </th>
-              <th className="px-3.5 py-3 text-left text-[11px] font-bold uppercase tracking-wider"><div className="flex items-center gap-1.5"><FileText size={14} className="shrink-0 text-emerald-500" /><span>Shop Sale No.</span></div></th>
-              <th className="px-3.5 py-3 text-left text-[11px] font-bold uppercase tracking-wider"><div className="flex items-center gap-1.5"><Calendar size={14} className="shrink-0 text-blue-500" /><span>Day</span></div></th>
-              <th className="px-3.5 py-3 text-left text-[11px] font-bold uppercase tracking-wider"><div className="flex items-center gap-1.5"><Store size={14} className="shrink-0 text-amber-500" /><span>Shop Name</span></div></th>
-              <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider"><div className="flex items-center justify-center gap-1.5"><Bird size={14} className="shrink-0 text-cyan-600" /><span>Birds</span></div></th>
-              <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider"><div className="flex items-center justify-center gap-1.5"><Scale size={14} className="shrink-0 text-orange-600" /><span>Weight</span></div></th>
-              <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider"><div className="flex items-center justify-center gap-1.5"><IndianRupee size={14} className="shrink-0 text-violet-600" /><span>Rate</span></div></th>
-              <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider">Amount</th>
-              <th className="px-3.5 py-3 text-left text-[11px] font-bold uppercase tracking-wider"><div className="flex items-center gap-1.5"><FileText size={14} className="shrink-0 text-slate-400" /><span>Remark</span></div></th>
+              <th className="px-3.5 py-3 text-left">{sortable("saleNo", <div className="flex items-center gap-1.5"><FileText size={14} className="shrink-0 text-emerald-500" /><span>Shop Sale No.</span></div>)}</th>
+              <th className="px-3.5 py-3 text-left">{sortable("tripDate", <div className="flex items-center gap-1.5"><Calendar size={14} className="shrink-0 text-blue-500" /><span>Day</span></div>)}</th>
+              <th className="px-3.5 py-3 text-left">{sortable("shopName", <div className="flex items-center gap-1.5"><Store size={14} className="shrink-0 text-amber-500" /><span>Shop Name</span></div>)}</th>
+              <th className="px-3.5 py-3 text-center">{sortable("birds", <div className="flex items-center justify-center gap-1.5"><Bird size={14} className="shrink-0 text-cyan-600" /><span>Birds</span></div>, true)}</th>
+              <th className="px-3.5 py-3 text-center">{sortable("weight", <div className="flex items-center justify-center gap-1.5"><Scale size={14} className="shrink-0 text-orange-600" /><span>Weight</span></div>, true)}</th>
+              <th className="px-3.5 py-3 text-center">{sortable("rate", <div className="flex items-center justify-center gap-1.5"><IndianRupee size={14} className="shrink-0 text-violet-600" /><span>Rate</span></div>, true)}</th>
+              <th className="px-3.5 py-3 text-center">{sortable("amount", <span>Amount</span>, true)}</th>
+              <th className="px-3.5 py-3 text-left">{sortable("remark", <div className="flex items-center gap-1.5"><FileText size={14} className="shrink-0 text-slate-400" /><span>Remark</span></div>)}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -285,7 +337,7 @@ function ShopSalesTable({
                 >
                   <td className="px-3.5 py-3 text-center text-xs font-semibold text-slate-500">{startIndex + index + 1}</td>
                   <td className="px-3.5 py-3 text-xs font-semibold text-emerald-600 whitespace-nowrap">
-                    <div>{sale.saleNo || sale.shopNo || "—"}</div>
+                    <div>{sale.saleNo || sale.tripNo || "—"}</div>
                   </td>
                   <td className="px-3.5 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(sale.tripDate)}</td>
                   <td className="px-3.5 py-3 text-xs font-semibold text-slate-700">{cleanDeliveryShopName(sale.shopName) || "—"}</td>

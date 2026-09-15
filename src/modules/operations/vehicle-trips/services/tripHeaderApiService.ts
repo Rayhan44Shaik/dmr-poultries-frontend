@@ -525,9 +525,9 @@ export async function saveTripDeliveries(tripId: number, trip: Partial<Trip>): P
   return mapApiTripToTrip(data, trip as Trip);
 }
 
-/** GET /api/trips/:id — load the complete trip, including its shop deliveries. */
-export async function loadTripById(id: number, options?: { signal?: AbortSignal }): Promise<Trip> {
-  const { data } = await apiGet<ApiTripRecord>(`${TRIPS_PATH}/${id}`, { signal: options?.signal });
+/** GET /api/trips/:id — load full trip (Step 1 resume). */
+export async function loadTripById(id: number): Promise<Trip> {
+  const { data } = await apiGet<ApiTripRecord>(`${TRIPS_PATH}/${id}`);
   return mapApiTripToTrip(data);
 }
 
@@ -563,7 +563,6 @@ export interface TripListFilters {
   supervisorId?: number;
   driverId?: number;
   farmId?: number;
-  shopId?: number;
   search?: string;
   page?: number;
   limit?: number;
@@ -596,7 +595,6 @@ export async function listCompletedTrips(filters: TripListFilters = {}): Promise
         supervisorId: filters.supervisorId,
         driverId: filters.driverId,
         farmId: filters.farmId,
-        shopId: filters.shopId,
         search: filters.search,
         page: filters.page,
         limit: filters.limit,

@@ -1,22 +1,13 @@
 import React, { useCallback, useRef } from "react";
 import { Check, Hash, Calendar, Truck, User, UserCog, Warehouse, ShoppingBag, Bird, Scale, HeartPulse, ArrowUp, ArrowDown } from "lucide-react";
 import type { Trip } from "../types/trip";
+import type { TripListSortKey } from "../utils/filterTripList";
 import { formatTripListDay } from "../utils/formatTripListDay";
 import { localizeTripViewText } from "../utils/tripViewLocalization";
 import { formatVehicleNumber } from "../../../../utils/format";
 import { useI18n } from "../../../../i18n";
 
-export type TripSortKey =
-  | "tripNo"
-  | "tripDate"
-  | "vehicleNo"
-  | "driverName"
-  | "supervisorName"
-  | "sourceFarm"
-  | "totalShops"
-  | "totalBirds"
-  | "totalWeight"
-  | "totalMortality";
+export type TripSortKey = TripListSortKey;
 
 interface Props {
   trips: Trip[];

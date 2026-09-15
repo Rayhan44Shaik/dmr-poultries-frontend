@@ -8,14 +8,24 @@ import type { Trip } from "../types/trip";
  * server which ignores one of those query parameters can never show unrelated
  * trips in the table.
  */
+export type TripListSortKey =
+  | "tripNo"
+  | "tripDate"
+  | "vehicleNo"
+  | "driverName"
+  | "supervisorName"
+  | "sourceFarm"
+  | "totalShops"
+  | "totalBirds"
+  | "totalWeight"
+  | "totalMortality";
+
 export type TripListClientFilters = {
   fromDate?: string;
   toDate?: string;
   vehicleId?: number;
   supervisorId?: number;
   farmId?: number;
-  /** Matches every delivery in a trip, not only its final shop. */
-  shopId?: number;
   /** Matches all visible Trip List columns, including vehicle plates. */
   search?: string;
 };
@@ -37,7 +47,6 @@ function matchesGlobalSearch(trip: Trip, search: string): boolean {
     trip.totalBirds,
     trip.totalWeight,
     trip.totalMortality,
-    ...trip.deliveries.flatMap((delivery) => [delivery.shopName, delivery.birdType]),
   ].map((value) => String(value ?? ""));
   const haystack = values.join(" ").toLocaleLowerCase();
   // Vehicle plates are displayed as "TS 07 UB 1222", but are often stored as
@@ -47,7 +56,7 @@ function matchesGlobalSearch(trip: Trip, search: string): boolean {
 
 export function filterTripListTrips(
   trips: readonly Trip[],
-  { fromDate, toDate, vehicleId, supervisorId, farmId, shopId, search = "" }: TripListClientFilters,
+  { fromDate, toDate, vehicleId, supervisorId, farmId, search = "" }: TripListClientFilters,
 ): Trip[] {
   const from = dateOnly(fromDate);
   const to = dateOnly(toDate);
@@ -58,7 +67,36 @@ export function filterTripListTrips(
     if (vehicleId != null && Number(trip.vehicleId) !== vehicleId) return false;
     if (supervisorId != null && Number(trip.supervisorId) !== supervisorId) return false;
     if (farmId != null && Number(trip.sourceFarmId) !== farmId) return false;
-    if (shopId != null && !trip.deliveries.some((delivery) => Number(delivery.shopId) === shopId)) return false;
     return matchesGlobalSearch(trip, search);
+  });
+}
+
+/**
+ * Applies the selected Trip List ordering client-side as well as through the
+ * API query. This keeps the displayed order reliable on older API versions
+ * that return valid filter data but ignore a sort query.
+ */
+export function sortTripListTrips(
+  trips: readonly Trip[],
+  sortBy: TripListSortKey | null | undefined,
+  sortDir: "asc" | "desc" = "asc",
+): Trip[] {
+  if (!sortBy) return [...trips];
+
+  const direction = sortDir === "desc" ? -1 : 1;
+  const numericKeys = new Set<TripListSortKey>([
+    "totalShops",
+    "totalBirds",
+    "totalWeight",
+    "totalMortality",
+  ]);
+  const stringValue = (trip: Trip) => String(trip[sortBy] ?? "");
+
+  return [...trips].sort((left, right) => {
+    const comparison = numericKeys.has(sortBy)
+      ? Number(left[sortBy]) - Number(right[sortBy])
+      : stringValue(left).localeCompare(stringValue(right), undefined, { numeric: true, sensitivity: "base" });
+    if (comparison !== 0) return comparison * direction;
+    return String(left.tripNo).localeCompare(String(right.tripNo), undefined, { numeric: true }) * direction;
   });
 }

@@ -149,6 +149,7 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
         fromDate={filter.fromDate}
         toDate={filter.toDate}
         shopName={filter.shopName}
+        sortBy={filter.sortBy}
         shopNames={shopNames}
         searchQuery={searchInput}
         setSearchQuery={handleSearchInputChange}
@@ -156,6 +157,10 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
         setToDate={(v) => setFilter({ ...filter, toDate: v })}
         setShopName={(v) => {
           setFilter({ ...filter, shopName: v });
+          setCurrentPage(1);
+        }}
+        setSortBy={(v) => {
+          setFilter({ ...filter, sortBy: v });
           setCurrentPage(1);
         }}
         onReset={handleResetFilters}
@@ -177,6 +182,11 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
           sales={paginatedSales}
           isLoading={isLoading}
           startIndex={(currentPage - 1) * pageSize}
+          sortBy={filter.sortBy}
+          onSortChange={(sortBy) => {
+            setFilter((current) => ({ ...current, sortBy }));
+            setCurrentPage(1);
+          }}
           onUpdateSale={handleUpdateSale}
         />
         {filteredSales.length > 0 && (
