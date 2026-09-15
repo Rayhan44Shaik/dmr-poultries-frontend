@@ -819,9 +819,12 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
           </div>
         </div>
         
-        {/* overflow-hidden: the donut's hover badge may sit slightly outside
-            the ring — it must stay stuck to THIS card, never bleed into the
-            neighbouring chart. */}
+        {/* No overflow-hidden on the card itself (same structure as the
+            Trips card): the donut is bounded by its own flex stage
+            (flex-1 + min-h-0 + max-h-full), so nothing can bleed — and
+            the shrink-0 KPI strip below the chart can never be clipped.
+            It always shows, fully, whether the space is reduced or
+            increased. */}
         <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/60 p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-5 w-full min-w-0 xl:h-[530px]">
           <Link
             to="/operations?tab=collection-report"
