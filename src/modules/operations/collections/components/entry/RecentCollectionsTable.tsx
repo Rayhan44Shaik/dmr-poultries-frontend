@@ -7,6 +7,7 @@ import TripPagination from "../../../vehicle-trips/components/TripPagination";
 import type { RecentCollection } from "../../types/collection";
 import { useI18n } from "../../../../../i18n";
 import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocalization";
+import { formatTripListDay } from "../../../vehicle-trips/utils/formatTripListDay";
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 import { opsSecondaryButtonClass } from "../../../../../shared/ui/operationsStyles";
 import { BrandRefreshButton } from "../../../../../ui";
@@ -68,19 +69,6 @@ export default function RecentCollectionsTable({
   /** Shop and collector names are data, not i18n keys, so they are transliterated
     * for Telugu using the same helper the Trip screens use. */
   const localize = (value: string) => localizeTripViewText(value, language);
-
-  /** Dates follow the language; numbers stay in Latin digits so amounts and
-    * reference numbers are never ambiguous. Same rule as the Trip view. */
-  const localizeDate = (value: string) => {
-    if (!value) return "-";
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return value;
-    return parsed.toLocaleDateString(language === "te" ? "te-IN" : "en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
 
   /**
    * Search matches the English source AND the Telugu rendering of every field,
@@ -421,16 +409,16 @@ export default function RecentCollectionsTable({
         * then Day. Remaining widths follow the content they carry so labels
         * and values stay evenly separated without wasting table space. */}
       <div className="overflow-x-auto">
-        <table className="min-w-[1120px] w-full table-fixed text-sm text-left border-collapse">
+        <table className="min-w-[1200px] w-full table-fixed text-sm text-left border-collapse">
           <colgroup>
-            <col className="w-[7%]" />
+            <col className="w-[6%]" />
+            <col className="w-[15%]" />
+            <col className="w-[16%]" />
+            <col className="w-[17%]" />
             <col className="w-[15%]" />
             <col className="w-[12%]" />
-            <col className="w-[19%]" />
-            <col className="w-[14%]" />
-            <col className="w-[12%]" />
+            <col className="w-[9%]" />
             <col className="w-[10%]" />
-            <col className="w-[11%]" />
           </colgroup>
           <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-600">
             <tr>
@@ -549,7 +537,7 @@ export default function RecentCollectionsTable({
                       {col.collectionNo}
                     </td>
                     <td className="px-4 py-3 text-left text-xs font-bold text-slate-600 tabular-nums whitespace-nowrap">
-                      {localizeDate(col.collectionDate)}
+                      {formatTripListDay(col.collectionDate, language)}
                     </td>
                     <td className="px-4 py-3 text-xs font-semibold text-slate-700 truncate">{localize(col.shopName)}</td>
                     <td className="px-4 py-3 text-xs font-medium text-slate-600 truncate">{localize(col.collectorName)}</td>

@@ -8,6 +8,7 @@ import { collectionService } from "../../services/collectionService";
 import { useI18n } from "../../../../../i18n";
 import AppShellModal from "../../../../../ui/AppShellModal";
 import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocalization";
+import { formatTripListDay } from "../../../vehicle-trips/utils/formatTripListDay";
 import { getDeleteWindowForStatus } from "../../utils/collectionDeleteWindow";
 import { collectionStatusKey, collectionStatusLabel } from "../../utils/collectionStatusLabel";
 import { exportCollectionPdf } from "../../utils/exportCollectionPdf";
@@ -489,10 +490,9 @@ export function EditCollectionModal({
           {isView ? (
             <>
               {/* ── Selected entry, shown first ───────────────────────────
-                * The row the user clicked is the reason this modal opened, so
-                * it leads: the amount as the hero figure, then the supporting
-                * fields on an icon-labelled grid. Everything except numbers
-                * follows the active language. */}
+                * The row the user clicked is the reason this modal opened.
+                * Every field gets an equally readable, colour-coded card;
+                * numbers remain in Latin digits in both languages. */}
               <div className="overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/50 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-100/70 px-5 py-3">
                   <div className="flex items-center gap-2">
@@ -522,54 +522,101 @@ export function EditCollectionModal({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-5 px-5 py-4 lg:grid-cols-12">
-                  {/* Hero amount — numeric, so it stays in Latin digits. */}
-                  <div className="lg:col-span-3">
-                    <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                      <IndianRupee size={13} className="text-emerald-600" />
-                      {t("operations.amount_received")}
-                    </p>
-                    <p className="mt-1 text-2xl font-extrabold tabular-nums text-emerald-700">
-                      {formatCurrency(formData.amount)}
-                    </p>
-                    <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-slate-500">
-                      <Store size={12} className="text-amber-500" />
-                      <span className="truncate">{tr(shopName)}</span>
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2 xl:grid-cols-3 lg:col-span-9">
-                    {renderField({
-                      label: t("common.day"),
-                      value: formatDate(formData.collectionDate, dateLocale),
-                      icon: Calendar,
-                    })}
-                    {renderField({
+                {/* Every selected-entry field is a self-contained, colour-coded
+                  * box. The uniform grid makes the value scan one field at a
+                  * time without the old amount/metadata spacing imbalance. */}
+                <div className="grid grid-cols-1 gap-3 p-5 sm:grid-cols-2 xl:grid-cols-4">
+                  {[
+                    {
+                      key: "amount",
+                      label: t("operations.amount_received"),
+                      value: formatCurrency(formData.amount),
+                      icon: IndianRupee,
+                      surface: "border-emerald-200 bg-emerald-50/65",
+                      iconClass: "bg-emerald-100 text-emerald-700 ring-emerald-200",
+                      valueClass: "text-lg text-emerald-800 tabular-nums",
+                    },
+                    {
+                      key: "collection",
                       label: t("ops.collection.collection_no_label"),
                       value: formData.collectionNo || "-",
-                      icon: Hash,
-                    })}
-                    {renderField({
+                      icon: FileText,
+                      surface: "border-teal-200 bg-teal-50/60",
+                      iconClass: "bg-teal-100 text-teal-700 ring-teal-200",
+                      valueClass: "text-slate-800",
+                    },
+                    {
+                      key: "day",
+                      label: t("common.day"),
+                      value: formatTripListDay(formData.collectionDate, language),
+                      icon: Calendar,
+                      surface: "border-blue-200 bg-blue-50/60",
+                      iconClass: "bg-blue-100 text-blue-700 ring-blue-200",
+                      valueClass: "text-slate-800 tabular-nums",
+                    },
+                    {
+                      key: "shop",
+                      label: t("table.shop"),
+                      value: tr(shopName) || "-",
+                      icon: Store,
+                      surface: "border-amber-200 bg-amber-50/60",
+                      iconClass: "bg-amber-100 text-amber-700 ring-amber-200",
+                      valueClass: "text-slate-800",
+                    },
+                    {
+                      key: "collector",
                       label: t("common.collector"),
                       value: tr(formData.collectorName) || "-",
-                      icon: User,
-                    })}
-                    {renderField({
+                      icon: UserCog,
+                      surface: "border-violet-200 bg-violet-50/60",
+                      iconClass: "bg-violet-100 text-violet-700 ring-violet-200",
+                      valueClass: "text-slate-800",
+                    },
+                    {
+                      key: "payment",
                       label: t("operations.payment_mode"),
-                      value: tr(formData.paymentModeName),
+                      value: tr(formData.paymentModeName) || "-",
                       icon: CreditCard,
-                    })}
-                    {renderField({
+                      surface: "border-sky-200 bg-sky-50/60",
+                      iconClass: "bg-sky-100 text-sky-700 ring-sky-200",
+                      valueClass: "text-slate-800",
+                    },
+                    {
+                      key: "reference",
                       label: t("operations.reference_no"),
                       value: formData.referenceNo || "-",
                       icon: Hash,
-                    })}
-                    {renderField({
+                      surface: "border-indigo-200 bg-indigo-50/60",
+                      iconClass: "bg-indigo-100 text-indigo-700 ring-indigo-200",
+                      valueClass: "text-slate-800 tabular-nums",
+                    },
+                    {
+                      key: "remarks",
                       label: t("common.remarks"),
                       value: tr(formData.remarks) || "-",
                       icon: FileText,
-                    })}
-                  </div>
+                      surface: "border-slate-200 bg-slate-50/80",
+                      iconClass: "bg-white text-slate-600 ring-slate-200",
+                      valueClass: "text-slate-800",
+                    },
+                  ].map(({ key, label, value, icon: Icon, surface, iconClass, valueClass }) => (
+                    <div
+                      key={key}
+                      className={`flex min-h-24 min-w-0 items-start gap-3 rounded-xl border p-3.5 shadow-sm ${surface}`}
+                    >
+                      <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ring-1 ring-inset ${iconClass}`}>
+                        <Icon size={17} strokeWidth={2.25} />
+                      </span>
+                      <div className="min-w-0 pt-0.5">
+                        <p className="text-[10px] font-extrabold uppercase tracking-wider text-slate-500">
+                          {label}
+                        </p>
+                        <p className={`mt-1 break-words text-sm font-bold leading-snug ${valueClass}`}>
+                          {value}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -656,15 +703,15 @@ export function EditCollectionModal({
                     {/* Same leading order as Recent Collections: S.No,
                       * Collection No, Day. Widths are balanced around the real
                       * values so all seven columns remain neat and readable. */}
-                    <table className="min-w-[900px] w-full table-fixed divide-y divide-slate-200">
+                    <table className="min-w-[980px] w-full table-fixed divide-y divide-slate-200">
                       <colgroup>
                         <col className="w-[7%]" />
-                        <col className="w-[19%]" />
-                        <col className="w-[13%]" />
+                        <col className="w-[18%]" />
+                        <col className="w-[17%]" />
+                        <col className="w-[17%]" />
                         <col className="w-[16%]" />
-                        <col className="w-[16%]" />
-                        <col className="w-[16%]" />
-                        <col className="w-[13%]" />
+                        <col className="w-[14%]" />
+                        <col className="w-[11%]" />
                       </colgroup>
                       {/* Header icons use the same vocabulary as every other
                         * operations table (Trip List, Shop Sales, Recent
@@ -689,13 +736,13 @@ export function EditCollectionModal({
                               {t("common.day")}
                             </span>
                           </th>
-                          <th className="px-3 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                            <span className="inline-flex items-center gap-1.5">
+                          <th className="px-4 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                            <span className="inline-flex w-full items-center justify-end gap-1.5">
                               <IndianRupee size={14} className="shrink-0 text-emerald-600" />
                               {t("table.amount")}
                             </span>
                           </th>
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                          <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
                             <span className="inline-flex items-center gap-1.5">
                               <UserCog size={14} className="shrink-0 text-violet-500" />
                               {t("table.collector")}
@@ -745,12 +792,12 @@ export function EditCollectionModal({
                               {col.collectionNo || "-"}
                             </td>
                             <td className="px-3 py-2.5 text-xs text-slate-600 tabular-nums whitespace-nowrap">
-                              {formatDate(col.collectionDate, dateLocale)}
+                              {formatTripListDay(col.collectionDate, language)}
                             </td>
-                            <td className="px-3 py-2.5 text-right text-xs font-bold tabular-nums text-slate-800">
+                            <td className="px-4 py-2.5 text-right text-xs font-bold tabular-nums text-slate-800 whitespace-nowrap">
                               {formatCurrency(Number(col.amount) || 0)}
                             </td>
-                            <td className="px-3 py-2.5 text-xs text-slate-600">
+                            <td className="px-4 py-2.5 text-xs font-medium text-slate-600 truncate">
                               {tr(col.collector) || "-"}
                             </td>
                             <td className="px-3 py-2.5 text-xs text-slate-600">
