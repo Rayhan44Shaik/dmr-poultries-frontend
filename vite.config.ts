@@ -23,6 +23,10 @@ const OPTIMIZE_DEPS = [
   'exceljs',
   'jspdf',
   'jspdf-autotable',
+  // Deep subpath imported lazily by the PDF previewer — pre-bundled up-front
+  // so opening the Reports pages can never trigger a dependency re-scan (and
+  // the "app was updated while this tab was open" full reload) after first load.
+  'pdfjs-dist/legacy/build/pdf.mjs',
   'react-date-range',
 ]
 
