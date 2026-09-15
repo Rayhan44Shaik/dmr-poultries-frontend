@@ -187,8 +187,8 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
             <div key={i} className="h-[52px] animate-pulse rounded-xl bg-slate-100/80" />
           ))}
         </div>
-        <div className="flex min-h-0 w-full flex-1 items-center justify-center">
-          <div className="relative aspect-square w-full max-w-[430px]" style={{ aspectRatio: "1 / 1" }}>
+        <div className="flex min-h-0 w-full flex-1 items-center justify-center pb-4">
+          <div className="relative aspect-square w-full max-w-[450px]" style={{ aspectRatio: "1 / 1" }}>
             <svg viewBox="0 0 400 400" className="h-full w-full" aria-hidden="true">
               {/* soft track */}
               <circle cx="200" cy="200" r="91" fill="none" stroke="#eef2f7" strokeWidth="33" />
@@ -257,10 +257,12 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
       {/* The donut FILLS the card's free space and sits exactly in the
           middle of the chart box. Re-keyed on every data change so the
           entrance (fade + slice sweep) replays for each new range. */}
-      <div className="flex min-h-0 w-full flex-1 items-center justify-center">
+      {/* pb-4 lifts the donut ~8 px above the exact middle of the box —
+          centred look, sitting a touch higher under the KPI strip. */}
+      <div className="flex min-h-0 w-full flex-1 items-center justify-center pb-4">
         <div
           key={signature}
-          className="relative aspect-square max-h-full w-full max-w-[430px] animate-fade-in"
+          className="relative aspect-square max-h-full w-full max-w-[450px] animate-fade-in"
           style={{ aspectRatio: "1 / 1" }}
         >
           {/* Soft background track behind the ring (same 74.24–107.5 band).

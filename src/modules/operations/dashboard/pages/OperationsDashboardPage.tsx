@@ -771,7 +771,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0 xl:h-[500px]">
+        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0 xl:h-[530px]">
           <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
             <div className="min-w-0">
               {/* The title is the way through to the detail page — no second link. */}
@@ -822,7 +822,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
         {/* overflow-hidden: the donut's hover badge may sit slightly outside
             the ring — it must stay stuck to THIS card, never bleed into the
             neighbouring chart. */}
-        <div className="lg:col-span-5 overflow-hidden bg-white rounded-2xl border border-slate-200/60 p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-5 w-full min-w-0 xl:h-[500px]">
+        <div className="lg:col-span-5 overflow-hidden bg-white rounded-2xl border border-slate-200/60 p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-5 w-full min-w-0 xl:h-[530px]">
           <Link
             to="/operations?tab=collection-report"
             title={t("nav.collectionReport")}
