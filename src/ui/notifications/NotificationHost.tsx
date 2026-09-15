@@ -23,6 +23,7 @@
  */
 
 import { useEffect, useSyncExternalStore } from "react";
+import { useViewLayerOpen } from "../../shared/ui/viewLayer";
 import { AlertTriangle, CheckCircle2, Info, X, XCircle } from "lucide-react";
 import { useI18n } from "../../i18n";
 import {
@@ -98,10 +99,17 @@ function Toast({ item, closeLabel }: { item: NotificationItem; closeLabel: strin
   );
 }
 
+/** Bottom-left stack — used while a full-screen view is open, so a toast can
+ *  never sit over the view's title or its language/close controls. */
+const VIEW_VIEWPORT_CLASS =
+  "pointer-events-none fixed inset-x-0 bottom-0 z-[90] flex flex-col items-start gap-2 p-3 " +
+  "sm:inset-x-auto sm:bottom-0 sm:left-0 sm:items-start sm:p-4";
+
 export default function NotificationHost() {
   const { t } = useI18n();
   const items = useSyncExternalStore(subscribe, getSnapshot, getSnapshot);
   const hasItems = items.length > 0;
+  const viewOpen = useViewLayerOpen();
 
   /* Escape clears the stack, but only while something is visible — so it can
      never shadow a dialog's or menu's own Escape handling. Listeners are
@@ -121,7 +129,7 @@ export default function NotificationHost() {
 
   return (
     <div
-      className={uiToastViewportClass}
+      className={viewOpen ? VIEW_VIEWPORT_CLASS : uiToastViewportClass}
       role="region"
       aria-label={t("notification.region")}
     >

@@ -781,6 +781,7 @@ const SupervisorPerformancePage = () => {
         open={selectedEntry != null}
         onClose={closeDrawer}
         icon={UserCheck}
+        sectionLabel={t("staff.perf.supervisor_title")}
         tone="sky"
         title={personNameLabel(t, language, selectedEntry?.row.supervisorName ?? "")}
         subtitle={`${drawerT("staff.perf.drawer.period")}: ${drawerRangeLabel}`}

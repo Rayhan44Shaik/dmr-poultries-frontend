@@ -35,6 +35,7 @@ import { translateRole, useI18n } from "../../i18n";
 import { personNameLabel } from "../../i18n/displayNames";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { getPendingCollectionSnapshot, subscribePendingCollectionSnapshot } from "../../modules/operations/collections/services/collectionSnapshot";
+import { useViewLayerOpen } from "../../shared/ui/viewLayer";
 import { usePendingApprovals } from "../../modules/approvals/hooks/usePendingApprovals";
 import { startApprovalPolling } from "../../modules/approvals/services/approvalSnapshot";
 import { PENDING_LEAVES_PATH } from "../../modules/staff/utils/leaveDeepLink";
@@ -146,6 +147,10 @@ function IconButton({
 /* ------------------------------------------------------------------ */
 function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
   const location = useLocation();
+  /* A full-screen view (Trip List view, Driver/Supervisor details, …) renders
+     above the page but below this header, so search, language and the
+     notification dropdown keep working while it is open. */
+  const viewOpen = useViewLayerOpen();
   const { theme, toggleTheme } = useTheme();
   const { language, t } = useI18n();
   const roleLabel = (role: string) => translateRole(t, role);
@@ -352,7 +357,9 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
 
 
   return (
-    <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-2 border-b border-slate-200/80 bg-white/85 px-4 backdrop-blur-md sm:gap-3 sm:px-6 dark:border-slate-800 dark:bg-slate-900/85">
+    <header
+      className={`sticky top-0 ${viewOpen ? "z-[55]" : "z-40"} flex h-16 shrink-0 items-center gap-2 border-b border-slate-200/80 bg-white/85 px-4 backdrop-blur-md sm:gap-3 sm:px-6 dark:border-slate-800 dark:bg-slate-900/85`}
+    >
       {/* Menu — every viewport, because it is the way back to a collapsed or
           hidden sidebar. Below `lg` it opens the floating popup; from `lg` up
           it steps the persistent panel (see DashboardLayout), so it must never

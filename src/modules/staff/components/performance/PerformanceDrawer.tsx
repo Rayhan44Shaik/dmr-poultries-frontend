@@ -132,6 +132,8 @@ interface PerformanceDrawerProps {
   onLanguageChange?: (language: Language) => void;
   /** Optional ‹ › person navigation (hidden when absent). */
   navigation?: DrawerNavigation;
+  /** Name of this card's section (the page's own table title). */
+  sectionLabel: string;
   /** Short explanation when the grade could not be scored comparatively. */
   unscoredNote?: ReactNode;
   summary: readonly DrawerSummaryMetric[];
@@ -157,6 +159,7 @@ export function PerformanceDrawer({
   language,
   onLanguageChange,
   navigation,
+  sectionLabel,
   unscoredNote,
   summary,
   factors,
@@ -215,13 +218,21 @@ export function PerformanceDrawer({
             >
               <Icon className="h-6 w-6" />
             </div>
-            <div className="min-w-0">
-              <h2
-                id="performance-drawer-title"
-                className="truncate text-lg font-bold tracking-tight text-slate-800 md:text-xl"
-              >
-                {title}
-              </h2>
+            <div className="min-w-0 flex-1">
+              <div className="flex min-w-0 flex-wrap items-center gap-2.5">
+                <h2
+                  id="performance-drawer-title"
+                  className="min-w-0 truncate text-lg font-bold tracking-tight text-slate-800 md:text-xl"
+                >
+                  {title}
+                </h2>
+                {/* Section name, exactly like the Trip List / Rate Entry card
+                    headers — so "Driver Performance" / "Supervisor Performance"
+                    reads on the view too. */}
+                <span className="inline-flex shrink-0 items-center rounded-full border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500 shadow-sm">
+                  {sectionLabel}
+                </span>
+              </div>
               <div className="mt-1.5 flex flex-wrap items-center gap-2">
                 {gradeBadge}
                 {rankBadge}

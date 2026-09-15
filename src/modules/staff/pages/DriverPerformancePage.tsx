@@ -783,6 +783,7 @@ const DriverPerformancePage = () => {
         open={selectedEntry != null}
         onClose={closeDrawer}
         icon={Truck}
+        sectionLabel={t("staff.perf.driver_title")}
         tone="orange"
         title={personNameLabel(t, language, selectedEntry?.row.driverName ?? "")}
         subtitle={`${drawerT("staff.perf.drawer.period")}: ${drawerRangeLabel}`}

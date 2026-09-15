@@ -10,6 +10,7 @@
 
 import { useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { enterViewLayer } from "../shared/ui/viewLayer";
 
 type Props = {
   open: boolean;
@@ -43,13 +44,23 @@ export default function AppShellModal({
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  // Tell the shell a view is open: the header stays usable above it and the
+  // toasts step aside (see shared/ui/viewLayer).
+  useEffect(() => {
+    if (!open) return;
+    return enterViewLayer();
+  }, [open]);
+
   if (!open) return null;
 
   const content = (
     <>
-      {/* Overlay — global level, no blur background as requested for trip list view */}
+      {/* Overlay — global level, no blur background as requested for trip list
+          view. From `sm` up it starts BELOW the header, so the header's own
+          controls (search, language, notifications) stay clickable while a view
+          is open instead of dismissing it. */}
       <div
-        className="fixed inset-0 animate-fade-in bg-black/20"
+        className="fixed inset-0 animate-fade-in bg-black/20 sm:top-16"
         style={{
           zIndex,
         }}
