@@ -1,4 +1,4 @@
-import { Wallet, ShoppingCart, Download, Calculator, Clock, ArrowRight, AlertTriangle } from "lucide-react";
+import { Wallet, ShoppingCart, Download, Calculator, ArrowRight, AlertTriangle } from "lucide-react";
 import { useI18n } from "../../../../../i18n";
 
 interface OutstandingSummaryProps {
@@ -84,7 +84,7 @@ export default function OutstandingSummary({
   const periodSubtitle = periodLabel || (periodType === "weekly" ? t("ops.collection.mon_sun_week") : t("ops.collection.daily_period"));
 
   return (
-    <div className="h-full w-full rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+    <div className="flex h-full w-full flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
       {/* Header section */}
       <div className="mb-5 flex items-center justify-between gap-2">
         <div className="flex items-center gap-2.5">
@@ -105,8 +105,11 @@ export default function OutstandingSummary({
         {periodSubtitle}
       </div>
 
-      {/* Financial rows */}
-      <div className="space-y-3 animate-in fade-in duration-500">
+      {/* Financial rows. `flex-1` lets this column absorb the height the
+        * neighbouring Collection Details card sets, and the dividers below
+        * take the slack (`mt-auto` on the last one), so Current Outstanding
+        * finishes flush with the bottom instead of leaving dead space. */}
+      <div className="flex flex-1 flex-col gap-3 animate-in fade-in duration-500">
         <Row
           title={t("ops.collection.opening_balance")}
           value={displayOpeningBalance}
@@ -134,7 +137,7 @@ export default function OutstandingSummary({
           isNegative
         />
 
-        <div className="my-2 border-t border-dashed border-slate-200" />
+        <div className="border-t border-dashed border-slate-200" />
 
         <Row
           title={t("operations.pending_approval")}
@@ -146,7 +149,7 @@ export default function OutstandingSummary({
           isInfo
         />
 
-        <div className="my-3 border-t border-dashed border-slate-200" />
+        <div className="mt-auto border-t border-dashed border-slate-200" />
 
         <div className="flex items-center justify-between rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 shadow-sm">
           <div className="flex items-center gap-3">
@@ -169,7 +172,7 @@ export default function OutstandingSummary({
 
         {/* Calculation hint */}
         {ledgerLoaded && showSummary && (
-          <div className="mt-3 pt-3 border-t border-dashed border-slate-200 text-xs text-slate-500">
+          <div className="pt-3 border-t border-dashed border-slate-200 text-xs text-slate-500">
             <div className="flex items-center gap-1.5 text-violet-600">
               <ArrowRight size={12} />
               <span>{t("ops.collection.calculation_hint")}</span>
