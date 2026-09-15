@@ -578,8 +578,13 @@ const DriverPerformancePage = () => {
         </div>
       )}
 
-      {/* KPI cards — reflect the applied dataset */}
-      <PerformanceKpiCards kpis={kpiCards} columns={5} />
+      {/* KPI cards — only for a single driver. They describe ONE person's
+          numbers, so they appear when that driver is picked in the filter and
+          stay away for the whole-fleet view (and for a search-only filter).
+          While the driver's data loads they show the calm static placeholders. */}
+      {applied.personId != null && (
+        <PerformanceKpiCards kpis={kpiCards} columns={5} />
+      )}
 
       {/* Driver Weekly Performance */}
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card">

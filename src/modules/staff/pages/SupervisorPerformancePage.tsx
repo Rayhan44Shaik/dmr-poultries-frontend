@@ -580,8 +580,13 @@ const SupervisorPerformancePage = () => {
         </div>
       )}
 
-      {/* KPI cards — reflect the applied dataset */}
-      <PerformanceKpiCards kpis={kpiCards} columns={5} />
+      {/* KPI cards — only for a single supervisor. They describe ONE person's
+          numbers, so they appear when that supervisor is picked in the filter
+          and stay away for the whole-fleet view (and for a search-only filter).
+          While the data loads they show the calm static placeholders. */}
+      {applied.personId != null && (
+        <PerformanceKpiCards kpis={kpiCards} columns={5} />
+      )}
 
       {/* Supervisor Weekly Performance */}
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card">
