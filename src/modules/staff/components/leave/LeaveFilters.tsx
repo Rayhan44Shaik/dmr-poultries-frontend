@@ -12,17 +12,26 @@ import {
   ChevronRight,
   RotateCcw,
   Plus,
+  Eye,
+  CheckCircle,
+  XCircle,
+  Trash2,
 } from 'lucide-react';
 import {
+  uiButton,
   uiCardClass,
+  uiDisabled,
   uiFilterLabelClass,
-  uiInputClass,
+  uiFocusInset,
+  uiIconButton,
+  uiTransition,
 } from '../../../../shared/ui/uiTokens';
 import { Button } from '../../../../ui';
 import { BrandRefreshButton } from '../../../../ui';
 import { ActionTooltip } from '../../../../ui/ActionTooltip';
 import MasterDropdown from '../../../masters/components/MasterDropdown';
 import type { LeaveFilters as LeaveFilterState } from '../../hooks/useLeaveManagement';
+import type { LeaveRequest } from '../../types/staffDashboard';
 import type { Employee } from '../../../masters/employees/types/employee';
 
 interface LeaveFiltersProps {
@@ -30,12 +39,42 @@ interface LeaveFiltersProps {
   employees: Employee[];
   departments: string[];
   onFilterChange: <K extends keyof LeaveFilterState>(key: K, value: LeaveFilterState[K]) => void;
+  /** Commit the typed search immediately (Enter / the Search button). */
+  onSearch: () => void;
   onReset: () => void;
   onRefresh: () => void;
   onNewRequest: () => void;
   loading: boolean;
   showForm: boolean;
+  /** Selected table row — the actions for it appear beside Reset. */
+  selected: LeaveRequest | null;
+  onViewSelected: () => void;
+  onApproveSelected: () => void;
+  onRejectSelected: () => void;
+  onDeleteSelected: () => void;
 }
+
+/**
+ * Search field: one step taller (44px) than the 40px filter controls, with the
+ * 18px glyph and 11px inset of the Trip List search. Finding a request is the
+ * main thing anyone does on this page, so it is the biggest control in the card
+ * and it sits on the left, where the eye starts.
+ */
+const searchInputClass = [
+  'h-11 w-full min-w-0 rounded-lg border border-slate-300 bg-white pl-11 pr-3',
+  'text-sm font-medium text-slate-800',
+  'placeholder:font-normal placeholder:text-slate-400',
+  uiFocusInset,
+  uiTransition,
+  uiDisabled,
+  'shadow-xs',
+].join(' ');
+
+const searchButtonClass = `${uiButton('primary', 'lg')} group`;
+const viewIconButtonClass = `${uiIconButton('view', 'lg')} group`;
+const approveIconButtonClass = `${uiIconButton('success', 'lg')} group`;
+const rejectIconButtonClass = `${uiIconButton('destructiveOutline', 'lg')} group`;
+const deleteIconButtonClass = `${uiIconButton('destructive', 'lg')} group`;
 
 const LEAVE_TYPES = ['Casual', 'Sick', 'Emergency', 'Annual'] as const;
 
@@ -167,21 +206,36 @@ function MonthPicker({
 /**
  * Leave Management filter card, standardised on the Trip List / Shop List
  * conventions: uppercase micro-labels with emerald glyphs, MasterDropdown
- * controls, the trips search input, a segmented status toggle, and the shared
- * action buttons — Reset (ghost + spin), the DMR-hen Refresh pill, and the
- * emerald New Request primary whose plus icon stamps on hover. Every hover
- * animation plays unconditionally (no `motion-safe:` guard).
+ * controls, and the shared action buttons — Reset (ghost + spin), the DMR-hen
+ * Refresh pill, and the emerald New Request primary whose plus icon stamps on
+ * hover. Every hover animation plays unconditionally (no `motion-safe:` guard).
+ *
+ * Row 2 is the Trip List layout: the search field sits on the LEFT, labelled
+ * and one size up (44px field, 18px glyph) because searching is the page's
+ * primary interaction; the actions sit on the right. Enter in that field, or
+ * the Search button, commits immediately — typing is debounced by the hook, so
+ * no request is fired per character.
+ *
+ * When a table row is selected its actions appear in that same cluster, beside
+ * Reset, instead of being repeated on every row: View (always), and Approve /
+ * Reject / Delete while the request is still Pending.
  */
 function LeaveFilters({
   filters,
   employees,
   departments,
   onFilterChange,
+  onSearch,
   onReset,
   onRefresh,
   onNewRequest,
   loading,
   showForm,
+  selected,
+  onViewSelected,
+  onApproveSelected,
+  onRejectSelected,
+  onDeleteSelected,
 }: LeaveFiltersProps) {
   const departmentOptions = departments.map((d) => ({ value: d, label: d }));
 
@@ -267,22 +321,100 @@ function LeaveFilters({
         </div>
       </div>
 
-      {/* Row 2 — compact search + actions in ONE line (Recent Trips pattern:
-          small search on the left, Reset / Refresh / New Request on the right). */}
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="relative w-full min-w-0 sm:w-64">
-          <Search size={16} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-          <input
-            type="text"
-            aria-label="Search leave requests"
-            placeholder="Search employee, leave type, reason..."
-            value={filters.search}
-            onChange={(e) => onFilterChange('search', e.target.value)}
-            className={`${uiInputClass} pl-10`}
-          />
+      {/* Row 2 — the Trip List layout: big search on the LEFT (label + 44px
+          field), then the action cluster on the right — the selected row's
+          actions first, then Search / Reset / Refresh / New Request. */}
+      <div className="grid grid-cols-1 items-end gap-3.5 lg:grid-cols-12">
+        <div className="lg:col-span-4 2xl:col-span-5">
+          <label className={uiFilterLabelClass} htmlFor="leave-search">
+            <Search size={17} className="shrink-0 text-slate-400" />
+            <span>Search</span>
+          </label>
+          <div className="relative">
+            <Search size={18} className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              id="leave-search"
+              type="text"
+              aria-label="Search leave requests"
+              placeholder="Search employee, leave type, reason..."
+              value={filters.search}
+              onChange={(e) => onFilterChange('search', e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key !== 'Enter') return;
+                e.preventDefault();
+                onSearch();
+              }}
+              className={searchInputClass}
+            />
+          </div>
         </div>
 
-        <div className="ml-auto flex max-w-full flex-wrap items-center gap-2 sm:shrink-0">
+        <div className="flex max-w-full flex-wrap items-center justify-end gap-2 lg:col-span-8 2xl:col-span-7">
+          {/* Selected-row actions — they appear the moment a row is selected and
+              act on that row only (the table has no Action column any more). */}
+          {selected && (
+            <div
+              role="group"
+              aria-label={`Actions for ${selected.employeeName}`}
+              className="flex max-w-full flex-wrap items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-50/80 p-1"
+            >
+              <span className="hidden max-w-[8.5rem] truncate px-1.5 text-xs font-semibold text-slate-600 2xl:inline">
+                {selected.employeeName}
+              </span>
+              <button
+                type="button"
+                onClick={onViewSelected}
+                className={viewIconButtonClass}
+                aria-label={`View leave history for ${selected.employeeName}`}
+              >
+                <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]"><Eye /></span>
+                <ActionTooltip label="View leave history" />
+              </button>
+              {selected.status === 'Pending' && (
+                <>
+                  <button
+                    type="button"
+                    onClick={onApproveSelected}
+                    className={approveIconButtonClass}
+                    aria-label={`Approve leave for ${selected.employeeName}`}
+                  >
+                    <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-approve)]"><CheckCircle /></span>
+                    <ActionTooltip label="Approve" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onRejectSelected}
+                    className={rejectIconButtonClass}
+                    aria-label={`Reject leave for ${selected.employeeName}`}
+                  >
+                    <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reject)]"><XCircle /></span>
+                    <ActionTooltip label="Reject" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onDeleteSelected}
+                    className={deleteIconButtonClass}
+                    aria-label={`Delete leave for ${selected.employeeName}`}
+                  >
+                    <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-delete)]"><Trash2 /></span>
+                    <ActionTooltip label="Delete" />
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={onSearch}
+            className={searchButtonClass}
+            aria-label="Search"
+          >
+            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-search)]"><Search size={15} /></span>
+            Search
+            <ActionTooltip label="Search" />
+          </button>
+
           <button
             type="button"
             onClick={onReset}

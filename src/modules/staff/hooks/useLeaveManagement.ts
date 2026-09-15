@@ -43,6 +43,27 @@ const DEFAULT_FILTERS: LeaveFilters = {
 };
 
 /**
+ * Typing pause before a search is sent to the API — the same 300 ms the Trip
+ * List uses. `filters.search` stays the *input* value; the request only ever
+ * sees the committed `appliedSearch`, so a fast typist fires one request
+ * instead of one per character (which is what made the page flicker and stall).
+ */
+const SEARCH_DEBOUNCE_MS = 300;
+
+export interface UseLeaveManagementOptions {
+  /**
+   * Also fetch `GET /staff/leaves/report`.
+   *
+   * The Leave page renders its table, tabs and counts from the list alone, so
+   * it opts out: the report is a whole-month aggregate (every employee, no
+   * paging) that would otherwise be re-requested on every keystroke, filter
+   * change and refresh for data nothing on screen reads. Defaults to `true` so
+   * the hook's contract is unchanged for any other caller.
+   */
+  includeReport?: boolean;
+}
+
+/**
  * @param initialFilters Filters to open with, taken from a deep link — e.g. the
  *   dashboard's pending-approvals tile sends `status: 'Pending', month: ''` so
  *   the page's very first fetch already asks for exactly what the tile counted.
@@ -51,8 +72,10 @@ const DEFAULT_FILTERS: LeaveFilters = {
  */
 export function useLeaveManagement(
   showNotification?: NotificationFn,
-  initialFilters?: Partial<LeaveFilters>
+  initialFilters?: Partial<LeaveFilters>,
+  options: UseLeaveManagementOptions = {}
 ) {
+  const { includeReport = true } = options;
   const notify = useMemo(
     () => showNotification || ((msg: string) => console.log(msg)),
     [showNotification]
@@ -68,10 +91,18 @@ export function useLeaveManagement(
   const [pageSize, setPageSize] = useState(25);
   const [report, setReport] = useState<LeaveReport>({ month: DEFAULT_FILTERS.month, items: [] });
   const [loading, setLoading] = useState(true);
+  /** First load only — afterwards the table stays on screen while it re-fetches. */
+  const [loadedOnce, setLoadedOnce] = useState(false);
   const [reportLoading, setReportLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
   const mutations = useRef(new Set<string>());
+
+  /** Committed search term — what the API is asked for (see SEARCH_DEBOUNCE_MS). */
+  const [appliedSearch, setAppliedSearch] = useState(() => (initialFilters?.search ?? '').trim());
+  const appliedSearchRef = useRef(appliedSearch);
+  /** Monotonic request id: a slow response can never overwrite a newer one. */
+  const listSeqRef = useRef(0);
 
   // Authoritative Employee Master from the backend.
   useEffect(() => {
@@ -96,11 +127,11 @@ export function useLeaveManagement(
       department: filters.department || undefined,
       employeeId: filters.employeeId ?? undefined,
       leaveType: filters.leaveType === 'All' ? undefined : filters.leaveType,
-      search: filters.search || undefined,
+      search: appliedSearch || undefined,
       page,
       limit: pageSize,
     });
-  }, [filters.status, filters.month, filters.department, filters.employeeId, filters.leaveType, filters.search, page, pageSize]);
+  }, [filters.status, filters.month, filters.department, filters.employeeId, filters.leaveType, appliedSearch, page, pageSize]);
 
   const fetchReport = useCallback(async () => {
     return getLeaveReport({
@@ -112,27 +143,36 @@ export function useLeaveManagement(
 
   // Initial + filter-change loads. The async IIFE only touches state after an
   // await, so it never triggers a synchronous setState cascade inside an effect.
+  // `cancelled` covers the re-run; `listSeqRef` also covers the manual `refresh`
+  // racing this fetch, so the newest answer is always the one rendered.
   useEffect(() => {
     let cancelled = false;
+    const seq = ++listSeqRef.current;
     (async () => {
       try {
         const data = await fetchList();
-        if (!cancelled) setList(data);
+        if (!cancelled && seq === listSeqRef.current) setList(data);
       } catch (e) {
-        if (!cancelled) {
+        if (!cancelled && seq === listSeqRef.current) {
           setError(e instanceof Error ? e.message : 'Failed to load leave requests.');
           setList({ items: [], total: 0, page, limit: pageSize, totalPages: 0 });
         }
       } finally {
-        if (!cancelled) setLoading(false);
+        // Only the newest request clears the busy flag — a stale response must
+        // not hide the progress line of a refresh that is still running.
+        if (!cancelled && seq === listSeqRef.current) {
+          setLoading(false);
+          setLoadedOnce(true);
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [fetchList, page]);
+  }, [fetchList, page, pageSize]);
 
   useEffect(() => {
+    if (!includeReport) return;
     let cancelled = false;
     (async () => {
       try {
@@ -150,7 +190,7 @@ export function useLeaveManagement(
     return () => {
       cancelled = true;
     };
-  }, [fetchReport, filters.month]);
+  }, [fetchReport, filters.month, includeReport]);
 
   const stats = useMemo(() => {
     const requests = list.items;
@@ -172,17 +212,27 @@ export function useLeaveManagement(
   }, [employees]);
 
   const refresh = useCallback(() => {
+    const seq = ++listSeqRef.current;
     setLoading(true);
     setError(null);
-    setReportLoading(true);
-    setReportError(null);
     fetchList()
-      .then((data) => setList(data))
+      .then((data) => {
+        if (seq === listSeqRef.current) setList(data);
+      })
       .catch((e) => {
+        if (seq !== listSeqRef.current) return;
         setError(e instanceof Error ? e.message : 'Failed to load leave requests.');
         setList({ items: [], total: 0, page, limit: pageSize, totalPages: 0 });
       })
-      .finally(() => setLoading(false));
+      .finally(() => {
+        if (seq === listSeqRef.current) {
+          setLoading(false);
+          setLoadedOnce(true);
+        }
+      });
+    if (!includeReport) return;
+    setReportLoading(true);
+    setReportError(null);
     fetchReport()
       .then((data) => setReport(data))
       .catch((e) => {
@@ -190,14 +240,50 @@ export function useLeaveManagement(
         setReport({ month: filters.month, items: [] });
       })
       .finally(() => setReportLoading(false));
-  }, [fetchList, fetchReport, filters.month, page]);
+  }, [fetchList, fetchReport, filters.month, page, pageSize, includeReport]);
 
   const setFilter = useCallback(<K extends keyof LeaveFilters>(key: K, value: LeaveFilters[K]) => {
-    setPage(1);
+    // Typing in the search box must not re-fetch per character: the page is
+    // reset (and the request started) when the debounced term is committed.
+    if (key !== 'search') {
+      setLoading(true);
+      setPage(1);
+    }
     setFilters((f) => ({ ...f, [key]: value }));
   }, []);
 
+  /** Send the current (or a given) search term to the API and go back to page 1. */
+  const commitSearch = useCallback((value?: string) => {
+    const normalized = (value ?? filters.search).trim();
+    if (appliedSearchRef.current === normalized) return;
+    appliedSearchRef.current = normalized;
+    setLoading(true);
+    setAppliedSearch(normalized);
+    setPage(1);
+  }, [filters.search]);
+
+  /** Paging: mark the list busy so the page can show its thin progress line. */
+  const changePage = useCallback((next: number) => {
+    setLoading(true);
+    setPage(next);
+  }, []);
+
+  const changePageSize = useCallback((size: number) => {
+    setLoading(true);
+    setPageSize(size);
+  }, []);
+
+  // Debounced commit — Enter / the Search button commit immediately through
+  // `commitSearch`; this timer then fires with the same value and no-ops.
+  useEffect(() => {
+    const timer = window.setTimeout(() => commitSearch(filters.search), SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [commitSearch, filters.search]);
+
   const resetFilters = useCallback(() => {
+    appliedSearchRef.current = '';
+    setLoading(true);
+    setAppliedSearch('');
     setPage(1);
     setFilters(DEFAULT_FILTERS);
   }, []);
@@ -309,9 +395,14 @@ export function useLeaveManagement(
     reportError,
     stats,
     loading,
+    /** True only until the first list response — the page's full-page spinner. */
+    initialLoading: loading && !loadedOnce,
+    /** True while a later fetch is in flight — the table stays mounted. */
+    refreshing: loading && loadedOnce,
     error,
     filters,
     setFilter,
+    commitSearch,
     resetFilters,
     employees,
     departments,
@@ -325,8 +416,8 @@ export function useLeaveManagement(
     pageSize: list.limit,
     total: list.total,
     totalPages: list.totalPages,
-    setPage,
-    setPageSize,
+    setPage: changePage,
+    setPageSize: changePageSize,
   };
 }
 

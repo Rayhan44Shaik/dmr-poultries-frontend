@@ -1,5 +1,5 @@
 import { memo } from 'react';
-import { CalendarOff } from 'lucide-react';
+import { CalendarOff, MousePointerClick } from 'lucide-react';
 import type { LeaveFilters } from '../../hooks/useLeaveManagement';
 
 type LeaveStatusTab = 'All' | 'Pending' | 'Approved' | 'Rejected';
@@ -15,14 +15,18 @@ const STATUS_TABS: LeaveStatusTab[] = ['All', 'Pending', 'Approved', 'Rejected']
 
 /**
  * "Leave Request" table header — the Leave Management twin of the Duty Assign
- * table header: compact (text-sm semibold, no subtitle), a small sky logo tile
- * whose CalendarOff glyph hops continuously and unconditionally (no
- * `motion-safe:` guard — it must animate for every user).
+ * table header: compact (text-sm semibold, no subtitle) with a calm, completely
+ * static sky logo tile. The CalendarOff glyph carries NO animation: a control
+ * bar is a place to work, and a permanently hopping icon in the corner of the
+ * table is noise, so the brand is stated once and then left alone.
  *
  * The status toggle is the TripRecentTable reference verbatim: a bordered
  * slate track with wide label-only tabs, the active tab wearing its status
  * colour (Pending orange, Approved green, Rejected light red), plus the
  * selected-status count chip beside the title.
+ *
+ * The right-hand hint names the row-selection keyboard model once, where the
+ * user is looking, instead of leaving ArrowUp/ArrowDown to be discovered.
  */
 function LeaveTableHeader({ status, onStatusChange, count }: Props) {
   return (
@@ -30,9 +34,7 @@ function LeaveTableHeader({ status, onStatusChange, count }: Props) {
       <div className="flex min-w-0 flex-wrap items-center gap-3">
         <div className="flex min-w-0 shrink-0 items-center gap-2.5">
           <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-sky-100">
-            <span className="inline-flex animate-[var(--animate-brand-hop)]">
-              <CalendarOff className="text-sky-600" size={16} />
-            </span>
+            <CalendarOff className="text-sky-600" size={16} />
           </div>
           <h3 className="text-sm font-semibold text-slate-700">Leave Request</h3>
         </div>
@@ -75,6 +77,17 @@ function LeaveTableHeader({ status, onStatusChange, count }: Props) {
           })}
         </div>
       </div>
+
+      {/* Row-selection keyboard hint — click a row, then ArrowUp/ArrowDown to
+          move, Enter to open, Escape to clear. */}
+      <span className="hidden items-center gap-1.5 text-[11px] font-medium text-slate-400 lg:inline-flex">
+        <MousePointerClick size={13} className="shrink-0" />
+        <span>
+          Click a row · <kbd className="font-sans font-semibold text-slate-500">↑</kbd>
+          <kbd className="ml-0.5 font-sans font-semibold text-slate-500">↓</kbd> to move ·
+          <kbd className="ml-1 font-sans font-semibold text-slate-500">Enter</kbd> to open
+        </span>
+      </span>
     </div>
   );
 }
