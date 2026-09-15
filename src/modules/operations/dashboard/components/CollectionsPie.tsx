@@ -4,6 +4,7 @@ import { useI18n } from "../../../../i18n";
 import { formatINRCompact } from "../../../../utils/format";
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
+const PIE_TRACK = { radius: 102.5, strokeWidth: 41 } as const;
 /** One extremely slow ambient revolution — 20 minutes per lap, always on. */
 const ORBIT_MS = 1200_000;
 
@@ -224,11 +225,18 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
   if (chartData.length === 0) {
     return (
       <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col" aria-busy="true">
-        <div className="min-h-[250px] w-full flex-1" style={{ minHeight: 250 }}>
+        <div className="min-h-[300px] w-full flex-1" style={{ minHeight: 300 }}>
           <div className="flex h-full w-full items-center justify-center">
-          <div className="relative aspect-square w-full max-w-[470px]" style={{ aspectRatio: "1 / 1" }}>
+          <div className="relative aspect-square w-full max-w-[520px]" style={{ aspectRatio: "1 / 1" }}>
             <svg viewBox="0 0 400 400" className="h-full w-full" aria-hidden="true">
-              <circle cx="200" cy="200" r="91" fill="none" stroke="#eef2f7" strokeWidth="33" />
+              <circle
+                cx="200"
+                cy="200"
+                r={PIE_TRACK.radius}
+                fill="none"
+                stroke="#eef2f7"
+                strokeWidth={PIE_TRACK.strokeWidth}
+              />
               <g
                 className="animate-[spin_1.6s_linear_infinite]"
                 style={{ transformBox: "view-box", transformOrigin: "200px 200px" }}
@@ -236,10 +244,10 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
                 <circle
                   cx="200"
                   cy="200"
-                  r="91"
+                  r={PIE_TRACK.radius}
                   fill="none"
                   stroke="#cbd5e1"
-                  strokeWidth="33"
+                  strokeWidth={PIE_TRACK.strokeWidth}
                   strokeDasharray="429 143"
                   strokeLinecap="round"
                 />
@@ -267,17 +275,24 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
     <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
       {/* The donut stays centered in the available chart stage. Its KPI row
           follows underneath with the same spacing used by Trip Movement. */}
-      <div className="min-h-[250px] w-full flex-1" style={{ minHeight: 250 }}>
+      <div className="min-h-[300px] w-full flex-1" style={{ minHeight: 300 }}>
         <div className="flex h-full w-full items-center justify-center">
           <div
             key={signature}
-            className="relative aspect-square max-h-full w-full max-w-[470px] animate-fade-in"
+            className="relative aspect-square max-h-full w-full max-w-[520px] animate-fade-in"
             style={{ aspectRatio: "1 / 1" }}
           >
-          {/* Soft background track behind the ring (same 74.24–107.5 band).
+          {/* Soft background track behind the enlarged ring (82–123 band).
               SVG circle so it scales with the scene at every card width. */}
           <svg viewBox="0 0 400 400" className="absolute inset-0 h-full w-full" aria-hidden="true">
-            <circle cx="200" cy="200" r="91" fill="none" stroke="rgba(241,245,249,0.8)" strokeWidth="33" />
+            <circle
+              cx="200"
+              cy="200"
+              r={PIE_TRACK.radius}
+              fill="none"
+              stroke="rgba(241,245,249,0.8)"
+              strokeWidth={PIE_TRACK.strokeWidth}
+            />
           </svg>
 
           {/* The rotating wrapper — the rAF loop sets its transform. */}
@@ -299,8 +314,8 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
                   nameKey="name"
                   cx="50%"
                   cy="50%"
-                  innerRadius="37.12%"
-                  outerRadius="53.75%"
+                  innerRadius="41%"
+                  outerRadius="61.5%"
                   paddingAngle={3}
                   cornerRadius={6}
                   stroke="none"
