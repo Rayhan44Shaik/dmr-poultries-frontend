@@ -64,10 +64,28 @@ function trip(id: number, overrides: Partial<Trip> = {}): Trip {
   };
 }
 
+function delivery(shopId: number, shopName: string) {
+  return {
+    id: shopId,
+    serialNo: 1,
+    boxNo: 1,
+    shopId,
+    shopName,
+    birdTypeId: 1,
+    birdType: "Broiler",
+    birds: 100,
+    weight: 200,
+    mortality: 0,
+    rate: null,
+    amount: 0,
+    remarks: "",
+  };
+}
+
 const rows = [
-  trip(1),
-  trip(2, { tripDate: "2026-09-16", vehicleId: 2, vehicleNo: "TS07UB1222", supervisorId: 21, sourceFarmId: 31 }),
-  trip(3, { tripDate: "2026-09-17", vehicleId: 2, vehicleNo: "TS08UB1037", supervisorId: 20, sourceFarmId: 30 }),
+  trip(1, { deliveries: [delivery(101, "First Shop"), delivery(102, "Second Shop")] }),
+  trip(2, { tripDate: "2026-09-16", vehicleId: 2, vehicleNo: "TS07UB1222", supervisorId: 21, sourceFarmId: 31, deliveries: [delivery(103, "Third Shop")] }),
+  trip(3, { tripDate: "2026-09-17", vehicleId: 2, vehicleNo: "TS08UB1037", supervisorId: 20, sourceFarmId: 30, deliveries: [delivery(104, "Fourth Shop")] }),
 ];
 
 test("Trip List applies vehicle, supervisor and source-farm filters together", () => {
@@ -94,6 +112,12 @@ test("Trip List global search matches vehicle plates with or without spaces", ()
     [2],
   );
   assert.deepEqual(filterTripListTrips(rows, { search: "ts07ub1222" }).map(({ id }) => id), [2]);
+});
+
+test("Trip List shop filter matches every delivery, not only a last shop", () => {
+  assert.deepEqual(filterTripListTrips(rows, { shopId: 102 }).map(({ id }) => id), [1]);
+  assert.deepEqual(filterTripListTrips(rows, { shopId: 103 }).map(({ id }) => id), [2]);
+  assert.deepEqual(filterTripListTrips(rows, { shopId: 999 }).map(({ id }) => id), []);
 });
 
 test("Trip List leaves every record visible when no filter is selected", () => {

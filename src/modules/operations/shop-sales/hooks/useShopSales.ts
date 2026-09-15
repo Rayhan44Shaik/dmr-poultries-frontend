@@ -13,7 +13,6 @@ const DEFAULT_FILTER: ShopSaleFilter = {
   toDate: "",
   shopName: "",
   search: "",
-  sortBy: "latest",
 };
 
 /**
@@ -52,7 +51,6 @@ function useShopSales() {
         fromDate: filter.fromDate || undefined,
         toDate: filter.toDate || undefined,
         search: filter.search || undefined,
-        sortBy: filter.sortBy || undefined,
       });
       if (!mountedRef.current || requestSequence !== requestSequenceRef.current) return false;
       setSales(data);
@@ -70,13 +68,12 @@ function useShopSales() {
         setIsLoading(false);
       }
     }
-  }, [filter.fromDate, filter.toDate, filter.search, filter.sortBy]);
+  }, [filter.fromDate, filter.toDate, filter.search]);
 
   // Re-fetch from the backend whenever the server-side filters actually
   // change — this is the "real backend filtering" the from/to date and
   // search fields now drive, replacing the old client-only filtering for
-  // those fields specifically. Shop-name filter and sort stay client-side
-  // below, same as before.
+  // those fields specifically. The Shop-name filter remains client-side below.
   useEffect(() => {
     refreshSales();
     // eslint-disable-next-line react-hooks/exhaustive-deps

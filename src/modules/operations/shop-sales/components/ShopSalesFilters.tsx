@@ -1,5 +1,5 @@
 import React, { useMemo } from "react";
-import { AlertTriangle, ArrowUpDown, Calendar, RotateCcw, Search, Store } from "lucide-react";
+import { AlertTriangle, Calendar, RotateCcw, Search, Store } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import {
   opsFilterCardClass,
@@ -17,13 +17,11 @@ interface Props {
   fromDate: string;
   toDate: string;
   shopName: string;
-  sortBy: string;
   shopNames: string[];
   searchQuery: string;
   setFromDate: (value: string) => void;
   setToDate: (value: string) => void;
   setShopName: (value: string) => void;
-  setSortBy: (value: string) => void;
   setSearchQuery: (value: string) => void;
   onReset: () => void;
   onRefresh: () => void;
@@ -42,12 +40,10 @@ function ShopSalesFilters({
   fromDate,
   toDate,
   shopName,
-  sortBy,
   shopNames,
   setFromDate,
   setToDate,
   setShopName,
-  setSortBy,
   searchQuery,
   setSearchQuery,
   onReset,
@@ -75,31 +71,10 @@ function ShopSalesFilters({
     })).sort((a, b) => a.label.localeCompare(b.label, undefined, { sensitivity: "accent", numeric: true }));
   }, [shopNames]);
 
-  const sortOptions = useMemo<MasterDropdownOption[]>(
-    () => [
-      { value: "latest", label: "Latest Day" },
-      { value: "oldest", label: "Oldest Day" },
-      { value: "sale_asc", label: "Shop Sale No. A–Z" },
-      { value: "sale_desc", label: "Shop Sale No. Z–A" },
-      { value: "shop_asc", label: "Shop Name A–Z" },
-      { value: "shop_desc", label: "Shop Name Z–A" },
-      { value: "birds_desc", label: "Birds: High to Low" },
-      { value: "birds_asc", label: "Birds: Low to High" },
-      { value: "weight_desc", label: "Weight: High to Low" },
-      { value: "weight_asc", label: "Weight: Low to High" },
-      { value: "rate_desc", label: "Rate: High to Low" },
-      { value: "rate_asc", label: "Rate: Low to High" },
-      { value: "amount_desc", label: "Amount: High to Low" },
-      { value: "amount_asc", label: "Amount: Low to High" },
-      { value: "remark_asc", label: "Remark A–Z" },
-      { value: "remark_desc", label: "Remark Z–A" },
-    ],
-    [],
-  );
 
   return (
     <div className={opsFilterCardClass}>
-      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
         <div>
           <label className={opsFilterLabelClass}>
             <Calendar size={17} className="shrink-0 text-emerald-500" />
@@ -134,22 +109,6 @@ function ShopSalesFilters({
           />
         </div>
 
-        <div>
-          <label className={opsFilterLabelClass}>
-            <ArrowUpDown size={17} className="shrink-0 text-violet-500" />
-            <span>Sort By</span>
-          </label>
-          <MasterDropdown
-            hideLabel
-            label="Sort By"
-            value={sortBy}
-            options={sortOptions}
-            onChange={(value) => setSortBy(value || "latest")}
-            placeholder="Latest Day"
-            searchable
-            className="w-full"
-          />
-        </div>
       </div>
 
       <div className="grid grid-cols-1 items-end gap-3.5 pt-1 lg:grid-cols-12">

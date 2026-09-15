@@ -1,5 +1,5 @@
 import React from "react";
-import { FileText, FileSpreadsheet, Search, Eye, Calendar, Truck, UserCog, Warehouse, RotateCcw } from "lucide-react";
+import { FileText, FileSpreadsheet, Search, Eye, Calendar, Truck, UserCog, Warehouse, RotateCcw, Store } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import {
   opsFilterCardClass,
@@ -21,17 +21,20 @@ interface Props {
   vehicle: string;
   supervisor: string;
   farm: string;
+  shop: string;
   search: string;
   setFromDate: (v: string) => void;
   setToDate: (v: string) => void;
   setVehicle: (v: string) => void;
   setSupervisor: (v: string) => void;
   setFarm: (v: string) => void;
+  setShop: (v: string) => void;
   setSearch: (v: string) => void;
   onReset: () => void;
   vehicles?: readonly (string | MasterDropdownOption)[];
   supervisors?: readonly (string | MasterDropdownOption)[];
   farms?: readonly (string | MasterDropdownOption)[];
+  shops?: readonly (string | MasterDropdownOption)[];
   onExportPDF?: () => void;
   onRefresh?: () => void;
   onExportExcel?: () => void;
@@ -48,17 +51,20 @@ function TripFilters({
   vehicle,
   supervisor,
   farm,
+  shop,
   search,
   setFromDate,
   setToDate,
   setVehicle,
   setSupervisor,
   setFarm,
+  setShop,
   setSearch,
   onReset,
   vehicles = [],
   supervisors = [],
   farms = [],
+  shops = [],
   onExportPDF,
   onRefresh,
   onExportExcel,
@@ -84,6 +90,7 @@ function TripFilters({
   const vehicleOptions = localizeOptions(withoutSentinel(vehicles || [], "All Vehicles"));
   const supervisorOptions = localizeOptions(withoutSentinel(supervisors || [], "All Supervisors"));
   const farmOptions = localizeOptions(withoutSentinel(farms || [], "All Sources"));
+  const shopOptions = localizeOptions(withoutSentinel(shops || [], "All Shops"));
 
   return (
     <div className={opsFilterCardClass}>
@@ -170,7 +177,7 @@ function TripFilters({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-end pt-1">
-        <div className="lg:col-span-5">
+        <div className="lg:col-span-4">
           <label className={opsFilterLabelClass}>
             <Search size={17} className="text-slate-400 flex-shrink-0" />
             <span>{t("common.search")}</span>
@@ -186,7 +193,25 @@ function TripFilters({
           </div>
         </div>
 
-        <div className="lg:col-span-7 flex items-center gap-2 justify-end flex-wrap">
+        <div className="lg:col-span-3">
+          <label className={opsFilterLabelClass}>
+            <Store size={17} className="text-amber-500 flex-shrink-0" />
+            <span>{t("operations.shop_name")}</span>
+          </label>
+          <MasterDropdown
+            hideLabel
+            label={t("operations.shop_name")}
+            value={shop === "All Shops" ? "" : shop}
+            options={shopOptions}
+            onChange={(next) => setShop(next || "All Shops")}
+            placeholder="All Shops"
+            searchable
+            allowClear
+            className="w-full"
+          />
+        </div>
+
+        <div className="lg:col-span-5 flex items-center gap-2 justify-end flex-wrap">
           {showViewButton && onViewSelected && (
             <button
               ref={viewButtonRef}

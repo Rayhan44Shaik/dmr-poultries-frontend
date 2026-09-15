@@ -14,6 +14,8 @@ export type TripListClientFilters = {
   vehicleId?: number;
   supervisorId?: number;
   farmId?: number;
+  /** Matches every delivery in a trip, not only its final shop. */
+  shopId?: number;
   /** Matches all visible Trip List columns, including vehicle plates. */
   search?: string;
 };
@@ -35,6 +37,7 @@ function matchesGlobalSearch(trip: Trip, search: string): boolean {
     trip.totalBirds,
     trip.totalWeight,
     trip.totalMortality,
+    ...trip.deliveries.flatMap((delivery) => [delivery.shopName, delivery.birdType]),
   ].map((value) => String(value ?? ""));
   const haystack = values.join(" ").toLocaleLowerCase();
   // Vehicle plates are displayed as "TS 07 UB 1222", but are often stored as
@@ -44,7 +47,7 @@ function matchesGlobalSearch(trip: Trip, search: string): boolean {
 
 export function filterTripListTrips(
   trips: readonly Trip[],
-  { fromDate, toDate, vehicleId, supervisorId, farmId, search = "" }: TripListClientFilters,
+  { fromDate, toDate, vehicleId, supervisorId, farmId, shopId, search = "" }: TripListClientFilters,
 ): Trip[] {
   const from = dateOnly(fromDate);
   const to = dateOnly(toDate);
@@ -55,6 +58,7 @@ export function filterTripListTrips(
     if (vehicleId != null && Number(trip.vehicleId) !== vehicleId) return false;
     if (supervisorId != null && Number(trip.supervisorId) !== supervisorId) return false;
     if (farmId != null && Number(trip.sourceFarmId) !== farmId) return false;
+    if (shopId != null && !trip.deliveries.some((delivery) => Number(delivery.shopId) === shopId)) return false;
     return matchesGlobalSearch(trip, search);
   });
 }

@@ -9,13 +9,11 @@ import type {
 ========================================= */
 
 /**
- * Client-side safety-net filter/sort for the Shop Sales list. The backend
+ * Client-side safety-net filter for the Shop Sales list. The backend
  * already applies fromDate/toDate/search via the API; this pass keeps the
  * in-memory list correct across fetch races and applies the shop-name filter
- * and the sort order locally (the full list is loaded, so this is instant).
- *
- * Sort keys include the public Shop Sale reference plus table-only numeric
- * columns. They are applied locally after the backend returns eligible rows.
+ * locally (the full list is loaded, so this is instant). The API response
+ * order is retained because Shop Sales no longer offers sorting controls.
  */
 export function filterShopSales(
 
@@ -97,84 +95,6 @@ export function filterShopSales(
 
   }
 
-  /* Sorting */
-
-  const byDate = (a: ShopSale, b: ShopSale, dir: 1 | -1) => {
-    const cmp = String(a.tripDate || "").localeCompare(String(b.tripDate || ""));
-    return cmp === 0 ? dir : cmp * dir;
-  };
-
-  switch (filter.sortBy) {
-
-    case "oldest":
-
-      data.sort((a, b) => byDate(a, b, 1));
-
-      break;
-
-    case "sale_asc":
-      data.sort((a, b) => String(a.saleNo ?? a.tripNo).localeCompare(String(b.saleNo ?? b.tripNo), undefined, { numeric: true }) || byDate(b, a, 1));
-      break;
-
-    case "sale_desc":
-      data.sort((a, b) => String(b.saleNo ?? b.tripNo).localeCompare(String(a.saleNo ?? a.tripNo), undefined, { numeric: true }) || byDate(b, a, 1));
-      break;
-
-    case "shop_asc":
-      data.sort((a, b) => a.shopName.localeCompare(b.shopName) || byDate(b, a, 1));
-      break;
-
-    case "shop_desc":
-      data.sort((a, b) => b.shopName.localeCompare(a.shopName) || byDate(b, a, 1));
-      break;
-
-    case "birds_desc":
-      data.sort((a, b) => (b.totalBirds ?? 0) - (a.totalBirds ?? 0) || byDate(b, a, 1));
-      break;
-
-    case "birds_asc":
-      data.sort((a, b) => (a.totalBirds ?? 0) - (b.totalBirds ?? 0) || byDate(b, a, 1));
-      break;
-
-    case "weight_desc":
-      data.sort((a, b) => (b.totalWeight ?? 0) - (a.totalWeight ?? 0) || byDate(b, a, 1));
-      break;
-
-    case "weight_asc":
-      data.sort((a, b) => (a.totalWeight ?? 0) - (b.totalWeight ?? 0) || byDate(b, a, 1));
-      break;
-
-    case "rate_desc":
-      data.sort((a, b) => (Number(b.rate) || 0) - (Number(a.rate) || 0) || byDate(b, a, 1));
-      break;
-
-    case "rate_asc":
-      data.sort((a, b) => (Number(a.rate) || 0) - (Number(b.rate) || 0) || byDate(b, a, 1));
-      break;
-
-    case "amount_desc":
-      data.sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0) || byDate(b, a, 1));
-      break;
-
-    case "amount_asc":
-      data.sort((a, b) => (a.amount ?? 0) - (b.amount ?? 0) || byDate(b, a, 1));
-      break;
-
-    case "remark_asc":
-      data.sort((a, b) => String(a.remark ?? "").localeCompare(String(b.remark ?? "")) || byDate(b, a, 1));
-      break;
-
-    case "remark_desc":
-      data.sort((a, b) => String(b.remark ?? "").localeCompare(String(a.remark ?? "")) || byDate(b, a, 1));
-      break;
-
-    case "latest":
-
-    default:
-
-      data.sort((a, b) => byDate(b, a, 1));
-
-  }
 
   return data;
 

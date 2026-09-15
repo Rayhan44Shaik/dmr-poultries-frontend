@@ -5,7 +5,7 @@
  * (rate_entry.locked = TRUE) says so.
  *
  * GET    /operations/shop-sales        -> eligible sales (Rate Entry locked, not soft-deleted)
- *                                         supports fromDate / toDate / search / sortBy /
+ *                                         supports fromDate / toDate / search /
  *                                         shopId / page / limit (paginated result shape)
  * PUT    /operations/shop-sales/:id    -> edit birds/weight/mortality/remarks/birdType only
  *                                          (rate/amount/shopId/shopName/tripId are backend-immutable
@@ -39,24 +39,18 @@ export interface ShopSalesPageResult {
 /** GET /operations/shop-sales — only trips whose Rate Entry is locked are
  * ever returned (backend-enforced eligibility; never re-derived here).
  * fromDate/toDate/search are sent to the backend (real filtering);
- * shop-name text filter and sort order stay client-side in the hook
+ * shop-name text filter stays client-side in the hook
  * (the full eligible list is loaded, so pagination remains client-side). */
 export async function listShopSales(filters: {
   fromDate?: string;
   toDate?: string;
   search?: string;
-  sortBy?: string;
 } = {}): Promise<ShopSale[]> {
   const params: Record<string, string> = {};
   if (filters.fromDate) params.fromDate = filters.fromDate;
   if (filters.toDate) params.toDate = filters.toDate;
   if (filters.search && filters.search.trim() !== "") params.search = filters.search.trim();
-  // The server supports the original coarse sort set. The table additionally
-  // offers instant client-side sorts (sale number, birds, weight, rate and remarks),
-  // which must not be sent as an unknown server enum during a manual refresh.
-  if (["latest", "oldest", "shop_asc", "shop_desc", "amount_desc", "amount_asc"].includes(filters.sortBy || "")) {
-    params.sortBy = filters.sortBy!;
-  }
+
 
   const { data } = await apiGet<ApiShopSale[] | ShopSalesPageResult>(
     SHOP_SALES_PATH,
