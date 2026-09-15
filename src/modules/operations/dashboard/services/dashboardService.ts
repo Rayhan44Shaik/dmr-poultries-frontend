@@ -44,7 +44,21 @@ export type OperationsDashboardApiResponse = {
   usedHelpers?: number;
   usedShops?: number;
   usedFarms?: number;
+  /** Sample-only row counts for the Operations module map. */
+  moduleCounts?: Partial<OperationsModuleCounts> | null;
 };
+
+/** Row counts behind each Operations page for the selected dashboard range. */
+export interface OperationsModuleCounts {
+  tripRecords: number;
+  rateEntries: number;
+  shopSales: number;
+  collections: number;
+  pendingShops: number;
+  mortalityTrips: number;
+  fuelBills: number;
+  orders: number;
+}
 
 /** UI shape used by Operations Dashboard components. */
 export interface DashboardData {
@@ -78,6 +92,8 @@ export interface DashboardData {
   usedHelpers: number;
   usedShops: number;
   usedFarms: number;
+  /** Sample-only record counts linking the overview to every Operations page. */
+  moduleCounts: OperationsModuleCounts | null;
   /** Non-null only when these numbers came from the quarter sample API. */
   sampleQuarter: SampleQuarter | null;
 }
@@ -85,6 +101,22 @@ export interface DashboardData {
 function toNumber(value: unknown): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
+}
+
+function mapModuleCounts(
+  raw: Partial<OperationsModuleCounts> | null | undefined
+): OperationsModuleCounts | null {
+  if (!raw) return null;
+  return {
+    tripRecords: toNumber(raw.tripRecords),
+    rateEntries: toNumber(raw.rateEntries),
+    shopSales: toNumber(raw.shopSales),
+    collections: toNumber(raw.collections),
+    pendingShops: toNumber(raw.pendingShops),
+    mortalityTrips: toNumber(raw.mortalityTrips),
+    fuelBills: toNumber(raw.fuelBills),
+    orders: toNumber(raw.orders),
+  };
 }
 
 /** Map API fields onto the existing dashboard UI shape. */
@@ -131,6 +163,7 @@ export function mapDashboardResponse(
     usedHelpers: toNumber(raw?.usedHelpers),
     usedShops: toNumber(raw?.usedShops),
     usedFarms: toNumber(raw?.usedFarms),
+    moduleCounts: raw?.sample === true ? mapModuleCounts(raw.moduleCounts) : null,
     // Only the sample server flags itself; a real backend leaves this null so
     // no "sample data" badge is ever shown against production numbers.
     sampleQuarter: raw?.sample === true && raw?.quarter ? raw.quarter : null,
@@ -297,7 +330,7 @@ function demoDashboard(from: Date | null, to: Date | null): DashboardData {
     collectionsByMode: [], expensesByCategory: [], mortalityData: [], recentTrips: [],
     activeVehicles: 18, activeDrivers: 24, activeHelpers: 31, totalShops: 100, totalFarms: 24,
     pendingCollectionsByShop: [], usedVehicles: 14, usedDrivers: 20, usedHelpers: 26,
-    usedShops: 38, usedFarms: 12, sampleQuarter: null,
+    usedShops: 38, usedFarms: 12, moduleCounts: null, sampleQuarter: null,
   };
   if (days.length === 0) return empty;
 
@@ -375,6 +408,7 @@ function demoDashboard(from: Date | null, to: Date | null): DashboardData {
     usedHelpers: 26,
     usedShops: 38,
     usedFarms: 12,
+    moduleCounts: null,
     sampleQuarter: null,
   };
 }
@@ -439,6 +473,7 @@ function offlineDashboard(): DashboardData {
     usedHelpers: 0,
     usedShops: 0,
     usedFarms: 0,
+    moduleCounts: null,
     sampleQuarter: null,
   };
 }

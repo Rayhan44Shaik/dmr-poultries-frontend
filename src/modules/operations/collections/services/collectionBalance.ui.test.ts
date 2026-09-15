@@ -73,12 +73,17 @@ test("Current Outstanding KPI is the primary summary figure (highlighted, bottom
 });
 
 test("Collection Entry renders the collection table with the required columns", () => {
-  assert.match(tableSrc, /Collection No/);
-  assert.match(tableSrc, /Shop/);  // Column header is "Shop"
-  assert.match(tableSrc, /Collector/);  // Column header is "Collector"
-  assert.match(tableSrc, /Date/);  // Column header is "Date"
-  assert.match(tableSrc, /Amount/);
-  assert.match(tableSrc, /Status/);
+  // Column headers are i18n-driven, so assert the keys the table actually
+  // renders rather than English literals (those only ever matched incidental
+  // comments, and silently stopped matching when the layout was reworked).
+  // en values: S.No · Collection No · Day · Shop · Collector · Amount · Status.
+  assert.match(tableSrc, /t\("table\.s_no"\)/);
+  assert.match(tableSrc, /t\("table\.collection_no"\)/);
+  assert.match(tableSrc, /t\("common\.day"\)/);
+  assert.match(tableSrc, /t\("table\.shop"\)/);
+  assert.match(tableSrc, /t\("table\.collector"\)/);
+  assert.match(tableSrc, /t\("table\.amount"\)/);
+  assert.match(tableSrc, /t\("table\.status"\)/);
 });
 
 test("Filtering happens before display (single global filter)", () => {

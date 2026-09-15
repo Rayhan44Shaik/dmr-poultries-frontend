@@ -525,7 +525,10 @@ for (const date of OP_DATES) {
     const vehicle = ACTIVE_VEHICLES[(tripSeq * 5) % ACTIVE_VEHICLES.length];
     const driver = DRIVERS[(tripSeq * 3) % DRIVERS.length];
     const supervisor = SUPERVISORS[(tripSeq * 7) % SUPERVISORS.length];
-    const farm = FARMS[(tripSeq * 2) % FARMS.length];
+    // 3 is coprime with the ten-farm master, so a full quarter actually uses
+    // every farm. The old ×2 cycle visited only five farms forever, leaving
+    // half the farm dropdown disconnected from all Operations sample rows.
+    const farm = FARMS[(tripSeq * 3) % FARMS.length];
     const birdType = BIRD_TYPES[tripSeq % 2 === 0 ? 0 : (tripSeq % BIRD_TYPES.length)];
     const helpers = [HELPERS[(tripSeq * 2) % HELPERS.length], HELPERS[(tripSeq * 5 + 1) % HELPERS.length]];
     const loaders = [LOADERS[(tripSeq * 3) % LOADERS.length], LOADERS[(tripSeq * 4 + 2) % LOADERS.length]];
@@ -1686,6 +1689,41 @@ function tripsIn(from, to) {
   );
 }
 
+function operationModuleCounts(from, to) {
+  const inWindow = (row, dateField) => inRange(row[dateField], from, to);
+  const tripRecords = TRIPS.filter(
+    (trip) => !isOrderContainerRow(trip) && inWindow(trip, "tripDate")
+  );
+  const rateEntries = tripRecords.filter(
+    (trip) =>
+      !trip.deleted &&
+      !trip.rateLockedAt &&
+      trip.deliveryStepSubmitted &&
+      trip.status !== "Draft"
+  );
+
+  return {
+    // Trip List deliberately includes Draft/Pending/Deleted audit rows; the
+    // headline KPI above counts live (non-deleted) trips only.
+    tripRecords: tripRecords.length,
+    rateEntries: rateEntries.length,
+    shopSales: SHOP_SALES.filter(
+      (sale) => sale.deleted !== true && inRange(sale.saleDate ?? sale.tripDate, from, to)
+    ).length,
+    collections: COLLECTIONS.filter(
+      (collection) => collection.deleted !== true && inWindow(collection, "collectionDate")
+    ).length,
+    // Outstanding is a live carried balance rather than a dated event, just
+    // like the dashboard's Pending Collections rupee KPI.
+    pendingShops: SHOPS.filter((shop) => Number(shop.currentBalance) > 0).length,
+    mortalityTrips: COMPLETED_TRIPS.filter((trip) => inWindow(trip, "tripDate")).length,
+    fuelBills: FUEL_EXPENSES.filter((bill) => inWindow(bill, "billDate")).length,
+    orders: TRIPS.filter(
+      (trip) => isOrderContainerRow(trip) && inWindow(trip, "tripDate")
+    ).length,
+  };
+}
+
 function operationsDashboard(from = QUARTER.fromDate, to = QUARTER.toDate) {
   const trips = tripsIn(from, to);
   // Unfiltered view of the whole dataset, for the "now" KPI tiles below.
@@ -1812,6 +1850,10 @@ function operationsDashboard(from = QUARTER.fromDate, to = QUARTER.toDate) {
     usedHelpers,
     usedShops,
     usedFarms,
+    // Record-level map behind the Operations overview tiles. These counts are
+    // rebuilt for the selected range on every request, so an in-memory write
+    // (trip/rate/sale/collection/fuel/order) appears here immediately too.
+    moduleCounts: operationModuleCounts(from, to),
     // Flags the payload as sample data so the dashboard can badge itself.
     sample: true,
     today: TODAY,
@@ -1911,6 +1953,39 @@ function mortalityAnalysis(params) {
     mortalityPercentage: t.totalBirds ? round((t.totalMortalityCount / t.totalBirds) * 100, 2) : 0,
     survivalRate: t.survivalRate,
   }));
+
+  // The page delegates every sortable column to the API. Sort BEFORE slicing
+  // so page 1 is genuinely the newest/highest/etc. across the full quarter,
+  // not merely a sorted ten-row fragment.
+  const sortBy = params.get("sortBy") || "tripDate";
+  const sortDirection = params.get("sortDir") === "asc" ? 1 : -1;
+  const sortValue = {
+    tripDate: (row) => row.tripDate,
+    tripNo: (row) => row.tripNo,
+    sourceFarm: (row) => row.sourceFarm,
+    supervisorName: (row) => row.supervisorName,
+    farmBirds: (row) => row.farmBirds,
+    farmWeight: (row) => row.farmWeight,
+    deliveryShops: (row) => row.deliveryShops,
+    deliveredBirds: (row) => row.deliveredBirds,
+    deliveredWeight: (row) => row.deliveredWeight,
+    mortalityCount: (row) => row.mortalityCount,
+    mortalityWeight: (row) => row.mortalityWeight,
+    mortalityPercentage: (row) => row.mortalityPercentage,
+    weightLoss: (row) => row.weightLoss,
+    weightLossPercentage: (row) => row.weightLossPercentage,
+  }[sortBy] ?? ((row) => row.tripDate);
+  rows.sort((left, right) => {
+    const a = sortValue(left);
+    const b = sortValue(right);
+    const comparison =
+      typeof a === "number" && typeof b === "number"
+        ? a - b
+        : String(a ?? "").localeCompare(String(b ?? ""), undefined, { numeric: true });
+    return comparison === 0
+      ? right.tripNo.localeCompare(left.tripNo, undefined, { numeric: true })
+      : comparison * sortDirection;
+  });
 
   const sum = (f) => round(rows.reduce((a, r) => a + f(r), 0), 2);
   const kpis = {
@@ -4569,9 +4644,24 @@ const server = http.createServer(async (req, res) => {
     if (p === "/api/operations/collection-entry/recent") {
       const shopId = Number(q.get("shopId"));
       const limit = Math.min(Number(q.get("limit") || 20), 500);
-      const rows = COLLECTIONS.filter((c) => c.deleted !== true && (!shopId || c.shopId === shopId))
-        .sort((a, b) => b.collectionDate.localeCompare(a.collectionDate))
-        .slice(0, limit);
+      const includeDeleted = String(q.get("includeDeleted")) === "true";
+      const rows = COLLECTIONS.filter(
+        (c) => (includeDeleted || c.deleted !== true) && (!shopId || c.shopId === shopId),
+      )
+        .sort(
+          (a, b) =>
+            b.collectionDate.localeCompare(a.collectionDate) ||
+            String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? "")) ||
+            b.id - a.id ||
+            b.collectionNo.localeCompare(a.collectionNo, undefined, { numeric: true }),
+        )
+        .slice(0, limit)
+        .map((row) => ({
+          ...row,
+          // Soft deletion must not masquerade as the previous Approved or
+          // Pending status in the complete per-shop history.
+          status: row.deleted === true ? "Deleted" : row.status,
+        }));
       return send(200, rows);
     }
     if (p === "/api/operations/collection-entry/pending-summary") {
@@ -4663,7 +4753,35 @@ const server = http.createServer(async (req, res) => {
         );
       }
       rows = rows.sort((a, b) => b.billDate.localeCompare(a.billDate));
-      return send(200, paginate(rows, q, 25));
+
+      // KPI totals belong to the complete filtered register, not the visible
+      // page. Returning them with the envelope keeps page 1, page 2 and page N
+      // perfectly stable while still limiting the table payload.
+      const tripFuel = rows.filter((bill) => bill.tripId && Number(bill.liters) > 0);
+      const tripDistance = tripFuel.reduce(
+        (total, bill) => total + Number(TRIP_BY_ID.get(Number(bill.tripId))?.totalKm ?? 0),
+        0
+      );
+      const tripLitres = tripFuel.reduce((total, bill) => total + Number(bill.liters ?? 0), 0);
+      const recentTripBill = tripFuel[0];
+      const recentTrip = recentTripBill
+        ? TRIP_BY_ID.get(Number(recentTripBill.tripId))
+        : null;
+      const page = paginate(rows, q, 25);
+      return send(200, {
+        ...page,
+        summary: {
+          totalLitres: round(rows.reduce((total, bill) => total + Number(bill.liters ?? 0), 0), 2),
+          totalAmount: round(rows.reduce((total, bill) => total + Number(bill.amount ?? 0), 0), 2),
+          pendingCount: rows.filter((bill) => bill.status === "Pending").length,
+          approvedCount: rows.filter((bill) => bill.status === "Approved").length,
+          avgMileage: tripLitres ? round(tripDistance / tripLitres, 2) : null,
+          recentTripMileage:
+            recentTripBill && recentTrip
+              ? round(Number(recentTrip.totalKm ?? 0) / Number(recentTripBill.liters), 2)
+              : null,
+        },
+      });
     }
     // Fuel register writes (Fuel Expenses page).
     if (p === "/api/operations/fuel-expenses" && method === "POST") {

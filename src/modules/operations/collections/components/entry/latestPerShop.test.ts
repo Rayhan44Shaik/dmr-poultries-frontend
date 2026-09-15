@@ -1,62 +1,122 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import type { RecentCollection } from "../../types/collection";
+import {
+  collectionShopKey,
+  latestApprovedPerShop,
+} from "./latestApprovedPerShop";
 
-type Row = { id: string; shopName: string; collectionNo: string; collectionDate: string; numericId?: number; rawStatus?: string; status?: string };
-
-// Mirrors the component's reducer exactly.
-function latestPerShop(collections: Row[], matching: (r: Row) => boolean) {
-  const allApproved = collections.filter((r) => (r.rawStatus || r.status) === "Approved");
-  const isNewer = (c: Row, cur: Row) => {
-    const byDate = c.collectionDate.localeCompare(cur.collectionDate);
-    if (byDate !== 0) return byDate > 0;
-    return (c.numericId ?? 0) > (cur.numericId ?? 0);
+function row(overrides: Partial<RecentCollection>): RecentCollection {
+  return {
+    id: "1",
+    collectionNo: "COL-20260901-001",
+    collectionDate: "2026-09-01",
+    shopName: "Sri Balaji",
+    collectorName: "Ravi",
+    paymentModeName: "Cash",
+    referenceNo: "",
+    amount: 1000,
+    remarks: "",
+    status: "Approved",
+    rawStatus: "Approved",
+    numericId: 1,
+    numericShopId: 1,
+    ...overrides,
   };
-  const m = new Map<string, Row>();
-  for (const col of allApproved) {
-    const ex = m.get(col.shopName);
-    if (!ex || isNewer(col, ex)) m.set(col.shopName, col);
-  }
-  const matchingShops = new Set(collections.filter(matching).filter(r => (r.rawStatus||r.status)==="Approved").map((r) => r.shopName));
-  return [...m.values()].filter((r) => matchingShops.has(r.shopName))
-    .sort((a, b) => b.collectionDate.localeCompare(a.collectionDate));
 }
 
-const rows: Row[] = [
-  { id:"1", shopName:"Sri Balaji", collectionNo:"COL-001", collectionDate:"2026-09-01", numericId:1, rawStatus:"Approved" },
-  { id:"2", shopName:"Sri Balaji", collectionNo:"COL-009", collectionDate:"2026-09-10", numericId:9, rawStatus:"Approved" },
-  { id:"3", shopName:"Sri Balaji", collectionNo:"COL-005", collectionDate:"2026-09-05", numericId:5, rawStatus:"Approved" },
-  { id:"4", shopName:"Hanuman",    collectionNo:"COL-throw", collectionDate:"2026-09-02", numericId:2, rawStatus:"Approved" },
-  { id:"5", shopName:"Gayatri",    collectionNo:"COL-007", collectionDate:"2026-09-07", numericId:7, rawStatus:"Pending Approval" },
+const rows: RecentCollection[] = [
+  row({ id: "1", collectionNo: "COL-20260901-001", collectionDate: "2026-09-01", numericId: 1 }),
+  row({ id: "9", collectionNo: "COL-20260910-009", collectionDate: "2026-09-10", numericId: 9 }),
+  row({ id: "5", collectionNo: "COL-20260905-005", collectionDate: "2026-09-05", numericId: 5 }),
+  row({
+    id: "2",
+    collectionNo: "COL-20260902-002",
+    collectionDate: "2026-09-02",
+    shopName: "Hanuman",
+    numericId: 2,
+    numericShopId: 2,
+  }),
+  row({
+    id: "7",
+    collectionNo: "COL-20260911-007",
+    collectionDate: "2026-09-11",
+    shopName: "Gayatri",
+    numericId: 7,
+    numericShopId: 3,
+    status: "Pending",
+    rawStatus: "Pending Approval",
+  }),
 ];
 
-test("every shop with an approved entry appears, exactly once", () => {
-  const out = latestPerShop(rows, () => true);
-  assert.deepEqual(out.map(r => r.shopName), ["Sri Balaji", "Hanuman"]);
-  assert.equal(new Set(out.map(r=>r.shopName)).size, out.length);
+test("Approved output contains every approved shop exactly once", () => {
+  const output = latestApprovedPerShop(rows);
+  assert.deepEqual(output.map((item) => item.shopName), ["Sri Balaji", "Hanuman"]);
+  assert.equal(new Set(output.map(collectionShopKey)).size, output.length);
 });
 
-test("the row carries that shop's LATEST collection number", () => {
-  const out = latestPerShop(rows, () => true);
-  assert.equal(out.find(r => r.shopName === "Sri Balaji")!.collectionNo, "COL-009");
+test("each shop row carries its newest approved collection number", () => {
+  const output = latestApprovedPerShop(rows);
+  assert.equal(
+    output.find((item) => item.shopName === "Sri Balaji")?.collectionNo,
+    "COL-20260910-009",
+  );
 });
 
-test("a shop with only pending entries does not appear", () => {
-  assert.equal(latestPerShop(rows, () => true).some(r => r.shopName === "Gayatri"), false);
-});
-
-test("same-day entries are broken by id, not insertion order", () => {
-  const tie: Row[] = [
-    { id:"a", shopName:"S", collectionNo:"COL-A", collectionDate:"2026-09-09", numericId:4, rawStatus:"Approved" },
-    { id:"b", shopName:"S", collectionNo:"COL-B", collectionDate:"2026-09-09", numericId:11, rawStatus:"Approved" },
+test("Pending and Deleted records never leak into or displace Approved rows", () => {
+  const mixed = [
+    ...rows,
+    row({
+      id: "12",
+      numericId: 12,
+      collectionNo: "COL-20260912-012",
+      collectionDate: "2026-09-12",
+      status: "Pending",
+      rawStatus: "Pending Approval",
+    }),
+    row({
+      id: "13",
+      numericId: 13,
+      collectionNo: "COL-20260913-013",
+      collectionDate: "2026-09-13",
+      status: "Deleted",
+      rawStatus: "Deleted",
+    }),
   ];
-  assert.equal(latestPerShop(tie, () => true)[0].collectionNo, "COL-B");
-  assert.equal(latestPerShop([...tie].reverse(), () => true)[0].collectionNo, "COL-B");
+  const output = latestApprovedPerShop(mixed);
+  assert.equal(output.length, 2);
+  assert.equal(output[0].collectionNo, "COL-20260910-009");
+  assert.ok(output.every((item) => item.rawStatus === "Approved"));
 });
 
-test("REGRESSION: searching an older entry still shows the shop's latest number", () => {
-  // User searches "COL-001" — the oldest Sri Balaji entry. The shop row must
-  // still report COL-009, the actual latest, not the matched older one.
-  const out = latestPerShop(rows, (r) => r.collectionNo === "COL-001");
-  assert.deepEqual(out.map(r => r.shopName), ["Sri Balaji"]);
-  assert.equal(out[0].collectionNo, "COL-009");
+test("same-day entries are broken by backend id, not insertion order", () => {
+  const tied = [
+    row({ id: "4", numericId: 4, collectionNo: "COL-20260909-004", collectionDate: "2026-09-09" }),
+    row({ id: "11", numericId: 11, collectionNo: "COL-20260909-011", collectionDate: "2026-09-09" }),
+  ];
+  assert.equal(latestApprovedPerShop(tied)[0].collectionNo, "COL-20260909-011");
+  assert.equal(latestApprovedPerShop([...tied].reverse())[0].collectionNo, "COL-20260909-011");
+});
+
+test("stable shop ids preserve distinct shops that share the same display name", () => {
+  const sameName = [
+    row({ id: "21", numericId: 21, numericShopId: 21, shopName: "Main Shop" }),
+    row({ id: "22", numericId: 22, numericShopId: 22, shopName: "Main Shop" }),
+  ];
+  const output = latestApprovedPerShop(sameName);
+  assert.equal(output.length, 2);
+  assert.equal(new Set(output.map(collectionShopKey)).size, 2);
+});
+
+test("searching an older approved number can retain the shop without changing its latest row", () => {
+  const matchingKeys = new Set(
+    rows
+      .filter((item) => item.collectionNo === "COL-20260901-001")
+      .map(collectionShopKey),
+  );
+  const output = latestApprovedPerShop(rows).filter((item) =>
+    matchingKeys.has(collectionShopKey(item)),
+  );
+  assert.equal(output.length, 1);
+  assert.equal(output[0].collectionNo, "COL-20260910-009");
 });

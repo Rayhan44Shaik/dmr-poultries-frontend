@@ -179,13 +179,15 @@ function buildRows() {
   for (let back = 44; back >= 0; back--) {
     const date = iso(addDays(today, -back));
     const daySeed = Number(date.replaceAll("-", ""));
+    let dailyCollectionSequence = 0;
     SHOPS.forEach((shop, shopIdx) => {
       const rnd = seeded(daySeed * 31 + shopIdx * 7 + 5);
       const count = Math.floor(rnd() * 3); // 0–2 collections per shop/day
       for (let i = 0; i < count; i++) {
+        dailyCollectionSequence += 1;
         rows.push({
           date,
-          collectionNo: `COL-${date.replaceAll("-", "")}-${shop.id}${i + 1}`,
+          collectionNo: `COL-${date.replaceAll("-", "")}-${String(dailyCollectionSequence).padStart(3, "0")}`,
           shopId: shop.id,
           shopName: shop.shopName,
           collector: COLLECTORS[Math.floor(rnd() * COLLECTORS.length)],

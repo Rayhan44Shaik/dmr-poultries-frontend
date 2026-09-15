@@ -11,6 +11,7 @@ import { granularityForRange, type Granularity } from "../utils/trendSeries";
 import CollectionsPie from "../components/CollectionsPie";
 import RecentTripsTable from "../components/RecentTripsTable";
 import ActiveCounts from "../components/ActiveCounts";
+import QuarterOperationsCoverage from "../components/QuarterOperationsCoverage";
 import PendingCollectionsByShop from "../components/PendingCollectionsByShop";
 import PendingApprovalsPanel from "../components/PendingApprovalsPanel";
 import {
@@ -794,6 +795,15 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
         actions={headerActions}
       />
 
+      {data.sampleQuarter && data.moduleCounts && calendarFrom && calendarTo ? (
+        <QuarterOperationsCoverage
+          quarter={data.sampleQuarter}
+          counts={data.moduleCounts}
+          fromDate={calendarFrom}
+          toDate={calendarTo}
+        />
+      ) : null}
+
       <div className="relative z-10">
         <KPICards
           current={data}
@@ -911,6 +921,11 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
           helpers={data?.activeHelpers || 0}
           shops={data?.totalShops || 0}
           farms={data?.totalFarms || 0}
+          usedVehicles={data?.usedVehicles || 0}
+          usedDrivers={data?.usedDrivers || 0}
+          usedHelpers={data?.usedHelpers || 0}
+          usedShops={data?.usedShops || 0}
+          usedFarms={data?.usedFarms || 0}
         />
       </div>
     </div>

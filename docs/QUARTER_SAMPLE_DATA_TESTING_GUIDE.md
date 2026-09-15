@@ -209,9 +209,17 @@ opening + sales − collections.
 
 ### 3.3 Operations — `/operations`
 
+The Overview opens on the exact rolling 92-day sample window. Its **Quarter
+Operations Map** reconciles the page-level row counts in one place and links
+straight to each register. On the 2026-09-15 anchor it reads: 632 Trip List
+records, 85 Rate Entry trips, 6,728 Shop Sale lines, 4,755 collections, 197
+shops with dues, 524 completed mortality trips, 738 fuel bills and 8 order-day
+plans. Changing the calendar re-scopes the dated counts; outstanding shops stays
+a live carried-balance count, matching the Pending Collections KPI.
+
 | Tab | Route | Checks |
 |---|---|---|
-| Operation Dashboard | `?tab=overview` | Same KPI set as `/dashboard`; change the date range to a single month → totals shrink accordingly. |
+| Operation Dashboard | `?tab=overview` | Defaults to the whole sample quarter. All KPI/chart/panel values and the Quarter Operations Map use the same range. Change the date range to a single month → dated totals/counts shrink accordingly. Active Ecosystem shows real used/active ratios (the quarter exercises all 10 farms), never `0 / total`. |
 | Trip Entry | `?tab=trip-entry` | Step 1 dropdowns: 23 vehicles, 29 drivers, 24 supervisors, 29 helpers, 24 loaders. Last-meter hint resolves per vehicle. Recent Trips shows Drafts parked at Steps 1/2/3/4 (dated 2026-09-11 and the 3 days after) → "Resume Step N" for every step. |
 | Trip List | `?tab=trip-list` | 632 rows; filter each status: Completed (bulk), Pending, Draft, Deleted (~10). Open a Completed trip → all 5 steps filled: staff, farm + GPS, DC weight + box details, deliveries, diesel + expenses + mileage. |
 | Rate Entry | `?tab=rate-entry` | Every delivery-submitted trip listed; open one → 8–18 shop lines, each with market-rate reference (master / last trip / avg + sample count) and a 4-day market-rate window. Completed trips show rate-locked state with lock timestamp. |
@@ -219,8 +227,8 @@ opening + sales − collections.
 | Collection Entry | `?tab=collection` | Shop picker (200 shops); recent-collections panel per shop; week bounds resolve to the current sample week. |
 | Pending Collections | `?tab=pending-collections` | 200 shop rows sorted by outstanding; total ≈ ₹1.69 Cr; each row shows total sales, total collected, last collection date and overdue days. |
 | Weight Loss / Mortality | `?tab=mortality` | KPI strip (farm birds, delivered birds, mortality %, weight loss %); farm + supervisor dropdowns populated from real data; sort every column; expand a trip → shop-wise mortality lines. |
-| Fuel Expenses | `?tab=fuel-expenses` | 606 bills, paginated 25/page; filter TRIP vs MANUAL; status Approved / Pending / Rejected; trip-linked rows carry trip no, meter and GPS. |
-| Orders | `?tab=orders` | Now reads the live API (bundled sample mode switched off). **8 `[ORDER]` collection containers** (one per each of the last 8 operating days, 20–36 shops each): the newest is still *in collection* (Tab 1 working order), the other 7 are *collected* and available in Tab 2, where **9 vehicle trips** are assignment-eligible (Step 2 done, Step 4 open). Tab 3 Delivery Tracking is driven by the captured Step 4 rows. |
+| Fuel Expenses | `?tab=fuel-expenses` | 738 bills on the 2026-09-15 anchor, paginated; the KPI strip is visible on the unfiltered quarter and totals **all filtered pages** (it does not change on page 2). Filter TRIP vs MANUAL and Approved / Pending / Rejected; trip-linked rows carry trip no, meter, GPS and mileage. |
+| Orders | `?tab=orders` | Now reads the live API (bundled sample mode switched off). **8 `[ORDER]` collection containers** (one per each of the last 8 operating days, 20–36 shops each): all eight fit inside the ten-calendar-day selector window, including the Sunday closure. The newest is still *in collection* (Tab 1 working order), the other 7 are *collected* and available in Tab 2, where **9 vehicle trips** are assignment-eligible (Step 2 done, Step 4 open). Tab 3 Delivery Tracking is driven by the captured Step 4 rows. |
 | Collection Report | `?tab=collection-report` | Payment-mode summary (Cash / Union Bank / HDFC) with % split; collector summary for all 20 collectors; change date range Jul→Sep and confirm totals move. |
 
 ### 3.4 Vehicles / Fleet — `/fleet`
@@ -295,15 +303,15 @@ Run with both processes up; each returns HTTP 200 with the row count shown.
 
 | Nav page | Endpoint | Rows |
 |---|---|---|
-| Dashboard | `/api/operations/dashboard` | 29 fields (KPIs + all panels) |
+| Dashboard | `/api/operations/dashboard` | KPIs + all panels + 8-field Operations module map |
 | Masters → Shops / Farms / Vehicles / Employees / Banks / Bird Types | `/api/masters/*` | 200 / 10 / 24 / 150 / 8 / 5 |
 | Masters → Market Rates | `/api/masters/market-rates` | 92 |
-| Operations → Trip List / Trip Entry | `/api/trips`, `/api/trips/available-resources` | 640 / 5 groups |
-| Operations → Rate Entry | `/api/operations/rate-entry` | 484 |
-| Operations → Shop Sales | `/api/operations/shop-sales` | 6,059 |
-| Operations → Collection Entry / Report / Pending | `/api/operations/collection-entry*` | 4,881 / summary / 200 |
-| Operations → Mortality | `/api/operations/mortality-analysis` | 25/page of 471 |
-| Operations → Fuel Expenses | `/api/operations/fuel-expenses` | 25/page of 606 |
+| Operations → Trip List / Trip Entry | `/api/trips`, `/api/trips/available-resources` | 640 total rows (632 vehicle trips + 8 order containers) / 5 groups |
+| Operations → Rate Entry | `/api/operations/rate-entry` | 85 waiting trips |
+| Operations → Shop Sales | `/api/operations/shop-sales` | 6,728 |
+| Operations → Collection Entry / Report / Pending | `/api/operations/collection-entry*` | 4,755 / summary / 200 |
+| Operations → Mortality | `/api/operations/mortality-analysis` | paged 524 completed trips |
+| Operations → Fuel Expenses | `/api/operations/fuel-expenses` | paged 738 bills + full-filter summary |
 | Operations → Orders | `/api/trips` (containers) | 8 containers + 9 assignable trips |
 | Fleet → Maintenance / Permits / EMI / FASTag / Analytics | `/api/fleet/*` | 307 / 120 / 12 (36-installment schedules) / 24 / 11 KPI blocks |
 | Staff → Duty Planner / Salaries / Leaves / Driver / Supervisor | `/api/staff/*` | week grid / 150 per month / 356 / 30 / 25 |

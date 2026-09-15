@@ -138,6 +138,7 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
         onReject={vm.rejectCollection}
         onEdit={vm.editCollection}
         onViewShop={handleViewShop}
+        onRefresh={vm.reloadCollections}
         onSelectionChange={handleSelectionChange}
       />
 
