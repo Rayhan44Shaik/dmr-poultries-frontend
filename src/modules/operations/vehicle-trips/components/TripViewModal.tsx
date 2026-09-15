@@ -34,7 +34,9 @@ import { useTripDeliveryWhatsApps } from "../hooks/useTripDeliveryWhatsApps";
 import { cleanDeliveryShopName } from "../utils/shopDisplayName";
 import { localizeBirdTypesForView, localizeShopsForView, localizeTripForView, localizeTripViewText } from "../utils/tripViewLocalization";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
-import { useI18n } from "../../../../i18n";
+import { ScopedI18nProvider, useI18n } from "../../../../i18n";
+import { ActionTooltip } from "../../../../ui/ActionTooltip";
+import { ViewLanguageToggle } from "../../../../ui/ViewLanguageToggle";
 import StepStart from "./StepStart";
 import StepFarm from "./StepFarm";
 import StepPickup from "./StepPickup";
@@ -217,7 +219,7 @@ function TripViewModal({
   initialStep,
   showCommunicationStatus = true,
 }: Props) {
-  const { t, language } = useI18n();
+  const { t, language, toggleLanguage } = useI18n();
   const initialViewStep = (trip: Trip | null) => {
     if (initialStep != null) return initialStep;
     return trip && trip.status === "Completed" && isTripWizardComplete(trip) ? 3 : 0;
@@ -397,6 +399,14 @@ function TripViewModal({
                     {t("ops.trip.approved_by")}: {viewTrip.approvedBy}
                   </span>
                 )}
+                <ViewLanguageToggle
+                  language={language}
+                  onToggle={toggleLanguage}
+                  tone="emerald"
+                  labelMode="target"
+                  ariaLabel={t("ops.trip.popup_language_toggle")}
+                  tooltip={<ActionTooltip label={t("ops.trip.popup_language_tooltip")} side="bottom" />}
+                />
                 <button
                   type="button"
                   onClick={onClose}
@@ -582,12 +592,21 @@ function TripViewModal({
   );
 }
 
+function ScopedTripViewModal(props: Props) {
+  const { language } = useI18n();
+  return (
+    <ScopedI18nProvider initialLanguage={language}>
+      <TripViewModal {...props} />
+    </ScopedI18nProvider>
+  );
+}
+
 export function RecentTripViewModal(props: Props) {
-  return <TripViewModal {...props} showCommunicationStatus={false} />;
+  return <ScopedTripViewModal {...props} showCommunicationStatus={false} />;
 }
 
 export function TripHistoryViewModal(props: Props) {
-  return <TripViewModal {...props} showCommunicationStatus />;
+  return <ScopedTripViewModal {...props} showCommunicationStatus />;
 }
 
 export default React.memo(TripHistoryViewModal);

@@ -89,6 +89,11 @@ export interface ModalProps {
   closeOnEscape?: boolean;
   /** Render the × in the header. Default true. */
   showCloseButton?: boolean;
+  /**
+   * Extra classes for the header × button only (e.g. a red dismiss glyph).
+   * Scoped to the call site — the global close treatment is unchanged.
+   */
+  closeButtonClassName?: string;
   /** Where focus goes on open. Default `"first"`. */
   initialFocus?: InitialFocusTarget;
   className?: string;
@@ -117,6 +122,7 @@ export function Modal({
   closeOnOverlay = true,
   closeOnEscape = true,
   showCloseButton = true,
+  closeButtonClassName,
   initialFocus = "first",
   className,
   bodyClassName,
@@ -189,7 +195,7 @@ export function Modal({
               <button
                 type="button"
                 onClick={onClose}
-                className={`group ${uiDialogCloseClass}`}
+                className={cn(`group ${uiDialogCloseClass}`, closeButtonClassName)}
                 aria-label="Close dialog"
                 title="Close dialog"
               >

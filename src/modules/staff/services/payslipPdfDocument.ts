@@ -225,6 +225,9 @@ export function drawPayslipPdf(
   };
   autoTable(doc, {
     ...plainTable,
+    // Explicit startY — without it this first grid jumps to the page top and
+    // prints OVER the DMR POULTRIES header + PAYSLIP title.
+    startY: boxTop,
     body: pairs,
     columnStyles: {
       0: { cellWidth: labelCol, fontStyle: "bold", textColor: MUTED },
@@ -238,6 +241,7 @@ export function drawPayslipPdf(
   /* ── Attendance strip ───────────────────────────────────────────────── */
   autoTable(doc, {
     ...plainTable,
+    startY: y,
     head: [["Working Days", "Present Days", "Leave Days", "Weekly Off"]],
     body: [[
       fmt(record.workingDays ?? "—"),
@@ -252,7 +256,7 @@ export function drawPayslipPdf(
       fontStyle: "bold",
       fontSize: 8,
       halign: "center",
-      cellPadding: { top: 2.4, bottom: 2.4 },
+      cellPadding: { top: 2.4, bottom: 2.4, left: 2, right: 2 },
       lineColor: BORDER,
       lineWidth: 0.2,
     },
@@ -261,7 +265,7 @@ export function drawPayslipPdf(
       fontSize: 9,
       halign: "center",
       fontStyle: "bold",
-      cellPadding: { top: 2.6, bottom: 2.6 },
+      cellPadding: { top: 2.6, bottom: 2.6, left: 2, right: 2 },
     },
   });
   y = lastTableY(y) + 5;
@@ -302,6 +306,7 @@ export function drawPayslipPdf(
 
   autoTable(doc, {
     ...plainTable,
+    startY: y,
     head: [["Earnings", "Amount (Rs.)", "Deductions", "Amount (Rs.)"]],
     body: tableBody,
     showHead: "everyPage",
@@ -313,14 +318,14 @@ export function drawPayslipPdf(
       fontSize: 8.5,
       halign: "center",
       valign: "middle",
-      cellPadding: { top: 2.6, bottom: 2.6 },
+      cellPadding: { top: 2.6, bottom: 2.6, left: 3, right: 3 },
       lineColor: BORDER,
       lineWidth: 0.2,
     },
     styles: {
       ...plainTable.styles,
       fontSize: 8.5,
-      cellPadding: { top: 2.2, bottom: 2.2 },
+      cellPadding: { top: 2.2, bottom: 2.2, left: 3, right: 3 },
       valign: "middle",
     },
     columnStyles: {
@@ -385,19 +390,22 @@ export function drawPayslipPdf(
   doc.rect(MARGIN, boxTop, contentWidth, y - boxTop);
   y += 6;
 
-  /* ── Signature (single, right-aligned) ─────────────────────────────── */
+  /* ── Signature (single, right-aligned) ───────────────────────────────
+   * Leaves open signing space above the rule (same as the on-screen sheet)
+   * so a handwritten signature fits neatly between the body and the line. */
   const sigRight = pageWidth - MARGIN;
+  const sigLineY = y + 27;
   doc.setDrawColor(RULE[0], RULE[1], RULE[2]);
   doc.setLineWidth(0.18);
-  doc.line(sigRight - 42, y + 13, sigRight, y + 13);
+  doc.line(sigRight - 42, sigLineY, sigRight, sigLineY);
   doc.setFont("helvetica", "bold");
   doc.setFontSize(8.5);
   doc.setTextColor(INK[0], INK[1], INK[2]);
-  doc.text("D. Srinivas Chakrapani", sigRight, y + 17, { align: "right" });
+  doc.text("D. Srinivas Chakrapani", sigRight, sigLineY + 4, { align: "right" });
   doc.setFont("helvetica", "normal");
   doc.setFontSize(8);
   doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
-  doc.text("Authorised Signatory", sigRight, y + 21, { align: "right" });
+  doc.text("Authorised Signatory", sigRight, sigLineY + 8, { align: "right" });
 
   /* ── Footer — thin line + small centered note ──────────────────────── */
   const generatedStr = new Date().toLocaleString("en-IN", {
