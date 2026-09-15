@@ -64,8 +64,6 @@ function CollectionStat({
   percent,
   color,
 }: Pick<EnrichedMode, "name" | "value" | "percent" | "color">) {
-  const shown = useCountUp(value);
-
   return (
     <div
       className="group min-w-0 cursor-default rounded-xl px-2.5 py-2 ring-1 ring-inset ring-slate-100 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
@@ -80,7 +78,7 @@ function CollectionStat({
       </span>
       <span className="mt-0.5 flex items-baseline justify-between gap-1">
         <span className="block truncate text-[15px] font-black tabular-nums text-slate-800">
-          {formatINRCompact(shown)}
+          {formatINRCompact(value)}
         </span>
         <span className="shrink-0 text-[10px] font-bold tabular-nums text-slate-500">
           {`${percent.toFixed(1)}%`}
@@ -102,8 +100,8 @@ function CollectionStat({
  *  • Loading: an animated donut skeleton (soft track + orbiting arc +
  *    pulsing KPI boxes) until the first data arrives.
  *  • Every load / range change replays a choreographed entrance: the donut
- *    fades in, the slices sweep in, the centre total counts up, and the
- *    KPI boxes rise in staggered.
+ *    fades in, the slices sweep in, and the centre total counts up while the
+ *    KPI values remain directly bound to the same data signature.
  *  • One very slow ambient revolution of the ring (8 min per lap, off with
  *    reduced-motion); hovering a slice lifts it out, the others stay solid.
  *  • Slice colours are bound to the slice's own name (stable gradient ids),
@@ -225,8 +223,9 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
   // ── Loading / empty: preserve the same chart-then-footer geometry. ─────
   if (chartData.length === 0) {
     return (
-      <div className="flex w-full min-w-0 flex-1 flex-col" aria-busy="true">
-        <div className="flex min-h-0 w-full flex-1 items-center justify-center">
+      <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col" aria-busy="true">
+        <div className="min-h-[250px] w-full flex-1" style={{ minHeight: 250 }}>
+          <div className="flex h-full w-full items-center justify-center">
           <div className="relative aspect-square w-full max-w-[470px]" style={{ aspectRatio: "1 / 1" }}>
             <svg viewBox="0 0 400 400" className="h-full w-full" aria-hidden="true">
               <circle cx="200" cy="200" r="91" fill="none" stroke="#eef2f7" strokeWidth="33" />
@@ -253,6 +252,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
               <span className="h-6 w-24 animate-pulse rounded-md bg-slate-100" />
             </div>
           </div>
+          </div>
         </div>
         <div className="mt-3 grid w-full shrink-0 grid-cols-2 gap-2 border-t border-slate-100 pt-3 sm:grid-cols-3">
           {[0, 1, 2].map((i) => (
@@ -264,16 +264,16 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
   }
 
   return (
-    <div className="flex w-full min-w-0 flex-1 flex-col">
-
+    <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
       {/* The donut stays centered in the available chart stage. Its KPI row
           follows underneath with the same spacing used by Trip Movement. */}
-      <div className="flex min-h-0 w-full flex-1 items-center justify-center">
-        <div
-          key={signature}
-          className="relative aspect-square max-h-full w-full max-w-[470px] animate-fade-in"
-          style={{ aspectRatio: "1 / 1" }}
-        >
+      <div className="min-h-[250px] w-full flex-1" style={{ minHeight: 250 }}>
+        <div className="flex h-full w-full items-center justify-center">
+          <div
+            key={signature}
+            className="relative aspect-square max-h-full w-full max-w-[470px] animate-fade-in"
+            style={{ aspectRatio: "1 / 1" }}
+          >
           {/* Soft background track behind the ring (same 74.24–107.5 band).
               SVG circle so it scales with the scene at every card width. */}
           <svg viewBox="0 0 400 400" className="absolute inset-0 h-full w-full" aria-hidden="true">
@@ -329,7 +329,8 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
           </div>
         </div>
       </div>
-      {modeKpis}
     </div>
+    {modeKpis}
+  </div>
   );
 }
