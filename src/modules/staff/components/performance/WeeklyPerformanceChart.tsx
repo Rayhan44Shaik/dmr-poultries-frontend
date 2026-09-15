@@ -397,7 +397,8 @@ function PanelsChart({
             {alive ? (
               <div className="mt-1 h-40">
                 <ResponsiveContainer width="100%" height="100%">
-                  <ComposedChart data={rows} margin={{ top: 6, right: 4, left: -18, bottom: 0 }}>
+                  {/* Room on the right so the last week's label is never clipped. */}
+                  <ComposedChart data={rows} margin={{ top: 8, right: 16, left: -14, bottom: 0 }}>
                     <defs>
                       <linearGradient id={`perf-grad-${config.key}`} x1="0" y1="0" x2="0" y2="1">
                         <stop offset="0%" stopColor={config.color} stopOpacity={0.28} />
@@ -420,6 +421,11 @@ function PanelsChart({
                       tickLine={false}
                       width={44}
                       allowDecimals={false}
+                      /* Every metric here is a positive quantity: the axis starts
+                         at zero instead of inventing room below it (a
+                         "−55 kg" tick made the weight-loss panel look wrong). A
+                         genuinely negative week still opens the axis down. */
+                      domain={[(dataMin: number) => Math.min(0, dataMin), "auto"]}
                     />
                     <Tooltip
                       cursor={{ fill: "rgba(15, 23, 42, 0.045)" }}
