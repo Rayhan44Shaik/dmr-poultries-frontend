@@ -353,9 +353,10 @@ const DriverPerformancePage = () => {
       })),
     [data.weekly, dateLocale],
   );
-  /* Three metrics, three panels — Distance, Fuel and Mileage each get their
-     own clean scale on the same weeks (a shared axis would flatten fuel to a
-     sliver and a dual axis would compare two unrelated rulers). */
+  /* One chart, three series, three rulers: Distance + Fuel as grouped bars
+     (each on its own axis so both volumes stay visible) and Mileage as a line.
+     Bars keep 0 as their floor; mileage hugs its own range so a 4.24 → 4.36
+     km/L week does not flat-line. */
   const chartSeries = useMemo<WeeklyChartSeries[]>(
     () => [
       {
@@ -371,7 +372,7 @@ const DriverPerformancePage = () => {
         label: t("staff.perf.weekly.fuel"),
         color: "#f59e0b",
         kind: "bar",
-        axis: "left",
+        axis: "right",
         format: (value) => formatLitres(value),
       },
       {
@@ -379,7 +380,8 @@ const DriverPerformancePage = () => {
         label: t("staff.perf.weekly.mileage"),
         color: "#059669",
         kind: "line",
-        axis: "left",
+        axis: "third",
+        zeroFloor: false,
         format: (value) => `${formatDecimal(value, 2)} km/L`,
       },
     ],
@@ -582,7 +584,6 @@ const DriverPerformancePage = () => {
             weekTrips={chartWeekTrips}
             emptyText={t("staff.perf.weekly.empty")}
             loading={initialLoading}
-            variant="panels"
             ariaLabel={t("staff.perf.weekly.aria_driver", { range: appliedRangeLabel })}
           />
         </div>

@@ -340,11 +340,11 @@ const SupervisorPerformancePage = () => {
     () => toWeeklyAxisRows(data.weekly, dateLocale),
     [data.weekly, dateLocale],
   );
-  // Three metrics, three panels: the Birds bars carry the weekly volume;
-  // Mortality and Weight-loss are the two loss trends. Each panel owns its
-  // scale, so a red line can never be squashed against a 5,000-bird bar.
-  // (Delivered weight remains in the KPIs, the table and the tooltip's derived
-  // average — it is only dropped as a chart series.)
+  /* One chart, three series, three rulers: Birds are the weekly volume (bars,
+     left), Mortality and Weight loss are the two loss trends — each on its own
+     colour-matched axis, so a red or violet trend can never be squashed under
+     a 5,000-bird bar. (Delivered weight remains in the KPIs, the table and the
+     tooltip's derived average — it is only dropped as a chart series.) */
   const chartSeries = useMemo<WeeklyChartSeries[]>(
     () => [
       {
@@ -367,8 +367,9 @@ const SupervisorPerformancePage = () => {
         key: "weightLoss",
         label: t("staff.perf.weekly.weight_loss"),
         color: "#8b5cf6",
-        axis: "right",
+        axis: "third",
         kind: "line",
+        zeroFloor: false,
         format: (value) => `${formatDecimal(value, 1)} kg`,
       },
     ],
@@ -584,7 +585,6 @@ const SupervisorPerformancePage = () => {
             weekTrips={chartWeekTrips}
             emptyText={t("staff.perf.weekly.empty")}
             loading={initialLoading}
-            variant="panels"
             ariaLabel={t("staff.perf.weekly.aria_supervisor", { range: appliedRangeLabel })}
           />
         </div>
