@@ -303,4 +303,15 @@ export default {
   'staff.leave.close_notification': 'నోటిఫికేషన్‌ను మూసివేయండి',
   'staff.leave.form_unnamed_employee': 'పేరు లేని ఉద్యోగి',
   'staff.leave.language_aria': 'భాష',
+  // Department values come from the employee master (Driver, Mechanic, …).
+  'staff.department.driver': 'డ్రైవర్',
+  'staff.department.mechanic': 'మెకానిక్',
+  'staff.department.supervisor': 'సూపర్‌వైజర్',
+  'staff.department.loader': 'లోడర్',
+  'staff.department.collection': 'కలెక్షన్',
+  'staff.department.office': 'ఆఫీస్',
+  'staff.department.helper': 'హెల్పర్',
+  'staff.department.owner': 'యజమాని',
+  'staff.department.farm': 'ఫారం',
+  'staff.department.general': 'సాధారణం',
 };

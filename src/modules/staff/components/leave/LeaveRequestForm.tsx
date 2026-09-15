@@ -6,7 +6,7 @@ import { useSafeNotification } from '../../../../hooks/useSafeNotification';
 import { DatePicker } from '../../../../components/common/DatePicker';
 import type { Employee } from '../../../masters/employees/types/employee';
 import { useI18n } from '../../../../i18n';
-import { leaveTypeLabel } from '../../utils/leaveDisplay';
+import { departmentLabel, leaveTypeLabel } from '../../utils/leaveDisplay';
 
 export interface LeaveRequestInput {
   employeeId: number;
@@ -250,7 +250,10 @@ function LeaveRequestForm({ employees: propEmployees, onSubmit, onCancel }: Leav
     }
   };
 
-  const departmentOptions = uniqueDepartments.map((d) => ({ value: d, label: d }));
+  const departmentOptions = uniqueDepartments.map((d) => ({
+    value: d,
+    label: departmentLabel(t, d),
+  }));
   /** Values stay the API's English leave types — only the labels translate. */
   const leaveTypeOptions: { value: LeaveRequestInput['type']; label: string }[] = [
     'Casual',

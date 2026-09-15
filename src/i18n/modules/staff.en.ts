@@ -303,4 +303,16 @@ export default {
   'staff.leave.close_notification': 'Close notification',
   'staff.leave.form_unnamed_employee': 'Unnamed Employee',
   'staff.leave.language_aria': 'Language',
+  // Department values come from the employee master (Driver, Mechanic, …).
+  // Only the LABEL is translated — filters still send the stored English value.
+  'staff.department.driver': 'Driver',
+  'staff.department.mechanic': 'Mechanic',
+  'staff.department.supervisor': 'Supervisor',
+  'staff.department.loader': 'Loader',
+  'staff.department.collection': 'Collection',
+  'staff.department.office': 'Office',
+  'staff.department.helper': 'Helper',
+  'staff.department.owner': 'Owner',
+  'staff.department.farm': 'Farm',
+  'staff.department.general': 'General',
 };

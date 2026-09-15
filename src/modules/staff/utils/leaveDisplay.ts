@@ -50,6 +50,18 @@ export function leaveStatusLabel(t: Translator, status: string): string {
   return translateStatus(t, status);
 }
 
+/**
+ * Department values live in the employee master as plain English words. The
+ * table and the filter dropdowns show the localised label; the filter itself
+ * keeps sending the stored value, so an unknown/new department simply shows the
+ * raw name instead of breaking.
+ */
+export function departmentLabel(t: Translator, department: string): string {
+  const key = `staff.department.${department.trim().toLowerCase()}`;
+  const label = t(key);
+  return label === key ? department : label;
+}
+
 /** Intl locale for month names and dates inside the Leave page. */
 export function leaveLocale(language: Language): string {
   return language === 'te' ? 'te-IN' : 'en-IN';

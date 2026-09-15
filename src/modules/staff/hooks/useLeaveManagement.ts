@@ -172,7 +172,7 @@ export function useLeaveManagement(
     return () => {
       cancelled = true;
     };
-  }, [fetchList, page, pageSize]);
+  }, [fetchList, page, pageSize, t]);
 
   useEffect(() => {
     if (!includeReport) return;
@@ -193,7 +193,7 @@ export function useLeaveManagement(
     return () => {
       cancelled = true;
     };
-  }, [fetchReport, filters.month, includeReport]);
+  }, [fetchReport, filters.month, includeReport, t]);
 
   const stats = useMemo(() => {
     const requests = list.items;

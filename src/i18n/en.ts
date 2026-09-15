@@ -37,6 +37,7 @@ export default {
   'nav.fastag': 'FASTag',
   'nav.dutyPlanner': 'Duty Planner',
   'nav.salaryRegister': 'Salary Register',
+  'nav.orders': 'Orders',
   'nav.leaves': 'Leaves',
   'nav.driverPerformance': 'Driver Performance',
   'nav.supervisorPerformance': 'Supervisor Performance',
@@ -1259,4 +1260,9 @@ export default {
   'reports.shop_ledger.toast.no_transaction_data': 'No transaction data to export.',
   'reports.shop_ledger.toast.failed_load': 'Failed to load ledger data. Please try again.',
   'reports.shop_ledger.opening_balance': 'Opening Balance',
+  'common.search_or_custom': 'Search or type custom',
+  'common.no_match_type_custom': 'No match — type custom',
+  'common.use_value': 'Use {value}',
+  'common.custom': 'custom',
+  'common.page_size_hint': '6 options • 45 included • search • custom Use',
 };

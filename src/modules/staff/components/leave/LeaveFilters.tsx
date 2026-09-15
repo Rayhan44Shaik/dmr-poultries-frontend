@@ -32,7 +32,7 @@ import { ActionTooltip } from '../../../../ui/ActionTooltip';
 import MasterDropdown from '../../../masters/components/MasterDropdown';
 import type { LeaveFilters as LeaveFilterState } from '../../hooks/useLeaveManagement';
 import { useI18n } from '../../../../i18n';
-import { leaveMonthName, leaveTypeLabel } from '../../utils/leaveDisplay';
+import { departmentLabel, leaveMonthName, leaveTypeLabel } from '../../utils/leaveDisplay';
 import type { LeaveRequest } from '../../types/staffDashboard';
 import type { Employee } from '../../../masters/employees/types/employee';
 
@@ -234,7 +234,7 @@ function LeaveFilters({
   onDeleteSelected,
 }: LeaveFiltersProps) {
   const { t } = useI18n();
-  const departmentOptions = departments.map((d) => ({ value: d, label: d }));
+  const departmentOptions = departments.map((d) => ({ value: d, label: departmentLabel(t, d) }));
 
   // Alphabetical from the first word, so the dropdown reads A → Z.
   const employeeOptions = [...employees]

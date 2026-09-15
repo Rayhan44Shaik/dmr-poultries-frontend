@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import type { LeaveRequest } from '../../types/staffDashboard';
 import { useI18n } from '../../../../i18n';
-import { leaveStatusLabel, leaveTypeBadge } from '../../utils/leaveDisplay';
+import { departmentLabel, leaveStatusLabel, leaveTypeBadge } from '../../utils/leaveDisplay';
 
 interface LeaveTableProps {
   leaves: LeaveRequest[];
@@ -147,7 +147,10 @@ function LeaveTable({
     /* No card chrome here — the page wrapper (border + LeaveTableHeader)
        provides it; this only scrolls the grid. */
     <div className="overflow-x-auto">
-      <table className="min-w-full text-left text-sm border-collapse" aria-label="Leave requests">
+      <table
+        className="min-w-full text-left text-sm border-collapse"
+        aria-label={t('staff.leave.header_title')}
+      >
         <thead className="border-b border-slate-200 bg-slate-50/80 text-slate-600">
           <tr className="whitespace-nowrap">
             <th className={`${th} w-10 text-center`}>#</th>
@@ -249,7 +252,7 @@ function LeaveTable({
                   {leaveNumber(leave)}
                 </td>
                 <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-700">{leave.employeeName}</td>
-                <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600">{leave.department || t('staff.leave.no_reason')}</td>
+                <td className="whitespace-nowrap px-4 py-3 text-xs text-slate-600">{leave.department ? departmentLabel(t, leave.department) : t('staff.leave.no_reason')}</td>
                 <td className="px-4 py-3">
                   <span className={`inline-block whitespace-nowrap rounded-full px-2 py-0.5 text-xs font-medium ${getTypeColor(leave.type)}`}>
                     {leaveTypeBadge(t, leave.type)}

@@ -339,6 +339,7 @@ export const NAV_SECTIONS: NavSection[] = [
       },
       {
         label: "Orders",
+        labelKey: "nav.orders",
         path: "/operations?tab=orders",
         icon: ClipboardList,
         tone: "emerald",

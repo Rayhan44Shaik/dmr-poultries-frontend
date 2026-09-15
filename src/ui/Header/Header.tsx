@@ -31,7 +31,7 @@ import {
 } from "lucide-react";
 import { QUICK_ACTIONS, resolveRoute } from "../../routes/navigation";
 import { useTheme } from "../../providers/ThemeProvider";
-import { useI18n } from "../../i18n";
+import { translateRole, useI18n } from "../../i18n";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { getPendingCollectionSnapshot, subscribePendingCollectionSnapshot } from "../../modules/operations/collections/services/collectionSnapshot";
 import { usePendingApprovals } from "../../modules/approvals/hooks/usePendingApprovals";
@@ -147,6 +147,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
   const location = useLocation();
   const { theme, toggleTheme } = useTheme();
   const { language, t } = useI18n();
+  const roleLabel = (role: string) => translateRole(t, role);
 
   const route = useMemo(() => resolveRoute(location.pathname + location.search), [location.pathname, location.search]);
 
@@ -543,7 +544,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
               </span>
               <span className="flex items-center gap-1 text-[11px] font-medium text-slate-400">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                {displayRole}
+                {roleLabel(displayRole)}
               </span>
             </span>
             <ChevronDown size={14} className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -565,7 +566,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
               <UserRound size={13} className="text-brand-600 dark:text-brand-400" />
               <span className="text-[11.5px] font-medium text-slate-500 dark:text-slate-300">{t("header.role")}</span>
               <span className="ml-auto rounded-full bg-brand-100 px-2 py-px text-[10.5px] font-semibold text-brand-800 dark:bg-brand-500/15 dark:text-brand-300">
-                {displayRole}
+                {roleLabel(displayRole)}
               </span>
             </div>
             <div className="my-1.5 h-px bg-slate-100 dark:bg-slate-700" />

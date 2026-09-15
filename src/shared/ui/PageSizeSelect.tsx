@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, useMemo } from "react";
 import { ChevronDown, Check, Search } from "lucide-react";
+import { useI18n } from "../../i18n";
 
 interface PageSizeSelectProps {
   value: number;
@@ -27,6 +28,7 @@ function clampToRange(raw: number): number {
  * - Global for all modules
  */
 export function PageSizeSelect({ value, onChange, disabled = false, className = "" }: PageSizeSelectProps) {
+  const { t } = useI18n();
   const id = useId();
   const safeValue = clampToRange(value);
   const [open, setOpen] = useState(false);
@@ -99,7 +101,7 @@ export function PageSizeSelect({ value, onChange, disabled = false, className = 
               type="text"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search or type custom"
+              placeholder={t("common.search_or_custom")}
               className="h-8 w-full rounded-xl border border-slate-200 bg-white pl-8 pr-3 text-[13px] font-medium text-slate-700 placeholder:text-slate-400 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100"
             />
           </div>
@@ -125,7 +127,9 @@ export function PageSizeSelect({ value, onChange, disabled = false, className = 
             })}
 
             {filtered.length === 0 && !showUseThis && (
-              <div className="px-3 py-3 text-center text-[12px] font-medium text-slate-400">No match — type custom</div>
+              <div className="px-3 py-3 text-center text-[12px] font-medium text-slate-400">
+                {t("common.no_match_type_custom")}
+              </div>
             )}
 
             {showUseThis && queryClamped != null && (
@@ -134,14 +138,14 @@ export function PageSizeSelect({ value, onChange, disabled = false, className = 
                 onClick={() => commit(queryClamped)}
                 className="mt-1.5 flex w-full items-center justify-between rounded-xl bg-slate-900 px-3 py-2.5 text-[13px] font-bold text-white shadow-sm hover:bg-black"
               >
-                <span>Use {queryClamped}</span>
-                <span className="text-[11px] opacity-70">custom</span>
+                <span>{t("common.use_value", { value: queryClamped })}</span>
+                <span className="text-[11px] opacity-70">{t("common.custom")}</span>
               </button>
             )}
           </div>
 
           <div className="border-t border-slate-100 bg-white px-3 py-2 text-center">
-            <p className="text-[10px] font-medium text-slate-400">6 options • 45 included • search • custom Use</p>
+            <p className="text-[10px] font-medium text-slate-400">{t("common.page_size_hint")}</p>
           </div>
         </div>
       )}

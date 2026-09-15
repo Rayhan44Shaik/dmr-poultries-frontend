@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
+import { useI18n } from '../../../i18n';
 import {
   ensureApprovalSnapshotLoaded,
   getApprovalSnapshot,
@@ -16,6 +17,7 @@ const ALERT_KEY = 'dmr:approval-alert:v1';
  */
 export function ApprovalAlertToaster() {
   const { showNotification } = useSafeNotification();
+  const { t } = useI18n();
   const firedRef = useRef(false);
 
   useEffect(() => {
@@ -45,19 +47,23 @@ export function ApprovalAlertToaster() {
         /* ignore */
       }
 
+      const part = (key: string, count: number) =>
+        t(`layout.approval_alert.part_${key}_${count === 1 ? 'one' : 'many'}`, { count });
+
       const parts: string[] = [];
-      if (state.trips.count > 0) parts.push(`${state.trips.count} trip${state.trips.count === 1 ? '' : 's'}`);
-      if (state.maintenance.count > 0)
-        parts.push(`${state.maintenance.count} maintenance bill${state.maintenance.count === 1 ? '' : 's'}`);
-      if (state.rateEntries.count > 0)
-        parts.push(`${state.rateEntries.count} rate entr${state.rateEntries.count === 1 ? 'y' : 'ies'}`);
-      if (state.payments.count > 0)
-        parts.push(`${state.payments.count} payment${state.payments.count === 1 ? '' : 's'}`);
-      if (state.collections.count > 0)
-        parts.push(`${state.collections.count} collection${state.collections.count === 1 ? '' : 's'}`);
+      if (state.trips.count > 0) parts.push(part('trips', state.trips.count));
+      if (state.maintenance.count > 0) parts.push(part('maintenance', state.maintenance.count));
+      if (state.rateEntries.count > 0) parts.push(part('rates', state.rateEntries.count));
+      if (state.payments.count > 0) parts.push(part('payments', state.payments.count));
+      if (state.collections.count > 0) parts.push(part('collections', state.collections.count));
 
       showNotification(
-        `🔔 ${state.total} item${state.total === 1 ? '' : 's'} pending approval: ${parts.join(', ')}. See the dashboard KPI strip or open the bell for details.`,
+        t(
+          state.total === 1
+            ? 'layout.approval_alert.summary_one'
+            : 'layout.approval_alert.summary_many',
+          { total: state.total, parts: parts.join(', ') }
+        ),
         state.total > 10 ? 'error' : 'warning',
         9000
       );
@@ -80,7 +86,7 @@ export function ApprovalAlertToaster() {
       done = true;
       unsubscribe();
     };
-  }, [showNotification]);
+  }, [showNotification, t]);
 
   return null;
 }

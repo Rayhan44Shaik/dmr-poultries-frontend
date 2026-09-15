@@ -37,6 +37,7 @@ export default {
   'nav.fastag': 'FASTag',
   'nav.dutyPlanner': 'డ్యూటీ ప్లానర్',
   'nav.salaryRegister': 'జీతాల రిజిస్టర్',
+  'nav.orders': 'ఆర్డర్లు',
   'nav.leaves': 'సెలవులు',
   'nav.driverPerformance': 'డ్రైవర్ పనితీరు',
   'nav.supervisorPerformance': 'సూపర్వైజర్ పనితీరు',
@@ -1217,4 +1218,9 @@ export default {
   'reports.shop_ledger.toast.no_transaction_data': 'ఎక్స్పోర్ట్ చేయడానికి ట్రాన్సాక్షన్ డేటా లేదు.',
   'reports.shop_ledger.toast.failed_load': 'లెడ్జర్ డేటా లోడ్ చేయడంలో విఫలమైంది. దయచేసి మళ్లీ ప్రయత్నించండి.',
 'reports.shop_ledger.opening_balance': 'ప్రారంభ బకాయి',
+  'common.search_or_custom': 'వెతకండి లేదా కస్టమ్ టైప్ చేయండి',
+  'common.no_match_type_custom': 'సరిపోలలేదు — కస్టమ్ టైప్ చేయండి',
+  'common.use_value': '{value} వాడండి',
+  'common.custom': 'కస్టమ్',
+  'common.page_size_hint': '6 ఎంపికలు • 45 కూడా ఉంది • వెతకండి • కస్టమ్ వాడకం',
 };

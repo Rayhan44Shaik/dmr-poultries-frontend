@@ -193,6 +193,21 @@ export const getLanguage = (): Language => activeLanguage;
  * Translate a status value coming from the backend/database.
  * Only the display string changes — the underlying value is untouched.
  */
+/**
+ * Platform roles arrive as `OWNER`, `Accountant`, `supervisor`, … — normalise
+ * them to `role.<lowercase>` and fall back to the raw value when there is no
+ * copy for that role yet (same contract as `translateStatus`).
+ */
+export const translateRole = (
+  t: (key: string) => string,
+  value: string
+): string => {
+  if (!value) return value;
+  const key = `role.${value.toLowerCase()}`;
+  const translated = t(key);
+  return translated === key ? value : translated;
+};
+
 export const translateStatus = (
   t: (key: string) => string,
   value: string

@@ -91,7 +91,7 @@ const Pagination: React.FC<PaginationProps> = ({
       </p>
       {onPageSizeChange && pageSize != null && (
         <div className="flex items-center gap-2">
-          <span className="text-[13px] font-semibold text-slate-600">Rows Per Page</span>
+          <span className="text-[13px] font-semibold text-slate-600">{t('common.rows_per_page')}</span>
           <PageSizeSelect value={pageSize} onChange={onPageSizeChange} />
         </div>
       )}
