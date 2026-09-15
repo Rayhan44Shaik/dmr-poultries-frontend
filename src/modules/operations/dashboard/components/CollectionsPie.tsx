@@ -55,9 +55,10 @@ function useCountUp(target: number, duration = 900): number {
 /**
  * Collection Streams — payment-mode donut for the Operations dashboard.
  *
- * The square stage (up to 256 px, scaling down with the card so the badges
- * can never bleed into a neighbouring chart) keeps the ring a perfect
- * circle at every window size. Slices sweep in on mount / range change.
+ * The square scene (up to 400 px, scaling down with the card) is sized so
+ * the donut AND every outer badge fit inside it — no badge can ever be
+ * clipped, and nothing can bleed into a neighbouring chart. Slices sweep in
+ * on mount / range change.
  *
  * ONE rotation clock, driven by a single requestAnimationFrame loop: the
  * angle is applied to the donut's wrapper AND (as the exact inverse) to
@@ -192,11 +193,11 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
     <div className="flex w-full min-w-0 flex-1 flex-col">
       {/* Donut — square stage that scales with the card, generous white space. */}
       <div className="flex min-h-0 flex-1 items-center justify-center py-3">
-        <div className="relative aspect-square w-full max-w-64">
-          {/* Soft background track behind the ring (matches the 58%–84% band).
-              SVG circle so it scales with the stage at every card width. */}
-          <svg viewBox="0 0 256 256" className="absolute inset-0 h-full w-full" aria-hidden="true">
-            <circle cx="128" cy="128" r="91" fill="none" stroke="rgba(241,245,249,0.8)" strokeWidth="33" />
+        <div className="relative aspect-square w-full max-w-[400px]">
+          {/* Soft background track behind the ring (same 74.24–107.5 band).
+              SVG circle so it scales with the scene at every card width. */}
+          <svg viewBox="0 0 400 400" className="absolute inset-0 h-full w-full" aria-hidden="true">
+            <circle cx="200" cy="200" r="91" fill="none" stroke="rgba(241,245,249,0.8)" strokeWidth="33" />
           </svg>
 
           {/* The rotating wrapper — the rAF loop sets its transform. The
@@ -220,8 +221,8 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
                   nameKey="name"
                   cx="50%"
                   cy="50%"
-                  innerRadius="58%"
-                  outerRadius="84%"
+                  innerRadius="37.12%"
+                  outerRadius="53.75%"
                   paddingAngle={3}
                   cornerRadius={6}
                   stroke="none"
@@ -245,10 +246,10 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
                 counter group gets the inverse rotation from the same
                 rAF clock, keeping it perfectly horizontal. */}
             <div className="pointer-events-none absolute inset-0">
-              <svg viewBox="0 0 256 256" className="h-full w-full overflow-visible">
+              <svg viewBox="0 0 400 400" className="h-full w-full overflow-visible">
                 <defs>
                   <filter id="cs-badge-shadow" x="-40%" y="-40%" width="180%" height="180%">
-                    <feDropShadow dx="0" dy="1.5" stdDeviation="2" floodColor="#0f172a" floodOpacity="0.16" />
+                    <feDropShadow dx="0" dy="2" stdDeviation="2.4" floodColor="#0f172a" floodOpacity="0.22" />
                   </filter>
                 </defs>
                 {enrichedData.map((d, i) => {
@@ -260,8 +261,8 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
                   // direction (support function) — zero gap at every angle.
                   const support = 26 * Math.abs(Math.sin(a)) + 11 * Math.abs(Math.cos(a));
                   const r = 107.5 + support;
-                  const px = 128 + r * Math.sin(a);
-                  const py = 128 - r * Math.cos(a);
+                  const px = 200 + r * Math.sin(a);
+                  const py = 200 - r * Math.cos(a);
                   return (
                     <g key={d.name}>
                       <g transform={`translate(${px.toFixed(2)}, ${py.toFixed(2)})`}>
