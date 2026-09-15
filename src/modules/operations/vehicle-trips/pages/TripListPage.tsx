@@ -70,6 +70,8 @@ function TripListPage({ embedded = false }: TripListPageProps) {
 
   const [trips, setTrips] = useState<Trip[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  /** True only once the current filter request has supplied its final totals. */
+  const [filterResultsReady, setFilterResultsReady] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [search, setSearch] = useState("");
   const [vehicle, setVehicle] = useState(ALL_VEHICLES);
@@ -94,6 +96,9 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     listAbortRef.current?.abort();
     const controller = new AbortController();
     listAbortRef.current = controller;
+    // Do not leave the previous filter's totals on screen while this request
+    // is in flight — they can be dramatically different from the next result.
+    setFilterResultsReady(false);
     setIsLoading(true);
 
     try {
@@ -129,6 +134,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
 
       const matchingTrips = filterTripListTrips(uniqueTripsById(fetchedTrips), filters);
       setTrips(matchingTrips);
+      setFilterResultsReady(true);
       setSelectedRowId((selectedId) =>
         selectedId != null && !matchingTrips.some((trip) => trip.id === selectedId) ? null : selectedId
       );
@@ -157,6 +163,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   }, [refreshTrips]);
 
   const resetFilters = () => {
+    setFilterResultsReady(false);
     setSearch("");
     setVehicle(ALL_VEHICLES);
     setSupervisor(ALL_SUPERVISORS);
@@ -177,22 +184,27 @@ function TripListPage({ embedded = false }: TripListPageProps) {
     setCurrentPage(1);
   }, []);
   const setFilterFromDate = useCallback((value: string) => {
+    setFilterResultsReady(false);
     setFromDate(value);
     setCurrentPage(1);
   }, []);
   const setFilterToDate = useCallback((value: string) => {
+    setFilterResultsReady(false);
     setToDate(value);
     setCurrentPage(1);
   }, []);
   const setFilterVehicle = useCallback((value: string) => {
+    setFilterResultsReady(false);
     setVehicle(value || ALL_VEHICLES);
     setCurrentPage(1);
   }, []);
   const setFilterSupervisor = useCallback((value: string) => {
+    setFilterResultsReady(false);
     setSupervisor(value || ALL_SUPERVISORS);
     setCurrentPage(1);
   }, []);
   const setFilterFarm = useCallback((value: string) => {
+    setFilterResultsReady(false);
     setFarm(value || ALL_SOURCES);
     setCurrentPage(1);
   }, []);
@@ -330,6 +342,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   /** First click sorts ascending; second flips to descending; a third click on
    *  the active column clears the sort entirely (deselect). */
   const handleSortChange = (key: TripSortKey) => {
+    setFilterResultsReady(false);
     if (sortBy === key) {
       if (sortDir === "asc") {
         setSortDir("desc");
@@ -467,6 +480,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
   };
 
   const handleRefreshClick = () => {
+    setFilterResultsReady(false);
     void refreshTrips().then((ok) => {
       if (ok) showNotification(t("notification.data_refreshed"), "success");
     });
@@ -507,7 +521,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
         viewButtonRef={viewButtonRef}
       />
 
-      {hasFilters && (
+      {hasFilters && filterResultsReady && !isLoading && (
         <TripKPICards
           totalTrips={totalCompletedTrips}
           totalBirds={totalCompletedBirds}
