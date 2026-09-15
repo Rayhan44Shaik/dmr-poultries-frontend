@@ -815,9 +815,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
           </div>
         </div>
         
-        <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0">
-          {/* Only the name, at top — and it is the way through to the Collection
-              Report (the same page the Reports menu opens). */}
+        <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/60 p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-5 w-full min-w-0">
           <Link
             to="/operations?tab=collection-report"
             title={t("nav.collectionReport")}
