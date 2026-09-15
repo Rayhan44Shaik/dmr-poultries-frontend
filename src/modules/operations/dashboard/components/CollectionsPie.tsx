@@ -4,7 +4,7 @@ import { useI18n } from "../../../../i18n";
 import { formatINRCompact } from "../../../../utils/format";
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
-const PIE_TRACK = { radius: 109.5, strokeWidth: 45 } as const;
+const PIE_TRACK = { radius: 112, strokeWidth: 48 } as const;
 /** A barely perceptible ambient revolution — 40 minutes per lap. */
 const ORBIT_MS = 2400_000;
 
@@ -105,7 +105,13 @@ function CollectionTooltip({
   const color = typeof item.color === "string" ? item.color : "#64748b";
 
   return (
-    <div className="min-w-[190px] rounded-xl border border-slate-200 bg-white/95 px-3 py-2.5 shadow-xl shadow-slate-900/10 backdrop-blur-sm">
+    <div
+      className="min-w-[190px] rounded-xl border border-slate-200 bg-white/95 px-3 py-2.5 shadow-xl shadow-slate-900/10 backdrop-blur-sm"
+      style={{
+        transform: "rotate(calc(-1 * var(--cs-pie-angle, 0deg)))",
+        transformOrigin: "center center",
+      }}
+    >
       <div className="flex items-center gap-2 border-b border-slate-100 pb-1.5">
         <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
         <p className="text-[11px] font-black uppercase tracking-wider text-slate-500">{item.name}</p>
@@ -208,7 +214,10 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
       if (!running) return;
       running = false;
       cancelAnimationFrame(frame);
-      if (spinRef.current) spinRef.current.style.transform = "";
+      if (spinRef.current) {
+        spinRef.current.style.transform = "";
+        spinRef.current.style.setProperty("--cs-pie-angle", "0deg");
+      }
     };
 
     const start = () => {
@@ -218,7 +227,9 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
       const tick = (now: number) => {
         if (!running) return;
         if (spinRef.current) {
-          spinRef.current.style.transform = `rotate(${((((now - t0) / ORBIT_MS) * 360) % 360).toFixed(3)}deg)`;
+          const angle = `${((((now - t0) / ORBIT_MS) * 360) % 360).toFixed(3)}deg`;
+          spinRef.current.style.transform = `rotate(${angle})`;
+          spinRef.current.style.setProperty("--cs-pie-angle", angle);
         }
         frame = requestAnimationFrame(tick);
       };
@@ -252,7 +263,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
   if (chartData.length === 0) {
     return (
       <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col" aria-busy="true">
-        <div className="min-h-[320px] w-full flex-1" style={{ minHeight: 320 }}>
+        <div className="min-h-[340px] w-full flex-1" style={{ minHeight: 340 }}>
           <div className="flex h-full w-full items-center justify-center">
           <div className="relative aspect-square w-full max-w-[560px]" style={{ aspectRatio: "1 / 1" }}>
             <svg viewBox="0 0 400 400" className="h-full w-full" aria-hidden="true">
@@ -302,14 +313,14 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
     <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
       {/* The donut stays centered in the available chart stage. Its KPI row
           follows underneath with the same spacing used by Trip Movement. */}
-      <div className="min-h-[320px] w-full flex-1" style={{ minHeight: 320 }}>
+      <div className="min-h-[340px] w-full flex-1" style={{ minHeight: 340 }}>
         <div className="flex h-full w-full items-center justify-center">
           <div
             key={signature}
             className="relative aspect-square max-h-full w-full max-w-[560px] animate-fade-in"
             style={{ aspectRatio: "1 / 1" }}
           >
-          {/* Soft background track behind the enlarged ring (82–123 band).
+          {/* Soft background track behind the enlarged ring (88–136 band).
               SVG circle so it scales with the scene at every card width. */}
           <svg viewBox="0 0 400 400" className="absolute inset-0 h-full w-full" aria-hidden="true">
             <circle
@@ -341,8 +352,8 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
                   nameKey="name"
                   cx="50%"
                   cy="50%"
-                  innerRadius="41%"
-                  outerRadius="61.5%"
+                  innerRadius="44%"
+                  outerRadius="68%"
                   paddingAngle={3}
                   cornerRadius={6}
                   stroke="none"
