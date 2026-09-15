@@ -771,7 +771,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0">
+        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0 xl:h-[530px]">
           <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
             <div className="min-w-0">
               {/* The title is the way through to the detail page — no second link. */}
@@ -804,7 +804,11 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
               calendarTitle={t("ops.dashboard.trend.back_to_calendar")}
             />
           </div>
-          <div className="w-full overflow-hidden">
+          {/* minHeight: overflow-hidden zeroes a flex item's auto min-size, so
+              without this floor the grid row (sized by content) can collapse
+              and clip the whole chart — the inline value makes the floor
+              independent of the CSS class. */}
+          <div className="flex w-full flex-1 flex-col overflow-hidden" style={{ minHeight: 200 }}>
             <OperationalTrendsChart
               trends={trendsQuery.trends}
               granularity={trendGranularity}
@@ -815,17 +819,28 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
           </div>
         </div>
         
-        <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.payment_breakdown")}</span>
-              <h3 className="text-sm font-black text-slate-800 mt-0.5">{t("ops.dashboard.collection_streams")}</h3>
-            </div>
-            <Link to="/operations?tab=collections" className="shrink-0 text-[11px] font-bold text-blue-600 hover:underline">View details →</Link>
-          </div>
-          <div className="w-full flex justify-center items-center py-2 overflow-hidden">
-            <CollectionsPie data={data?.collectionsByMode || []} />
-          </div>
+        {/* No overflow-hidden on the card itself (same structure as the
+            Trips card): the donut is bounded by its own flex stage
+            (flex-1 + min-h-0 + max-h-full), so nothing can bleed — and
+            the shrink-0 KPI strip below the chart can never be clipped.
+            It always shows, fully, whether the space is reduced or
+            increased. */}
+        <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-5 w-full min-w-0 xl:h-[530px]">
+          <Link
+            to="/operations?tab=collection-report"
+            title={t("nav.collectionReport")}
+            className="group/title -mt-1 inline-flex w-fit items-center gap-1.5"
+          >
+            <h3 className="text-sm font-black text-slate-800 transition-colors group-hover/title:text-emerald-600">
+              {t("ops.dashboard.collection_streams")}
+            </h3>
+            <ArrowUpRight
+              size={13}
+              strokeWidth={2.6}
+              className="text-slate-300 transition-all duration-150 group-hover/title:-translate-y-[1px] group-hover/title:translate-x-[1px] group-hover/title:text-emerald-600"
+            />
+          </Link>
+          <CollectionsPie data={data?.collectionsByMode || []} />
         </div>
       </div>
 
