@@ -454,6 +454,18 @@ export function PerformanceDrawer({
         {children}
       </div>
 
+      {/* Footer — the same animated ✕ as the header, so the view can also be
+          closed from the end of a long scroll. */}
+      <div className="flex shrink-0 items-center justify-end rounded-b-2xl border-t border-slate-100 bg-white px-6 py-3 md:px-8">
+        <button
+          type="button"
+          onClick={onClose}
+          className={closeControlClass}
+          aria-label={labels.close}
+        >
+          <X size={16} aria-hidden="true" className={closeIconClass} />
+        </button>
+      </div>
     </div>
   );
 

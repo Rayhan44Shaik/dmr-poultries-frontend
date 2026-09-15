@@ -124,6 +124,18 @@ export function formatVehicleNumber(value: string | null | undefined): string {
   return m ? `${m[1].toUpperCase()} ${m[2]} ${m[3].toUpperCase()} ${m[4]}` : raw;
 }
 
+/**
+ * Trip number, spaced the same way vehicle numbers are, so a row reads as
+ * "TRP 2026 0911 008" instead of one dense token. Presentation only — the id
+ * itself, its sorting and its links never change.
+ */
+export function formatTripNumber(value: string | null | undefined): string {
+  if (!value) return "—";
+  const raw = String(value).trim();
+  const m = /^(TRP)-?(\d{4})(\d{2})(\d{2})-?(\d+)$/i.exec(raw);
+  return m ? `${m[1].toUpperCase()} ${m[2]} ${m[3]}${m[4]} ${m[5]}` : raw;
+}
+
 /** ISO date for a day offset from today (e.g. -1 for yesterday). */
 export function isoDateDaysAgo(days: number): string {
   const date = new Date();

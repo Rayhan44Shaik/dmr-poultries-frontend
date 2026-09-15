@@ -10,7 +10,7 @@
 // Presentation only — sorting reorders the loaded rows, grades never change.
 // ============================================================================
 
-import { memo } from "react";
+import { memo, type ReactNode } from "react";
 import { ArrowDown, ArrowUp, ChevronsUpDown } from "lucide-react";
 import { perfThClass } from "./tableRhythm";
 
@@ -33,6 +33,8 @@ interface SortableHeaderProps {
   /** Direction used on the FIRST click (numeric columns default to desc). */
   firstDir?: SortDirection;
   className?: string;
+  /** The column's own 14px glyph, shown before the name like the Trip List. */
+  icon?: ReactNode;
 }
 
 function SortableHeaderImpl({
@@ -43,6 +45,7 @@ function SortableHeaderImpl({
   align = "left",
   firstDir = "desc",
   className = "",
+  icon,
 }: SortableHeaderProps) {
   const active = sort?.key === sortKey;
   const dir = active ? sort!.dir : null;
@@ -83,6 +86,7 @@ function SortableHeaderImpl({
           active ? "text-emerald-700" : "text-slate-500 hover:text-slate-900"
         } ${justifyClass}`}
       >
+        {icon}
         <span className="truncate">{label}</span>
         <Icon
           size={iconSize}

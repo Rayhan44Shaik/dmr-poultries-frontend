@@ -22,11 +22,15 @@
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
+  Fuel,
   Gauge,
+  IndianRupee,
   Route,
+  Scale,
   TrendingUp,
   Truck,
   Users,
+  Wrench,
 } from "lucide-react";
 import { te as teDateLocale } from "date-fns/locale";
 import type { Locale } from "date-fns";
@@ -39,6 +43,7 @@ import { rankDriverRows } from "../utils/performanceGrading";
 import SortableHeader, {
   type SortState,
 } from "../components/performance/PerformanceSortableHeader";
+import type { DriverVehicleDetail } from "../types/performance";
 import {
   formatBusinessDate,
   formatPeriodLabel,
@@ -94,7 +99,6 @@ import {
   uiTableRowSelectedClass,
   uiTableTdClass,
   uiTableTdNumericClass,
-  uiTableThClass,
 } from "../../../shared/ui/uiTokens";
 
 /** Typing pause before the search reaches the API (Leave page parity). */
@@ -253,6 +257,7 @@ const DriverPerformancePage = () => {
     setSort(next);
     setCurrentPage(1);
   }, []);
+
 
   const driverSortAccessors = useMemo<
     Record<string, (entry: (typeof rowsView)[number]) => number | string>
@@ -461,6 +466,45 @@ const DriverPerformancePage = () => {
     perf.refreshNonce,
   );
   const personDetail = detailQuery.detail;
+
+  /* Vehicle Breakdown sorts on its own — the page's award order never moves. */
+  const [vehicleSort, setVehicleSort] = useState<SortState | null>(null);
+  const vehicleSortAccessors = useMemo<
+    Record<string, (vehicle: DriverVehicleDetail) => number | string>
+  >(
+    () => ({
+      vehicle_no: (vehicle) => vehicle.vehicleNo,
+      trips: (vehicle) => vehicle.trips,
+      distance: (vehicle) => vehicle.distance,
+      avg_per_trip: (vehicle) => vehicle.avgDistancePerTrip,
+      fuel: (vehicle) => vehicle.fuelLitres,
+      fuel_cost: (vehicle) => vehicle.fuelCost,
+      maintenance_cost: (vehicle) => vehicle.maintenanceCost,
+      total_cost: (vehicle) => vehicle.totalCost,
+      mileage: (vehicle) => vehicle.mileage,
+    }),
+    [],
+  );
+
+  const sortedVehicles = useMemo(() => {
+    const vehicles = personDetail?.vehicles ?? [];
+    if (!vehicleSort) return vehicles;
+    const accessor = vehicleSortAccessors[vehicleSort.key];
+    if (!accessor) return vehicles;
+    const dir = vehicleSort.dir === "asc" ? 1 : -1;
+    return [...vehicles].sort((a, b) => {
+      const av = accessor(a);
+      const bv = accessor(b);
+      if (typeof av === "string" || typeof bv === "string") {
+        return String(av).localeCompare(String(bv), undefined, {
+          sensitivity: "accent",
+          numeric: true,
+        }) * dir;
+      }
+      return (av - bv) * dir;
+    });
+  }, [personDetail?.vehicles, vehicleSort, vehicleSortAccessors]);
+
 
   // ‹ › traversal across the award-ordered rows (rank literal order).
   const drawerNavigation = useMemo(() => {
@@ -861,38 +905,85 @@ const DriverPerformancePage = () => {
                 <div className="mt-2 overflow-x-auto rounded-xl border border-slate-200">
                   <table className="min-w-full divide-y divide-slate-100">
                     <thead className="bg-slate-50/80">
+                      {/* Every column carries its own glyph and sorts, exactly
+                          like the Trip List table. */}
                       <tr>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-left`}>
-                          {drawerT("staff.perf.vehicle.col.vehicle_no")}
-                        </th>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-right`}>
-                          {drawerT("staff.perf.vehicle.col.trips")}
-                        </th>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-right`}>
-                          {drawerT("staff.perf.vehicle.col.distance")}
-                        </th>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-right`}>
-                          {drawerT("staff.perf.vehicle.col.avg_per_trip")}
-                        </th>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-right`}>
-                          {drawerT("staff.perf.vehicle.col.fuel")}
-                        </th>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-right`}>
-                          {drawerT("staff.perf.vehicle.col.fuel_cost")}
-                        </th>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-right`}>
-                          {drawerT("staff.perf.vehicle.col.maintenance_cost")}
-                        </th>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-right`}>
-                          {drawerT("staff.perf.vehicle.col.total_cost")}
-                        </th>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-right`}>
-                          {drawerT("staff.perf.vehicle.col.mileage")}
-                        </th>
+                        <SortableHeader
+                          label={drawerT("staff.perf.vehicle.col.vehicle_no")}
+                          sortKey="vehicle_no"
+                          sort={vehicleSort}
+                          onSortChange={setVehicleSort}
+                          firstDir="asc"
+                          icon={<Truck size={14} className="shrink-0 text-indigo-500" />}
+                        />
+                        <SortableHeader
+                          label={drawerT("staff.perf.vehicle.col.trips")}
+                          sortKey="trips"
+                          sort={vehicleSort}
+                          onSortChange={setVehicleSort}
+                          align="right"
+                          icon={<Route size={14} className="shrink-0 text-emerald-500" />}
+                        />
+                        <SortableHeader
+                          label={drawerT("staff.perf.vehicle.col.distance")}
+                          sortKey="distance"
+                          sort={vehicleSort}
+                          onSortChange={setVehicleSort}
+                          align="right"
+                          icon={<Gauge size={14} className="shrink-0 text-sky-500" />}
+                        />
+                        <SortableHeader
+                          label={drawerT("staff.perf.vehicle.col.avg_per_trip")}
+                          sortKey="avg_per_trip"
+                          sort={vehicleSort}
+                          onSortChange={setVehicleSort}
+                          align="right"
+                          icon={<TrendingUp size={14} className="shrink-0 text-violet-500" />}
+                        />
+                        <SortableHeader
+                          label={drawerT("staff.perf.vehicle.col.fuel")}
+                          sortKey="fuel"
+                          sort={vehicleSort}
+                          onSortChange={setVehicleSort}
+                          align="right"
+                          icon={<Fuel size={14} className="shrink-0 text-amber-500" />}
+                        />
+                        <SortableHeader
+                          label={drawerT("staff.perf.vehicle.col.fuel_cost")}
+                          sortKey="fuel_cost"
+                          sort={vehicleSort}
+                          onSortChange={setVehicleSort}
+                          align="right"
+                          icon={<IndianRupee size={14} className="shrink-0 text-teal-500" />}
+                        />
+                        <SortableHeader
+                          label={drawerT("staff.perf.vehicle.col.maintenance_cost")}
+                          sortKey="maintenance_cost"
+                          sort={vehicleSort}
+                          onSortChange={setVehicleSort}
+                          align="right"
+                          icon={<Wrench size={14} className="shrink-0 text-orange-500" />}
+                        />
+                        <SortableHeader
+                          label={drawerT("staff.perf.vehicle.col.total_cost")}
+                          sortKey="total_cost"
+                          sort={vehicleSort}
+                          onSortChange={setVehicleSort}
+                          align="right"
+                          icon={<Scale size={14} className="shrink-0 text-rose-500" />}
+                        />
+                        <SortableHeader
+                          label={drawerT("staff.perf.vehicle.col.mileage")}
+                          sortKey="mileage"
+                          sort={vehicleSort}
+                          onSortChange={setVehicleSort}
+                          align="right"
+                          icon={<Gauge size={14} className="shrink-0 text-cyan-500" />}
+                        />
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 bg-white">
-                      {personDetail.vehicles.map((vehicle) => (
+                      {sortedVehicles.map((vehicle) => (
                         <tr key={vehicle.vehicleNo} className="transition-colors hover:bg-slate-50/70">
                           <td className={`${uiTableTdClass} whitespace-nowrap px-3 py-2 text-[13px] font-bold tabular-nums text-slate-800`}>
                             {formatVehicleNumber(vehicle.vehicleNo)}
