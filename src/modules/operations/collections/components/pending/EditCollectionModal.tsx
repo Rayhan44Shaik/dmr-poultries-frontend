@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import {
   X, Save, Eye, Calendar, User, CreditCard, Hash, IndianRupee, FileText, Loader2,
-  FileDown, Trash2, Store, Activity, Wallet, ShieldAlert, Clock, UserCog,
+  FileDown, Trash2, Store, Activity, Wallet, ShieldAlert, Clock, UserCog, Search,
 } from "lucide-react";
 import type { Collection, CollectionApiEntry } from "../../types/collection";
 import { collectionService } from "../../services/collectionService";
@@ -64,7 +64,22 @@ export function EditCollectionModal({
     .filter((c) => c.shopName === shopName)
     .sort((a, b) => b.collectionDate.localeCompare(a.collectionDate));
   const latest = shopCollections.length > 0 ? shopCollections[0] : null;
-  const selected = collection ?? latest;
+  /**
+   * Which entry the detail block is showing.
+   *
+   * Defaults to the collection the modal was opened for (falling back to the
+   * shop's latest), but picking a row in the credits table below overrides it
+   * — so the user can step through a shop's history one entry at a time and
+   * watch the detail above follow, without closing and reopening the modal.
+   */
+  const openKey = `${isOpen ? "1" : "0"}:${shopName}:${collection?.id ?? ""}`;
+  const [pick, setPick] = useState<{ key: string; id: string } | null>(null);
+  // Tying the pick to the open context means a reopen — or opening on a
+  // different row — discards it automatically, with no reset effect.
+  const pickedId = pick && pick.key === openKey ? pick.id : null;
+  const setPickedId = (id: string) => setPick({ key: openKey, id });
+  const picked = pickedId == null ? null : shopCollections.find((c) => String(c.id) === pickedId) ?? null;
+  const selected = picked ?? collection ?? latest;
 
   const [formData, setFormData] = useState({
     collectionNo: "",
@@ -78,6 +93,8 @@ export function EditCollectionModal({
 
   // Backend-sourced "Recent 10 Shop Credits": newest first, max 10, per shop.
   const [recentList, setRecentList] = useState<CollectionApiEntry[]>([]);
+  /** Free-text filter over this shop's credits. */
+  const [creditSearch, setCreditSearch] = useState("");
   const [recentLoading, setRecentLoading] = useState(false);
 
   useEffect(() => {
@@ -128,6 +145,35 @@ export function EditCollectionModal({
       });
     }
   }, [selected]);
+
+  /**
+   * Credits filtered by the search box. Matches the raw English value AND its
+   * Telugu rendering, so a user reading in either language finds the row.
+   */
+  const filteredCredits = recentList.filter((col) => {
+    const q = creditSearch.trim().toLowerCase();
+    if (!q) return true;
+    const squashed = q.replace(/\s+/g, "");
+    const statusKey = "status." + String(col.status).toLowerCase().replace(/\s+/g, "_");
+    const statusLabel = t(statusKey);
+    const candidates = [
+      col.collectionNo,
+      col.collectionDate,
+      formatDate(col.collectionDate, dateLocale),
+      String(col.amount ?? ""),
+      col.collector,
+      col.paymentMode,
+      col.referenceNo,
+      col.status,
+      statusLabel === statusKey ? "" : statusLabel,
+      tr(col.collector),
+      tr(col.paymentMode),
+    ];
+    return candidates.some((value) => {
+      const text = String(value ?? "").toLowerCase();
+      return text.includes(q) || text.replace(/\s+/g, "").includes(squashed);
+    });
+  });
 
   const handleChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
@@ -567,18 +613,49 @@ export function EditCollectionModal({
                       <FileText size={15} />
                     </span>
                     {t("ops.collection.recent_10_credits")}
-                  </h4>
-                  {recentLoading && (
-                    <span className="inline-flex items-center gap-1 text-xs text-slate-400">
-                      <Loader2 size={12} className="animate-spin" />
-                      {t("common.loading")}
+                    <span className="hidden rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:inline">
+                      {t("ops.collection.click_row_to_view")}
                     </span>
-                  )}
+                  </h4>
+                  <div className="flex items-center gap-2">
+                    {recentLoading && (
+                      <span className="inline-flex items-center gap-1 text-xs text-slate-400">
+                        <Loader2 size={12} className="animate-spin" />
+                        {t("common.loading")}
+                      </span>
+                    )}
+                    {/* Search this shop's credits, so a specific entry can be
+                      * found and selected without leaving the view. */}
+                    <div className="relative">
+                      <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-slate-400" />
+                      <input
+                        type="text"
+                        value={creditSearch}
+                        onChange={(e) => setCreditSearch(e.target.value)}
+                        placeholder={t("ops.collection.search_collections_placeholder")}
+                        className="w-48 rounded-lg border border-slate-200 bg-white py-1.5 pl-8 pr-7 text-xs outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-400/20 sm:w-60"
+                      />
+                      {creditSearch && (
+                        <button
+                          type="button"
+                          onClick={() => setCreditSearch("")}
+                          aria-label={t("common.clear")}
+                          className="group absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+                        >
+                          <X size={13} className={uiActionIconMotionClass.close} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
                 {recentLoading && recentList.length === 0 ? (
                   <p className="text-sm text-slate-500">{t("ops.collection.loading_recent")}</p>
                 ) : recentList.length === 0 ? (
                   <p className="text-sm text-slate-500">{t("ops.collection.no_collections_for_shop")}</p>
+                ) : filteredCredits.length === 0 ? (
+                  <p className="rounded-lg border border-dashed border-slate-200 bg-slate-50/50 px-4 py-6 text-center text-sm text-slate-500">
+                    {t("empty.search_no_results")}
+                  </p>
                 ) : (
                   <div className="overflow-x-auto rounded-lg border border-slate-200">
                     {/* Proportioned to content, same rule as the Collection
@@ -644,13 +721,26 @@ export function EditCollectionModal({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 bg-white">
-                        {recentList.slice(0, 10).map((col, index) => (
+                        {filteredCredits.slice(0, 10).map((col, index) => {
+                          const isRowSelected = selected != null && String(selected.id) === String(col.id);
+                          return (
                           <tr
                             key={col.id}
-                            className={`transition-colors duration-150 hover:bg-slate-50/80 ${
-                              selected && String(selected.id) === String(col.id)
+                            tabIndex={0}
+                            role="button"
+                            aria-selected={isRowSelected}
+                            onClick={() => setPickedId(String(col.id))}
+                            onKeyDown={(event) => {
+                              if (event.target !== event.currentTarget) return;
+                              if (event.key === "Enter" || event.key === " ") {
+                                event.preventDefault();
+                                setPickedId(String(col.id));
+                              }
+                            }}
+                            className={`cursor-pointer outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
+                              isRowSelected
                                 ? "bg-blue-50/70 ring-1 ring-inset ring-blue-200"
-                                : ""
+                                : "hover:bg-slate-50/80"
                             }`}
                           >
                             <td className="px-3 py-2.5 text-xs tabular-nums text-slate-400">{index + 1}</td>
@@ -677,10 +767,11 @@ export function EditCollectionModal({
                               })()}
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
-                    {recentList.length >= 10 && (
+                    {filteredCredits.length >= 10 && (
                       <p className="px-3 py-2 text-xs text-slate-400">
                         {t("ops.collection.showing_latest_10", { count: recentList.length })}
                       </p>

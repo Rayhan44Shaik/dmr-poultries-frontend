@@ -318,7 +318,9 @@ export default function RecentCollectionsTable({
                 tab === "Approved"
                   ? "bg-emerald-50/80 text-emerald-500 shadow-sm"
                   : "bg-orange-50/80 text-orange-500 shadow-sm";
-              const key = `status.${tab.toLowerCase()}`;
+              // The Pending tab is "Pending Approval" — the same words the row
+              // badge uses, so the tab and the rows it filters agree.
+              const key = tab === "Pending" ? "status.pending_approval" : `status.${tab.toLowerCase()}`;
               const label = t(key) === key ? tab : t(key);
               return (
                 <button
@@ -600,7 +602,10 @@ export default function RecentCollectionsTable({
                           </>
                         )}
 
-                        {!isDeleted && (
+                        {/* View is an approved-only affordance. A pending row
+                          * has nothing settled to inspect yet — approve or edit
+                          * it first. */}
+                        {!isDeleted && !isPending && (
                           <button
                             type="button"
                             onClick={() => onViewShop(col.shopName)}

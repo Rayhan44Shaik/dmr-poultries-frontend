@@ -120,6 +120,7 @@ export default {
   'ops.collection.delete_window_today': 'Deletable today only',
   'ops.collection.search_results': '{count} match(es)',
   'ops.collection.searching_all': 'Searching all approved collections',
+  'ops.collection.click_row_to_view': 'Select a row to view it',
   'ops.collection.read_only': 'Read only',
   'ops.collection.received_today': 'Received Today',
   'ops.collection.recent_10_credits': 'Recent 10 credits',

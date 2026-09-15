@@ -120,6 +120,7 @@ export default {
   'ops.collection.delete_window_today': 'ఈరోజు మాత్రమే తొలగించవచ్చు',
   'ops.collection.search_results': '{count} ఫలితం(లు)',
   'ops.collection.searching_all': 'అన్ని ఆమోదిత కలెక్షన్లలో శోధిస్తోంది',
+  'ops.collection.click_row_to_view': 'చూడటానికి ఒక వరుసను ఎంచుకోండి',
   'ops.collection.read_only': 'చదవడానికి మాత్రమే',
   'ops.collection.received_today': 'ఈ రోజు అందుకున్నది',
   'ops.collection.recent_10_credits': 'ఇటీవలి 10 క్రెడిట్లు',
