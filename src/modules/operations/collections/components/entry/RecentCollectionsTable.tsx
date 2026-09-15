@@ -12,6 +12,11 @@ import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 import { opsSecondaryButtonClass } from "../../../../../shared/ui/operationsStyles";
 import { BrandRefreshButton } from "../../../../../ui";
 import { collectionStatusKey, collectionStatusLabel } from "../../utils/collectionStatusLabel";
+import {
+  collectionShopKey,
+  compareCollectionRecency,
+  latestApprovedPerShop,
+} from "./latestApprovedPerShop";
 
 interface Props {
   collections: RecentCollection[];
@@ -110,57 +115,29 @@ export default function RecentCollectionsTable({
     const pending = filteredBySearch.filter((col) => col.rawStatus === "Pending Approval");
     const deleted = filteredBySearch.filter((col) => col.rawStatus === "Deleted");
 
-    // Approved tab: one row per shop, showing that shop's MOST RECENT
-    // approved collection.
-    //
-    // Two things matter here and both were previously wrong:
-    //
-    // 1. "Latest" is resolved against the FULL approved set, never the
-    //    search-filtered one. Picking the newest of only the matching rows
-    //    would show an older collection number whenever the search happened
-    //    to exclude the real latest entry — the row would claim to be the
-    //    shop's current state while showing stale figures. The search is
-    //    applied afterwards, to decide which shop rows to display.
-    //
-    // 2. Recency is compared on ONE clock. Mixing approvedDate for one side
-    //    and collectionDate for the other compares different quantities, so
-    //    the winner depended on which rows happened to carry an approvedDate.
-    //    collectionDate is the entry date every row has; the id breaks ties
-    //    within a day, giving a total order that cannot flip between renders.
-    const allApproved = collections.filter((row) => (row.rawStatus || row.status) === "Approved");
-
-    const isNewer = (candidate: RecentCollection, current: RecentCollection) => {
-      const byDate = candidate.collectionDate.localeCompare(current.collectionDate);
-      if (byDate !== 0) return byDate > 0;
-      return (candidate.numericId ?? 0) > (current.numericId ?? 0);
-    };
-
-    const shopMap = new Map<string, RecentCollection>();
-    for (const col of allApproved) {
-      const existing = shopMap.get(col.shopName);
-      if (!existing || isNewer(col, existing)) shopMap.set(col.shopName, col);
-    }
-
-    const sort = (rows: RecentCollection[]) =>
-      [...rows].sort((a, b) => b.collectionDate.localeCompare(a.collectionDate));
-
-    // Now apply the search to the one-row-per-shop list.
-    const matchingShops = new Set(
+    // Resolve the one-row-per-shop Approved list against the COMPLETE
+    // approved set before applying search. This guarantees that searching an
+    // older number can reveal its shop, but the row still displays that shop's
+    // actual newest approved collection number. Stable shop ids prevent two
+    // shops with the same display name from being collapsed together.
+    const newestApprovedRows = latestApprovedPerShop(collections);
+    const matchingApprovedShopKeys = new Set(
       filteredBySearch
         .filter((row) => (row.rawStatus || row.status) === "Approved")
-        .map((row) => row.shopName),
+        .map(collectionShopKey),
+    );
+    const approvedByShop = newestApprovedRows.filter((row) =>
+      matchingApprovedShopKeys.has(collectionShopKey(row)),
     );
 
-    const approvedByShop = sort(
-      Array.from(shopMap.values()).filter((row) => matchingShops.has(row.shopName)),
-    );
+    const sort = (rows: RecentCollection[]) =>
+      [...rows].sort((a, b) => compareCollectionRecency(b, a));
 
     return {
       Pending: sort(pending),
-      // EVERY shop that has an approved collection appears, one row each,
-      // showing that shop's most recent entry. The row is a doorway: opening
-      // it reveals that shop's latest 10 collections. Pagination keeps the
-      // full list manageable, so no shop is silently withheld.
+      // EVERY shop that has an approved collection appears exactly once and
+      // carries that shop's most recent approved collection number. Opening
+      // the row loads the same shop's latest 10 records across all statuses.
       Approved: approvedByShop,
       Deleted: sort(deleted),
     };

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   X, Save, Eye, Calendar, User, CreditCard, Hash, IndianRupee, FileText, Loader2,
   FileDown, Trash2, Store, Activity, Wallet, ShieldAlert, Clock, UserCog, Search, Settings2,
@@ -62,6 +62,14 @@ export function EditCollectionModal({
     (value: string | null | undefined) => localizeTripViewText(value, language, { cleanShopCode: true }),
     [language],
   );
+
+  // Backend-sourced "Recent 10 Shop Credits": newest first, max 10, per shop,
+  // across every status (including deleted history).
+  const [recentList, setRecentList] = useState<CollectionApiEntry[]>([]);
+  /** Free-text filter over this shop's credits. */
+  const [creditSearch, setCreditSearch] = useState("");
+  const [recentLoading, setRecentLoading] = useState(false);
+
   const shopCollections = allCollections
     .filter((c) => c.shopName === shopName)
     .sort((a, b) => b.collectionDate.localeCompare(a.collectionDate));
@@ -80,8 +88,41 @@ export function EditCollectionModal({
   // different row — discards it automatically, with no reset effect.
   const pickedId = pick && pick.key === openKey ? pick.id : null;
   const setPickedId = (id: string) => setPick({ key: openKey, id });
-  const picked = pickedId == null ? null : shopCollections.find((c) => String(c.id) === pickedId) ?? null;
-  const selected = picked ?? collection ?? latest;
+  const pickedCached =
+    pickedId == null ? null : shopCollections.find((c) => String(c.id) === pickedId) ?? null;
+  const pickedApi =
+    pickedId == null ? null : recentList.find((c) => String(c.id) === pickedId) ?? null;
+  // Deleted records are deliberately absent from allCollections, so map a
+  // picked recent API row into the shared detail shape. Memoizing keeps the
+  // selected object stable and prevents the form-sync effect from re-running
+  // when unrelated modal state changes.
+  const pickedFromRecent = useMemo<Collection | null>(() => {
+    if (!pickedApi) return null;
+    return {
+      id: String(pickedApi.id),
+      collectionNo: pickedApi.collectionNo,
+      collectionDate: pickedApi.collectionDate,
+      shopName: pickedApi.shopName,
+      collectorName: pickedApi.collector,
+      paymentModeName: pickedApi.paymentMode,
+      referenceNo: pickedApi.referenceNo,
+      amount: Number(pickedApi.amount),
+      remarks: pickedApi.remarks,
+      status:
+        pickedApi.deleted || pickedApi.status === "Deleted"
+          ? "Deleted"
+          : pickedApi.status === "Approved"
+            ? "Approved"
+            : "Pending",
+      createdDate: pickedApi.createdAt ?? pickedApi.collectionDate,
+      createdBy: pickedApi.createdBy,
+      approvedDate: pickedApi.approvedAt ?? undefined,
+      approvedBy: pickedApi.approvedBy ?? undefined,
+      numericId: pickedApi.id,
+      numericShopId: pickedApi.shopId,
+    };
+  }, [pickedApi]);
+  const selected = pickedFromRecent ?? pickedCached ?? collection ?? latest;
 
   const [formData, setFormData] = useState({
     collectionNo: "",
@@ -92,12 +133,6 @@ export function EditCollectionModal({
     amount: 0,
     remarks: "",
   });
-
-  // Backend-sourced "Recent 10 Shop Credits": newest first, max 10, per shop.
-  const [recentList, setRecentList] = useState<CollectionApiEntry[]>([]);
-  /** Free-text filter over this shop's credits. */
-  const [creditSearch, setCreditSearch] = useState("");
-  const [recentLoading, setRecentLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;

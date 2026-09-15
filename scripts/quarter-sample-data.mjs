@@ -4615,9 +4615,24 @@ const server = http.createServer(async (req, res) => {
     if (p === "/api/operations/collection-entry/recent") {
       const shopId = Number(q.get("shopId"));
       const limit = Math.min(Number(q.get("limit") || 20), 500);
-      const rows = COLLECTIONS.filter((c) => c.deleted !== true && (!shopId || c.shopId === shopId))
-        .sort((a, b) => b.collectionDate.localeCompare(a.collectionDate))
-        .slice(0, limit);
+      const includeDeleted = String(q.get("includeDeleted")) === "true";
+      const rows = COLLECTIONS.filter(
+        (c) => (includeDeleted || c.deleted !== true) && (!shopId || c.shopId === shopId),
+      )
+        .sort(
+          (a, b) =>
+            b.collectionDate.localeCompare(a.collectionDate) ||
+            String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? "")) ||
+            b.id - a.id ||
+            b.collectionNo.localeCompare(a.collectionNo, undefined, { numeric: true }),
+        )
+        .slice(0, limit)
+        .map((row) => ({
+          ...row,
+          // Soft deletion must not masquerade as the previous Approved or
+          // Pending status in the complete per-shop history.
+          status: row.deleted === true ? "Deleted" : row.status,
+        }));
       return send(200, rows);
     }
     if (p === "/api/operations/collection-entry/pending-summary") {

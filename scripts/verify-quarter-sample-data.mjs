@@ -466,6 +466,68 @@ async function run() {
     shopCollections.every((row) => row.shopId === scopedShopId),
     "collection-entry must honour the shopId filter instead of returning the whole register",
   );
+
+  // Collection numbers share one permanent namespace across every lifecycle
+  // status. Create and remove a pending probe so this audit proves — rather
+  // than merely permits — that deleted history remains in the latest-10 view.
+  const deletedHistoryProbe = await request("/operations/collection-entry", {
+    method: "POST",
+    body: JSON.stringify({
+      collectionDate: manifest.quarter.today,
+      shopId: scopedShopId,
+      amount: 321,
+      collector: "Quarter Verifier",
+      paymentMode: "Cash",
+      remarks: "Recent-history status probe",
+    }),
+  });
+  await request(`/operations/collection-entry/pending/${deletedHistoryProbe.id}`, {
+    method: "DELETE",
+  });
+
+  // Deleted numbers remain reserved, and the View Collection history returns
+  // the exact newest 10 records for its shop across all statuses.
+  const completeCollectionRegister = await request(
+    "/operations/collection-entry?includeDeleted=true",
+  );
+  assert.equal(
+    new Set(completeCollectionRegister.map((row) => row.collectionNo)).size,
+    completeCollectionRegister.length,
+    "Pending, Approved, and Deleted rows must never share a collection number",
+  );
+  const expectedRecentCredits = completeCollectionRegister
+    .filter((row) => row.shopId === scopedShopId)
+    .sort(
+      (a, b) =>
+        b.collectionDate.localeCompare(a.collectionDate) ||
+        String(b.createdAt ?? "").localeCompare(String(a.createdAt ?? "")) ||
+        b.id - a.id ||
+        b.collectionNo.localeCompare(a.collectionNo, undefined, { numeric: true }),
+    )
+    .slice(0, 10);
+  const recentCredits = await request(
+    `/operations/collection-entry/recent?shopId=${scopedShopId}&limit=10&includeDeleted=true`,
+  );
+  assert.deepEqual(
+    recentCredits.map((row) => row.id),
+    expectedRecentCredits.map((row) => row.id),
+    "View Collection must return the exact newest 10 records for the selected shop",
+  );
+  assert.ok(
+    recentCredits.every((row) => row.shopId === scopedShopId),
+    "View Collection recent credits must never leak another shop's record",
+  );
+  assert.ok(
+    recentCredits.every((row) => row.deleted !== true || row.status === "Deleted"),
+    "deleted history rows must be labelled Deleted without changing their collection number",
+  );
+  const deletedProbeInHistory = recentCredits.find(
+    (row) => row.id === deletedHistoryProbe.id,
+  );
+  assert.ok(deletedProbeInHistory, "the newly deleted collection must remain in the shop's latest 10");
+  assert.equal(deletedProbeInHistory.status, "Deleted");
+  assert.equal(deletedProbeInHistory.collectionNo, deletedHistoryProbe.collectionNo);
+
   const scopedVehicleId = (await request("/operations/fuel-expenses")).data[0].vehicleId;
   const vehicleFuel = await request(`/operations/fuel-expenses?vehicleId=${scopedVehicleId}`);
   assert.ok(vehicleFuel.data.length > 0);
