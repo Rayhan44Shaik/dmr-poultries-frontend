@@ -214,7 +214,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
           (stacks below it on narrow screens). The whole row is centred in
           whatever height the card gives it, so the card stays short. */}
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 @md:flex-row">
-        <div className="relative aspect-square w-full max-w-[300px] shrink-0" style={{ aspectRatio: "1 / 1" }}>
+        <div className="relative aspect-square w-full max-w-[340px] shrink-0" style={{ aspectRatio: "1 / 1" }}>
           {/* Soft background track behind the ring (same 74.24–107.5 band).
               SVG circle so it scales with the scene at every card width. */}
           <svg viewBox="0 0 400 400" className="absolute inset-0 h-full w-full" aria-hidden="true">
