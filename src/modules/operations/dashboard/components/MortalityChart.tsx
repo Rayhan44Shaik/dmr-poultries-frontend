@@ -15,7 +15,8 @@ export default function MortalityChart({ data }: MortalityChartProps) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
       <h3 className="text-sm font-semibold text-slate-700 mb-3">{t("ops.dashboard.mortality_trend")}</h3>
-      <ResponsiveContainer width="100%" height={200}>
+      <div className="h-[12.5rem] w-full">
+      <ResponsiveContainer width="100%" height="100%">
         <BarChart data={chartData}>
           <CartesianGrid strokeDasharray="3 3" />
           <XAxis dataKey="date" tick={{ fontSize: 10 }} />
@@ -24,6 +25,7 @@ export default function MortalityChart({ data }: MortalityChartProps) {
           <Bar dataKey="mortality" fill="#ef4444" />
         </BarChart>
       </ResponsiveContainer>
+      </div>
     </div>
   );
 }

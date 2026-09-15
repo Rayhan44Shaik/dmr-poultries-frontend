@@ -127,7 +127,7 @@ export function KpiCardGrid({ items, gridClassName = "", ariaLabel }: Props) {
           <div
             key={id}
             title={tooltip}
-            className={`group relative isolate min-h-[108px] overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md ${tooltip ? "cursor-help" : ""}`}
+            className={`group relative isolate min-h-[6.75rem] overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md ${tooltip ? "cursor-help" : ""}`}
           >
             <span className={`pointer-events-none absolute -right-7 -top-7 h-24 w-24 rounded-full ${classes.glow}`} aria-hidden="true" />
             <span className={`absolute inset-x-0 bottom-0 h-1 ${classes.accent}`} aria-hidden="true" />

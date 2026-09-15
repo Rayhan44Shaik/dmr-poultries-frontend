@@ -284,7 +284,7 @@ export default function OperationalTrendsChart({
 
   if (loading && !trends) {
     return (
-      <div className="flex h-[330px] w-full items-center justify-center">
+      <div className="flex h-[20.625rem] w-full items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-slate-200 border-t-emerald-500" />
       </div>
     );
@@ -292,7 +292,7 @@ export default function OperationalTrendsChart({
 
   if (error && !trends) {
     return (
-      <div className="flex h-[330px] w-full flex-col items-center justify-center gap-3 text-center">
+      <div className="flex h-[20.625rem] w-full flex-col items-center justify-center gap-3 text-center">
         <p className="text-[13px] font-semibold text-slate-600">{error}</p>
         {onRetry ? (
           <button
@@ -309,7 +309,7 @@ export default function OperationalTrendsChart({
 
   if (buckets.length === 0) {
     return (
-      <div className="flex h-[330px] w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 text-center">
+      <div className="flex h-[20.625rem] w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 text-center">
         <p className="text-sm font-semibold text-slate-500">{t("ops.dashboard.trend.empty")}</p>
         <p className="text-[11.5px] text-slate-400">{t("ops.dashboard.trend.empty_hint")}</p>
       </div>
@@ -319,7 +319,7 @@ export default function OperationalTrendsChart({
   return (
     <div className="flex w-full flex-1 flex-col">
       {/* ── Plot ─────────────────────────────────────────────────────── */}
-      <div className="min-h-[140px] w-full flex-1" style={{ minHeight: 140 }}>
+      <div className="min-h-[8.75rem] w-full flex-1" style={{ minHeight: "8.75rem" }}>
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 10, right: 2, bottom: 0, left: -8 }}>
             <defs>

@@ -268,7 +268,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
   if (chartData.length === 0) {
     return (
       <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col" aria-busy="true">
-        <div className="min-h-[340px] w-full flex-1" style={{ minHeight: 340 }}>
+        <div className="min-h-[21.25rem] w-full flex-1" style={{ minHeight: "21.25rem" }}>
           <div className="flex h-full w-full items-center justify-center">
           <div className="relative aspect-square w-full max-w-[560px]" style={{ aspectRatio: "1 / 1" }}>
             <svg viewBox="0 0 400 400" className="h-full w-full" aria-hidden="true">
@@ -307,7 +307,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
         </div>
         <div className="mt-3 grid w-full shrink-0 grid-cols-2 gap-2 border-t border-slate-100 pt-3 sm:grid-cols-3">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-[52px] animate-pulse rounded-xl bg-slate-100/80" />
+            <div key={i} className="h-[3.25rem] animate-pulse rounded-xl bg-slate-100/80" />
           ))}
         </div>
       </div>
@@ -318,7 +318,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
     <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
       {/* The donut stays centered in the available chart stage. Its KPI row
           follows underneath with the same spacing used by Trip Movement. */}
-      <div className="min-h-[340px] w-full flex-1" style={{ minHeight: 340 }}>
+      <div className="min-h-[21.25rem] w-full flex-1" style={{ minHeight: "21.25rem" }}>
         <div className="flex h-full w-full items-center justify-center">
           <div
             key={signature}

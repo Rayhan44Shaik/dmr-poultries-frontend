@@ -46,6 +46,9 @@
   }
 
   html {
+    /* All rem-based Tailwind utilities and design tokens scale together. Fixed
+       legacy pixel typography is bridged once near the end of this file. */
+    font-size: calc(100% * var(--dmr-font-scale));
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
@@ -364,12 +367,13 @@
   width: 100% !important;
 }
 
-.rdrMonth { padding: 4px 0 !important; }
-.rdrMonthAndYearWrapper { padding: 4px 0 !important; height: 32px !important; }
-.rdrWeekDays { padding: 0 4px !important; }
+.rdrMonth { padding: 0.25rem 0 !important; }
+.rdrMonthAndYearWrapper { padding: 0.25rem 0 !important; min-height: 2rem !important; height: auto !important; }
+.rdrWeekDays { padding: 0 0.25rem !important; }
 
 .rdrWeekDay {
-  height: 28px !important;
+  min-height: 1.75rem !important;
+  height: auto !important;
   flex-basis: 14.2857% !important;
   width: auto !important;
   font-size: 0.6rem !important;
@@ -377,7 +381,8 @@
 }
 
 .rdrDay {
-  height: 28px !important;
+  min-height: 1.75rem !important;
+  height: auto !important;
   flex-basis: 14.2857% !important;
   width: auto !important;
 }
@@ -410,7 +415,7 @@
 
 .rdrNextPrevButton,
 .rdrPprevButton,
-.rdrNextButton { width: 24px !important; height: 24px !important; }
+.rdrNextButton { min-width: 1.5rem !important; min-height: 1.5rem !important; width: auto !important; height: auto !important; }
 
 .rdrDayStartEdge,
 .rdrDayEndEdge,
@@ -493,6 +498,452 @@
 .month-only-picker .rdp-day {
   display: none !important;
 }
+
+/* =============================================================================
+ * FIXED-PIXEL GEOMETRY COMPATIBILITY
+ * -----------------------------------------------------------------------------
+ * Tailwind's standard spacing/sizing utilities are rem-based already. These
+ * selectors cover the audited legacy arbitrary `[Npx]` utility tokens in one
+ * place, including table floors, dialog caps, dense controls and empty/loading
+ * states. Exact px-to-rem equivalents preserve 100% while allowing every value
+ * to follow the root scale. `!important` is intentional: arbitrary utilities
+ * are emitted later by Tailwind in the built stylesheet.
+ * ===========================================================================*/
+
+/* Audited unprefixed pixel-geometry utilities. */
+[class~="-bottom-[5px]"] { bottom: -0.3125rem !important; }
+[class~="-top-[5px]"] { top: -0.3125rem !important; }
+[class~="border-[3px]"] { border-width: 0.1875rem !important; }
+[class~="border-l-[3px]"] { border-left-width: 0.1875rem !important; }
+[class~="gap-[3px]"] { gap: 0.1875rem !important; }
+[class~="h-[18px]"] { height: 1.125rem !important; }
+[class~="h-[220px]"] { height: 13.75rem !important; }
+[class~="h-[22px]"] { height: 1.375rem !important; }
+[class~="h-[240px]"] { height: 15rem !important; }
+[class~="h-[2px]"] { height: 0.125rem !important; }
+[class~="h-[32px]"] { height: 2rem !important; }
+[class~="h-[338px]"] { height: 21.125rem !important; }
+[class~="h-[38px]"] { height: 2.375rem !important; }
+[class~="h-[3px]"] { height: 0.1875rem !important; }
+[class~="h-[40px]"] { height: 2.5rem !important; }
+[class~="h-[42px]"] { height: 2.625rem !important; }
+[class~="h-[44px]"] { height: 2.75rem !important; }
+[class~="h-[480px]"] { height: 30rem !important; }
+[class~="h-[60px]"] { height: 3.75rem !important; }
+[class~="left-[328px]"] { left: 20.5rem !important; }
+[class~="max-h-[155px]"] { max-height: 9.6875rem !important; }
+[class~="max-h-[200px]"] { max-height: 12.5rem !important; }
+[class~="max-h-[320px]"] { max-height: 20rem !important; }
+[class~="max-h-[400px]"] { max-height: 25rem !important; }
+[class~="max-h-[440px]"] { max-height: 27.5rem !important; }
+[class~="max-h-[520px]"] { max-height: 32.5rem !important; }
+[class~="max-w-[100px]"] { max-width: 6.25rem !important; }
+[class~="max-w-[120px]"] { max-width: 7.5rem !important; }
+[class~="max-w-[140px]"] { max-width: 8.75rem !important; }
+[class~="max-w-[1480px]"] { max-width: 92.5rem !important; }
+[class~="max-w-[150px]"] { max-width: 9.375rem !important; }
+[class~="max-w-[1600px]"] { max-width: 100rem !important; }
+[class~="max-w-[160px]"] { max-width: 10rem !important; }
+[class~="max-w-[170px]"] { max-width: 10.625rem !important; }
+[class~="max-w-[180px]"] { max-width: 11.25rem !important; }
+[class~="max-w-[200px]"] { max-width: 12.5rem !important; }
+[class~="max-w-[220px]"] { max-width: 13.75rem !important; }
+[class~="max-w-[230px]"] { max-width: 14.375rem !important; }
+[class~="max-w-[240px]"] { max-width: 15rem !important; }
+[class~="max-w-[260px]"] { max-width: 16.25rem !important; }
+[class~="max-w-[320px]"] { max-width: 20rem !important; }
+[class~="max-w-[400px]"] { max-width: 25rem !important; }
+[class~="max-w-[480px]"] { max-width: 30rem !important; }
+[class~="max-w-[560px]"] { max-width: 35rem !important; }
+[class~="max-w-[60px]"] { max-width: 3.75rem !important; }
+[class~="max-w-[620px]"] { max-width: 38.75rem !important; }
+[class~="max-w-[760px]"] { max-width: 47.5rem !important; }
+[class~="max-w-[820px]"] { max-width: 51.25rem !important; }
+[class~="max-w-[900px]"] { max-width: 56.25rem !important; }
+[class~="min-h-[120px]"] { min-height: 7.5rem !important; }
+[class~="min-h-[18px]"] { min-height: 1.125rem !important; }
+[class~="min-h-[220px]"] { min-height: 13.75rem !important; }
+[class~="min-h-[300px]"] { min-height: 18.75rem !important; }
+[class~="min-h-[380px]"] { min-height: 23.75rem !important; }
+[class~="min-h-[42px]"] { min-height: 2.625rem !important; }
+[class~="min-h-[530px]"] { min-height: 33.125rem !important; }
+[class~="min-h-[68px]"] { min-height: 4.25rem !important; }
+[class~="min-h-[76px]"] { min-height: 4.75rem !important; }
+[class~="min-h-[80px]"] { min-height: 5rem !important; }
+[class~="min-h-[92px]"] { min-height: 5.75rem !important; }
+[class~="min-h-[94px]"] { min-height: 5.875rem !important; }
+[class~="min-w-[1000px]"] { min-width: 62.5rem !important; }
+[class~="min-w-[100px]"] { min-width: 6.25rem !important; }
+[class~="min-w-[1040px]"] { min-width: 65rem !important; }
+[class~="min-w-[1060px]"] { min-width: 66.25rem !important; }
+[class~="min-w-[106px]"] { min-width: 6.625rem !important; }
+[class~="min-w-[1080px]"] { min-width: 67.5rem !important; }
+[class~="min-w-[110px]"] { min-width: 6.875rem !important; }
+[class~="min-w-[1140px]"] { min-width: 71.25rem !important; }
+[class~="min-w-[1144px]"] { min-width: 71.5rem !important; }
+[class~="min-w-[1200px]"] { min-width: 75rem !important; }
+[class~="min-w-[1280px]"] { min-width: 80rem !important; }
+[class~="min-w-[130px]"] { min-width: 8.125rem !important; }
+[class~="min-w-[140px]"] { min-width: 8.75rem !important; }
+[class~="min-w-[1480px]"] { min-width: 92.5rem !important; }
+[class~="min-w-[150px]"] { min-width: 9.375rem !important; }
+[class~="min-w-[180px]"] { min-width: 11.25rem !important; }
+[class~="min-w-[18px]"] { min-width: 1.125rem !important; }
+[class~="min-w-[190px]"] { min-width: 11.875rem !important; }
+[class~="min-w-[200px]"] { min-width: 12.5rem !important; }
+[class~="min-w-[216px]"] { min-width: 13.5rem !important; }
+[class~="min-w-[220px]"] { min-width: 13.75rem !important; }
+[class~="min-w-[230px]"] { min-width: 14.375rem !important; }
+[class~="min-w-[236px]"] { min-width: 14.75rem !important; }
+[class~="min-w-[240px]"] { min-width: 15rem !important; }
+[class~="min-w-[260px]"] { min-width: 16.25rem !important; }
+[class~="min-w-[280px]"] { min-width: 17.5rem !important; }
+[class~="min-w-[28px]"] { min-width: 1.75rem !important; }
+[class~="min-w-[340px]"] { min-width: 21.25rem !important; }
+[class~="min-w-[460px]"] { min-width: 28.75rem !important; }
+[class~="min-w-[56px]"] { min-width: 3.5rem !important; }
+[class~="min-w-[64px]"] { min-width: 4rem !important; }
+[class~="min-w-[72px]"] { min-width: 4.5rem !important; }
+[class~="min-w-[750px]"] { min-width: 46.875rem !important; }
+[class~="min-w-[75px]"] { min-width: 4.6875rem !important; }
+[class~="min-w-[80px]"] { min-width: 5rem !important; }
+[class~="min-w-[820px]"] { min-width: 51.25rem !important; }
+[class~="min-w-[84px]"] { min-width: 5.25rem !important; }
+[class~="min-w-[85px]"] { min-width: 5.3125rem !important; }
+[class~="min-w-[880px]"] { min-width: 55rem !important; }
+[class~="min-w-[88px]"] { min-width: 5.5rem !important; }
+[class~="min-w-[900px]"] { min-width: 56.25rem !important; }
+[class~="min-w-[920px]"] { min-width: 57.5rem !important; }
+[class~="min-w-[980px]"] { min-width: 61.25rem !important; }
+[class~="mt-[5px]"] { margin-top: 0.3125rem !important; }
+[class~="p-[1px]"] { padding: 0.0625rem !important; }
+[class~="pl-[42px]"] { padding-left: 2.625rem !important; }
+[class~="py-[5px]"] { padding-block: 0.3125rem !important; }
+[class~="rounded-[10px]"] { border-radius: 0.625rem !important; }
+[class~="rounded-[24px]"] { border-radius: 1.5rem !important; }
+[class~="rounded-[2px]"] { border-radius: 0.125rem !important; }
+[class~="rounded-[3px]"] { border-radius: 0.1875rem !important; }
+[class~="rounded-[4px]"] { border-radius: 0.25rem !important; }
+[class~="top-[-20px]"] { top: -1.25rem !important; }
+[class~="w-[13px]"] { width: 0.8125rem !important; }
+[class~="w-[180px]"] { width: 11.25rem !important; }
+[class~="w-[18px]"] { width: 1.125rem !important; }
+[class~="w-[200px]"] { width: 12.5rem !important; }
+[class~="w-[320px]"] { width: 20rem !important; }
+[class~="w-[360px]"] { width: 22.5rem !important; }
+[class~="w-[3px]"] { width: 0.1875rem !important; }
+[class~="w-[480px]"] { width: 30rem !important; }
+[class~="w-[88px]"] { width: 5.5rem !important; }
+[class~="w-[92px]"] { width: 5.75rem !important; }
+
+/* Variant-prefixed legacy geometry that cannot use the unprefixed bridge. */
+[class~="[&>svg]:h-[18px]"] > svg { height: 1.125rem !important; }
+[class~="[&>svg]:w-[18px]"] > svg { width: 1.125rem !important; }
+[class~="[&_svg]:size-[18px]"] svg { width: 1.125rem !important; height: 1.125rem !important; }
+[class~="after:left-[2px]"]::after { left: 0.125rem !important; }
+[class~="after:top-[2px]"]::after { top: 0.125rem !important; }
+[class~="before:left-[15px]"]::before { left: 0.9375rem !important; }
+[class~="before:w-[3px]"]::before { width: 0.1875rem !important; }
+
+
+/* =============================================================================
+ * FIXED-PIXEL TYPOGRAPHY COMPATIBILITY
+ * -----------------------------------------------------------------------------
+ * Most of the application already uses rem-based Tailwind utilities and the
+ * design tokens above. A legacy audit found fixed arbitrary `text-[Npx]`
+ * classes plus Recharts presentation/inline font sizes. Map those existing
+ * values to their exact rem equivalents here, once, so they participate in the
+ * same global scale without page-by-page edits. At 100% every computed pixel
+ * value is unchanged.
+ * ===========================================================================*/
+
+[style*="font-size: 6.6px"],
+[style*="font-size:6.6px"],
+[font-size="6.6"],
+[font-size="6.6px"] { font-size: 0.4125rem !important; }
+
+[style*="font-size: 7px"],
+[style*="font-size:7px"],
+[font-size="7"],
+[font-size="7px"] { font-size: 0.4375rem !important; }
+
+[class~="text-[7.5px]"],
+[style*="font-size: 7.5px"],
+[style*="font-size:7.5px"],
+[font-size="7.5"],
+[font-size="7.5px"] { font-size: 0.46875rem !important; }
+
+[style*="font-size: 7.6px"],
+[style*="font-size:7.6px"],
+[font-size="7.6"],
+[font-size="7.6px"] { font-size: 0.475rem !important; }
+
+[class~="text-[8px]"],
+[style*="font-size: 8px"],
+[style*="font-size:8px"],
+[font-size="8"],
+[font-size="8px"] { font-size: 0.5rem !important; }
+
+[class~="text-[8.5px]"],
+[style*="font-size: 8.5px"],
+[style*="font-size:8.5px"],
+[font-size="8.5"],
+[font-size="8.5px"] { font-size: 0.53125rem !important; }
+
+[class~="text-[9px]"],
+[style*="font-size: 9px"],
+[style*="font-size:9px"],
+[font-size="9"],
+[font-size="9px"] { font-size: 0.5625rem !important; }
+
+[class~="text-[9.5px]"],
+[style*="font-size: 9.5px"],
+[style*="font-size:9.5px"],
+[font-size="9.5"],
+[font-size="9.5px"] { font-size: 0.59375rem !important; }
+
+[class~="text-[10px]"],
+[style*="font-size: 10px"],
+[style*="font-size:10px"],
+[font-size="10"],
+[font-size="10px"] { font-size: 0.625rem !important; }
+
+[class~="text-[10.5px]"],
+[style*="font-size: 10.5px"],
+[style*="font-size:10.5px"],
+[font-size="10.5"],
+[font-size="10.5px"] { font-size: 0.65625rem !important; }
+
+[class~="text-[11px]"],
+[style*="font-size: 11px"],
+[style*="font-size:11px"],
+[font-size="11"],
+[font-size="11px"] { font-size: 0.6875rem !important; }
+
+[class~="text-[11.5px]"],
+[style*="font-size: 11.5px"],
+[style*="font-size:11.5px"],
+[font-size="11.5"],
+[font-size="11.5px"] { font-size: 0.71875rem !important; }
+
+[class~="text-[12px]"],
+[style*="font-size: 12px"],
+[style*="font-size:12px"],
+[font-size="12"],
+[font-size="12px"] { font-size: 0.75rem !important; }
+
+[class~="text-[12.5px]"],
+[style*="font-size: 12.5px"],
+[style*="font-size:12.5px"],
+[font-size="12.5"],
+[font-size="12.5px"] { font-size: 0.78125rem !important; }
+
+[class~="text-[13px]"],
+[style*="font-size: 13px"],
+[style*="font-size:13px"],
+[font-size="13"],
+[font-size="13px"] { font-size: 0.8125rem !important; }
+
+[class~="text-[13.5px]"],
+[style*="font-size: 13.5px"],
+[style*="font-size:13.5px"],
+[font-size="13.5"],
+[font-size="13.5px"] { font-size: 0.84375rem !important; }
+
+[class~="text-[14px]"],
+[style*="font-size: 14px"],
+[style*="font-size:14px"],
+[font-size="14"],
+[font-size="14px"] { font-size: 0.875rem !important; }
+
+[class~="text-[15px]"],
+[style*="font-size: 15px"],
+[style*="font-size:15px"],
+[font-size="15"],
+[font-size="15px"] { font-size: 0.9375rem !important; }
+
+[class~="text-[16px]"],
+[style*="font-size: 16px"],
+[style*="font-size:16px"],
+[font-size="16"],
+[font-size="16px"] { font-size: 1rem !important; }
+
+[class~="text-[17px]"],
+[style*="font-size: 17px"],
+[style*="font-size:17px"],
+[font-size="17"],
+[font-size="17px"] { font-size: 1.0625rem !important; }
+
+[class~="text-[19px]"],
+[style*="font-size: 19px"],
+[style*="font-size:19px"],
+[font-size="19"],
+[font-size="19px"] { font-size: 1.1875rem !important; }
+
+[class~="text-[20px]"],
+[style*="font-size: 20px"],
+[style*="font-size:20px"],
+[font-size="20"],
+[font-size="20px"] { font-size: 1.25rem !important; }
+
+[class~="text-[21px]"],
+[style*="font-size: 21px"],
+[style*="font-size:21px"],
+[font-size="21"],
+[font-size="21px"] { font-size: 1.3125rem !important; }
+
+[class~="text-[22px]"],
+[style*="font-size: 22px"],
+[style*="font-size:22px"],
+[font-size="22"],
+[font-size="22px"] { font-size: 1.375rem !important; }
+
+[class~="text-[24px]"],
+[style*="font-size: 24px"],
+[style*="font-size:24px"],
+[font-size="24"],
+[font-size="24px"] { font-size: 1.5rem !important; }
+
+[class~="text-[26px]"],
+[style*="font-size: 26px"],
+[style*="font-size:26px"],
+[font-size="26"],
+[font-size="26px"] { font-size: 1.625rem !important; }
+
+[class~="text-[28px]"],
+[style*="font-size: 28px"],
+[style*="font-size:28px"],
+[font-size="28"],
+[font-size="28px"] { font-size: 1.75rem !important; }
+
+
+/* Lucide's numeric `size` prop emits fixed SVG presentation attributes.
+   Exact rem bridges make icon + text proportions grow together; any explicit
+   Tailwind size class has higher specificity and remains authoritative. */
+:where(svg.lucide[width="9"]) { width: 0.5625rem; height: 0.5625rem; }
+:where(svg.lucide[width="10"]) { width: 0.625rem; height: 0.625rem; }
+:where(svg.lucide[width="11"]) { width: 0.6875rem; height: 0.6875rem; }
+:where(svg.lucide[width="12"]) { width: 0.75rem; height: 0.75rem; }
+:where(svg.lucide[width="13"]) { width: 0.8125rem; height: 0.8125rem; }
+:where(svg.lucide[width="14"]) { width: 0.875rem; height: 0.875rem; }
+:where(svg.lucide[width="15"]) { width: 0.9375rem; height: 0.9375rem; }
+:where(svg.lucide[width="16"]) { width: 1rem; height: 1rem; }
+:where(svg.lucide[width="17"]) { width: 1.0625rem; height: 1.0625rem; }
+:where(svg.lucide[width="18"]) { width: 1.125rem; height: 1.125rem; }
+:where(svg.lucide[width="19"]) { width: 1.1875rem; height: 1.1875rem; }
+:where(svg.lucide[width="20"]) { width: 1.25rem; height: 1.25rem; }
+:where(svg.lucide[width="22"]) { width: 1.375rem; height: 1.375rem; }
+:where(svg.lucide[width="24"]) { width: 1.5rem; height: 1.5rem; }
+:where(svg.lucide[width="25"]) { width: 1.5625rem; height: 1.5625rem; }
+:where(svg.lucide[width="26"]) { width: 1.625rem; height: 1.625rem; }
+:where(svg.lucide[width="28"]) { width: 1.75rem; height: 1.75rem; }
+:where(svg.lucide[width="32"]) { width: 2rem; height: 2rem; }
+:where(svg.lucide[width="34"]) { width: 2.125rem; height: 2.125rem; }
+:where(svg.lucide[width="36"]) { width: 2.25rem; height: 2.25rem; }
+:where(svg.lucide[width="80"]) { width: 5rem; height: 5rem; }
+:where(svg.lucide[width="100"]) { width: 6.25rem; height: 6.25rem; }
+
+/* Recharts computes plot geometry independently from DOM typography. Let larger
+   axis glyphs use the surrounding scaled card padding instead of clipping at
+   the SVG edge; data, domains, and chart calculations remain untouched. */
+.recharts-wrapper,
+.recharts-surface {
+  overflow: visible;
+}
+
+.recharts-default-tooltip {
+  max-width: min(20rem, calc(100vw - 2rem));
+  white-space: normal !important;
+  overflow-wrap: anywhere;
+}
+
+/* Preserve existing responsive/container typography tiers while scaling them. */
+@media (min-width: 640px) {
+  [class~="sm:text-[17px]"] { font-size: 1.0625rem !important; }
+  [class~="sm:text-[22px]"] { font-size: 1.375rem !important; }
+  [class~="sm:max-w-[280px]"] { max-width: 17.5rem !important; }
+  [class~="sm:min-w-[260px]"] { min-width: 16.25rem !important; }
+  [class~="sm:w-[460px]"] { width: 28.75rem !important; }
+}
+
+@media (min-width: 768px) {
+  [class~="md:text-[11px]"] { font-size: 0.6875rem !important; }
+  [class~="md:min-h-[58px]"] { min-height: 3.625rem !important; }
+  [class~="md:w-[220px]"] { width: 13.75rem !important; }
+}
+
+@media (min-width: 1024px) {
+  [class~="lg:w-[336px]"] { width: 21rem !important; }
+}
+
+@container (min-width: 96px) {
+  [class~="@min-[96px]:text-[8.5px]"] { font-size: 0.53125rem !important; }
+  [class~="@min-[96px]:text-[9px]"] { font-size: 0.5625rem !important; }
+  [class~="@min-[96px]:text-[10px]"] { font-size: 0.625rem !important; }
+  [class~="@min-[96px]:text-[11px]"] { font-size: 0.6875rem !important; }
+  [class~="@min-[96px]:text-[19px]"] { font-size: 1.1875rem !important; }
+}
+
+@container (min-width: 100px) {
+  [class~="@min-[100px]:text-[10.5px]"] { font-size: 0.65625rem !important; }
+  [class~="@min-[100px]:text-[11.5px]"] { font-size: 0.71875rem !important; }
+  [class~="@min-[100px]:text-[20px]"] { font-size: 1.25rem !important; }
+}
+
+@container (min-width: 120px) {
+  [class~="@min-[120px]:text-[9.5px]"] { font-size: 0.59375rem !important; }
+  [class~="@min-[120px]:text-[11px]"] { font-size: 0.6875rem !important; }
+  [class~="@min-[120px]:text-[13px]"] { font-size: 0.8125rem !important; }
+  [class~="@min-[120px]:text-[24px]"] { font-size: 1.5rem !important; }
+  [class~="@min-[120px]:h-[11px]"] { height: 0.6875rem !important; }
+  [class~="@min-[120px]:w-[11px]"] { width: 0.6875rem !important; }
+}
+
+/* Keep the required scale/language controls usable in the single-row mobile
+   header. Optional search/profile chrome retires only where the added control
+   would otherwise collide; those destinations remain in application nav. */
+@media (max-width: 479px) {
+  .dmr-header-search-mobile,
+  .dmr-header-profile {
+    display: none !important;
+  }
+}
+
+@media (max-width: 639px) {
+  :root:not([data-font-scale="100"]) .dmr-header-search-mobile,
+  :root:not([data-font-scale="100"]) .dmr-header-profile {
+    display: none !important;
+  }
+}
+
+/* On the narrowest view, the globe retains the language switcher's accessible
+   name while its translated visible label yields room to the live percentage. */
+@media (max-width: 359px) {
+  .dmr-language-label,
+  .dmr-language-chevron {
+    display: none !important;
+  }
+}
+
+@media (max-width: 519px) {
+  :root:is([data-font-scale="130"], [data-font-scale="140"], [data-font-scale="150"]) {
+    .dmr-app-header {
+      gap: 0.25rem;
+      padding-inline: 0.5rem;
+    }
+
+    .dmr-language-label,
+    .dmr-language-chevron {
+      display: none !important;
+    }
+
+    .dmr-font-scale-trigger,
+    .dmr-language-trigger {
+      padding-inline: 0.375rem;
+    }
+  }
+}
+
 
 /* =============================================================================
  * NUMBER INPUTS — hide native up/down spinners (dense ERP forms)

@@ -47,7 +47,7 @@ export default function LanguageSwitcher() {
         ? "text-brand-700 dark:text-brand-300"
         : "text-slate-600 dark:text-slate-300"
     }`;
-  const buttonClass = `flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-semibold transition-colors ${
+  const buttonClass = `dmr-language-trigger flex h-9 items-center gap-1.5 rounded-lg px-2.5 text-[13px] font-semibold transition-colors ${
     open
       ? "bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-100"
       : "text-slate-500 hover:bg-slate-100 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100"
@@ -63,10 +63,10 @@ export default function LanguageSwitcher() {
         className={buttonClass}
       >
         <Globe size={15} className="shrink-0" />
-        <span className="whitespace-nowrap">{shortLabel}</span>
+        <span className="dmr-language-label whitespace-nowrap">{shortLabel}</span>
         <ChevronDown
           size={13}
-          className={chevronClass}
+          className={`dmr-language-chevron ${chevronClass}`}
         />
       </button>
 

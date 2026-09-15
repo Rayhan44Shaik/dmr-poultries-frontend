@@ -54,7 +54,7 @@ function ChartTooltip({
 function EmptyChart({ message }: { message?: string }) {
   const { t } = useI18n();
   return (
-    <div className="flex h-full min-h-[180px] items-center justify-center rounded-lg border border-dashed border-slate-200 text-xs font-medium text-slate-400 dark:border-slate-700 dark:text-slate-500">
+    <div className="flex h-full min-h-[11.25rem] items-center justify-center rounded-lg border border-dashed border-slate-200 text-xs font-medium text-slate-400 dark:border-slate-700 dark:text-slate-500">
       {message ? t(message) : t("dashboard.charts.empty_sales_collections")}
     </div>
   );
@@ -67,7 +67,8 @@ export function SalesVsCollectionsChart({ data }: { data: DerivedDashboard }) {
   if (!hasData) return <EmptyChart message="dashboard.charts.empty_sales_collections" />;
 
   return (
-    <ResponsiveContainer width="100%" height={264}>
+    <div className="h-[16.5rem] w-full">
+    <ResponsiveContainer width="100%" height="100%">
       <ComposedChart data={data.salesVsCollections} margin={{ top: 8, right: 4, bottom: 0, left: 4 }}>
         <defs>
           <linearGradient id="gradSales" x1="0" y1="0" x2="0" y2="1">
@@ -89,6 +90,7 @@ export function SalesVsCollectionsChart({ data }: { data: DerivedDashboard }) {
         <Line type="monotone" dataKey="collections" name={t("dashboard.charts.legend.collections")} stroke="#0ea5e9" strokeWidth={2} dot={false} activeDot={{ r: 3.5 }} />
       </ComposedChart>
     </ResponsiveContainer>
+    </div>
   );
 }
 
@@ -99,7 +101,8 @@ export function WeeklyRevenueChart({ data }: { data: DerivedDashboard }) {
   if (!hasData) return <EmptyChart message="dashboard.charts.empty_revenue" />;
 
   return (
-    <ResponsiveContainer width="100%" height={190}>
+    <div className="h-[11.875rem] w-full">
+    <ResponsiveContainer width="100%" height="100%">
       <BarChart data={data.weeklyRevenue} margin={{ top: 8, right: 4, bottom: 0, left: 4 }}>
         <CartesianGrid stroke={GRID_STROKE} vertical={false} />
         <XAxis dataKey="day" tick={AXIS_TICK} axisLine={false} tickLine={false} dy={6} />
@@ -108,6 +111,7 @@ export function WeeklyRevenueChart({ data }: { data: DerivedDashboard }) {
         <Bar dataKey="revenue" name={t("dashboard.charts.legend.revenue")} fill="#059669" radius={[5, 5, 0, 0]} maxBarSize={30} />
       </BarChart>
     </ResponsiveContainer>
+    </div>
   );
 }
 
@@ -118,7 +122,8 @@ export function DeliveryVolumeChart({ data }: { data: DerivedDashboard }) {
   if (!hasData) return <EmptyChart message="dashboard.charts.empty_deliveries" />;
 
   return (
-    <ResponsiveContainer width="100%" height={190}>
+    <div className="h-[11.875rem] w-full">
+    <ResponsiveContainer width="100%" height="100%">
       <ComposedChart data={data.deliveryVolume} margin={{ top: 8, right: 4, bottom: 0, left: 4 }}>
         <CartesianGrid stroke={GRID_STROKE} vertical={false} />
         <XAxis dataKey="date" tick={AXIS_TICK} axisLine={false} tickLine={false} dy={6} />
@@ -155,6 +160,7 @@ export function DeliveryVolumeChart({ data }: { data: DerivedDashboard }) {
         <Line yAxisId="weight" type="monotone" dataKey="weight" name={t("dashboard.charts.legend.weight")} stroke="#0ea5e9" strokeWidth={2} dot={false} />
       </ComposedChart>
     </ResponsiveContainer>
+    </div>
   );
 }
 
@@ -172,7 +178,7 @@ export function VehicleActivityDonut({ data }: { data: DerivedDashboard }) {
 
   return (
     <div className="flex items-center gap-4">
-      <div className="relative h-[168px] w-[168px] shrink-0">
+      <div className="relative h-[10.5rem] w-[10.5rem] shrink-0">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>
             <Pie

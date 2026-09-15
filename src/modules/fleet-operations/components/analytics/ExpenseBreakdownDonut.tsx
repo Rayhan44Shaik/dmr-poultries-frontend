@@ -51,7 +51,7 @@ const ExpenseBreakdownDonut = ({ data, height = 280 }: ExpenseBreakdownDonutProp
   }));
 
   return (
-    <div className="flex h-full w-full flex-col" style={{ minHeight: height }}>
+    <div className="flex h-full w-full flex-col" style={{ minHeight: `${height / 16}rem` }}>
       <div className="relative mx-auto h-40 w-40 flex-shrink-0">
         <ResponsiveContainer width="100%" height="100%">
           <PieChart>

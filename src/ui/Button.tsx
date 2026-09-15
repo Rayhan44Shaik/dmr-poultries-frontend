@@ -37,6 +37,7 @@ import { useRef, useState, type ButtonHTMLAttributes, type ReactNode, type Mouse
 import { createPortal } from "react-dom";
 import { cn } from "../utils/cn";
 import { uiButton, uiIconButton, type ButtonSize, type ButtonVariant } from "../shared/ui/uiTokens";
+import { getAppliedFontScale } from "../providers/fontScale";
 
 /** Legacy alias kept so pre-existing variant names continue to work. */
 export type ButtonVariantName = ButtonVariant | "danger";
@@ -119,11 +120,13 @@ export function Button({
   const showTooltip = () => {
     if (!title || !buttonRef.current) return;
     const rect = buttonRef.current.getBoundingClientRect();
-    const width = Math.min(280, window.innerWidth - 16);
-    const estimatedHeight = 52;
-    const above = rect.top >= estimatedHeight + 10;
-    const top = above ? rect.top - estimatedHeight - 6 : rect.bottom + 6;
-    const left = Math.max(8, Math.min(rect.left + rect.width / 2 - width / 2, window.innerWidth - width - 8));
+    const scale = getAppliedFontScale();
+    const gutter = 8 * scale;
+    const width = Math.min(280 * scale, window.innerWidth - gutter * 2);
+    const estimatedHeight = 52 * scale;
+    const above = rect.top >= estimatedHeight + 10 * scale;
+    const top = above ? rect.top - estimatedHeight - 6 * scale : rect.bottom + 6 * scale;
+    const left = Math.max(gutter, Math.min(rect.left + rect.width / 2 - width / 2, window.innerWidth - width - gutter));
     setTooltipPosition({ top, left, width });
     setTooltipOpen(true);
   };

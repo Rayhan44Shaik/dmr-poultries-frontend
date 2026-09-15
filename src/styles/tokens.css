@@ -784,6 +784,10 @@
  * readable name while still tracking the single source of truth.
  * ===========================================================================*/
 :root {
+  /* Six-level accessibility scale. index.html sets the persisted value before
+     first paint; 1 is the defensive/default value for tests and embedded use. */
+  --dmr-font-scale: 1;
+
   /* --- colour ----------------------------------------------------------- */
   --ds-color-primary: var(--color-emerald-600);
   --ds-color-primary-hover: var(--color-emerald-700);

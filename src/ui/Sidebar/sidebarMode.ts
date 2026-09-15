@@ -19,8 +19,8 @@ export const SIDEBAR_WIDTH: Record<SidebarMode, number> = {
 
 /** Content offset for each mode (only applies from the `lg` breakpoint up). */
 export const SIDEBAR_CONTENT_CLASS: Record<SidebarMode, string> = {
-  expanded: "lg:pl-[260px]",
-  rail: "lg:pl-[72px]",
+  expanded: "lg:pl-[16.25rem]",
+  rail: "lg:pl-[4.5rem]",
   hidden: "lg:pl-0",
 };
 
