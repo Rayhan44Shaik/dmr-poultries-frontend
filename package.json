@@ -37,6 +37,7 @@
     "test:collections": "tsx --test src/modules/operations/collections/services/collectionService.contract.test.ts src/modules/operations/collections/services/collectionBalance.ui.test.ts",
     "test:accounts-analysis": "tsx --test src/modules/accounts/utils/periodRanges.test.ts src/shared/kpi/analysisLink.test.ts",
     "test:e2e": "playwright test",
+    "verify:dashboard": "node scripts/dashboard-sync-check.mjs",
     "mock:backend": "node scripts/quarter-sample-data.mjs",
     "mock:trips": "node scripts/dev-mock-backend.mjs",
     "smoke": "node scripts/ssr-smoke.mjs",

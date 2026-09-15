@@ -35,7 +35,12 @@ function lazyShell(page: () => Promise<PageModule>) {
 
 // Lazy components are created once at module level (stable identity).
 const pages = {
-  dashboard: lazyWithRetry(lazyShell(() => import("../modules/operations/dashboard/pages/OperationsDashboardPage"))),
+  // `/dashboard` is the EXECUTIVE dashboard (src/modules/dashboard): KPI row,
+  // business-overview charts, pending collections, fleet status, activity and
+  // the quarter-to-date band — all read from the same rows every module uses.
+  // The Operations dashboard keeps its own home at `/operations?tab=overview`,
+  // where the sidebar's "Operation Dashboard" entry points.
+  dashboard: lazyWithRetry(lazyShell(() => import("../modules/dashboard/DashboardPage"))),
   masters: lazyWithRetry(lazyShell(() => import("../modules/masters/pages/MastersPage"))),
   mastersShops: lazyWithRetry(lazyShell(() => import("../modules/masters/shops/pages/ShopsPage"))),
   mastersFarms: lazyWithRetry(lazyShell(() => import("../modules/masters/farms/pages/FarmsPage"))),

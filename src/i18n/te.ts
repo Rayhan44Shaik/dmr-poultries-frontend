@@ -934,6 +934,22 @@ export default {
   'dashboard.kpi.profit': 'ఈ రోజు లాభం',
   'dashboard.kpi.profit_sub': 'నిన్న {yesterday}Codec ভারతివ',
 
+  // Dashboard — quarter-to-date band
+  'dashboard.quarter.title': 'క్వార్టర్ ఇప్పటివరకు',
+  'dashboard.quarter.through': '{date} వరకు',
+  'dashboard.quarter.trips': 'ట్రిప్పులు',
+  'dashboard.quarter.trips_sub': '{weight} డెలివరీ',
+  'dashboard.quarter.sales': 'అమ్మకాలు',
+  'dashboard.quarter.sales_sub': 'షాప్ డెలివరీలు',
+  'dashboard.quarter.collections': 'వసూళ్లు',
+  'dashboard.quarter.collections_sub': 'అమ్మకాలలో {pct}%',
+  'dashboard.quarter.expenses': 'ఖర్చులు',
+  'dashboard.quarter.expenses_sub': 'డీజిల్ {fuel} · ట్రిప్ {trip} · సర్వీస్ {maintenance}',
+  'dashboard.quarter.net': 'నికరం',
+  'dashboard.quarter.net_sub': 'అమ్మకాలు − ఖర్చులు',
+  'dashboard.quarter.pending': 'బకాయి',
+  'dashboard.quarter.pending_sub': 'ఇంకా వసూలు చేయాలి',
+
   // Dashboard TodayTripsTable
   'dashboard.trips.latest': 'తాజా ట్రిప్‌లు',
   'dashboard.trips.today': 'ఈ రోజు ట్రిప్‌లు',

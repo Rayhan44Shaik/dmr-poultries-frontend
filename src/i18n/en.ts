@@ -939,6 +939,22 @@ export default {
   'dashboard.kpi.profit': "Today's Profit",
   'dashboard.kpi.profit_sub': 'vs {yesterday} yesterday',
 
+  // Dashboard — quarter-to-date band
+  'dashboard.quarter.title': 'Quarter to date',
+  'dashboard.quarter.through': 'Through {date}',
+  'dashboard.quarter.trips': 'Trips',
+  'dashboard.quarter.trips_sub': '{weight} delivered',
+  'dashboard.quarter.sales': 'Sales',
+  'dashboard.quarter.sales_sub': 'Shop deliveries booked',
+  'dashboard.quarter.collections': 'Collections',
+  'dashboard.quarter.collections_sub': '{pct}% of sales',
+  'dashboard.quarter.expenses': 'Expenses',
+  'dashboard.quarter.expenses_sub': 'Fuel {fuel} · Trip {trip} · Service {maintenance}',
+  'dashboard.quarter.net': 'Net',
+  'dashboard.quarter.net_sub': 'Sales − expenses',
+  'dashboard.quarter.pending': 'Outstanding',
+  'dashboard.quarter.pending_sub': 'Still to be collected',
+
   // Dashboard TodayTripsTable
   'dashboard.trips.latest': 'Latest trips',
   'dashboard.trips.today': "Today's trips",

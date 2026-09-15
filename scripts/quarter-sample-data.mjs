@@ -492,6 +492,12 @@ for (const date of OP_DATES) {
 
     // ── Lifecycle mix: past days are Completed; the last few days hold the
     //    Draft/Pending/Deleted variety so every wizard state is reachable.
+    //
+    //    Today and the three operating days before it ALSO keep a closed core.
+    //    Those four days are exactly what the dashboards aggregate for
+    //    "today" and "last 7 days"; without a completed trip on them the
+    //    sales / weight / mortality tiles and charts read as empty even though
+    //    the rest of the app is fully populated from the same rows.
     const daysFromToday = dayDiff(date, TODAY);
     let status = "Completed";
     let stage = 5; // 1..5 = last submitted wizard step
@@ -499,10 +505,13 @@ for (const date of OP_DATES) {
       status = "Draft";
       stage = 1;
     } else if (daysFromToday === 0) {
-      stage = [1, 2, 3, 4, 5, 5, 4, 3][k];
-      status = stage === 5 ? "Pending" : "Draft";
+      // Live day: the early runs have already closed, the rest are still out
+      // — one draft parked at every wizard step (1…4) so Trip Entry can
+      // resume any of them, plus one in-flight trip at step 5.
+      stage = [5, 5, 5, 5, 4, 3, 2, 1][k];
+      status = stage === 5 ? (k < 3 ? "Completed" : "Pending") : "Draft";
     } else if (daysFromToday <= 3) {
-      stage = [5, 5, 4, 3, 2, 1, 5, 5][k];
+      stage = [5, 5, 5, 5, 4, 3, 2, 1][k];
       status = stage === 5 ? (k % 2 ? "Pending" : "Completed") : "Draft";
     } else if (tripSeq % 61 === 0) {
       status = "Deleted";
@@ -625,7 +634,11 @@ for (const date of OP_DATES) {
     const expense = deliveryTolls + pickupTolls + meals + loading + vehicleMaintenance;
 
     // ── Rate Entry sample enrichment: last 20 days have 60% pending for rate entry ──
-    const isRecentForRate = OP_DATES.indexOf(date) >= OP_DATES.length - 20;
+    //    The four most recent operating days are the dashboards' live window,
+    //    so they are never downgraded — downgrading them would strip the
+    //    rates off the very deliveries the dashboard totals as "today's sales".
+    const isRecentForRate =
+      OP_DATES.indexOf(date) >= OP_DATES.length - 20 && daysFromToday > 3;
     const makePendingForRateEntry = isRecentForRate && status === "Completed" && r() < 0.6;
     const effectiveStatus = makePendingForRateEntry ? "Pending" : status;
     const effectiveRateLockedAt = makePendingForRateEntry ? null : (status === "Completed" ? ts(date, "20:10:00") : null);

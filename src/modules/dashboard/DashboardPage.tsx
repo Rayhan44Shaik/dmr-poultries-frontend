@@ -23,6 +23,7 @@ import PendingCollectionsCard from "./components/PendingCollectionsCard";
 import FleetStatusCard from "./components/FleetStatusCard";
 import ActivityTimeline from "./components/ActivityTimeline";
 import DashboardSkeleton from "./components/DashboardSkeleton";
+import QuarterSnapshot from "./components/QuarterSnapshot";
 import {
   DeliveryVolumeChart,
   SalesVsCollectionsChart,
@@ -85,7 +86,13 @@ function DashboardPage() {
           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">
             {t("dashboard.subtitle")}
           </p>
-          <p className="mt-0.5 text-xs font-medium text-slate-400 dark:text-slate-500">{formatDateLong(new Date())}</p>
+          {/* The sample dataset is generated in the ERP's business timezone, so
+              when it is the source the page dates itself with the dataset's own
+              business day — otherwise the header and every tile below it would
+              disagree about which day "today" is. */}
+          <p className="mt-0.5 text-xs font-medium text-slate-400 dark:text-slate-500">
+            {formatDateLong(data?.sampleQuarter?.today ? new Date(`${data.sampleQuarter.today}T00:00:00`) : new Date())}
+          </p>
         </div>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -131,6 +138,11 @@ function DashboardPage() {
         <DashboardSkeleton />
       ) : derived ? (
         <>
+          {/* ------------------------------------------------------ */}
+          {/* Quarter to date                                         */}
+          {/* ------------------------------------------------------ */}
+          <QuarterSnapshot quarter={derived.quarter} />
+
           {/* ------------------------------------------------------ */}
           {/* KPI cards                                               */}
           {/* ------------------------------------------------------ */}

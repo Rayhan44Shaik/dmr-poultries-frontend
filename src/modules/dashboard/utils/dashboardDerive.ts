@@ -15,7 +15,7 @@ import {
   Truck,
   Users,
 } from "lucide-react";
-import type { DashboardData, VehicleRow } from "../services/dashboardService";
+import type { DashboardData, QuarterSnapshot, VehicleRow } from "../services/dashboardService";
 import type { Trip } from "../../operations/vehicle-trips/types/trip";
 import { getMaintenance } from "../../fleet-operations/services/storage";
 import { formatDateShort, formatINR, formatINRCompact, formatNumber, formatWeight } from "../../../utils/format";
@@ -70,6 +70,8 @@ export interface ActivityItem {
 }
 
 export interface DerivedDashboard {
+  /** Whole-window roll-up (null when /api/operations/dashboard is unavailable). */
+  quarter: QuarterSnapshot | null;
   kpis: KpiDatum[];
   salesVsCollections: { date: string; sales: number; collections: number }[];
   weeklyRevenue: { day: string; revenue: number }[];
@@ -89,6 +91,9 @@ export interface DerivedDashboard {
     todayProfit: number;
     todayBirds: number;
     todayWeight: number;
+    /** Fuel + trip + maintenance booked on the dashboard's business date. */
+    todayExpenses: number;
+    todayMaintenance: number;
   };
 }
 
@@ -143,8 +148,23 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
   const todayTripExpense = sum(data.trips.filter((t) => t.tripDate === today).map((t) => Number(t.expense) || 0));
   const yesterdayFuel = sum(data.fuelExpenses.filter((f) => f.date === yesterday).map((f) => Number(f.amount) || 0));
   const yesterdayTripExpense = sum(data.trips.filter((t) => t.tripDate === yesterday).map((t) => Number(t.expense) || 0));
-  const todayProfit = todaySales - todayFuel - todayTripExpense;
-  const yesterdayProfit = yesterdaySales - yesterdayFuel - yesterdayTripExpense;
+
+  // Maintenance is the third bucket the Operations dashboard and the Accounts
+  // analysis roll into `totalExpenses` (fuel + trip + maintenance). The profit
+  // tile has to use the same definition, or the three pages disagree about
+  // what a day cost.
+  const maintenanceCostOn = (day: string): number =>
+    sum(
+      data.maintenance
+        .filter((m) => Boolean(m.date) && m.date.slice(0, 10) === day)
+        .map((m) => Number(m.totalCost) || 0)
+    );
+  const todayMaintenance = maintenanceCostOn(today);
+  const yesterdayMaintenance = maintenanceCostOn(yesterday);
+  const todayExpenses = todayFuel + todayTripExpense + todayMaintenance;
+  const yesterdayExpenses = yesterdayFuel + yesterdayTripExpense + yesterdayMaintenance;
+  const todayProfit = todaySales - todayExpenses;
+  const yesterdayProfit = yesterdaySales - yesterdayExpenses;
 
   const pendingAmount = sum(data.pendingCollections.map((p) => Number(p.currentPending) || 0));
   const overdueCount = data.pendingCollections.filter((p) => Number(p.overdueDays) > 0).length;
@@ -164,7 +184,15 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
     const fuel = sum(data.fuelExpenses.filter((f) => f.date === date).map((f) => Number(f.amount) || 0));
     const tripExpense = sum(data.trips.filter((t) => t.tripDate === date).map((t) => Number(t.expense) || 0));
     const label = new Date(date + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short" });
-    return { date: label, iso: date, sales, collections, birds, weight, expenses: fuel + tripExpense };
+    return {
+      date: label,
+      iso: date,
+      sales,
+      collections,
+      birds,
+      weight,
+      expenses: fuel + tripExpense + maintenanceCostOn(date),
+    };
   });
 
   const salesVsCollections = series.map((s) => ({
@@ -256,78 +284,98 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
   }));
 
   /* ----- Activity timeline ----- */
-  const activity: ActivityItem[] = [];
+  // Every entry keeps the business date it actually happened on, so the panel
+  // can label it ("Today" / "Yesterday" / 12 Sep) instead of stamping every row
+  // "Today" — and so a quiet day (a Sunday, or a morning before the first
+  // delivery lands) still shows the latest real movements from the same rows
+  // rather than an empty panel.
+  type ActivitySeed = Omit<ActivityItem, "time"> & { date: string };
+  const seeds: ActivitySeed[] = [];
 
-  data.trips
-    .filter((t) => t.tripDate === today && t.status === "Completed")
-    .slice(0, 3)
-    .forEach((t) => {
-      activity.push({
-        id: `trip-${t.tripNo}`,
-        title: tFunc("dashboard.activity.delivery_completed", { tripNo: t.tripNo }),
-        description: tFunc("dashboard.activity.delivery_desc", {
-          vehicle: t.vehicleNo,
-          count: t.deliveries?.length ?? 0,
-          weight: formatWeight(t.totalDeliveredWeight || 0),
-        }),
-        time: tFunc("time.today"),
-        tone: "brand",
-        icon: Truck,
-      });
+  const newest = <T>(rows: T[], dateOf: (row: T) => string, limit: number): T[] =>
+    [...rows]
+      .filter((row) => Boolean(dateOf(row)))
+      .sort((a, b) => dateOf(b).localeCompare(dateOf(a)))
+      .slice(0, limit);
+
+  newest(
+    data.trips.filter((t) => t.status === "Completed"),
+    (t) => t.tripDate,
+    3
+  ).forEach((t) => {
+    seeds.push({
+      date: t.tripDate,
+      id: `trip-${t.tripNo}`,
+      title: tFunc("dashboard.activity.delivery_completed", { tripNo: t.tripNo }),
+      description: tFunc("dashboard.activity.delivery_desc", {
+        vehicle: t.vehicleNo,
+        count: t.deliveries?.length ?? 0,
+        weight: formatWeight(t.totalDeliveredWeight || 0),
+      }),
+      tone: "brand",
+      icon: Truck,
     });
+  });
 
-  data.collections
-    .filter((c) => c.collectionDate === today)
-    .slice(0, 3)
-    .forEach((c) => {
-      activity.push({
-        id: `col-${c.collectionNo}`,
-        title: tFunc("dashboard.activity.collection_received", { shopName: c.shopName }),
-        description: tFunc("dashboard.activity.collection_desc", {
-          amount: formatINR(Number(c.amount) || 0),
-          paymentMode: c.paymentModeName,
-        }),
-        time: tFunc("time.today"),
-        tone: "sky",
-        icon: CreditCard,
-      });
+  newest(data.collections, (c) => c.collectionDate, 3).forEach((c) => {
+    seeds.push({
+      date: c.collectionDate,
+      id: `col-${c.collectionNo}`,
+      title: tFunc("dashboard.activity.collection_received", { shopName: c.shopName }),
+      description: tFunc("dashboard.activity.collection_desc", {
+        amount: formatINR(Number(c.amount) || 0),
+        paymentMode: c.paymentModeName,
+      }),
+      tone: "sky",
+      icon: CreditCard,
     });
+  });
 
-  data.fuelExpenses
-    .filter((f) => f.date === today)
-    .slice(0, 2)
-    .forEach((f) => {
-      activity.push({
-        id: `fuel-${f.billNo}`,
-        title: tFunc("dashboard.activity.fuel_entry", { billNo: f.billNo }),
-        description: tFunc("dashboard.activity.fuel_desc", {
-          vehicle: f.vehicleNo,
-          litres: f.litres,
-          amount: formatINR(Number(f.amount) || 0),
-        }),
-        time: tFunc("time.today"),
-        tone: "amber",
-        icon: Bird,
-      });
+  newest(data.fuelExpenses, (f) => f.date, 2).forEach((f) => {
+    seeds.push({
+      date: f.date,
+      id: `fuel-${f.billNo}`,
+      title: tFunc("dashboard.activity.fuel_entry", { billNo: f.billNo }),
+      description: tFunc("dashboard.activity.fuel_desc", {
+        vehicle: f.vehicleNo,
+        litres: f.litres,
+        amount: formatINR(Number(f.amount) || 0),
+      }),
+      tone: "amber",
+      icon: Bird,
     });
+  });
 
-  (maintenanceRecords as { vehicleNo?: string; date?: string; totalCost?: number }[])
-    .sort((a, b) => (b.date ?? "").localeCompare(a.date ?? ""))
-    .slice(0, 2)
-    .forEach((m) => {
-      activity.push({
-        id: `maint-${m.vehicleNo}-${m.date}`,
-        title: tFunc("dashboard.activity.maintenance_completed", { vehicleNo: m.vehicleNo ?? tFunc("common.vehicle") }),
-        description: tFunc("dashboard.activity.maintenance_desc", { amount: formatINR(Number(m.totalCost) || 0) }),
-        // The fleet API stamps jobs with a full ISO date-time; show the same
-        // short date label the rest of the timeline uses.
-        time: m.date ? formatDateShort(m.date) : "",
-        tone: "violet",
-        icon: Truck,
-      });
+  newest(
+    maintenanceRecords as { vehicleNo?: string; date?: string; totalCost?: number }[],
+    (m) => (m.date ?? "").slice(0, 10),
+    2
+  ).forEach((m) => {
+    seeds.push({
+      date: (m.date ?? "").slice(0, 10),
+      id: `maint-${m.vehicleNo}-${m.date}`,
+      title: tFunc("dashboard.activity.maintenance_completed", {
+        vehicleNo: m.vehicleNo ?? tFunc("common.vehicle"),
+      }),
+      description: tFunc("dashboard.activity.maintenance_desc", {
+        amount: formatINR(Number(m.totalCost) || 0),
+      }),
+      tone: "violet",
+      icon: Truck,
     });
+  });
 
-  activity.sort((a, b) => b.time.localeCompare(a.time));
+  const labelFor = (date: string): string =>
+    date === today
+      ? tFunc("time.today")
+      : date === yesterday
+      ? tFunc("time.yesterday")
+      : formatDateShort(date);
+
+  const activity: ActivityItem[] = seeds
+    .sort((a, b) => b.date.localeCompare(a.date))
+    .slice(0, 7)
+    .map(({ date, ...seed }) => ({ ...seed, time: labelFor(date) }));
 
   /* ----- KPIs ----- */
   const kpis: KpiDatum[] = [
@@ -431,6 +479,7 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
     data.vehicles.length > 0;
 
   return {
+    quarter: data.quarter,
     kpis,
     salesVsCollections,
     weeklyRevenue,
@@ -450,6 +499,8 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
       todayProfit,
       todayBirds: sum(data.shopSales.filter((s) => s.tripDate === today).map((s) => Number(s.totalBirds) || 0)),
       todayWeight: sum(data.shopSales.filter((s) => s.tripDate === today).map((s) => Number(s.totalWeight) || 0)),
+      todayExpenses,
+      todayMaintenance,
     },
   };
 }

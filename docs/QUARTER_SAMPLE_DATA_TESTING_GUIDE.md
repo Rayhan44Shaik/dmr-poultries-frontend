@@ -23,6 +23,16 @@ reach them. Each was a pass-through/flag change only:
 | `operations/orders/sampleOrdersData.ts` | `ORDERS_SAMPLE_DATA_ENABLED: true → false` | The Orders page ran entirely on bundled sample rows and made **no network call**. The quarter dataset now supplies the `[ORDER]` collection containers. |
 | `accounts/pages/PaymentBookPage.tsx` | `useState(import.meta.env.DEV)` → `useState(false)` | Payment Register always opened in bundled demo mode in dev, hiding the real 662 payments. The demo toggle still exists as a manual fallback. |
 
+### Dashboard sync round (later pass)
+
+| File | Change | Why |
+|---|---|---|
+| `routes/AppRoutes.tsx` | `/dashboard` now renders `modules/dashboard/DashboardPage` (the executive dashboard) instead of the Operations dashboard. | The executive dashboard — KPI row, business-overview charts, pending collections, fleet status, activity — was built but **never routed**, so `/dashboard` showed a duplicate of `/operations?tab=overview`, which is where the sidebar's "Operation Dashboard" entry already points. |
+| `dashboard/services/dashboardService.ts` | Every sample read is windowed against the dataset's own business date instead of `new Date()`; new `fetchQuarterSnapshot()` reads `GET /api/operations/dashboard` for the whole quarter. | The dataset is generated in IST, so a browser west of it is a calendar day behind and the old windows silently cut off the rows the "today" tiles aggregate. The quarter band now comes from the same aggregate Operations and Accounts render. |
+| `dashboard/utils/dashboardDerive.ts` | Maintenance added to the daily expense/profit model; activity entries carry their real date (Today / Yesterday / date) and fall back to the newest movements. | Profit used fuel + trip only, so it disagreed with the expense model on the Operations dashboard and Accounts. The timeline stamped every row "Today" and went empty on a quiet day. |
+| `dashboard/components/QuarterSnapshot.tsx` (new) | "Quarter to date" band: trips, weight, sales, collections, expenses (fuel · trip · service), net, outstanding. | The executive view only ever showed a single day; the rest of the quarter was invisible on it. |
+| `scripts/quarter-sample-data.mjs` | Today and the three preceding operating days now keep a **closed core** of trips, and are exempt from the "pending for rate entry" downgrade. | Those four days are exactly what the dashboard aggregates for "today" and "last 7 days". With every trip on them still Draft/Pending, "Today's Sales" read ₹0 and the profit tile went negative while the rest of the app was fully populated. Drafts at wizard steps 1–4 are preserved, so Trip Entry's "Resume Step N" still works. |
+
 `tsc -p tsconfig.app.json --noEmit` reports **no new errors** (only the
 repository's pre-existing unused-import warnings).
 
@@ -115,11 +125,28 @@ opening + sales − collections.
 
 ## 3. Module-by-module verification — check every page
 
-### 3.1 Overview
+### 3.1 Overview — the executive dashboard at `/dashboard`
 
-| Page | Route | What to verify |
-|---|---|---|
-| Dashboard | `/dashboard` | **KPI tiles** (whole quarter, captured on the 2026-09-11 anchor): 633 trips, ₹4.81 Cr sales, ₹4.04 Cr collections, ₹1.69 Cr pending, expenses ₹59.1 L (fuel ₹22.3 L + trip ₹12.3 L + maintenance ₹24.4 L). **Panels (all populated):** Operational Trends line chart = up to 30 daily points (trips / weight / mortality); Outstanding Balances = top 10 shops; Collection Streams pie = Cash / Union Bank / HDFC; Recent Transit table = 10 latest trips with vehicle, driver, weight, status; Active Fleet counts = 22 vehicles, 29 drivers, 29 helpers, 192 shops, 10 farms. Today / this-week / this-month tiles are anchored on the dataset's "today" and stay constant as you change the range; the rest of the KPIs are aggregated by the sample API for the exact range you pick, so changing the date range re-aggregates trips, sales, collections and expenses. An amber **Sample data** banner names the quarter window whenever the sample API is the source. |
+`/dashboard` renders the **executive dashboard** (`src/modules/dashboard`); the
+range-picking Operations dashboard lives at `/operations?tab=overview` (§3.3).
+Both read the same dataset.
+
+| Block | What to verify |
+|---|---|
+| **Quarter to date** band | One row, six figures for the whole 92-day window, read from `GET /api/operations/dashboard` — the *same* aggregate Operations and Accounts → Analysis render, so the three pages can never disagree: **trips**, **delivered weight**, **sales**, **collections** (% of sales), **expenses** (broken out as fuel · trip · service) and **net / outstanding**. Captured on the 2026-09-15 anchor: 631 trips, 5,22,623 kg, ₹5.39 Cr sales, ₹4.10 Cr collections (76%), ₹64.3 L expenses (fuel ₹27.6 L + trip ₹12.3 L + service ₹24.4 L), net ₹4.75 Cr, outstanding ₹2.22 Cr. |
+| **KPI row** (8 tiles, one line) | Shops 200 (192 active), Farms 10, Vehicles 24 (22 in service), Employees 150 (145 active), **Today's Sales**, **Today's Collections**, **Pending** with the overdue shop count, and **Today's Profit** = sales − (fuel + trip + maintenance) — the same three-bucket expense model the Operations dashboard and Accounts use. The money tiles compare against the dataset's *yesterday* and carry a % delta chip. |
+| **Sales vs Collections** | 7 daily points ending on the dataset's business date. Six of the seven carry sales; the empty one is a **Sunday** (no dispatch, no collections — the dataset keeps Sundays off). |
+| **Vehicle Activity** | Donut: On Trip / Available / Inactive, derived from the vehicle master status plus the trips dated today. |
+| **Weekly Revenue** + **Delivery Volume** | Revenue bars per day, and birds (bars) against delivered weight (line) per day — both from the same 7-day window. |
+| **Pending Collections** | Top 6 shops by outstanding, total in the header, overdue count, deep link to `/operations?tab=pending-collections`. |
+| **Today's Trips** | Every trip dated the business date with vehicle, driver, supervisor, farm, first shop, birds, weight and status — Drafts at steps 1–4, one in-flight trip at step 5 and the closed runs all appear. |
+| **Recent activity** | Newest completed deliveries, collections, fuel entries and service jobs — each labelled **Today** / **Yesterday** / a date, so the panel stays populated when the business date is quiet. |
+| **Vehicle status** | Per-vehicle status, driver, latest odometer, last fuel bill and next-service mileage from the fleet maintenance rows. |
+
+An amber **Sample data** chip and a blue **quarter** chip (naming the window,
+e.g. "Quarter 3 — Jun to Sep 2026") sit next to the greeting whenever the sample
+API is the source. The page dates itself with the dataset's own business date,
+not the browser clock.
 
 ### 3.2 Masters — `/masters`
 
@@ -137,8 +164,8 @@ opening + sales − collections.
 
 | Tab | Route | Checks |
 |---|---|---|
-| Operation Dashboard | `?tab=overview` | Same KPI set as `/dashboard`; change the date range to a single month → totals shrink accordingly. |
-| Trip Entry | `?tab=trip-entry` | Step 1 dropdowns: 23 vehicles, 29 drivers, 24 supervisors, 29 helpers, 24 loaders. Last-meter hint resolves per vehicle. Recent Trips shows Drafts parked at Steps 1/2/3/4 (dated 2026-09-11 and the 3 days after) → "Resume Step N" for every step. |
+| Operation Dashboard | `?tab=overview` | The range-picking view (7D / 15D / 1M / QTR / custom), opening on the previous Mon–Sun week and measured against the equal-length window before it. Same source as the executive dashboard's quarter band: `GET /api/operations/dashboard`, re-aggregated for the exact range you pick — change to a single month and totals shrink accordingly. Panels: Operational Trends (trips / weight / mortality), Collection Streams pie, Outstanding Balances, Recent Transit, Active Fleet counts. |
+| Trip Entry | `?tab=trip-entry` | Step 1 dropdowns: 23 vehicles, 29 drivers, 24 supervisors, 29 helpers, 24 loaders. Last-meter hint resolves per vehicle. Recent Trips shows Drafts parked at Steps 1/2/3/4 dated the business day → "Resume Step N" for every step. |
 | Trip List | `?tab=trip-list` | 632 rows; filter each status: Completed (bulk), Pending, Draft, Deleted (~10). Open a Completed trip → all 5 steps filled: staff, farm + GPS, DC weight + box details, deliveries, diesel + expenses + mileage. |
 | Rate Entry | `?tab=rate-entry` | Every delivery-submitted trip listed; open one → 8–18 shop lines, each with market-rate reference (master / last trip / avg + sample count) and a 4-day market-rate window. Completed trips show rate-locked state with lock timestamp. |
 | Shop Sales | `?tab=shop-sales` | 6,059 sale lines with `TRP-xxxxx-Sxxx` numbers; date filter; shop search; rows within 10 days of 2026-09-11 are editable, older rows show "Editing period has expired." |
@@ -207,7 +234,28 @@ opening + sales − collections.
 
 ---
 
-## 5. Notes / limits
+## 5. One command to prove the dashboard is in sync
+
+```bash
+npm run verify:dashboard        # needs the sample API on :4000 (npm run dev)
+```
+
+`scripts/dashboard-sync-check.mjs` loads the **real** dashboard service and
+derivation modules through Vite's SSR pipeline, points them at the running
+sample API and prints everything the page renders, then asserts the sync:
+
+* master counts equal the dataset manifest (`/api/quarter-summary`);
+* pending-collections total equals the Operations dashboard's;
+* today's sales / collections / trips equal the Shop Sales, Collections and
+  Trip List rows for the same business date;
+* the quarter band's expenses equal fuel + trip + maintenance, its outstanding
+  equals the pending-collections card, and its sales equal the Operations KPI;
+* every panel is populated, no KPI reads zero, and at least 5 of the 7 series
+  days carry sales.
+
+It exits non-zero on any failure, so it is safe to wire into CI.
+
+## 6. Notes / limits
 
 - Writes (POST/PUT/PATCH/DELETE) return `200 {ok:true}` so UI flows complete, but the dataset is immutable — restart-safe and always identical.
 - Auth is stubbed: any credentials log you in as Owner with all permissions.
@@ -215,7 +263,10 @@ opening + sales − collections.
 
 ---
 
-## 6. Sync verification — every navigation page hits the dataset
+## 7. Sync verification — every navigation page hits the dataset
+
+| Dashboard (executive) | `/api/operations/dashboard` (quarter band) + `/api/masters/*`, `/api/operations/trip-list`, `/api/operations/shop-sales`, `/api/operations/collection-entry`, `/api/operations/collections/pending`, `/api/fleet/maintenance` | quarter roll-up + 200 / 10 / 24 / 150 masters, 208 trips, 379 sale lines, 565 collections, 200 pending, 101 jobs |
+
 
 Run with both processes up; each returns HTTP 200 with the row count shown.
 

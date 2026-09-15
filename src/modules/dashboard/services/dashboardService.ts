@@ -19,6 +19,7 @@
 // -----------------------------------------------------------------------------
 
 import { apiClient, apiTryGet } from "../../../api";
+import { isBusinessDate, toBusinessDate } from "../../../utils/businessDate";
 import { getQuarterSampleInfo, type SampleQuarter } from "../../../sample/quarterSample";
 import { tripService } from "../../operations/vehicle-trips/services/tripService";
 import { collectionService } from "../../operations/collections/services/collectionService";
@@ -73,6 +74,34 @@ export interface MaintenanceRow {
   totalCost: number;
 }
 
+/**
+ * Whole-quarter roll-up behind the dashboard's "quarter to date" band.
+ *
+ * It is read from GET /api/operations/dashboard — the SAME endpoint (and the
+ * same window) the Operations Dashboard and Accounts → Analysis use — so the
+ * executive dashboard totals can never drift away from those pages. Null when
+ * the endpoint is unavailable, in which case the band simply isn't rendered.
+ */
+export interface QuarterSnapshot {
+  /** e.g. "Quarter 3 — Jun to Sep 2026". */
+  label: string;
+  fromDate: string;
+  toDate: string;
+  /** The dataset's business date — the last day the window is summed through. */
+  today: string;
+  trips: number;
+  /** Delivered weight in kg across the window. */
+  weight: number;
+  sales: number;
+  collections: number;
+  pending: number;
+  /** Fuel + trip + maintenance, the same three costs Operations totals. */
+  expenses: number;
+  fuelExpense: number;
+  tripExpense: number;
+  maintenanceExpense: number;
+}
+
 export interface DashboardData {
   shops: ShopRow[];
   farms: FarmRow[];
@@ -89,6 +118,8 @@ export interface DashboardData {
   demoActive: boolean;
   /** Set only when the quarter sample API is the source of these rows. */
   sampleQuarter: SampleQuarter | null;
+  /** Whole-window roll-up from /api/operations/dashboard; null if unavailable. */
+  quarter: QuarterSnapshot | null;
 }
 
 /* ------------------------------------------------------------------ */
@@ -105,15 +136,36 @@ const SAMPLE_ROW_LIMIT = 500;
 /** Hard stop so a mis-reported `totalPages` can never loop forever. */
 const SAMPLE_MAX_PAGES = 40;
 
-function isoDaysAgo(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+/**
+ * The dashboard's business anchor date.
+ *
+ * Every sample read is windowed against the dataset's OWN "today", never the
+ * browser clock. The quarter dataset is generated in the ERP's business
+ * timezone (IST), so a browser sitting west of it can still be on the previous
+ * calendar day — a window that ended on the browser's date would then silently
+ * cut off the very rows the dashboard must show for "today", which is exactly
+ * how those tiles used to read zero while every other page showed the data.
+ * With no sample server this is the local calendar date, as before.
+ */
+function businessAnchor(sampleQuarter: SampleQuarter | null): string {
+  const candidate = sampleQuarter?.today || sampleQuarter?.toDate;
+  if (isBusinessDate(candidate)) return candidate as string;
+  return toBusinessDate(new Date());
 }
 
-/** Inclusive `fromDate`/`toDate` window ending today, `days` back. */
-function sampleRange(days: number): { fromDate: string; toDate: string } {
-  return { fromDate: isoDaysAgo(days), toDate: isoDaysAgo(0) };
+/** Calendar-safe day shift — never `toISOString()`, which moves the day for
+ *  non-UTC browsers (see utils/businessDate). */
+function shiftDays(isoDate: string, days: number): string {
+  const [y, m, d] = isoDate.split("-").map(Number);
+  if (!y || !m || !d) return isoDate;
+  const date = new Date(y, m - 1, d);
+  date.setDate(date.getDate() + days);
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+}
+
+/** Inclusive `fromDate`/`toDate` window ending on `anchor`, `days` back. */
+function sampleRange(anchor: string, days: number): { fromDate: string; toDate: string } {
+  return { fromDate: shiftDays(anchor, -days), toDate: anchor };
 }
 
 /* ---- row-level helpers (the two servers spell some fields differently) ---- */
@@ -166,10 +218,10 @@ async function fetchSampleRows(
 }
 
 /** GET /api/operations/trip-list — real vehicle trips for the last 30 days. */
-async function fetchSampleTrips(): Promise<Trip[]> {
+async function fetchSampleTrips(anchor: string): Promise<Trip[]> {
   try {
     const rows = await fetchSampleRows("/operations/trip-list", {
-      ...sampleRange(SAMPLE_WINDOW_DAYS),
+      ...sampleRange(anchor, SAMPLE_WINDOW_DAYS),
       // `latestTrips` renders the head of this array, so ask the endpoint for
       // newest-first (sortBy/sortDir are part of the documented trip-list
       // contract) instead of relying on the server's insertion order.
@@ -213,9 +265,9 @@ function toFuelExpense(row: Record<string, unknown>): FuelExpense {
 }
 
 /** GET /api/operations/fuel-expenses — the same window as the trips read. */
-async function fetchSampleFuel(): Promise<FuelExpense[]> {
+async function fetchSampleFuel(anchor: string): Promise<FuelExpense[]> {
   try {
-    const rows = await fetchSampleRows("/operations/fuel-expenses", sampleRange(SAMPLE_WINDOW_DAYS));
+    const rows = await fetchSampleRows("/operations/fuel-expenses", sampleRange(anchor, SAMPLE_WINDOW_DAYS));
     return rows.map(toFuelExpense);
   } catch {
     return [];
@@ -265,11 +317,11 @@ function toShopSale(row: Record<string, unknown>): ShopSale {
 }
 
 /** GET /api/operations/shop-sales — delivery lines behind the sales KPIs. */
-async function fetchSampleShopSales(): Promise<ShopSale[]> {
+async function fetchSampleShopSales(anchor: string): Promise<ShopSale[]> {
   try {
     const rows = await fetchSampleRows(
       "/operations/shop-sales",
-      sampleRange(SAMPLE_SERIES_WINDOW_DAYS)
+      sampleRange(anchor, SAMPLE_SERIES_WINDOW_DAYS)
     );
     return rows.map(toShopSale).filter((s) => s.tripDate);
   } catch {
@@ -310,10 +362,10 @@ function toCollection(row: Record<string, unknown>): Collection {
 }
 
 /** GET /api/operations/collection-entry — the collections register. */
-async function fetchSampleCollections(): Promise<Collection[]> {
+async function fetchSampleCollections(anchor: string): Promise<Collection[]> {
   try {
     const rows = await fetchSampleRows("/operations/collection-entry", {
-      ...sampleRange(SAMPLE_SERIES_WINDOW_DAYS),
+      ...sampleRange(anchor, SAMPLE_SERIES_WINDOW_DAYS),
       includeDeleted: "false",
     });
     return rows
@@ -385,15 +437,72 @@ function toMaintenanceRow(row: Record<string, unknown>): MaintenanceRow {
  * without it every vehicle read "No open issues" while the Fleet module showed
  * 300+ jobs from the same dataset.
  */
-async function fetchSampleMaintenance(): Promise<MaintenanceRow[]> {
+async function fetchSampleMaintenance(anchor: string): Promise<MaintenanceRow[]> {
   try {
-    const rows = await fetchSampleRows("/fleet/maintenance", sampleRange(SAMPLE_WINDOW_DAYS));
+    const rows = await fetchSampleRows("/fleet/maintenance", sampleRange(anchor, SAMPLE_WINDOW_DAYS));
     return rows
       .map(toMaintenanceRow)
       .filter((m) => m.date && (m.vehicleNo || m.vehicleId))
       .sort((a, b) => b.date.localeCompare(a.date));
   } catch {
     return [];
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/*  Quarter roll-up                                                     */
+/* ------------------------------------------------------------------ */
+/**
+ * GET /api/operations/dashboard — the one aggregate every money page in the
+ * app already trusts. Read for the whole business window so the executive
+ * dashboard can show where the quarter stands next to its "today" tiles.
+ *
+ * Failures resolve to `null` (never throw): the band is an enhancement, and a
+ * backend that does not implement the endpoint must not break the page.
+ */
+async function fetchQuarterSnapshot(
+  sampleQuarter: SampleQuarter | null
+): Promise<QuarterSnapshot | null> {
+  try {
+    const { data } = await apiClient.get<Record<string, unknown>>("/operations/dashboard", {
+      params: sampleQuarter ? { fromDate: sampleQuarter.fromDate, toDate: sampleQuarter.toDate } : {},
+      timeout: 8_000,
+    });
+    const raw = data as Record<string, unknown> | null;
+    if (!raw || typeof raw !== "object") return null;
+
+    const rawQuarter = (raw.quarter ?? null) as Record<string, unknown> | null;
+    const fromDate = str(rawQuarter?.fromDate) || sampleQuarter?.fromDate || "";
+    const toDate = str(rawQuarter?.toDate) || sampleQuarter?.toDate || "";
+    if (!toDate) return null;
+
+    const fuelExpense = num(raw.fuelExpenses);
+    const tripExpense = num(raw.tripExpense);
+    const expenses =
+      raw.totalExpenses != null ? num(raw.totalExpenses) : fuelExpense + tripExpense;
+
+    return {
+      label:
+        str(rawQuarter?.label) ||
+        sampleQuarter?.label ||
+        `Quarter to date (${fromDate} → ${toDate})`,
+      fromDate,
+      toDate,
+      today: str(raw.today) || sampleQuarter?.today || toDate,
+      trips: num(raw.totalTrips),
+      weight: num(raw.totalWeight),
+      sales: num(raw.totalSales),
+      collections: num(raw.totalCollections),
+      pending: num(raw.pendingCollections),
+      expenses,
+      fuelExpense,
+      tripExpense,
+      // The endpoint reports the total and its two named parts; the rest is
+      // maintenance — the same three buckets Operations breaks out.
+      maintenanceExpense: Math.max(0, expenses - fuelExpense - tripExpense),
+    };
+  } catch {
+    return null;
   }
 }
 
@@ -518,7 +627,12 @@ async function loadMasters(): Promise<Pick<DashboardData, "shops" | "farms" | "v
 /*  Main loader                                                        */
 /* ------------------------------------------------------------------ */
 export async function loadDashboardData(): Promise<DashboardData> {
-  const masters = await loadMasters();
+  // Resolved FIRST: every sample read below is windowed against the dataset's
+  // own business date, so the anchor has to be known before they run.
+  const sampleQuarter = (await getQuarterSampleInfo())?.quarter ?? null;
+  const anchor = businessAnchor(sampleQuarter);
+
+  const [masters, quarter] = await Promise.all([loadMasters(), fetchQuarterSnapshot(sampleQuarter)]);
 
   let trips: Trip[] = [];
   let collections: Collection[] = [];
@@ -553,16 +667,15 @@ export async function loadDashboardData(): Promise<DashboardData> {
   // rows first, so they always win over a stale/partial local cache, and any
   // locally-only row is still kept. Production is untouched: the probe
   // resolves to null outside dev/preview and against a real backend.
-  const sampleQuarter = (await getQuarterSampleInfo())?.quarter ?? null;
   if (sampleQuarter) {
     const [apiTrips, apiFuel, apiShopSales, apiCollections, apiPending, apiMaintenance] =
       await Promise.all([
-        fetchSampleTrips(),
-        fetchSampleFuel(),
-        fetchSampleShopSales(),
-        fetchSampleCollections(),
+        fetchSampleTrips(anchor),
+        fetchSampleFuel(anchor),
+        fetchSampleShopSales(anchor),
+        fetchSampleCollections(anchor),
         fetchSamplePendingCollections(),
-        fetchSampleMaintenance(),
+        fetchSampleMaintenance(anchor),
       ]);
     trips = mergeById(apiTrips, trips);
     fuelExpenses = mergeById(apiFuel, fuelExpenses);
@@ -582,6 +695,7 @@ export async function loadDashboardData(): Promise<DashboardData> {
     maintenance,
     demoActive: isDemoDataActive(),
     sampleQuarter,
+    quarter,
   };
 }
 
