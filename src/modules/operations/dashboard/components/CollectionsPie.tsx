@@ -76,7 +76,7 @@ function ModeTooltip({ active, payload }: ModeTooltipProps) {
 /**
  * Collection Streams — payment-mode donut for the Operations dashboard.
  *
- * A fixed 208 px square stage keeps the ring a perfect circle at every window
+ * A fixed 240 px square stage keeps the ring a perfect circle at every window
  * size, with generous white space on all sides. Slices sweep in on mount /
  * range change, lift and dim on hover, carry their own % label, sit on a soft
  * background track, and the legend below lists every mode with exact amount
@@ -146,7 +146,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
               y={ly}
               textAnchor="middle"
               dominantBaseline="central"
-              fontSize={10}
+              fontSize={11}
               fontWeight={700}
               fill="#ffffff"
               style={{ pointerEvents: "none" }}
@@ -172,9 +172,9 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
     <div className="flex w-full min-w-0 flex-1 flex-col">
       {/* Donut — fixed square stage, generous white space on all sides. */}
       <div className="flex min-h-0 flex-1 items-center justify-center py-3">
-        <div className="relative h-52 w-52">
-          {/* Soft background track behind the ring. */}
-          <div className="absolute left-1/2 top-1/2 h-[175px] w-[175px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[27px] border-slate-100/80" />
+        <div className="relative h-64 w-64">
+          {/* Soft background track behind the ring (matches the 58%–84% band). */}
+          <div className="absolute left-1/2 top-1/2 h-[215px] w-[215px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[33px] border-slate-100/80" />
 
           <div className="h-full w-full [filter:drop-shadow(0_18px_26px_-16px_rgba(15,23,42,0.35))]">
             <ResponsiveContainer width="100%" height="100%">
@@ -216,10 +216,10 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
 
           {/* Centre total — count-up on load / range change. */}
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-400">
+            <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
               {t("ops.dashboard.collection_streams_total")}
             </span>
-            <span className="mt-1 text-[21px] font-black leading-none tracking-tight text-slate-800 tabular-nums">
+            <span className="mt-1 text-[24px] font-black leading-none tracking-tight text-slate-800 tabular-nums">
               {formatINRCompact(animatedTotal)}
             </span>
           </div>
