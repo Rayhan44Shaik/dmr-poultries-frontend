@@ -1,14 +1,14 @@
 // Shop Sales table. Rows are backend-authoritative: the edit/lock state comes
 // exclusively from the API response, and the table only presents that state.
 
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
   Bird,
   Calendar,
   Check,
-  Edit2,
+  Pencil,
   FileText,
   Hash,
   IndianRupee,
@@ -28,6 +28,7 @@ import {
 } from "../utils/shopSaleFormat";
 import { formatTripListDay } from "../../vehicle-trips/utils/formatTripListDay";
 import { cleanDeliveryShopName } from "../../vehicle-trips/utils/shopDisplayName";
+import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 
 interface Props {
   sales: ShopSale[];
@@ -78,6 +79,7 @@ function ShopSalesTable({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<ShopSale>>({});
   const [saving, setSaving] = useState(false);
+  const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
 
   const selectedSale = sales.find((sale) => sale.id === selectedId) ?? null;
   const selectedLock = selectedSale ? shopSaleLockState(selectedSale) : null;
@@ -171,6 +173,27 @@ function ShopSalesTable({
     }
   }, [editingId, saving]);
 
+  const handleRowKeyDown = useCallback((event: React.KeyboardEvent<HTMLTableRowElement>, rowIndex: number) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      const sale = sales[rowIndex];
+      if (sale) handleRowSelect(sale);
+      return;
+    }
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+
+    event.preventDefault();
+    const nextIndex = event.key === "ArrowDown" ? rowIndex + 1 : rowIndex - 1;
+    const nextSale = sales[nextIndex];
+    if (!nextSale) return;
+    handleRowSelect(nextSale);
+    // Keep keyboard navigation visual and predictable even after React applies
+    // the new selected-row state.
+    requestAnimationFrame(() => rowRefs.current.get(nextSale.id)?.focus());
+  }, [handleRowSelect, sales]);
+
+  const canEditSelectedSale = Boolean(selectedSale && selectedLock?.editable && !saving);
+
   return (
     <>
       {/* Same static title treatment as the Trip List table. */}
@@ -187,7 +210,7 @@ function ShopSalesTable({
           )}
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap">
+        <div className="flex flex-wrap items-center gap-2">
           {editingId ? (
             <>
               <div className="flex items-center gap-1.5 text-xs font-semibold text-slate-600">
@@ -229,21 +252,33 @@ function ShopSalesTable({
                 <X size={14} />
               </button>
             </>
-          ) : selectedSale && selectedLock ? (
-            selectedLock.editable ? (
-              <button type="button" onClick={startEditing} className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-600 px-3.5 py-2 text-xs font-semibold text-white shadow-sm transition-all hover:bg-emerald-700 active:scale-95">
-                <Edit2 size={14} /> Edit
-              </button>
-            ) : (
-              <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">
-                  <Lock size={14} /> {selectedLock.label}
-                </span>
-                <span className="hidden max-w-xs text-xs font-medium text-slate-500 md:inline">{selectedLock.message}</span>
-              </div>
-            )
           ) : (
-            <span className="text-xs font-medium text-slate-400">Select a sale to view its edit or lock status</span>
+            <>
+              {/* Always present, exactly like Recent Trip Activity. It becomes
+                  active only after an editable row is selected. */}
+              <button
+                type="button"
+                onClick={startEditing}
+                disabled={!canEditSelectedSale}
+                aria-label="Edit selected shop sale"
+                className={`group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${
+                  canEditSelectedSale
+                    ? "bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-500 border border-emerald-200/60 active:scale-95"
+                    : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"
+                }`}
+              >
+                <span className={`inline-flex ${canEditSelectedSale ? uiActionIconMotionClass.edit : ""}`}><Pencil size={13} /></span>
+                <span className="hidden md:inline">Edit</span>
+              </button>
+              {selectedSale && selectedLock && !selectedLock.editable ? (
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-100 px-3 py-2 text-xs font-semibold text-slate-500">
+                    <Lock size={14} /> {selectedLock.label}
+                  </span>
+                  <span className="hidden max-w-xs text-xs font-medium text-slate-500 md:inline">{selectedLock.message}</span>
+                </div>
+              ) : null}
+            </>
           )}
         </div>
       </div>
@@ -277,9 +312,16 @@ function ShopSalesTable({
               return (
                 <tr
                   key={sale.id}
+                  ref={(element) => {
+                    if (element) rowRefs.current.set(sale.id, element);
+                    else rowRefs.current.delete(sale.id);
+                  }}
+                  tabIndex={0}
+                  onFocus={() => handleRowSelect(sale)}
                   onClick={() => handleRowSelect(sale)}
+                  onKeyDown={(event) => handleRowKeyDown(event, index)}
                   aria-selected={isSelected}
-                  className={`cursor-pointer transition-colors ${
+                  className={`cursor-pointer outline-none transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
                     isEditing ? "bg-emerald-50/50 shadow-[inset_3px_0_0_0_#10b981]" : isSelected ? "bg-emerald-50/70 shadow-[inset_3px_0_0_0_#10b981] hover:bg-emerald-50" : "hover:bg-slate-50/80"
                   } ${!lock.editable && !isSelected ? "opacity-80" : ""}`}
                 >
