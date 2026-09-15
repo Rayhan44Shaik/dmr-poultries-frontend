@@ -3,15 +3,15 @@
 //
 // What it shows, all in one plot:
 //   • Trips            → indigo line, right axis
-//   • Farm weight      → the height of the stacked bar (kg)
-//   • Delivered weight → emerald segment of that bar
-//   • Mortality        → rose segment of that bar
-//   • Weight loss      → amber segment of that bar
+//   • Farm weight      → the height of the stacked weight flow (kg)
+//   • Delivered weight → blue layer of that flow
+//   • Mortality        → rose layer of that flow
+//   • Weight loss      → amber layer of that flow
 //
 // Because farm weight = delivered + mortality + loss holds for every trip, the
-// three segments stack to exactly the farm weight — one bar carries all four
-// weight numbers at once. The footer carries the shares, so the plot itself
-// stays in kilos and needs no mode toggle.
+// three layers stack to exactly the farm weight — one smooth flow carries all
+// four weight numbers at once. The footer carries the totals, so the plot stays
+// in kilos and needs no mode toggle.
 //
 // The range comes from the dashboard's global calendar; the bucket (per day /
 // week / month) is chosen by the Today / Week / Month chips in the card header
@@ -24,7 +24,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Area,
-  Bar,
   CartesianGrid,
   ComposedChart,
   Line,
@@ -59,10 +58,12 @@ interface OperationalTrendsChartProps {
 }
 
 const COLOR = {
-  trips: "#6366f1",
-  farmWeight: "#0ea5e9",
-  delivered: "#10b981",
-  mortality: "#f43f5e",
+  trips: "#4338ca",
+  // Neutral slate keeps the farm-weight reference calm while the series below
+  // use a clear blue / rose / amber palette instead of competing greens.
+  farmWeight: "#64748b",
+  delivered: "#2563eb",
+  mortality: "#e11d48",
   weightLoss: "#f59e0b",
 } as const;
 
@@ -212,7 +213,7 @@ function useAnimatedNumber(value: number, duration = 520): number {
 /**
  * The average marker's caption, on its own plate: a rounded white chip hung
  * just above the dashed line at the right-hand edge, so it can never print
- * across a bar or the axis.
+ * across an area or the axis.
  */
 function AverageLabel({
   viewBox,
@@ -322,7 +323,8 @@ export default function OperationalTrendsChart({
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 10, right: 2, bottom: 0, left: -8 }}>
             <defs>
-              {/* Soft fill under the trips line, and a little depth on the bars. */}
+              {/* Soft fills give the stacked movement areas depth without
+                  overpowering the trips line. */}
               <linearGradient id="ot-trips-area" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%" stopColor={COLOR.trips} stopOpacity={0.22} />
                 <stop offset="100%" stopColor={COLOR.trips} stopOpacity={0} />
@@ -339,7 +341,7 @@ export default function OperationalTrendsChart({
                 <stop offset="0%" stopColor={COLOR.weightLoss} stopOpacity={1} />
                 <stop offset="100%" stopColor={COLOR.weightLoss} stopOpacity={0.78} />
               </linearGradient>
-              {/* A touch of depth so the trips line floats over the bars. */}
+              {/* A touch of depth keeps the trips line readable above the areas. */}
               <filter id="ot-line-shadow" x="-20%" y="-20%" width="140%" height="160%">
                 <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor={COLOR.trips} floodOpacity={0.3} />
               </filter>
@@ -367,7 +369,7 @@ export default function OperationalTrendsChart({
               yAxisId="trips"
               orientation="right"
               allowDecimals={false}
-              tick={{ fontSize: 10, fill: "#6366f1" }}
+              tick={{ fontSize: 10, fill: COLOR.trips }}
               tickLine={false}
               axisLine={false}
               width={34}
@@ -389,39 +391,47 @@ export default function OperationalTrendsChart({
               cursor={{ fill: "rgba(99,102,241,0.05)", radius: 6 }}
             />
 
-            {/* Segments sum to the farm weight — the bar's height IS it. */}
-            <Bar
+            {/* Smooth stacked movement areas replace the heavy bar treatment.
+                The three layers still sum to farm weight, but now read as a
+                continuous flow across the selected date window. */}
+            <Area
               yAxisId="weight"
+              type="monotone"
               dataKey="deliveredWeight"
               stackId="wt"
               name={t("ops.dashboard.trend.delivered_weight")}
+              stroke={COLOR.delivered}
+              strokeWidth={1.6}
               fill="url(#ot-delivered)"
-              maxBarSize={30}
               animationDuration={620}
               animationEasing="ease-out"
+              connectNulls
             />
-            {/* Kept so the bar still adds up to the farm weight; the card
-                reports mortality as birds, not kilos. */}
-            <Bar
+            <Area
               yAxisId="weight"
+              type="monotone"
               dataKey="mortalityWeight"
               stackId="wt"
               name={t("ops.dashboard.trend.mortality_weight")}
+              stroke={COLOR.mortality}
+              strokeWidth={1.4}
               fill="url(#ot-mortality)"
-              maxBarSize={30}
               animationDuration={620}
               animationEasing="ease-out"
+              connectNulls
             />
-            <Bar
+            <Area
               yAxisId="weight"
+              type="monotone"
               dataKey="lossBar"
               stackId="wt"
               name={t("ops.dashboard.trend.weight_loss")}
+              stroke={COLOR.weightLoss}
+              strokeWidth={1.4}
               fill="url(#ot-loss)"
-              radius={[6, 6, 0, 0]}
-              maxBarSize={30}
               animationDuration={620}
               animationEasing="ease-out"
+              connectNulls
             />
             <ReferenceLine
               yAxisId="weight"
@@ -430,7 +440,7 @@ export default function OperationalTrendsChart({
               strokeDasharray="4 4"
               strokeOpacity={0.7}
               strokeWidth={1}
-              /* Its own little plate, so the average never prints over a bar. */
+              /* Its own little plate, so the average never prints over an area. */
               label={
                 <AverageLabel
                   text={`${t("ops.dashboard.trend.average")} ${tickKg(totals.avgFarmWeight, locale)}`}
