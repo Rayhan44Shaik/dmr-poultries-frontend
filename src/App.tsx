@@ -1,5 +1,6 @@
 import { BrowserRouter } from 'react-router-dom';
 import ErrorBoundary from './components/common/ErrorBoundary';
+import InstanceWatchdog from './components/common/InstanceWatchdog';
 import { I18nProvider } from './i18n';
 import { ThemeProvider } from './providers/ThemeProvider';
 import { SettingsProvider } from './providers/SettingsProvider';
@@ -12,6 +13,10 @@ import AppRoutes from './routes/AppRoutes';
 function App() {
   return (
     <ErrorBoundary>
+      {/* Watches for the dev server restarting underneath an open tab and
+          self-heals it (reload) before stale JS/CSS can confuse the user.
+          No-op in production. */}
+      <InstanceWatchdog />
       <BrowserRouter>
         <I18nProvider>
           <ThemeProvider>

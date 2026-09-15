@@ -1,7 +1,15 @@
+import { randomUUID } from 'node:crypto'
 import { ServerResponse } from 'node:http'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+
+// Fresh on every dev-server (re)start. Injected into every transformed
+// module (see the `dmr-instance-stamp` plugin below) so a running tab can
+// tell when the server serving its port is a *different* instance than the
+// one that served its modules — i.e. the dev server restarted underneath
+// it and the tab is still executing the previous instance's old JS/CSS.
+const DMR_INSTANCE_ID = randomUUID()
 
 // Heavy runtime deps, pre-bundled up-front (at server start) so the first
 // browser request never triggers a re-optimization + mid-session reload.
@@ -30,11 +38,49 @@ const OPTIMIZE_DEPS = [
   'react-date-range',
 ]
 
+/**
+ * Stamps the running tab with the dev-server instance id and serves
+ * `GET /__dmr/ping` -> { instance } (no-store). A running tab that polls this
+ * and gets an id different from the one baked into its own modules knows the
+ * dev server was restarted underneath it and it must reload (its in-memory
+ * JS/CSS belong to the previous instance, even though API calls transparently
+ * reach the new one). See `InstanceWatchdog`.
+ *
+ * The stamp ships as a virtual module (not `define`) because Vite 8 does not
+ * apply bare-identifier `define` replacements to client (browser) modules in
+ * dev — a virtual module is transformed like any other, so it reaches every
+ * browser bundle.
+ */
+const DMR_INSTANCE_VIRTUAL = 'virtual:dmr-instance'
+const DMR_INSTANCE_RESOLVED = '\0' + DMR_INSTANCE_VIRTUAL
+
+const dmrInstanceStamp = {
+  name: 'dmr-instance-stamp',
+  resolveId(id: string) {
+    if (id === DMR_INSTANCE_VIRTUAL) return DMR_INSTANCE_RESOLVED
+    return null
+  },
+  load(id: string) {
+    if (id === DMR_INSTANCE_RESOLVED) {
+      return `export const INSTANCE_ID = ${JSON.stringify(DMR_INSTANCE_ID)};`
+    }
+    return null
+  },
+  configureServer(server: { middlewares: { use: (path: string, handler: (req: import('node:http').IncomingHttpMessage, res: import('node:http').ServerResponse) => void) => void } }) {
+    server.middlewares.use('/__dmr/ping', (_req, res) => {
+      res.setHeader('Content-Type', 'application/json')
+      res.setHeader('Cache-Control', 'no-store')
+      res.end(JSON.stringify({ instance: DMR_INSTANCE_ID }))
+    })
+  },
+}
+
 export default defineConfig({
   base: './',
   plugins: [
     react(),
     tailwindcss(),
+    dmrInstanceStamp,
   ],
   optimizeDeps: {
     include: OPTIMIZE_DEPS,
