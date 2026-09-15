@@ -299,17 +299,21 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
             className="group min-w-0 animate-fade-in-up cursor-default rounded-xl px-2.5 py-2 ring-1 ring-inset ring-slate-100 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
             style={{ backgroundColor: `${d.color}0f`, animationDelay: `${260 + index * 90}ms` }}
           >
-            <span className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">
-              <span
-                className="h-1.5 w-1.5 shrink-0 rounded-full transition-transform duration-200 group-hover:scale-150"
-                style={{ backgroundColor: d.color }}
-              />
-              <span className="truncate">{d.name}</span>
-              <span className="ml-auto shrink-0 tabular-nums">{`${d.percent.toFixed(1)}%`}</span>
-            </span>
-            <span className="mt-0.5 block truncate text-[15px] font-black tabular-nums text-slate-800">
-              {formatINRCompact(d.value)}
-            </span>
+              <span className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full transition-transform duration-200 group-hover:scale-150"
+                  style={{ backgroundColor: d.color }}
+                />
+                <span className="truncate">{d.name}</span>
+              </span>
+              <span className="mt-0.5 flex items-baseline justify-between gap-1">
+                <span className="block truncate text-[14px] font-black tabular-nums text-slate-800">
+                  {formatINRCompact(d.value)}
+                </span>
+                <span className="shrink-0 text-[10px] font-bold tabular-nums text-slate-500">
+                  {`${d.percent.toFixed(1)}%`}
+                </span>
+              </span>
           </div>
         ))}
       </div>
