@@ -9,6 +9,7 @@ import { useI18n } from "../../../../../i18n";
 import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocalization";
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 import { getDeleteWindowForStatus } from "../../utils/collectionDeleteWindow";
+import { collectionStatusKey, collectionStatusLabel } from "../../utils/collectionStatusLabel";
 
 interface Props {
   collections: RecentCollection[];
@@ -94,7 +95,7 @@ export default function RecentCollectionsTable({
     const squashed = lower.replace(/\s+/g, "");
     return collections.filter((col) => {
       const rawStatus = col.rawStatus || col.status;
-      const statusKey = "status." + String(rawStatus).toLowerCase().replace(/\s+/g, "_");
+      const statusKey = collectionStatusKey(rawStatus);
       const translatedStatus = t(statusKey);
       const candidates = [
         col.collectionNo,
@@ -323,9 +324,8 @@ export default function RecentCollectionsTable({
                   : tab === "Pending"
                   ? "bg-orange-50/80 text-orange-500 shadow-sm"
                   : "bg-rose-50/80 text-rose-500 shadow-sm";
-              // The Pending tab is "Pending Approval" — the same words the row
-              // badge uses, so the tab and the rows it filters agree.
-              const key = tab === "Pending" ? "status.pending_approval" : `status.${tab.toLowerCase()}`;
+              // Tab and row badge share one label source, so they always agree.
+              const key = `status.${tab.toLowerCase()}`;
               const label = t(key) === key ? tab : t(key);
               return (
                 <button
@@ -404,38 +404,35 @@ export default function RecentCollectionsTable({
           * measured against the live dataset (longest / average characters):
           *
           *   S.No 3 · Collection No 16 · Date 11 · Shop 33/22 · Collector 14/11
-          *   · Amount 11 · Status 16 · Actions 4 icons
+          *   · Amount 11 · Status "Pending" · Actions 4 icons
           *
-          * So the deterministic columns (S.No, Date, Amount, Actions) get fixed
-          * widths that exactly fit their worst case — Actions needs 178px for
-          * four 32px buttons plus gaps and padding, which no sane percentage
-          * guarantees on a narrow viewport — and the variable-length text
-          * columns share the remaining space in proportion to their content.
-          * An even 1/8 split wasted a third of the row on S.No and Actions
-          * while truncating shop names.
+          * 8/14/10/19/14/10/9/16, summing to exactly 100%. The 1180px floor
+          * guarantees every worst case: Actions 16% = 189px against the 178px
+          * four 32px buttons plus gaps and padding need, Status 9% = 106px for
+          * the short "Pending" badge, Shop 19% = 224px. Below the floor the
+          * table scrolls horizontally rather than crushing a column.
           *
-          * Widths sum to exactly 100%, and the 1180px floor guarantees the
-          * worst case everywhere: Actions 17% = 201px (needs 178), Status
-          * 10% = 118px (fits the "Pending Approval" badge), Shop 21% = 248px
-          * (the 33-character maximum). Below that floor the table scrolls
-          * horizontally rather than crushing any column. */}
+          * S.No, Date and their headers are left-aligned like every other text
+          * column. They were previously centred, which floated the value away
+          * from its own heading and read as uneven gaps either side of
+          * Collection No — an alignment problem that no width change fixes. */}
         <table className="min-w-[1180px] w-full table-fixed text-sm text-left border-collapse">
           <colgroup>
-            <col className="w-[5%]" />
+            <col className="w-[8%]" />
             <col className="w-[14%]" />
             <col className="w-[10%]" />
-            <col className="w-[21%]" />
-            <col className="w-[13%]" />
+            <col className="w-[19%]" />
+            <col className="w-[14%]" />
             <col className="w-[10%]" />
-            <col className="w-[10%]" />
-            <col className="w-[17%]" />
+            <col className="w-[9%]" />
+            <col className="w-[16%]" />
           </colgroup>
           <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-600">
             <tr>
               {/* Each column is tagged with the same icon vocabulary Shop Sales
                 * uses, so a column means the same thing across the product. */}
-              <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">
-                <span className="inline-flex items-center justify-center gap-1.5">
+              <th className="px-4 py-3 text-left text-sm font-bold uppercase tracking-wider">
+                <span className="inline-flex items-center gap-1.5">
                   <Hash size={14} className="shrink-0 text-slate-400" />
                   {t("table.s_no")}
                 </span>
@@ -446,8 +443,8 @@ export default function RecentCollectionsTable({
                   {t("table.collection_no")}
                 </span>
               </th>
-              <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">
-                <span className="inline-flex items-center justify-center gap-1.5">
+              <th className="px-4 py-3 text-left text-sm font-bold uppercase tracking-wider">
+                <span className="inline-flex items-center gap-1.5">
                   <Calendar size={14} className="shrink-0 text-blue-500" />
                   {t("table.date")}
                 </span>
@@ -510,8 +507,7 @@ export default function RecentCollectionsTable({
                 const isSelected = selectedId === col.id;
                 const isPending = rawStatus === "Pending Approval";
                 const isDeleted = rawStatus === "Deleted";
-                const statusKey = "status." + String(rawStatus).toLowerCase().replace(/\s+/g, "_");
-                const statusLabel = t(statusKey) === statusKey ? rawStatus : t(statusKey);
+                const statusLabel = collectionStatusLabel(rawStatus, t);
                 // Delete window, from the single source of truth shared with
                 // the view modal and the backend. Pending entries get the
                 // entry day only; approved entries get the full 10 days.
@@ -555,13 +551,13 @@ export default function RecentCollectionsTable({
                         : "hover:bg-slate-50/80"
                     }`}
                   >
-                    <td className="px-4 py-3 text-center text-xs font-semibold text-slate-500 tabular-nums">
+                    <td className="px-4 py-3 text-left text-xs font-semibold text-slate-500 tabular-nums">
                       {startIndex + index + 1}
                     </td>
                     <td className="px-4 py-3 text-xs font-semibold text-slate-800 truncate">
                       {col.collectionNo}
                     </td>
-                    <td className="px-4 py-3 text-center text-xs font-bold text-slate-600 tabular-nums whitespace-nowrap">
+                    <td className="px-4 py-3 text-left text-xs font-bold text-slate-600 tabular-nums whitespace-nowrap">
                       {localizeDate(col.collectionDate)}
                     </td>
                     <td className="px-4 py-3 text-xs font-semibold text-slate-700 truncate">{localize(col.shopName)}</td>

@@ -9,6 +9,7 @@ import { useI18n } from "../../../../../i18n";
 import AppShellModal from "../../../../../ui/AppShellModal";
 import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocalization";
 import { getDeleteWindowForStatus } from "../../utils/collectionDeleteWindow";
+import { collectionStatusKey, collectionStatusLabel } from "../../utils/collectionStatusLabel";
 import { exportCollectionPdf } from "../../utils/exportCollectionPdf";
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 import { notify as globalNotify } from "../../../../../ui/notifications/notificationStore";
@@ -154,7 +155,7 @@ export function EditCollectionModal({
     const q = creditSearch.trim().toLowerCase();
     if (!q) return true;
     const squashed = q.replace(/\s+/g, "");
-    const statusKey = "status." + String(col.status).toLowerCase().replace(/\s+/g, "_");
+    const statusKey = collectionStatusKey(col.status);
     const statusLabel = t(statusKey);
     const candidates = [
       col.collectionNo,
@@ -506,11 +507,7 @@ export function EditCollectionModal({
                     {selected?.status && (
                       <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-semibold text-slate-600">
                         <Activity size={12} className="text-orange-500" />
-                        {(() => {
-                          const k = "status." + String(selected.status).toLowerCase().replace(/\s+/g, "_");
-                          const label = t(k);
-                          return label === k ? selected.status : label;
-                        })()}
+                        {collectionStatusLabel(selected.status, t)}
                       </span>
                     )}
                     {/* The delete clock, stated plainly rather than hidden in a tooltip. */}
@@ -760,11 +757,7 @@ export function EditCollectionModal({
                               {tr(col.paymentMode) || "-"}
                             </td>
                             <td className="px-3 py-2.5 text-xs text-slate-600">
-                              {(() => {
-                                const k = "status." + String(col.status).toLowerCase().replace(/\s+/g, "_");
-                                const label = t(k);
-                                return label === k ? col.status || "-" : label;
-                              })()}
+                              {collectionStatusLabel(col.status, t) || "-"}
                             </td>
                           </tr>
                           );
