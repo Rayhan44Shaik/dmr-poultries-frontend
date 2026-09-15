@@ -8,7 +8,7 @@ import { collectionService } from "../../services/collectionService";
 import { useI18n } from "../../../../../i18n";
 import AppShellModal from "../../../../../ui/AppShellModal";
 import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocalization";
-import { getDeleteWindow } from "../../utils/collectionDeleteWindow";
+import { getDeleteWindowForStatus } from "../../utils/collectionDeleteWindow";
 import { exportCollectionPdf } from "../../utils/exportCollectionPdf";
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 import { notify as globalNotify } from "../../../../../ui/notifications/notificationStore";
@@ -196,7 +196,8 @@ export function EditCollectionModal({
    * Confirming starts a visible countdown instead of deleting straight away,
    * which gives an undo window for a destructive, balance-changing action.
    * ------------------------------------------------------------------ */
-  const deleteWindow = getDeleteWindow(formData.collectionDate);
+  const deleteWindow = getDeleteWindowForStatus(formData.collectionDate, selected?.status);
+  const isPendingEntry = String(selected?.status ?? "").toLowerCase().startsWith("pending");
   const canDelete = Boolean(selected) && deleteWindow.canDelete && selected?.status !== "Deleted";
 
   const [confirmingDelete, setConfirmingDelete] = useState(false);
@@ -259,11 +260,15 @@ export function EditCollectionModal({
 
   const deleteHint = !selected
     ? ""
-    : deleteWindow.canDelete
-      ? deleteWindow.daysRemaining === 0
-        ? t("ops.collection.delete_window_last_day")
-        : t("ops.collection.delete_window_open", { days: deleteWindow.daysRemaining })
-      : t("ops.collection.delete_window_closed");
+    : !deleteWindow.canDelete
+      ? isPendingEntry
+        ? t("ops.collection.delete_today_only")
+        : t("ops.collection.delete_window_closed")
+      : isPendingEntry
+        ? t("ops.collection.delete_window_today")
+        : deleteWindow.daysRemaining === 0
+          ? t("ops.collection.delete_window_last_day")
+          : t("ops.collection.delete_window_open", { days: deleteWindow.daysRemaining });
 
   if (!isOpen) return null;
 

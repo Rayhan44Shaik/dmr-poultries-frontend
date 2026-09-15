@@ -1017,7 +1017,7 @@ for (const date of OP_DATES) {
       createdBy: collector.employeeName,
       createdAt: ts(date, `1${between(r, 0, 9)}:${String(between(r, 0, 59)).padStart(2, "0")}:00`),
       updatedAt: ts(date, "21:00:00"),
-      canDelete: dayDiff(date, TODAY) <= 10,
+      canDelete: dayDiff(date, TODAY) <= (pendingApproval ? 0 : 10),
     });
   }
 }
@@ -4461,10 +4461,18 @@ const server = http.createServer(async (req, res) => {
         return send(200, { ...row, currentBalance });
       }
       if (method === "DELETE") {
-        // Same 10-day window as the pending endpoint. The entry date is the
-        // only clock that counts, and the backend stays authoritative.
-        if (dayDiff(row.collectionDate, TODAY) > 10) {
-          return send(409, { error: "delete_window_closed", message: "This collection is outside the 10-day deletion window." });
+        // The entry date is the only clock that counts, and the backend stays
+        // authoritative. Pending entries may be removed on their entry day
+        // only; approved entries get the full 10 days.
+        const isPendingRow = String(row.status || "").toLowerCase().startsWith("pending");
+        const windowDays = isPendingRow ? 0 : 10;
+        if (dayDiff(row.collectionDate, TODAY) > windowDays) {
+          return send(409, {
+            error: "delete_window_closed",
+            message: isPendingRow
+              ? "Pending collections can only be deleted on the day they were entered."
+              : "This collection is outside the 10-day deletion window.",
+          });
         }
         row.deleted = true;
         row.deletedBy = "web-user";

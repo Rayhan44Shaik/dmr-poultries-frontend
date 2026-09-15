@@ -11,8 +11,17 @@
  * button and explaining why — never the enforcement point.
  */
 
-/** Inclusive number of days after the entry date during which delete is allowed. */
+/**
+ * Inclusive number of days after the entry date during which delete is allowed.
+ *
+ * APPROVED entries get the full 10-day window. PENDING entries get the entry
+ * day ONLY: they are still awaiting a decision, so a same-day correction is
+ * reasonable but a silent removal days later is not.
+ */
 export const COLLECTION_DELETE_WINDOW_DAYS = 10;
+
+/** Pending entries may only be deleted on the day they were entered. */
+export const PENDING_DELETE_WINDOW_DAYS = 0;
 
 const MS_PER_DAY = 24 * 60 * 60 * 1000;
 
@@ -60,6 +69,8 @@ export interface DeleteWindowState {
 export function getDeleteWindow(
   entryDate: string | Date | null | undefined,
   now: Date = new Date(),
+  /** Window length in days. Defaults to the 10-day approved rule. */
+  windowDays: number = COLLECTION_DELETE_WINDOW_DAYS,
 ): DeleteWindowState {
   if (!entryDate) {
     return { canDelete: false, ageInDays: null, daysRemaining: 0, deadline: null };
@@ -71,13 +82,29 @@ export function getDeleteWindow(
 
   const from = startOfDayUtc(entryDate);
   const deadline =
-    from == null
-      ? null
-      : new Date(from + COLLECTION_DELETE_WINDOW_DAYS * MS_PER_DAY).toISOString().slice(0, 10);
+    from == null ? null : new Date(from + windowDays * MS_PER_DAY).toISOString().slice(0, 10);
 
   // Future-dated entries (ageInDays < 0) are still inside the window.
-  const canDelete = ageInDays <= COLLECTION_DELETE_WINDOW_DAYS;
-  const daysRemaining = Math.max(0, COLLECTION_DELETE_WINDOW_DAYS - Math.max(0, ageInDays));
+  const canDelete = ageInDays <= windowDays;
+  const daysRemaining = Math.max(0, windowDays - Math.max(0, ageInDays));
 
   return { canDelete, ageInDays, daysRemaining, deadline };
+}
+
+/**
+ * Window for one collection, chosen by its status.
+ *
+ * Pending → the entry day only. Approved → 10 days.
+ */
+export function getDeleteWindowForStatus(
+  entryDate: string | Date | null | undefined,
+  status: string | null | undefined,
+  now: Date = new Date(),
+): DeleteWindowState {
+  const isPending = String(status ?? "").toLowerCase().startsWith("pending");
+  return getDeleteWindow(
+    entryDate,
+    now,
+    isPending ? PENDING_DELETE_WINDOW_DAYS : COLLECTION_DELETE_WINDOW_DAYS,
+  );
 }

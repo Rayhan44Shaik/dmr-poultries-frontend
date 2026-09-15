@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import {
-  Search, X, History, CheckCircle, Clock, AlertCircle, Eye, Pencil, Trash2,
+  Search, X, History, CheckCircle, Clock, AlertCircle, Eye, Pencil, Trash2, Info,
   Hash, FileText, Calendar, Store, UserCog, IndianRupee, Activity, Settings2,
 } from "lucide-react";
 import TripPagination from "../../../vehicle-trips/components/TripPagination";
@@ -8,14 +8,15 @@ import type { RecentCollection } from "../../types/collection";
 import { useI18n } from "../../../../../i18n";
 import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocalization";
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
-import { getDeleteWindow } from "../../utils/collectionDeleteWindow";
+import { getDeleteWindowForStatus } from "../../utils/collectionDeleteWindow";
 
 interface Props {
   collections: RecentCollection[];
   /** True while the Recent Collections feed is refreshing. */
   isLoading?: boolean;
-  statusFilter: "Pending" | "Approved" | "Deleted";
-  onStatusChange: (status: "Pending" | "Approved" | "Deleted") => void;
+  /** Only these two are meaningful here; deleted entries live in the report. */
+  statusFilter: "Pending" | "Approved";
+  onStatusChange: (status: "Pending" | "Approved") => void;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   onEdit: (collection: RecentCollection) => void;
@@ -117,12 +118,14 @@ export default function RecentCollectionsTable({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collections, searchQuery, t, language]);
 
+  /** True while the user is actually searching. */
+  const isSearching = searchQuery.trim().length > 0;
+
   /** Row buckets per tab — computed once so the toggle can show live counts. */
   const buckets = useMemo(() => {
     const pending = filteredBySearch.filter((col) => col.rawStatus === "Pending Approval");
-    const deleted = filteredBySearch.filter((col) => col.rawStatus === "Deleted");
 
-    // Approved tab shows only the latest approved collection per shop.
+    // Approved tab collapses to the latest entry per shop.
     const shopMap = new Map<string, RecentCollection>();
     for (const col of filteredBySearch.filter((row) => row.rawStatus === "Approved")) {
       const existing = shopMap.get(col.shopName);
@@ -141,17 +144,27 @@ export default function RecentCollectionsTable({
     const sort = (rows: RecentCollection[]) =>
       [...rows].sort((a, b) => b.collectionDate.localeCompare(a.collectionDate));
 
-    // Approved shows the latest collection per shop, and only the 10 most
-    // recently-collected shops. The full approved history lives in the
-    // Collection Report; this panel is a "what just happened" view.
-    const latestPerShop = sort(Array.from(shopMap.values())).slice(0, APPROVED_SHOP_LIMIT);
+    const approvedByShop = sort(Array.from(shopMap.values()));
 
     return {
       Pending: sort(pending),
-      Approved: latestPerShop,
-      Deleted: sort(deleted),
+      // Idle, this is a "what just happened" panel: the latest entry for each
+      // of the 10 most recently collected shops. While SEARCHING the cap is
+      // lifted, so the box searches the whole approved history instead of
+      // only the ten rows that happen to be on screen — a search that can
+      // only find what you can already see is not a search.
+      Approved: isSearching ? approvedByShop : approvedByShop.slice(0, APPROVED_SHOP_LIMIT),
     };
-  }, [filteredBySearch]);
+  }, [filteredBySearch, isSearching]);
+
+  /** How many shops the Approved tab is holding back while idle. */
+  const approvedHiddenCount = useMemo(() => {
+    if (isSearching) return 0;
+    const shops = new Set(
+      collections.filter((col) => col.rawStatus === "Approved").map((col) => col.shopName),
+    );
+    return Math.max(0, shops.size - APPROVED_SHOP_LIMIT);
+  }, [collections, isSearching]);
 
   const displayedData = buckets[statusFilter];
 
@@ -272,8 +285,6 @@ export default function RecentCollectionsTable({
         return t("empty.no_pending");
       case "Approved":
         return t("ops.collection.no_approved");
-      case "Deleted":
-        return t("ops.collection.no_deleted");
       default:
         return t("empty.no_collections");
     }
@@ -300,15 +311,13 @@ export default function RecentCollectionsTable({
           </span>
 
           <div className="flex items-center p-0.5 ml-2 border border-slate-200/80 rounded-lg overflow-hidden bg-slate-50 shadow-sm">
-            {(["Pending", "Approved", "Deleted"] as const).map((tab) => {
+            {(["Pending", "Approved"] as const).map((tab) => {
               const isActive = statusFilter === tab;
               // Colours match the meaning of each tab and the row/badge tints.
               const activeClass =
                 tab === "Approved"
                   ? "bg-emerald-50/80 text-emerald-500 shadow-sm"
-                  : tab === "Pending"
-                  ? "bg-orange-50/80 text-orange-500 shadow-sm"
-                  : "bg-rose-50/80 text-rose-500 shadow-sm";
+                  : "bg-orange-50/80 text-orange-500 shadow-sm";
               const key = `status.${tab.toLowerCase()}`;
               const label = t(key) === key ? tab : t(key);
               return (
@@ -354,6 +363,33 @@ export default function RecentCollectionsTable({
           </div>
         </div>
       </div>
+
+      {/* A quiet caption answering "why is this list short?" — the Approved
+        * tab deliberately shows only the 10 most recent shops, and the search
+        * box deliberately reaches past them into the full history. Saying so
+        * is cheaper than letting someone conclude their data is missing. */}
+      {statusFilter === "Approved" && !isLoading && (
+        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-6 py-2">
+          <Info size={13} className="shrink-0 text-slate-400" />
+          {isSearching ? (
+            <p className="text-xs font-medium text-slate-500">
+              {t("ops.collection.searching_all")}
+              <span className="ml-1.5 font-semibold text-slate-700">
+                {t("ops.collection.search_results", { count: displayedData.length })}
+              </span>
+            </p>
+          ) : (
+            <p className="text-xs font-medium text-slate-500">
+              {t("ops.collection.approved_cap_note")}
+              {approvedHiddenCount > 0 && (
+                <span className="ml-1.5 rounded-full bg-slate-200/70 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-slate-600">
+                  +{approvedHiddenCount}
+                </span>
+              )}
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Table — column sizing and type scale match Recent Trip Activity. */}
       <div className="overflow-x-auto">
@@ -469,15 +505,20 @@ export default function RecentCollectionsTable({
                 const isDeleted = rawStatus === "Deleted";
                 const statusKey = "status." + String(rawStatus).toLowerCase().replace(/\s+/g, "_");
                 const statusLabel = t(statusKey) === statusKey ? rawStatus : t(statusKey);
-                // The 10-day delete window, from the same single source of
-                // truth the view modal and the backend use.
-                const deleteWindow = getDeleteWindow(col.collectionDate);
+                // Delete window, from the single source of truth shared with
+                // the view modal and the backend. Pending entries get the
+                // entry day only; approved entries get the full 10 days.
+                const deleteWindow = getDeleteWindowForStatus(col.collectionDate, rawStatus);
                 const canDeleteRow = deleteWindow.canDelete && !isDeleted;
-                const deleteHint = deleteWindow.canDelete
-                  ? deleteWindow.daysRemaining === 0
-                    ? t("ops.collection.delete_window_last_day")
-                    : t("ops.collection.delete_window_open", { days: deleteWindow.daysRemaining })
-                  : t("ops.collection.delete_window_closed");
+                const deleteHint = !deleteWindow.canDelete
+                  ? isPending
+                    ? t("ops.collection.delete_today_only")
+                    : t("ops.collection.delete_window_closed")
+                  : isPending
+                    ? t("ops.collection.delete_window_today")
+                    : deleteWindow.daysRemaining === 0
+                      ? t("ops.collection.delete_window_last_day")
+                      : t("ops.collection.delete_window_open", { days: deleteWindow.daysRemaining });
                 const statusIcon = isDeleted ? (
                   <AlertCircle size={12} />
                 ) : isPending ? (
