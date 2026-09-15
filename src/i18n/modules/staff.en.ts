@@ -15,6 +15,7 @@ export default {
   'staff.perf.filter.all_drivers': 'All Drivers',
   'staff.perf.filter.all_supervisors': 'All Supervisors',
   'staff.perf.filter.search_label': 'Search',
+  'staff.perf.filter.search_live': 'searches as you type',
   'staff.perf.filter.search_driver': 'Search driver name…',
   'staff.perf.filter.search_supervisor': 'Search supervisor name…',
   'staff.perf.filter.search_action': 'Search',

@@ -19,7 +19,7 @@
 //     deterministic presentation scorer in `utils/performanceGrading`.
 // ============================================================================
 
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   Gauge,
@@ -88,6 +88,9 @@ import {
   uiTableThClass,
 } from "../../../shared/ui/uiTokens";
 
+/** Typing pause before the search reaches the API (Leave page parity). */
+const SEARCH_DEBOUNCE_MS = 300;
+
 const ITEMS_PER_PAGE = 10;
 
 const DriverPerformancePage = () => {
@@ -108,57 +111,80 @@ const DriverPerformancePage = () => {
     search: applied.search,
   }));
 
-  // Re-seed the draft + reset pagination when the applied set changes
-  // (Search / Clear). Done with the render-phase adjustment pattern (the
-  // official alternative to setState-in-effect): `applied` identity changes
-  // exactly once per apply/clear, never while typing.
+  /* Reset to page 1 whenever a new query is applied (a filter change is a new
+     list). Detected with the render-phase adjustment pattern — the official
+     alternative to setState-in-effect. The draft is NOT re-seeded from the
+     applied set: it is what we just sent, and copying it back would overwrite
+     characters typed while the request was in flight. */
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(ITEMS_PER_PAGE);
   const [lastApplied, setLastApplied] = useState(applied);
   if (lastApplied !== applied) {
     setLastApplied(applied);
-    setDraft({
-      fromDate: applied.fromDate,
-      toDate: applied.toDate,
-      personId: applied.personId,
-      search: applied.search,
-    });
     setCurrentPage(1);
   }
 
-  const updateDraft = useCallback((patch: Partial<PerformanceDraftFilters>) => {
-    setDraft((current) => {
-      const next = { ...current, ...patch };
-      // Keep the draft range ordered while editing (the hook re-validates on
-      // apply as well).
+  /** Always the freshest draft — the debounce below reads it without re-running. */
+  const draftRef = useRef(draft);
+
+  const runQuery = useCallback(
+    (next: PerformanceDraftFilters) => {
+      perf.applyFilters({
+        fromDate: next.fromDate,
+        toDate: next.toDate,
+        personId: next.personId,
+        search: next.search,
+      });
+    },
+    [perf],
+  );
+
+  /**
+   * Filters apply the moment they change — there is no Search button.
+   * A date or a driver is a discrete choice, so it goes to the API at once;
+   * typing waits out the same 300 ms pause the Leave page uses (one request
+   * per typing burst, never one per character). `applyFilters` ignores an
+   * identical set, so an immediate apply plus the trailing debounce cannot
+   * duplicate a request.
+   */
+  const updateDraft = useCallback(
+    (patch: Partial<PerformanceDraftFilters>) => {
+      const next = { ...draftRef.current, ...patch };
+      // Keep the range ordered while editing (the hook re-validates too).
       if (next.fromDate && next.toDate && next.fromDate > next.toDate) {
         if (patch.fromDate) next.toDate = next.fromDate;
         else next.fromDate = next.toDate;
       }
-      return next;
-    });
-  }, []);
+      draftRef.current = next;
+      setDraft(next);
+      if (!("search" in patch)) runQuery(next);
+    },
+    [runQuery],
+  );
 
+  // Typing: apply once the user pauses.
+  useEffect(() => {
+    const timer = window.setTimeout(() => runQuery(draftRef.current), SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [draft.search, runQuery]);
+
+  /** Enter commits immediately (the trailing debounce then finds nothing to do). */
   const handleApply = useCallback(() => {
-    perf.applyFilters({
-      fromDate: draft.fromDate,
-      toDate: draft.toDate,
-      personId: draft.personId,
-      search: draft.search,
-    });
-  }, [perf, draft]);
+    runQuery(draftRef.current);
+  }, [runQuery]);
 
   const handleClear = useCallback(() => {
     perf.clearFilters();
-    /* Reset clears the *draft* too, not just the applied query: a driver picked
-       in the dropdown but never searched would otherwise stay on screen after
-       Reset (the hook's early-return path changes nothing to re-seed from). */
-    setDraft({
+    /* Reset restores the draft as well, so a driver picked but not yet applied
+       does not survive it. */
+    const restored: PerformanceDraftFilters = {
       fromDate: perf.defaultFilters.fromDate,
       toDate: perf.defaultFilters.toDate,
       personId: perf.defaultFilters.personId,
       search: perf.defaultFilters.search,
-    });
+    };
+    draftRef.current = restored;
+    setDraft(restored);
   }, [perf]);
 
   const handleRefresh = useCallback(() => {
@@ -752,8 +778,9 @@ const DriverPerformancePage = () => {
         {selectedEntry && detailQuery.loading && (
           <div className="space-y-3" aria-busy="true">
             <p className="sr-only">{drawerT("staff.perf.drawer.detail_loading")}</p>
-            <div className="h-16 animate-pulse rounded-xl bg-slate-100" />
-            <div className="h-40 animate-pulse rounded-xl bg-slate-100" />
+            {/* Static blocks: the drawer shows its shape without pulsing. */}
+            <div className="h-16 rounded-xl bg-slate-100" />
+            <div className="h-40 rounded-xl bg-slate-100" />
           </div>
         )}
         {selectedEntry && detailQuery.error && !personDetail && (

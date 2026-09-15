@@ -47,6 +47,12 @@ interface MasterDropdownProps {
   required?: boolean;
   error?: string;
   hideLabel?: boolean;
+  /**
+   * Id for the trigger button so an external <label htmlFor> can name it —
+   * this is what makes clicking the filter name open the dropdown. Defaults to
+   * a generated id.
+   */
+  triggerId?: string;
   labelStyle?: "filter" | "field";
   className?: string;
   /**
@@ -81,6 +87,7 @@ export default function MasterDropdown({
   required = false,
   error,
   hideLabel = false,
+  triggerId,
   labelStyle = "filter",
   className = "",
   triggerClassName = "",
@@ -88,7 +95,8 @@ export default function MasterDropdown({
   portal = true,
 }: MasterDropdownProps) {
   const { t } = useI18n();
-  const id = useId();
+  const autoId = useId();
+  const id = triggerId ?? autoId;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(-1);

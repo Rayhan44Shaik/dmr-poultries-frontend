@@ -15,6 +15,7 @@ export default {
   'staff.perf.filter.all_drivers': 'అందరు డ్రైవర్లు',
   'staff.perf.filter.all_supervisors': 'అందరు సూపర్వైజర్లు',
   'staff.perf.filter.search_label': 'వెతకండి',
+  'staff.perf.filter.search_live': 'టైప్ చేసిన వెంటనే వెతుకుతుంది',
   'staff.perf.filter.search_driver': 'డ్రైవర్ పేరు వెతకండి…',
   'staff.perf.filter.search_supervisor': 'సూపర్వైజర్ పేరు వెతకండి…',
   'staff.perf.filter.search_action': 'వెతకండి',

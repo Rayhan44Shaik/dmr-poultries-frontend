@@ -12,7 +12,6 @@
 // ============================================================================
 
 import { memo, type ReactNode } from "react";
-import { uiSkeletonClass } from "../../../../shared/ui/uiTokens";
 
 export interface PerformanceKpi {
   /** Already-translated label. */
@@ -53,8 +52,10 @@ function PerformanceKpiCardsImpl({
               )}
               <span className="truncate">{kpi.label}</span>
             </div>
+            {/* Missing value → a static block: the tile never pulses, and the row
+                keeps its height while the numbers arrive. */}
             {kpi.value == null ? (
-              <div className={`mt-1.5 h-7 w-24 ${uiSkeletonClass}`} aria-hidden="true" />
+              <div className="mt-1.5 h-7 w-24 rounded-md bg-slate-100" aria-hidden="true" />
             ) : (
               <div className="mt-1.5 truncate text-[22px] font-bold leading-7 tabular-nums text-slate-900">
                 {kpi.value}

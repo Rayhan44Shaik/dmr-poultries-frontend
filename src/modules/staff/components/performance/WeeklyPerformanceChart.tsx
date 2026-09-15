@@ -40,7 +40,6 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { uiSkeletonClass } from "../../../../shared/ui/uiTokens";
 
 export interface WeeklyChartSeries {
   key: string;
@@ -459,7 +458,8 @@ function WeeklyPerformanceChartImpl({
   if (loading) {
     return (
       <div className={`w-full ${variant === "panels" ? "h-56" : heightClass}`} role="status" aria-busy="true">
-        <div className={`h-full w-full ${uiSkeletonClass}`} />
+        {/* Calm placeholder while the week loads — no pulse, no layout jump. */}
+        <div className="h-full w-full rounded-md bg-slate-100" />
         <span className="sr-only">{emptyText}</span>
       </div>
     );

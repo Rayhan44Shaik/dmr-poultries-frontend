@@ -14,7 +14,7 @@ import { useDutyPlannerText } from '../hooks/useDutyPlannerText';
 import { dutyDisplayValue, dutyLocale, localizeDutyError } from '../i18n/dutyPlannerCopy';
 import '../styles/dutyPlanner.css';
 import { dutyDisplayName, filterDutyEmployees, formatDutyDate, getDutyRangeError, todayStr, type DutyReportData, type DutyReportRange } from '../services/dutyReport';
-import { CheckCircle2, AlertCircle, LoaderCircle, RefreshCw, LockKeyhole, ChevronDown } from 'lucide-react';
+import { CheckCircle2, AlertCircle, RefreshCw, LockKeyhole, ChevronDown } from 'lucide-react';
 import type { DutyPlannerFilters as DutyPlannerFiltersType, DutyAssignment } from '../types/staffDashboard';
 
 /* Default Period state — shared by the initial mount and by Reset so the two
@@ -362,9 +362,9 @@ function DutyPlannerPage() {
               <RefreshCw size={12} />{t('retry')}
             </button>
           </div>
-        ) : !reportData ? (
-          <p role="status" className="flex items-center gap-1.5 text-xs text-slate-500"><LoaderCircle size={13} className="animate-spin" />{t('loading')}</p>
-        ) : tableEmployees.length === 0 ? (
+        ) : tableEmployees.length === 0 && reportData ? (
+          /* While the range is still loading there is nothing to report here —
+             the table's own card shows the wait (TableLoading). */
           <p role="status" className="text-xs text-amber-700">{t('noEmployees')} {t('changeFilters')}</p>
         ) : null}
       />
