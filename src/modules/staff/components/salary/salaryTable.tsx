@@ -200,9 +200,9 @@ export function SalaryTable({
                   </td>
                   )}
                   <td className="px-3 py-2.5 min-w-0">
-                    <div className="truncate text-sm font-semibold text-slate-800" title={record.employeeName}>{record.employeeName}</div>
+                    <div className="truncate text-sm font-semibold text-slate-800">{record.employeeName}</div>
                     {record.department ? (
-                      <div className="truncate text-[11px] text-slate-500 mt-0.5" title={record.department}>{record.department}</div>
+                      <div className="truncate text-[11px] text-slate-500 mt-0.5">{record.department}</div>
                     ) : null}
                   </td>
                   <td className="px-3 py-2.5 text-right text-sm tabular-nums text-slate-700 whitespace-nowrap">{record.workingDays ?? "—"}</td>
@@ -227,8 +227,7 @@ export function SalaryTable({
                       <div className="flex items-center justify-center gap-1.5">
                         <button
                           type="button"
-                          title={`View payslip for ${record.employeeName}`}
-                          aria-label={`View payslip for ${record.employeeName}`}
+                                          aria-label={`View payslip for ${record.employeeName}`}
                           onClick={() => onView(record)}
                           className="inline-flex h-7 items-center justify-center rounded-lg border border-slate-200 bg-white px-1.5 text-slate-500 transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-700 disabled:opacity-40"
                         >
@@ -237,8 +236,7 @@ export function SalaryTable({
                         {onEmail && (
                           <button
                             type="button"
-                            title={`Email payslip to ${record.employeeName}${(record.emailsSent ?? 0) > 0 ? ` (${record.emailsSent} already sent)` : ""}`}
-                            aria-label={`Email payslip to ${record.employeeName}`}
+                                            aria-label={`Email payslip to ${record.employeeName}`}
                             onClick={() => onEmail(record)}
                             disabled={saving}
                             className="inline-flex h-7 items-center gap-1 rounded-lg border border-slate-200 bg-white px-1.5 text-slate-500 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 disabled:opacity-40"
@@ -250,8 +248,7 @@ export function SalaryTable({
                         {onWhatsApp && (
                           <button
                             type="button"
-                            title={`WhatsApp payslip to ${record.employeeName}${(record.whatsappsSent ?? 0) > 0 ? ` (${record.whatsappsSent} already sent)` : ""}`}
-                            aria-label={`WhatsApp payslip to ${record.employeeName}`}
+                                            aria-label={`WhatsApp payslip to ${record.employeeName}`}
                             onClick={() => onWhatsApp(record)}
                             disabled={saving}
                             className="inline-flex h-7 items-center gap-1 rounded-lg bg-[#25D366]/15 px-1.5 text-[#1DA851] transition hover:bg-[#25D366] hover:text-white disabled:opacity-40"

@@ -47,7 +47,6 @@ import { Calendar, CalendarCheck, RotateCcw, Search, UserRound } from "lucide-re
 import MasterDropdown from "../../../masters/components/MasterDropdown";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import { BrandRefreshButton } from "../../../../ui";
-import { ActionTooltip } from "../../../../ui/ActionTooltip";
 import { useI18n } from "../../../../i18n";
 import {
   uiCardClass,
@@ -264,7 +263,6 @@ function PerformanceFilterBarImpl({
           >
             <AnimatedSearchIcon />
             {t("staff.perf.filter.search_action")}
-            <ActionTooltip label={t("staff.perf.filter.search_action")} />
           </button>
 
           {/* Reset carries the same word as the Leave page's reset button,
@@ -277,7 +275,6 @@ function PerformanceFilterBarImpl({
           >
             <AnimatedResetIcon />
             {t("common.reset")}
-            <ActionTooltip label={t("staff.perf.filter.clear_action")} />
           </button>
 
           {/* The hen pill: identical to the Trip List, so "reload this page"

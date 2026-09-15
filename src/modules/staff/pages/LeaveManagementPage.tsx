@@ -17,6 +17,7 @@ import LeaveTableHeader from '../components/leave/LeaveTableHeader';
 import LeaveHistoryModal from '../components/leave/LeaveHistoryModal';
 import LeaveRejectDialog from '../components/leave/LeaveRejectDialog';
 import Pagination from '../components/common/Pagination';
+import TableLoading from '../components/common/TableLoading';
 import type { LeaveRequest } from '../types/staffDashboard';
 import type { LeaveFilters as LeaveFilterState } from '../hooks/useLeaveManagement';
 import { personNameLabel } from '../utils/leaveDisplay';
@@ -272,8 +273,11 @@ function LeaveManagementPage() {
       )}
 
       {initialLoading ? (
-        <div className="flex items-center justify-center h-32">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600" />
+        /* The loading state lives inside the table card (same as Shop Sales),
+           so the tab bar and the filters stay put while the list arrives. */
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <LeaveTableHeader status={filters.status} onStatusChange={onStatusChange} count={total} />
+          <TableLoading label={t('staff.table.loading.leave')} />
         </div>
       ) : (
         <div

@@ -159,7 +159,6 @@ export function EmailPayslipsModal({
               onClick={() => void handleDownloadAll()}
               disabled={downloading || records.length === 0}
               loading={downloading}
-              title="Download the A4 payslip PDFs to attach and send from any email app"
               icon={<Download size={14} />}
             >
               {downloading ? "Preparing…" : "Download PDFs"}

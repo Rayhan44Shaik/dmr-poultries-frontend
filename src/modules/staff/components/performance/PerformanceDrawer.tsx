@@ -224,7 +224,6 @@ export function PerformanceDrawer({
                 disabled={!canPrev}
                 className={navButtonClass}
                 aria-label={navigation.prevLabel}
-                title={navigation.prevLabel}
               >
                 <ChevronLeft aria-hidden="true" />
               </button>
@@ -240,7 +239,6 @@ export function PerformanceDrawer({
                 disabled={!canNext}
                 className={navButtonClass}
                 aria-label={navigation.nextLabel}
-                title={navigation.nextLabel}
               >
                 <ChevronRight aria-hidden="true" />
               </button>
@@ -251,7 +249,6 @@ export function PerformanceDrawer({
             onClick={onClose}
             className={uiDialogCloseClass}
             aria-label={labels.close}
-            title={labels.close}
           >
             <X aria-hidden="true" />
           </button>
@@ -278,7 +275,7 @@ export function PerformanceDrawer({
                 <dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
                   {metric.label}
                 </dt>
-                <dd className="mt-0.5 truncate text-sm font-bold tabular-nums text-slate-900" title={metric.value}>
+                <dd className="mt-0.5 truncate text-sm font-bold tabular-nums text-slate-900">
                   {metric.value}
                 </dd>
               </div>

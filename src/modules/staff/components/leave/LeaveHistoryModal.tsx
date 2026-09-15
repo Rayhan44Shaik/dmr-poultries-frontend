@@ -21,7 +21,6 @@ import {
   personNameLabel,
   type LeaveTranslator,
 } from '../../utils/leaveDisplay';
-import { ActionTooltip } from '../../../../ui/ActionTooltip';
 import { uiActionIconMotionClass } from '../../../../shared/ui/uiTokens';
 import MasterDropdown from '../../../masters/components/MasterDropdown';
 
@@ -287,7 +286,6 @@ function LeaveHistoryModal({ leave, leaves, onClose }: LeaveHistoryModalProps) {
               <X size={14} />
             </span>
             {t('common.close')}
-            <ActionTooltip label={t('common.close')} />
           </button>
         </div>
       </div>

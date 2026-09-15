@@ -261,7 +261,6 @@ export function SalaryReviewModal({
                 variant="secondary"
                 onClick={() => setEditing(true)}
                 disabled={!canEdit}
-                title={canEdit ? "Edit this payslip" : "Locked — only Pending records can be edited"}
                 icon={canEdit ? <Pencil size={13} /> : <Lock size={13} />}
               >
                 {canEdit ? "Edit" : "Locked"}
@@ -428,7 +427,6 @@ export function SalaryReviewModal({
                                   ? "font-bold text-emerald-700"
                                   : "font-medium text-slate-700"
                               }`}
-                              title={r.employeeName}
                             >
                               {r.employeeName}
                             </span>
@@ -439,7 +437,6 @@ export function SalaryReviewModal({
 
                           <span className="flex shrink-0 items-center gap-0.5">
                             <span
-                              title={`${emailsSent} email${emailsSent === 1 ? "" : "s"} sent`}
                               className={`inline-flex items-center gap-0.5 rounded px-1 text-[10px] font-semibold tabular-nums ${
                                 emailsSent > 0 ? "text-emerald-600" : "text-slate-300"
                               }`}
@@ -448,7 +445,6 @@ export function SalaryReviewModal({
                               {emailsSent}
                             </span>
                             <span
-                              title={`${whatsappsSent} WhatsApp${whatsappsSent === 1 ? "" : "s"} sent`}
                               className={`inline-flex items-center gap-0.5 rounded px-1 text-[10px] font-semibold tabular-nums ${
                                 whatsappsSent > 0 ? "text-[#25D366]" : "text-slate-300"
                               }`}

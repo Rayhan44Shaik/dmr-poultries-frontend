@@ -1,6 +1,6 @@
 import { memo } from 'react';
 import { AlertCircle, CheckCircle2, Wand2 } from 'lucide-react';
-import { dutyDisplayName, formatDutyDate, formatDutyWeekday } from '../../services/dutyReport';
+import { dutyDisplayName, formatDutyWeekday } from '../../services/dutyReport';
 import { useDutyPlannerText } from '../../hooks/useDutyPlannerText';
 import { dutyDisplayValue } from '../../i18n/dutyPlannerCopy';
 import type { PendingDutyEmployee } from '../../hooks/useDutyPlanner';
@@ -69,7 +69,7 @@ function PendingDutiesPanel({ pending, unassignedCount, canEdit, saving = false,
                       {dutyDisplayValue(row.role, language)}{row.department ? ` · ${dutyDisplayValue(row.department, language)}` : ''}
                     </p>
                   </div>
-                  <span title={t('missingDays')} className="inline-flex h-5 shrink-0 items-center justify-center rounded-full bg-amber-100 px-1.5 text-[10px] font-bold tabular-nums text-amber-700">{row.missingDays.length}</span>
+                  <span className="inline-flex h-5 shrink-0 items-center justify-center rounded-full bg-amber-100 px-1.5 text-[10px] font-bold tabular-nums text-amber-700">{row.missingDays.length}</span>
                 </div>
                 <div role="group" aria-label={t('missingDays')} className="flex flex-wrap items-center gap-1.5">
                   {row.missingDays.map((date) => (
@@ -78,8 +78,7 @@ function PendingDutiesPanel({ pending, unassignedCount, canEdit, saving = false,
                       type="button"
                       onClick={() => onPickCell(row.employeeId, date)}
                       disabled={!canEdit}
-                      title={canEdit ? `${t('pendingPick')} · ${formatDutyDate(date, language)}` : t('readOnly')}
-                      className="inline-flex h-6 items-center rounded-md border border-amber-200 bg-white px-1.5 text-[10.5px] font-semibold text-amber-800 transition hover:border-amber-300 hover:bg-amber-100 focus-visible:ring-2 focus-visible:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
+                          className="inline-flex h-6 items-center rounded-md border border-amber-200 bg-white px-1.5 text-[10.5px] font-semibold text-amber-800 transition hover:border-amber-300 hover:bg-amber-100 focus-visible:ring-2 focus-visible:ring-amber-300 disabled:cursor-not-allowed disabled:opacity-60"
                     >
                       {formatDutyWeekday(date, language)} {date.slice(-2)}
                     </button>

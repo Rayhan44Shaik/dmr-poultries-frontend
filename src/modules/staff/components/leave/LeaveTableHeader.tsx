@@ -1,7 +1,6 @@
 import { memo } from 'react';
 import { CalendarOff, MousePointerClick } from 'lucide-react';
 import { useI18n } from '../../../../i18n';
-import { leaveStatusLabel } from '../../utils/leaveDisplay';
 import type { LeaveFilters } from '../../hooks/useLeaveManagement';
 
 type LeaveStatusTab = 'All' | 'Pending' | 'Approved' | 'Rejected';
@@ -59,7 +58,6 @@ function LeaveTableHeader({ status, onStatusChange, count }: Props) {
         {/* Selected-status count beside the title (updates with the toggle). */}
         <span
           className="inline-flex items-center justify-center rounded-full border border-slate-200/80 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-slate-600 shadow-sm"
-          title={status === 'All' ? t('common.all') : leaveStatusLabel(t, status)}
         >
           {count}
         </span>

@@ -8,6 +8,7 @@ import DutyPlannerGrid from '../components/duty-planner/DutyPlannerGrid';
 import DutyPlannerReportTable from '../components/duty-planner/DutyPlannerReportTable';
 import DutyTableHeader from '../components/duty-planner/DutyTableHeader';
 import PendingDutiesPanel from '../components/duty-planner/PendingDutiesPanel';
+import TableLoading from '../components/common/TableLoading';
 import ShiftPicker from '../components/duty-planner/ShiftPicker';
 import { useDutyPlannerText } from '../hooks/useDutyPlannerText';
 import { dutyDisplayValue, dutyLocale, localizeDutyError } from '../i18n/dutyPlannerCopy';
@@ -319,7 +320,6 @@ function DutyPlannerPage() {
         view={view}
         onViewChange={setView}
         periodLabel={view === 'month' ? monthLabel : formatWeekRange(filters.weekStart, true)}
-        periodTitle={view === 'month' ? monthLabel : formatWeekRange(filters.weekStart)}
         onPreviousPeriod={view === 'month' ? prevMonth : () => moveWeek(-1)}
         onNextPeriod={view === 'month' ? nextMonth : () => moveWeek(1)}
         onCurrentPeriod={view === 'week' ? resetFilters : undefined}
@@ -329,7 +329,6 @@ function DutyPlannerPage() {
           <>
             {view === 'week' && (
               <span
-                title={`${statusLabel}${!canEditWeek ? ` (${t('readOnly')})` : ''}`}
                 className={`inline-flex h-5 items-center whitespace-nowrap rounded-full border px-2 text-[10px] font-semibold ${statusClasses}`}
               >
                 {gatedByPrevWeek ? t('locked') : statusLabel}
@@ -337,7 +336,6 @@ function DutyPlannerPage() {
             )}
             {usingSampleData && (
               <span
-                title={t('sampleHint')}
                 className="inline-flex h-5 items-center whitespace-nowrap rounded-full border border-amber-200 bg-amber-50 px-2 text-[10px] font-semibold text-amber-700"
               >
                 {t('sample')}
@@ -406,8 +404,14 @@ function DutyPlannerPage() {
           <DutyPlannerReportTable data={reportData} employees={tableEmployees} asOf={today} dates={visibleTableDates} />
         </div>
       ) : (
-        <div className="rounded-xl border border-slate-200/90 bg-white p-12 text-center text-sm text-slate-500">
-          {rangeError ? t('chooseRange') : reportError ? t('loadRetry') : t('loading')}
+        <div className="overflow-hidden rounded-xl border border-slate-200/90 bg-white">
+          {rangeError ? (
+            <p className="p-10 text-center text-sm text-slate-500">{t('chooseRange')}</p>
+          ) : reportError ? (
+            <p className="p-10 text-center text-sm text-slate-500">{t('loadRetry')}</p>
+          ) : (
+            <TableLoading label={t('loading')} />
+          )}
         </div>
       )}
 
@@ -417,13 +421,6 @@ function DutyPlannerPage() {
         <button
           onClick={handleSubmitWeek}
           disabled={!canEditWeek || loading || saving || automaticSaveError}
-          title={
-            !prevWeekClosed
-              ? t('closePrevious')
-              : unassignedCount > 0
-                ? t('assignAll', { count: unassignedCount })
-                : t('submit')
-          }
           className="h-10 px-4 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition flex items-center gap-2 shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
         >
           <CheckCircle2 size={15} />
@@ -436,7 +433,7 @@ function DutyPlannerPage() {
             onClick={() => setShowPending((value) => !value)}
             aria-expanded={showPending}
             aria-controls="duty-pending-panel"
-            title={unassignedCount > 0 ? t('assignAll', { count: unassignedCount }) : t('ready')}
+            aria-label={unassignedCount > 0 ? t('assignAll', { count: unassignedCount }) : t('ready')}
             className={`inline-flex h-7 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-semibold transition focus-visible:ring-2 focus-visible:ring-emerald-300 ${unassignedCount > 0
               ? 'border-amber-200 bg-amber-50 text-amber-700 hover:border-amber-300 hover:bg-amber-100'
               : 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:border-emerald-300 hover:bg-emerald-100'}`}

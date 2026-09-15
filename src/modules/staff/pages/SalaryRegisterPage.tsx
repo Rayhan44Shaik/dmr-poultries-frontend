@@ -35,6 +35,8 @@ import {
 import { Button, ConfirmDialog, EmptyState, SearchInput } from "../../../ui";
 import MasterDropdown from "../../masters/components/MasterDropdown";
 import { uiBadgeClass, uiFilterBarClass, type StatusTone } from "../../../shared/ui/uiTokens";
+import TableLoading from "../components/common/TableLoading";
+import { useI18n } from "../../../i18n";
 import { SalaryTable } from "../components/salary/salaryTable";
 import { SalaryView } from "../components/salary/SalaryView";
 import { SalaryReviewModal } from "../components/salary/SalaryReviewModal";
@@ -78,6 +80,7 @@ const MONTHS = [
 ];
 
 function SalaryRegisterPage() {
+  const { t } = useI18n();
   const { showNotification } = useSafeNotification();
 
   const getCurrentYearMonth = () => {
@@ -727,7 +730,6 @@ function SalaryRegisterPage() {
               iconOnly
               onClick={handleRefresh}
               disabled={refreshing || saving}
-              title="Refresh"
               aria-label="Refresh"
               icon={<RefreshCw size={16} className={refreshing ? "animate-spin" : ""} />}
             />
@@ -743,9 +745,9 @@ function SalaryRegisterPage() {
 
       {/* Table / states — data remains visible during refresh */}
       {loading ? (
-        <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500 flex flex-col items-center justify-center space-y-2">
-          <div className="w-5 h-5 border-2 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-          <span className="text-xs font-medium">Loading salary register for {formatMonthName(month)}...</span>
+        /* In-table loading, the same treatment as Shop Sales. */
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+          <TableLoading label={t('staff.table.loading.salary')} />
         </div>
       ) : !hasRecords ? (
         <div className="bg-white rounded-xl border border-slate-200">

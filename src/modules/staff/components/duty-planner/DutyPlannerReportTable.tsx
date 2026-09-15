@@ -56,7 +56,7 @@ export default function DutyPlannerReportTable({ data, employees, asOf, dates }:
                   const label = future ? t('future') : cell.isLeave ? t('approvedLeave') : getDutyLabel(cell.dutyType, language);
                   return (
                     <td key={cell.date} data-date={cell.date} data-empty={empty} className="px-1 py-1.5">
-                      <div title={`${dutyDisplayName(employee, language)} · ${cell.date} · ${label}${cell.automatic && !future ? ` · ${t('automaticHint')}` : ''}`} aria-label={`${dutyDisplayName(employee, language)} · ${cell.date} · ${label}`} className={`flex min-h-9 items-center justify-center rounded-md border px-2 py-1 text-center font-medium ${language === 'te' ? 'text-xs' : 'text-[11px]'} ${colors}`}>
+                      <div aria-label={`${dutyDisplayName(employee, language)} · ${cell.date} · ${label}`} className={`flex min-h-9 items-center justify-center rounded-md border px-2 py-1 text-center font-medium ${language === 'te' ? 'text-xs' : 'text-[11px]'} ${colors}`}>
                         {empty ? null : getDutyLabel(cell.dutyType, language)}
                       </div>
                     </td>

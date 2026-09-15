@@ -27,7 +27,6 @@ import {
 } from '../../../../shared/ui/uiTokens';
 import { Button } from '../../../../ui';
 import { BrandRefreshButton } from '../../../../ui';
-import { ActionTooltip } from '../../../../ui/ActionTooltip';
 import MasterDropdown from '../../../masters/components/MasterDropdown';
 import type { LeaveFilters as LeaveFilterState } from '../../hooks/useLeaveManagement';
 import { useI18n } from '../../../../i18n';
@@ -386,7 +385,6 @@ function LeaveFilters({
                 className="group absolute right-2.5 top-1/2 inline-flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus-visible:ring-2 focus-visible:ring-emerald-300"
               >
                 <X size={15} aria-hidden="true" />
-                <ActionTooltip label={`${t('common.clear')} — ${t('common.search')}`} />
               </button>
             )}
           </div>
@@ -416,7 +414,6 @@ function LeaveFilters({
                 })}
               >
                 <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]"><Eye /></span>
-                <ActionTooltip label={t('staff.leave.view_history')} />
               </button>
               {selected.status === 'Pending' && (
                 <>
@@ -429,7 +426,6 @@ function LeaveFilters({
                     })}
                   >
                     <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-approve)]"><CheckCircle /></span>
-                    <ActionTooltip label={t('common.approve')} />
                   </button>
                   <button
                     type="button"
@@ -440,7 +436,6 @@ function LeaveFilters({
                     })}
                   >
                     <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reject)]"><XCircle /></span>
-                    <ActionTooltip label={t('common.reject')} />
                   </button>
                   <button
                     type="button"
@@ -451,7 +446,6 @@ function LeaveFilters({
                     })}
                   >
                     <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-delete)]"><Trash2 /></span>
-                    <ActionTooltip label={t('common.delete')} />
                   </button>
                 </>
               )}
@@ -473,7 +467,6 @@ function LeaveFilters({
           >
             <span className="inline-flex group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>
             {t('common.reset')}
-            <ActionTooltip label={`${t('common.reset')} — ${t('common.filter')}`} />
           </button>
 
           <BrandRefreshButton loading={loading} onClick={onRefresh} size="lg" ariaLabel={t('staff.leave.refresh_aria')}>

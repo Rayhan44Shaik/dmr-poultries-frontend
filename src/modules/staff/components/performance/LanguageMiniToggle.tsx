@@ -50,8 +50,7 @@ export function LanguageMiniToggle({ className, language, onChange }: LanguageMi
             type="button"
             aria-pressed={activeOption}
             onClick={() => choose(option.code)}
-            title={option.code === "en" ? "English" : "తెలుగు"}
-            className={cn(
+              className={cn(
               "whitespace-nowrap rounded-md px-2 py-1 text-[11px] font-bold leading-none transition-colors",
               activeOption
                 ? "bg-white text-brand-700 shadow-sm"

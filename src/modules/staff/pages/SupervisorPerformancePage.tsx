@@ -72,7 +72,8 @@ import PerformanceDrawer from "../components/performance/PerformanceDrawer";
 import RecentTripsTable from "../components/performance/RecentTripsTable";
 import Pagination from "../components/common/Pagination";
 import RefreshToast from "../components/common/RefreshToast";
-import { EmptyState, TableSkeleton } from "../../../ui";
+import { EmptyState } from "../../../ui";
+import TableLoading from "../components/common/TableLoading";
 import { cn } from "../../../utils/cn";
 import {
   uiTableHeadClass,
@@ -572,9 +573,7 @@ const SupervisorPerformancePage = () => {
         </header>
 
         {showTableSkeleton ? (
-          <div className="p-4 sm:p-5">
-            <TableSkeleton rows={6} columns={6} label={t("common.loading")} />
-          </div>
+          <TableLoading label={t("staff.table.loading.supervisor_perf")} />
         ) : showNoMatch ? (
           <EmptyState
             variant="no-search"
@@ -679,7 +678,6 @@ const SupervisorPerformancePage = () => {
                         <td className={`${uiTableTdClass} text-center`}>
                           {grade == null ? (
                             <span
-                              title={t("staff.perf.grade.unranked")}
                               className="text-xs font-semibold text-slate-300"
                             >
                               —

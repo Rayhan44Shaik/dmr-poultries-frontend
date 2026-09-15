@@ -82,7 +82,6 @@ function Field({ label, value }: { label: string; value: ReactNode }) {
       <div
         className="mt-0.5 truncate font-bold tabular-nums"
         style={{ color: INK, fontSize: 14 }}
-        title={typeof value === "string" ? value : undefined}
       >
         {value}
       </div>

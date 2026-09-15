@@ -269,10 +269,7 @@ function LeaveTable({
                 <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-600">{leave.fromDate}</td>
                 <td className="whitespace-nowrap px-4 py-3 text-xs font-medium text-slate-600">{leave.toDate}</td>
                 <td className="px-4 py-3 text-center text-xs font-bold text-slate-700">{leave.days}</td>
-                <td
-                  className="max-w-[160px] truncate px-4 py-3 text-xs text-slate-500"
-                  title={leave.reason ? leaveReasonLabel(t, language, leave.reason) : undefined}
-                >
+                <td className="max-w-[160px] truncate px-4 py-3 text-xs text-slate-500">
                   {leave.reason ? leaveReasonLabel(t, language, leave.reason) : t('staff.leave.no_reason')}
                 </td>
                 <td className="px-4 py-3 text-center">
