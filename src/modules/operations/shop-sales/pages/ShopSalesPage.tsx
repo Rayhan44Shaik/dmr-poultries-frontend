@@ -12,6 +12,7 @@ import ShopSalesTable from "../components/ShopSalesTable";
 import ShopSalesPagination from "../components/ShopSalesPagination";
 import type { ShopSale } from "../types/shopSale";
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
+import { notifyTripDataChanged } from "../../../../shared/events/tripDataEvents";
 
 interface ShopSalesPageProps {
   initialTrip?: Trip | null;
@@ -89,6 +90,9 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
     async (updatedSale: ShopSale) => {
       try {
         await updateSale(updatedSale);
+        // The server has updated the source Trip delivery/totals too. Notify
+        // an already-mounted Trip List to refetch that same authoritative row.
+        notifyTripDataChanged({ tripId: updatedSale.tripId, source: "shop-sales" });
         showNotification("Sale updated successfully", "success");
         await refreshSales({ silent: true });
       } catch (error) {

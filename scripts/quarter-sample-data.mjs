@@ -133,6 +133,44 @@ const monthOf = (s) => s.slice(0, 7);
 const ts = (date, time) => `${date}T${time}`;
 const round = (n, p = 2) => Math.round(n * 10 ** p) / 10 ** p;
 
+/**
+ * The bird equation is invariant for every trip: pickup birds must equal the
+ * sum of delivered birds and mortality. Delivery allocation is generated with
+ * natural variation first, then any small rounding/allocation remainder is
+ * reconciled across the final delivery rows without ever making a count
+ * negative. This keeps the sample as strict as the Shop Sales edit guard.
+ */
+function reconcileDeliveryBirdBalance(deliveries, pickupBirds, averageBirdWeight) {
+  const mortality = deliveries.reduce((total, delivery) => total + Number(delivery.mortality || 0), 0);
+  const delivered = deliveries.reduce((total, delivery) => total + Number(delivery.birds || 0), 0);
+  let adjustment = Number(pickupBirds || 0) - delivered - mortality;
+  if (!adjustment || deliveries.length === 0) return;
+
+  const updateBirds = (delivery, nextBirds) => {
+    const previousBirds = Number(delivery.birds || 0);
+    const weightPerBird = previousBirds > 0
+      ? Number(delivery.weight || 0) / previousBirds
+      : Number(averageBirdWeight || 0);
+    delivery.birds = nextBirds;
+    delivery.weight = round(nextBirds * weightPerBird, 2);
+    delivery.amount = delivery.rate == null ? 0 : round(delivery.weight * Number(delivery.rate), 2);
+  };
+
+  if (adjustment > 0) {
+    const last = deliveries[deliveries.length - 1];
+    updateBirds(last, Number(last.birds || 0) + adjustment);
+    return;
+  }
+
+  for (let index = deliveries.length - 1; index >= 0 && adjustment < 0; index -= 1) {
+    const delivery = deliveries[index];
+    const removable = Math.min(Number(delivery.birds || 0), Math.abs(adjustment));
+    if (!removable) continue;
+    updateBirds(delivery, Number(delivery.birds || 0) - removable);
+    adjustment += removable;
+  }
+}
+
 /** Every calendar date in the quarter. */
 const DATES = [];
 for (let i = 0; i <= dayDiff(QUARTER.fromDate, QUARTER.toDate); i += 1) {
@@ -586,6 +624,7 @@ for (const date of OP_DATES) {
       }
     }
 
+    reconcileDeliveryBirdBalance(deliveries, totalBirds, avgWeight);
     const deliveredBirds = deliveries.reduce((a, d) => a + d.birds, 0);
     const deliveredWeight = round(deliveries.reduce((a, d) => a + d.weight, 0), 2);
     const mortalityCount = deliveries.reduce((a, d) => a + d.mortality, 0);
@@ -2519,6 +2558,53 @@ function materializeTripSales(trip) {
   for (const shopId of affectedShopIds) syncShopCurrentBalance(shopId);
 }
 
+/**
+ * The Shop Sales edit limit is calculated at request time from the entire
+ * source trip. It therefore cannot be bypassed by paging, filtering, a stale
+ * tab, or a crafted request: delivered birds plus all mortality must never be
+ * greater than the birds picked up for that trip.
+ */
+function shopSaleBirdCapacity(trip, saleId, proposedBirds, proposedMortality) {
+  const pickupBirds = Number(trip?.totalBirds);
+  if (!Number.isSafeInteger(pickupBirds) || pickupBirds < 0) return null;
+
+  const deliveries = Array.isArray(trip?.deliveries) ? trip.deliveries : [];
+  const otherDelivered = deliveries.reduce(
+    (total, delivery) =>
+      Number(delivery.id) === Number(saleId)
+        ? total
+        : total + Number(delivery.birds || 0),
+    0,
+  );
+  const mortality = deliveries.reduce(
+    (total, delivery) =>
+      total + (Number(delivery.id) === Number(saleId)
+        ? Number(proposedMortality ?? delivery.mortality ?? 0)
+        : Number(delivery.mortality || 0)),
+    0,
+  );
+  const maximumBirds = Math.max(0, pickupBirds - otherDelivered - mortality);
+  const nextBirds = proposedBirds == null ? null : Number(proposedBirds);
+  return {
+    pickupBirds,
+    otherDelivered,
+    mortality,
+    maximumBirds,
+    valid: nextBirds == null || (Number.isSafeInteger(nextBirds) && nextBirds >= 0 && nextBirds <= maximumBirds),
+  };
+}
+
+/** Public Shop Sales shape enriched with backend-authoritative edit limits. */
+function publicShopSale(sale) {
+  const trip = TRIP_BY_ID.get(Number(sale.tripId));
+  const capacity = shopSaleBirdCapacity(trip, sale.id);
+  return {
+    ...sale,
+    tripPickupBirds: capacity?.pickupBirds ?? null,
+    maxEditableBirds: capacity?.maximumBirds ?? null,
+  };
+}
+
 /** Keep the Accounts → Farmer Payments register in step with a completed trip. */
 function materializeFarmPayment(trip) {
   if (!trip?.id || FARM_PAYMENTS.some((payment) => payment.tripId === trip.id)) return;
@@ -3835,12 +3921,14 @@ const server = http.createServer(async (req, res) => {
             s.tripNo.toLowerCase().includes(search) ||
             (s.saleNo ?? "").toLowerCase().includes(search)
         );
-      return send(200, q.get("page") ? paginate(rows, q) : rows);
+      const publicRows = rows.map(publicShopSale);
+      return send(200, q.get("page") ? paginate(publicRows, q) : publicRows);
     }
     if (m(/^\/api\/operations\/shop-sales\/(\d+)$/)) {
       const id = Number(m(/^\/api\/operations\/shop-sales\/(\d+)$/)[1]);
       const sale = SHOP_SALES.find((row) => row.id === id && row.deleted !== true);
       if (!sale) return send(404, { error: "shop_sale_not_found" });
+      const trip = TRIP_BY_ID.get(Number(sale.tripId));
       if (method === "PUT" || method === "PATCH") {
         const body = await readBody(req);
         // Rate, value and owner are locked by Rate Entry. The frontend sends
@@ -3853,11 +3941,26 @@ const server = http.createServer(async (req, res) => {
         if (!sale.editable) {
           return send(409, { error: "correction_window_closed", message: sale.lockReason || "Editing period has expired." });
         }
+        const nextBirds = body.birds != null ? Number(body.birds) : Number(sale.birds);
+        const nextMortality = body.mortality != null ? Number(body.mortality) : Number(sale.mortality);
+        if (!Number.isSafeInteger(nextBirds) || nextBirds < 0) {
+          return send(422, { error: "invalid_birds", message: "Birds must be a whole, non-negative number." });
+        }
+        if (!Number.isSafeInteger(nextMortality) || nextMortality < 0) {
+          return send(422, { error: "invalid_mortality", message: "Mortality must be a whole, non-negative number." });
+        }
+        const birdCapacity = shopSaleBirdCapacity(trip, sale.id, nextBirds, nextMortality);
+        if (birdCapacity && !birdCapacity.valid) {
+          return send(422, {
+            error: "trip_bird_limit_exceeded",
+            message: `Birds cannot exceed ${birdCapacity.maximumBirds} for this shop. Delivered birds plus mortality cannot exceed the ${birdCapacity.pickupBirds} birds picked up for this trip.`,
+            tripPickupBirds: birdCapacity.pickupBirds,
+            maxEditableBirds: birdCapacity.maximumBirds,
+          });
+        }
         if (body.birds != null) {
-          const birds = Number(body.birds);
-          if (!Number.isFinite(birds) || birds < 0) return send(422, { error: "invalid_birds" });
-          sale.birds = birds;
-          sale.totalBirds = birds;
+          sale.birds = nextBirds;
+          sale.totalBirds = nextBirds;
         }
         if (body.weight != null) {
           const weight = Number(body.weight);
@@ -3866,9 +3969,7 @@ const server = http.createServer(async (req, res) => {
           sale.totalWeight = weight;
         }
         if (body.mortality != null) {
-          const mortality = Number(body.mortality);
-          if (!Number.isFinite(mortality) || mortality < 0) return send(422, { error: "invalid_mortality" });
-          sale.mortality = mortality;
+          sale.mortality = nextMortality;
         }
         if (body.remarks != null) {
           sale.remarks = String(body.remarks);
@@ -3878,7 +3979,6 @@ const server = http.createServer(async (req, res) => {
         if (body.birdType != null) sale.birdType = String(body.birdType);
         sale.amount = sale.rate == null ? 0 : round(Number(sale.weight || 0) * Number(sale.rate), 2);
         sale.updatedAt = nowIso();
-        const trip = TRIP_BY_ID.get(sale.tripId);
         const delivery = trip?.deliveries?.find((row) => row.id === sale.id);
         if (delivery) {
           Object.assign(delivery, {
@@ -3894,7 +3994,7 @@ const server = http.createServer(async (req, res) => {
           syncTripDeliveryTotals(trip);
         }
         syncShopCurrentBalance(sale.shopId);
-        return send(200, sale);
+        return send(200, publicShopSale(sale));
       }
       if (method === "DELETE") {
         sale.deleted = true;
@@ -3903,7 +4003,7 @@ const server = http.createServer(async (req, res) => {
         syncShopCurrentBalance(sale.shopId);
         return send(200, { ok: true, deleted: true, id: sale.id });
       }
-      return send(200, sale);
+      return send(200, publicShopSale(sale));
     }
 
     if (p === "/api/operations/collection-entry" && method === "GET") {

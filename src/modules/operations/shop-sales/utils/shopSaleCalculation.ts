@@ -14,8 +14,8 @@ import type {
  * in-memory list correct across fetch races and applies the shop-name filter
  * and the sort order locally (the full list is loaded, so this is instant).
  *
- * Sort keys mirror the backend whitelist:
- *   latest | oldest | shop_asc | shop_desc | amount_desc | amount_asc
+ * Sort keys include the public Shop Sale reference plus table-only numeric
+ * columns. They are applied locally after the backend returns eligible rows.
  */
 export function filterShopSales(
 
@@ -112,12 +112,12 @@ export function filterShopSales(
 
       break;
 
-    case "trip_asc":
-      data.sort((a, b) => String(a.tripNo).localeCompare(String(b.tripNo), undefined, { numeric: true }) || byDate(b, a, 1));
+    case "sale_asc":
+      data.sort((a, b) => String(a.saleNo ?? a.tripNo).localeCompare(String(b.saleNo ?? b.tripNo), undefined, { numeric: true }) || byDate(b, a, 1));
       break;
 
-    case "trip_desc":
-      data.sort((a, b) => String(b.tripNo).localeCompare(String(a.tripNo), undefined, { numeric: true }) || byDate(b, a, 1));
+    case "sale_desc":
+      data.sort((a, b) => String(b.saleNo ?? b.tripNo).localeCompare(String(a.saleNo ?? a.tripNo), undefined, { numeric: true }) || byDate(b, a, 1));
       break;
 
     case "shop_asc":

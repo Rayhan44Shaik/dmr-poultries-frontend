@@ -23,7 +23,6 @@ import {
   formatSaleAmount,
   formatSaleRate,
   formatSaleRemark,
-  formatSaleSequence,
   formatSaleWeight,
   shopSaleLockState,
 } from "../utils/shopSaleFormat";
@@ -41,12 +40,10 @@ interface Props {
   onUpdateSale?: (updatedSale: ShopSale) => void | Promise<void>;
 }
 
-type SortColumn = "tripNo" | "tripDate" | "shopName" | "birds" | "weight" | "rate" | "amount" | "remark";
+type SortColumn = "saleNo" | "tripDate" | "shopName" | "birds" | "weight" | "rate" | "amount" | "remark";
 
-const RATE_MIN = 50;
-const RATE_MAX = 300;
 const SORT_VALUES: Record<SortColumn, { asc: string; desc: string }> = {
-  tripNo: { asc: "trip_asc", desc: "trip_desc" },
+  saleNo: { asc: "sale_asc", desc: "sale_desc" },
   tripDate: { asc: "oldest", desc: "latest" },
   shopName: { asc: "shop_asc", desc: "shop_desc" },
   birds: { asc: "birds_asc", desc: "birds_desc" },
@@ -84,6 +81,8 @@ function ShopSalesTable({
 
   const selectedSale = sales.find((sale) => sale.id === selectedId) ?? null;
   const selectedLock = selectedSale ? shopSaleLockState(selectedSale) : null;
+  const selectedBirdLimit = Number(selectedSale?.maxEditableBirds);
+  const hasSelectedBirdLimit = Number.isSafeInteger(selectedBirdLimit) && selectedBirdLimit >= 0;
 
   const currentSort = (column: SortColumn): "asc" | "desc" | undefined => {
     const values = SORT_VALUES[column];
@@ -116,7 +115,6 @@ function ShopSalesTable({
     setEditData({
       totalBirds: selectedSale.totalBirds,
       totalWeight: selectedSale.totalWeight,
-      rate: selectedSale.rate ?? 0,
     });
   }, [selectedSale, saving]);
 
@@ -136,13 +134,19 @@ function ShopSalesTable({
 
     const newBirds = editData.totalBirds ?? originalSale.totalBirds ?? 0;
     const newWeight = editData.totalWeight ?? originalSale.totalWeight ?? 0;
-    const newRate = editData.rate ?? originalSale.rate ?? 0;
-    if (newRate < RATE_MIN || newRate > RATE_MAX) {
-      globalNotify.error(`Rate must be between ₹${RATE_MIN} and ₹${RATE_MAX}.`);
+    if (!Number.isInteger(newBirds) || newBirds < 0) {
+      globalNotify.error("Birds must be a whole, non-negative number.");
       return;
     }
-    if (newBirds < 0 || newWeight < 0) {
-      globalNotify.error("Birds and Weight cannot be negative.");
+    if (newWeight < 0) {
+      globalNotify.error("Weight cannot be negative.");
+      return;
+    }
+    const maximumBirds = Number(originalSale.maxEditableBirds);
+    if (Number.isSafeInteger(maximumBirds) && maximumBirds >= 0 && newBirds > maximumBirds) {
+      globalNotify.error(
+        `Birds cannot exceed ${maximumBirds.toLocaleString()} for this shop. Total delivered birds plus mortality must stay within the trip pickup count.`
+      );
       return;
     }
 
@@ -152,7 +156,6 @@ function ShopSalesTable({
         ...originalSale,
         totalBirds: newBirds,
         totalWeight: newWeight,
-        rate: newRate,
       });
       setEditingId(null);
       setEditData({});
@@ -223,8 +226,12 @@ function ShopSalesTable({
                   onChange={(event) => handleInputChange("totalBirds", parseFloat(event.target.value) || 0)}
                   className="h-9 w-20 rounded-lg border border-blue-300 bg-white px-2 text-center text-xs font-bold text-blue-700 shadow-2xs outline-none transition-all [appearance:textfield] focus:border-blue-500 focus:ring-2 focus:ring-blue-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                   min={0}
+                  max={hasSelectedBirdLimit ? selectedBirdLimit : undefined}
                   step={1}
                 />
+                {hasSelectedBirdLimit ? (
+                  <span className="hidden whitespace-nowrap text-[10px] font-medium text-slate-500 lg:inline">Max {selectedBirdLimit.toLocaleString()}</span>
+                ) : null}
                 <Scale size={13} className="text-orange-600" />
                 <input
                   type="number"
@@ -232,16 +239,6 @@ function ShopSalesTable({
                   value={editData.totalWeight ?? 0}
                   onChange={(event) => handleInputChange("totalWeight", parseFloat(event.target.value) || 0)}
                   className="h-9 w-20 rounded-lg border border-blue-300 bg-white px-2 text-center text-xs font-bold text-orange-600 shadow-2xs outline-none transition-all [appearance:textfield] focus:border-blue-500 focus:ring-2 focus:ring-blue-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
-                  min={0}
-                  step={0.01}
-                />
-                <IndianRupee size={13} className="text-violet-600" />
-                <input
-                  type="number"
-                  aria-label="Rate"
-                  value={editData.rate ?? 0}
-                  onChange={(event) => handleInputChange("rate", parseFloat(event.target.value) || 0)}
-                  className="h-9 w-20 rounded-lg border border-blue-300 bg-white px-2 text-center text-xs font-bold text-violet-600 shadow-2xs outline-none transition-all [appearance:textfield] focus:border-blue-500 focus:ring-2 focus:ring-blue-500 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
                   min={0}
                   step={0.01}
                 />
@@ -291,7 +288,7 @@ function ShopSalesTable({
               <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 <div className="flex items-center justify-center gap-1.5"><Hash size={14} className="text-slate-400" /> S.No</div>
               </th>
-              <th className="px-3.5 py-3 text-left">{sortable("tripNo", <div className="flex items-center gap-1.5"><FileText size={14} className="shrink-0 text-emerald-500" /><span>Trip No.</span></div>)}</th>
+              <th className="px-3.5 py-3 text-left">{sortable("saleNo", <div className="flex items-center gap-1.5"><FileText size={14} className="shrink-0 text-emerald-500" /><span>Shop Sale No.</span></div>)}</th>
               <th className="px-3.5 py-3 text-left">{sortable("tripDate", <div className="flex items-center gap-1.5"><Calendar size={14} className="shrink-0 text-blue-500" /><span>Day</span></div>)}</th>
               <th className="px-3.5 py-3 text-left">{sortable("shopName", <div className="flex items-center gap-1.5"><Store size={14} className="shrink-0 text-amber-500" /><span>Shop Name</span></div>)}</th>
               <th className="px-3.5 py-3 text-center">{sortable("birds", <div className="flex items-center justify-center gap-1.5"><Bird size={14} className="shrink-0 text-cyan-600" /><span>Birds</span></div>, true)}</th>
@@ -309,7 +306,6 @@ function ShopSalesTable({
             ) : sales.map((sale, index) => {
               const isSelected = selectedId === sale.id;
               const isEditing = editingId === sale.id;
-              const sequence = formatSaleSequence(sale.saleNo);
               const lock = shopSaleLockState(sale);
               return (
                 <tr
@@ -328,16 +324,7 @@ function ShopSalesTable({
                   } ${!lock.editable && !isSelected ? "opacity-80" : ""}`}
                 >
                   <td className="px-3.5 py-3 text-center text-xs font-semibold text-slate-500">{startIndex + index + 1}</td>
-                  <td className="px-3.5 py-3 whitespace-nowrap">
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-semibold text-emerald-600">{sale.tripNo || "—"}</span>
-                      {sequence ? (
-                        <span className="rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-emerald-700">
-                          {sequence}
-                        </span>
-                      ) : null}
-                    </div>
-                  </td>
+                  <td className="px-3.5 py-3 text-xs font-semibold text-emerald-600 whitespace-nowrap">{sale.saleNo || sale.tripNo || "—"}</td>
                   <td className="px-3.5 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(sale.tripDate)}</td>
                   <td className="px-3.5 py-3 text-xs font-semibold text-slate-700">{cleanDeliveryShopName(sale.shopName) || "—"}</td>
                   <td className="px-3.5 py-3 text-center text-xs font-bold text-cyan-700">{Number(sale.totalBirds || 0).toLocaleString()}</td>

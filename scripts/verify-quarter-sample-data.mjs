@@ -118,6 +118,35 @@ async function run() {
     "every Shop Sales row must conform to the frontend's API mapper contract",
   );
 
+  // Sale numbers are unique full references. Within each trip S01, S02… is
+  // assigned in captured delivery-time order, never from the route array order.
+  assert.equal(new Set(sales.map((sale) => sale.saleNo)).size, sales.length);
+  const sequencedSale = sales.find((sale) => sale.editable && sale.deliveryTime && sale.maxEditableBirds != null);
+  assert.ok(sequencedSale, "expected an editable, delivery-timestamped Shop Sale");
+  const tripSales = sales
+    .filter((sale) => sale.tripId === sequencedSale.tripId)
+    .sort((a, b) => a.deliveryTime.localeCompare(b.deliveryTime));
+  assert.deepEqual(
+    tripSales.map((sale, index) => sale.saleNo),
+    tripSales.map((_, index) => `${sequencedSale.tripNo}-S${String(index + 1).padStart(2, "0")}`),
+    "Shop Sale S-numbers must follow delivery time within the source trip",
+  );
+  const sequencedTrip = await request(`/trips/${sequencedSale.tripId}`);
+  assert.equal(
+    sum(sequencedTrip.deliveries, "birds") + sum(sequencedTrip.deliveries, "mortality"),
+    sequencedTrip.totalBirds,
+    "every sample trip must reconcile pickup birds with delivered birds plus mortality",
+  );
+  const overLimit = await fetch(`${api}/operations/shop-sales/${sequencedSale.id}`, {
+    method: "PUT",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({ birds: sequencedSale.maxEditableBirds + 1 }),
+  });
+  calls.push(`PUT /operations/shop-sales/${sequencedSale.id} → ${overLimit.status}`);
+  assert.equal(overLimit.status, 422, "the API must reject a bird edit above the trip pickup capacity");
+  const overLimitBody = await overLimit.json();
+  assert.equal(overLimitBody.error, "trip_bird_limit_exceeded");
+
   // Pending Collections and Collection Entry read different views over the
   // exact same weekly aggregate. Check all totals and a selected shop.
   const pending = await request(`/operations/collection-entry/pending-summary?date=${manifest.quarter.today}`);

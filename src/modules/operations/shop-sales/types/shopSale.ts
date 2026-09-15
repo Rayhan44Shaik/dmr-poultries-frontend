@@ -48,6 +48,11 @@ amount: number;
   numericTripId?: number | null;
   numericShopId?: number | null;
   mortality?: number;
+  /** Server-reported pickup quantity for the sale's source trip. */
+  tripPickupBirds?: number | null;
+  /** Server-computed maximum birds for this shop after all other deliveries
+   * and the trip's total mortality are accounted for. */
+  maxEditableBirds?: number | null;
   birdTypeId?: number | null;
   /** Whether the backend currently allows editing/deleting this sale
    * (Rate Entry locked + within the 10-day window). Backend remains the
@@ -97,7 +102,7 @@ export interface ShopSaleFilter {
    * Shop Name, Trip No and remarks (backend ILIKE). */
   search: string;
 
-  /** One of: latest | oldest | shop_asc | shop_desc | amount_desc | amount_asc */
+  /** One of: latest | oldest | sale_asc | sale_desc | shop_asc | shop_desc | amount_desc | amount_asc */
   sortBy: string;
 
 }

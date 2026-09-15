@@ -28,6 +28,9 @@ export interface ApiShopSale {
   rate: number;
   amount: number;
   mortality: number;
+  /** Server-computed trip-wide bird validation facts for Shop Sales editing. */
+  tripPickupBirds?: number | null;
+  maxEditableBirds?: number | null;
   remarks: string;
   status: string;
   deleted: boolean;
@@ -79,6 +82,8 @@ export function mapApiSaleToShopSale(row: ApiShopSale): ShopSale {
     numericTripId: row.tripId,
     numericShopId: row.shopId,
     mortality: num(row.mortality),
+    tripPickupBirds: row.tripPickupBirds ?? null,
+    maxEditableBirds: row.maxEditableBirds ?? null,
     birdTypeId: row.birdTypeId,
     editable: row.editable,
     windowExpiresAt: row.windowExpiresAt,

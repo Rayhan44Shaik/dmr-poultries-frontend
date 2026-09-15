@@ -10,6 +10,7 @@ import { clearStep5Draft } from "../../../../shared/trip/step5DraftStore";
 import { sendTripDeliveryEmails } from "../services/deliveryEmailService";
 import { translate } from "../../../../i18n";
 import { notify as globalNotify } from "../../../../ui/notifications/notificationStore";
+import { TRIP_DATA_CHANGED_EVENT } from "../../../../shared/events/tripDataEvents";
 
 type NotificationFn = (message: string, type?: "success" | "error" | "info") => void;
 
@@ -94,6 +95,17 @@ export default function useTrips(
       cancelled = true;
       refreshAbortRef.current?.abort();
     };
+  }, [refreshTrips]);
+
+  // Shop Sales corrections mutate the corresponding Trip delivery and its
+  // calculated totals on the backend. Refresh an already-mounted Trip List
+  // immediately instead of leaving a stale, client-side copy on screen.
+  useEffect(() => {
+    const handleTripDataChanged = () => {
+      void refreshTrips();
+    };
+    window.addEventListener(TRIP_DATA_CHANGED_EVENT, handleTripDataChanged);
+    return () => window.removeEventListener(TRIP_DATA_CHANGED_EVENT, handleTripDataChanged);
   }, [refreshTrips]);
 
   const acquireOperationLock = (key: string) => {

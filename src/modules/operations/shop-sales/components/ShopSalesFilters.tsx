@@ -73,8 +73,8 @@ function ShopSalesFilters({
     () => [
       { value: "latest", label: "Latest Day" },
       { value: "oldest", label: "Oldest Day" },
-      { value: "trip_asc", label: "Trip No. A–Z" },
-      { value: "trip_desc", label: "Trip No. Z–A" },
+      { value: "sale_asc", label: "Shop Sale No. A–Z" },
+      { value: "sale_desc", label: "Shop Sale No. Z–A" },
       { value: "shop_asc", label: "Shop Name A–Z" },
       { value: "shop_desc", label: "Shop Name Z–A" },
       { value: "birds_desc", label: "Birds: High to Low" },

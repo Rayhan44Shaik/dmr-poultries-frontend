@@ -22,6 +22,8 @@ function row(overrides: Partial<ApiShopSale> = {}): ApiShopSale {
     rate: 100,
     amount: 5800,
     mortality: 0,
+    tripPickupBirds: 600,
+    maxEditableBirds: 84,
     remarks: "Urgent delivery",
     status: "Approved",
     deleted: false,
@@ -57,6 +59,8 @@ describe("mapApiSaleToShopSale", () => {
     assert.equal(mapped.rate, 100);
     assert.equal(mapped.amount, 5800);
     assert.equal(mapped.totalBirds, 58);
+    assert.equal(mapped.tripPickupBirds, 600);
+    assert.equal(mapped.maxEditableBirds, 84);
     assert.equal(mapped.remark, "Urgent delivery");
   });
 

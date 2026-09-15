@@ -100,14 +100,6 @@ function useShopSales() {
       if (updatedSale.totalBirds !== original.totalBirds) patch.birds = updatedSale.totalBirds;
       if (updatedSale.totalWeight !== original.totalWeight) patch.weight = updatedSale.totalWeight;
       if (updatedSale.remark !== original.remark) patch.remarks = updatedSale.remark;
-      // A genuine attempted rate or shop change is passed through
-      // deliberately — the backend will correctly reject it with 409 once
-      // Rate Entry is locked, and the catch below refreshes the
-      // authoritative record so the UI snaps back rather than showing the
-      // rejected value.
-      if (updatedSale.rate !== original.rate && updatedSale.rate != null) patch.rate = updatedSale.rate;
-      if (updatedSale.shopName !== original.shopName) patch.shopName = updatedSale.shopName;
-
       if (Object.keys(patch).length === 0) {
         return updatedSale;
       }
