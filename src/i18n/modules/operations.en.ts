@@ -262,6 +262,13 @@ export default {
   'ops.shop_sales.updated_success': 'Shop Sale updated successfully.',
   'ops.shop_sales.update_failed': 'Unable to update this Shop Sale. Refresh and try again.',
   'ops.shop_sales.weight': 'Weight',
+  'ops.shop_sales.kpi.total_shops': 'Total Shops',
+  'ops.shop_sales.kpi.total_birds': 'Total Birds',
+  'ops.shop_sales.kpi.total_weight': 'Total Weight',
+  'ops.shop_sales.kpi.total_amount': 'Total Amount',
+  'ops.shop_sales.kpi.average_rate': 'Average Rate',
+  'ops.shop_sales.kpi.average_weight_per_bird': 'Average Weight / Bird',
+  'ops.shop_sales.title': 'Shop Sales',
 
   // ----- Vehicle trips -----
   'ops.trip.active_log_entry': 'Active Log Entry',

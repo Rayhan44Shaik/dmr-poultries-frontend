@@ -72,11 +72,14 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
     ])
   ).filter(Boolean);
 
-  const handleSearch = useCallback(() => {
-    const query = searchInput.trim();
-    setFilter((prev) => ({ ...prev, search: query }));
+  // The global Search field filters as the operator types; no separate Search
+  // button is needed. The hook's request-sequence guard keeps only the latest
+  // backend response when input changes quickly.
+  const handleSearchInputChange = useCallback((value: string) => {
+    setSearchInput(value);
+    setFilter((prev) => ({ ...prev, search: value.trim() }));
     setCurrentPage(1);
-  }, [searchInput, setFilter, setCurrentPage]);
+  }, [setFilter, setCurrentPage]);
 
   const handleResetFilters = useCallback(() => {
     resetFilters();
@@ -149,7 +152,7 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
         sortBy={filter.sortBy}
         shopNames={shopNames}
         searchQuery={searchInput}
-        setSearchQuery={setSearchInput}
+        setSearchQuery={handleSearchInputChange}
         setFromDate={(v) => setFilter({ ...filter, fromDate: v })}
         setToDate={(v) => setFilter({ ...filter, toDate: v })}
         setShopName={(v) => {
@@ -160,7 +163,6 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
           setFilter({ ...filter, sortBy: v });
           setCurrentPage(1);
         }}
-        onSearch={handleSearch}
         onReset={handleResetFilters}
         onRefresh={() => void handleRefresh()}
         refreshing={isLoading}
@@ -171,9 +173,6 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
       {hasActiveFilters && (
         <ShopSalesSummary
           summary={summary}
-          fromDate={filter.fromDate}
-          toDate={filter.toDate}
-          shopName={filter.shopName}
           isLoading={isLoading}
         />
       )}

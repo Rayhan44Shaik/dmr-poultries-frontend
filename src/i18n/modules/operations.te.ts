@@ -262,6 +262,13 @@ export default {
   'ops.shop_sales.updated_success': 'షాప్ అమ్మకం విజయవంతంగా నవీకరించబడింది.',
   'ops.shop_sales.update_failed': 'ఈ షాప్ అమ్మకాన్ని నవీకరించలేకపోయాము. రిఫ్రెష్ చేసి మళ్లీ ప్రయత్నించండి.',
   'ops.shop_sales.weight': 'బరువు',
+  'ops.shop_sales.kpi.total_shops': 'మొత్తం షాపులు',
+  'ops.shop_sales.kpi.total_birds': 'మొత్తం పక్షులు',
+  'ops.shop_sales.kpi.total_weight': 'మొత్తం బరువు',
+  'ops.shop_sales.kpi.total_amount': 'మొత్తం మొత్తం',
+  'ops.shop_sales.kpi.average_rate': 'సగటు రేటు',
+  'ops.shop_sales.kpi.average_weight_per_bird': 'పక్షికి సగటు బరువు',
+  'ops.shop_sales.title': 'షాప్ అమ్మకాలు',
 
   // ----- Vehicle trips -----
   'ops.trip.active_log_entry': 'ప్రస్తుత లాగ్',

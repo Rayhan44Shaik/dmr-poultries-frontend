@@ -5,7 +5,6 @@ import {
   opsFilterCardClass,
   opsFilterLabelClass,
   opsInputClass,
-  opsPrimaryButtonClass,
   opsSecondaryButtonClass,
 } from "../../../../shared/ui/operationsStyles";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
@@ -26,7 +25,6 @@ interface Props {
   setShopName: (value: string) => void;
   setSortBy: (value: string) => void;
   setSearchQuery: (value: string) => void;
-  onSearch: () => void;
   onReset: () => void;
   onRefresh: () => void;
   refreshing?: boolean;
@@ -37,8 +35,8 @@ interface Props {
 
 /**
  * Shop Sales uses the same two-row filter treatment as Trip List: field labels
- * always have a meaningful icon, while search/reset/refresh retain the shared
- * action animations. Values remain raw IDs/names so filtering is unaffected.
+ * always have a meaningful icon, while reset/refresh retain the shared action
+ * animations. Values remain raw IDs/names so filtering is unaffected.
  */
 function ShopSalesFilters({
   fromDate,
@@ -52,7 +50,6 @@ function ShopSalesFilters({
   setSortBy,
   searchQuery,
   setSearchQuery,
-  onSearch,
   onReset,
   onRefresh,
   refreshing = false,
@@ -167,12 +164,6 @@ function ShopSalesFilters({
               type="search"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  onSearch();
-                }
-              }}
               placeholder="Search trip no., shop name, sale no. or remark"
               className={`${opsInputClass} pl-10`}
             />
@@ -189,10 +180,6 @@ function ShopSalesFilters({
         )}
 
         <div className={`flex flex-wrap items-center justify-end gap-2 ${hasAssignmentNotice ? "lg:col-span-4" : "lg:col-span-7"}`}>
-          <button type="button" onClick={onSearch} className={`group relative ${opsPrimaryButtonClass}`} aria-label="Search shop sales">
-            <span className={`inline-flex ${uiActionIconMotionClass.search}`}><Search size={15} /></span>
-            Search
-          </button>
           <button type="button" onClick={onReset} className={`group relative ${opsSecondaryButtonClass}`} aria-label="Reset shop sales filters">
             <span className={`inline-flex ${uiActionIconMotionClass.reset}`}><RotateCcw size={14} /></span>
             Reset
