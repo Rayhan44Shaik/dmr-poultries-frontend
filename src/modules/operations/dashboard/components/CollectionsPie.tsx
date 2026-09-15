@@ -52,57 +52,27 @@ function useCountUp(target: number, duration = 900): number {
 /**
  * Collection Streams — payment-mode donut for the Operations dashboard.
  *
- * The square stage (up to 256 px, scaling down with the card so the badge
+ * The square stage (up to 256 px, scaling down with the card so the badges
  * can never bleed into a neighbouring chart) keeps the ring a perfect
- * circle at every window size. Slices sweep in on mount / range change. The whole donut makes one very slow ambient revolution —
- * 8 minutes per lap, barely noticeable, off with reduced-motion.
+ * circle at every window size. Slices sweep in on mount / range change.
+ * The whole donut makes one very slow ambient revolution — 8 minutes per
+ * lap, barely noticeable, off with reduced-motion.
  *
- * A white pop badge with the exact share appears ONLY for the checked
- * (hovered) slice: it springs in outside the ring, its inner edge touching
- * the ring's outer side at that sector's exact mid-angle, and disappears
- * when the slice is un-checked. No badges show at any other time.
- *
- * The badge joins the pie's own rotation clock via a negative
- * animation-delay captured at hover time, so it is always locked to its
- * slice's mid-angle (never drifting or rotating separately) while the
- * donut keeps its one very slow ambient revolution (8 min per lap, off
- * with reduced-motion); a counter-rotation keeps the pill perfectly
- * horizontal at all times. Hovering lifts the slice out; the other
- * slices stay fully solid (no fading). The centre shows the total with a
- * count-up, the legend lists every mode with exact amount and share, and
- * the card title links to the Collection Report.
+ * EVERY slice always carries a white pop badge with its exact share,
+ * outside the ring, its inner edge touching the ring's outer side at the
+ * sector's exact mid-angle. The badges mount together with the donut, so
+ * their orbit and counter-rotation animations start on the exact same
+ * clock as the donut's own spin — each badge stays locked at its slice's
+ * mid-angle (never drifting or rotating separately) and the
+ * counter-rotation keeps every pill perfectly horizontal at all times.
+ * Hovering a slice lifts it out; the other slices stay fully solid (no
+ * fading). The centre shows the total with a count-up, the legend lists
+ * every mode with exact amount and share, and the card title links to the
+ * Collection Report.
  */
 export default function CollectionsPie({ data }: CollectionsPieProps) {
   const { t } = useI18n();
   const chartData = useMemo(() => data ?? [], [data]);
-  const [hoverIndex, setHoverIndex] = useState(-1);
-
-  // One shared clock for the ambient orbit. A badge mounts on hover, so at
-  // that moment we read the donut's CURRENT rotation from its computed
-  // transform and join the badge to the exact same phase via a negative
-  // animation-delay — it orbits locked to its own slice's mid-angle, never
-  // separately from the pie.
-  const ORBIT_SECONDS = 480; // keep in sync with .cs-* animations in tokens.css
-  const spinRef = useRef<HTMLDivElement | null>(null);
-  const [orbitDelay, setOrbitDelay] = useState("-0s");
-  const handleSliceOver = useCallback(
-    (index?: number) => {
-      if (index === undefined || index === hoverIndex) return;
-      let phase = 0;
-      const el = spinRef.current;
-      if (el) {
-        const tr = getComputedStyle(el).transform;
-        if (tr && tr !== "none") {
-          const m = tr.slice(7, -1).split(",").map(Number);
-          phase = (Math.atan2(m[1], m[0]) * 180) / Math.PI;
-        }
-      }
-      const sec = (((((phase % 360) + 360) % 360) / 360) * ORBIT_SECONDS).toFixed(3);
-      setOrbitDelay(`-${sec}s`);
-      setHoverIndex(index);
-    },
-    [hoverIndex]
-  );
 
   const enrichedData = useMemo<EnrichedMode[]>(() => {
     const total = chartData.reduce((sum, d) => sum + (Number(d.value) || 0), 0);
@@ -166,7 +136,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
 
   return (
     <div className="flex w-full min-w-0 flex-1 flex-col">
-      {/* Donut — fixed square stage, generous white space on all sides. */}
+      {/* Donut — square stage that scales with the card, generous white space. */}
       <div className="flex min-h-0 flex-1 items-center justify-center py-3">
         <div className="relative aspect-square w-full max-w-64">
           {/* Soft background track behind the ring (matches the 58%–84% band).
@@ -175,7 +145,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
             <circle cx="128" cy="128" r="91" fill="none" stroke="rgba(241,245,249,0.8)" strokeWidth="33" />
           </svg>
 
-          <div ref={spinRef} className="cs-pie-spin h-full w-full">
+          <div className="cs-pie-spin h-full w-full">
             <div className="h-full w-full [filter:drop-shadow(0_18px_26px_-16px_rgba(15,23,42,0.35))]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -199,8 +169,6 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
                   cornerRadius={6}
                   stroke="none"
                   shape={renderSector}
-                  onMouseOver={(_entry, index) => handleSliceOver(index)}
-                  onMouseOut={() => setHoverIndex(-1)}
                   animationBegin={150}
                   animationDuration={900}
                   animationEasing="ease-out"
@@ -214,11 +182,11 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
             </div>
           </div>
 
-          {/* White pop badge — a separate layer ABOVE the chart. It appears
-              ONLY for the checked (hovered) slice: centred exactly on that
-              sector's mid-angle, outside the ring and touching its edge,
-              popping in and orbiting with the pie while staying perfectly
-              horizontal. Nothing else shows a badge at any time. */}
+          {/* White pop badges — a separate layer ABOVE the chart. One badge
+              per slice, ALWAYS on: centred exactly on that sector's
+              mid-angle, outside the ring and touching its edge, orbiting
+              with the pie (same clock — mounted together) while staying
+              perfectly horizontal. */}
           <div className="pointer-events-none absolute inset-0">
             <svg viewBox="0 0 256 256" className="h-full w-full overflow-visible">
               <defs>
@@ -226,62 +194,60 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
                   <feDropShadow dx="0" dy="1.5" stdDeviation="2" floodColor="#0f172a" floodOpacity="0.16" />
                 </filter>
               </defs>
-              {hoverIndex >= 0 &&
-                enrichedData[hoverIndex] &&
-                enrichedData[hoverIndex].percent >= 4 &&
-                (() => {
-                  const d = enrichedData[hoverIndex];
-                  const a = (sliceMids[hoverIndex] * Math.PI) / 180;
-                  // The pill (52×22) sits so its inner edge touches the ring's
-                  // outer side (107.5) at ANY angle: the centre is pushed out
-                  // by the pill's radial half-extent in this direction.
-                  const support = 26 * Math.abs(Math.sin(a)) + 11 * Math.abs(Math.cos(a));
-                  const r = 107.5 + support + 1;
-                  const px = 128 + r * Math.sin(a);
-                  const py = 128 - r * Math.cos(a);
-                  // Orbit + counter both run on the pie's own clock (joined
-                  // via the shared negative delay): the badge stays locked at
-                  // its sector's mid-angle while circling, and the pill
-                  // counter-rotates to stay perfectly horizontal.
-                  return (
-                    <g key={d.name} className="cs-badge-orbit" style={{ animationDelay: orbitDelay }}>
-                      <g transform={`translate(${px.toFixed(2)}, ${py.toFixed(2)})`}>
+              {enrichedData.map((d, i) => {
+                if (d.percent < 4) return null;
+                const a = (sliceMids[i] * Math.PI) / 180;
+                // The pill (52×22) sits so its inner edge touches the ring's
+                // outer side (107.5) at ANY angle: the centre is pushed out
+                // by the pill's radial half-extent in this direction.
+                const support = 26 * Math.abs(Math.sin(a)) + 11 * Math.abs(Math.cos(a));
+                const r = 107.5 + support + 1;
+                const px = 128 + r * Math.sin(a);
+                const py = 128 - r * Math.cos(a);
+                // Orbit + counter run on the donut's own clock (both were
+                // mounted with it, so their animations share its start
+                // frame): the badge stays locked at its sector's mid-angle
+                // while circling, and the pill counter-rotates to stay
+                // perfectly horizontal.
+                return (
+                  <g key={d.name} className="cs-badge-orbit">
+                    <g transform={`translate(${px.toFixed(2)}, ${py.toFixed(2)})`}>
+                      <g
+                        className="animate-pop-in"
+                        style={{ transformBox: "view-box", transformOrigin: `${px.toFixed(2)}px ${py.toFixed(2)}px` }}
+                      >
                         <g
-                          className="animate-pop-in"
-                          style={{ transformBox: "view-box", transformOrigin: `${px.toFixed(2)}px ${py.toFixed(2)}px` }}
+                          className="cs-badge-counter"
+                          style={{ transformOrigin: `${px.toFixed(2)}px ${py.toFixed(2)}px` }}
                         >
-                          <g
-                            className="cs-badge-counter"
-                            style={{ transformOrigin: `${px.toFixed(2)}px ${py.toFixed(2)}px`, animationDelay: orbitDelay }}
+                          <rect
+                            x={-26}
+                            y={-11}
+                            width={52}
+                            height={22}
+                            rx={11}
+                            fill="#ffffff"
+                            stroke="rgba(15,23,42,0.08)"
+                            strokeWidth={1}
+                            filter="url(#cs-badge-shadow)"
+                          />
+                          <text
+                            x={0}
+                            y={0.5}
+                            textAnchor="middle"
+                            dominantBaseline="central"
+                            fontSize={11}
+                            fontWeight={800}
+                            fill="#1e293b"
                           >
-                            <rect
-                              x={-26}
-                              y={-11}
-                              width={52}
-                              height={22}
-                              rx={11}
-                              fill="#ffffff"
-                              stroke="rgba(15,23,42,0.08)"
-                              strokeWidth={1}
-                              filter="url(#cs-badge-shadow)"
-                            />
-                            <text
-                              x={0}
-                              y={0.5}
-                              textAnchor="middle"
-                              dominantBaseline="central"
-                              fontSize={11}
-                              fontWeight={800}
-                              fill="#1e293b"
-                            >
-                              {`${d.percent.toFixed(1)}%`}
-                            </text>
-                          </g>
+                            {`${d.percent.toFixed(1)}%`}
+                          </text>
                         </g>
                       </g>
                     </g>
-                  );
-                })()}
+                  </g>
+                );
+              })}
             </svg>
           </div>
 

@@ -30,13 +30,15 @@ export async function runPieRenderCheck(): Promise<void> {
     "33.7%",
     "cs-badge-shadow", // badge layer is wired up
     "cs-pie-spin", // the slow donut revolution
+    "cs-badge-orbit", // always-on badge orbits
   ];
-  // The % badge renders only for the checked (hovered) slice — SSR has no
-  // hover, so no badge rect may be present in static markup.
-  if (html.includes('x="-26"')) absent.push("badge rect rendered without hover");
   const missing = [...mustNot.filter((s) => html.includes(s))].map((s) => `"${s}" still present`);
   const absent = must.filter((s) => !html.includes(s)).map((s) => `"${s}" missing`);
   const modes = data.map((d) => d.name).filter((n) => !html.includes(n)).map((n) => `mode "${n}" missing`);
+  // The % badges are ALWAYS on (one per slice, on the donut's own clock), so
+  // the static SSR markup must contain exactly one badge rect per slice.
+  const badgeRects = (html.match(/x="-26"/g) ?? []).length;
+  if (badgeRects !== data.length) absent.push(`expected ${data.length} badge rects in SSR, found ${badgeRects}`);
 
   console.log(missing.length + absent.length + modes.length === 0 ? "PIE RENDER CHECK PASS ✔" : "PIE RENDER CHECK FAIL ✖");
   for (const problem of [...missing, ...absent, ...modes]) console.log("  -", problem);
