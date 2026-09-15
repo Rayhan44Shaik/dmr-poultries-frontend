@@ -1,4 +1,4 @@
-import { useRef, useState, type ComponentProps } from "react";
+import { useEffect, useRef, useState, type ComponentProps } from "react";
 import { IndianRupee, LoaderCircle, Store } from "lucide-react";
 import useCompletedTrips from "../hooks/useCompletedTrips";
 import CompletedTripsFilters from "../components/CompletedTripsFilters";
@@ -45,7 +45,20 @@ export default function RatesEntryPage({ embedded = false }: Props) {
   const { t, language } = useI18n();
   const { showNotification } = useSafeNotification();
   const exportBusyRef = useRef<"pdf" | "excel" | null>(null);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
   const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
+
+  // A selection belongs only to this table. Clicking elsewhere clears its
+  // highlight, matching Recent Trip Activity and Trip List.
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!tableContainerRef.current?.contains(event.target as Node)) {
+        setSelectedRowId(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const {
     filteredTrips,
@@ -223,7 +236,7 @@ export default function RatesEntryPage({ embedded = false }: Props) {
       )}
 
       {/* Table — separate card like trip list, Rate Entry on top of table */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+      <div ref={tableContainerRef} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
         {/* Rate Entry table title: intentionally static; other page animations are unchanged. */}
         <div className="flex items-center px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-emerald-50/60 via-white to-emerald-50/40">
           <div className="flex items-center gap-3">

@@ -517,6 +517,7 @@ function TripRecentTable({
           <TripPagination
             currentPage={safeCurrentPage}
             totalPages={Math.max(totalPages, 1)}
+            totalItems={filteredTrips.length}
             onPageChange={setCurrentPage}
             pageSize={pageSize}
             onPageSizeChange={(next) => {
