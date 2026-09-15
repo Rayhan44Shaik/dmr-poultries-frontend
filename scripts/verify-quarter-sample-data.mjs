@@ -430,6 +430,63 @@ async function run() {
   assert.ok(vehicleFuel.data.length > 0);
   assert.ok(vehicleFuel.data.every((row) => row.vehicleId === scopedVehicleId));
 
+  // ── Collection Entry → Outstanding Summary carry-forward ─────────────────
+  // Opening Balance must be the PREVIOUS week's closing balance so the panel
+  // reads: opening + weekly sales − weekly approved collections = outstanding.
+  const dayMs = 86_400_000;
+  const shiftDays = (iso, days) =>
+    new Date(new Date(`${iso}T00:00:00Z`).getTime() + days * dayMs).toISOString().slice(0, 10);
+
+  const today = manifest.quarter.today;
+  const carryRows = await request(`/operations/collection-entry/weekly-summaries?date=${today}`);
+  assert.ok(carryRows.length > 0);
+  assert.ok(
+    carryRows.every(
+      (row) => Number.isFinite(row.openingBalance) && typeof row.previousWeekEnd === "string" && row.previousWeekEnd,
+    ),
+    "every weekly summary must carry an openingBalance and the previous week's end date",
+  );
+  for (const row of carryRows) {
+    assert.equal(row.previousWeekEnd, shiftDays(row.weekStart, -1), "previousWeekEnd must be the day before weekStart");
+    // `balance` is the live all-time balance, so it only equals the week's
+    // closing figure for the current week (nothing has happened after it yet).
+    if (row.isCurrentWeek) {
+      assert.equal(
+        round(row.openingBalance + row.weeklySales - row.approvedCollections),
+        round(row.balance),
+        `shop ${row.shopId}: opening + sales − collections must equal the current outstanding`,
+      );
+    }
+  }
+
+  // Walk consecutive weeks: each week's opening equals the prior week's close.
+  const carryShop = carryRows.find((row) => row.openingBalance > 0);
+  assert.ok(carryShop, "expected a shop carrying a balance into the current week");
+  const currentWeekStart = carryShop.weekStart;
+  let priorClose = null;
+  for (let back = 4; back >= 0; back -= 1) {
+    const probe = shiftDays(currentWeekStart, -7 * back);
+    const summary = (await request(`/operations/collection-entry/weekly-summaries?date=${probe}`)).find(
+      (row) => row.shopId === carryShop.shopId,
+    );
+    assert.ok(summary, `expected a weekly summary for shop ${carryShop.shopId} on ${probe}`);
+    if (priorClose != null) {
+      assert.equal(
+        round(summary.openingBalance),
+        priorClose,
+        `shop ${carryShop.shopId} week ${summary.weekStart}: opening must equal the previous week's closing balance`,
+      );
+    }
+    priorClose = round(summary.openingBalance + summary.weeklySales - summary.approvedCollections);
+  }
+
+  // The single-shop endpoint the page actually calls exposes the same fields.
+  const oneShop = await request(
+    `/operations/collection-entry/weekly-summary?shopId=${carryShop.shopId}&date=${today}`,
+  );
+  assert.equal(round(oneShop.openingBalance), round(carryShop.openingBalance));
+  assert.equal(oneShop.previousWeekEnd, carryShop.previousWeekEnd);
+
   console.log(`✓ Quarter data sync verified: ${calls.length} API checks passed.`);
   console.log(`  ${manifest.quarter.label} · ${manifest.shops} shops · ${manifest.trips} trips · ${manifest.deliveries} deliveries`);
 }

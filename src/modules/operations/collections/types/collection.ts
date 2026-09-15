@@ -237,6 +237,10 @@ export interface CollectionWeeklySummary {
   shopName: string;
   weekStart: string;
   weekEnd: string;
+  /** Last day of the previous week — labels the carried-forward opening balance. */
+  previousWeekEnd: string;
+  /** Closing balance carried forward from the previous week (settled before weekStart). */
+  openingBalance: number;
   /** Authoritative live shop outstanding (shops.current_balance) — persistent, never weekly. */
   balance: number;
   weeklySales: number;

@@ -77,6 +77,7 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
             shopName={vm.entry.shopName}
             periodLabel={vm.weekRangeFormatted}
             periodType="weekly"
+            previousWeekEnd={vm.previousWeekEnd}
           />
         </div>
         <div className="lg:col-span-5 min-w-0">

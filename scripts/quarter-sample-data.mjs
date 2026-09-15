@@ -2737,6 +2737,29 @@ function collectionPendingSummary(asOfDate = TODAY) {
         collection.deleted !== true &&
         collection.status === "Approved",
     );
+    // Opening balance = the closing balance carried forward from the previous
+    // week, i.e. everything that settled strictly BEFORE this week started.
+    // Computed from the ledger rather than derived from the live balance, so
+    // it stays correct even when a back-dated sale or collection lands later.
+    const salesBeforeWeek = sumForShop(
+      SHOP_SALES,
+      shop.id,
+      (sale) => sale.deleted !== true && String(sale.saleDate ?? sale.tripDate) < weekStart,
+      (sale) => sale.amount,
+    );
+    const collectionsBeforeWeek = sumForShop(
+      COLLECTIONS,
+      shop.id,
+      (collection) =>
+        collection.deleted !== true &&
+        collection.status === "Approved" &&
+        String(collection.collectionDate) < weekStart,
+      (collection) => collection.amount,
+    );
+    const openingBalance = round(
+      Number(shop.openingBalance || 0) + salesBeforeWeek - collectionsBeforeWeek,
+      2,
+    );
     const lastCollectionDate = approvedForShop
       .map((collection) => collection.collectionDate)
       .sort()
@@ -2746,6 +2769,10 @@ function collectionPendingSummary(asOfDate = TODAY) {
       shopName: shop.shopName,
       weekStart,
       weekEnd,
+      // Last day of the previous week — labels the carried-forward opening.
+      previousWeekEnd: shiftIso(weekStart, -1),
+      // Closing balance brought forward from the previous week.
+      openingBalance,
       // This is a live outstanding balance, not a weekly balance.
       balance: syncShopCurrentBalance(shop.id),
       weeklySales,
@@ -2791,6 +2818,8 @@ function weeklyCollectionSummary(shopId, asOfDate = TODAY) {
     shopName: shop.shopName,
     weekStart: shop.weekStart,
     weekEnd: shop.weekEnd,
+    previousWeekEnd: shop.previousWeekEnd,
+    openingBalance: shop.openingBalance,
     balance: shop.balance,
     weeklySales: shop.weeklySales,
     approvedCollections: shop.weeklyApprovedCollections,
@@ -4264,6 +4293,8 @@ const server = http.createServer(async (req, res) => {
         shopName: shop.shopName,
         weekStart: shop.weekStart,
         weekEnd: shop.weekEnd,
+        previousWeekEnd: shop.previousWeekEnd,
+        openingBalance: shop.openingBalance,
         balance: shop.balance,
         weeklySales: shop.weeklySales,
         approvedCollections: shop.weeklyApprovedCollections,

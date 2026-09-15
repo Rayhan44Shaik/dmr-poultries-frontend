@@ -666,6 +666,8 @@ function mapWeeklySummary(data: CollectionWeeklySummary): CollectionWeeklySummar
     shopName: String(data.shopName ?? ""),
     weekStart: String(data.weekStart),
     weekEnd: String(data.weekEnd),
+    previousWeekEnd: String(data.previousWeekEnd ?? ""),
+    openingBalance: Number(data.openingBalance ?? 0),
     balance: Number(data.balance ?? 0),
     weeklySales: Number(data.weeklySales ?? 0),
     approvedCollections: Number(data.approvedCollections ?? 0),

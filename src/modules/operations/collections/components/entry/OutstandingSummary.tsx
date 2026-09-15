@@ -12,7 +12,15 @@ interface OutstandingSummaryProps {
   shopName?: string;
   periodLabel: string;
   periodType: "daily" | "weekly";
+  /** Last day of the previous week — dates the carried-forward opening balance. */
+  previousWeekEnd?: string;
 }
+
+/** YYYY-MM-DD → DD-MM-YYYY, matching the date format used across Operations. */
+const fmtDate = (iso: string) => {
+  const [y, m, d] = String(iso).split("-");
+  return y && m && d ? `${d}-${m}-${y}` : String(iso);
+};
 
 const inr = (n: number) =>
   "₹ " + Number(n || 0).toLocaleString("en-IN", {
@@ -72,6 +80,7 @@ export default function OutstandingSummary({
   shopName,
   periodLabel,
   periodType,
+  previousWeekEnd,
 }: OutstandingSummaryProps) {
   const { t } = useI18n();
 
@@ -110,13 +119,22 @@ export default function OutstandingSummary({
         * take the slack (`mt-auto` on the last one), so Current Outstanding
         * finishes flush with the bottom instead of leaving dead space. */}
       <div className="flex flex-1 flex-col gap-3 animate-in fade-in duration-500">
+        {/* Opening Balance is last week's CLOSING balance, carried forward.
+          * When the backend supplies the previous week's end date we show it,
+          * so the figure is traceable to a specific closing day. */}
         <Row
           title={t("ops.collection.opening_balance")}
           value={displayOpeningBalance}
           iconBg="bg-violet-100"
           iconColor="text-violet-600"
           icon={<Wallet size={18} />}
-          subtitle={periodType === "weekly" ? t("ops.collection.brought_forward_week") : t("ops.collection.brought_forward_day")}
+          subtitle={
+            periodType === "weekly"
+              ? ledgerLoaded && previousWeekEnd
+                ? `${t("ops.collection.brought_forward_week")} (${fmtDate(previousWeekEnd)})`
+                : t("ops.collection.brought_forward_week")
+              : t("ops.collection.brought_forward_day")
+          }
         />
         <Row
           title={t("ops.collection.approved_sales")}
