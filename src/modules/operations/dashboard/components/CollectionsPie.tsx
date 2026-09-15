@@ -160,7 +160,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
       <div className="flex min-h-0 flex-1 items-center justify-center py-2">
         <svg
           viewBox={`0 0 ${W} ${H}`}
-          className="w-full max-w-[450px]"
+          className="w-full max-w-[380px]"
           role="img"
           aria-label={`Collection streams: ${slices.map((s) => `${s.name} ${Math.round(s.percent)}%`).join(", ")}`}
         >
@@ -175,8 +175,10 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
                   x2={CX}
                   y2={CY + RY}
                 >
-                  <stop offset="0%" stopColor={shade(s.color, 0.24)} />
-                  <stop offset="100%" stopColor={s.color} />
+                  {/* Lit from above so the face reads as a solid dome, not a flat sector. */}
+                  <stop offset="0%" stopColor={shade(s.color, 0.28)} />
+                  <stop offset="55%" stopColor={shade(s.color, 0.06)} />
+                  <stop offset="100%" stopColor={shade(s.color, -0.04)} />
                 </linearGradient>
                 <linearGradient
                   id={`cs3d-wall-${i}`}
@@ -198,7 +200,6 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
 
           {/* Slices, back to front: side wall + gradient top face. */}
           {drawOrder.map(({ s, i }) => {
-            const dimmed = hoverIndex !== -1 && hoverIndex !== i;
             const gA0 = s.a0 + GAP_DEG / 2;
             const gA1 = Math.max(s.a1 - GAP_DEG / 2, gA0 + 0.4);
             const wall = wallPath(gA0, gA1);
@@ -206,9 +207,10 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
               <g
                 key={s.name}
                 style={{
-                  opacity: dimmed ? 0.4 : 1,
+                  // No dimming — unselected slices stay fully solid (fading
+                  // them made them look like pale skeletons).
                   transform: hoverIndex === i ? liftTransform(s.mid) : "translate(0px, 0px)",
-                  transition: `opacity 200ms ease, transform 300ms ${SPRING}`,
+                  transition: `transform 300ms ${SPRING}`,
                 }}
               >
                 {wall && <path d={wall} fill={`url(#cs3d-wall-${i})`} />}
