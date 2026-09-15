@@ -1,6 +1,7 @@
 # DMR Poultries — Full-Quarter Sample Data & Module-by-Module Testing Guide
 
-**Dataset file (the only file added):** `scripts/quarter-sample-data.mjs`
+**Dataset source:** `scripts/quarter-sample-data.mjs`
+**Synchronization audit:** `scripts/verify-quarter-sample-data.mjs` (`npm run verify:quarter-data`)
 **Quarter:** a rolling **92-day window ending today** (Sundays off) — e.g. on
 2026-09-12 the window is 2026-06-13 → 2026-09-12 and the label reads
 "Quarter 3 — Jun to Sep 2026".
@@ -12,7 +13,30 @@ The dataset is a single standalone Node file that answers the same `/api/...`
 contracts the frontend already calls, so every page renders with a full quarter
 of data.
 
-### Sync changes (3 small wiring fixes — no business logic touched)
+### Verify the data sync
+
+```bash
+npm run verify:quarter-data
+```
+
+The command starts a separate in-memory sample API on port `4301`, runs the
+contract and reconciliation audit, then stops it. It never changes the API used
+by `npm run dev`. Set `SAMPLE_VERIFY_PORT` if that port is unavailable.
+
+The audit checks the dashboard/manifest quarter, canonical Shop Sales fields,
+weekly Collection Entry and Pending Collections summaries, and the live
+Operations hand-offs below:
+
+- **Collection:** save → approve → amend → delete updates the master balance,
+  pending total, shop ledger and dashboard collections together.
+- **Shop Sales:** an allowed correction recalculates its amount and rolls into
+  dashboard sales; locked fields still return the production-like validation.
+- **Rate Entry:** Save & Lock moves every delivery exactly once into Shop Sales
+  and removes that trip from the rate-entry queue.
+- **Fuel:** a pending bill affects dashboard expense only after approval and is
+  removed from the totals on delete.
+
+### Initial frontend wiring fixes
 
 Three places previously **ignored the API on purpose**, so data alone could not
 reach them. Each was a pass-through/flag change only:
@@ -209,7 +233,7 @@ opening + sales − collections.
 
 ## 5. Notes / limits
 
-- Writes (POST/PUT/PATCH/DELETE) return `200 {ok:true}` so UI flows complete, but the dataset is immutable — restart-safe and always identical.
+- Writes (POST/PUT/PATCH/DELETE) are held in memory for the current sample-server session; the related Operations, master, ledger, Accounts and dashboard endpoints re-aggregate immediately. Restarting the server restores the pristine deterministic dataset.
 - Auth is stubbed: any credentials log you in as Owner with all permissions.
 - To move the quarter, edit the `QUARTER` constant and `TODAY` at the top of `scripts/quarter-sample-data.mjs`; everything else regenerates from those two values.
 
