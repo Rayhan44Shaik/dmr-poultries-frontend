@@ -576,7 +576,13 @@ export function EditCollectionModal({
                   <p className="text-sm text-slate-500">{t("ops.collection.no_collections_for_shop")}</p>
                 ) : (
                   <div className="overflow-x-auto rounded-lg border border-slate-200">
-                    <table className="min-w-full divide-y divide-slate-200">
+                    {/* Equal columns, same rule as the Collection Entry table. */}
+                    <table className="min-w-full table-fixed divide-y divide-slate-200">
+                      <colgroup>
+                        {Array.from({ length: 7 }).map((_, i) => (
+                          <col key={i} className="w-[14.28%]" />
+                        ))}
+                      </colgroup>
                       {/* Header icons use the same vocabulary as every other
                         * operations table (Trip List, Shop Sales, Recent
                         * Collections) so the columns read identically. */}

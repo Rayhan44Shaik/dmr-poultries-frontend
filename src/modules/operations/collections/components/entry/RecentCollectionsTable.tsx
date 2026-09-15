@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import {
   Search, X, History, CheckCircle, Clock, AlertCircle, Eye, Pencil, Trash2,
   Hash, FileText, Calendar, Store, UserCog, IndianRupee, Activity, Settings2,
@@ -8,6 +8,7 @@ import type { RecentCollection } from "../../types/collection";
 import { useI18n } from "../../../../../i18n";
 import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocalization";
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
+import { getDeleteWindow } from "../../utils/collectionDeleteWindow";
 
 interface Props {
   collections: RecentCollection[];
@@ -20,6 +21,8 @@ interface Props {
   onEdit: (collection: RecentCollection) => void;
   onDelete: (id: string) => void;
   onViewShop: (shopName: string) => void;
+  /** Fires whenever the highlighted row changes, so the page can mirror it. */
+  onSelectionChange?: (collection: RecentCollection | null) => void;
 }
 
 /** Approved tab shows only the most recent shops, not the whole history. */
@@ -54,6 +57,7 @@ export default function RecentCollectionsTable({
   onEdit,
   onDelete,
   onViewShop,
+  onSelectionChange,
 }: Props) {
   const { t, language } = useI18n();
   const [searchQuery, setSearchQuery] = useState("");
@@ -64,6 +68,19 @@ export default function RecentCollectionsTable({
   /** Shop and collector names are data, not i18n keys, so they are transliterated
     * for Telugu using the same helper the Trip screens use. */
   const localize = (value: string) => localizeTripViewText(value, language);
+
+  /** Dates follow the language; numbers stay in Latin digits so amounts and
+    * reference numbers are never ambiguous. Same rule as the Trip view. */
+  const localizeDate = (value: string) => {
+    if (!value) return "-";
+    const parsed = new Date(value);
+    if (Number.isNaN(parsed.getTime())) return value;
+    return parsed.toLocaleDateString(language === "te" ? "te-IN" : "en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
 
   /**
    * Search matches the English source AND the Telugu rendering of every field,
@@ -145,6 +162,101 @@ export default function RecentCollectionsTable({
   const startIndex = (safeCurrentPage - 1) * pageSize;
   const paginatedData = displayedData.slice(startIndex, startIndex + pageSize);
 
+
+  /**
+   * Keyboard navigation, matching the Trip List.
+   *
+   * Rows are a roving tabstop: exactly one row is tabbable at a time, so Tab
+   * enters the table once and moves on rather than walking every row. Inside
+   * the table, Up/Down move the selection (and follow it across page
+   * boundaries), Home/End jump to the ends, and Escape clears. Selecting by
+   * any route reports the row upward so the page shows its detail.
+   */
+  const rowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
+
+  const selectRow = (col: RecentCollection | null) => {
+    setSelectedId(col ? col.id : null);
+    onSelectionChange?.(col);
+  };
+
+  const focusRow = (index: number) => {
+    // Defer to after the row has rendered, which matters when the move
+    // crossed a page boundary and the row did not exist a tick ago.
+    window.requestAnimationFrame(() => rowRefs.current[index]?.focus());
+  };
+
+  const moveSelection = (fromIndex: number, delta: number) => {
+    const target = fromIndex + delta;
+
+    // Step past the end of this page onto the next/previous one.
+    if (target < 0) {
+      if (safeCurrentPage > 1) {
+        setCurrentPage(safeCurrentPage - 1);
+        const lastIndex = pageSize - 1;
+        const row = displayedData[(safeCurrentPage - 2) * pageSize + lastIndex];
+        if (row) selectRow(row);
+        focusRow(lastIndex);
+      }
+      return;
+    }
+    if (target >= paginatedData.length) {
+      if (safeCurrentPage < totalPages) {
+        setCurrentPage(safeCurrentPage + 1);
+        const row = displayedData[safeCurrentPage * pageSize];
+        if (row) selectRow(row);
+        focusRow(0);
+      }
+      return;
+    }
+
+    selectRow(paginatedData[target]);
+    focusRow(target);
+  };
+
+  const handleRowKeyDown = (event: React.KeyboardEvent<HTMLTableRowElement>, index: number, col: RecentCollection) => {
+    // Let the action buttons keep their own keyboard behaviour.
+    if (event.target !== event.currentTarget) return;
+
+    switch (event.key) {
+      case "ArrowDown":
+        event.preventDefault();
+        moveSelection(index, 1);
+        break;
+      case "ArrowUp":
+        event.preventDefault();
+        moveSelection(index, -1);
+        break;
+      case "Home":
+        event.preventDefault();
+        if (paginatedData.length > 0) {
+          selectRow(paginatedData[0]);
+          focusRow(0);
+        }
+        break;
+      case "End":
+        event.preventDefault();
+        if (paginatedData.length > 0) {
+          const last = paginatedData.length - 1;
+          selectRow(paginatedData[last]);
+          focusRow(last);
+        }
+        break;
+      case "Enter":
+      case " ":
+        event.preventDefault();
+        selectRow(selectedId === col.id ? null : col);
+        break;
+      case "Escape":
+        event.preventDefault();
+        selectRow(null);
+        break;
+      default:
+        break;
+    }
+  };
+
+  /** The roving tabstop: the selected row, else the first row. */
+  const activeRowIndex = Math.max(0, paginatedData.findIndex((row) => row.id === selectedId));
 
   /** Any change to the result set returns to page 1, so the view can never be
     * stranded on a page that no longer exists. */
@@ -245,7 +357,15 @@ export default function RecentCollectionsTable({
 
       {/* Table — column sizing and type scale match Recent Trip Activity. */}
       <div className="overflow-x-auto">
-        <table className="min-w-full text-sm text-left border-collapse">
+        {/* `table-fixed` + an even colgroup gives all eight columns — actions
+          * included — exactly the same width, so the grid reads evenly instead
+          * of collapsing around whichever cell happens to hold long text. */}
+        <table className="min-w-full table-fixed text-sm text-left border-collapse">
+          <colgroup>
+            {Array.from({ length: 8 }).map((_, i) => (
+              <col key={i} className="w-[12.5%]" />
+            ))}
+          </colgroup>
           <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-600">
             <tr>
               {/* Each column is tagged with the same icon vocabulary Shop Sales
@@ -328,6 +448,15 @@ export default function RecentCollectionsTable({
                 const isDeleted = rawStatus === "Deleted";
                 const statusKey = "status." + String(rawStatus).toLowerCase().replace(/\s+/g, "_");
                 const statusLabel = t(statusKey) === statusKey ? rawStatus : t(statusKey);
+                // The 10-day delete window, from the same single source of
+                // truth the view modal and the backend use.
+                const deleteWindow = getDeleteWindow(col.collectionDate);
+                const canDeleteRow = deleteWindow.canDelete && !isDeleted;
+                const deleteHint = deleteWindow.canDelete
+                  ? deleteWindow.daysRemaining === 0
+                    ? t("ops.collection.delete_window_last_day")
+                    : t("ops.collection.delete_window_open", { days: deleteWindow.daysRemaining })
+                  : t("ops.collection.delete_window_closed");
                 const statusIcon = isDeleted ? (
                   <AlertCircle size={12} />
                 ) : isPending ? (
@@ -339,15 +468,17 @@ export default function RecentCollectionsTable({
                 return (
                   <tr
                     key={`${col.id}-${index}`}
-                    tabIndex={0}
-                    onClick={() => setSelectedId(isSelected ? null : col.id)}
-                    onKeyDown={(event) => {
-                      if (event.target !== event.currentTarget) return;
-                      if (event.key === "Enter" || event.key === " ") {
-                        event.preventDefault();
-                        setSelectedId(isSelected ? null : col.id);
-                      }
+                    ref={(node) => {
+                      // Clearing on unmount keeps the arrow keys from ever
+                      // focusing a detached row after the page shrinks.
+                      rowRefs.current[index] = node;
+                      return () => {
+                        rowRefs.current[index] = null;
+                      };
                     }}
+                    tabIndex={index === activeRowIndex ? 0 : -1}
+                    onClick={() => selectRow(isSelected ? null : col)}
+                    onKeyDown={(event) => handleRowKeyDown(event, index, col)}
                     aria-selected={isSelected}
                     className={`cursor-pointer outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
                       isSelected
@@ -358,14 +489,14 @@ export default function RecentCollectionsTable({
                     <td className="px-4 py-3 text-center text-xs font-semibold text-slate-500 tabular-nums">
                       {startIndex + index + 1}
                     </td>
-                    <td className="px-4 py-3 text-xs font-semibold text-slate-800 whitespace-nowrap">
+                    <td className="px-4 py-3 text-xs font-semibold text-slate-800 truncate">
                       {col.collectionNo}
                     </td>
                     <td className="px-4 py-3 text-center text-xs font-bold text-slate-600 tabular-nums whitespace-nowrap">
-                      {col.collectionDate}
+                      {localizeDate(col.collectionDate)}
                     </td>
-                    <td className="px-4 py-3 text-xs font-semibold text-slate-700">{localize(col.shopName)}</td>
-                    <td className="px-4 py-3 text-xs font-medium text-slate-600">{localize(col.collectorName)}</td>
+                    <td className="px-4 py-3 text-xs font-semibold text-slate-700 truncate">{localize(col.shopName)}</td>
+                    <td className="px-4 py-3 text-xs font-medium text-slate-600 truncate">{localize(col.collectorName)}</td>
                     <td className="px-4 py-3 text-right text-xs font-bold text-slate-700 tabular-nums whitespace-nowrap">
                       {inr(col.amount)}
                     </td>
@@ -382,7 +513,7 @@ export default function RecentCollectionsTable({
                         * No title attributes — the page is tooltip-free, so each
                         * control carries an aria-label for assistive tech only. */}
                       <div className="flex items-center justify-center gap-1.5">
-                        {isPending ? (
+                        {isPending && (
                           <>
                             <button
                               type="button"
@@ -404,28 +535,43 @@ export default function RecentCollectionsTable({
                                 <Pencil size={14} />
                               </span>
                             </button>
-                            <button
-                              type="button"
-                              onClick={() => onDelete(col.id)}
-                              aria-label={t("common.delete")}
-                              className="group h-8 w-8 rounded-xl bg-rose-50 hover:bg-rose-500 text-rose-600 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95"
-                            >
-                              <span className={`inline-flex ${uiActionIconMotionClass.delete}`}>
-                                <Trash2 size={14} />
-                              </span>
-                            </button>
                           </>
-                        ) : isDeleted ? (
-                          <span className="text-xs font-medium text-slate-400">{t("status.deleted")}</span>
-                        ) : (
+                        )}
+
+                        {!isDeleted && (
                           <button
                             type="button"
                             onClick={() => onViewShop(col.shopName)}
                             aria-label={t("common.view")}
-                            className="group h-8 w-8 rounded-xl bg-violet-50 hover:bg-violet-500 text-violet-600 hover:text-white flex items-center justify-center mx-auto transition-all shadow-sm active:scale-95"
+                            className="group h-8 w-8 rounded-xl bg-violet-50 hover:bg-violet-500 text-violet-600 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95"
                           >
                             <span className={`inline-flex ${uiActionIconMotionClass.view}`}>
                               <Eye size={14} />
+                            </span>
+                          </button>
+                        )}
+
+                        {/* Delete lives on every row, not just at the top. It is
+                          * enabled only inside the 10-day window measured from the
+                          * entry date; outside it the icon stays visible but
+                          * disabled, so the rule is legible rather than hidden. */}
+                        {isDeleted ? (
+                          <span className="text-xs font-medium text-slate-400">{t("status.deleted")}</span>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => canDeleteRow && onDelete(col.id)}
+                            disabled={!canDeleteRow}
+                            aria-label={`${t("common.delete")} — ${deleteHint}`}
+                            aria-disabled={!canDeleteRow}
+                            className={
+                              canDeleteRow
+                                ? "group h-8 w-8 rounded-xl bg-rose-50 hover:bg-rose-500 text-rose-600 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95"
+                                : "h-8 w-8 rounded-xl bg-slate-50 text-slate-300 border border-slate-200 flex items-center justify-center cursor-not-allowed"
+                            }
+                          >
+                            <span className={canDeleteRow ? `inline-flex ${uiActionIconMotionClass.delete}` : "inline-flex"}>
+                              <Trash2 size={14} />
                             </span>
                           </button>
                         )}
