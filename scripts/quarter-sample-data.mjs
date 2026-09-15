@@ -856,32 +856,54 @@ const COMPLETED_TRIPS = TRIPS.filter((t) => t.status === "Completed" && !t._orde
 const SHOP_SALES = [];
 for (const t of COMPLETED_TRIPS) {
   t.deliveries.forEach((d, i) => {
+    const editable = dayDiff(t.tripDate, TODAY) <= 10;
     SHOP_SALES.push({
       id: d.id,
       saleNo: `${t.tripNo}-S${String(i + 1).padStart(3, "0")}`,
       tripId: t.id,
       tripNo: t.tripNo,
+      // Both spellings are emitted on purpose: the internal aggregations
+      // (shop ledger, pending collections) read tripDate / totalBirds /
+      // totalWeight / remark, while GET /operations/shop-sales answers the
+      // PostgreSQL contract the Shop Sales page maps from — saleDate / birds /
+      // weight / remarks (see shopSaleMapping.ApiShopSale). Emitting only the
+      // internal names made the page's Day / Weight / Remark columns render
+      // "—" and 0.00 next to correct amounts.
+      saleDate: t.tripDate,
       tripDate: t.tripDate,
       shopNo: SHOP_BY_ID.get(d.shopId)?.shopNumber ?? "",
       shopId: d.shopId,
       shopName: d.shopName,
       birdTypeId: d.birdTypeId,
       birdType: d.birdType,
+      birds: d.birds,
       totalBirds: d.birds,
+      weight: d.weight,
       totalWeight: d.weight,
       mortality: d.mortality,
       rate: d.rate,
       amount: d.amount,
+      remarks: d.remarks,
       remark: d.remarks,
+      vehicleNo: t.vehicleNo ?? null,
+      farmName: t.sourceFarm ?? null,
       status: "Completed",
-      editable: dayDiff(t.tripDate, TODAY) <= 10,
+      deleted: false,
+      deletedReason: null,
+      editable,
       windowExpiresAt: addDays(t.tripDate, 10),
       tripDeleted: false,
-      lockReason:
-        dayDiff(t.tripDate, TODAY) > 10 ? "Editing period has expired." : null,
+      lockReason: editable ? null : "Editing period has expired.",
+      correctionWindowExpired: !editable,
+      correctionWindowClosesAt: addDays(t.tripDate, 10),
+      rateCompleted: true,
       rateLocked: true,
       rateLockedAt: t.rateLockedAt,
+      rateLockedBy: "Office",
+      approvedBy: "Owner",
+      approvedAt: ts(t.tripDate, "21:00:00"),
       createdAt: ts(t.tripDate, "20:20:00"),
+      updatedAt: ts(t.tripDate, "20:20:00"),
     });
   });
 }
@@ -1299,7 +1321,19 @@ for (const date of OP_DATES) {
       referenceNo: `REF${between(r, 10000000, 99999999)}`,
       category: type === "Farmer Payment" ? "Procurement" : "Operations",
       remarks: i % 5 === 0 ? "Settled against quarter dues" : "",
-      status: dayDiff(date, TODAY) <= 2 && i % 4 === 0 ? "Approved" : "Paid",
+      // Lifecycle: Draft (awaiting sign-off in the Payment Register's default
+      // "Pending" view + the shell's approval bell) → Approved → Paid. Recent
+      // days carry the open drafts, older days are settled history.
+      status:
+        dayDiff(date, TODAY) <= 2
+          ? i % 4 === 0
+            ? "Approved"
+            : i % 4 === 1
+              ? "Draft"
+              : "Paid"
+          : dayDiff(date, TODAY) <= 10 && i % 6 === 0
+            ? "Approved"
+            : "Paid",
       createdBy: "Office",
       createdAt: ts(date, "16:00:00"),
       updatedAt: ts(date, "16:05:00"),
@@ -1542,8 +1576,19 @@ const ADVANCES = EMPLOYEES.filter((_, i) => i % 4 === 0).map((e, i) => {
 
 const inRange = (d, from, to) => (!from || d >= from) && (!to || d <= to);
 
+/**
+ * Trip rows used by every aggregation (dashboards, performance, analytics).
+ *
+ * ORD-* order containers are NOT trips: they carry no vehicle, no driver and
+ * no distance — they exist only to hold a day's order plan for the Orders
+ * page. They are excluded here for the same reason `/api/operations/trip-list`
+ * and Recent Transit exclude them, so no phantom "0" driver / "0" vehicle row
+ * and no inflated trip count can leak into a KPI or a report.
+ */
 function tripsIn(from, to) {
-  return TRIPS.filter((t) => !t.deleted && inRange(t.tripDate, from, to));
+  return TRIPS.filter(
+    (t) => !t.deleted && !t._orderContainer && !isOrderContainerRow(t) && inRange(t.tripDate, from, to)
+  );
 }
 
 function operationsDashboard(from = QUARTER.fromDate, to = QUARTER.toDate) {
@@ -1815,7 +1860,21 @@ function fleetAnalytics(params) {
   const litres = round(fuel.reduce((a, f) => a + f.liters, 0), 2);
   const fuelCost = round(fuel.reduce((a, f) => a + f.amount, 0), 2);
   const maintenanceCost = round(mnt.reduce((a, m) => a + m.totalCost, 0), 2);
-  const emiDue = round(EMIS.reduce((a, e) => a + e.emiAmount * 3, 0), 2);
+  // EMI is a monthly charge: only the installments that actually fall due
+  // inside the requested range count. Charging the whole loan (or a flat
+  // three months) made a two-day range carry a quarter of EMIs, which pushed
+  // the fleet total and cost/km far away from every other cost view.
+  const emiForVehicle = (id) => {
+    const emi = EMIS.find((e) => e.vehicleId === id);
+    if (!emi) return 0;
+    return round(
+      emiSchedule(emi)
+        .filter((installment) => inRange(installment.dueDate, from, to))
+        .reduce((a, installment) => a + installment.amount, 0),
+      2
+    );
+  };
+  const emiDue = round(EMIS.reduce((a, e) => a + emiForVehicle(e.vehicleId), 0), 2);
   const tollCost = round(trips.reduce((a, t) => a + t.deliveryTolls + t.pickupTolls, 0), 2);
   const otherCost = round(trips.reduce((a, t) => a + (t.meals ?? 0) + (t.loading ?? 0), 0), 2);
   const totalExpense = round(fuelCost + maintenanceCost + emiDue + tollCost + otherCost, 2);
@@ -1863,7 +1922,18 @@ function fleetAnalytics(params) {
     e.maintenanceCost += m.totalCost;
     perVehicle.set(m.vehicleId, e);
   }
-  const vehicleStats = [...perVehicle.entries()].map(([id, v]) => ({
+  // One row per fleet vehicle (not only the ones that moved): the page's
+  // "vehicle utilization" is active ÷ total, so the total has to be the whole
+  // fleet. Vehicles with no activity in the range keep a zero row.
+  const perVehicleRows = new Map(perVehicle);
+  if (!vehicleId) {
+    for (const v of VEHICLES) {
+      if (!perVehicleRows.has(v.id)) {
+        perVehicleRows.set(v.id, { trips: 0, distance: 0, fuelLitres: 0, fuelCost: 0, maintenanceCost: 0, tollCost: 0, otherCost: 0 });
+      }
+    }
+  }
+  const vehicleStats = [...perVehicleRows.entries()].map(([id, v]) => ({
     vehicleId: id,
     vehicleNumber: VEHICLE_BY_ID.get(id)?.vehicleNumber ?? String(id),
     trips: v.trips,
@@ -1871,7 +1941,7 @@ function fleetAnalytics(params) {
     fuelLitres: round(v.fuelLitres, 2),
     fuelCost: round(v.fuelCost, 2),
     maintenanceCost: round(v.maintenanceCost, 2),
-    emiCost: round((EMIS.find((e) => e.vehicleId === id)?.emiAmount ?? 0) * 3, 2),
+    emiCost: emiForVehicle(id),
     tollCost: round(v.tollCost, 2),
     otherCost: round(v.otherCost, 2),
     totalExpense: round(v.fuelCost + v.maintenanceCost + v.tollCost + v.otherCost, 2),
@@ -2212,22 +2282,35 @@ function attendanceSummary(month) {
   const monthDates = DATES.filter((d) => monthOf(d) === m);
   return EMPLOYEES.filter((e) => e.status === "Active").map((e) => {
     const rows = monthDates.map((d) => (DUTY_BY_DATE.get(d) ?? []).find((a) => a.employeeId === e.id));
-    const present = rows.filter((a) => a && !["WeeklyOff", "Rest"].includes(a.dutyType)).length;
+    // The salary register derives its Working / Present / Leave columns from
+    // THIS summary, so the two must apply one rule:
+    //   workingDays  = calendar days in the month − weekly offs (Sundays)
+    //   presentDays  = workingDays − approved leave days
+    // Rostered "Rest" days are paid working days, and an unassigned future
+    // cell in the planner is not an absence — counting either as one made the
+    // summary disagree with the register it is the authority for.
     const weeklyOff = rows.filter((a) => a && a.dutyType === "WeeklyOff").length;
+    const rosteredDutyDays = rows.filter((a) => a && a.dutyType !== "WeeklyOff").length;
     const leaveDays = LEAVES.filter(
       (l) => l.employeeId === e.id && l.status === "Approved" && monthOf(l.fromDate) === m
     ).reduce((a, l) => a + l.days, 0);
+    const workingDays = monthDates.length - weeklyOff;
     return {
       employeeId: e.id,
       employeeNo: e.employeeNo,
       employeeName: e.employeeName,
       department: e.department,
       month: m,
-      workingDays: monthDates.length - weeklyOff,
-      presentDays: Math.max(0, present - leaveDays),
+      workingDays,
+      presentDays: Math.max(0, workingDays - leaveDays),
       leaveDays,
       weeklyOffDays: weeklyOff,
-      absentDays: Math.max(0, monthDates.length - weeklyOff - present),
+      // Unapproved absence is not modelled in this dataset.
+      absentDays: 0,
+      // Informational: how many of the working days the roster itself fills.
+      // A gap is a pending planner cell, never an absence.
+      rosterDutyDays: rosteredDutyDays,
+      unassignedDays: Math.max(0, workingDays - rosteredDutyDays),
     };
   });
 }
@@ -3479,6 +3562,34 @@ const server = http.createServer(async (req, res) => {
         );
       return send(200, q.get("page") ? paginate(rows, q) : rows);
     }
+    // Edit one sale line (Shop Sales page): birds / weight / mortality /
+    // remarks / bird type are editable inside the 10-day window; amount is
+    // recomputed from weight × rate exactly like the backend does, and the
+    // row comes back in the same shape GET returns.
+    if (m(/^\/api\/operations\/shop-sales\/(\d+)$/) && ["PUT", "PATCH"].includes(method)) {
+      const id = Number(m(/^\/api\/operations\/shop-sales\/(\d+)$/)[1]);
+      const row = SHOP_SALES.find((s) => s.id === id);
+      if (!row) return send(404, { error: "not_found" });
+      if (!row.editable) return send(409, { error: row.lockReason || "Editing period has expired." });
+      const body = await readBody(req);
+      const previousAmount = row.amount;
+      if (body?.birds != null) row.birds = row.totalBirds = Number(body.birds) || 0;
+      if (body?.weight != null) row.weight = row.totalWeight = Number(body.weight) || 0;
+      if (body?.rate != null) row.rate = Number(body.rate) || 0;
+      if (body?.mortality != null) row.mortality = Number(body.mortality) || 0;
+      if (body?.remarks != null) row.remarks = row.remark = String(body.remarks);
+      if (body?.birdType != null) row.birdType = String(body.birdType);
+      if (body?.birdTypeId != null) row.birdTypeId = Number(body.birdTypeId);
+      row.amount = round((row.weight ?? 0) * (row.rate ?? 0), 2);
+      row.updatedAt = nowIso();
+      // Shop ledger + pending balance read the same rows, so keep the books
+      // tied out after an edit (shop balance moves with the amount).
+      const delta = round(row.amount - previousAmount, 2);
+      SALES_BY_SHOP.set(row.shopId, round((SALES_BY_SHOP.get(row.shopId) ?? 0) + delta, 2));
+      const shop = SHOP_BY_ID.get(row.shopId);
+      if (shop) shop.currentBalance = round(shop.currentBalance + delta, 2);
+      return send(200, row);
+    }
 
     if (p === "/api/operations/collection-entry" && method === "GET") {
       // `status` lets the app shell count only the rows waiting for approval
@@ -3561,13 +3672,66 @@ const server = http.createServer(async (req, res) => {
       return send(200, rows);
     }
     if (p === "/api/operations/collection-entry/pending-summary") {
-      const rows = pendingCollections();
-      return send(200, {
-        data: rows,
-        rows,
-        totalPending: round(rows.reduce((a, r) => a + Math.max(0, r.currentPending), 0), 2),
-        shops: rows.length,
-      });
+      // Contract expected by collectionService.fetchPendingSummary():
+      //   { weekStart, weekEnd, shops: [{ shopId, shopName, weekStart, weekEnd,
+      //     balance, weeklySales, weeklyApprovedCollections,
+      //     weeklyPendingCollections, recoveryPercentage, overdueDays,
+      //     hasPendingCollections, lastCollectionDate }], totals: {...} }
+      // The page renders exactly these fields (it must not recompute them).
+      const asOf = q.get("date") || TODAY;
+      const weekStart = weekKey(asOf);
+      const weekEnd = addDays(weekStart, 6);
+      const shops = pendingCollections()
+        .filter((r) => r.currentPending > 0)
+        .map((r) => {
+          const weeklySales = round(
+            SHOP_SALES.filter((s) => s.shopId === r.shopId && inRange(s.tripDate, weekStart, weekEnd)).reduce(
+              (a, s) => a + s.amount,
+              0
+            ),
+            2
+          );
+          const weekCollections = COLLECTIONS.filter(
+            (c) => !c.deleted && c.shopId === r.shopId && inRange(c.collectionDate, weekStart, weekEnd)
+          );
+          const weeklyApprovedCollections = round(
+            weekCollections.filter((c) => c.status === "Approved").reduce((a, c) => a + c.amount, 0),
+            2
+          );
+          const weeklyPendingCollections = round(
+            weekCollections.filter((c) => c.status === "Pending Approval").reduce((a, c) => a + c.amount, 0),
+            2
+          );
+          return {
+            shopId: r.shopId,
+            shopName: r.shopName,
+            weekStart,
+            weekEnd,
+            balance: round(r.currentPending, 2),
+            weeklySales,
+            weeklyApprovedCollections,
+            weeklyPendingCollections,
+            // Backend-authoritative recovery: approved weekly collections vs
+            // weekly sales (0 % when nothing was sold in the week).
+            recoveryPercentage: weeklySales ? round((weeklyApprovedCollections / weeklySales) * 100, 2) : 0,
+            overdueDays: r.overdueDays ?? 0,
+            hasPendingCollections: weeklyPendingCollections > 0,
+            lastCollectionDate: r.lastCollectionDate && r.lastCollectionDate !== "-" ? r.lastCollectionDate : null,
+          };
+        })
+        .sort((a, b) => b.balance - a.balance);
+      const sum = (pick) => round(shops.reduce((a, s) => a + pick(s), 0), 2);
+      const totals = {
+        weeklySales: sum((s) => s.weeklySales),
+        weeklyApprovedCollections: sum((s) => s.weeklyApprovedCollections),
+        weeklyPendingCollections: sum((s) => s.weeklyPendingCollections),
+        balance: sum((s) => s.balance),
+        recoveryPercentage: 0,
+      };
+      totals.recoveryPercentage = totals.weeklySales
+        ? round((totals.weeklyApprovedCollections / totals.weeklySales) * 100, 2)
+        : 0;
+      return send(200, { weekStart, weekEnd, shops, totals });
     }
     if (m(/^\/api\/operations\/collection-entry\/pending\/(\d+)$/)) {
       const id = Number(m(/^\/api\/operations\/collection-entry\/pending\/(\d+)$/)[1]);

@@ -62,6 +62,30 @@ function toView(payload: FleetAnalyticsResponse): AnalyticsView {
   const expenses = payload.highestExpense ?? [];
   const performers = payload.topPerformers ?? [];
   const expenseByVehicle = new Map(expenses.map((row) => [row.vehicleId, row]));
+  // The backend already ships the full per-vehicle rollup (every vehicle, with
+  // its trip count and EMI share for the selected range). Render it as-is —
+  // rebuilding the table from the top-5 list dropped 19 vehicles and showed
+  // 0 trips / 0 EMI for the rows that remained. Payloads without the rollup
+  // keep working through the top-5 fallback.
+  const vehicleStats = payload.vehicleStats?.length
+    ? payload.vehicleStats.map((row) => ({ ...row }))
+    : performers.map((row) => {
+        const expense = expenseByVehicle.get(row.vehicleId);
+        return {
+          vehicleId: row.vehicleId,
+          vehicleNumber: row.vehicleNumber,
+          trips: row.trips ?? 0,
+          distance: row.distance,
+          fuelLitres: row.fuelLitres,
+          fuelCost: expense?.fuelCost ?? 0,
+          maintenanceCost: expense?.maintenanceCost ?? 0,
+          emiCost: expense?.emiCost ?? 0,
+          tollCost: expense?.tollCost ?? 0,
+          otherCost: expense?.otherCost ?? 0,
+          totalExpense: expense?.totalExpense ?? 0,
+          mileage: row.mileage,
+        };
+      });
   return {
     kpis: {
       ...EMPTY.kpis,
@@ -75,25 +99,11 @@ function toView(payload: FleetAnalyticsResponse): AnalyticsView {
       mileage: row.mileage,
     })),
     costCenters: payload.costCenters ?? [],
-    topPerformers: performers.map((row) => ({ ...row, trips: 0 })),
-    highestExpense: expenses.map((row) => ({ ...row, emiCost: 0 })),
-    vehicleStats: performers.map((row) => {
-      const expense = expenseByVehicle.get(row.vehicleId);
-      return {
-        vehicleId: row.vehicleId,
-        vehicleNumber: row.vehicleNumber,
-        trips: 0,
-        distance: row.distance,
-        fuelLitres: row.fuelLitres,
-        fuelCost: expense?.fuelCost ?? 0,
-        maintenanceCost: expense?.maintenanceCost ?? 0,
-        emiCost: 0,
-        tollCost: expense?.tollCost ?? 0,
-        otherCost: expense?.otherCost ?? 0,
-        totalExpense: expense?.totalExpense ?? 0,
-        mileage: row.mileage,
-      };
-    }),
+    // Vehicle-level figures come straight from the payload (trips / trips cost /
+    // EMI share included) — never zeroed out at the mapping layer.
+    topPerformers: performers.map((row) => ({ ...row })),
+    highestExpense: expenses.map((row) => ({ ...row })),
+    vehicleStats,
   };
 }
 

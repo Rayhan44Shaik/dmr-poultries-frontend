@@ -22,7 +22,6 @@ import permitApi from '../../fleet-operations/services/permitApi';
 import { fleetSharedGet } from '../../fleet-operations/services/fleetSessionCache';
 import { listEligibleTrips } from '../../operations/shop-sales/services/rateEntryApiService';
 import { listPayments } from '../../accounts/services/paymentApiService';
-import { createDemoPayments } from '../../accounts/utils/paymentRegisterDemo';
 import { listLeaves } from '../../staff/services/leaveService';
 import { STAFF_LEAVES_CHANGED } from '../../staff/services/staffEvents';
 import { apiGet } from '../../../api';
@@ -159,12 +158,14 @@ export function refreshApprovalSnapshot(force = false): Promise<void> {
   publish({ loading: true, error: false });
 
   inFlight = (async () => {
-    const demoPayments = import.meta.env.DEV;
     const results = await Promise.allSettled([
       listTrips(),
       maintenanceApi.list({ status: 'Pending', limit: 500 }),
       listEligibleTrips().catch(() => []),
-      demoPayments ? Promise.resolve(createDemoPayments()) : listPayments().catch(() => []),
+      // Real payments in every environment — the same dataset the Payment
+      // Register opens with. A dev-only switch to the bundled examples used to
+      // make this queue disagree with the register (and with the backend).
+      listPayments().catch(() => []),
       fleetSharedGet('permits:list', () => permitApi.list()).catch(() => []),
       listPendingApprovalCollections(),
       // Every pending leave, whatever month it was raised in — the queue the
