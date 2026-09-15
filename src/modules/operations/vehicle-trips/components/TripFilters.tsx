@@ -210,22 +210,6 @@ function TripFilters({
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-end pt-1">
-        <div className="lg:col-span-5">
-          <label className={opsFilterLabelClass}>
-            <Search size={17} className="text-slate-400 flex-shrink-0" />
-            <span>{t("common.search")}</span>
-          </label>
-          <div className="relative">
-            <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              value={search}
-              onChange={(event) => setSearch(event.target.value)}
-              placeholder={t("ops.trip.search_trips_placeholder")}
-              className={`${opsInputClass} pl-10`}
-            />
-          </div>
-        </div>
-
         <div className="lg:col-span-3">
           <label className={opsFilterLabelClass}>
             <ArrowUpDown size={17} className="text-violet-500 flex-shrink-0" />
@@ -242,6 +226,22 @@ function TripFilters({
             allowClear
             className="w-full"
           />
+        </div>
+
+        <div className="lg:col-span-5">
+          <label className={opsFilterLabelClass}>
+            <Search size={17} className="text-slate-400 flex-shrink-0" />
+            <span>{t("common.search")}</span>
+          </label>
+          <div className="relative">
+            <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={t("ops.trip.search_trips_placeholder")}
+              className={`${opsInputClass} pl-10`}
+            />
+          </div>
         </div>
 
         <div className="lg:col-span-4 flex items-center gap-2 justify-end flex-wrap">

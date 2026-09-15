@@ -213,8 +213,11 @@ function ShopSalesTable({
           </div>
           <h3 className="truncate text-base font-bold tracking-tight text-slate-800">Shop Sales</h3>
           {selectedSale && (
-            <span className="hidden truncate rounded-full border border-emerald-200/70 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700 sm:inline">
-              {selectedSale.tripNo}
+            <span
+              className="inline-flex whitespace-nowrap rounded-full border border-emerald-200/70 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700"
+              title={selectedSale.saleNo || ""}
+            >
+              {selectedSale.saleNo || "—"}
             </span>
           )}
         </div>
