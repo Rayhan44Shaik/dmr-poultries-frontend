@@ -77,7 +77,7 @@ export default function useCollectionEntry() {
   const [loading, setLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
-  const [statusFilter, setStatusFilter] = useState<"Pending" | "Approved">("Pending");
+  const [statusFilter, setStatusFilter] = useState<"Pending" | "Approved" | "Deleted">("Pending");
 
   const today = useMemo(() => new Date().toLocaleDateString("en-GB"), []);
   const dashboard = useMemo(() => collectionService.getDashboardSummary(), []);
@@ -437,7 +437,7 @@ export default function useCollectionEntry() {
     resetEntry();
   }
 
-  function changeStatusFilter(status: "Pending" | "Approved") {
+  function changeStatusFilter(status: "Pending" | "Approved" | "Deleted") {
     setStatusFilter(status);
     setRecentCollections(collectionService.getRecentCollections(status));
   }

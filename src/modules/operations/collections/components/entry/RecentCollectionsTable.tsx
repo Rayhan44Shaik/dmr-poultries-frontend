@@ -14,9 +14,8 @@ interface Props {
   collections: RecentCollection[];
   /** True while the Recent Collections feed is refreshing. */
   isLoading?: boolean;
-  /** Only these two are meaningful here; deleted entries live in the report. */
-  statusFilter: "Pending" | "Approved";
-  onStatusChange: (status: "Pending" | "Approved") => void;
+  statusFilter: "Pending" | "Approved" | "Deleted";
+  onStatusChange: (status: "Pending" | "Approved" | "Deleted") => void;
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   onEdit: (collection: RecentCollection) => void;
@@ -124,6 +123,7 @@ export default function RecentCollectionsTable({
   /** Row buckets per tab — computed once so the toggle can show live counts. */
   const buckets = useMemo(() => {
     const pending = filteredBySearch.filter((col) => col.rawStatus === "Pending Approval");
+    const deleted = filteredBySearch.filter((col) => col.rawStatus === "Deleted");
 
     // Approved tab collapses to the latest entry per shop.
     const shopMap = new Map<string, RecentCollection>();
@@ -154,6 +154,7 @@ export default function RecentCollectionsTable({
       // only the ten rows that happen to be on screen — a search that can
       // only find what you can already see is not a search.
       Approved: isSearching ? approvedByShop : approvedByShop.slice(0, APPROVED_SHOP_LIMIT),
+      Deleted: sort(deleted),
     };
   }, [filteredBySearch, isSearching]);
 
@@ -285,6 +286,8 @@ export default function RecentCollectionsTable({
         return t("empty.no_pending");
       case "Approved":
         return t("ops.collection.no_approved");
+      case "Deleted":
+        return t("ops.collection.no_deleted");
       default:
         return t("empty.no_collections");
     }
@@ -311,13 +314,15 @@ export default function RecentCollectionsTable({
           </span>
 
           <div className="flex items-center p-0.5 ml-2 border border-slate-200/80 rounded-lg overflow-hidden bg-slate-50 shadow-sm">
-            {(["Pending", "Approved"] as const).map((tab) => {
+            {(["Pending", "Approved", "Deleted"] as const).map((tab) => {
               const isActive = statusFilter === tab;
               // Colours match the meaning of each tab and the row/badge tints.
               const activeClass =
                 tab === "Approved"
                   ? "bg-emerald-50/80 text-emerald-500 shadow-sm"
-                  : "bg-orange-50/80 text-orange-500 shadow-sm";
+                  : tab === "Pending"
+                  ? "bg-orange-50/80 text-orange-500 shadow-sm"
+                  : "bg-rose-50/80 text-rose-500 shadow-sm";
               // The Pending tab is "Pending Approval" — the same words the row
               // badge uses, so the tab and the rows it filters agree.
               const key = tab === "Pending" ? "status.pending_approval" : `status.${tab.toLowerCase()}`;
