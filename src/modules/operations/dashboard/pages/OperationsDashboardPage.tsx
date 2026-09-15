@@ -815,7 +815,10 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
           </div>
         </div>
         
-        <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/60 p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-5 w-full min-w-0">
+        {/* overflow-hidden: the donut's hover badge may sit slightly outside
+            the ring — it must stay stuck to THIS card, never bleed into the
+            neighbouring chart. */}
+        <div className="lg:col-span-5 overflow-hidden bg-white rounded-2xl border border-slate-200/60 p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-5 w-full min-w-0">
           <Link
             to="/operations?tab=collection-report"
             title={t("nav.collectionReport")}

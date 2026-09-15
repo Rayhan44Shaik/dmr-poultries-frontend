@@ -52,9 +52,9 @@ function useCountUp(target: number, duration = 900): number {
 /**
  * Collection Streams — payment-mode donut for the Operations dashboard.
  *
- * A fixed 256 px square stage keeps the ring a perfect circle at every window
- * size, with generous white space on all sides. Slices sweep in on mount /
- * range change. The whole donut makes one very slow ambient revolution —
+ * The square stage (up to 256 px, scaling down with the card so the badge
+ * can never bleed into a neighbouring chart) keeps the ring a perfect
+ * circle at every window size. Slices sweep in on mount / range change. The whole donut makes one very slow ambient revolution —
  * 8 minutes per lap, barely noticeable, off with reduced-motion.
  *
  * A white pop badge with the exact share appears ONLY for the checked
@@ -168,9 +168,12 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
     <div className="flex w-full min-w-0 flex-1 flex-col">
       {/* Donut — fixed square stage, generous white space on all sides. */}
       <div className="flex min-h-0 flex-1 items-center justify-center py-3">
-        <div className="relative h-64 w-64">
-          {/* Soft background track behind the ring (matches the 58%–84% band). */}
-          <div className="absolute left-1/2 top-1/2 h-[215px] w-[215px] -translate-x-1/2 -translate-y-1/2 rounded-full border-[33px] border-slate-100/80" />
+        <div className="relative aspect-square w-full max-w-64">
+          {/* Soft background track behind the ring (matches the 58%–84% band).
+              SVG circle so it scales with the stage at every card width. */}
+          <svg viewBox="0 0 256 256" className="absolute inset-0 h-full w-full" aria-hidden="true">
+            <circle cx="128" cy="128" r="91" fill="none" stroke="rgba(241,245,249,0.8)" strokeWidth="33" />
+          </svg>
 
           <div ref={spinRef} className="cs-pie-spin h-full w-full">
             <div className="h-full w-full [filter:drop-shadow(0_18px_26px_-16px_rgba(15,23,42,0.35))]">
