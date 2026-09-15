@@ -15,11 +15,9 @@ import {
   CheckCircle2,
   CircleMinus,
   Clock,
-  Eye,
   IndianRupee,
   Lock,
   Mail,
-  Settings2,
   ShieldCheck,
   User,
   UserCheck,
@@ -127,7 +125,7 @@ export function SalaryTable({
   paidOnDate,
 }: SalaryTableProps) {
   const selectable = Boolean(selectedIds && onToggleSelect && onToggleSelectAll);
-  const hasRowActions = Boolean(onView || onEmail || onWhatsApp);
+  const hasQuickActions = Boolean(onEmail || onWhatsApp);
   const formatVal = formatCurrency || ((amount: number) =>
     new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount || 0));
 
@@ -193,22 +191,23 @@ export function SalaryTable({
       <div className="w-full overflow-x-auto">
         {/* table-fixed + colgroup keeps every column on an exact width so the
             header, body and totals rows all sync on the same grid lines: the
-            three day-count columns share one width, the three money columns
-            share one width, and Status / Actions stay short — no leftover
-            space drifting to the end of the row. */}
-        <table className="w-full min-w-[1080px] table-fixed text-[13px] text-left border-collapse">
+            three day-count columns share one width (data centred under the
+            header), the three money columns share one width (amounts start at
+            the left of the column, leaving a clean gap before Status), and
+            the mail / WhatsApp quick actions live under the employee name —
+            no separate Actions column. */}
+        <table className="w-full min-w-[1000px] table-fixed text-[13px] text-left border-collapse">
           <colgroup>
             {selectable && <col className="w-10" />}
             <col className="w-11" />
-            <col className="w-[14%]" />
+            <col className="w-[20%]" />
             <col className="w-[9%]" />
             <col className="w-[9%]" />
             <col className="w-[9%]" />
+            <col className="w-[13%]" />
+            <col className="w-[13%]" />
+            <col className="w-[13%]" />
             <col className="w-[12%]" />
-            <col className="w-[12%]" />
-            <col className="w-[12%]" />
-            <col className="w-[10%]" />
-            {hasRowActions && <col className="w-[11%]" />}
           </colgroup>
           <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-600">
             <tr className="whitespace-nowrap">
@@ -231,32 +230,27 @@ export function SalaryTable({
               <th className={`${TH_CLASS} text-left`}>
                 <ColHead icon={<User size={14} className="text-emerald-500 flex-shrink-0" />} label="Employee" />
               </th>
-              <th className={`${TH_CLASS} text-right`}>
-                <ColHead right icon={<Calendar size={14} className="text-blue-500 flex-shrink-0" />} label="Working" />
+              <th className={`${TH_CLASS} text-center`}>
+                <ColHead center icon={<Calendar size={14} className="text-blue-500 flex-shrink-0" />} label="Working" />
               </th>
-              <th className={`${TH_CLASS} text-right`}>
-                <ColHead right icon={<UserCheck size={14} className="text-cyan-500 flex-shrink-0" />} label="Present" />
+              <th className={`${TH_CLASS} text-center`}>
+                <ColHead center icon={<UserCheck size={14} className="text-cyan-500 flex-shrink-0" />} label="Present" />
               </th>
-              <th className={`${TH_CLASS} text-right`}>
-                <ColHead right icon={<Clock size={14} className="text-amber-500 flex-shrink-0" />} label="Leave" />
+              <th className={`${TH_CLASS} text-center`}>
+                <ColHead center icon={<Clock size={14} className="text-amber-500 flex-shrink-0" />} label="Leave" />
               </th>
-              <th className={`${TH_CLASS} text-right`}>
-                <ColHead right icon={<Wallet size={14} className="text-indigo-500 flex-shrink-0" />} label="Basic" />
+              <th className={`${TH_CLASS} text-left`}>
+                <ColHead icon={<Wallet size={14} className="text-indigo-500 flex-shrink-0" />} label="Basic" />
               </th>
-              <th className={`${TH_CLASS} text-right`}>
-                <ColHead right icon={<CircleMinus size={14} className="text-rose-500 flex-shrink-0" />} label="Deductions" />
+              <th className={`${TH_CLASS} text-left`}>
+                <ColHead icon={<CircleMinus size={14} className="text-rose-500 flex-shrink-0" />} label="Deductions" />
               </th>
-              <th className={`${TH_CLASS} text-right`}>
-                <ColHead right icon={<IndianRupee size={14} className="text-emerald-600 flex-shrink-0" />} label="Net" />
+              <th className={`${TH_CLASS} text-left`}>
+                <ColHead icon={<IndianRupee size={14} className="text-emerald-600 flex-shrink-0" />} label="Net" />
               </th>
               <th className={`${TH_CLASS} text-left`}>
                 <ColHead icon={<ShieldCheck size={14} className="text-purple-500 flex-shrink-0" />} label="Status" />
               </th>
-              {hasRowActions && (
-                <th className={`${TH_CLASS} text-center`}>
-                  <ColHead center icon={<Settings2 size={14} className="text-slate-400 flex-shrink-0" />} label="Actions" />
-                </th>
-              )}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -290,16 +284,51 @@ export function SalaryTable({
                   <td className="px-3 py-4 text-center text-[13px] text-slate-500 font-medium">{serialNo}</td>
                   <td className="px-3 py-4 min-w-0">
                     <div className="truncate text-[13px] font-bold text-slate-800">{record.employeeName}</div>
-                    {record.department ? (
-                      <div className="truncate text-[11px] font-medium text-slate-500 mt-0.5">{record.department}</div>
-                    ) : null}
+                    <div className="mt-0.5 flex items-center gap-2 min-w-0">
+                      {record.department ? (
+                        <span className="truncate text-[11px] font-medium text-slate-500">{record.department}</span>
+                      ) : null}
+                      {/* Mail / WhatsApp quick actions sit beside the department,
+                          under the name — plain glyphs, no filled background. */}
+                      {hasQuickActions && (
+                        <span
+                          className="flex items-center gap-2 shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {onEmail && (
+                            <button
+                              type="button"
+                              aria-label={`Email payslip to ${record.employeeName}`}
+                              onClick={() => onEmail(record)}
+                              disabled={saving}
+                              className="group inline-flex items-center gap-0.5 text-slate-400 transition hover:text-blue-600 disabled:opacity-40"
+                            >
+                              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-mail)]"><Mail size={13} /></span>
+                              <span className="text-[10px] font-bold tabular-nums">{record.emailsSent ?? 0}</span>
+                            </button>
+                          )}
+                          {onWhatsApp && (
+                            <button
+                              type="button"
+                              aria-label={`WhatsApp payslip to ${record.employeeName}`}
+                              onClick={() => onWhatsApp(record)}
+                              disabled={saving}
+                              className="group inline-flex items-center gap-0.5 text-[#1DA851] transition hover:text-[#128C3E] disabled:opacity-40"
+                            >
+                              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-whatsapp)]"><WhatsAppBrandIcon size={13} /></span>
+                              <span className="text-[10px] font-bold tabular-nums">{record.whatsappsSent ?? 0}</span>
+                            </button>
+                          )}
+                        </span>
+                      )}
+                    </div>
                   </td>
-                  <td className="px-3 py-4 text-right text-[13px] font-medium tabular-nums text-slate-600 whitespace-nowrap">{record.workingDays ?? "—"}</td>
-                  <td className="px-3 py-4 text-right text-[13px] font-medium tabular-nums text-slate-600 whitespace-nowrap">{record.presentDays ?? "—"}</td>
-                  <td className="px-3 py-4 text-right text-[13px] font-medium tabular-nums text-amber-600 whitespace-nowrap">{record.leaveDays ?? "—"}</td>
-                  <td className="px-3 py-4 text-right text-[13px] font-medium tabular-nums text-slate-700 whitespace-nowrap">{formatVal(record.basicSalary)}</td>
-                  <td className="px-3 py-4 text-right text-[13px] font-bold tabular-nums text-rose-600 whitespace-nowrap">{formatVal(record.totalDeductions)}</td>
-                  <td className="px-3 py-4 text-right text-[13px] font-bold tabular-nums text-emerald-700 whitespace-nowrap">{formatVal(record.netSalary)}</td>
+                  <td className="px-3 py-4 text-center text-[13px] font-medium tabular-nums text-slate-600 whitespace-nowrap">{record.workingDays ?? "—"}</td>
+                  <td className="px-3 py-4 text-center text-[13px] font-medium tabular-nums text-slate-600 whitespace-nowrap">{record.presentDays ?? "—"}</td>
+                  <td className="px-3 py-4 text-center text-[13px] font-medium tabular-nums text-amber-600 whitespace-nowrap">{record.leaveDays ?? "—"}</td>
+                  <td className="px-3 py-4 text-left text-[13px] font-medium tabular-nums text-slate-700 whitespace-nowrap">{formatVal(record.basicSalary)}</td>
+                  <td className="px-3 py-4 text-left text-[13px] font-bold tabular-nums text-rose-600 whitespace-nowrap">{formatVal(record.totalDeductions)}</td>
+                  <td className="px-3 py-4 text-left text-[13px] font-bold tabular-nums text-emerald-700 whitespace-nowrap">{formatVal(record.netSalary)}</td>
                   <td className="px-3 py-4 whitespace-nowrap">
                     <StatusBadge record={record} />
                     {record.status === "Paid" && windowOpen && (
@@ -308,47 +337,6 @@ export function SalaryTable({
                       </span>
                     )}
                   </td>
-                  {hasRowActions && (
-                    <td
-                      className="px-3 py-4 text-center"
-                      onClick={(e) => e.stopPropagation()}
-                    >
-                      <div className="flex items-center justify-center gap-1.5">
-                        <button
-                          type="button"
-                          aria-label={`View payslip for ${record.employeeName}`}
-                          onClick={() => onView(record)}
-                          className="group inline-flex h-7 items-center justify-center rounded-lg border border-violet-200 bg-white px-1.5 text-violet-500 transition hover:border-violet-300 hover:bg-violet-50 hover:text-violet-700 disabled:opacity-40"
-                        >
-                          <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]"><Eye size={13} /></span>
-                        </button>
-                        {onEmail && (
-                          <button
-                            type="button"
-                            aria-label={`Email payslip to ${record.employeeName}`}
-                            onClick={() => onEmail(record)}
-                            disabled={saving}
-                            className="group inline-flex h-7 items-center gap-1 rounded-lg border border-slate-200 bg-white px-1.5 text-slate-500 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-600 disabled:opacity-40"
-                          >
-                            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-mail)]"><Mail size={13} /></span>
-                            <span className="text-[10px] font-bold tabular-nums">{record.emailsSent ?? 0}</span>
-                          </button>
-                        )}
-                        {onWhatsApp && (
-                          <button
-                            type="button"
-                            aria-label={`WhatsApp payslip to ${record.employeeName}`}
-                            onClick={() => onWhatsApp(record)}
-                            disabled={saving}
-                            className="group inline-flex h-7 items-center gap-1 rounded-lg bg-[#25D366]/15 px-1.5 text-[#1DA851] transition hover:bg-[#25D366] hover:text-white disabled:opacity-40"
-                          >
-                            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-whatsapp)]"><WhatsAppBrandIcon size={13} /></span>
-                            <span className="text-[10px] font-bold tabular-nums">{record.whatsappsSent ?? 0}</span>
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  )}
                 </tr>
               );
             })}
@@ -358,14 +346,13 @@ export function SalaryTable({
               {selectable && <td className="px-3 py-4" />}
               <td className="px-3 py-4" />
               <td className="px-3 py-4 text-[13px] font-bold text-slate-800 whitespace-nowrap">Total ({footer.count})</td>
-              <td className="px-3 py-4 text-right text-[13px] tabular-nums font-bold text-slate-700 whitespace-nowrap">{footer.workingDays}</td>
-              <td className="px-3 py-4 text-right text-[13px] tabular-nums font-bold text-slate-700 whitespace-nowrap">{footer.presentDays}</td>
-              <td className="px-3 py-4 text-right text-[13px] tabular-nums font-bold text-amber-700 whitespace-nowrap">{footer.leaveDays}</td>
-              <td className="px-3 py-4 text-right text-[13px] tabular-nums font-bold text-slate-700 whitespace-nowrap">{formatVal(footer.basicSalary)}</td>
-              <td className="px-3 py-4 text-right text-[13px] tabular-nums font-bold text-rose-700 whitespace-nowrap">{formatVal(footer.totalDeductions)}</td>
-              <td className="px-3 py-4 text-right text-[13px] tabular-nums font-bold text-emerald-700 whitespace-nowrap">{formatVal(footer.netSalary)}</td>
-              {/* Spans Status + Actions so the breakdown fits the short columns. */}
-              <td colSpan={hasRowActions ? 2 : 1} className="px-3 py-4 text-[11px] tabular-nums font-semibold text-slate-600 whitespace-nowrap">
+              <td className="px-3 py-4 text-center text-[13px] tabular-nums font-bold text-slate-700 whitespace-nowrap">{footer.workingDays}</td>
+              <td className="px-3 py-4 text-center text-[13px] tabular-nums font-bold text-slate-700 whitespace-nowrap">{footer.presentDays}</td>
+              <td className="px-3 py-4 text-center text-[13px] tabular-nums font-bold text-amber-700 whitespace-nowrap">{footer.leaveDays}</td>
+              <td className="px-3 py-4 text-left text-[13px] tabular-nums font-bold text-slate-700 whitespace-nowrap">{formatVal(footer.basicSalary)}</td>
+              <td className="px-3 py-4 text-left text-[13px] tabular-nums font-bold text-rose-700 whitespace-nowrap">{formatVal(footer.totalDeductions)}</td>
+              <td className="px-3 py-4 text-left text-[13px] tabular-nums font-bold text-emerald-700 whitespace-nowrap">{formatVal(footer.netSalary)}</td>
+              <td className="px-3 py-4 text-[11px] tabular-nums font-semibold text-slate-600 whitespace-nowrap">
                 {footer.pending} Pending · {footer.submitted} Submitted · {footer.paid} Paid
               </td>
             </tr>
