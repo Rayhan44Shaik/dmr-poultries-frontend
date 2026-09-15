@@ -9,7 +9,8 @@ import { useShops } from "../../../masters/shops/hooks/useShops";
 import ShopSalesFilters from "../components/ShopSalesFilters";
 import ShopSalesSummary from "../components/ShopSalesSummary";
 import ShopSalesTable from "../components/ShopSalesTable";
-import ShopSalesPagination from "../components/ShopSalesPagination";
+import { Pagination } from "../../../../ui/Pagination";
+import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import type { ShopSale } from "../types/shopSale";
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
 import { notifyTripDataChanged } from "../../../../shared/events/tripDataEvents";
@@ -37,7 +38,6 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
     setCurrentPage,
     pageSize,
     setPageSize,
-    totalPages,
     resetFilters,
     refreshSales,
     isLoading,
@@ -189,17 +189,20 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
           }}
           onUpdateSale={handleUpdateSale}
         />
-        {filteredSales.length > 0 && (
-          <ShopSalesPagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-            pageSize={pageSize}
-            onPageSizeChange={(size) => {
-              setPageSize(size);
-              setCurrentPage(1);
-            }}
-          />
+        {shouldShowPagination(filteredSales.length) && (
+          <div className="border-t border-slate-200 bg-slate-50/50 px-3 py-2">
+            <Pagination
+              page={currentPage}
+              pageSize={pageSize}
+              totalItems={filteredSales.length}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+              }}
+              disabled={isLoading}
+            />
+          </div>
         )}
       </div>
     </div>

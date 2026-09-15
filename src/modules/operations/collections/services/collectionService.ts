@@ -27,6 +27,7 @@ import {
   toApiError,
 } from "../../../../api";
 import { calculateCollectorSummary, calculatePaymentModeSummary } from "../utils/collectionCalculation";
+import { assertUniqueCollectionNumbers } from "../utils/collectionNumberIntegrity";
 
 /** Sizes for list fetches when pagination is unavoidable. */
 const PAGE_SIZE = 200;
@@ -51,6 +52,7 @@ let shopsCache: { id: number; shopName: string; currentBalance: number }[] = [];
    mapping
 ================================================================== */
 function mapStatus(status: string): CollectionLegacyStatus {
+  if (status === "Deleted") return "Deleted";
   if (status === "Approved") return "Approved";
   return "Pending";
 }
@@ -153,8 +155,11 @@ async function fetchPage<T>(
 }
 
 async function fetchCollections(quiet404?: boolean): Promise<CollectionApiEntry[]> {
+  // Load the complete number namespace. Deleted rows stay out of financial
+  // calculations in rebuildCache(), but remain available for the Deleted tab
+  // and for collision checks so their numbers can never be recycled.
   const rows = await fetchPage<Record<string, unknown>>(COLLECTION_PATH, {
-    includeDeleted: "false",
+    includeDeleted: "true",
   }, quiet404);
   return rows.map(mapRawEntry);
 }
@@ -167,18 +172,19 @@ async function fetchShopSales(quiet404?: boolean): Promise<ShopSale[]> {
 /**
  * Recent collection/credit records for ONE shop — backend LIMIT 10, newest
  * first (ORDER BY collection_date DESC, created_at DESC, collection_no DESC).
- * Calls the dedicated GET /collection-entry/recent endpoint, which is also
- * the only endpoint that returns the backend-authoritative `canDelete` flag
- * (CURRENT_DATE <= collection_date + 7) used by Pending Collection. Powers
- * the "Recent 10 Shop Credits" section of the View Collection modal. Never
- * downloads the full register and never uses localStorage.
+ * `includeDeleted=true` makes "latest 10" a complete shop history across
+ * Pending, Approved, Rejected, and Deleted records; deletion changes status,
+ * never identity or collection number. Calls the dedicated
+ * GET /collection-entry/recent endpoint, which also returns the backend-
+ * authoritative `canDelete` flag used by Pending Collection. Never downloads
+ * the full register and never uses localStorage.
  */
 async function fetchRecentCollectionsForShop(
   shopId: number,
   limit = 10
 ): Promise<CollectionApiEntry[]> {
   const { data } = await apiGet<Record<string, unknown>[]>(`${COLLECTION_PATH}/recent`, {
-    params: { shopId, limit },
+    params: { shopId, limit, includeDeleted: "true" },
   });
   return (data ?? []).map((row) => mapRawEntry(row));
 }
@@ -193,6 +199,9 @@ async function fetchShops(): Promise<typeof shopsCache> {
 }
 
 function mapRawEntry(raw: Record<string, unknown>): CollectionApiEntry {
+  const deleted = raw.deleted === true || raw.deleted === 1 || raw.deleted === "true";
+  const sourceStatus = String(raw.status ?? "") as CollectionApiEntry["status"];
+
   return {
     id: Number(raw.id),
     collectionNo: String(raw.collectionNo ?? raw.collection_no ?? ""),
@@ -207,8 +216,11 @@ function mapRawEntry(raw: Record<string, unknown>): CollectionApiEntry {
     paymentMode: String(raw.paymentMode ?? raw.payment_mode ?? "Cash"),
     referenceNo: String(raw.referenceNo ?? raw.reference_no ?? ""),
     remarks: String(raw.remarks ?? ""),
-    status: (String(raw.status ?? "") as CollectionApiEntry["status"]) || "Pending Approval",
-    deleted: Boolean(raw.deleted),
+    // A soft-deleted row can retain its former database status (often
+    // Approved). The UI contract is unambiguous: deleted always renders and
+    // filters as Deleted while keeping the same permanent collection number.
+    status: deleted ? "Deleted" : sourceStatus || "Pending Approval",
+    deleted,
     deletedBy: raw.deletedBy != null ? String(raw.deletedBy) : (raw.deleted_by != null ? String(raw.deleted_by) : null),
     deletedAt: raw.deletedAt != null ? String(raw.deletedAt) : (raw.deleted_at != null ? String(raw.deleted_at) : null),
     isFinancial: Boolean(raw.isFinancial ?? raw.is_financial),
@@ -280,6 +292,10 @@ export async function refreshFromBackend(options?: {
       fetchShopSales(options?.quietNotFound),
       fetchShops(),
     ]);
+    // Collection numbers are permanent financial references. Validate the
+    // complete register (including deleted rows) before exposing any tab so a
+    // duplicate can never be silently presented as a valid record.
+    assertUniqueCollectionNumbers(entries);
     entriesCache = entries;
     shopSalesCache = sales;
     shopsCache = shops;
@@ -318,7 +334,7 @@ function getRecentCollections(status: "Pending" | "Approved" | "Deleted" = "Pend
 
   if (status === "Deleted") {
     // For deleted collections, read directly from entriesCache (including deleted ones)
-    const deletedEntries = entriesCache.filter((e) => e.deleted);
+    const deletedEntries = entriesCache.filter((e) => e.deleted || e.status === "Deleted");
     rows = deletedEntries.map(mapEntryToCollection);
   } else if (status === "Approved") {
     rows = collectionsCache.filter((c) => c.status === "Approved");

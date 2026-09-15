@@ -24,6 +24,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 interface RecordedCall {
   method: string;
   url: string;
+  params?: Record<string, unknown>;
 }
 
 function installMockAdapter(): { calls: RecordedCall[]; restore: () => void } {
@@ -33,7 +34,11 @@ function installMockAdapter(): { calls: RecordedCall[]; restore: () => void } {
   apiClient.defaults.adapter = async (config: AxiosRequestConfig) => {
     const method = (config.method ?? "get").toLowerCase();
     const url = config.url ?? "";
-    calls.push({ method, url });
+    calls.push({
+      method,
+      url,
+      params: config.params as Record<string, unknown> | undefined,
+    });
 
     // GET requests are only hit here because deletePendingCollection() and
     // deleteCollection() both call refreshFromBackend() on success, which
@@ -107,13 +112,30 @@ test("Collection Entry delete and Pending Collection delete are NOT the same end
   }
 });
 
-test("fetchRecentCollectionsForShop() calls GET /operations/collection-entry/recent (the endpoint that returns canDelete)", async () => {
+test("refreshFromBackend() requests deleted rows for global collection-number integrity", async () => {
+  const { calls, restore } = installMockAdapter();
+  try {
+    await collectionService.refreshFromBackend();
+    const collectionCall = calls.find(
+      (call) => call.method === "get" && call.url === "/operations/collection-entry",
+    );
+    assert.ok(collectionCall);
+    assert.equal(collectionCall.params?.includeDeleted, "true");
+  } finally {
+    restore();
+  }
+});
+
+test("fetchRecentCollectionsForShop() requests the shop's complete latest 10 across statuses", async () => {
   const { calls, restore } = installMockAdapter();
   try {
     await collectionService.fetchRecentCollectionsForShop(5, 10);
     const getCalls = calls.filter((c) => c.method === "get");
     assert.equal(getCalls.length, 1);
     assert.equal(getCalls[0].url, "/operations/collection-entry/recent");
+    assert.equal(getCalls[0].params?.shopId, 5);
+    assert.equal(getCalls[0].params?.limit, 10);
+    assert.equal(getCalls[0].params?.includeDeleted, "true");
   } finally {
     restore();
   }

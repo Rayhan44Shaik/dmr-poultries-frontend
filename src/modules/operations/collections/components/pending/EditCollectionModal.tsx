@@ -1,13 +1,14 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   X, Save, Eye, Calendar, User, CreditCard, Hash, IndianRupee, FileText, Loader2,
-  FileDown, Trash2, Store, Activity, Wallet, ShieldAlert, Clock, UserCog, Search,
+  FileDown, Trash2, Store, Activity, Wallet, ShieldAlert, Clock, UserCog, Search, Settings2,
 } from "lucide-react";
 import type { Collection, CollectionApiEntry } from "../../types/collection";
 import { collectionService } from "../../services/collectionService";
 import { useI18n } from "../../../../../i18n";
 import AppShellModal from "../../../../../ui/AppShellModal";
 import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocalization";
+import { formatTripListDay } from "../../../vehicle-trips/utils/formatTripListDay";
 import { getDeleteWindowForStatus } from "../../utils/collectionDeleteWindow";
 import { collectionStatusKey, collectionStatusLabel } from "../../utils/collectionStatusLabel";
 import { exportCollectionPdf } from "../../utils/exportCollectionPdf";
@@ -61,6 +62,14 @@ export function EditCollectionModal({
     (value: string | null | undefined) => localizeTripViewText(value, language, { cleanShopCode: true }),
     [language],
   );
+
+  // Backend-sourced "Recent 10 Shop Credits": newest first, max 10, per shop,
+  // across every status (including deleted history).
+  const [recentList, setRecentList] = useState<CollectionApiEntry[]>([]);
+  /** Free-text filter over this shop's credits. */
+  const [creditSearch, setCreditSearch] = useState("");
+  const [recentLoading, setRecentLoading] = useState(false);
+
   const shopCollections = allCollections
     .filter((c) => c.shopName === shopName)
     .sort((a, b) => b.collectionDate.localeCompare(a.collectionDate));
@@ -79,8 +88,41 @@ export function EditCollectionModal({
   // different row — discards it automatically, with no reset effect.
   const pickedId = pick && pick.key === openKey ? pick.id : null;
   const setPickedId = (id: string) => setPick({ key: openKey, id });
-  const picked = pickedId == null ? null : shopCollections.find((c) => String(c.id) === pickedId) ?? null;
-  const selected = picked ?? collection ?? latest;
+  const pickedCached =
+    pickedId == null ? null : shopCollections.find((c) => String(c.id) === pickedId) ?? null;
+  const pickedApi =
+    pickedId == null ? null : recentList.find((c) => String(c.id) === pickedId) ?? null;
+  // Deleted records are deliberately absent from allCollections, so map a
+  // picked recent API row into the shared detail shape. Memoizing keeps the
+  // selected object stable and prevents the form-sync effect from re-running
+  // when unrelated modal state changes.
+  const pickedFromRecent = useMemo<Collection | null>(() => {
+    if (!pickedApi) return null;
+    return {
+      id: String(pickedApi.id),
+      collectionNo: pickedApi.collectionNo,
+      collectionDate: pickedApi.collectionDate,
+      shopName: pickedApi.shopName,
+      collectorName: pickedApi.collector,
+      paymentModeName: pickedApi.paymentMode,
+      referenceNo: pickedApi.referenceNo,
+      amount: Number(pickedApi.amount),
+      remarks: pickedApi.remarks,
+      status:
+        pickedApi.deleted || pickedApi.status === "Deleted"
+          ? "Deleted"
+          : pickedApi.status === "Approved"
+            ? "Approved"
+            : "Pending",
+      createdDate: pickedApi.createdAt ?? pickedApi.collectionDate,
+      createdBy: pickedApi.createdBy,
+      approvedDate: pickedApi.approvedAt ?? undefined,
+      approvedBy: pickedApi.approvedBy ?? undefined,
+      numericId: pickedApi.id,
+      numericShopId: pickedApi.shopId,
+    };
+  }, [pickedApi]);
+  const selected = pickedFromRecent ?? pickedCached ?? collection ?? latest;
 
   const [formData, setFormData] = useState({
     collectionNo: "",
@@ -91,12 +133,6 @@ export function EditCollectionModal({
     amount: 0,
     remarks: "",
   });
-
-  // Backend-sourced "Recent 10 Shop Credits": newest first, max 10, per shop.
-  const [recentList, setRecentList] = useState<CollectionApiEntry[]>([]);
-  /** Free-text filter over this shop's credits. */
-  const [creditSearch, setCreditSearch] = useState("");
-  const [recentLoading, setRecentLoading] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -243,7 +279,10 @@ export function EditCollectionModal({
    * Confirming starts a visible countdown instead of deleting straight away,
    * which gives an undo window for a destructive, balance-changing action.
    * ------------------------------------------------------------------ */
-  const deleteWindow = getDeleteWindowForStatus(formData.collectionDate, selected?.status);
+  const deleteWindow = getDeleteWindowForStatus(
+    selected?.collectionDate ?? formData.collectionDate,
+    selected?.status,
+  );
   const isPendingEntry = String(selected?.status ?? "").toLowerCase().startsWith("pending");
   const canDelete = Boolean(selected) && deleteWindow.canDelete && selected?.status !== "Deleted";
 
@@ -449,28 +488,6 @@ export function EditCollectionModal({
                     )}
                   </button>
 
-                  {/* Delete — enabled only inside the 10-day window. Outside
-                    * it the icon is disabled and says why; there is no
-                    * override anywhere in the UI. */}
-                  <button
-                    type="button"
-                    onClick={startDeleteCountdown}
-                    disabled={!canDelete || confirmingDelete || deleting}
-                    aria-label={`${t("ops.collection.delete_collection")} — ${deleteHint}`}
-                    className={
-                      canDelete && !confirmingDelete && !deleting
-                        ? "group relative inline-flex items-center justify-center rounded-xl border border-rose-100 bg-rose-50/70 hover:bg-rose-50/90 p-2 text-rose-500 shadow-sm transition-all active:scale-95"
-                        : "inline-flex items-center justify-center rounded-xl border border-slate-200 bg-slate-50 p-2 text-slate-300 cursor-not-allowed"
-                    }
-                  >
-                    {deleting ? (
-                      <Loader2 size={16} className="animate-spin" />
-                    ) : (
-                      <span className={canDelete ? `inline-flex ${uiActionIconMotionClass.delete}` : "inline-flex"}>
-                        <Trash2 size={16} />
-                      </span>
-                    )}
-                  </button>
                 </>
               )}
               <button
@@ -491,10 +508,9 @@ export function EditCollectionModal({
           {isView ? (
             <>
               {/* ── Selected entry, shown first ───────────────────────────
-                * The row the user clicked is the reason this modal opened, so
-                * it leads: the amount as the hero figure, then the supporting
-                * fields on an icon-labelled grid. Everything except numbers
-                * follows the active language. */}
+                * The row the user clicked is the reason this modal opened.
+                * Every field gets an equally readable, colour-coded card;
+                * numbers remain in Latin digits in both languages. */}
               <div className="overflow-hidden rounded-2xl border border-emerald-100 bg-gradient-to-br from-emerald-50/70 via-white to-teal-50/50 shadow-sm">
                 <div className="flex flex-wrap items-center justify-between gap-3 border-b border-emerald-100/70 px-5 py-3">
                   <div className="flex items-center gap-2">
@@ -524,54 +540,101 @@ export function EditCollectionModal({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 gap-5 px-5 py-4 lg:grid-cols-12">
-                  {/* Hero amount — numeric, so it stays in Latin digits. */}
-                  <div className="lg:col-span-3">
-                    <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
-                      <IndianRupee size={13} className="text-emerald-600" />
-                      {t("operations.amount_received")}
-                    </p>
-                    <p className="mt-1 text-2xl font-extrabold tabular-nums text-emerald-700">
-                      {formatCurrency(formData.amount)}
-                    </p>
-                    <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-slate-500">
-                      <Store size={12} className="text-amber-500" />
-                      <span className="truncate">{tr(shopName)}</span>
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2 xl:grid-cols-3 lg:col-span-9">
-                    {renderField({
+                {/* Every selected-entry field is a self-contained, colour-coded
+                  * box. The uniform grid makes the value scan one field at a
+                  * time without the old amount/metadata spacing imbalance. */}
+                <div className="grid grid-cols-1 gap-2.5 p-4 sm:grid-cols-2 xl:grid-cols-4">
+                  {[
+                    {
+                      key: "amount",
+                      label: t("operations.amount_received"),
+                      value: formatCurrency(formData.amount),
+                      icon: IndianRupee,
+                      surface: "border-emerald-200 bg-emerald-50/65",
+                      iconClass: "bg-emerald-100 text-emerald-700 ring-emerald-200",
+                      valueClass: "text-lg text-emerald-800 tabular-nums",
+                    },
+                    {
+                      key: "collection",
                       label: t("ops.collection.collection_no_label"),
                       value: formData.collectionNo || "-",
-                      icon: Hash,
-                    })}
-                    {renderField({
-                      label: t("operations.collection_date"),
-                      value: formatDate(formData.collectionDate, dateLocale),
+                      icon: FileText,
+                      surface: "border-teal-200 bg-teal-50/60",
+                      iconClass: "bg-teal-100 text-teal-700 ring-teal-200",
+                      valueClass: "text-slate-800",
+                    },
+                    {
+                      key: "day",
+                      label: t("common.day"),
+                      value: formatTripListDay(formData.collectionDate, language),
                       icon: Calendar,
-                    })}
-                    {renderField({
+                      surface: "border-blue-200 bg-blue-50/60",
+                      iconClass: "bg-blue-100 text-blue-700 ring-blue-200",
+                      valueClass: "text-slate-800 tabular-nums",
+                    },
+                    {
+                      key: "shop",
+                      label: t("table.shop"),
+                      value: tr(shopName) || "-",
+                      icon: Store,
+                      surface: "border-amber-200 bg-amber-50/60",
+                      iconClass: "bg-amber-100 text-amber-700 ring-amber-200",
+                      valueClass: "text-slate-800",
+                    },
+                    {
+                      key: "collector",
                       label: t("common.collector"),
                       value: tr(formData.collectorName) || "-",
-                      icon: User,
-                    })}
-                    {renderField({
+                      icon: UserCog,
+                      surface: "border-violet-200 bg-violet-50/60",
+                      iconClass: "bg-violet-100 text-violet-700 ring-violet-200",
+                      valueClass: "text-slate-800",
+                    },
+                    {
+                      key: "payment",
                       label: t("operations.payment_mode"),
-                      value: tr(formData.paymentModeName),
+                      value: tr(formData.paymentModeName) || "-",
                       icon: CreditCard,
-                    })}
-                    {renderField({
+                      surface: "border-sky-200 bg-sky-50/60",
+                      iconClass: "bg-sky-100 text-sky-700 ring-sky-200",
+                      valueClass: "text-slate-800",
+                    },
+                    {
+                      key: "reference",
                       label: t("operations.reference_no"),
                       value: formData.referenceNo || "-",
                       icon: Hash,
-                    })}
-                    {renderField({
+                      surface: "border-indigo-200 bg-indigo-50/60",
+                      iconClass: "bg-indigo-100 text-indigo-700 ring-indigo-200",
+                      valueClass: "text-slate-800 tabular-nums",
+                    },
+                    {
+                      key: "remarks",
                       label: t("common.remarks"),
                       value: tr(formData.remarks) || "-",
                       icon: FileText,
-                    })}
-                  </div>
+                      surface: "border-slate-200 bg-slate-50/80",
+                      iconClass: "bg-white text-slate-600 ring-slate-200",
+                      valueClass: "text-slate-800",
+                    },
+                  ].map(({ key, label, value, icon: Icon, surface, iconClass, valueClass }) => (
+                    <div
+                      key={key}
+                      className={`flex min-h-[76px] min-w-0 items-start gap-2.5 rounded-xl border p-3 shadow-sm ${surface}`}
+                    >
+                      <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ring-1 ring-inset ${iconClass}`}>
+                        <Icon size={16} strokeWidth={2.25} />
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-[9.5px] font-extrabold uppercase tracking-wider text-slate-500">
+                          {label}
+                        </p>
+                        <p className={`mt-0.5 break-words text-[13px] font-bold leading-snug ${valueClass}`}>
+                          {value}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
                 </div>
               </div>
 
@@ -604,13 +667,13 @@ export function EditCollectionModal({
 
               {/* Recent 10 Shop Credits — backend-sourced, newest first */}
               <div className="mt-5">
-                <div className="mb-3 flex items-center justify-between">
-                  <h4 className="flex items-center gap-2 text-sm font-bold text-slate-700">
-                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+                <div className="mb-3 flex flex-col gap-3 rounded-xl border border-slate-200/80 bg-gradient-to-r from-slate-50 via-white to-emerald-50/40 px-4 py-3 shadow-sm lg:flex-row lg:items-center lg:justify-between">
+                  <h4 className="flex items-center gap-2 text-sm font-extrabold tracking-tight text-slate-800">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-100 text-emerald-700 ring-1 ring-inset ring-emerald-200">
                       <FileText size={15} />
                     </span>
                     {t("ops.collection.recent_10_credits")}
-                    <span className="hidden rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-500 sm:inline">
+                    <span className="hidden rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-700 sm:inline">
                       {t("ops.collection.click_row_to_view")}
                     </span>
                   </h4>
@@ -655,64 +718,71 @@ export function EditCollectionModal({
                   </p>
                 ) : (
                   <div className="overflow-x-auto rounded-lg border border-slate-200">
-                    {/* Proportioned to content, same rule as the Collection
-                      * Entry table: the serial number needs a sliver, the
-                      * collection number and status need real room. */}
-                    <table className="min-w-[720px] w-full table-fixed divide-y divide-slate-200">
+                    {/* Same leading order as Recent Collections: S.No,
+                      * Collection No, Day. Amount and Collector get equal room;
+                      * the final Actions cell belongs to the selected row. */}
+                    <table className="min-w-[1080px] w-full table-fixed divide-y divide-slate-200">
                       <colgroup>
-                        <col className="w-[5%]" />
-                        <col className="w-[12%]" />
-                        <col className="w-[19%]" />
-                        <col className="w-[13%]" />
+                        <col className="w-[6%]" />
                         <col className="w-[17%]" />
-                        <col className="w-[16%]" />
-                        <col className="w-[18%]" />
+                        <col className="w-[17%]" />
+                        <col className="w-[14%]" />
+                        <col className="w-[14%]" />
+                        <col className="w-[13%]" />
+                        <col className="w-[10%]" />
+                        <col className="w-[9%]" />
                       </colgroup>
                       {/* Header icons use the same vocabulary as every other
                         * operations table (Trip List, Shop Sales, Recent
                         * Collections) so the columns read identically. */}
-                      <thead className="bg-slate-50">
+                      <thead className="border-b border-slate-200 bg-slate-50/75 text-slate-600">
                         <tr>
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
                             <span className="inline-flex items-center gap-1.5">
                               <Hash size={14} className="shrink-0 text-slate-400" />
                               {t("table.s_no")}
                             </span>
                           </th>
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
-                            <span className="inline-flex items-center gap-1.5">
-                              <Calendar size={14} className="shrink-0 text-blue-500" />
-                              {t("table.date")}
-                            </span>
-                          </th>
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
                             <span className="inline-flex items-center gap-1.5">
                               <FileText size={14} className="shrink-0 text-emerald-500" />
                               {t("table.collection_no")}
                             </span>
                           </th>
-                          <th className="px-3 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
                             <span className="inline-flex items-center gap-1.5">
+                              <Calendar size={14} className="shrink-0 text-blue-500" />
+                              {t("common.day")}
+                            </span>
+                          </th>
+                          <th className="px-4 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
+                            <span className="inline-flex w-full items-center justify-end gap-1.5">
                               <IndianRupee size={14} className="shrink-0 text-emerald-600" />
                               {t("table.amount")}
                             </span>
                           </th>
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
                             <span className="inline-flex items-center gap-1.5">
                               <UserCog size={14} className="shrink-0 text-violet-500" />
                               {t("table.collector")}
                             </span>
                           </th>
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
                             <span className="inline-flex items-center gap-1.5">
                               <CreditCard size={14} className="shrink-0 text-sky-500" />
                               {t("operations.payment_mode")}
                             </span>
                           </th>
-                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                          <th className="px-4 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
                             <span className="inline-flex items-center gap-1.5">
                               <Activity size={14} className="shrink-0 text-orange-500" />
                               {t("table.status")}
+                            </span>
+                          </th>
+                          <th className="px-4 py-3 text-center text-xs font-bold text-slate-500 uppercase tracking-wider">
+                            <span className="inline-flex items-center justify-center gap-1.5">
+                              <Settings2 size={14} className="shrink-0 text-slate-400" />
+                              {t("table.actions")}
                             </span>
                           </th>
                         </tr>
@@ -740,24 +810,46 @@ export function EditCollectionModal({
                                 : "hover:bg-slate-50/80"
                             }`}
                           >
-                            <td className="px-3 py-2.5 text-xs tabular-nums text-slate-400">{index + 1}</td>
-                            <td className="px-3 py-2.5 text-xs text-slate-600">
-                              {formatDate(col.collectionDate, dateLocale)}
+                            <td className="px-4 py-3 text-xs font-semibold tabular-nums text-slate-500">
+                              {index + 1}
                             </td>
-                            <td className="px-3 py-2.5 text-xs font-medium text-slate-700">
+                            <td className="px-4 py-3 text-xs font-medium text-slate-700">
                               {col.collectionNo || "-"}
                             </td>
-                            <td className="px-3 py-2.5 text-right text-xs font-bold tabular-nums text-slate-800">
+                            <td className="px-4 py-3 text-xs text-slate-600 tabular-nums whitespace-nowrap">
+                              {formatTripListDay(col.collectionDate, language)}
+                            </td>
+                            <td className="px-4 py-3 text-right text-xs font-bold tabular-nums text-slate-800 whitespace-nowrap">
                               {formatCurrency(Number(col.amount) || 0)}
                             </td>
-                            <td className="px-3 py-2.5 text-xs text-slate-600">
+                            <td className="px-4 py-3 text-xs font-medium text-slate-600 truncate">
                               {tr(col.collector) || "-"}
                             </td>
-                            <td className="px-3 py-2.5 text-xs text-slate-600">
+                            <td className="px-4 py-3 text-xs text-slate-600">
                               {tr(col.paymentMode) || "-"}
                             </td>
-                            <td className="px-3 py-2.5 text-xs text-slate-600">
+                            <td className="px-4 py-3 text-xs font-medium text-slate-600">
                               {collectionStatusLabel(col.status, t) || "-"}
+                            </td>
+                            <td className="px-4 py-3 text-center">
+                              {isRowSelected && canDelete ? (
+                                <button
+                                  type="button"
+                                  onClick={(event) => {
+                                    event.stopPropagation();
+                                    startDeleteCountdown();
+                                  }}
+                                  disabled={confirmingDelete || deleting}
+                                  aria-label={`${t("ops.collection.delete_collection")} — ${deleteHint}`}
+                                  className="group inline-flex h-8 w-8 items-center justify-center rounded-xl border border-rose-100 bg-rose-50 text-rose-500 shadow-sm transition-all hover:bg-rose-500 hover:text-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                                >
+                                  {deleting ? (
+                                    <Loader2 size={14} className="animate-spin" />
+                                  ) : (
+                                    <Trash2 size={14} className={uiActionIconMotionClass.delete} />
+                                  )}
+                                </button>
+                              ) : null}
                             </td>
                           </tr>
                           );

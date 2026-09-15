@@ -309,18 +309,17 @@ function FuelExpensesPage() {
   };
 
   const KpiCards = useMemo(
-    () =>
-      hasFilters ? (
-        <FuelKPICards
-          totalLitres={filteredSummary.totalLitres}
-          totalAmount={filteredSummary.totalAmount}
-          pendingCount={filteredSummary.pendingCount}
-          approvedCount={filteredSummary.approvedCount}
-          avgMileage={filteredSummary.avgMileage}
-          recentTripMileage={filteredSummary.recentTripMileage}
-        />
-      ) : null,
-    [hasFilters, filteredSummary]
+    () => (
+      <FuelKPICards
+        totalLitres={filteredSummary.totalLitres}
+        totalAmount={filteredSummary.totalAmount}
+        pendingCount={filteredSummary.pendingCount}
+        approvedCount={filteredSummary.approvedCount}
+        avgMileage={filteredSummary.avgMileage}
+        recentTripMileage={filteredSummary.recentTripMileage}
+      />
+    ),
+    [filteredSummary]
   );
 
   const selectStyles = opsReactSelectStyles();

@@ -312,7 +312,9 @@ export function OrdersDateControl({
   hideDayChip?: boolean;
 }) {
   if (!day || !today) return null;
-  const minDate = addLocalDays(today, -6);
+  // Matches fetchOrdersData's ten-day selector window. The sample quarter has
+  // eight order days with Sundays off, so every populated day remains reachable.
+  const minDate = addLocalDays(today, -9);
   return (
     <div className={`inline-flex items-center gap-2 ${className}`}>
       <DatePicker

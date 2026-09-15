@@ -46,9 +46,12 @@ prints that and exits without failing the dev command.
   drop the variable (or use `?demo=1` per URL) to exercise real login.
 - Pages can tell they are on sample data: `/api/quarter-summary` and the
   `/api/operations/dashboard` payload carry `sample: true` plus the quarter
-  window. The Executive dashboard shows it as a sky quarter chip; the Operations
-  dashboard no longer prints a "Sample data" strip — the data speaks for itself.
-  Nothing is ever badged in a production build, because the probe is dev-only.
+  window. The Operations overview opens on the complete rolling quarter and
+  shows a compact **Quarter Operations Map**: Trip List, Rate Entry, Shop Sales,
+  Collection Report, Pending Collections, Mortality, Fuel Expenses and Orders
+  each get a live count and a direct link. Changing the overview calendar
+  re-aggregates these counts for that exact range. A real production payload
+  has no sample manifest, so the map is omitted there.
 - `npm run mock:backend` is kept as an alias for `dev:sample-api` (start just the
   sample API); `npm run mock:trips` serves the older, trip-wizard-focused sample
   (`scripts/dev-mock-backend.mjs`) with in-memory wizard save/submit support.

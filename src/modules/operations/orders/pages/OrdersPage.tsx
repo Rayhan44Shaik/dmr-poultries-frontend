@@ -138,7 +138,7 @@ const OrdersPage: React.FC = () => {
   // ── Selected operational day (drives Tabs 1 + 2; today by default) ──────
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const today = data?.today ?? "";
-  // Clamp: never future, always inside the 7-day window.
+  // Clamp: never future, always inside the ten-day operational window.
   const day = selectedDay && today && selectedDay <= today && data?.days.includes(selectedDay)
     ? selectedDay
     : today;

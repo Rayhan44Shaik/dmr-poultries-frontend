@@ -1,14 +1,22 @@
 import { useMemo, useRef, useState } from "react";
 import {
-  Search, X, History, CheckCircle, Clock, AlertCircle, Eye, Pencil,
+  Search, X, History, CheckCircle, Clock, AlertCircle, Eye, Pencil, RotateCcw,
   Hash, FileText, Calendar, Store, UserCog, IndianRupee, Activity, Settings2,
 } from "lucide-react";
 import TripPagination from "../../../vehicle-trips/components/TripPagination";
 import type { RecentCollection } from "../../types/collection";
 import { useI18n } from "../../../../../i18n";
 import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocalization";
+import { formatTripListDay } from "../../../vehicle-trips/utils/formatTripListDay";
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
+import { opsSecondaryButtonClass } from "../../../../../shared/ui/operationsStyles";
+import { BrandRefreshButton } from "../../../../../ui";
 import { collectionStatusKey, collectionStatusLabel } from "../../utils/collectionStatusLabel";
+import {
+  collectionShopKey,
+  compareCollectionRecency,
+  latestApprovedPerShop,
+} from "./latestApprovedPerShop";
 
 interface Props {
   collections: RecentCollection[];
@@ -20,6 +28,8 @@ interface Props {
   onReject: (id: string) => void;
   onEdit: (collection: RecentCollection) => void;
   onViewShop: (shopName: string) => void;
+  /** Reloads the recent feed from the backend without changing the active view. */
+  onRefresh: () => void | Promise<void>;
   /** Fires whenever the highlighted row changes, so the page can mirror it. */
   onSelectionChange?: (collection: RecentCollection | null) => void;
 }
@@ -52,6 +62,7 @@ export default function RecentCollectionsTable({
   onApprove,
   onEdit,
   onViewShop,
+  onRefresh,
   onSelectionChange,
 }: Props) {
   const { t, language } = useI18n();
@@ -63,19 +74,6 @@ export default function RecentCollectionsTable({
   /** Shop and collector names are data, not i18n keys, so they are transliterated
     * for Telugu using the same helper the Trip screens use. */
   const localize = (value: string) => localizeTripViewText(value, language);
-
-  /** Dates follow the language; numbers stay in Latin digits so amounts and
-    * reference numbers are never ambiguous. Same rule as the Trip view. */
-  const localizeDate = (value: string) => {
-    if (!value) return "-";
-    const parsed = new Date(value);
-    if (Number.isNaN(parsed.getTime())) return value;
-    return parsed.toLocaleDateString(language === "te" ? "te-IN" : "en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
-  };
 
   /**
    * Search matches the English source AND the Telugu rendering of every field,
@@ -117,57 +115,29 @@ export default function RecentCollectionsTable({
     const pending = filteredBySearch.filter((col) => col.rawStatus === "Pending Approval");
     const deleted = filteredBySearch.filter((col) => col.rawStatus === "Deleted");
 
-    // Approved tab: one row per shop, showing that shop's MOST RECENT
-    // approved collection.
-    //
-    // Two things matter here and both were previously wrong:
-    //
-    // 1. "Latest" is resolved against the FULL approved set, never the
-    //    search-filtered one. Picking the newest of only the matching rows
-    //    would show an older collection number whenever the search happened
-    //    to exclude the real latest entry — the row would claim to be the
-    //    shop's current state while showing stale figures. The search is
-    //    applied afterwards, to decide which shop rows to display.
-    //
-    // 2. Recency is compared on ONE clock. Mixing approvedDate for one side
-    //    and collectionDate for the other compares different quantities, so
-    //    the winner depended on which rows happened to carry an approvedDate.
-    //    collectionDate is the entry date every row has; the id breaks ties
-    //    within a day, giving a total order that cannot flip between renders.
-    const allApproved = collections.filter((row) => (row.rawStatus || row.status) === "Approved");
-
-    const isNewer = (candidate: RecentCollection, current: RecentCollection) => {
-      const byDate = candidate.collectionDate.localeCompare(current.collectionDate);
-      if (byDate !== 0) return byDate > 0;
-      return (candidate.numericId ?? 0) > (current.numericId ?? 0);
-    };
-
-    const shopMap = new Map<string, RecentCollection>();
-    for (const col of allApproved) {
-      const existing = shopMap.get(col.shopName);
-      if (!existing || isNewer(col, existing)) shopMap.set(col.shopName, col);
-    }
-
-    const sort = (rows: RecentCollection[]) =>
-      [...rows].sort((a, b) => b.collectionDate.localeCompare(a.collectionDate));
-
-    // Now apply the search to the one-row-per-shop list.
-    const matchingShops = new Set(
+    // Resolve the one-row-per-shop Approved list against the COMPLETE
+    // approved set before applying search. This guarantees that searching an
+    // older number can reveal its shop, but the row still displays that shop's
+    // actual newest approved collection number. Stable shop ids prevent two
+    // shops with the same display name from being collapsed together.
+    const newestApprovedRows = latestApprovedPerShop(collections);
+    const matchingApprovedShopKeys = new Set(
       filteredBySearch
         .filter((row) => (row.rawStatus || row.status) === "Approved")
-        .map((row) => row.shopName),
+        .map(collectionShopKey),
+    );
+    const approvedByShop = newestApprovedRows.filter((row) =>
+      matchingApprovedShopKeys.has(collectionShopKey(row)),
     );
 
-    const approvedByShop = sort(
-      Array.from(shopMap.values()).filter((row) => matchingShops.has(row.shopName)),
-    );
+    const sort = (rows: RecentCollection[]) =>
+      [...rows].sort((a, b) => compareCollectionRecency(b, a));
 
     return {
       Pending: sort(pending),
-      // EVERY shop that has an approved collection appears, one row each,
-      // showing that shop's most recent entry. The row is a doorway: opening
-      // it reveals that shop's latest 10 collections. Pagination keeps the
-      // full list manageable, so no shop is silently withheld.
+      // EVERY shop that has an approved collection appears exactly once and
+      // carries that shop's most recent approved collection number. Opening
+      // the row loads the same shop's latest 10 records across all statuses.
       Approved: approvedByShop,
       Deleted: sort(deleted),
     };
@@ -278,13 +248,27 @@ export default function RecentCollectionsTable({
   /** The roving tabstop: the selected row, else the first row. */
   const activeRowIndex = Math.max(0, paginatedData.findIndex((row) => row.id === selectedId));
 
-  /** Any change to the result set returns to page 1, so the view can never be
-    * stranded on a page that no longer exists. */
+  /** Any search/reset change returns to page 1 and clears the old selection,
+    * so an action can never target a row that is no longer visible. */
   const updateSearch = (value: string) => {
     setSearchQuery(value);
     setCurrentPage(1);
+    selectRow(null);
   };
   const clearSearch = () => updateSearch("");
+  const resetTable = () => updateSearch("");
+
+  const refreshTable = () => {
+    setCurrentPage(1);
+    selectRow(null);
+    void onRefresh();
+  };
+
+  /** Approved actions always select first, then open that exact entry. */
+  const viewApprovedCollection = (collection: RecentCollection) => {
+    selectRow(collection);
+    onViewShop(collection.shopName);
+  };
 
   const getEmptyStateMessage = (): string => {
     switch (statusFilter) {
@@ -337,6 +321,7 @@ export default function RecentCollectionsTable({
                   key={tab}
                   type="button"
                   onClick={() => {
+                    selectRow(null);
                     onStatusChange(tab);
                     setCurrentPage(1);
                   }}
@@ -373,37 +358,44 @@ export default function RecentCollectionsTable({
               </button>
             )}
           </div>
+
+          <button
+            type="button"
+            onClick={resetTable}
+            className={`group relative ${opsSecondaryButtonClass}`}
+            aria-label={t("common.reset")}
+          >
+            <span className={`inline-flex ${uiActionIconMotionClass.reset}`}>
+              <RotateCcw size={14} />
+            </span>
+            {t("common.reset")}
+          </button>
+
+          <BrandRefreshButton
+            onClick={refreshTable}
+            loading={isLoading}
+            ariaLabel={t("common.refresh")}
+          >
+            {t("common.refresh")}
+          </BrandRefreshButton>
+
         </div>
       </div>
 
-      {/* Table — column sizing and type scale match Recent Trip Activity. */}
+      {/* Data-first order shared with View Collection: S.No, Collection No,
+        * then Day. Remaining widths follow the content they carry so labels
+        * and values stay evenly separated without wasting table space. */}
       <div className="overflow-x-auto">
-        {/* Column widths are proportioned to what each column actually holds,
-          * measured against the live dataset (longest / average characters):
-          *
-          *   S.No 3 · Collection No 16 · Date 11 · Shop 33/22 · Collector 14/11
-          *   · Amount 11 · Status "Pending" · Actions 4 icons
-          *
-          * 8/14/10/19/14/10/9/16, summing to exactly 100%. The 1180px floor
-          * guarantees every worst case: Actions 16% = 189px against the 178px
-          * four 32px buttons plus gaps and padding need, Status 9% = 106px for
-          * the short "Pending" badge, Shop 19% = 224px. Below the floor the
-          * table scrolls horizontally rather than crushing a column.
-          *
-          * S.No, Date and their headers are left-aligned like every other text
-          * column. They were previously centred, which floated the value away
-          * from its own heading and read as uneven gaps either side of
-          * Collection No — an alignment problem that no width change fixes. */}
-        <table className="min-w-[1180px] w-full table-fixed text-sm text-left border-collapse">
+        <table className="min-w-[1200px] w-full table-fixed text-sm text-left border-collapse">
           <colgroup>
-            <col className="w-[8%]" />
-            <col className="w-[14%]" />
-            <col className="w-[10%]" />
-            <col className="w-[19%]" />
-            <col className="w-[14%]" />
-            <col className="w-[10%]" />
-            <col className="w-[9%]" />
+            <col className="w-[6%]" />
+            <col className="w-[15%]" />
             <col className="w-[16%]" />
+            <col className="w-[18%]" />
+            <col className="w-[12%]" />
+            <col className="w-[12%]" />
+            <col className="w-[10%]" />
+            <col className="w-[11%]" />
           </colgroup>
           <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-600">
             <tr>
@@ -415,7 +407,7 @@ export default function RecentCollectionsTable({
                   {t("table.s_no")}
                 </span>
               </th>
-              <th className="px-4 py-3 text-sm font-bold uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-sm font-bold uppercase tracking-wider">
                 <span className="inline-flex items-center gap-1.5">
                   <FileText size={14} className="shrink-0 text-emerald-500" />
                   {t("table.collection_no")}
@@ -424,7 +416,7 @@ export default function RecentCollectionsTable({
               <th className="px-4 py-3 text-left text-sm font-bold uppercase tracking-wider">
                 <span className="inline-flex items-center gap-1.5">
                   <Calendar size={14} className="shrink-0 text-blue-500" />
-                  {t("table.date")}
+                  {t("common.day")}
                 </span>
               </th>
               <th className="px-4 py-3 text-sm font-bold uppercase tracking-wider">
@@ -440,7 +432,7 @@ export default function RecentCollectionsTable({
                 </span>
               </th>
               <th className="px-4 py-3 text-right text-sm font-bold uppercase tracking-wider">
-                <span className="inline-flex items-center justify-end gap-1.5">
+                <span className="inline-flex w-full items-center justify-end gap-1.5">
                   <IndianRupee size={14} className="shrink-0 text-emerald-600" />
                   {t("table.amount")}
                 </span>
@@ -522,7 +514,7 @@ export default function RecentCollectionsTable({
                       {col.collectionNo}
                     </td>
                     <td className="px-4 py-3 text-left text-xs font-bold text-slate-600 tabular-nums whitespace-nowrap">
-                      {localizeDate(col.collectionDate)}
+                      {formatTripListDay(col.collectionDate, language)}
                     </td>
                     <td className="px-4 py-3 text-xs font-semibold text-slate-700 truncate">{localize(col.shopName)}</td>
                     <td className="px-4 py-3 text-xs font-medium text-slate-600 truncate">{localize(col.collectorName)}</td>
@@ -573,13 +565,14 @@ export default function RecentCollectionsTable({
                         {!isDeleted && !isPending && (
                           <button
                             type="button"
-                            onClick={() => onViewShop(col.shopName)}
-                            aria-label={t("common.view")}
-                            className="group h-8 w-8 rounded-xl bg-violet-50 hover:bg-violet-500 text-violet-600 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95"
+                            onClick={() => viewApprovedCollection(col)}
+                            aria-label={`${t("common.view")} ${col.collectionNo}`}
+                            className="group inline-flex h-8 items-center justify-center gap-1.5 rounded-xl bg-violet-50 px-3 text-xs font-bold text-violet-600 shadow-sm transition-all hover:bg-violet-500 hover:text-white active:scale-95"
                           >
                             <span className={`inline-flex ${uiActionIconMotionClass.view}`}>
                               <Eye size={14} />
                             </span>
+                            {t("common.view")}
                           </button>
                         )}
 

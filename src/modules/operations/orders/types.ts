@@ -271,7 +271,7 @@ export type OrdersEligibleVehicle = {
 export type OrdersFetch = {
   /** Operational "today" (local date, YYYY-MM-DD). */
   today: string;
-  /** 7-day scroller window: [today-6 … today] (no future days). */
+  /** 10-day selector window: [today-9 … today] (no future days). */
   days: string[];
   /** Persisted collections, keyed by operational day (YYYY-MM-DD). */
   collectionsByDay: Record<string, OrdersDayCollection>;

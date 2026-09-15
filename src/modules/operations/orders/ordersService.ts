@@ -96,7 +96,10 @@ export async function fetchOrdersData(): Promise<OrdersFetch> {
   vehicleList = vehicles.map((v) => ({ id: v.id, noOfBoxes: v.noOfBoxes }));
 
   const today = localToday();
-  const days = Array.from({ length: 7 }, (_, i) => addLocalDays(today, i - 6));
+  // Ten calendar days always contain the sample generator's latest eight
+  // operating days (Sundays are closed). This keeps every Order day advertised
+  // by the quarter overview reachable from the single date picker.
+  const days = Array.from({ length: 10 }, (_, i) => addLocalDays(today, i - 9));
 
   // ── Per-day collections (one container per operational day) ─────────────
   const containers = trips.filter(isOrderContainer);

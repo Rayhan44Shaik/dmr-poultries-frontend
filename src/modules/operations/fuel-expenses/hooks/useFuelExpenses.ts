@@ -1,5 +1,9 @@
 import { useCallback, useEffect, useState } from "react";
-import { fuelExpenseService, type FuelListMeta } from "../services/fuelExpenseService";
+import {
+  fuelExpenseService,
+  type FuelListMeta,
+  type FuelListSummary,
+} from "../services/fuelExpenseService";
 import type { FuelExpense, FuelExpenseDraft } from "../types/fuelExpense";
 
 type NotificationFn = (msg: string, type?: "success" | "error" | "info") => void;
@@ -7,6 +11,14 @@ type NotificationFn = (msg: string, type?: "success" | "error" | "info") => void
 export function useFuelExpenses(showNotification?: NotificationFn) {
   const [expenses, setExpenses] = useState<FuelExpense[]>([]);
   const [meta, setMeta] = useState<FuelListMeta>({ total: 0, page: 1, limit: 10, totalPages: 1 });
+  const [summary, setSummary] = useState<FuelListSummary>({
+    totalLitres: 0,
+    totalAmount: 0,
+    pendingCount: 0,
+    approvedCount: 0,
+    avgMileage: null,
+    recentTripMileage: null,
+  });
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -38,6 +50,7 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
       });
       setExpenses(result.data);
       setMeta(result.meta);
+      setSummary(result.summary);
     } catch (err) {
       const message = err instanceof Error ? err.message : "Failed to load fuel expenses.";
       setError(message);
@@ -62,14 +75,10 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
     void refresh();
   }, [refresh]);
 
-  const filteredSummary = {
-    totalLitres: expenses.reduce((sum, e) => sum + e.litres, 0),
-    totalAmount: expenses.reduce((sum, e) => sum + e.amount, 0),
-    pendingCount: expenses.filter((e) => e.status === "Pending").length,
-    approvedCount: expenses.filter((e) => e.status === "Approved").length,
-    avgMileage: null as number | null,
-    recentTripMileage: null as number | null,
-  };
+  // The API summary covers the complete filtered register. `expenses` is only
+  // the current table page, so reducing it here would make the quarter totals
+  // jump every time the user paginates.
+  const filteredSummary = summary;
 
   const saveExpense = async (expense: FuelExpenseDraft) => {
     setIsSaving(true);
