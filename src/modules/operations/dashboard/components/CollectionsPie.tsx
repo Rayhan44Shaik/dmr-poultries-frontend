@@ -187,7 +187,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
             <div key={i} className="h-[52px] animate-pulse rounded-xl bg-slate-100/80" />
           ))}
         </div>
-        <div className="flex min-h-0 w-full flex-1 items-center justify-center pt-4">
+        <div className="flex min-h-0 w-full flex-1 items-center justify-center">
           <div className="relative aspect-square w-full max-w-[430px]" style={{ aspectRatio: "1 / 1" }}>
             <svg viewBox="0 0 400 400" className="h-full w-full" aria-hidden="true">
               {/* soft track */}
@@ -257,7 +257,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
       {/* The donut FILLS the card's free space and sits exactly in the
           middle of the chart box. Re-keyed on every data change so the
           entrance (fade + slice sweep) replays for each new range. */}
-      <div className="flex min-h-0 w-full flex-1 items-center justify-center pt-4">
+      <div className="flex min-h-0 w-full flex-1 items-center justify-center">
         <div
           key={signature}
           className="relative aspect-square max-h-full w-full max-w-[430px] animate-fade-in"
@@ -271,7 +271,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
 
           {/* The rotating wrapper — the rAF loop sets its transform. */}
           <div ref={spinRef} className="cs-pie-spin h-full w-full [will-change:transform]">
-            <div className="h-full w-full [filter:drop-shadow(0_18px_26px_-16px_rgba(15,23,42,0.35))]">
+            <div className="h-full w-full [filter:drop-shadow(0_8px_16px_-12px_rgba(15,23,42,0.3))]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <defs>
