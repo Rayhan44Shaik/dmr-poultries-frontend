@@ -1,47 +1,40 @@
 // src/modules/staff/components/performance/PerformanceCardMark.tsx
 //
 // ============================================================================
-// PERFORMANCE CARD MARK — the brand logo that opens a performance card header
+// PERFORMANCE CARD MARK — the card's logo, in the Rate Entry / Trip List style
 // ============================================================================
-// The Driver/Supervisor Performance cards (chart and table) lead with the DMR
-// hen logo so the two cards read as a branded pair:
+// The Driver/Supervisor Performance cards (chart and table) open with their
+// respective mark, built exactly like the ones on the Trip List and Rate Entry
+// cards:
 //
-//   [ hen ] Driver Weekly Performance          Reporting weeks: …
-//   [ hen ] Driver Performance — 29 drivers, 158 trips
+//   ┌────┐
+//   │ 🚚 │  Driver Weekly Performance      Reporting weeks: …
+//   └────┘
 //
-// The chip is the exact chip the KPI cards use (36px, rounded-xl, emerald-50
-// with a 1px emerald-100 inset ring), holding the 22px hen cut-out — so the
-// logo lands in the same visual language rather than as a stray image.
-// Decorative only: the heading beside it carries the accessible name.
+// The chip is copied from those pages — 36px `rounded-xl`, tone-50 fill, 1px
+// tone-100 ring, `shadow-inner` well, 20px tone-500 glyph — so a driver card
+// carries the driver mark (Truck, orange) and a supervisor card the supervisor
+// mark (UserCheck, sky), i.e. the same icon and tone those pages show in the
+// sidebar. Decorative only: the heading beside it carries the accessible name.
 // ============================================================================
 
-import { memo } from "react";
-import HenIcon from "../../../../ui/icons/HenIcon";
-
-export type PerformanceCardMarkSize = "sm" | "md";
+import { memo, type ComponentType } from "react";
+import { CARD_MARK_TONE, type PerformanceCardTone } from "./performanceCardTone";
 
 interface PerformanceCardMarkProps {
-  /** "md" (default) beside a card title, "sm" for denser headers. */
-  size?: PerformanceCardMarkSize;
+  /** The page's own glyph (Truck for drivers, UserCheck for supervisors). */
+  icon: ComponentType<{ className?: string }>;
+  /** The page's own tone, matching its sidebar entry. */
+  tone: PerformanceCardTone;
 }
 
-const CHIP: Record<PerformanceCardMarkSize, string> = {
-  sm: "h-8 w-8 rounded-lg",
-  md: "h-9 w-9 rounded-xl",
-};
-
-const HEN: Record<PerformanceCardMarkSize, number> = {
-  sm: 18,
-  md: 22,
-};
-
-function PerformanceCardMarkImpl({ size = "md" }: PerformanceCardMarkProps) {
+function PerformanceCardMarkImpl({ icon: Icon, tone }: PerformanceCardMarkProps) {
   return (
     <span
       aria-hidden="true"
-      className={`flex ${CHIP[size]} shrink-0 items-center justify-center bg-emerald-50 text-emerald-600 shadow-xs ring-1 ring-inset ring-emerald-100`}
+      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border shadow-inner ${CARD_MARK_TONE[tone]}`}
     >
-      <HenIcon size={HEN[size]} />
+      <Icon className="h-5 w-5" />
     </span>
   );
 }

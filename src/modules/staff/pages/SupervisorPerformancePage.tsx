@@ -26,6 +26,7 @@ import {
   Scale,
   Store,
   TrendingUp,
+  UserCheck,
   Users,
 } from "lucide-react";
 import { te as teDateLocale } from "date-fns/locale";
@@ -59,6 +60,7 @@ import {
   translateGrade,
 } from "../utils/performanceView";
 import PerformanceCardMark from "../components/performance/PerformanceCardMark";
+import { CARD_HEADER_TONE } from "../components/performance/performanceCardTone";
 import PerformanceFilterBar, {
   type PerformanceDraftFilters,
 } from "../components/performance/PerformanceFilterBar";
@@ -583,9 +585,11 @@ const SupervisorPerformancePage = () => {
 
       {/* Supervisor Weekly Performance */}
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card">
-        <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-b border-slate-200 px-4 py-3 sm:px-5">
+        <header
+          className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-b px-4 py-3 sm:px-5 ${CARD_HEADER_TONE.sky}`}
+        >
           <div className="flex min-w-0 items-center gap-2.5">
-            <PerformanceCardMark />
+            <PerformanceCardMark icon={UserCheck} tone="sky" />
             <h2 className="min-w-0 text-base font-bold text-slate-800 tracking-tight">
               {t("staff.perf.weekly.supervisor_header")}
             </h2>
@@ -612,9 +616,11 @@ const SupervisorPerformancePage = () => {
 
       {/* Supervisor Performance table */}
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card">
-        <header className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 border-b border-slate-200 px-4 py-3 sm:px-5">
+        <header
+          className={`flex flex-wrap items-center gap-x-2.5 gap-y-1.5 border-b px-4 py-3 sm:px-5 ${CARD_HEADER_TONE.sky}`}
+        >
           <div className="flex min-w-0 items-center gap-2.5">
-            <PerformanceCardMark />
+            <PerformanceCardMark icon={UserCheck} tone="sky" />
             <h2 className="min-w-0 text-base font-bold text-slate-800 tracking-tight">
               {t("staff.perf.supervisor_title")}
             </h2>
