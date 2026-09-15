@@ -10,7 +10,6 @@ import ShopSalesFilters from "../components/ShopSalesFilters";
 import ShopSalesSummary from "../components/ShopSalesSummary";
 import ShopSalesTable from "../components/ShopSalesTable";
 import ShopSalesPagination from "../components/ShopSalesPagination";
-import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import type { ShopSale } from "../types/shopSale";
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
 
@@ -43,10 +42,12 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
 
   const { shops, refreshShops } = useShops();
 
+  // `useShopSales` owns the Shop Sales request lifecycle. This page only loads
+  // its Shop-master labels; calling both here caused duplicate list requests
+  // whenever a filter changed.
   useEffect(() => {
-    refreshSales();
-    refreshShops();
-  }, [refreshSales, refreshShops]);
+    void refreshShops();
+  }, [refreshShops]);
 
   useEffect(() => {
     if (initialTrip && initialTrip.tripNo) {
@@ -79,6 +80,11 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
     showNotification("Filters have been reset.", "info");
   }, [resetFilters, showNotification]);
 
+  const handleRefresh = useCallback(async () => {
+    const refreshed = await refreshSales();
+    if (refreshed) showNotification("Shop sales refreshed.", "success");
+  }, [refreshSales, showNotification]);
+
   const handleUpdateSale = useCallback(
     async (updatedSale: ShopSale) => {
       try {
@@ -106,22 +112,22 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
         shopName={filter.shopName}
         sortBy={filter.sortBy}
         shopNames={shopNames}
-        totalEntries={filteredSales.length}
         searchQuery={searchInput}
         setSearchQuery={setSearchInput}
-        setFromDate={(v) => {
-          setFilter({ ...filter, fromDate: v });
-          if (v) showNotification(`From date set to ${v}`, "info");
+        setFromDate={(v) => setFilter({ ...filter, fromDate: v })}
+        setToDate={(v) => setFilter({ ...filter, toDate: v })}
+        setShopName={(v) => {
+          setFilter({ ...filter, shopName: v });
+          setCurrentPage(1);
         }}
-        setToDate={(v) => {
-          setFilter({ ...filter, toDate: v });
-          if (v) showNotification(`To date set to ${v}`, "info");
+        setSortBy={(v) => {
+          setFilter({ ...filter, sortBy: v });
+          setCurrentPage(1);
         }}
-        setShopName={(v) => setFilter({ ...filter, shopName: v })}
-        setSortBy={(v) => setFilter({ ...filter, sortBy: v })}
         onSearch={handleSearch}
         onReset={handleResetFilters}
-        hasFilters={hasActiveFilters}
+        onRefresh={() => void handleRefresh()}
+        refreshing={isLoading}
       />
 
       {hasActiveFilters && (
@@ -138,9 +144,15 @@ function ShopSalesPage({ initialTrip, embedded = false }: ShopSalesPageProps) {
         <ShopSalesTable
           sales={paginatedSales}
           isLoading={isLoading}
+          startIndex={(currentPage - 1) * pageSize}
+          sortBy={filter.sortBy}
+          onSortChange={(sortBy) => {
+            setFilter((current) => ({ ...current, sortBy }));
+            setCurrentPage(1);
+          }}
           onUpdateSale={handleUpdateSale}
         />
-        {shouldShowPagination(filteredSales.length) && (
+        {filteredSales.length > 0 && (
           <ShopSalesPagination
             currentPage={currentPage}
             totalPages={totalPages}

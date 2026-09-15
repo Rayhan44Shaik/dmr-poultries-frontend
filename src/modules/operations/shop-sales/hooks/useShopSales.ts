@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ShopSale, ShopSaleFilter } from "../types/shopSale";
 import { listShopSales, updateShopSale, type ShopSalePatch } from "../services/shopSalesApiService";
 import { handleApiError } from "../../../../api";
@@ -29,8 +29,23 @@ function useShopSales() {
   const [filter, setFilter] = useState<ShopSaleFilter>({ ...DEFAULT_FILTER });
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
+  const mountedRef = useRef(false);
+  const requestSequenceRef = useRef(0);
+
+  // Keep a latest-request guard so fast filter changes, manual refreshes and
+  // Strict Mode's development effect replay cannot overwrite fresh rows with
+  // a late response from an earlier request.
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      requestSequenceRef.current += 1;
+    };
+  }, []);
 
   const refreshSales = useCallback(async (options?: { silent?: boolean }) => {
+    const requestSequence = requestSequenceRef.current + 1;
+    requestSequenceRef.current = requestSequence;
     if (!options?.silent) setIsLoading(true);
     try {
       const data = await listShopSales({
@@ -39,15 +54,21 @@ function useShopSales() {
         search: filter.search || undefined,
         sortBy: filter.sortBy || undefined,
       });
+      if (!mountedRef.current || requestSequence !== requestSequenceRef.current) return false;
       setSales(data);
+      return true;
     } catch (error) {
+      if (!mountedRef.current || requestSequence !== requestSequenceRef.current) return false;
       handleApiError(error);
       // Do not fall back to stale/fake data on failure — an empty,
       // clearly-not-current list is preferable to silently showing data
       // that no longer reflects PostgreSQL.
       setSales([]);
+      return false;
     } finally {
-      setIsLoading(false);
+      if (mountedRef.current && requestSequence === requestSequenceRef.current) {
+        setIsLoading(false);
+      }
     }
   }, [filter.fromDate, filter.toDate, filter.search, filter.sortBy]);
 
@@ -116,6 +137,12 @@ function useShopSales() {
   }, [sales, filter]);
 
   const totalPages = Math.max(1, Math.ceil(filteredSales.length / pageSize));
+
+  // A changed filter or page size can reduce the page count. Clamp the page
+  // before slicing so the table never appears blank on a now-invalid page.
+  useEffect(() => {
+    setCurrentPage((page) => Math.min(Math.max(1, page), totalPages));
+  }, [totalPages]);
 
   const paginatedSales = useMemo(() => {
     return paginateSales(filteredSales, currentPage, pageSize);

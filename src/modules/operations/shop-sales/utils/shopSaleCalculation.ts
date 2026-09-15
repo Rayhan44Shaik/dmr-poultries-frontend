@@ -112,32 +112,60 @@ export function filterShopSales(
 
       break;
 
+    case "trip_asc":
+      data.sort((a, b) => String(a.tripNo).localeCompare(String(b.tripNo), undefined, { numeric: true }) || byDate(b, a, 1));
+      break;
+
+    case "trip_desc":
+      data.sort((a, b) => String(b.tripNo).localeCompare(String(a.tripNo), undefined, { numeric: true }) || byDate(b, a, 1));
+      break;
+
     case "shop_asc":
-
-      data.sort((a, b) =>
-        a.shopName.localeCompare(b.shopName) || byDate(b, a, 1)
-      );
-
+      data.sort((a, b) => a.shopName.localeCompare(b.shopName) || byDate(b, a, 1));
       break;
 
     case "shop_desc":
+      data.sort((a, b) => b.shopName.localeCompare(a.shopName) || byDate(b, a, 1));
+      break;
 
-      data.sort((a, b) =>
-        b.shopName.localeCompare(a.shopName) || byDate(b, a, 1)
-      );
+    case "birds_desc":
+      data.sort((a, b) => (b.totalBirds ?? 0) - (a.totalBirds ?? 0) || byDate(b, a, 1));
+      break;
 
+    case "birds_asc":
+      data.sort((a, b) => (a.totalBirds ?? 0) - (b.totalBirds ?? 0) || byDate(b, a, 1));
+      break;
+
+    case "weight_desc":
+      data.sort((a, b) => (b.totalWeight ?? 0) - (a.totalWeight ?? 0) || byDate(b, a, 1));
+      break;
+
+    case "weight_asc":
+      data.sort((a, b) => (a.totalWeight ?? 0) - (b.totalWeight ?? 0) || byDate(b, a, 1));
+      break;
+
+    case "rate_desc":
+      data.sort((a, b) => (Number(b.rate) || 0) - (Number(a.rate) || 0) || byDate(b, a, 1));
+      break;
+
+    case "rate_asc":
+      data.sort((a, b) => (Number(a.rate) || 0) - (Number(b.rate) || 0) || byDate(b, a, 1));
       break;
 
     case "amount_desc":
-
       data.sort((a, b) => (b.amount ?? 0) - (a.amount ?? 0) || byDate(b, a, 1));
-
       break;
 
     case "amount_asc":
-
       data.sort((a, b) => (a.amount ?? 0) - (b.amount ?? 0) || byDate(b, a, 1));
+      break;
 
+    case "remark_asc":
+      data.sort((a, b) => String(a.remark ?? "").localeCompare(String(b.remark ?? "")) || byDate(b, a, 1));
+      break;
+
+    case "remark_desc":
+      data.sort((a, b) => String(b.remark ?? "").localeCompare(String(a.remark ?? "")) || byDate(b, a, 1));
       break;
 
     case "latest":

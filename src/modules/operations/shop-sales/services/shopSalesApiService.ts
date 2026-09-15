@@ -51,7 +51,12 @@ export async function listShopSales(filters: {
   if (filters.fromDate) params.fromDate = filters.fromDate;
   if (filters.toDate) params.toDate = filters.toDate;
   if (filters.search && filters.search.trim() !== "") params.search = filters.search.trim();
-  if (filters.sortBy) params.sortBy = filters.sortBy;
+  // The server supports the original coarse sort set. The table additionally
+  // offers instant client-side sorts (trip, birds, weight, rate and remarks),
+  // which must not be sent as an unknown server enum during a manual refresh.
+  if (["latest", "oldest", "shop_asc", "shop_desc", "amount_desc", "amount_asc"].includes(filters.sortBy || "")) {
+    params.sortBy = filters.sortBy!;
+  }
 
   const { data } = await apiGet<ApiShopSale[] | ShopSalesPageResult>(
     SHOP_SALES_PATH,
