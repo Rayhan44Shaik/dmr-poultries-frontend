@@ -10,12 +10,17 @@
 //   Supervisor  Birds bars · Mortality line · Weight loss (kg) line
 //
 // Quiet by design: bars fall from a soft tone gradient into a pale foot, lines
-// are hairline-thin with white-centred dots, the grid is a whisper, and each
-// ruler tints its own tick labels with a diluted share of its series colour —
-// so which ruler belongs to which shape stays obvious without any shape
-// shouting. Volumes (bars) keep 0 as their floor — a bar must never start from
-// a cropped baseline — while ratios/trends (`zeroFloor: false`) get a tight
-// axis so a 4.24 → 4.36 km/L week is actually visible instead of flat-lining.
+// are hairline-thin with white-centred dots and a faint glow, the grid is a
+// whisper and each ruler tints its own tick labels with a diluted share of its
+// series colour — so which ruler belongs to which shape stays obvious without
+// any shape shouting. Volumes (bars) keep 0 as their floor — a bar must never
+// start from a cropped baseline — while ratios/trends (`zeroFloor: false`) get
+// a tight axis so a 4.24 → 4.36 km/L week is actually visible instead of
+// flat-lining.
+//
+// The reporting week still running (`inProgressWeek`) is drawn in a paler
+// shade and called out under the plot: a two-day-old bar must never read as a
+// collapse.
 //
 // Series carry `kind: "bar" | "line"` and the chart only ever renders the
 // buckets the API returned, in the API's order, with the API's own numbers —
@@ -34,6 +39,7 @@ import { memo, useMemo } from "react";
 import {
   Bar,
   CartesianGrid,
+  Cell,
   ComposedChart,
   Legend,
   Line,
@@ -101,6 +107,10 @@ interface WeeklyPerformanceChartProps {
   ariaLabel: string;
   /** Chart body height. */
   heightClass?: string;
+  /** Raw `week` value of the bucket whose reporting week is still running. */
+  inProgressWeek?: string | number;
+  /** Already-translated caption shown under the plot for that bucket. */
+  inProgressNote?: string;
 }
 
 const compactAxis = (value: number): string => {
@@ -122,8 +132,10 @@ function withAlpha(color: string, alpha: number): string {
   return hex;
 }
 
-/** Gradient paint server for a bar series (soft top → pale foot). */
+/** Paint servers: a full-strength bar gradient and its paler sibling. */
 const barGradientId = (key: string) => `wpc-bar-${key}`;
+const softBarGradientId = (key: string) => `wpc-bar-${key}-soft`;
+const lineGlowId = (key: string) => `wpc-glow-${key}`;
 
 function hasAnyValue(rows: readonly WeeklyChartPoint[], series: readonly WeeklyChartSeries[]): boolean {
   return rows.some((row) =>
@@ -222,6 +234,7 @@ function ComboChart({
   weekTrips,
   ariaLabel,
   heightClass,
+  inProgressWeek,
 }: {
   rows: WeeklyChartPoint[];
   series: readonly WeeklyChartSeries[];
@@ -229,6 +242,7 @@ function ComboChart({
   weekTrips?: (point: WeeklyChartPoint) => WeekTripRow[];
   ariaLabel: string;
   heightClass: string;
+  inProgressWeek?: string | number;
 }) {
   const barSeries = series.filter((s) => (s.kind ?? "bar") === "bar");
   const lineSeries = series.filter((s) => s.kind === "line");
@@ -237,6 +251,10 @@ function ComboChart({
   const axisSeries = (axis: WeeklyAxisId) => series.find((s) => s.axis === axis);
   const rightSeries = axisSeries("right");
   const thirdSeries = axisSeries("third");
+
+  /** The week that is still running gets the paler shade. */
+  const isRunning = (row: WeeklyChartPoint) =>
+    inProgressWeek != null && String(row.week) === String(inProgressWeek);
 
   /** Tick text keeps the series hue, diluted so the axis stays quiet. */
   const axisTick = (axis: WeeklyAxisId) => ({
@@ -261,8 +279,8 @@ function ComboChart({
         <ComposedChart
           data={rows}
           margin={{ top: 10, right: 10, left: -6, bottom: 4 }}
-          barGap={barCount > 1 ? 6 : 0}
-          barCategoryGap={barCount > 1 ? "34%" : "46%"}
+          barGap={barCount > 1 ? 8 : 0}
+          barCategoryGap={barCount > 1 ? "26%" : "44%"}
         >
           <defs>
             {barSeries.map((config) => (
@@ -275,8 +293,39 @@ function ComboChart({
                 y2="1"
               >
                 <stop offset="0%" stopColor={config.color} stopOpacity={0.92} />
-                <stop offset="100%" stopColor={config.color} stopOpacity={0.38} />
+                <stop offset="100%" stopColor={config.color} stopOpacity={0.45} />
               </linearGradient>
+            ))}
+            {barSeries.map((config) => (
+              <linearGradient
+                key={`${config.key}-soft`}
+                id={softBarGradientId(config.key)}
+                x1="0"
+                y1="0"
+                x2="0"
+                y2="1"
+              >
+                <stop offset="0%" stopColor={config.color} stopOpacity={0.42} />
+                <stop offset="100%" stopColor={config.color} stopOpacity={0.14} />
+              </linearGradient>
+            ))}
+            {lineSeries.map((config) => (
+              <filter
+                key={config.key}
+                id={lineGlowId(config.key)}
+                x="-20%"
+                y="-30%"
+                width="140%"
+                height="180%"
+              >
+                <feDropShadow
+                  dx="0"
+                  dy="3"
+                  stdDeviation="3.2"
+                  floodColor={config.color}
+                  floodOpacity={0.3}
+                />
+              </filter>
             ))}
           </defs>
 
@@ -284,9 +333,9 @@ function ComboChart({
           <XAxis
             dataKey="label"
             tick={xTick}
-            axisLine={false}
+            axisLine={{ stroke: "#e2e8f0" }}
             tickLine={false}
-            tickMargin={12}
+            tickMargin={10}
             interval={0}
           />
           {/* Left ruler (also the axis the bars sit on). */}
@@ -369,11 +418,19 @@ function ComboChart({
               yAxisId={config.axis}
               dataKey={config.key}
               name={config.label}
-              fill={`url(#${barGradientId(config.key)})`}
-              radius={[5, 5, 0, 0]}
-              maxBarSize={barCount > 1 ? 24 : 40}
+              radius={[6, 6, 0, 0]}
+              maxBarSize={barCount > 1 ? 50 : 56}
               isAnimationActive={false}
-            />
+            >
+              {rows.map((row) => (
+                <Cell
+                  key={String(row.week)}
+                  fill={`url(#${
+                    isRunning(row) ? softBarGradientId(config.key) : barGradientId(config.key)
+                  })`}
+                />
+              ))}
+            </Bar>
           ))}
           {lineSeries.map((config) => (
             <Line
@@ -383,10 +440,11 @@ function ComboChart({
               dataKey={config.key}
               name={config.label}
               stroke={config.color}
-              strokeWidth={2}
+              strokeWidth={2.5}
               strokeLinecap="round"
-              dot={{ r: 2.6, fill: "#ffffff", stroke: config.color, strokeWidth: 1.6 }}
-              activeDot={{ r: 4.6, fill: config.color, stroke: "#ffffff", strokeWidth: 2 }}
+              filter={`url(#${lineGlowId(config.key)})`}
+              dot={{ r: 3, fill: "#ffffff", stroke: config.color, strokeWidth: 1.8 }}
+              activeDot={{ r: 5, fill: config.color, stroke: "#ffffff", strokeWidth: 2 }}
               legendType="circle"
               connectNulls={false}
               isAnimationActive={false}
@@ -416,6 +474,8 @@ function WeeklyPerformanceChartImpl({
   loading = false,
   ariaLabel,
   heightClass = "h-72 sm:h-80",
+  inProgressWeek,
+  inProgressNote,
 }: WeeklyPerformanceChartProps) {
   const hasData = useMemo(() => rows.length > 0 && hasAnyValue(rows, series), [rows, series]);
 
@@ -449,7 +509,14 @@ function WeeklyPerformanceChartImpl({
         weekTrips={weekTrips}
         ariaLabel={ariaLabel}
         heightClass={heightClass}
+        inProgressWeek={inProgressWeek}
       />
+      {inProgressNote && inProgressWeek != null && (
+        <p className="mt-1 flex items-center gap-1.5 text-[10.5px] font-medium text-slate-400">
+          <span aria-hidden="true" className="h-1.5 w-1.5 rounded-full bg-slate-300" />
+          {inProgressNote}
+        </p>
+      )}
     </div>
   );
 }

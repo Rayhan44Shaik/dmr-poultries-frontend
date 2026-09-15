@@ -42,6 +42,7 @@ import SortableHeader, {
 import {
   formatBusinessDate,
   formatPeriodLabel,
+  inProgressWeekKey,
   periodsForRange,
   toWeeklyAxisRows,
 } from "../utils/performancePeriods";
@@ -358,6 +359,14 @@ const DriverPerformancePage = () => {
       })),
     [data.weekly, dateLocale],
   );
+  /* The week that is still running (if the range reaches into it): drawn in a
+     paler shade and called out under the plot. */
+  const inProgressWeek = useMemo(() => inProgressWeekKey(data.weekly), [data.weekly]);
+  const inProgressNote = useMemo(() => {
+    if (inProgressWeek == null) return undefined;
+    const row = chartRows.find((point) => String(point.week) === String(inProgressWeek));
+    return t("staff.perf.weekly.in_progress", { week: row?.label ?? "" });
+  }, [inProgressWeek, chartRows, t]);
   /* One chart, three series, three rulers: Distance + Fuel as grouped bars
      (each on its own axis so both volumes stay visible) and Mileage as a line.
      Bars keep 0 as their floor; mileage hugs its own range so a 4.24 → 4.36
@@ -590,6 +599,8 @@ const DriverPerformancePage = () => {
             emptyText={t("staff.perf.weekly.empty")}
             loading={initialLoading}
             ariaLabel={t("staff.perf.weekly.aria_driver", { range: appliedRangeLabel })}
+            inProgressWeek={inProgressWeek}
+            inProgressNote={inProgressNote}
           />
         </div>
       </section>

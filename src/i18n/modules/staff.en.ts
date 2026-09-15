@@ -72,6 +72,7 @@ export default {
   'staff.perf.weekly.mortality': 'Mortality',
   'staff.perf.weekly.weight_loss': 'Weight loss (kg)',
   'staff.perf.weekly.aria_supervisor': 'Weekly chart of birds delivered with mortality and weight-loss trends, {range}',
+  'staff.perf.weekly.in_progress': '{week} is still in progress — totals are partial',
 
   // Table -------------------------------------------------------------------
   'staff.perf.table.rank': 'Rank',

@@ -72,6 +72,7 @@ export default {
   'staff.perf.weekly.mortality': 'మరణాలు',
   'staff.perf.weekly.weight_loss': 'బరువు తగ్గుదల (కి.గ్రా)',
   'staff.perf.weekly.aria_supervisor': '{range} కాలానికి వారపు కోళ్లు, మరణాలు మరియు బరువు తగ్గుదల ధోరణుల చార్ట్',
+  'staff.perf.weekly.in_progress': '{week} ఇంకా కొనసాగుతోంది — మొత్తాలు తాత్కాలికం',
 
   // Table -------------------------------------------------------------------
   'staff.perf.table.rank': 'ర్యాంక్',

@@ -188,6 +188,38 @@ export function weeklyBucketLabel(
 }
 
 /**
+ * Raw `week` value of the bucket whose reporting week is still running — the
+ * Monday → Saturday window that contains `today`, while that window has days
+ * left in it. `undefined` when every bucket is complete: on the closing
+ * Saturday itself, and on a Sunday (it belongs to the week that ended the day
+ * before). Display-only: the bucket's own numbers are never touched, they are
+ * only drawn in a paler shade so a two-day-old week cannot read as a collapse.
+ */
+export function inProgressWeekKey<T extends { week: string | number }>(
+  weekly: readonly T[] | undefined,
+  today: Date | string = new Date(),
+): string | number | undefined {
+  if (!Array.isArray(weekly) || weekly.length === 0) return undefined;
+  const now =
+    typeof today === "string" ? (parseBusinessDate(today) ?? new Date()) : today;
+  const openPeriod = weekPeriodContaining(now);
+  const from = parseBusinessDate(openPeriod.from);
+  const to = parseBusinessDate(openPeriod.to);
+  if (!from || !to) return undefined;
+  // The final day of the window closes it — only a week with days still to
+  // come is drawn as in progress.
+  if (now.getTime() >= to.getTime()) return undefined;
+  for (const point of weekly) {
+    const match = INLINE_ISO_DATE.exec(String(point.week ?? ""));
+    if (!match) continue;
+    const parsed = parseBusinessDate(match[0]);
+    if (!parsed) continue;
+    if (weekPeriodContaining(parsed).from === openPeriod.from) return point.week;
+  }
+  return undefined;
+}
+
+/**
  * Map API weekly buckets onto axis rows, keeping every bucket the API sent —
  * in the order the API returned them, with its own values untouched. The
  * label is display-only (see `weeklyBucketLabel`).

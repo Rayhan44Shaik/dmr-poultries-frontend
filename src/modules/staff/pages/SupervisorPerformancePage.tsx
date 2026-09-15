@@ -42,6 +42,7 @@ import SortableHeader, {
 import {
   formatBusinessDate,
   formatPeriodLabel,
+  inProgressWeekKey,
   periodsForRange,
   toWeeklyAxisRows,
 } from "../utils/performancePeriods";
@@ -345,6 +346,14 @@ const SupervisorPerformancePage = () => {
     () => toWeeklyAxisRows(data.weekly, dateLocale),
     [data.weekly, dateLocale],
   );
+  /* The week that is still running (if the range reaches into it): drawn in a
+     paler shade and called out under the plot. */
+  const inProgressWeek = useMemo(() => inProgressWeekKey(data.weekly), [data.weekly]);
+  const inProgressNote = useMemo(() => {
+    if (inProgressWeek == null) return undefined;
+    const row = chartRows.find((point) => String(point.week) === String(inProgressWeek));
+    return t("staff.perf.weekly.in_progress", { week: row?.label ?? "" });
+  }, [inProgressWeek, chartRows, t]);
   /* One chart, three series, three rulers: Birds are the weekly volume (bars,
      left), Mortality and Weight loss are the two loss trends — each on its own
      colour-matched axis, so a red or violet trend can never be squashed under
@@ -591,6 +600,8 @@ const SupervisorPerformancePage = () => {
             emptyText={t("staff.perf.weekly.empty")}
             loading={initialLoading}
             ariaLabel={t("staff.perf.weekly.aria_supervisor", { range: appliedRangeLabel })}
+            inProgressWeek={inProgressWeek}
+            inProgressNote={inProgressNote}
           />
         </div>
       </section>
