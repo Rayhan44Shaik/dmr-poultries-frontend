@@ -816,16 +816,23 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
         </div>
         
         <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0">
-          <div className="flex items-start justify-between gap-3">
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.payment_breakdown")}</span>
-              <h3 className="text-sm font-black text-slate-800 mt-0.5">{t("ops.dashboard.collection_streams")}</h3>
-            </div>
-            <Link to="/operations?tab=collections" className="shrink-0 text-[11px] font-bold text-blue-600 hover:underline">View details →</Link>
-          </div>
-          <div className="w-full flex justify-center items-center py-2 overflow-hidden">
-            <CollectionsPie data={data?.collectionsByMode || []} />
-          </div>
+          {/* Only the name, at top — and it is the way through to the Collection
+              Report (the same page the Reports menu opens). */}
+          <Link
+            to="/operations?tab=collection-report"
+            title={t("nav.collectionReport")}
+            className="group/title -mt-1 inline-flex w-fit items-center gap-1.5"
+          >
+            <h3 className="text-sm font-black text-slate-800 transition-colors group-hover/title:text-emerald-600">
+              {t("ops.dashboard.collection_streams")}
+            </h3>
+            <ArrowUpRight
+              size={13}
+              strokeWidth={2.6}
+              className="text-slate-300 transition-all duration-150 group-hover/title:-translate-y-[1px] group-hover/title:translate-x-[1px] group-hover/title:text-emerald-600"
+            />
+          </Link>
+          <CollectionsPie data={data?.collectionsByMode || []} />
         </div>
       </div>
 

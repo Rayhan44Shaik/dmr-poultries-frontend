@@ -41,6 +41,7 @@
     "mock:trips": "node scripts/dev-mock-backend.mjs",
     "smoke": "node scripts/ssr-smoke.mjs",
     "check:dashboard-sync": "node scripts/dashboard-sync-check.runner.mjs",
+    "check:collections-pie": "node scripts/collections-pie-render-check.runner.mjs",
     "test:duty-planner": "tsx --test src/modules/staff/services/dutyReport.test.ts src/modules/staff/services/dutyReportExcel.test.ts src/modules/staff/services/dutyRules.test.ts",
     "test:leave-deep-link": "tsx --test src/modules/staff/utils/leaveDeepLink.test.ts",
     "test:e2e:duty-planner": "playwright test --config tests/duty-planner/playwright.config.ts",
