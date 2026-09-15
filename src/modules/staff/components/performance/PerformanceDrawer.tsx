@@ -30,21 +30,21 @@
 //     computed/translated by the page — the pop-up makes NO API calls.
 // ============================================================================
 
-import { useRef, type KeyboardEvent, type ReactNode } from "react";
-import { createPortal } from "react-dom";
-import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { useRef, type ComponentType, type KeyboardEvent, type ReactNode } from "react";
+import { ChevronLeft, ChevronRight, Languages, X } from "lucide-react";
+import AppShellModal from "../../../../ui/AppShellModal";
 import { useFocusTrap } from "../../../../hooks/useFocusTrap";
-import type { Language } from "../../../../i18n";
-import { cn } from "../../../../utils/cn";
-import LanguageMiniToggle from "./LanguageMiniToggle";
+import { useI18n, type Language } from "../../../../i18n";
+import {
+  CARD_VIEW_HEADER_TONE,
+  CARD_VIEW_LANGUAGE_TONE,
+  CARD_VIEW_TILE_TONE,
+  type PerformanceCardTone,
+} from "./performanceCardTone";
 import {
   PerformanceI18nContext,
   performanceScopeFor,
 } from "./performanceI18nScope";
-import {
-  uiDialogCloseClass,
-  uiOverlayClass,
-} from "../../../../shared/ui/uiTokens";
 
 export interface DrawerSummaryMetric {
   /** Already-translated label. */
@@ -102,14 +102,20 @@ const FACTOR_ICON: Record<DrawerFactor["band"], { glyph: string; className: stri
   unavailable: { glyph: "○", className: "text-slate-300" },
 };
 
-const navButtonClass = cn(
-  uiDialogCloseClass,
-  "border border-slate-200/80 disabled:pointer-events-none disabled:opacity-40",
-);
+/** Round icon control — the same shape the Trip List view uses. */
+const roundControlClass =
+  "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:text-slate-700 active:scale-95 disabled:pointer-events-none disabled:opacity-40 disabled:hover:translate-y-0";
+
+const closeControlClass =
+  "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:-translate-y-0.5 hover:border-red-100 hover:bg-red-50 hover:text-red-500 active:scale-95";
 
 interface PerformanceDrawerProps {
   open: boolean;
   onClose: () => void;
+  /** The page's glyph (Truck for drivers, UserCheck for supervisors). */
+  icon: ComponentType<{ className?: string }>;
+  /** The page's tone, matching its sidebar entry and card headers. */
+  tone: PerformanceCardTone;
   /** Driver/supervisor name. */
   title: string;
   /** Reporting period line. */
@@ -142,6 +148,8 @@ const sectionTitleClass =
 export function PerformanceDrawer({
   open,
   onClose,
+  icon: Icon,
+  tone,
   title,
   subtitle,
   gradeBadge,
@@ -156,6 +164,7 @@ export function PerformanceDrawer({
   labels,
   children,
 }: PerformanceDrawerProps) {
+  const { t } = useI18n();
   const panelRef = useRef<HTMLDivElement>(null);
 
   useFocusTrap({
@@ -184,79 +193,97 @@ export function PerformanceDrawer({
     }
   };
 
+  // The pop-up's own language switch shows the language it would switch TO,
+  // exactly like the Trip List view's toggle.
+  const languageLabel = language === "te" ? "ఇంగ్లీష్" : t("settings.telugu");
+
   const panel = (
     <div
       ref={panelRef}
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="performance-drawer-title"
       tabIndex={-1}
-      className="relative flex max-h-[92dvh] w-full max-w-lg flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-overlay animate-scale-in sm:max-w-2xl lg:max-w-4xl"
+      className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-2xl bg-white"
     >
-      {/* Header */}
-      <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-4 py-4 sm:px-5">
-        <div className="min-w-0 flex-1">
-          <h2
-            id="performance-drawer-title"
-            className="truncate text-[15px] font-bold leading-snug tracking-tight text-slate-900"
-          >
-            {title}
-          </h2>
-          <p className="mt-0.5 truncate text-[11px] font-medium text-slate-500">
-            {subtitle}
-          </p>
-          {(gradeBadge || rankBadge) && (
-            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-              {gradeBadge}
-              {rankBadge}
+      {/* Header — the Trip List view's band: 48px tile, title + badges, and the
+          pop-up controls (scoped language switch, ‹ › people, close). */}
+      <div
+        className={`shrink-0 rounded-t-2xl border-b border-slate-100 bg-gradient-to-r ${CARD_VIEW_HEADER_TONE[tone]}`}
+      >
+        <div className="flex flex-col gap-4 px-6 py-4 sm:flex-row sm:items-center sm:justify-between md:px-8">
+          <div className="flex min-w-0 flex-1 items-center gap-4">
+            <div
+              className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br text-white shadow-lg ${CARD_VIEW_TILE_TONE[tone]}`}
+            >
+              <Icon className="h-6 w-6" />
             </div>
-          )}
-        </div>
-        <div className="flex shrink-0 items-center gap-1.5">
-          {scoped && (
-            <LanguageMiniToggle language={language} onChange={onLanguageChange} />
-          )}
-          {navigation && navigation.total > 1 && (
-            <>
+            <div className="min-w-0">
+              <h2
+                id="performance-drawer-title"
+                className="truncate text-lg font-bold tracking-tight text-slate-800 md:text-xl"
+              >
+                {title}
+              </h2>
+              <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                {gradeBadge}
+                {rankBadge}
+                <span className="text-xs font-medium text-slate-400">{subtitle}</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-2 sm:w-auto">
+            {scoped && (
               <button
                 type="button"
-                onClick={navigation.onPrev}
-                disabled={!canPrev}
-                className={navButtonClass}
-                aria-label={navigation.prevLabel}
+                onClick={() => onLanguageChange?.(language === "te" ? "en" : "te")}
+                aria-label={t("staff.perf.language.toggle_aria")}
+                className={`inline-flex items-center gap-2 rounded-full border bg-white px-3 py-1.5 text-xs font-bold shadow-sm transition-all hover:-translate-y-0.5 active:scale-95 ${CARD_VIEW_LANGUAGE_TONE[tone]}`}
               >
-                <ChevronLeft aria-hidden="true" />
+                <Languages size={13} aria-hidden="true" />
+                {languageLabel}
               </button>
-              <span
-                aria-hidden="true"
-                className="min-w-[3.25rem] text-center text-[11px] font-bold tabular-nums text-slate-400"
-              >
-                {navigation.index + 1} / {navigation.total}
-              </span>
-              <button
-                type="button"
-                onClick={navigation.onNext}
-                disabled={!canNext}
-                className={navButtonClass}
-                aria-label={navigation.nextLabel}
-              >
-                <ChevronRight aria-hidden="true" />
-              </button>
-            </>
-          )}
-          <button
-            type="button"
-            onClick={onClose}
-            className={uiDialogCloseClass}
-            aria-label={labels.close}
-          >
-            <X aria-hidden="true" />
-          </button>
+            )}
+            {navigation && navigation.total > 1 && (
+              <>
+                <button
+                  type="button"
+                  onClick={navigation.onPrev}
+                  disabled={!canPrev}
+                  className={roundControlClass}
+                  aria-label={navigation.prevLabel}
+                >
+                  <ChevronLeft aria-hidden="true" />
+                </button>
+                <span
+                  aria-hidden="true"
+                  className="min-w-[3.25rem] text-center text-[11px] font-bold tabular-nums text-slate-400"
+                >
+                  {navigation.index + 1} / {navigation.total}
+                </span>
+                <button
+                  type="button"
+                  onClick={navigation.onNext}
+                  disabled={!canNext}
+                  className={roundControlClass}
+                  aria-label={navigation.nextLabel}
+                >
+                  <ChevronRight aria-hidden="true" />
+                </button>
+              </>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className={closeControlClass}
+              aria-label={labels.close}
+            >
+              <X size={15} aria-hidden="true" />
+            </button>
+          </div>
         </div>
       </div>
 
       {/* Scrollable body — two columns on desktop, stacked on phones */}
-      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-4 sm:px-5">
+      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-6 py-5 md:px-8">
         {unscoredNote && (
           <p className="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2 text-[11px] font-medium leading-relaxed text-slate-500">
             {unscoredNote}
@@ -266,7 +293,7 @@ export function PerformanceDrawer({
         {/* Performance summary */}
         <section aria-label={labels.summarySection}>
           <h3 className={sectionTitleClass}>{labels.summarySection}</h3>
-          <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+          <dl className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-7">
             {summary.map((metric) => (
               <div
                 key={metric.label}
@@ -352,29 +379,39 @@ export function PerformanceDrawer({
         {/* Optional detail sections (already loaded data only) */}
         {children}
       </div>
+
+      {/* Footer — the Trip List view's soft band with a single Close action */}
+      <div className="flex shrink-0 items-center justify-end gap-3 rounded-b-2xl border-t border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 px-6 py-5 md:px-8">
+        <button
+          type="button"
+          onClick={onClose}
+          className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-6 py-2.5 text-xs font-semibold text-slate-700 transition-all hover:bg-slate-200 active:scale-95"
+        >
+          <X size={15} aria-hidden="true" />
+          {labels.close}
+        </button>
+      </div>
     </div>
   );
 
-  const drawer = (
-    <div
-      className={`${uiOverlayClass} z-[70] flex items-center justify-center p-3 sm:p-6`}
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
-      }}
-      onKeyDown={handleKeyDown}
+  return (
+    <AppShellModal
+      open={open}
+      onClose={onClose}
+      panelClassName="bg-white"
+      ariaLabelledBy="performance-drawer-title"
     >
-      {scoped ? (
-        <PerformanceI18nContext.Provider value={performanceScopeFor(language)}>
-          {panel}
-        </PerformanceI18nContext.Provider>
-      ) : (
-        panel
-      )}
-    </div>
+      <div onKeyDown={handleKeyDown} className="h-full w-full">
+        {scoped ? (
+          <PerformanceI18nContext.Provider value={performanceScopeFor(language)}>
+            {panel}
+          </PerformanceI18nContext.Provider>
+        ) : (
+          panel
+        )}
+      </div>
+    </AppShellModal>
   );
-
-  if (typeof document === "undefined") return drawer;
-  return createPortal(drawer, document.body);
 }
 
 export default PerformanceDrawer;

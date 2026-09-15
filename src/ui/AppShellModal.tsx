@@ -18,12 +18,22 @@ type Props = {
   panelClassName?: string;
   closeOnOverlay?: boolean;
   zIndex?: number;
+  /** Id of the heading inside the panel, so it names the dialog. */
+  ariaLabelledBy?: string;
 };
 
 const HEADER_H = 64;
 const GAP = 16;
 
-export default function AppShellModal({ open, onClose, children, panelClassName = "", closeOnOverlay = true, zIndex = 50 }: Props) {
+export default function AppShellModal({
+  open,
+  onClose,
+  children,
+  panelClassName = "",
+  closeOnOverlay = true,
+  zIndex = 50,
+  ariaLabelledBy,
+}: Props) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -70,6 +80,7 @@ export default function AppShellModal({ open, onClose, children, panelClassName 
           }}
           role="dialog"
           aria-modal="true"
+          aria-labelledby={ariaLabelledBy}
         >
           {children}
         </div>

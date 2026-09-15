@@ -161,7 +161,7 @@ function TooltipCard({ label, payload, series, tooltipExtras, weekTrips, point }
   const extras = point ? (tooltipExtras?.(point) ?? []) : [];
   const trips = point ? (weekTrips?.(point) ?? []) : [];
   return (
-    <div className="min-w-[216px] rounded-xl border border-slate-200 bg-white/95 px-3.5 py-3 shadow-xl shadow-slate-900/10 backdrop-blur-sm">
+    <div className="min-w-[216px] rounded-xl border border-slate-200 bg-white px-3.5 py-3 shadow-xl shadow-slate-900/10">
       <div className="mb-2 border-b border-slate-100 pb-1.5 text-[12.5px] font-bold tracking-tight text-slate-800">
         {String(label ?? "")}
       </div>

@@ -780,6 +780,8 @@ const SupervisorPerformancePage = () => {
       <PerformanceDrawer
         open={selectedEntry != null}
         onClose={closeDrawer}
+        icon={UserCheck}
+        tone="sky"
         title={personNameLabel(t, language, selectedEntry?.row.supervisorName ?? "")}
         subtitle={`${drawerT("staff.perf.drawer.period")}: ${drawerRangeLabel}`}
         rankBadge={
