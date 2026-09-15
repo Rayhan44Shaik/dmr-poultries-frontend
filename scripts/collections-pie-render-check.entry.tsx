@@ -23,7 +23,10 @@ export async function runPieRenderCheck(): Promise<void> {
   // "svg" is not asserted: ResponsiveContainer renders the <svg> only once a
   // real container is measured, which never happens in SSR.
   const mustNot = ["Payment Breakdown", "Collections Summary", "3D pie"];
-  const must = ["Total", "recharts-responsive-container", "%", "33.7%"];
+  const must = ["Total", "recharts-responsive-container", "%", "33.7%", "cs-badge-shadow"];
+  // The badge overlay must render one badge (rect) per visible mode.
+  const badgeRects = (html.match(/cs-badge-shadow"|x="-26"/g) || []).filter((s) => s === 'x="-26"').length;
+  if (badgeRects !== data.length) absent.push(`badge rects ${badgeRects} != modes ${data.length}`);
   const missing = [...mustNot.filter((s) => html.includes(s))].map((s) => `"${s}" still present`);
   const absent = must.filter((s) => !html.includes(s)).map((s) => `"${s}" missing`);
   const modes = data.map((d) => d.name).filter((n) => !html.includes(n)).map((n) => `mode "${n}" missing`);

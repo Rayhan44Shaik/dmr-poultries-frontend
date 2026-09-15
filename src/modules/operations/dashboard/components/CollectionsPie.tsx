@@ -55,14 +55,18 @@ function useCountUp(target: number, duration = 900): number {
  * A fixed 256 px square stage keeps the ring a perfect circle at every window
  * size, with generous white space on all sides. Slices sweep in on mount /
  * range change, and EVERY slice carries a small white pop badge with its
- * exact share, sitting right on the ring band. Hovering a slice lifts it out;
- * the other slices stay fully solid (no fading). The centre shows the total
- * with a count-up, the legend lists every mode with exact amount and share,
- * and the card title links to the Collection Report.
+ * exact share, riding just OUTSIDE the ring with its inner edge touching the
+ * slice's outer edge (rotated to follow the ring, soft drop shadow). The
+ * badges live in an overlay layer above the chart so all of them always
+ * show. Hovering a slice lifts it out and pushes its badge along; the other
+ * slices stay fully solid (no fading). The centre shows the total with a
+ * count-up, the legend lists every mode with exact amount and share, and the
+ * card title links to the Collection Report.
  */
 export default function CollectionsPie({ data }: CollectionsPieProps) {
   const { t } = useI18n();
   const chartData = useMemo(() => data ?? [], [data]);
+  const [hoverIndex, setHoverIndex] = useState(-1);
 
   const enrichedData = useMemo<EnrichedMode[]>(() => {
     const total = chartData.reduce((sum, d) => sum + (Number(d.value) || 0), 0);
@@ -80,72 +84,40 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
   );
   const animatedTotal = useCountUp(total);
 
+  // Badge positions — the Pie's own layout (0° = 12 o'clock, clockwise, data
+  // order), so each badge sits exactly at its slice's mid-angle.
+  const sliceMids = useMemo(() => {
+    const mids: number[] = [];
+    let acc = 0;
+    for (const d of enrichedData) {
+      const span = total > 0 ? (d.value / total) * 360 : 0;
+      mids.push(acc + span / 2);
+      acc += span;
+    }
+    return mids;
+  }, [enrichedData, total]);
+
   // recharts v3: the per-sector shape gets `isActive` for the hovered slice —
-  // lift it (bigger outer radius) and nudge its white % badge out with it.
-  // Unselected slices keep full colour — no dimming, no skeleton look.
+  // just lift it (bigger outer radius). The % badges live in a separate
+  // overlay layer above the chart, so every one of them always renders.
   const renderSector = useCallback(
     (props: PieSectorShapeProps) => {
-      const {
-        cx,
-        cy,
-        innerRadius,
-        outerRadius,
-        startAngle,
-        endAngle,
-        isActive,
-        index,
-        midAngle,
-        middleRadius,
-        isAnimating,
-      } = props;
-      const mode = enrichedData[index];
+      const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, isActive, index } = props;
       const oR = isActive ? (outerRadius ?? 0) + 8 : outerRadius;
-      const showBadge = !isAnimating && (mode?.percent ?? 0) >= 4 && midAngle != null && middleRadius != null;
-      const rad = ((midAngle ?? 0) * Math.PI) / 180;
-      const lx = (cx ?? 0) + (middleRadius ?? 0) * Math.cos(rad) + (isActive ? 4 : 0);
-      const ly = (cy ?? 0) + (middleRadius ?? 0) * Math.sin(rad) + (isActive ? 4 : 0);
       return (
-        <g>
-          <Sector
-            cx={cx}
-            cy={cy}
-            innerRadius={innerRadius}
-            outerRadius={oR}
-            startAngle={startAngle}
-            endAngle={endAngle}
-            cornerRadius={6}
-            fill={`url(#cs-grad-${index})`}
-          />
-          {showBadge && (
-            /* White pop badge with the exact share — on every slice. */
-            <g transform={`translate(${lx}, ${ly})`} style={{ pointerEvents: "none" }}>
-              <rect
-                x={-26}
-                y={-11}
-                width={52}
-                height={22}
-                rx={11}
-                fill="#ffffff"
-                stroke="rgba(15,23,42,0.08)"
-                strokeWidth={1}
-              />
-              <text
-                x={0}
-                y={0.5}
-                textAnchor="middle"
-                dominantBaseline="central"
-                fontSize={11}
-                fontWeight={800}
-                fill="#1e293b"
-              >
-                {`${mode!.percent.toFixed(1)}%`}
-              </text>
-            </g>
-          )}
-        </g>
+        <Sector
+          cx={cx}
+          cy={cy}
+          innerRadius={innerRadius}
+          outerRadius={oR}
+          startAngle={startAngle}
+          endAngle={endAngle}
+          cornerRadius={6}
+          fill={`url(#cs-grad-${index})`}
+        />
       );
     },
-    [enrichedData]
+    []
   );
 
   if (chartData.length === 0) {
@@ -187,6 +159,8 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
                   cornerRadius={6}
                   stroke="none"
                   shape={renderSector}
+                  onMouseOver={(_entry, index) => setHoverIndex(index)}
+                  onMouseOut={() => setHoverIndex(-1)}
                   animationBegin={150}
                   animationDuration={900}
                   animationEasing="ease-out"
@@ -197,6 +171,63 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
                 </Pie>
               </PieChart>
             </ResponsiveContainer>
+          </div>
+
+          {/* White pop badges — a separate layer ABOVE the chart, so every
+              badge (including the last slice's) always shows. Each pill
+              rides just outside the ring, rotated to follow it, with its
+              inner edge touching the slice's outer edge. */}
+          <div className="pointer-events-none absolute inset-0">
+            <svg viewBox="0 0 256 256" className="h-full w-full overflow-visible">
+              <defs>
+                <filter id="cs-badge-shadow" x="-40%" y="-40%" width="180%" height="180%">
+                  <feDropShadow dx="0" dy="1.5" stdDeviation="2" floodColor="#0f172a" floodOpacity="0.16" />
+                </filter>
+              </defs>
+              {enrichedData.map((d, i) => {
+                if (d.percent < 4) return null;
+                const a = (sliceMids[i] * Math.PI) / 180;
+                // Ring outer edge is 107.5; badge half-height is 11, so its
+                // inner edge sits at r-11 = 108 — just outside, touching the ring.
+                const r = 119 + (hoverIndex === i ? 8 : 0);
+                const px = 128 + r * Math.sin(a);
+                const py = 128 - r * Math.cos(a);
+                // Clock-face flip: on the left/bottom half the pill is turned
+                // 180° so the text always reads upright (the pill is
+                // symmetric, so only the text orientation changes).
+                const mid = sliceMids[i];
+                const rot = mid > 90 && mid < 270 ? mid + 180 : mid;
+                return (
+                  <g
+                    key={d.name}
+                    transform={`translate(${px.toFixed(2)}, ${py.toFixed(2)}) rotate(${rot.toFixed(2)})`}
+                  >
+                    <rect
+                      x={-26}
+                      y={-11}
+                      width={52}
+                      height={22}
+                      rx={11}
+                      fill="#ffffff"
+                      stroke="rgba(15,23,42,0.08)"
+                      strokeWidth={1}
+                      filter="url(#cs-badge-shadow)"
+                    />
+                    <text
+                      x={0}
+                      y={0.5}
+                      textAnchor="middle"
+                      dominantBaseline="central"
+                      fontSize={11}
+                      fontWeight={800}
+                      fill="#1e293b"
+                    >
+                      {`${d.percent.toFixed(1)}%`}
+                    </text>
+                  </g>
+                );
+              })}
+            </svg>
           </div>
 
           {/* Centre total — count-up on load / range change. */}
