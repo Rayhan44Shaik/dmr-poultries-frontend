@@ -7,20 +7,19 @@ const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 /* ------------------------------------------------------------------ *
  * 3D pie geometry — fixed viewBox stage (pure SVG, no chart library).
  *
- * A solid, thick extruded pie: the top face is a glossy ellipse and
- * the slice walls extrude straight down by DEPTH (≈ 1.4× the face
- * depth, like an infographic 3D pie). Front (lower-half) walls get a
- * strong dark gradient, a soft ground shadow sits under the pie, and
- * every slice carries a large colour-matched % label floating just
- * outside its own mid-angle edge.
+ * The pie is an ellipse (top face) extruded straight down by DEPTH,
+ * like a classic infographic 3D pie: a gradient top face, darker
+ * extruded side walls on the front (lower) half, a soft ground
+ * shadow, and a big colour-matched % label floating outside every
+ * slice at its own mid-angle.
  * ------------------------------------------------------------------ */
 const W = 480;
 const H = 330;
 const CX = W / 2;
-const CY = 118; // top-face centre
-const RX = 150; // top-face horizontal radius
-const RY = 68; // top-face vertical radius (flattened = perspective)
-const DEPTH = 94; // vertical extrusion — thick, solid walls
+const CY = 139; // top-face centre
+const RX = 148; // top-face horizontal radius
+const RY = 66; // top-face vertical radius (flattened = perspective)
+const DEPTH = 52; // vertical extrusion
 const GAP_DEG = 3.5; // angular gap between slices
 const LABEL_GAP = 14; // label distance outside the pie edge
 
@@ -105,13 +104,11 @@ interface Slice {
 /**
  * Collection Streams — payment-mode 3D pie for the Operations dashboard.
  *
- * A solid extruded 3D pie (glossy top face + thick front side walls +
- * ground shadow) with a large colour-matched % label floating outside
- * every slice at its own mid-angle. The SVG fills whatever space the
- * card gives it (aspect-locked), so this card never out-grows the
- * Trips card beside it. Hovering a slice lifts it outward, grows its
- * label, and dims the rest. The legend below lists every mode with
- * exact amount and share; the card title links to the Collection Report.
+ * A solid extruded 3D pie (top face + front side walls + ground shadow)
+ * with a large colour-matched % label floating outside every slice at its
+ * own mid-angle. Hovering a slice lifts it outward, grows its label, and
+ * dims the rest. The legend below lists every mode with exact amount and
+ * share; the card title links to the Collection Report.
  */
 export default function CollectionsPie({ data }: CollectionsPieProps) {
   const { t } = useI18n();
@@ -159,20 +156,17 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
 
   return (
     <div className="flex w-full min-w-0 flex-1 flex-col">
-      {/* 3D pie — aspect-locked, fills exactly the space the card has left,
-          so this card can never be taller than the Trips card beside it
-          (its minimum stays below that card's natural height). */}
-      <div className="flex min-h-[200px] w-full flex-1 items-center justify-center">
+      {/* 3D pie — fixed viewBox stage, generous white space on all sides. */}
+      <div className="flex min-h-0 flex-1 items-center justify-center py-2">
         <svg
           viewBox={`0 0 ${W} ${H}`}
-          className="h-full max-h-[340px] w-full aspect-[480/330]"
+          className="w-full max-w-[450px]"
           role="img"
           aria-label={`Collection streams: ${slices.map((s) => `${s.name} ${Math.round(s.percent)}%`).join(", ")}`}
         >
           <defs>
             {slices.map((s, i) => (
               <g key={s.name}>
-                {/* Glossy top face: bright crown fading into the base colour. */}
                 <linearGradient
                   id={`cs3d-top-${i}`}
                   gradientUnits="userSpaceOnUse"
@@ -181,30 +175,28 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
                   x2={CX}
                   y2={CY + RY}
                 >
-                  <stop offset="0%" stopColor={shade(s.color, 0.32)} />
-                  <stop offset="55%" stopColor={shade(s.color, 0.1)} />
-                  <stop offset="100%" stopColor={shade(s.color, -0.04)} />
+                  <stop offset="0%" stopColor={shade(s.color, 0.24)} />
+                  <stop offset="100%" stopColor={s.color} />
                 </linearGradient>
-                {/* Thick front wall: light at the equator, deep shadow below. */}
                 <linearGradient
                   id={`cs3d-wall-${i}`}
                   gradientUnits="userSpaceOnUse"
                   x1={CX}
-                  y1={CY + 10}
+                  y1={CY + 8}
                   x2={CX}
                   y2={CY + RY + DEPTH}
                 >
-                  <stop offset="0%" stopColor={shade(s.color, -0.14)} />
-                  <stop offset="100%" stopColor={shade(s.color, -0.42)} />
+                  <stop offset="0%" stopColor={shade(s.color, -0.16)} />
+                  <stop offset="100%" stopColor={shade(s.color, -0.36)} />
                 </linearGradient>
               </g>
             ))}
           </defs>
 
           {/* Soft ground shadow under the pie. */}
-          <ellipse cx={CX} cy={CY + RY + DEPTH + 7} rx={RX * 0.99} ry={14} fill="rgba(15,23,42,0.08)" />
+          <ellipse cx={CX} cy={CY + RY + DEPTH + 7} rx={RX * 0.99} ry={13} fill="rgba(15,23,42,0.07)" />
 
-          {/* Slices, back to front: side wall + glossy top face. */}
+          {/* Slices, back to front: side wall + gradient top face. */}
           {drawOrder.map(({ s, i }) => {
             const dimmed = hoverIndex !== -1 && hoverIndex !== i;
             const gA0 = s.a0 + GAP_DEG / 2;
@@ -223,8 +215,8 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
                 <path
                   d={topFacePath(gA0, gA1)}
                   fill={`url(#cs3d-top-${i})`}
-                  stroke="rgba(255,255,255,0.75)"
-                  strokeWidth={1.2}
+                  stroke="rgba(255,255,255,0.7)"
+                  strokeWidth={1}
                   strokeLinejoin="round"
                 />
               </g>
