@@ -50,9 +50,11 @@ function StaffPages() {
     return tabComponents[activeTab] ?? DutyPlannerPage;
   }, [activeTab]);
 
+  // Same page gutter and content width as the Trip List, so the staff filter
+  // boxes line up identically with the operations ones.
   return (
-    <div className="w-full px-4 pb-8 pt-6 sm:px-6 lg:px-8">
-      <div className="mx-auto w-full max-w-[1480px]">
+    <div className="w-full px-4 pb-8 pt-6 sm:px-5 lg:px-6">
+      <div className="mx-auto w-full max-w-[1600px]">
         <ActiveComponent embedded={true} />
       </div>
     </div>
