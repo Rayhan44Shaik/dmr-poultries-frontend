@@ -108,7 +108,7 @@ function ColHead({
   );
 }
 
-const TH_CLASS = "px-4 py-4 text-[12px] font-bold uppercase tracking-wider whitespace-nowrap";
+const TH_CLASS = "px-3 py-4 text-[12px] font-bold uppercase tracking-wider whitespace-nowrap";
 
 export function SalaryTable({
   records,
@@ -129,7 +129,7 @@ export function SalaryTable({
   const selectable = Boolean(selectedIds && onToggleSelect && onToggleSelectAll);
   const hasRowActions = Boolean(onView || onEmail || onWhatsApp);
   const formatVal = formatCurrency || ((amount: number) =>
-    new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 2 }).format(amount || 0));
+    new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount || 0));
 
   const totalPages = Math.ceil(records.length / itemsPerPage) || 1;
   // Clamp the active page so a refresh or filter that shrinks the result set
@@ -191,11 +191,29 @@ export function SalaryTable({
       </div>
 
       <div className="w-full overflow-x-auto">
-        <table className="min-w-full text-[13px] text-left border-collapse">
+        {/* table-fixed + colgroup keeps every column on an exact width so the
+            header, body and totals rows all sync on the same grid lines: the
+            three day-count columns share one width, the three money columns
+            share one width, and Status / Actions stay short — no leftover
+            space drifting to the end of the row. */}
+        <table className="w-full min-w-[1080px] table-fixed text-[13px] text-left border-collapse">
+          <colgroup>
+            {selectable && <col className="w-10" />}
+            <col className="w-11" />
+            <col className="w-[17%]" />
+            <col className="w-[8%]" />
+            <col className="w-[8%]" />
+            <col className="w-[8%]" />
+            <col className="w-[12%]" />
+            <col className="w-[12%]" />
+            <col className="w-[12%]" />
+            <col className="w-[9%]" />
+            {hasRowActions && <col className="w-[11%]" />}
+          </colgroup>
           <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-600">
             <tr className="whitespace-nowrap">
               {selectable && (
-                <th className="px-4 py-4 text-left w-10">
+                <th className="px-3 py-4 text-left">
                   <input
                     type="checkbox"
                     aria-label="Select all visible salaries"
@@ -209,7 +227,7 @@ export function SalaryTable({
                   />
                 </th>
               )}
-              <th className={`${TH_CLASS} text-center w-10`}>#</th>
+              <th className={`${TH_CLASS} text-center`}>#</th>
               <th className={`${TH_CLASS} text-left`}>
                 <ColHead icon={<User size={14} className="text-emerald-500 flex-shrink-0" />} label="Employee" />
               </th>
@@ -258,7 +276,7 @@ export function SalaryTable({
                   }`}
                 >
                   {selectable && (
-                    <td className="px-4 py-4" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-3 py-4" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
                         aria-label={`Select ${record.employeeName}`}
@@ -269,20 +287,20 @@ export function SalaryTable({
                       />
                     </td>
                   )}
-                  <td className="px-4 py-4 text-center text-[13px] text-slate-500 font-medium w-10">{serialNo}</td>
-                  <td className="px-4 py-4 min-w-0">
+                  <td className="px-3 py-4 text-center text-[13px] text-slate-500 font-medium">{serialNo}</td>
+                  <td className="px-3 py-4 min-w-0">
                     <div className="truncate text-[13px] font-bold text-slate-800">{record.employeeName}</div>
                     {record.department ? (
                       <div className="truncate text-[11px] font-medium text-slate-500 mt-0.5">{record.department}</div>
                     ) : null}
                   </td>
-                  <td className="px-4 py-4 text-right text-[13px] font-medium tabular-nums text-slate-600 whitespace-nowrap">{record.workingDays ?? "—"}</td>
-                  <td className="px-4 py-4 text-right text-[13px] font-medium tabular-nums text-slate-600 whitespace-nowrap">{record.presentDays ?? "—"}</td>
-                  <td className="px-4 py-4 text-right text-[13px] font-medium tabular-nums text-amber-600 whitespace-nowrap">{record.leaveDays ?? "—"}</td>
-                  <td className="px-4 py-4 text-right text-[13px] font-medium tabular-nums text-slate-700 whitespace-nowrap">{formatVal(record.basicSalary)}</td>
-                  <td className="px-4 py-4 text-right text-[13px] font-bold tabular-nums text-rose-600 whitespace-nowrap">{formatVal(record.totalDeductions)}</td>
-                  <td className="px-4 py-4 text-right text-[13px] font-bold tabular-nums text-emerald-700 whitespace-nowrap">{formatVal(record.netSalary)}</td>
-                  <td className="px-4 py-4 whitespace-nowrap">
+                  <td className="px-3 py-4 text-right text-[13px] font-medium tabular-nums text-slate-600 whitespace-nowrap">{record.workingDays ?? "—"}</td>
+                  <td className="px-3 py-4 text-right text-[13px] font-medium tabular-nums text-slate-600 whitespace-nowrap">{record.presentDays ?? "—"}</td>
+                  <td className="px-3 py-4 text-right text-[13px] font-medium tabular-nums text-amber-600 whitespace-nowrap">{record.leaveDays ?? "—"}</td>
+                  <td className="px-3 py-4 text-right text-[13px] font-medium tabular-nums text-slate-700 whitespace-nowrap">{formatVal(record.basicSalary)}</td>
+                  <td className="px-3 py-4 text-right text-[13px] font-bold tabular-nums text-rose-600 whitespace-nowrap">{formatVal(record.totalDeductions)}</td>
+                  <td className="px-3 py-4 text-right text-[13px] font-bold tabular-nums text-emerald-700 whitespace-nowrap">{formatVal(record.netSalary)}</td>
+                  <td className="px-3 py-4 whitespace-nowrap">
                     <StatusBadge record={record} />
                     {record.status === "Paid" && windowOpen && (
                       <span className="ml-1 text-[10px] text-amber-600">
@@ -292,7 +310,7 @@ export function SalaryTable({
                   </td>
                   {hasRowActions && (
                     <td
-                      className="px-4 py-4 text-center"
+                      className="px-3 py-4 text-center"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex items-center justify-center gap-1.5">
@@ -337,19 +355,19 @@ export function SalaryTable({
           </tbody>
           <tfoot>
             <tr className="border-t-2 border-slate-200 bg-slate-50">
-              {selectable && <td className="px-4 py-4" />}
-              <td className="px-4 py-4" />
-              <td className="px-4 py-4 text-[13px] font-bold text-slate-800 whitespace-nowrap">Total ({footer.count})</td>
-              <td className="px-4 py-4 text-right text-[13px] tabular-nums font-bold text-slate-700 whitespace-nowrap">{footer.workingDays}</td>
-              <td className="px-4 py-4 text-right text-[13px] tabular-nums font-bold text-slate-700 whitespace-nowrap">{footer.presentDays}</td>
-              <td className="px-4 py-4 text-right text-[13px] tabular-nums font-bold text-amber-700 whitespace-nowrap">{footer.leaveDays}</td>
-              <td className="px-4 py-4 text-right text-[13px] tabular-nums font-bold text-slate-700 whitespace-nowrap">{formatVal(footer.basicSalary)}</td>
-              <td className="px-4 py-4 text-right text-[13px] tabular-nums font-bold text-rose-700 whitespace-nowrap">{formatVal(footer.totalDeductions)}</td>
-              <td className="px-4 py-4 text-right text-[13px] tabular-nums font-bold text-emerald-700 whitespace-nowrap">{formatVal(footer.netSalary)}</td>
-              <td className="px-4 py-4 text-[12px] tabular-nums font-semibold text-slate-600 whitespace-nowrap">
+              {selectable && <td className="px-3 py-4" />}
+              <td className="px-3 py-4" />
+              <td className="px-3 py-4 text-[13px] font-bold text-slate-800 whitespace-nowrap">Total ({footer.count})</td>
+              <td className="px-3 py-4 text-right text-[13px] tabular-nums font-bold text-slate-700 whitespace-nowrap">{footer.workingDays}</td>
+              <td className="px-3 py-4 text-right text-[13px] tabular-nums font-bold text-slate-700 whitespace-nowrap">{footer.presentDays}</td>
+              <td className="px-3 py-4 text-right text-[13px] tabular-nums font-bold text-amber-700 whitespace-nowrap">{footer.leaveDays}</td>
+              <td className="px-3 py-4 text-right text-[13px] tabular-nums font-bold text-slate-700 whitespace-nowrap">{formatVal(footer.basicSalary)}</td>
+              <td className="px-3 py-4 text-right text-[13px] tabular-nums font-bold text-rose-700 whitespace-nowrap">{formatVal(footer.totalDeductions)}</td>
+              <td className="px-3 py-4 text-right text-[13px] tabular-nums font-bold text-emerald-700 whitespace-nowrap">{formatVal(footer.netSalary)}</td>
+              {/* Spans Status + Actions so the breakdown fits the short columns. */}
+              <td colSpan={hasRowActions ? 2 : 1} className="px-3 py-4 text-[11px] tabular-nums font-semibold text-slate-600 whitespace-nowrap">
                 {footer.pending} Pending · {footer.submitted} Submitted · {footer.paid} Paid
               </td>
-              {hasRowActions && <td className="px-4 py-4" />}
             </tr>
           </tfoot>
         </table>

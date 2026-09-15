@@ -66,11 +66,15 @@ function formatMonthName(monthStr: string): string {
   return date.toLocaleString("default", { month: "long", year: "numeric" });
 }
 
+// Whole-rupee format for the register table — the paise (".00") added no
+// information and made the Basic / Deductions / Net columns overflow their
+// width. The formal payslip document keeps its own 2-decimal format.
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-IN", {
     style: "currency",
     currency: "INR",
-    minimumFractionDigits: 2,
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
   }).format(amount || 0);
 
 const MONTHS = [
