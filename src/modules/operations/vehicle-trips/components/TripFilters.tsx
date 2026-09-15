@@ -1,11 +1,9 @@
 import React from "react";
-import { FileText, FileSpreadsheet, Search, Eye, Calendar, Truck, UserCog, Warehouse, RotateCcw } from "lucide-react";
+import { FileText, FileSpreadsheet, Eye, Calendar, Truck, UserCog, Warehouse, RotateCcw } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import {
   opsFilterCardClass,
   opsFilterLabelClass,
-  opsInputClass,
-  opsPrimaryButtonClass,
   opsSecondaryButtonClass,
   opsPdfButtonClass,
   opsExcelButtonClass,
@@ -22,14 +20,11 @@ interface Props {
   vehicle: string;
   supervisor: string;
   farm: string;
-  search: string;
   setFromDate: (v: string) => void;
   setToDate: (v: string) => void;
   setVehicle: (v: string) => void;
   setSupervisor: (v: string) => void;
   setFarm: (v: string) => void;
-  setSearch: (v: string) => void;
-  onSearch: () => void;
   onReset: () => void;
   vehicles?: readonly (string | MasterDropdownOption)[];
   supervisors?: readonly (string | MasterDropdownOption)[];
@@ -50,14 +45,11 @@ function TripFilters({
   vehicle,
   supervisor,
   farm,
-  search,
   setFromDate,
   setToDate,
   setVehicle,
   setSupervisor,
   setFarm,
-  setSearch,
-  onSearch,
   onReset,
   vehicles = [],
   supervisors = [],
@@ -172,24 +164,7 @@ function TripFilters({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-end pt-1">
-        <div className="lg:col-span-5">
-          <label className={opsFilterLabelClass}>
-            <Search size={17} className="text-slate-400 flex-shrink-0" />
-            <span>{t("common.search")}</span>
-          </label>
-          <div className="relative">
-            <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder={t("ops.trip.search_trips_placeholder")}
-              className={`${opsInputClass} pl-10`}
-            />
-          </div>
-        </div>
-
-        <div className="lg:col-span-7 flex items-center gap-2 justify-end flex-wrap">
+      <div className="flex items-center justify-end gap-2 flex-wrap pt-1">
           {showViewButton && onViewSelected && (
             <button
               ref={viewButtonRef}
@@ -202,10 +177,6 @@ function TripFilters({
               {t("ops.trip.view_selected")}
             </button>
           )}
-          <button type="button" onClick={onSearch} className={`group relative ${opsPrimaryButtonClass}`} aria-label={t("common.search")}>
-            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-search)]"><Search size={15} /></span>
-            {t("common.search")}
-          </button>
           <button type="button" onClick={onReset} className={`group relative ${opsSecondaryButtonClass}`} aria-label={t("common.reset")}>
             <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>
             {t("common.reset")}
@@ -224,7 +195,6 @@ function TripFilters({
             </button>
           )}
         </div>
-      </div>
     </div>
   );
 }
