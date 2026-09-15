@@ -17,51 +17,53 @@ interface Props {
  */
 function TripKPICards({ totalTrips, totalBirds, totalWeight, totalMortality, totalShops }: Props) {
   const { t } = useI18n();
+  // Keep the operational reading order consistent with the Trip List table:
+  // trips → shops → birds → weight → mortality.
   const cards = [
     {
       title: t("ops.trip.total_trips"),
       value: totalTrips.toLocaleString(),
       Icon: Truck,
-      valueClass: "text-blue-700",
-      iconClass: "border-blue-200 bg-gradient-to-br from-blue-500 to-blue-600 text-white shadow-blue-200/70",
-      glowClass: "bg-blue-100/80",
-      accentClass: "bg-blue-500",
-    },
-    {
-      title: t("ops.trip.total_birds"),
-      value: totalBirds.toLocaleString(),
-      Icon: Bird,
-      valueClass: "text-emerald-700",
-      iconClass: "border-emerald-200 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-emerald-200/70",
-      glowClass: "bg-emerald-100/80",
-      accentClass: "bg-emerald-500",
-    },
-    {
-      title: t("ops.trip.total_weight_kg"),
-      value: totalWeight.toFixed(2),
-      Icon: Scale,
-      valueClass: "text-violet-700",
-      iconClass: "border-violet-200 bg-gradient-to-br from-violet-500 to-violet-600 text-white shadow-violet-200/70",
-      glowClass: "bg-violet-100/80",
-      accentClass: "bg-violet-500",
-    },
-    {
-      title: t("operations.total_mortality"),
-      value: totalMortality.toLocaleString(),
-      Icon: HeartPulse,
-      valueClass: "text-rose-700",
-      iconClass: "border-rose-200 bg-gradient-to-br from-rose-500 to-rose-600 text-white shadow-rose-200/70",
-      glowClass: "bg-rose-100/80",
-      accentClass: "bg-rose-500",
+      valueClass: "text-blue-600",
+      iconClass: "border-blue-100 bg-blue-50 text-blue-500 shadow-blue-100/60",
+      glowClass: "bg-blue-50",
+      accentClass: "bg-blue-300",
     },
     {
       title: t("ops.trip.total_shops"),
       value: totalShops.toLocaleString(),
       Icon: Store,
-      valueClass: "text-amber-700",
-      iconClass: "border-amber-200 bg-gradient-to-br from-amber-500 to-orange-500 text-white shadow-amber-200/70",
-      glowClass: "bg-amber-100/80",
-      accentClass: "bg-amber-500",
+      valueClass: "text-amber-600",
+      iconClass: "border-amber-100 bg-amber-50 text-amber-500 shadow-amber-100/60",
+      glowClass: "bg-amber-50",
+      accentClass: "bg-amber-300",
+    },
+    {
+      title: t("ops.trip.total_birds"),
+      value: totalBirds.toLocaleString(),
+      Icon: Bird,
+      valueClass: "text-emerald-600",
+      iconClass: "border-emerald-100 bg-emerald-50 text-emerald-500 shadow-emerald-100/60",
+      glowClass: "bg-emerald-50",
+      accentClass: "bg-emerald-300",
+    },
+    {
+      title: t("ops.trip.total_weight_kg"),
+      value: totalWeight.toFixed(2),
+      Icon: Scale,
+      valueClass: "text-violet-600",
+      iconClass: "border-violet-100 bg-violet-50 text-violet-500 shadow-violet-100/60",
+      glowClass: "bg-violet-50",
+      accentClass: "bg-violet-300",
+    },
+    {
+      title: t("operations.total_mortality"),
+      value: totalMortality.toLocaleString(),
+      Icon: HeartPulse,
+      valueClass: "text-rose-600",
+      iconClass: "border-rose-100 bg-rose-50 text-rose-500 shadow-rose-100/60",
+      glowClass: "bg-rose-50",
+      accentClass: "bg-rose-300",
     },
   ];
 
@@ -70,7 +72,7 @@ function TripKPICards({ totalTrips, totalBirds, totalWeight, totalMortality, tot
       {cards.map(({ title, value, Icon, valueClass, iconClass, glowClass, accentClass }) => (
         <div
           key={title}
-          className="group relative isolate min-h-[108px] overflow-hidden rounded-2xl border border-slate-200/90 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
+          className="group relative isolate min-h-[108px] overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md"
         >
           <span className={`pointer-events-none absolute -right-7 -top-7 h-24 w-24 rounded-full ${glowClass}`} aria-hidden="true" />
           <span className={`absolute inset-x-0 bottom-0 h-1 ${accentClass}`} aria-hidden="true" />
@@ -82,7 +84,7 @@ function TripKPICards({ totalTrips, totalBirds, totalWeight, totalMortality, tot
               </p>
             </div>
             <span
-              className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border shadow-md transition-transform duration-200 group-hover:scale-105 ${iconClass}`}
+              className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border shadow-sm transition-transform duration-200 group-hover:scale-105 ${iconClass}`}
               aria-hidden="true"
             >
               <Icon size={22} strokeWidth={2.25} />
