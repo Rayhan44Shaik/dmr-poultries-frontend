@@ -1,6 +1,7 @@
 // Dev-SSR render check: mount the real CollectionsPie with live quarter data
 // and assert the donut markup (no removed labels, ring + centre total +
 // legend present, exact shares in the legend).
+import { readFileSync } from "node:fs";
 import "./dashboard-sync-check-stub";
 import { renderToString } from "react-dom/server";
 import { I18nProvider } from "../src/i18n";
@@ -40,6 +41,17 @@ export async function runPieRenderCheck(): Promise<void> {
   ];
   const missing = [...mustNot.filter((s) => html.includes(s))].map((s) => `"${s}" still present`);
   const absent = must.filter((s) => !html.includes(s)).map((s) => `"${s}" missing`);
+  // Slice colours are bound to the slice's own NAME, not its array position:
+  // the shape fill and the gradient ids must both be derived from the name
+  // (checked against the source — recharts' ResponsiveContainer renders no
+  // <svg> in SSR, so the defs are not in the markup).
+  const src = readFileSync(
+    new URL("../src/modules/operations/dashboard/components/CollectionsPie.tsx", import.meta.url),
+    "utf8"
+  );
+  for (const marker of ["slug(name)", "id={`cs-grad-${d.gid}`}", "url(#cs-grad-${gid})"]) {
+    if (!src.includes(marker)) absent.push(`slice colour wiring missing: ${marker}`);
+  }
   const modes = data.map((d) => d.name).filter((n) => !html.includes(n)).map((n) => `mode "${n}" missing`);
   // The % badges are ALWAYS on — one per slice, each seated exactly on its
   // slice's mid-angle, attached to the donut's own rotating wrapper — so the

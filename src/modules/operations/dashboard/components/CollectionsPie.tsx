@@ -7,6 +7,11 @@ const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 /** One very slow ambient revolution — 8 minutes per lap. */
 const ORBIT_MS = 480_000;
 
+/** Stable id fragment for a mode name (gradient ids never depend on order). */
+function slug(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+}
+
 /** Lighten a hex colour toward white (for the slice gradient top stop). */
 function lighten(hex: string, amt = 0.22): string {
   const n = hex.replace("#", "");
@@ -24,6 +29,7 @@ interface EnrichedMode {
   value: number;
   percent: number;
   color: string;
+  gid: string;
 }
 
 /** Ease-out count-up for the centre total (rAF driven, ~900 ms). */
@@ -69,7 +75,10 @@ function useCountUp(target: number, duration = 900): number {
  * perfectly horizontal. The whole thing makes one very slow ambient
  * revolution (8 min per lap, runs always, off with reduced-motion), and
  * the angle is derived from wall-clock time, so even a backgrounded tab
- * snaps back to the correct position the moment it wakes.
+ * snaps back to the correct position the moment it wakes. Slice colours
+ * are bound to the slice's own name (stable gradient ids), never to its
+ * array position, so a colour can never end up on the wrong slice when
+ * the data order changes.
  *
  * EVERY slice always carries a white pop badge with its exact share,
  * outside the ring, its inner edge seated exactly on the ring's outer
@@ -89,6 +98,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
       value: Number(d.value) || 0,
       percent: total > 0 ? ((Number(d.value) || 0) / total) * 100 : 0,
       color: COLORS[i % COLORS.length],
+      gid: slug(d.name),
     }));
   }, [chartData]);
 
@@ -116,8 +126,14 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
   // overlay layer above the chart, so every one of them always renders.
   const renderSector = useCallback(
     (props: PieSectorShapeProps) => {
-      const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, isActive, index } = props;
+      const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, isActive } = props;
       const oR = isActive ? (outerRadius ?? 0) + 8 : outerRadius;
+      // Identify the slice by its OWN data (the payload travels with the
+      // sector through any recharts re-ordering or data-change animation) —
+      // never by array index — so a slice can never be painted with another
+      // slice's colour.
+      const name = (props.payload as { name?: string } | null | undefined)?.name;
+      const gid = name ? slug(name) : "";
       return (
         <Sector
           cx={cx}
@@ -127,7 +143,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
           startAngle={startAngle}
           endAngle={endAngle}
           cornerRadius={6}
-          fill={`url(#cs-grad-${index})`}
+          fill={gid ? `url(#cs-grad-${gid})` : (props.fill ?? "#94a3b8")}
         />
       );
     },
@@ -208,8 +224,8 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
                 <defs>
-                  {enrichedData.map((d, i) => (
-                    <linearGradient key={d.name} id={`cs-grad-${i}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                  {enrichedData.map((d) => (
+                    <linearGradient key={d.gid} id={`cs-grad-${d.gid}`} x1="0%" y1="0%" x2="0%" y2="100%">
                       <stop offset="0%" stopColor={lighten(d.color)} />
                       <stop offset="100%" stopColor={d.color} />
                     </linearGradient>
@@ -232,7 +248,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
                   animationEasing="ease-out"
                 >
                   {enrichedData.map((d) => (
-                    <Cell key={d.name} fill={d.color} />
+                    <Cell key={d.gid} fill={`url(#cs-grad-${d.gid})`} />
                   ))}
                 </Pie>
               </PieChart>
