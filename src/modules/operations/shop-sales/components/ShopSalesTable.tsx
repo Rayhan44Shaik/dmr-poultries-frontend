@@ -297,20 +297,20 @@ function ShopSalesTable({
       </div>
 
       <div className="overflow-x-auto">
-        <table className="min-w-full text-xs md:text-sm">
+        <table className="min-w-full text-[13px] text-left border-collapse">
           <thead className="border-b border-slate-200 bg-slate-50/80">
             <tr className="whitespace-nowrap text-slate-700">
-              <th className="px-3.5 py-3 text-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              <th className="px-4 py-4 text-center text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 <div className="flex items-center justify-center gap-1.5"><Hash size={14} className="text-slate-400" /> S.No</div>
               </th>
-              <th className="px-3.5 py-3 text-left">{sortable("saleNo", <div className="flex items-center gap-1.5"><FileText size={14} className="shrink-0 text-emerald-500" /><span>Shop Sale No.</span></div>)}</th>
-              <th className="px-3.5 py-3 text-left">{sortable("tripDate", <div className="flex items-center gap-1.5"><Calendar size={14} className="shrink-0 text-blue-500" /><span>Day</span></div>)}</th>
-              <th className="px-3.5 py-3 text-left">{sortable("shopName", <div className="flex items-center gap-1.5"><Store size={14} className="shrink-0 text-amber-500" /><span>Shop Name</span></div>)}</th>
-              <th className="px-3.5 py-3 text-center">{sortable("birds", <div className="flex items-center justify-center gap-1.5"><Bird size={14} className="shrink-0 text-cyan-600" /><span>Birds</span></div>, true)}</th>
-              <th className="px-3.5 py-3 text-center">{sortable("weight", <div className="flex items-center justify-center gap-1.5"><Scale size={14} className="shrink-0 text-orange-600" /><span>Weight</span></div>, true)}</th>
-              <th className="px-3.5 py-3 text-center">{sortable("rate", <div className="flex items-center justify-center gap-1.5"><IndianRupee size={14} className="shrink-0 text-violet-600" /><span>Rate</span></div>, true)}</th>
-              <th className="px-3.5 py-3 text-center">{sortable("amount", <span>Amount</span>, true)}</th>
-              <th className="px-3.5 py-3 text-left">{sortable("remark", <div className="flex items-center gap-1.5"><FileText size={14} className="shrink-0 text-slate-400" /><span>Remark</span></div>)}</th>
+              <th className="px-4 py-4 text-left">{sortable("saleNo", <div className="flex items-center gap-1.5"><FileText size={14} className="shrink-0 text-emerald-500" /><span>Shop Sale No.</span></div>)}</th>
+              <th className="px-4 py-4 text-left">{sortable("tripDate", <div className="flex items-center gap-1.5"><Calendar size={14} className="shrink-0 text-blue-500" /><span>Day</span></div>)}</th>
+              <th className="px-4 py-4 text-left">{sortable("shopName", <div className="flex items-center gap-1.5"><Store size={14} className="shrink-0 text-amber-500" /><span>Shop Name</span></div>)}</th>
+              <th className="px-4 py-4 text-center">{sortable("birds", <div className="flex items-center justify-center gap-1.5"><Bird size={14} className="shrink-0 text-cyan-600" /><span>Birds</span></div>, true)}</th>
+              <th className="px-4 py-4 text-center">{sortable("weight", <div className="flex items-center justify-center gap-1.5"><Scale size={14} className="shrink-0 text-orange-600" /><span>Weight</span></div>, true)}</th>
+              <th className="px-4 py-4 text-center">{sortable("rate", <div className="flex items-center justify-center gap-1.5"><IndianRupee size={14} className="shrink-0 text-violet-600" /><span>Rate</span></div>, true)}</th>
+              <th className="px-4 py-4 text-center">{sortable("amount", <span>Amount</span>, true)}</th>
+              <th className="px-4 py-4 text-left">{sortable("remark", <div className="flex items-center gap-1.5"><FileText size={14} className="shrink-0 text-slate-400" /><span>Remark</span></div>)}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -338,17 +338,17 @@ function ShopSalesTable({
                     isEditing ? "bg-emerald-50/50 shadow-[inset_3px_0_0_0_#10b981]" : isSelected ? "bg-emerald-50/70 shadow-[inset_3px_0_0_0_#10b981] hover:bg-emerald-50" : "hover:bg-slate-50/80"
                   } ${!lock.editable && !isSelected ? "opacity-80" : ""}`}
                 >
-                  <td className="px-3.5 py-3 text-center text-xs font-semibold text-slate-500">{startIndex + index + 1}</td>
-                  <td className="px-3.5 py-3 text-xs font-semibold text-emerald-600 whitespace-nowrap">
+                  <td className="px-4 py-5 text-center text-[13px] font-semibold text-slate-500">{startIndex + index + 1}</td>
+                  <td className="px-4 py-5 text-[13px] font-semibold text-emerald-600 whitespace-nowrap">
                     <div>{sale.saleNo || sale.tripNo || "—"}</div>
                   </td>
-                  <td className="px-3.5 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(sale.tripDate)}</td>
-                  <td className="px-3.5 py-3 text-xs font-semibold text-slate-700">{cleanDeliveryShopName(sale.shopName) || "—"}</td>
-                  <td className="px-3.5 py-3 text-center text-xs font-bold text-cyan-700">{Number(sale.totalBirds || 0).toLocaleString()}</td>
-                  <td className="px-3.5 py-3 text-center text-xs font-bold text-orange-600">{formatSaleWeight(sale.totalWeight)}</td>
-                  <td className="px-3.5 py-3 text-center text-xs font-bold text-violet-600">{formatSaleRate(sale.rate)}</td>
-                  <td className="px-3.5 py-3 text-center text-xs font-bold text-slate-700">{formatSaleAmount(sale.amount)}</td>
-                  <td className="px-3.5 py-3 text-xs text-slate-600"><span className="font-medium text-slate-700">{formatSaleRemark(sale.remark)}</span></td>
+                  <td className="px-4 py-5 text-[13px] font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(sale.tripDate)}</td>
+                  <td className="px-4 py-5 text-[13px] font-semibold text-slate-700">{cleanDeliveryShopName(sale.shopName) || "—"}</td>
+                  <td className="px-4 py-5 text-center text-[13px] font-bold text-cyan-700">{Number(sale.totalBirds || 0).toLocaleString()}</td>
+                  <td className="px-4 py-5 text-center text-[13px] font-bold text-orange-600">{formatSaleWeight(sale.totalWeight)}</td>
+                  <td className="px-4 py-5 text-center text-[13px] font-bold text-violet-600">{formatSaleRate(sale.rate)}</td>
+                  <td className="px-4 py-5 text-center text-[13px] font-bold text-slate-700">{formatSaleAmount(sale.amount)}</td>
+                  <td className="px-4 py-5 text-[13px] text-slate-600"><span className="font-medium text-slate-700">{formatSaleRemark(sale.remark)}</span></td>
                 </tr>
               );
             })}
