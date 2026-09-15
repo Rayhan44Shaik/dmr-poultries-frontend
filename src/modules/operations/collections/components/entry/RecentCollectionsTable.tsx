@@ -1,7 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import {
   Search, X, History, CheckCircle, Clock, AlertCircle, Eye, Pencil, RotateCcw,
-  FileText, Calendar, Store, UserCog, IndianRupee, Activity, Settings2,
+  Hash, FileText, Calendar, Store, UserCog, IndianRupee, Activity, Settings2,
 } from "lucide-react";
 import TripPagination from "../../../vehicle-trips/components/TripPagination";
 import type { RecentCollection } from "../../types/collection";
@@ -417,19 +417,20 @@ export default function RecentCollectionsTable({
         </div>
       </div>
 
-      {/* Table — begins with the business date in every Recent Collections
-        * view; there is no synthetic serial-number column competing with the
-        * actual collection data. */}
+      {/* Data-first order shared with View Collection: S.No, Collection No,
+        * then Day. Remaining widths follow the content they carry so labels
+        * and values stay evenly separated without wasting table space. */}
       <div className="overflow-x-auto">
-        <table className="min-w-[1080px] w-full table-fixed text-sm text-left border-collapse">
+        <table className="min-w-[1120px] w-full table-fixed text-sm text-left border-collapse">
           <colgroup>
-            <col className="w-[12%]" />
-            <col className="w-[16%]" />
-            <col className="w-[20%]" />
+            <col className="w-[7%]" />
             <col className="w-[15%]" />
             <col className="w-[12%]" />
-            <col className="w-[11%]" />
+            <col className="w-[19%]" />
             <col className="w-[14%]" />
+            <col className="w-[12%]" />
+            <col className="w-[10%]" />
+            <col className="w-[11%]" />
           </colgroup>
           <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-600">
             <tr>
@@ -437,14 +438,20 @@ export default function RecentCollectionsTable({
                 * uses, so a column means the same thing across the product. */}
               <th className="px-4 py-3 text-left text-sm font-bold uppercase tracking-wider">
                 <span className="inline-flex items-center gap-1.5">
-                  <Calendar size={14} className="shrink-0 text-blue-500" />
-                  {t("table.date")}
+                  <Hash size={14} className="shrink-0 text-slate-400" />
+                  {t("table.s_no")}
                 </span>
               </th>
-              <th className="px-4 py-3 text-sm font-bold uppercase tracking-wider">
+              <th className="px-4 py-3 text-left text-sm font-bold uppercase tracking-wider">
                 <span className="inline-flex items-center gap-1.5">
                   <FileText size={14} className="shrink-0 text-emerald-500" />
                   {t("table.collection_no")}
+                </span>
+              </th>
+              <th className="px-4 py-3 text-left text-sm font-bold uppercase tracking-wider">
+                <span className="inline-flex items-center gap-1.5">
+                  <Calendar size={14} className="shrink-0 text-blue-500" />
+                  {t("common.day")}
                 </span>
               </th>
               <th className="px-4 py-3 text-sm font-bold uppercase tracking-wider">
@@ -482,7 +489,7 @@ export default function RecentCollectionsTable({
           <tbody className="divide-y divide-slate-100">
             {isLoading ? (
               <tr>
-                <td colSpan={7} className="py-16 text-center text-sm font-medium text-slate-400">
+                <td colSpan={8} className="py-16 text-center text-sm font-medium text-slate-400">
                   <span className="inline-flex items-center gap-2">
                     <span
                       className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600"
@@ -494,7 +501,7 @@ export default function RecentCollectionsTable({
               </tr>
             ) : displayedData.length === 0 ? (
               <tr>
-                <td colSpan={7} className="py-16 text-center text-slate-400">
+                <td colSpan={8} className="py-16 text-center text-slate-400">
                   <History size={24} className="mx-auto mb-2" />
                   {getEmptyStateMessage()}
                 </td>
@@ -535,11 +542,14 @@ export default function RecentCollectionsTable({
                         : "hover:bg-slate-50/80"
                     }`}
                   >
-                    <td className="px-4 py-3 text-left text-xs font-bold text-slate-600 tabular-nums whitespace-nowrap">
-                      {localizeDate(col.collectionDate)}
+                    <td className="px-4 py-3 text-left text-xs font-semibold text-slate-500 tabular-nums">
+                      {startIndex + index + 1}
                     </td>
                     <td className="px-4 py-3 text-xs font-semibold text-slate-800 truncate">
                       {col.collectionNo}
+                    </td>
+                    <td className="px-4 py-3 text-left text-xs font-bold text-slate-600 tabular-nums whitespace-nowrap">
+                      {localizeDate(col.collectionDate)}
                     </td>
                     <td className="px-4 py-3 text-xs font-semibold text-slate-700 truncate">{localize(col.shopName)}</td>
                     <td className="px-4 py-3 text-xs font-medium text-slate-600 truncate">{localize(col.collectorName)}</td>

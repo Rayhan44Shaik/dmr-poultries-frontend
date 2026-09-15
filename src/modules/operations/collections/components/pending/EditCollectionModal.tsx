@@ -540,7 +540,7 @@ export function EditCollectionModal({
 
                   <div className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2 xl:grid-cols-3 lg:col-span-9">
                     {renderField({
-                      label: t("operations.collection_date"),
+                      label: t("common.day"),
                       value: formatDate(formData.collectionDate, dateLocale),
                       icon: Calendar,
                     })}
@@ -653,17 +653,18 @@ export function EditCollectionModal({
                   </p>
                 ) : (
                   <div className="overflow-x-auto rounded-lg border border-slate-200">
-                    {/* Six business columns share the table evenly. Date leads
-                      * the row in both this history and the parent Collection
-                      * Entry table; no synthetic serial column is rendered. */}
-                    <table className="min-w-[840px] w-full table-fixed divide-y divide-slate-200">
+                    {/* Same leading order as Recent Collections: S.No,
+                      * Collection No, Day. Widths are balanced around the real
+                      * values so all seven columns remain neat and readable. */}
+                    <table className="min-w-[900px] w-full table-fixed divide-y divide-slate-200">
                       <colgroup>
-                        <col className="w-1/6" />
-                        <col className="w-1/6" />
-                        <col className="w-1/6" />
-                        <col className="w-1/6" />
-                        <col className="w-1/6" />
-                        <col className="w-1/6" />
+                        <col className="w-[7%]" />
+                        <col className="w-[19%]" />
+                        <col className="w-[13%]" />
+                        <col className="w-[16%]" />
+                        <col className="w-[16%]" />
+                        <col className="w-[16%]" />
+                        <col className="w-[13%]" />
                       </colgroup>
                       {/* Header icons use the same vocabulary as every other
                         * operations table (Trip List, Shop Sales, Recent
@@ -672,14 +673,20 @@ export function EditCollectionModal({
                         <tr>
                           <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
                             <span className="inline-flex items-center gap-1.5">
-                              <Calendar size={14} className="shrink-0 text-blue-500" />
-                              {t("table.date")}
+                              <Hash size={14} className="shrink-0 text-slate-400" />
+                              {t("table.s_no")}
                             </span>
                           </th>
                           <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
                             <span className="inline-flex items-center gap-1.5">
                               <FileText size={14} className="shrink-0 text-emerald-500" />
                               {t("table.collection_no")}
+                            </span>
+                          </th>
+                          <th className="px-3 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wider">
+                            <span className="inline-flex items-center gap-1.5">
+                              <Calendar size={14} className="shrink-0 text-blue-500" />
+                              {t("common.day")}
                             </span>
                           </th>
                           <th className="px-3 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wider">
@@ -709,7 +716,7 @@ export function EditCollectionModal({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 bg-white">
-                        {filteredCredits.slice(0, 10).map((col) => {
+                        {filteredCredits.slice(0, 10).map((col, index) => {
                           const isRowSelected = selected != null && String(selected.id) === String(col.id);
                           return (
                           <tr
@@ -731,11 +738,14 @@ export function EditCollectionModal({
                                 : "hover:bg-slate-50/80"
                             }`}
                           >
-                            <td className="px-3 py-2.5 text-xs text-slate-600">
-                              {formatDate(col.collectionDate, dateLocale)}
+                            <td className="px-3 py-2.5 text-xs font-semibold tabular-nums text-slate-500">
+                              {index + 1}
                             </td>
                             <td className="px-3 py-2.5 text-xs font-medium text-slate-700">
                               {col.collectionNo || "-"}
+                            </td>
+                            <td className="px-3 py-2.5 text-xs text-slate-600 tabular-nums whitespace-nowrap">
+                              {formatDate(col.collectionDate, dateLocale)}
                             </td>
                             <td className="px-3 py-2.5 text-right text-xs font-bold tabular-nums text-slate-800">
                               {formatCurrency(Number(col.amount) || 0)}
