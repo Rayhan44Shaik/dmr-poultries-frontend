@@ -58,6 +58,7 @@ import {
   gradeBadgeClass,
   translateGrade,
 } from "../utils/performanceView";
+import PerformanceCardMark from "../components/performance/PerformanceCardMark";
 import PerformanceFilterBar, {
   type PerformanceDraftFilters,
 } from "../components/performance/PerformanceFilterBar";
@@ -582,10 +583,13 @@ const SupervisorPerformancePage = () => {
 
       {/* Supervisor Weekly Performance */}
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card">
-        <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-slate-200 px-4 py-3 sm:px-5">
-          <h2 className="text-base font-bold text-slate-800 tracking-tight">
-            {t("staff.perf.weekly.supervisor_header")}
-          </h2>
+        <header className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-b border-slate-200 px-4 py-3 sm:px-5">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <PerformanceCardMark />
+            <h2 className="min-w-0 text-base font-bold text-slate-800 tracking-tight">
+              {t("staff.perf.weekly.supervisor_header")}
+            </h2>
+          </div>
           <p className="text-[11px] font-medium tabular-nums text-slate-500">
             <span className="text-slate-400">{t("staff.perf.weekly.reporting_weeks")}: </span>
             {periodsLine || appliedRangeLabel}
@@ -608,10 +612,13 @@ const SupervisorPerformancePage = () => {
 
       {/* Supervisor Performance table */}
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card">
-        <header className="flex flex-wrap items-baseline gap-x-2 border-b border-slate-200 px-4 py-3 sm:px-5">
-          <h2 className="text-base font-bold text-slate-800 tracking-tight">
-            {t("staff.perf.supervisor_title")}
-          </h2>
+        <header className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 border-b border-slate-200 px-4 py-3 sm:px-5">
+          <div className="flex min-w-0 items-center gap-2.5">
+            <PerformanceCardMark />
+            <h2 className="min-w-0 text-base font-bold text-slate-800 tracking-tight">
+              {t("staff.perf.supervisor_title")}
+            </h2>
+          </div>
           <span className="min-w-0 text-[11px] font-medium text-slate-500">
             <span aria-hidden="true">—&nbsp;</span>
             {summaryLine}
