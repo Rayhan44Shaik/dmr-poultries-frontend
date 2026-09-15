@@ -825,7 +825,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
             the shrink-0 KPI strip below the chart can never be clipped.
             It always shows, fully, whether the space is reduced or
             increased. */}
-        <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/60 p-6 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-5 w-full min-w-0 xl:h-[530px]">
+        <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-5 w-full min-w-0 xl:h-[530px]">
           <Link
             to="/operations?tab=collection-report"
             title={t("nav.collectionReport")}
