@@ -916,30 +916,10 @@
 }
 
 /* =============================================================================
- * Collection Streams donut — one very slow ambient revolution (8 min per lap).
- * The pie rotates; each % badge orbits with its own slice while
- * counter-rotating, so the pills stay perfectly horizontal at all times.
+ * Collection Streams donut — rotation is driven in JS (CollectionsPie.tsx):
+ * a single requestAnimationFrame clock applies the ambient revolution to
+ * the donut wrapper and the exact inverse to each badge pill in the same
+ * frame, so badges stay attached to their slices and perfectly horizontal.
+ * No CSS animations here (they would fight the inline transforms).
  * ============================================================================= */
-@keyframes cs-orbit-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-.cs-pie-spin {
-  animation: cs-orbit-spin 480s linear infinite;
-}
-.cs-badge-orbit {
-  transform-box: view-box;
-  transform-origin: 128px 128px;
-  animation: cs-orbit-spin 480s linear infinite;
-}
-.cs-badge-counter {
-  transform-box: view-box;
-  animation: cs-orbit-spin 480s linear infinite reverse;
-}
-@media (prefers-reduced-motion: reduce) {
-  .cs-pie-spin,
-  .cs-badge-orbit,
-  .cs-badge-counter {
-    animation: none;
-  }
-}
+

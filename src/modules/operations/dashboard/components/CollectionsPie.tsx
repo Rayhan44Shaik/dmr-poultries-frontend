@@ -4,6 +4,9 @@ import { useI18n } from "../../../../i18n";
 import { formatINRCompact } from "../../../../utils/format";
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
+/** One very slow ambient revolution — 8 minutes per lap. */
+const ORBIT_MS = 480_000;
+
 /** Lighten a hex colour toward white (for the slice gradient top stop). */
 function lighten(hex: string, amt = 0.22): string {
   const n = hex.replace("#", "");
@@ -55,20 +58,24 @@ function useCountUp(target: number, duration = 900): number {
  * The square stage (up to 256 px, scaling down with the card so the badges
  * can never bleed into a neighbouring chart) keeps the ring a perfect
  * circle at every window size. Slices sweep in on mount / range change.
- * The whole donut makes one very slow ambient revolution — 8 minutes per
- * lap, barely noticeable, off with reduced-motion.
+ *
+ * ONE rotation clock, driven by a single requestAnimationFrame loop: the
+ * angle is applied to the donut's wrapper AND (as the exact inverse) to
+ * every badge pill's counter group in the same frame. Because the badge
+ * layer lives INSIDE the rotating wrapper, each badge is attached to its
+ * slice's exact mid-angle by construction — no separate orbit, no
+ * desync, no drifting — while the counter-rotation keeps every pill
+ * perfectly horizontal. The whole thing makes one very slow ambient
+ * revolution (8 min per lap, runs always, off with reduced-motion), and
+ * the angle is derived from wall-clock time, so even a backgrounded tab
+ * snaps back to the correct position the moment it wakes.
  *
  * EVERY slice always carries a white pop badge with its exact share,
- * outside the ring, its inner edge touching the ring's outer side at the
- * sector's exact mid-angle. The badges mount together with the donut, so
- * their orbit and counter-rotation animations start on the exact same
- * clock as the donut's own spin — each badge stays locked at its slice's
- * mid-angle (never drifting or rotating separately) and the
- * counter-rotation keeps every pill perfectly horizontal at all times.
- * Hovering a slice lifts it out; the other slices stay fully solid (no
- * fading). The centre shows the total with a count-up, the legend lists
- * every mode with exact amount and share, and the card title links to the
- * Collection Report.
+ * outside the ring, its inner edge seated exactly on the ring's outer
+ * side (zero gap) at the sector's exact mid-angle. Hovering a slice
+ * lifts it out; the other slices stay fully solid (no fading). The centre
+ * shows the total with a count-up, the legend lists every mode with exact
+ * amount and share, and the card title links to the Collection Report.
  */
 export default function CollectionsPie({ data }: CollectionsPieProps) {
   const { t } = useI18n();
@@ -126,6 +133,53 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
     []
   );
 
+  // ---- one rotation clock (rAF) -------------------------------------------
+  // The donut wrapper rotates; every pill counter-group receives the exact
+  // inverse rotation in the same frame — a single source of truth, so the
+  // badges can never drift from their slices or tilt.
+  const spinRef = useRef<HTMLDivElement | null>(null);
+  const counterRefs = useRef<(SVGGElement | null)[]>([]);
+
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let frame = 0;
+    let running = false;
+
+    const apply = (angle: number) => {
+      if (spinRef.current) spinRef.current.style.transform = `rotate(${angle}deg)`;
+      const inv = `rotate(${-angle}deg)`;
+      for (const g of counterRefs.current) if (g) g.style.transform = inv;
+    };
+
+    const stop = () => {
+      if (!running) return;
+      running = false;
+      cancelAnimationFrame(frame);
+      if (spinRef.current) spinRef.current.style.transform = "";
+      for (const g of counterRefs.current) if (g) g.style.transform = "";
+    };
+
+    const start = () => {
+      if (running) return;
+      running = true;
+      const t0 = performance.now();
+      const tick = (now: number) => {
+        if (!running) return;
+        apply((((now - t0) / ORBIT_MS) * 360) % 360);
+        frame = requestAnimationFrame(tick);
+      };
+      frame = requestAnimationFrame(tick);
+    };
+
+    const sync = () => (mq.matches ? stop() : start());
+    sync();
+    mq.addEventListener("change", sync);
+    return () => {
+      mq.removeEventListener("change", sync);
+      cancelAnimationFrame(frame);
+    };
+  }, []);
+
   if (chartData.length === 0) {
     return (
       <div className="flex w-full min-w-0 flex-1 items-center justify-center py-10 text-center text-sm text-slate-400">
@@ -145,7 +199,10 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
             <circle cx="128" cy="128" r="91" fill="none" stroke="rgba(241,245,249,0.8)" strokeWidth="33" />
           </svg>
 
-          <div className="cs-pie-spin h-full w-full">
+          {/* The rotating wrapper — the rAF loop sets its transform. The
+              badge layer lives INSIDE it, so the badges are attached to
+              their slices by construction. */}
+          <div ref={spinRef} className="cs-pie-spin h-full w-full">
             <div className="h-full w-full [filter:drop-shadow(0_18px_26px_-16px_rgba(15,23,42,0.35))]">
             <ResponsiveContainer width="100%" height="100%">
               <PieChart>
@@ -180,78 +237,78 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
               </PieChart>
               </ResponsiveContainer>
             </div>
-          </div>
 
-          {/* White pop badges — a separate layer ABOVE the chart. One badge
-              per slice, ALWAYS on: centred exactly on that sector's
-              mid-angle, outside the ring and touching its edge, orbiting
-              with the pie (same clock — mounted together) while staying
-              perfectly horizontal. */}
-          <div className="pointer-events-none absolute inset-0">
-            <svg viewBox="0 0 256 256" className="h-full w-full overflow-visible">
-              <defs>
-                <filter id="cs-badge-shadow" x="-40%" y="-40%" width="180%" height="180%">
-                  <feDropShadow dx="0" dy="1.5" stdDeviation="2" floodColor="#0f172a" floodOpacity="0.16" />
-                </filter>
-              </defs>
-              {enrichedData.map((d, i) => {
-                if (d.percent < 4) return null;
-                const a = (sliceMids[i] * Math.PI) / 180;
-                // The pill (52×22) sits so its inner edge touches the ring's
-                // outer side (107.5) at ANY angle: the centre is pushed out
-                // by the pill's radial half-extent in this direction.
-                const support = 26 * Math.abs(Math.sin(a)) + 11 * Math.abs(Math.cos(a));
-                const r = 107.5 + support + 1;
-                const px = 128 + r * Math.sin(a);
-                const py = 128 - r * Math.cos(a);
-                // Orbit + counter run on the donut's own clock (both were
-                // mounted with it, so their animations share its start
-                // frame): the badge stays locked at its sector's mid-angle
-                // while circling, and the pill counter-rotates to stay
-                // perfectly horizontal.
-                return (
-                  <g key={d.name} className="cs-badge-orbit">
-                    <g transform={`translate(${px.toFixed(2)}, ${py.toFixed(2)})`}>
-                      <g
-                        className="animate-pop-in"
-                        style={{ transformBox: "view-box", transformOrigin: `${px.toFixed(2)}px ${py.toFixed(2)}px` }}
-                      >
+            {/* White pop badges — one per slice, ALWAYS on. This layer sits
+                inside the rotating wrapper, so each badge is permanently
+                attached to its slice's exact mid-angle, outside the ring
+                and seated on its outer side (zero gap). Each pill's
+                counter group gets the inverse rotation from the same
+                rAF clock, keeping it perfectly horizontal. */}
+            <div className="pointer-events-none absolute inset-0">
+              <svg viewBox="0 0 256 256" className="h-full w-full overflow-visible">
+                <defs>
+                  <filter id="cs-badge-shadow" x="-40%" y="-40%" width="180%" height="180%">
+                    <feDropShadow dx="0" dy="1.5" stdDeviation="2" floodColor="#0f172a" floodOpacity="0.16" />
+                  </filter>
+                </defs>
+                {enrichedData.map((d, i) => {
+                  if (d.percent < 4) return null;
+                  const a = (sliceMids[i] * Math.PI) / 180;
+                  // The pill (52×22) is seated so its inner edge sits EXACTLY
+                  // on the ring's outer side (107.5) at ANY angle: the centre
+                  // is pushed out by the pill's radial half-extent in this
+                  // direction (support function) — zero gap at every angle.
+                  const support = 26 * Math.abs(Math.sin(a)) + 11 * Math.abs(Math.cos(a));
+                  const r = 107.5 + support;
+                  const px = 128 + r * Math.sin(a);
+                  const py = 128 - r * Math.cos(a);
+                  return (
+                    <g key={d.name}>
+                      <g transform={`translate(${px.toFixed(2)}, ${py.toFixed(2)})`}>
                         <g
-                          className="cs-badge-counter"
-                          style={{ transformOrigin: `${px.toFixed(2)}px ${py.toFixed(2)}px` }}
+                          className="animate-pop-in"
+                          style={{ transformBox: "view-box", transformOrigin: `${px.toFixed(2)}px ${py.toFixed(2)}px` }}
                         >
-                          <rect
-                            x={-26}
-                            y={-11}
-                            width={52}
-                            height={22}
-                            rx={11}
-                            fill="#ffffff"
-                            stroke="rgba(15,23,42,0.08)"
-                            strokeWidth={1}
-                            filter="url(#cs-badge-shadow)"
-                          />
-                          <text
-                            x={0}
-                            y={0.5}
-                            textAnchor="middle"
-                            dominantBaseline="central"
-                            fontSize={11}
-                            fontWeight={800}
-                            fill="#1e293b"
+                          <g
+                            className="cs-badge-counter"
+                            ref={(el) => {
+                              counterRefs.current[i] = el;
+                            }}
+                            style={{ transformBox: "view-box", transformOrigin: `${px.toFixed(2)}px ${py.toFixed(2)}px` }}
                           >
-                            {`${d.percent.toFixed(1)}%`}
-                          </text>
+                            <rect
+                              x={-26}
+                              y={-11}
+                              width={52}
+                              height={22}
+                              rx={11}
+                              fill="#ffffff"
+                              stroke="rgba(15,23,42,0.08)"
+                              strokeWidth={1}
+                              filter="url(#cs-badge-shadow)"
+                            />
+                            <text
+                              x={0}
+                              y={0.5}
+                              textAnchor="middle"
+                              dominantBaseline="central"
+                              fontSize={11}
+                              fontWeight={800}
+                              fill="#1e293b"
+                            >
+                              {`${d.percent.toFixed(1)}%`}
+                            </text>
+                          </g>
                         </g>
                       </g>
                     </g>
-                  </g>
-                );
-              })}
-            </svg>
+                  );
+                })}
+              </svg>
+            </div>
           </div>
 
-          {/* Centre total — count-up on load / range change. */}
+          {/* Centre total — count-up on load / range change (never rotates). */}
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
               {t("ops.dashboard.collection_streams_total")}

@@ -22,21 +22,28 @@ export async function runPieRenderCheck(): Promise<void> {
 
   // "svg" is not asserted: ResponsiveContainer renders the <svg> only once a
   // real container is measured, which never happens in SSR.
+  // Largest slice's share — computed from the LIVE data (the mock API
+  // rotates datasets, so never hard-code a percentage here).
+  const topPercent =
+    data.length > 0
+      ? `${Math.max(...data.map((d) => d.value / data.reduce((s, x) => s + x.value, 0) * 100)).toFixed(1)}%`
+      : "%";
+
   const mustNot = ["Payment Breakdown", "Collections Summary", "3D pie"];
   const must = [
     "Total",
     "recharts-responsive-container",
     "%",
-    "33.7%",
+    topPercent, // biggest share shows in the legend + on its badge
     "cs-badge-shadow", // badge layer is wired up
-    "cs-pie-spin", // the slow donut revolution
-    "cs-badge-orbit", // always-on badge orbits
+    "cs-pie-spin", // the rotating donut wrapper
   ];
   const missing = [...mustNot.filter((s) => html.includes(s))].map((s) => `"${s}" still present`);
   const absent = must.filter((s) => !html.includes(s)).map((s) => `"${s}" missing`);
   const modes = data.map((d) => d.name).filter((n) => !html.includes(n)).map((n) => `mode "${n}" missing`);
-  // The % badges are ALWAYS on (one per slice, on the donut's own clock), so
-  // the static SSR markup must contain exactly one badge rect per slice.
+  // The % badges are ALWAYS on — one per slice, each seated exactly on its
+  // slice's mid-angle, attached to the donut's own rotating wrapper — so the
+  // static SSR markup must contain exactly one badge rect per slice.
   const badgeRects = (html.match(/x="-26"/g) ?? []).length;
   if (badgeRects !== data.length) absent.push(`expected ${data.length} badge rects in SSR, found ${badgeRects}`);
 
