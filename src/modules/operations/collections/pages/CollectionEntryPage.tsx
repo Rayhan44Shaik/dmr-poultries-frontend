@@ -59,7 +59,9 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
         onReferenceChange={vm.changeReference}
         onViewLedger={vm.viewLedger}
         onReset={vm.resetEntry}
+        onRefresh={vm.reloadCollections}
         ledgerLoading={vm.ledgerLoading}
+        refreshing={vm.loading}
       />
 
       <div className="grid grid-cols-1 lg:grid-cols-10 gap-6 items-stretch">

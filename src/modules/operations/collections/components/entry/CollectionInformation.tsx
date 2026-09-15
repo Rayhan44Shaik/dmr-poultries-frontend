@@ -9,6 +9,7 @@ import {
   opsSecondaryButtonClass,
 } from "../../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../../i18n";
+import { BrandRefreshButton } from "../../../../../ui";
 import MasterDropdown, { type MasterDropdownOption } from "../../../../masters/components/MasterDropdown";
 
 interface Props {
@@ -24,7 +25,11 @@ interface Props {
   onReferenceChange: (value: string) => void;
   onViewLedger: () => void;
   onReset: () => void;
+  /** Reload masters + collections from the API (Trip List's refresh action). */
+  onRefresh?: () => void;
   ledgerLoading?: boolean;
+  /** Drives the refresh button's dancing-hen loading state. */
+  refreshing?: boolean;
 }
 
 /**
@@ -46,7 +51,9 @@ function CollectionInformation({
   onReferenceChange,
   onViewLedger,
   onReset,
+  onRefresh,
   ledgerLoading = false,
+  refreshing = false,
 }: Props) {
   const { t } = useI18n();
 
@@ -66,30 +73,8 @@ function CollectionInformation({
 
   return (
     <div className={opsFilterCardClass}>
-      {/* Shop Name carries long trading names, so it gets double width; the
-        * date / collector / mode / reference controls stay compact beside it. */}
-      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-6">
-        <div className="lg:col-span-2">
-          <label className={opsFilterLabelClass}>
-            <Store size={17} className="text-amber-500 flex-shrink-0" />
-            <span>
-              {t("operations.shop_name")} <span className="text-red-500">*</span>
-            </span>
-          </label>
-          <MasterDropdown
-            hideLabel
-            label={t("operations.shop_name")}
-            value={entry.shopName}
-            options={shopOptions}
-            onChange={onShopChange}
-            placeholder={t("operations.select_shop")}
-            error={errors.shopName}
-            searchable
-            allowClear
-            className="w-full"
-          />
-        </div>
-
+      {/* Row 1 — the four compact entry fields, in capture order. */}
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <label className={opsFilterLabelClass}>
             <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
@@ -171,7 +156,31 @@ function CollectionInformation({
         </div>
       </div>
 
-      <div className="flex items-center justify-end gap-2 flex-wrap pt-1">
+      {/* Row 2 — Shop Name is searchable and holds long trading names, so it
+        * spans the width of the four fields above, with the actions alongside. */}
+      <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-12 items-end pt-1">
+        <div className="lg:col-span-7">
+          <label className={opsFilterLabelClass}>
+            <Store size={17} className="text-amber-500 flex-shrink-0" />
+            <span>
+              {t("operations.shop_name")} <span className="text-red-500">*</span>
+            </span>
+          </label>
+          <MasterDropdown
+            hideLabel
+            label={t("operations.shop_name")}
+            value={entry.shopName}
+            options={shopOptions}
+            onChange={onShopChange}
+            placeholder={t("operations.select_shop")}
+            error={errors.shopName}
+            searchable
+            allowClear
+            className="w-full"
+          />
+        </div>
+
+        <div className="lg:col-span-5 flex items-center justify-end gap-2 flex-wrap">
         <button
           type="button"
           onClick={onViewLedger}
@@ -219,6 +228,8 @@ function CollectionInformation({
           </span>
           {t("common.reset")}
         </button>
+          {onRefresh && <BrandRefreshButton loading={refreshing} onClick={onRefresh} />}
+        </div>
       </div>
     </div>
   );
