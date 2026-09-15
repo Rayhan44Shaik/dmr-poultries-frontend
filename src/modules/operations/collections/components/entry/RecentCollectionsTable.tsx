@@ -1,5 +1,9 @@
 import { useMemo, useState } from "react";
-import { Search, X, History, CheckCircle, Clock, AlertCircle, Eye, Pencil, Trash2 } from "lucide-react";
+import {
+  Search, X, History, CheckCircle, Clock, AlertCircle, Eye, Pencil, Trash2,
+  Hash, FileText, Calendar, Store, UserCog, IndianRupee, Activity, Settings2,
+} from "lucide-react";
+import TripPagination from "../../../vehicle-trips/components/TripPagination";
 import type { RecentCollection } from "../../types/collection";
 import { useI18n } from "../../../../../i18n";
 import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocalization";
@@ -17,6 +21,9 @@ interface Props {
   onDelete: (id: string) => void;
   onViewShop: (shopName: string) => void;
 }
+
+/** Approved tab shows only the most recent shops, not the whole history. */
+const APPROVED_SHOP_LIMIT = 10;
 
 const inr = (n: number) =>
   "₹ " + Number(n || 0).toLocaleString("en-IN", {
@@ -50,6 +57,9 @@ export default function RecentCollectionsTable({
 }: Props) {
   const { t, language } = useI18n();
   const [searchQuery, setSearchQuery] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
 
   /** Shop and collector names are data, not i18n keys, so they are transliterated
     * for Telugu using the same helper the Trip screens use. */
@@ -114,16 +124,35 @@ export default function RecentCollectionsTable({
     const sort = (rows: RecentCollection[]) =>
       [...rows].sort((a, b) => b.collectionDate.localeCompare(a.collectionDate));
 
+    // Approved shows the latest collection per shop, and only the 10 most
+    // recently-collected shops. The full approved history lives in the
+    // Collection Report; this panel is a "what just happened" view.
+    const latestPerShop = sort(Array.from(shopMap.values())).slice(0, APPROVED_SHOP_LIMIT);
+
     return {
       Pending: sort(pending),
-      Approved: sort(Array.from(shopMap.values())),
+      Approved: latestPerShop,
       Deleted: sort(deleted),
     };
   }, [filteredBySearch]);
 
   const displayedData = buckets[statusFilter];
 
-  const clearSearch = () => setSearchQuery("");
+  // Pagination. Reset to page 1 whenever the tab or the search changes, so a
+  // filtered-down list can never leave the view stranded on an empty page.
+  const totalPages = Math.max(1, Math.ceil(displayedData.length / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const startIndex = (safeCurrentPage - 1) * pageSize;
+  const paginatedData = displayedData.slice(startIndex, startIndex + pageSize);
+
+
+  /** Any change to the result set returns to page 1, so the view can never be
+    * stranded on a page that no longer exists. */
+  const updateSearch = (value: string) => {
+    setSearchQuery(value);
+    setCurrentPage(1);
+  };
+  const clearSearch = () => updateSearch("");
 
   const getEmptyStateMessage = (): string => {
     switch (statusFilter) {
@@ -174,7 +203,10 @@ export default function RecentCollectionsTable({
                 <button
                   key={tab}
                   type="button"
-                  onClick={() => onStatusChange(tab)}
+                  onClick={() => {
+                    onStatusChange(tab);
+                    setCurrentPage(1);
+                  }}
                   aria-pressed={isActive}
                   className={`inline-flex items-center px-5 py-1.5 text-xs font-semibold rounded-md transition-all ${
                     isActive ? activeClass : "bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-200/50"
@@ -193,7 +225,7 @@ export default function RecentCollectionsTable({
             <input
               type="text"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => updateSearch(e.target.value)}
               placeholder={t("ops.collection.search_collections_placeholder")}
               className="w-full sm:w-64 pl-8 pr-8 py-1.5 text-sm border border-slate-200 rounded-xl bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-400/20 outline-none transition-all"
             />
@@ -216,14 +248,56 @@ export default function RecentCollectionsTable({
         <table className="min-w-full text-sm text-left border-collapse">
           <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-600">
             <tr>
-              <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("table.s_no")}</th>
-              <th className="px-4 py-3 text-sm font-bold uppercase tracking-wider">{t("table.collection_no")}</th>
-              <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("table.date")}</th>
-              <th className="px-4 py-3 text-sm font-bold uppercase tracking-wider">{t("table.shop")}</th>
-              <th className="px-4 py-3 text-sm font-bold uppercase tracking-wider">{t("table.collector")}</th>
-              <th className="px-4 py-3 text-right text-sm font-bold uppercase tracking-wider">{t("table.amount")}</th>
-              <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("table.status")}</th>
-              <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">{t("table.actions")}</th>
+              {/* Each column is tagged with the same icon vocabulary Shop Sales
+                * uses, so a column means the same thing across the product. */}
+              <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">
+                <span className="inline-flex items-center justify-center gap-1.5">
+                  <Hash size={14} className="shrink-0 text-slate-400" />
+                  {t("table.s_no")}
+                </span>
+              </th>
+              <th className="px-4 py-3 text-sm font-bold uppercase tracking-wider">
+                <span className="inline-flex items-center gap-1.5">
+                  <FileText size={14} className="shrink-0 text-emerald-500" />
+                  {t("table.collection_no")}
+                </span>
+              </th>
+              <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">
+                <span className="inline-flex items-center justify-center gap-1.5">
+                  <Calendar size={14} className="shrink-0 text-blue-500" />
+                  {t("table.date")}
+                </span>
+              </th>
+              <th className="px-4 py-3 text-sm font-bold uppercase tracking-wider">
+                <span className="inline-flex items-center gap-1.5">
+                  <Store size={14} className="shrink-0 text-amber-500" />
+                  {t("table.shop")}
+                </span>
+              </th>
+              <th className="px-4 py-3 text-sm font-bold uppercase tracking-wider">
+                <span className="inline-flex items-center gap-1.5">
+                  <UserCog size={14} className="shrink-0 text-violet-500" />
+                  {t("table.collector")}
+                </span>
+              </th>
+              <th className="px-4 py-3 text-right text-sm font-bold uppercase tracking-wider">
+                <span className="inline-flex items-center justify-end gap-1.5">
+                  <IndianRupee size={14} className="shrink-0 text-emerald-600" />
+                  {t("table.amount")}
+                </span>
+              </th>
+              <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">
+                <span className="inline-flex items-center justify-center gap-1.5">
+                  <Activity size={14} className="shrink-0 text-orange-500" />
+                  {t("table.status")}
+                </span>
+              </th>
+              <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider">
+                <span className="inline-flex items-center justify-center gap-1.5">
+                  <Settings2 size={14} className="shrink-0 text-slate-400" />
+                  {t("table.actions")}
+                </span>
+              </th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -247,8 +321,9 @@ export default function RecentCollectionsTable({
                 </td>
               </tr>
             ) : (
-              displayedData.map((col, index) => {
+              paginatedData.map((col, index) => {
                 const rawStatus = col.rawStatus || col.status;
+                const isSelected = selectedId === col.id;
                 const isPending = rawStatus === "Pending Approval";
                 const isDeleted = rawStatus === "Deleted";
                 const statusKey = "status." + String(rawStatus).toLowerCase().replace(/\s+/g, "_");
@@ -264,10 +339,24 @@ export default function RecentCollectionsTable({
                 return (
                   <tr
                     key={`${col.id}-${index}`}
-                    className="transition-colors hover:bg-slate-50/80"
+                    tabIndex={0}
+                    onClick={() => setSelectedId(isSelected ? null : col.id)}
+                    onKeyDown={(event) => {
+                      if (event.target !== event.currentTarget) return;
+                      if (event.key === "Enter" || event.key === " ") {
+                        event.preventDefault();
+                        setSelectedId(isSelected ? null : col.id);
+                      }
+                    }}
+                    aria-selected={isSelected}
+                    className={`cursor-pointer outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
+                      isSelected
+                        ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200"
+                        : "hover:bg-slate-50/80"
+                    }`}
                   >
                     <td className="px-4 py-3 text-center text-xs font-semibold text-slate-500 tabular-nums">
-                      {index + 1}
+                      {startIndex + index + 1}
                     </td>
                     <td className="px-4 py-3 text-xs font-semibold text-slate-800 whitespace-nowrap">
                       {col.collectionNo}
@@ -288,7 +377,7 @@ export default function RecentCollectionsTable({
                         {statusLabel}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-center">
+                    <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
                       {/* Icon buttons matching the Trip List action vocabulary.
                         * No title attributes — the page is tooltip-free, so each
                         * control carries an aria-label for assistive tech only. */}
@@ -349,6 +438,23 @@ export default function RecentCollectionsTable({
           </tbody>
         </table>
       </div>
+
+      {/* Same pagination control as the Trip List, built on the shared
+        * paginationStyles tokens, so page size and navigation behave
+        * identically across Operations. */}
+      {displayedData.length > 0 && (
+        <TripPagination
+          currentPage={safeCurrentPage}
+          totalPages={totalPages}
+          totalItems={displayedData.length}
+          onPageChange={setCurrentPage}
+          pageSize={pageSize}
+          onPageSizeChange={(next) => {
+            setPageSize(next);
+            setCurrentPage(1);
+          }}
+        />
+      )}
     </div>
   );
 }

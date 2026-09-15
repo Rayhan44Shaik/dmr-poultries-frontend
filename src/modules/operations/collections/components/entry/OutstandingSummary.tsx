@@ -137,11 +137,11 @@ export default function OutstandingSummary({
         {periodSubtitle}
       </div>
 
-      {/* Financial rows. `flex-1` lets this column absorb the height the
-        * neighbouring Collection Details card sets, and the dividers below
-        * take the slack (`mt-auto` on the last one), so Current Outstanding
-        * finishes flush with the bottom instead of leaving dead space. */}
-      <div className="flex flex-1 flex-col gap-3 animate-in fade-in duration-500">
+      {/* Financial rows sit on one even gap-2.5 rhythm. They are deliberately
+        * NOT stretched to fill the card: pushing the total to the bottom left a
+        * large dead gap above Current Outstanding. The card still matches its
+        * neighbour's height via the page grid's items-stretch. */}
+      <div className="flex flex-col gap-2.5 animate-in fade-in duration-500">
         {/* Opening Balance is last week's CLOSING balance, carried forward.
           * When the backend supplies the previous week's end date we show it,
           * so the figure is traceable to a specific closing day. */}
@@ -203,12 +203,15 @@ export default function OutstandingSummary({
           isInfo
         />
 
-        <div className="mt-auto border-t border-dashed border-slate-200" />
+        <div className="border-t border-dashed border-slate-200" />
 
-        <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4 shadow-sm">
+        {/* Current Outstanding uses the same row geometry as the rows above
+          * (h-10 icon tile, px-4 py-3) so the column reads as one consistent
+          * list; only the colour weight marks it as the total. */}
+        <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm">
-              <Calculator size={20} />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-emerald-600 text-white shadow-sm">
+              <Calculator size={18} />
             </div>
             <div className="flex min-w-0 flex-col">
               <span className="text-sm font-bold text-slate-800">
@@ -219,7 +222,7 @@ export default function OutstandingSummary({
               </span>
             </div>
           </div>
-          <span className="shrink-0 text-xl font-extrabold tabular-nums text-emerald-700">
+          <span className="shrink-0 text-base font-extrabold tabular-nums text-emerald-700">
             {inr(displayCurrentOutstanding)}
           </span>
         </div>
