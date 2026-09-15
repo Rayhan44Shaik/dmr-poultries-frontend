@@ -413,6 +413,14 @@ export const NAV_SECTIONS: NavSection[] = [
     children: [
       //{ label: "Employees", path: "/masters?tab=employees", icon: UserRound, keywords: "employees staff master" },
       {
+        label: "Overview",
+        labelKey: "nav.staffOverview",
+        path: "/staff?tab=overview",
+        icon: LayoutDashboard,
+        tone: "sky",
+        keywords: "staff overview kpi quarter duty leave salary performance",
+      },
+      {
         label: "Duty Planner",
         labelKey: "nav.dutyPlanner",
         path: "/staff?tab=duty-planner",
