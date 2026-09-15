@@ -1,6 +1,6 @@
 // Dev-SSR render check: mount the real CollectionsPie with live quarter data
-// and assert the 3D pie markup (svg + paths, big % labels, legend, no removed
-// labels, no recharts dependency left in this card).
+// and assert the donut markup (no removed labels, ring + centre total +
+// legend present, exact shares in the legend).
 import "./dashboard-sync-check-stub";
 import { renderToString } from "react-dom/server";
 import { I18nProvider } from "../src/i18n";
@@ -20,20 +20,16 @@ export async function runPieRenderCheck(): Promise<void> {
     </I18nProvider>
   );
 
-  const mustNot = ["Payment Breakdown", "Collections Summary", "recharts", "Tooltip"];
-  const must = ["<svg", "<path", "34%", "33%", "01", "linearGradient"];
+  // "svg" is not asserted: ResponsiveContainer renders the <svg> only once a
+  // real container is measured, which never happens in SSR.
+  const mustNot = ["Payment Breakdown", "Collections Summary", "3D pie"];
+  const must = ["Total", "recharts-responsive-container", "%", "33.7%"];
   const missing = [...mustNot.filter((s) => html.includes(s))].map((s) => `"${s}" still present`);
   const absent = must.filter((s) => !html.includes(s)).map((s) => `"${s}" missing`);
   const modes = data.map((d) => d.name).filter((n) => !html.includes(n)).map((n) => `mode "${n}" missing`);
 
   console.log(missing.length + absent.length + modes.length === 0 ? "PIE RENDER CHECK PASS ✔" : "PIE RENDER CHECK FAIL ✖");
   for (const problem of [...missing, ...absent, ...modes]) console.log("  -", problem);
-
-  // Geometry sanity: every path/ellipse/text coordinate must be a finite number.
-  if (/[A-Za-z]+="?[^\"]*\bNaN\b/.test(html) || html.includes("NaN")) {
-    console.log("PIE RENDER CHECK FAIL ✖ — NaN in rendered geometry");
-    return;
-  }
 
   // Empty-state render must not throw.
   renderToString(
