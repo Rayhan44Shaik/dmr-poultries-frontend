@@ -19,6 +19,7 @@ import type { Locale } from 'date-fns';
 import { AlertTriangle } from 'lucide-react';
 import { usePerformanceI18n } from './performanceI18nScope';
 import { parseBusinessDate } from '../../../../utils/businessDate';
+import { formatVehicleNumber } from '../../../../utils/format';
 import {
   uiTableHeadClass,
   uiTableThClass,
@@ -123,13 +124,15 @@ function LaggingTripCard({
     <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
-          <span className="font-mono text-[11px] font-bold text-slate-900">{trip.tripNo}</span>
+          <span className="font-mono text-xs font-bold text-slate-900">{trip.tripNo}</span>
           <span aria-hidden="true" className="text-slate-300">·</span>
           <span className="text-[11px] font-medium text-slate-500">
             {parsed ? format(parsed, 'dd MMM yyyy', { locale }) : '—'}
           </span>
           <span aria-hidden="true" className="text-slate-300">·</span>
-          <span className="text-[11px] font-semibold text-slate-600">{trip.vehicleNo}</span>
+          <span className="text-xs font-semibold text-slate-600">
+            {formatVehicleNumber(trip.vehicleNo)}
+          </span>
         </div>
         <PaceChip offPace />
       </div>
@@ -205,18 +208,18 @@ const RecentTripsTable = ({ trips, paceRow, paceKind }: RecentTripsTableProps) =
         <table className="min-w-full divide-y divide-slate-100">
           <thead className={uiTableHeadClass}>
             <tr>
-              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-left`}>{t('staff.perf.trips.col.trip')}</th>
-              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-left`}>{t('staff.perf.trips.col.date')}</th>
-              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-left`}>{t('staff.perf.trips.col.vehicle')}</th>
+              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-left`}>{t('staff.perf.trips.col.trip')}</th>
+              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-left`}>{t('staff.perf.trips.col.date')}</th>
+              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-left`}>{t('staff.perf.trips.col.vehicle')}</th>
               {paceRow && (
-                <th scope="col" className={`${uiTableThClass} px-3 py-2 text-center`}>{t('staff.perf.trips.col.pace')}</th>
+                <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-center`}>{t('staff.perf.trips.col.pace')}</th>
               )}
-              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>{t('staff.perf.trips.col.shops')}</th>
-              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>{t('staff.perf.trips.col.birds')}</th>
-              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>{t('staff.perf.trips.col.weight')}</th>
-              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>{t('staff.perf.trips.col.mortality')}</th>
-              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>{t('staff.perf.trips.col.weight_loss')}</th>
-              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>{t('staff.perf.trips.col.km')}</th>
+              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-right`}>{t('staff.perf.trips.col.shops')}</th>
+              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-right`}>{t('staff.perf.trips.col.birds')}</th>
+              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-right`}>{t('staff.perf.trips.col.weight')}</th>
+              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-right`}>{t('staff.perf.trips.col.mortality')}</th>
+              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-right`}>{t('staff.perf.trips.col.weight_loss')}</th>
+              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-right`}>{t('staff.perf.trips.col.km')}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
@@ -228,22 +231,24 @@ const RecentTripsTable = ({ trips, paceRow, paceKind }: RecentTripsTableProps) =
                   key={trip.tripNo}
                   className={`transition-colors hover:bg-slate-50/70 ${pace ? 'bg-amber-50/40' : ''}`}
                 >
-                  <td className={`${uiTableTdClass} whitespace-nowrap px-3 py-2 font-mono text-[11px] font-semibold text-slate-800`}>{trip.tripNo}</td>
-                  <td className={`${uiTableTdClass} whitespace-nowrap px-3 py-2 text-xs text-slate-600`}>
+                  <td className={`${uiTableTdClass} whitespace-nowrap px-3 py-2 font-mono text-[13px] font-semibold text-slate-800`}>{trip.tripNo}</td>
+                  <td className={`${uiTableTdClass} whitespace-nowrap px-3 py-2 text-[13px] text-slate-600`}>
                     {parsed ? format(parsed, 'dd MMM yyyy', { locale }) : '—'}
                   </td>
-                  <td className={`${uiTableTdClass} whitespace-nowrap px-3 py-2 text-xs font-medium text-slate-700`}>{trip.vehicleNo}</td>
+                  <td className={`${uiTableTdClass} whitespace-nowrap px-3 py-2 text-[13px] font-semibold tabular-nums text-slate-800`}>
+                    {formatVehicleNumber(trip.vehicleNo)}
+                  </td>
                   {paceRow && (
                     <td className={`${uiTableTdClass} whitespace-nowrap px-3 py-2 text-center`}>
                       <PaceChip offPace={Boolean(pace)} />
                     </td>
                   )}
-                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>{fmt(trip.totalShops)}</td>
-                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>{fmt(trip.totalBirdsDelivered)}</td>
-                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>{fmt(trip.totalDeliveredWeight)}</td>
-                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>{fmt(trip.totalMortality)}</td>
-                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>{fmt(trip.weightLoss, 1)}</td>
-                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>{fmt(trip.totalKm)}</td>
+                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>{fmt(trip.totalShops)}</td>
+                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>{fmt(trip.totalBirdsDelivered)}</td>
+                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>{fmt(trip.totalDeliveredWeight)}</td>
+                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>{fmt(trip.totalMortality)}</td>
+                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>{fmt(trip.weightLoss, 1)}</td>
+                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>{fmt(trip.totalKm)}</td>
                 </tr>
               );
             })}

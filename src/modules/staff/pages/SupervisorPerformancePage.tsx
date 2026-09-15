@@ -723,13 +723,13 @@ const SupervisorPerformancePage = () => {
                           selected && uiTableRowSelectedClass,
                         )}
                       >
-                        <td className={`${perfTdClass} text-center text-xs font-bold tabular-nums text-slate-500`}>
+                        <td className={`${perfTdClass} text-center text-sm font-bold tabular-nums text-slate-500`}>
                           {rank}
                         </td>
-                        <td className={`${perfTdClass} whitespace-nowrap text-[13px] font-semibold text-slate-900`}>
+                        <td className={`${perfTdClass} whitespace-nowrap text-sm font-semibold text-slate-900`}>
                           {personNameLabel(t, language, row.supervisorName)}
                         </td>
-                        <td className={`${perfTdClass} whitespace-nowrap text-xs text-slate-500`}>
+                        <td className={`${perfTdClass} whitespace-nowrap text-[13px] text-slate-500`}>
                           {translateStatus(t, row.employeeStatus)}
                         </td>
                         <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatCount(row.trips)}</td>
@@ -742,13 +742,13 @@ const SupervisorPerformancePage = () => {
                         <td className={`${perfTdClass} text-center`}>
                           {grade == null ? (
                             <span
-                              className="text-xs font-semibold text-slate-300"
+                              className="text-sm font-semibold text-slate-300"
                             >
                               —
                             </span>
                           ) : (
                             <span
-                              className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${gradeBadgeClass(grade)}`}
+                              className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${gradeBadgeClass(grade)}`}
                             >
                               {translateGrade(grade, t)}
                             </span>
@@ -846,7 +846,7 @@ const SupervisorPerformancePage = () => {
         )}
         {selectedEntry && personDetail && (
           <section aria-label={drawerT("staff.perf.drawer.recent_trips")}>
-            <h3 className="mb-2 text-[11px] font-bold uppercase tracking-widest text-slate-400">
+            <h3 className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">
               {drawerT("staff.perf.drawer.recent_trips")}
             </h3>
             <RecentTripsTable

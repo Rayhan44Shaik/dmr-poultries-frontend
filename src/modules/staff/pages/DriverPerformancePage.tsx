@@ -86,6 +86,7 @@ import RefreshToast from "../components/common/RefreshToast";
 import { EmptyState } from "../../../ui";
 import TableLoading from "../components/common/TableLoading";
 import { cn } from "../../../utils/cn";
+import { formatVehicleNumber } from "../../../utils/format";
 import {
   uiTableHeadClass,
   uiTableRowClass,
@@ -722,13 +723,13 @@ const DriverPerformancePage = () => {
                           selected && uiTableRowSelectedClass,
                         )}
                       >
-                        <td className={`${perfTdClass} text-center text-xs font-bold tabular-nums text-slate-500`}>
+                        <td className={`${perfTdClass} text-center text-sm font-bold tabular-nums text-slate-500`}>
                           {rank}
                         </td>
-                        <td className={`${perfTdClass} whitespace-nowrap text-[13px] font-semibold text-slate-900`}>
+                        <td className={`${perfTdClass} whitespace-nowrap text-sm font-semibold text-slate-900`}>
                           {personNameLabel(t, language, row.driverName)}
                         </td>
-                        <td className={`${perfTdClass} whitespace-nowrap text-xs text-slate-500`}>
+                        <td className={`${perfTdClass} whitespace-nowrap text-[13px] text-slate-500`}>
                           {translateStatus(t, row.employeeStatus)}
                         </td>
                         <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatCount(row.trips)}</td>
@@ -744,13 +745,13 @@ const DriverPerformancePage = () => {
                         <td className={`${perfTdClass} text-center`}>
                           {grade == null ? (
                             <span
-                              className="text-xs font-semibold text-slate-300"
+                              className="text-sm font-semibold text-slate-300"
                             >
                               —
                             </span>
                           ) : (
                             <span
-                              className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${gradeBadgeClass(grade)}`}
+                              className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${gradeBadgeClass(grade)}`}
                             >
                               {translateGrade(grade, t)}
                             </span>
@@ -849,11 +850,11 @@ const DriverPerformancePage = () => {
         {selectedEntry && personDetail && (
           <div className="space-y-5">
             <section aria-label={drawerT("staff.perf.drawer.vehicles")}>
-              <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-400">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400">
                 {drawerT("staff.perf.drawer.vehicles")}
               </h3>
               {personDetail.vehicles.length === 0 ? (
-                <p className="mt-2 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-3 py-2.5 text-xs font-medium text-slate-400">
+                <p className="mt-2 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-3 py-2.5 text-[13px] font-medium text-slate-400">
                   {drawerT("staff.perf.vehicle.empty")}
                 </p>
               ) : (
@@ -861,31 +862,31 @@ const DriverPerformancePage = () => {
                   <table className="min-w-full divide-y divide-slate-100">
                     <thead className="bg-slate-50/80">
                       <tr>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-left`}>
+                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-left`}>
                           {drawerT("staff.perf.vehicle.col.vehicle_no")}
                         </th>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>
+                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-right`}>
                           {drawerT("staff.perf.vehicle.col.trips")}
                         </th>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>
+                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-right`}>
                           {drawerT("staff.perf.vehicle.col.distance")}
                         </th>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>
+                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-right`}>
                           {drawerT("staff.perf.vehicle.col.avg_per_trip")}
                         </th>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>
+                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-right`}>
                           {drawerT("staff.perf.vehicle.col.fuel")}
                         </th>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>
+                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-right`}>
                           {drawerT("staff.perf.vehicle.col.fuel_cost")}
                         </th>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>
+                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-right`}>
                           {drawerT("staff.perf.vehicle.col.maintenance_cost")}
                         </th>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>
+                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-right`}>
                           {drawerT("staff.perf.vehicle.col.total_cost")}
                         </th>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>
+                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-right`}>
                           {drawerT("staff.perf.vehicle.col.mileage")}
                         </th>
                       </tr>
@@ -893,31 +894,31 @@ const DriverPerformancePage = () => {
                     <tbody className="divide-y divide-slate-100 bg-white">
                       {personDetail.vehicles.map((vehicle) => (
                         <tr key={vehicle.vehicleNo} className="transition-colors hover:bg-slate-50/70">
-                          <td className={`${uiTableTdClass} whitespace-nowrap px-3 py-2 text-xs font-bold text-slate-800`}>
-                            {vehicle.vehicleNo}
+                          <td className={`${uiTableTdClass} whitespace-nowrap px-3 py-2 text-[13px] font-bold tabular-nums text-slate-800`}>
+                            {formatVehicleNumber(vehicle.vehicleNo)}
                           </td>
-                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>
+                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>
                             {formatCount(vehicle.trips)}
                           </td>
-                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>
+                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>
                             {formatCount(vehicle.distance)}
                           </td>
-                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>
+                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>
                             {formatDecimal(vehicle.avgDistancePerTrip, 1)}
                           </td>
-                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>
+                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>
                             {formatDecimal(vehicle.fuelLitres, 1)}
                           </td>
-                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>
+                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>
                             {formatMoney(vehicle.fuelCost)}
                           </td>
-                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>
+                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>
                             {formatMoney(vehicle.maintenanceCost)}
                           </td>
                           <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs font-bold`}>
                             {formatMoney(vehicle.totalCost)}
                           </td>
-                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>
+                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>
                             {formatMileage(vehicle.mileage)}
                           </td>
                         </tr>

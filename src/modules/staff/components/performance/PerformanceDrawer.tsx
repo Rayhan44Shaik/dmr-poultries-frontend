@@ -106,8 +106,14 @@ const FACTOR_ICON: Record<DrawerFactor["band"], { glyph: string; className: stri
 const roundControlClass =
   "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:-translate-y-0.5 hover:bg-slate-50 hover:text-slate-700 active:scale-95 disabled:pointer-events-none disabled:opacity-40 disabled:hover:translate-y-0";
 
+/* The single close control: a round button whose ✕ turns a quarter-turn and
+   swells a touch on hover, then snaps in on press. `group` lets the ICON carry
+   the motion while the button carries the colour + lift. */
 const closeControlClass =
-  "inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:-translate-y-0.5 hover:border-red-100 hover:bg-red-50 hover:text-red-500 active:scale-95";
+  "group inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-all duration-200 ease-out hover:-translate-y-0.5 hover:border-red-200 hover:bg-red-50 hover:text-red-500 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-200 active:scale-90";
+
+const closeIconClass =
+  "transition-transform duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)] group-hover:rotate-90 group-hover:scale-110 group-focus-visible:rotate-90 group-focus-visible:scale-110 group-active:scale-90";
 
 interface PerformanceDrawerProps {
   open: boolean;
@@ -145,7 +151,7 @@ interface PerformanceDrawerProps {
 }
 
 const sectionTitleClass =
-  "text-[11px] font-bold uppercase tracking-widest text-slate-400";
+  "text-xs font-bold uppercase tracking-widest text-slate-400";
 
 export function PerformanceDrawer({
   open,
@@ -289,7 +295,7 @@ export function PerformanceDrawer({
               <div className="mt-1.5 flex flex-wrap items-center gap-2">
                 {gradeBadge}
                 {rankBadge}
-                <span className="text-xs font-medium text-slate-400">{subtitle}</span>
+                <span className="text-[13px] font-medium text-slate-500">{subtitle}</span>
               </div>
             </div>
           </div>
@@ -340,7 +346,7 @@ export function PerformanceDrawer({
               className={closeControlClass}
               aria-label={labels.close}
             >
-              <X size={15} aria-hidden="true" />
+              <X size={16} aria-hidden="true" className={closeIconClass} />
             </button>
           </div>
         </div>
@@ -353,7 +359,7 @@ export function PerformanceDrawer({
         className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-6 py-5 outline-none md:px-8"
       >
         {unscoredNote && (
-          <p className="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2 text-[11px] font-medium leading-relaxed text-slate-500">
+          <p className="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2 text-xs font-medium leading-relaxed text-slate-500">
             {unscoredNote}
           </p>
         )}
@@ -367,10 +373,10 @@ export function PerformanceDrawer({
                 key={metric.label}
                 className="rounded-lg border border-slate-200/70 bg-slate-50/70 px-3 py-2"
               >
-                <dt className="text-[10px] font-semibold uppercase tracking-wide text-slate-400">
+                <dt className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">
                   {metric.label}
                 </dt>
-                <dd className="mt-0.5 truncate text-sm font-bold tabular-nums text-slate-900">
+                <dd className="mt-1 truncate text-base font-bold tabular-nums text-slate-900">
                   {metric.value}
                 </dd>
               </div>
@@ -389,7 +395,7 @@ export function PerformanceDrawer({
                 return (
                   <li
                     key={factor.key}
-                    className="flex items-start gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2 text-xs leading-relaxed text-slate-600"
+                    className="flex items-start gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2.5 text-[13px] leading-relaxed text-slate-600"
                   >
                     <span className={`mt-0.5 shrink-0 text-[9px] ${icon.className}`} aria-hidden="true">
                       {icon.glyph}
@@ -406,13 +412,13 @@ export function PerformanceDrawer({
             <section aria-label={labels.improveSection}>
               <h3 className={sectionTitleClass}>{labels.improveSection}</h3>
               {improvements.length === 0 ? (
-                <p className="mt-2 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-3 py-2.5 text-xs leading-relaxed text-slate-500">
+                <p className="mt-2 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-3 py-2.5 text-[13px] leading-relaxed text-slate-500">
                   {labels.improveNone}
                 </p>
               ) : (
                 <ul className="mt-2 list-inside list-disc space-y-1">
                   {improvements.map((improvement) => (
-                    <li key={improvement.key} className="text-xs font-medium text-slate-700">
+                    <li key={improvement.key} className="text-[13px] font-medium text-slate-700">
                       {improvement.title}
                     </li>
                   ))}
@@ -424,7 +430,7 @@ export function PerformanceDrawer({
             <section aria-label={labels.recommendSection}>
               <h3 className={sectionTitleClass}>{labels.recommendSection}</h3>
               {improvements.length === 0 ? (
-                <p className="mt-2 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-3 py-2.5 text-xs leading-relaxed text-slate-500">
+                <p className="mt-2 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-3 py-2.5 text-[13px] leading-relaxed text-slate-500">
                   {labels.recommendSustain}
                 </p>
               ) : (
@@ -434,8 +440,8 @@ export function PerformanceDrawer({
                       key={improvement.key}
                       className="rounded-lg border border-amber-100 bg-amber-50/50 px-3 py-2.5"
                     >
-                      <p className="text-xs font-bold text-slate-800">{improvement.title}</p>
-                      <p className="mt-1 text-xs font-medium text-amber-800">{improvement.recommendation}</p>
+                      <p className="text-[13px] font-bold text-slate-800">{improvement.title}</p>
+                      <p className="mt-1 text-[13px] font-medium text-amber-800">{improvement.recommendation}</p>
                     </li>
                   ))}
                 </ul>
@@ -448,17 +454,6 @@ export function PerformanceDrawer({
         {children}
       </div>
 
-      {/* Footer — the Trip List view's soft band with a single Close action */}
-      <div className="flex shrink-0 items-center justify-end gap-3 rounded-b-2xl border-t border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 px-6 py-5 md:px-8">
-        <button
-          type="button"
-          onClick={onClose}
-          className="inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-6 py-2.5 text-xs font-semibold text-slate-700 transition-all hover:bg-slate-200 active:scale-95"
-        >
-          <X size={15} aria-hidden="true" />
-          {labels.close}
-        </button>
-      </div>
     </div>
   );
 
