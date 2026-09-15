@@ -53,10 +53,16 @@ export default function useTrips(
   const mountedRef = useRef(true);
   const operationLocksRef = useRef<Set<string>>(new Set());
 
-  useEffect(() => () => {
-    mountedRef.current = false;
-    refreshSeqRef.current += 1;
-    refreshAbortRef.current?.abort();
+  // React Strict Mode replays effects during development. Resetting this flag in
+  // the setup is essential: otherwise the first cleanup leaves it false and all
+  // later successful refreshes are deliberately discarded as if unmounted.
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      refreshSeqRef.current += 1;
+      refreshAbortRef.current?.abort();
+    };
   }, []);
 
   const refreshTrips = useCallback(async (): Promise<boolean> => {
