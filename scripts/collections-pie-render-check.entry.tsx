@@ -28,16 +28,12 @@ export async function runPieRenderCheck(): Promise<void> {
     "recharts-responsive-container",
     "%",
     "33.7%",
-    "cs-badge-shadow",
+    "cs-badge-shadow", // badge layer is wired up
     "cs-pie-spin", // the slow donut revolution
-    "cs-badge-orbit", // one orbiting badge per slice
-    "cs-badge-counter", // horizontal counter-rotation
   ];
-  // The badge overlay must render one badge (rect) per visible mode.
-  const badgeRects = (html.match(/x="-26"/g) || []).length;
-  if (badgeRects !== data.length) absent.push(`badge rects ${badgeRects} != modes ${data.length}`);
-  const orbits = (html.match(/cs-badge-orbit/g) || []).length;
-  if (orbits !== data.length) absent.push(`orbit groups ${orbits} != modes ${data.length}`);
+  // The % badge renders only for the checked (hovered) slice — SSR has no
+  // hover, so no badge rect may be present in static markup.
+  if (html.includes('x="-26"')) absent.push("badge rect rendered without hover");
   const missing = [...mustNot.filter((s) => html.includes(s))].map((s) => `"${s}" still present`);
   const absent = must.filter((s) => !html.includes(s)).map((s) => `"${s}" missing`);
   const modes = data.map((d) => d.name).filter((n) => !html.includes(n)).map((n) => `mode "${n}" missing`);

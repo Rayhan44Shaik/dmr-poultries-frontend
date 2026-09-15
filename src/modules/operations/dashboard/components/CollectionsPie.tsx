@@ -12,9 +12,6 @@ function lighten(hex: string, amt = 0.22): string {
   return `rgb(${f(c[0])}, ${f(c[1])}, ${f(c[2])})`;
 }
 
-/** Springy easing for the hover lift / badge nudge. */
-const SPRING = "cubic-bezier(0.34, 1.4, 0.64, 1)";
-
 interface CollectionsPieProps {
   data: { name: string; value: number }[];
 }
@@ -57,17 +54,17 @@ function useCountUp(target: number, duration = 900): number {
  *
  * A fixed 256 px square stage keeps the ring a perfect circle at every window
  * size, with generous white space on all sides. Slices sweep in on mount /
- * range change, and EVERY slice carries a small white pop badge with its
- * exact share, riding just OUTSIDE the ring, centred exactly on the sector's
- * mid-angle, with its inner edge touching the slice's outer edge. The whole
- * donut (and the badges, orbiting with their own slices) makes one very slow
- * ambient revolution — 3 minutes per lap, off with reduced-motion — while
- * the pills counter-rotate so they stay perfectly horizontal at all times.
- * The badges live in an overlay layer above the chart so all of them always
- * show. Hovering a slice lifts it out and pushes its badge along; the other
- * slices stay fully solid (no fading). The centre shows the total with a
- * count-up, the legend lists every mode with exact amount and share, and the
- * card title links to the Collection Report.
+ * range change. The whole donut makes one very slow ambient revolution —
+ * 8 minutes per lap, barely noticeable, off with reduced-motion.
+ *
+ * A white pop badge with the exact share appears ONLY for the checked
+ * (hovered) slice: it springs in outside the ring, centred exactly on that
+ * sector's mid-angle, touching the slice's outer edge, orbits with the pie
+ * while counter-rotating to stay perfectly horizontal — and disappears
+ * when the slice is un-checked. No badges show at any other time. Hovering
+ * lifts the slice out; the other slices stay fully solid (no fading). The
+ * centre shows the total with a count-up, the legend lists every mode with
+ * exact amount and share, and the card title links to the Collection Report.
  */
 export default function CollectionsPie({ data }: CollectionsPieProps) {
   const { t } = useI18n();
@@ -181,10 +178,11 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
             </div>
           </div>
 
-          {/* White pop badges — a separate layer ABOVE the chart, so every
-              badge (including the last slice's) always shows. Each pill
-              rides just outside the ring, rotated to follow it, with its
-              inner edge touching the slice's outer edge. */}
+          {/* White pop badge — a separate layer ABOVE the chart. It appears
+              ONLY for the checked (hovered) slice: centred exactly on that
+              sector's mid-angle, outside the ring and touching its edge,
+              popping in and orbiting with the pie while staying perfectly
+              horizontal. Nothing else shows a badge at any time. */}
           <div className="pointer-events-none absolute inset-0">
             <svg viewBox="0 0 256 256" className="h-full w-full overflow-visible">
               <defs>
@@ -192,60 +190,59 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
                   <feDropShadow dx="0" dy="1.5" stdDeviation="2" floodColor="#0f172a" floodOpacity="0.16" />
                 </filter>
               </defs>
-              {enrichedData.map((d, i) => {
-                if (d.percent < 4) return null;
-                const a = (sliceMids[i] * Math.PI) / 180;
-                // Badge centre sits EXACTLY at its sector's mid-angle, just
-                // outside the ring's outer edge (107.5) — touching it.
-                const px = 128 + 119 * Math.sin(a);
-                const py = 128 - 119 * Math.cos(a);
-                // The orbit group rotates with the pie; the counter group
-                // turns the same amount the other way about the badge's own
-                // centre, so the pill stays perfectly horizontal always.
-                const hovered = hoverIndex === i;
-                const nx = hovered ? 8 * Math.sin(a) : 0;
-                const ny = hovered ? -8 * Math.cos(a) : 0;
-                return (
-                  <g key={d.name} className="cs-badge-orbit">
-                    <g transform={`translate(${px.toFixed(2)}, ${py.toFixed(2)})`}>
-                      <g
-                        style={{
-                          transform: `translate(${nx.toFixed(2)}px, ${ny.toFixed(2)}px)`,
-                          transition: `transform 300ms ${SPRING}`,
-                        }}
-                      >
+              {hoverIndex >= 0 &&
+                enrichedData[hoverIndex] &&
+                enrichedData[hoverIndex].percent >= 4 &&
+                (() => {
+                  const d = enrichedData[hoverIndex];
+                  const a = (sliceMids[hoverIndex] * Math.PI) / 180;
+                  // Badge centre sits EXACTLY at its sector's mid-angle, just
+                  // outside the ring's outer edge (107.5) — touching it.
+                  const px = 128 + 119 * Math.sin(a);
+                  const py = 128 - 119 * Math.cos(a);
+                  // Orbit group rotates with the pie (same 480s clock); the
+                  // counter group turns the same amount the other way about
+                  // the badge's own centre, so the pill stays perfectly
+                  // horizontal while it circles with its slice.
+                  return (
+                    <g key={d.name} className="cs-badge-orbit">
+                      <g transform={`translate(${px.toFixed(2)}, ${py.toFixed(2)})`}>
                         <g
-                          className="cs-badge-counter"
-                          style={{ transformOrigin: `${px.toFixed(2)}px ${py.toFixed(2)}px` }}
+                          className="animate-pop-in"
+                          style={{ transformBox: "view-box", transformOrigin: `${px.toFixed(2)}px ${py.toFixed(2)}px` }}
                         >
-                          <rect
-                            x={-26}
-                            y={-11}
-                            width={52}
-                            height={22}
-                            rx={11}
-                            fill="#ffffff"
-                            stroke="rgba(15,23,42,0.08)"
-                            strokeWidth={1}
-                            filter="url(#cs-badge-shadow)"
-                          />
-                          <text
-                            x={0}
-                            y={0.5}
-                            textAnchor="middle"
-                            dominantBaseline="central"
-                            fontSize={11}
-                            fontWeight={800}
-                            fill="#1e293b"
+                          <g
+                            className="cs-badge-counter"
+                            style={{ transformOrigin: `${px.toFixed(2)}px ${py.toFixed(2)}px` }}
                           >
-                            {`${d.percent.toFixed(1)}%`}
-                          </text>
+                            <rect
+                              x={-26}
+                              y={-11}
+                              width={52}
+                              height={22}
+                              rx={11}
+                              fill="#ffffff"
+                              stroke="rgba(15,23,42,0.08)"
+                              strokeWidth={1}
+                              filter="url(#cs-badge-shadow)"
+                            />
+                            <text
+                              x={0}
+                              y={0.5}
+                              textAnchor="middle"
+                              dominantBaseline="central"
+                              fontSize={11}
+                              fontWeight={800}
+                              fill="#1e293b"
+                            >
+                              {`${d.percent.toFixed(1)}%`}
+                            </text>
+                          </g>
                         </g>
                       </g>
                     </g>
-                  </g>
-                );
-              })}
+                  );
+                })()}
             </svg>
           </div>
 

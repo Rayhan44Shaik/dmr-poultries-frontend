@@ -916,7 +916,7 @@
 }
 
 /* =============================================================================
- * Collection Streams donut — one slow ambient revolution (3 min per lap).
+ * Collection Streams donut — one very slow ambient revolution (8 min per lap).
  * The pie rotates; each % badge orbits with its own slice while
  * counter-rotating, so the pills stay perfectly horizontal at all times.
  * ============================================================================= */
@@ -925,16 +925,16 @@
   to { transform: rotate(360deg); }
 }
 .cs-pie-spin {
-  animation: cs-orbit-spin 180s linear infinite;
+  animation: cs-orbit-spin 480s linear infinite;
 }
 .cs-badge-orbit {
   transform-box: view-box;
   transform-origin: 128px 128px;
-  animation: cs-orbit-spin 180s linear infinite;
+  animation: cs-orbit-spin 480s linear infinite;
 }
 .cs-badge-counter {
   transform-box: view-box;
-  animation: cs-orbit-spin 180s linear infinite reverse;
+  animation: cs-orbit-spin 480s linear infinite reverse;
 }
 @media (prefers-reduced-motion: reduce) {
   .cs-pie-spin,
