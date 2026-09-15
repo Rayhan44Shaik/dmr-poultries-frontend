@@ -10,6 +10,7 @@
 
 import { useEffect, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { enterViewLayer } from "../shared/ui/viewLayer";
 
 type Props = {
   open: boolean;
@@ -18,12 +19,22 @@ type Props = {
   panelClassName?: string;
   closeOnOverlay?: boolean;
   zIndex?: number;
+  /** Id of the heading inside the panel, so it names the dialog. */
+  ariaLabelledBy?: string;
 };
 
 const HEADER_H = 64;
 const GAP = 16;
 
-export default function AppShellModal({ open, onClose, children, panelClassName = "", closeOnOverlay = true, zIndex = 50 }: Props) {
+export default function AppShellModal({
+  open,
+  onClose,
+  children,
+  panelClassName = "",
+  closeOnOverlay = true,
+  zIndex = 50,
+  ariaLabelledBy,
+}: Props) {
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -33,13 +44,23 @@ export default function AppShellModal({ open, onClose, children, panelClassName 
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
+  // Tell the shell a view is open: the header stays usable above it and the
+  // toasts step aside (see shared/ui/viewLayer).
+  useEffect(() => {
+    if (!open) return;
+    return enterViewLayer();
+  }, [open]);
+
   if (!open) return null;
 
   const content = (
     <>
-      {/* Overlay — global level, no blur background as requested for trip list view */}
+      {/* Overlay — global level, no blur background as requested for trip list
+          view. From `sm` up it starts BELOW the header, so the header's own
+          controls (search, language, notifications) stay clickable while a view
+          is open instead of dismissing it. */}
       <div
-        className="fixed inset-0 animate-fade-in bg-black/20"
+        className="fixed inset-0 animate-fade-in bg-black/20 sm:top-16"
         style={{
           zIndex,
         }}
@@ -70,6 +91,7 @@ export default function AppShellModal({ open, onClose, children, panelClassName 
           }}
           role="dialog"
           aria-modal="true"
+          aria-labelledby={ariaLabelledBy}
         >
           {children}
         </div>

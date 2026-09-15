@@ -8,6 +8,7 @@ import { FuelEntryForm } from "../components/FuelEntryForm";
 import { FuelBillTable } from "../components/FuelBillTable";
 import { FuelViewModal } from "../components/FuelViewModal";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
+import { useI18n } from "../../../../i18n";
 import { PageSizeSelect } from "../../../../shared/ui/PageSizeSelect";
 import {
   paginationBarClass,
@@ -50,6 +51,7 @@ import {
 } from "../../../../shared/ui/operationsStyles";
 
 function FuelExpensesPage() {
+  const { t } = useI18n();
   const { showNotification } = useSafeNotification();
   const { vehicles } = useVehicles();
   const { employees } = useEmployees();
@@ -550,7 +552,7 @@ function FuelExpensesPage() {
         {shouldShowPagination(totalCount) && (
           <div className={paginationBarClass}>
             <div className="mr-auto flex items-center gap-2">
-            <span className="text-[13px] font-semibold text-slate-600">Rows Per Page</span>
+            <span className="text-[13px] font-semibold text-slate-600">{t("common.rows_per_page")}</span>
                 <PageSizeSelect
                 value={pageSize}
                 onChange={(size) => {
@@ -560,21 +562,25 @@ function FuelExpensesPage() {
               />
           </div>
             <button
+              type="button"
               disabled={currentPage === 1}
               onClick={() => setCurrentPage((p) => p - 1)}
               className={paginationNavBtnClass}
+              aria-label={t("common.previous_page")}
             >
-              Previous
+              {t("common.previous")}
             </button>
             <span className={paginationPageBtnClass(true)}>
               {currentPage}
             </span>
             <button
+              type="button"
               disabled={currentPage === totalPages}
               onClick={() => setCurrentPage((p) => p + 1)}
               className={paginationNavBtnClass}
+              aria-label={t("common.next_page")}
             >
-              Next
+              {t("common.next")}
             </button>
           </div>
         )}

@@ -259,7 +259,12 @@ export default function Sidebar({ open, onClose, mode, onModeChange }: SidebarPr
                         {collapsed ? (
                           badgeCount > 0 && (
                             <span
-                              title={`${badgeCount} pending approval${badgeCount === 1 ? "" : "s"}`}
+                              title={t(
+                                  badgeCount === 1
+                                    ? "layout.pending_approval_one"
+                                    : "layout.pending_approval_many",
+                                  { count: badgeCount },
+                                )}
                               className="absolute right-2 top-1.5 h-1.5 w-1.5 rounded-full bg-amber-500 ring-2 ring-white dark:ring-slate-900"
                             />
                           )
@@ -268,7 +273,12 @@ export default function Sidebar({ open, onClose, mode, onModeChange }: SidebarPr
                             <span className="flex-1 truncate text-left">{label}</span>
                             {badgeCount > 0 && (
                               <span
-                                title={`${badgeCount} pending approval${badgeCount === 1 ? "" : "s"}`}
+                                title={t(
+                                  badgeCount === 1
+                                    ? "layout.pending_approval_one"
+                                    : "layout.pending_approval_many",
+                                  { count: badgeCount },
+                                )}
                                 className="ml-auto inline-flex h-[18px] min-w-[18px] shrink-0 items-center justify-center rounded-full bg-amber-100 px-1 text-[10px] font-bold tabular-nums text-amber-800 dark:bg-amber-500/20 dark:text-amber-300"
                               >
                                 {badgeCount > 99 ? "99+" : badgeCount}

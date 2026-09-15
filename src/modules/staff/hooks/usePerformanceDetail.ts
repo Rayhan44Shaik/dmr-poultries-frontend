@@ -19,6 +19,12 @@
 //   • `detail` is only returned when it belongs to the CURRENTLY selected
 //     person — navigating can never flash the previous person's trips.
 //   • No fabrication: `detail` stays null until a real response arrives.
+//   • `prefetchPerformanceDetail` WARMS that same cache for a person the user
+//     is only about to open (row hover / keyboard focus, or the ‹ › neighbour
+//     of the open pop-up). It renders nothing, writes no React state and is a
+//     no-op when the entry is already cached or already in flight — so a click
+//     lands on a complete pop-up (no spinner, no reflow) and the number of
+//     requests never grows.
 // ============================================================================
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -85,6 +91,52 @@ function detailSharedGet(
   return pending;
 }
 
+/** One cache key shape for the hook AND the prefetch — never diverges. */
+function detailCacheKey(
+  kind: StaffPerformanceKind,
+  range: PerformanceDetailRange,
+  personId: number,
+): string {
+  return `staff-perf-detail:${kind}:${range.fromDate}|${range.toDate}|${personId}`;
+}
+
+function requestDetail(
+  kind: StaffPerformanceKind,
+  range: PerformanceDetailRange,
+  personId: number,
+): Promise<DriverPerformanceResponse | SupervisorPerformanceResponse> {
+  return kind === "drivers"
+    ? getDriverPerformance({
+        fromDate: range.fromDate,
+        toDate: range.toDate,
+        driverId: personId,
+      })
+    : getSupervisorPerformance({
+        fromDate: range.fromDate,
+        toDate: range.toDate,
+        supervisorId: personId,
+      });
+}
+
+/**
+ * Warm the detail cache for one person without rendering anything.
+ *
+ * Used by the pages on row hover / focus and for the open pop-up's ‹ ›
+ * neighbours, so the pop-up is already complete when it opens. Never throws,
+ * never touches React state, and does nothing when the entry is cached or
+ * already loading (the caller can spray it — no duplicate request is possible).
+ */
+export function prefetchPerformanceDetail(
+  kind: StaffPerformanceKind,
+  personId: number | null | undefined,
+  range: PerformanceDetailRange,
+): void {
+  if (personId == null) return;
+  const key = detailCacheKey(kind, range, personId);
+  if (detailCacheGet(key) || detailInflight.has(key)) return;
+  void detailSharedGet(key, () => requestDetail(kind, range, personId)).catch(() => undefined);
+}
+
 /* ---------------------------------- hook ---------------------------------- */
 
 interface DetailState {
@@ -116,11 +168,13 @@ export function usePerformanceDetail<K extends StaffPerformanceKind>(
     };
   }, []);
 
+  // Only the two date strings are read, so the memo (and the effect below) stay
+  // keyed on primitives — a new `range` object literal per render is harmless.
   const cacheKey = useMemo(
     () =>
       personId == null
         ? null
-        : `staff-perf-detail:${kind}:${range.fromDate}|${range.toDate}|${personId}`,
+        : detailCacheKey(kind, { fromDate: range.fromDate, toDate: range.toDate }, personId),
     [kind, personId, range.fromDate, range.toDate],
   );
 
@@ -141,17 +195,7 @@ export function usePerformanceDetail<K extends StaffPerformanceKind>(
     }
 
     void detailSharedGet(cacheKey, () =>
-      kind === "drivers"
-        ? getDriverPerformance({
-            fromDate: range.fromDate,
-            toDate: range.toDate,
-            driverId: personId,
-          })
-        : getSupervisorPerformance({
-            fromDate: range.fromDate,
-            toDate: range.toDate,
-            supervisorId: personId,
-          }),
+      requestDetail(kind, { fromDate: range.fromDate, toDate: range.toDate }, personId),
     )
       .then((payload) => {
         if (!mounted.current || gen !== loadGen.current) return; // stale — discard

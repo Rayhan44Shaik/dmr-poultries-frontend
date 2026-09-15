@@ -12,13 +12,26 @@
 // complete metric tiles and a translated explanation — followed by the
 // complete table (with Pace chips) for every trip.
 
-import { memo } from 'react';
+import { memo, type ReactNode } from 'react';
 import { format } from 'date-fns';
 import { te as teLocale } from 'date-fns/locale';
 import type { Locale } from 'date-fns';
-import { AlertTriangle } from 'lucide-react';
+import {
+  AlertTriangle,
+  Bird,
+  Calendar,
+  Gauge,
+  Hash,
+  HeartPulse,
+  Route,
+  Scale,
+  ShoppingBag,
+  TrendingDown,
+  Truck,
+} from 'lucide-react';
 import { usePerformanceI18n } from './performanceI18nScope';
 import { parseBusinessDate } from '../../../../utils/businessDate';
+import { formatTripNumber, formatVehicleNumber } from '../../../../utils/format';
 import {
   uiTableHeadClass,
   uiTableThClass,
@@ -37,6 +50,29 @@ import {
   type TripRaceEntry,
 } from '../../utils/performanceView';
 
+/** One column name with its own glyph — the Trip List header recipe, scaled
+ *  for the in-view tables. */
+function HeadCell({
+  icon,
+  label,
+  align = 'left',
+}: {
+  icon: ReactNode;
+  label: string;
+  align?: 'left' | 'right' | 'center';
+}) {
+  const justify =
+    align === 'right' ? 'justify-end' : align === 'center' ? 'justify-center' : 'justify-start';
+  return (
+    <th scope="col" className={`${uiTableThClass} px-3 py-2 text-xs text-${align}`}>
+      <span className={`flex items-center gap-1.5 ${justify}`}>
+        {icon}
+        <span>{label}</span>
+      </span>
+    </th>
+  );
+}
+
 const fmt = (value: number, digits = 0) =>
   Number(value || 0).toLocaleString('en-IN', { maximumFractionDigits: digits });
 
@@ -48,6 +84,18 @@ interface RecentTripsTableProps {
 }
 
 type Translate = ReturnType<typeof usePerformanceI18n>['t'];
+
+/** Tile colours — the KPI card recipe, one step smaller. */
+// Each metric tile is a plain white box: the figure, its label, and the metric's
+// own glyph — only the glyph chip carries a colour. No colour bar, no tinted
+// figure, nothing under the box.
+const TILE_TONE = {
+  sky: { chip: 'border-sky-100 bg-sky-50 text-sky-600' },
+  emerald: { chip: 'border-emerald-100 bg-emerald-50 text-emerald-600' },
+  rose: { chip: 'border-rose-100 bg-rose-50 text-rose-600' },
+  violet: { chip: 'border-violet-100 bg-violet-50 text-violet-600' },
+  indigo: { chip: 'border-indigo-100 bg-indigo-50 text-indigo-600' },
+} as const;
 
 function PaceChip({ offPace }: { offPace: boolean }) {
   const { t } = usePerformanceI18n();
@@ -94,28 +142,37 @@ function LaggingTripCard({
   const { mRate, lossPct } = tripRateTiles(trip);
   const isDriver = paceKind === 'drivers';
 
-  // Five metric tiles; the lagging dimension is accent-tinted and its sub
-  // line carries the direct comparison (headline = "actual / own average").
-  const tiles: Array<{ label: string; value: string; sub?: string; accent?: boolean }> = [
-    { label: t('staff.perf.trips.col.shops'), value: fmt(trip.totalShops) },
-    { label: t('staff.perf.trips.col.birds'), value: fmt(trip.totalBirdsDelivered) },
+  // Five metric tiles, each a plain white box: quiet uppercase label, the
+  // figure, its secondary line and the metric's own glyph chip.
+  const tiles: Array<{
+    label: string;
+    value: string;
+    sub?: string;
+    tone: 'sky' | 'emerald' | 'rose' | 'violet' | 'indigo';
+    icon: typeof ShoppingBag;
+  }> = [
+    { label: t('staff.perf.trips.col.shops'), value: fmt(trip.totalShops), tone: 'sky', icon: ShoppingBag },
+    { label: t('staff.perf.trips.col.birds'), value: fmt(trip.totalBirdsDelivered), tone: 'emerald', icon: Bird },
     {
       label: t('staff.perf.trips.col.mortality'),
       value: fmt(trip.totalMortality),
       sub: `${formatDecimal(mRate, 2)}%`,
-      accent: paceKind === 'supervisors',
+      tone: 'rose',
+      icon: HeartPulse,
     },
     {
       label: t('staff.perf.trips.col.weight_loss'),
       value: `${fmt(trip.weightLoss, 1)} kg`,
       sub: `${formatDecimal(lossPct, 2)}%`,
-      accent: paceKind === 'supervisors',
+      tone: 'violet',
+      icon: Scale,
     },
     {
       label: t('staff.perf.trips.col.km'),
       value: `${fmt(trip.totalKm)} km`,
       sub: isDriver ? entry.headline : undefined,
-      accent: isDriver,
+      tone: 'indigo',
+      icon: Route,
     },
   ];
 
@@ -123,36 +180,54 @@ function LaggingTripCard({
     <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3">
       <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1">
         <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
-          <span className="font-mono text-[11px] font-bold text-slate-900">{trip.tripNo}</span>
+          <span className="text-xs font-bold tabular-nums text-slate-900">
+            {formatTripNumber(trip.tripNo)}
+          </span>
           <span aria-hidden="true" className="text-slate-300">·</span>
           <span className="text-[11px] font-medium text-slate-500">
             {parsed ? format(parsed, 'dd MMM yyyy', { locale }) : '—'}
           </span>
           <span aria-hidden="true" className="text-slate-300">·</span>
-          <span className="text-[11px] font-semibold text-slate-600">{trip.vehicleNo}</span>
+          <span className="text-xs font-semibold text-slate-600">
+            {formatVehicleNumber(trip.vehicleNo)}
+          </span>
         </div>
         <PaceChip offPace />
       </div>
 
-      <div className="mt-2 grid grid-cols-2 gap-1.5 sm:grid-cols-5">
-        {tiles.map((tile) => (
-          <div
-            key={tile.label}
-            className={`rounded-lg border px-2 py-1.5 ${
-              tile.accent
-                ? 'border-amber-200 bg-white'
-                : 'border-slate-100 bg-white/80'
-            }`}
-          >
-            <div className="text-[9px] font-semibold uppercase tracking-wide text-slate-400">
-              {tile.label}
+      <div className="mt-2.5 grid grid-cols-2 gap-2 sm:grid-cols-5">
+        {tiles.map((tile) => {
+          const tone = TILE_TONE[tile.tone];
+          const TileIcon = tile.icon;
+          return (
+            <div
+              key={tile.label}
+              className="rounded-xl border border-slate-200 bg-white shadow-xs"
+            >
+              <div className="flex items-start justify-between gap-2 px-3 py-2.5">
+                <div className="min-w-0">
+                  <p className="truncate text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                    {tile.label}
+                  </p>
+                  <p className="mt-1 truncate text-[17px] font-bold leading-none tracking-tight tabular-nums text-slate-900">
+                    {tile.value}
+                  </p>
+                  {tile.sub && (
+                    <p className="mt-1 truncate text-[11px] font-medium tabular-nums text-slate-400">
+                      {tile.sub}
+                    </p>
+                  )}
+                </div>
+                <span
+                  aria-hidden="true"
+                  className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border ${tone.chip} [&>svg]:h-3.5 [&>svg]:w-3.5`}
+                >
+                  <TileIcon />
+                </span>
+              </div>
             </div>
-            <div className="text-xs font-bold tabular-nums text-slate-900">{tile.value}</div>
-            {tile.sub && (
-              <div className="text-[10px] font-medium tabular-nums text-slate-500">{tile.sub}</div>
-            )}
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       <p className="mt-2 flex items-start gap-1.5 text-[11px] font-medium leading-relaxed text-amber-800">
@@ -205,18 +280,22 @@ const RecentTripsTable = ({ trips, paceRow, paceKind }: RecentTripsTableProps) =
         <table className="min-w-full divide-y divide-slate-100">
           <thead className={uiTableHeadClass}>
             <tr>
-              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-left`}>{t('staff.perf.trips.col.trip')}</th>
-              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-left`}>{t('staff.perf.trips.col.date')}</th>
-              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-left`}>{t('staff.perf.trips.col.vehicle')}</th>
+              <HeadCell icon={<Hash size={13} className="text-slate-400" />} label={t('staff.perf.trips.col.trip')} />
+              <HeadCell icon={<Calendar size={13} className="text-sky-500" />} label={t('staff.perf.trips.col.date')} />
+              <HeadCell icon={<Truck size={13} className="text-indigo-500" />} label={t('staff.perf.trips.col.vehicle')} />
               {paceRow && (
-                <th scope="col" className={`${uiTableThClass} px-3 py-2 text-center`}>{t('staff.perf.trips.col.pace')}</th>
+                <HeadCell
+                  icon={<Gauge size={13} className="text-amber-500" />}
+                  label={t('staff.perf.trips.col.pace')}
+                  align="center"
+                />
               )}
-              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>{t('staff.perf.trips.col.shops')}</th>
-              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>{t('staff.perf.trips.col.birds')}</th>
-              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>{t('staff.perf.trips.col.weight')}</th>
-              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>{t('staff.perf.trips.col.mortality')}</th>
-              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>{t('staff.perf.trips.col.weight_loss')}</th>
-              <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>{t('staff.perf.trips.col.km')}</th>
+              <HeadCell icon={<ShoppingBag size={13} className="text-cyan-500" />} label={t('staff.perf.trips.col.shops')} align="right" />
+              <HeadCell icon={<Bird size={13} className="text-emerald-500" />} label={t('staff.perf.trips.col.birds')} align="right" />
+              <HeadCell icon={<Scale size={13} className="text-orange-500" />} label={t('staff.perf.trips.col.weight')} align="right" />
+              <HeadCell icon={<HeartPulse size={13} className="text-rose-500" />} label={t('staff.perf.trips.col.mortality')} align="right" />
+              <HeadCell icon={<TrendingDown size={13} className="text-violet-500" />} label={t('staff.perf.trips.col.weight_loss')} align="right" />
+              <HeadCell icon={<Route size={13} className="text-teal-500" />} label={t('staff.perf.trips.col.km')} align="right" />
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100 bg-white">
@@ -228,22 +307,24 @@ const RecentTripsTable = ({ trips, paceRow, paceKind }: RecentTripsTableProps) =
                   key={trip.tripNo}
                   className={`transition-colors hover:bg-slate-50/70 ${pace ? 'bg-amber-50/40' : ''}`}
                 >
-                  <td className={`${uiTableTdClass} whitespace-nowrap px-3 py-2 font-mono text-[11px] font-semibold text-slate-800`}>{trip.tripNo}</td>
-                  <td className={`${uiTableTdClass} whitespace-nowrap px-3 py-2 text-xs text-slate-600`}>
+                  <td className={`${uiTableTdClass} whitespace-nowrap px-3 py-2 text-[13px] font-semibold tabular-nums text-slate-800`}>{formatTripNumber(trip.tripNo)}</td>
+                  <td className={`${uiTableTdClass} whitespace-nowrap px-3 py-2 text-[13px] text-slate-600`}>
                     {parsed ? format(parsed, 'dd MMM yyyy', { locale }) : '—'}
                   </td>
-                  <td className={`${uiTableTdClass} whitespace-nowrap px-3 py-2 text-xs font-medium text-slate-700`}>{trip.vehicleNo}</td>
+                  <td className={`${uiTableTdClass} whitespace-nowrap px-3 py-2 text-[13px] font-semibold tabular-nums text-slate-800`}>
+                    {formatVehicleNumber(trip.vehicleNo)}
+                  </td>
                   {paceRow && (
                     <td className={`${uiTableTdClass} whitespace-nowrap px-3 py-2 text-center`}>
                       <PaceChip offPace={Boolean(pace)} />
                     </td>
                   )}
-                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>{fmt(trip.totalShops)}</td>
-                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>{fmt(trip.totalBirdsDelivered)}</td>
-                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>{fmt(trip.totalDeliveredWeight)}</td>
-                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>{fmt(trip.totalMortality)}</td>
-                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>{fmt(trip.weightLoss, 1)}</td>
-                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>{fmt(trip.totalKm)}</td>
+                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>{fmt(trip.totalShops)}</td>
+                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>{fmt(trip.totalBirdsDelivered)}</td>
+                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>{fmt(trip.totalDeliveredWeight)}</td>
+                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>{fmt(trip.totalMortality)}</td>
+                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>{fmt(trip.weightLoss, 1)}</td>
+                  <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>{fmt(trip.totalKm)}</td>
                 </tr>
               );
             })}

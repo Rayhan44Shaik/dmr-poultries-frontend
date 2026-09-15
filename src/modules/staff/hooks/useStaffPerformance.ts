@@ -19,6 +19,11 @@
 //     The previous dataset stays on screen (`refreshing`, not `loading`).
 //   • ROW SELECTION is pure UI state: it never reaches the query and never
 //     triggers a request.
+//   • `prefetchStaffPerformance(kind)` warms the SIBLING page's default
+//     dataset through the very same cache (driver page warms supervisors and
+//     vice-versa), so switching tabs shows the table immediately — no loading
+//     frame at all. Deduped by the same cache/in-flight rules, so it can never
+//     double a request.
 //
 // Default period: the last four Monday→Saturday reporting weeks up to today
 // (~one month), computed by `utils/performancePeriods` — never hard-coded.
@@ -119,6 +124,55 @@ function sharedGet(key: string, loader: () => Promise<PerformanceResponse>): Pro
   return pending;
 }
 
+/** ONE cache-key shape for the hook, the initial lookup and the prefetch. */
+function listCacheKey(
+  kind: StaffPerformanceKind,
+  fromDate: string,
+  toDate: string,
+  search: string,
+  personId: number | null,
+): string {
+  return `staff-perf:${kind}:${fromDate}|${toDate}|${search.trim()}|${personId ?? ""}`;
+}
+
+function listRequest(
+  kind: StaffPerformanceKind,
+  fromDate: string,
+  toDate: string,
+  search: string,
+  personId: number | null,
+): Promise<PerformanceResponse> {
+  return kind === "drivers"
+    ? getDriverPerformance({
+        fromDate,
+        toDate,
+        search: search || undefined,
+        driverId: personId,
+      })
+    : getSupervisorPerformance({
+        fromDate,
+        toDate,
+        search: search || undefined,
+        supervisorId: personId,
+      });
+}
+
+/**
+ * Warm the OTHER performance page's default dataset (its initial period, no
+ * person, no search) so switching between Driver Performance and Supervisor
+ * Performance is instant — the sibling page then finds its data in the cache on
+ * its very first render, so there is no loading frame and no spinner at all.
+ *
+ * Best-effort and state-free: never throws, never renders, and a no-op when the
+ * entry is cached or already in flight — it can never add a duplicate request.
+ */
+export function prefetchStaffPerformance(kind: StaffPerformanceKind): void {
+  const { fromDate, toDate } = buildDefaultFilters();
+  const key = listCacheKey(kind, fromDate, toDate, "", null);
+  if (cacheGet(key) || inflightStore.has(key)) return;
+  void sharedGet(key, () => listRequest(kind, fromDate, toDate, "", null)).catch(() => undefined);
+}
+
 /* --------------------------------------------------------------------------
  * Helpers
  * ------------------------------------------------------------------------ */
@@ -191,8 +245,7 @@ function useStaffPerformanceImpl(kind: StaffPerformanceKind) {
   const [refreshNonce, setRefreshNonce] = useState(0);
 
   const initialKey = useMemo(
-    () =>
-      `staff-perf:${kind}:${filters.fromDate}|${filters.toDate}|${filters.search.trim()}|`,
+    () => listCacheKey(kind, filters.fromDate, filters.toDate, filters.search, filters.personId),
     // Initial cache lookup only — filters are the source from here on.
     // eslint-disable-next-line react-hooks/exhaustive-deps
     [kind],
@@ -236,10 +289,10 @@ function useStaffPerformanceImpl(kind: StaffPerformanceKind) {
       };
       if (filtersEqual(appliedRef.current, candidate)) return;
       appliedRef.current = candidate;
-      // Flags are set here (event handler), not in the fetch effect, so the
-      // effect body itself never calls setState synchronously.
-      if (hasData.current) setRefreshing(true);
-      else setLoading(true);
+      // A filter change is NOT a refresh: the previous dataset simply stays on
+      // screen until the new one lands, so no pill dances and no "refreshed"
+      // toast fires (that is reserved for the explicit Refresh action).
+      if (!hasData.current) setLoading(true);
       setFilters(candidate);
     },
     [],
@@ -254,8 +307,8 @@ function useStaffPerformanceImpl(kind: StaffPerformanceKind) {
       return;
     }
     appliedRef.current = restored;
-    if (hasData.current) setRefreshing(true);
-    else setLoading(true);
+    // Reset is a filter change too — quiet, exactly like the other filters.
+    if (!hasData.current) setLoading(true);
     setFilters(restored);
     setSelectedId(null);
   }, [defaultFilters]);
@@ -265,7 +318,11 @@ function useStaffPerformanceImpl(kind: StaffPerformanceKind) {
     setSelectedId((current) => (current === id ? current : id));
   }, []);
 
-  /** Single-flight refresh: invalidate cache, then re-request current filters. */
+  /**
+   * Single-flight refresh: invalidate cache, then re-request current filters.
+   * This is the ONLY path that raises `refreshing`, so the Refresh pill (and
+   * the "refreshed" toast) marks a deliberate refresh and nothing else.
+   */
   const refresh = useCallback(() => {
     if (inFlight.current) return;
     cacheInvalidate("staff-perf:");
@@ -275,7 +332,13 @@ function useStaffPerformanceImpl(kind: StaffPerformanceKind) {
     setRefreshNonce((nonce) => nonce + 1);
   }, []);
 
-  const cacheKey = `staff-perf:${kind}:${filters.fromDate}|${filters.toDate}|${filters.search}|${filters.personId ?? ""}`;
+  const cacheKey = listCacheKey(
+    kind,
+    filters.fromDate,
+    filters.toDate,
+    filters.search,
+    filters.personId,
+  );
 
   useEffect(() => {
     const hit = refreshNonce === 0 ? cacheGet(cacheKey) : undefined;
@@ -296,19 +359,7 @@ function useStaffPerformanceImpl(kind: StaffPerformanceKind) {
     inFlight.current = true;
 
     void sharedGet(cacheKey, () =>
-      kind === "drivers"
-        ? getDriverPerformance({
-            fromDate: filters.fromDate,
-            toDate: filters.toDate,
-            search: filters.search || undefined,
-            driverId: filters.personId,
-          })
-        : getSupervisorPerformance({
-            fromDate: filters.fromDate,
-            toDate: filters.toDate,
-            search: filters.search || undefined,
-            supervisorId: filters.personId,
-          })
+      listRequest(kind, filters.fromDate, filters.toDate, filters.search, filters.personId),
     )
       .then((payload) => {
         if (!mounted.current || gen !== loadGen.current) return; // stale response — discard

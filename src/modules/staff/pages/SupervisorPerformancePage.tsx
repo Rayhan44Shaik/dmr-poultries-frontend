@@ -19,22 +19,28 @@
 //     deterministic presentation scorer in `utils/performanceGrading`.
 // ============================================================================
 
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
   ClipboardCheck,
   Scale,
   Store,
   TrendingUp,
+  UserCheck,
   Users,
 } from "lucide-react";
 import { te as teDateLocale } from "date-fns/locale";
 import type { Locale } from "date-fns";
 
-import { makeT, useI18n, type Language } from "../../../i18n";
-import { useStaffPerformance } from "../hooks/useStaffPerformance";
+import { makeT, translateStatus, useI18n, type Language } from "../../../i18n";
+import {
+  prefetchStaffPerformance,
+  useStaffPerformance,
+} from "../hooks/useStaffPerformance";
 import { useStaffDirectory } from "../hooks/useStaffDirectory";
 import { usePerformanceDetail } from "../hooks/usePerformanceDetail";
+import { usePerformanceRowWarmup } from "../hooks/usePerformanceRowWarmup";
+import { runWhenIdle } from "../utils/idle";
 import { rankSupervisorRows } from "../utils/performanceGrading";
 import SortableHeader, {
   type SortState,
@@ -42,6 +48,7 @@ import SortableHeader, {
 import {
   formatBusinessDate,
   formatPeriodLabel,
+  inProgressWeekKey,
   periodsForRange,
   toWeeklyAxisRows,
 } from "../utils/performancePeriods";
@@ -57,6 +64,8 @@ import {
   gradeBadgeClass,
   translateGrade,
 } from "../utils/performanceView";
+import PerformanceCardMark from "../components/performance/PerformanceCardMark";
+import { CARD_HEADER_TONE } from "../components/performance/performanceCardTone";
 import PerformanceFilterBar, {
   type PerformanceDraftFilters,
 } from "../components/performance/PerformanceFilterBar";
@@ -67,21 +76,28 @@ import WeeklyPerformanceChart, {
   type WeeklyChartPoint,
   type WeeklyChartSeries,
 } from "../components/performance/WeeklyPerformanceChart";
+import { personNameLabel } from "../utils/leaveDisplay";
+import {
+  perfTdClass,
+  perfTdNumericClass,
+  perfThClass,
+} from "../components/performance/tableRhythm";
 import PerformanceDrawer from "../components/performance/PerformanceDrawer";
 import RecentTripsTable from "../components/performance/RecentTripsTable";
 import Pagination from "../components/common/Pagination";
 import RefreshToast from "../components/common/RefreshToast";
-import { EmptyState, TableSkeleton } from "../../../ui";
+import { EmptyState } from "../../../ui";
+import TableLoading from "../components/common/TableLoading";
 import { cn } from "../../../utils/cn";
 import {
   uiTableHeadClass,
   uiTableRowClass,
   uiTableRowFocusableClass,
   uiTableRowSelectedClass,
-  uiTableTdClass,
-  uiTableTdNumericClass,
-  uiTableThClass,
 } from "../../../shared/ui/uiTokens";
+
+/** Typing pause before the search reaches the API (Leave page parity). */
+const SEARCH_DEBOUNCE_MS = 300;
 
 const ITEMS_PER_PAGE = 10;
 
@@ -103,45 +119,79 @@ const SupervisorPerformancePage = () => {
     search: applied.search,
   }));
 
-  // Re-seed the draft + reset pagination when the applied set changes
-  // (Search / Clear). Render-phase adjustment pattern — `applied` identity
-  // changes exactly once per apply/clear, never while typing.
+  /* Reset to page 1 whenever a new query is applied (a filter change is a new
+     list). Render-phase adjustment pattern — `applied` identity changes once
+     per apply. The draft is NOT re-seeded from the applied set: it is what we
+     just sent, and copying it back would overwrite characters typed while the
+     request was in flight. */
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(ITEMS_PER_PAGE);
   const [lastApplied, setLastApplied] = useState(applied);
   if (lastApplied !== applied) {
     setLastApplied(applied);
-    setDraft({
-      fromDate: applied.fromDate,
-      toDate: applied.toDate,
-      personId: applied.personId,
-      search: applied.search,
-    });
     setCurrentPage(1);
   }
 
-  const updateDraft = useCallback((patch: Partial<PerformanceDraftFilters>) => {
-    setDraft((current) => {
-      const next = { ...current, ...patch };
+  /** Always the freshest draft — the debounce below reads it without re-running. */
+  const draftRef = useRef(draft);
+
+  const runQuery = useCallback(
+    (next: PerformanceDraftFilters) => {
+      perf.applyFilters({
+        fromDate: next.fromDate,
+        toDate: next.toDate,
+        personId: next.personId,
+        search: next.search,
+      });
+    },
+    [perf],
+  );
+
+  /**
+   * Filters apply the moment they change — there is no Search button.
+   * A date or a supervisor is a discrete choice, so it goes to the API at once;
+   * typing waits out the same 300 ms pause the Leave page uses (one request per
+   * typing burst, never one per character). `applyFilters` ignores an identical
+   * set, so an immediate apply plus the trailing debounce cannot duplicate a
+   * request.
+   */
+  const updateDraft = useCallback(
+    (patch: Partial<PerformanceDraftFilters>) => {
+      const next = { ...draftRef.current, ...patch };
       if (next.fromDate && next.toDate && next.fromDate > next.toDate) {
         if (patch.fromDate) next.toDate = next.fromDate;
         else next.fromDate = next.toDate;
       }
-      return next;
-    });
-  }, []);
+      draftRef.current = next;
+      setDraft(next);
+      if (!("search" in patch)) runQuery(next);
+    },
+    [runQuery],
+  );
 
+  // Typing: apply once the user pauses.
+  useEffect(() => {
+    const timer = window.setTimeout(() => runQuery(draftRef.current), SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [draft.search, runQuery]);
+
+  /** Enter commits immediately (the trailing debounce then finds nothing to do). */
   const handleApply = useCallback(() => {
-    perf.applyFilters({
-      fromDate: draft.fromDate,
-      toDate: draft.toDate,
-      personId: draft.personId,
-      search: draft.search,
-    });
-  }, [perf, draft]);
+    runQuery(draftRef.current);
+  }, [runQuery]);
 
   const handleClear = useCallback(() => {
     perf.clearFilters();
+    /* Reset restores the draft as well, so a person picked but not yet applied
+       does not survive it. */
+    const restored: PerformanceDraftFilters = {
+      fromDate: perf.defaultFilters.fromDate,
+      toDate: perf.defaultFilters.toDate,
+      personId: perf.defaultFilters.personId,
+      search: perf.defaultFilters.search,
+    };
+    draftRef.current = restored;
+    setDraft(restored);
   }, [perf]);
 
   const handleRefresh = useCallback(() => {
@@ -262,18 +312,21 @@ const SupervisorPerformancePage = () => {
         value: initialLoading ? null : formatCount(kpis.supervisors),
         sub: t("staff.perf.kpi.sub.participating"),
         icon: <Users size={14} />,
+        tone: "sky",
       },
       {
         label: t("staff.perf.kpi.shops_delivered"),
         value: initialLoading ? null : formatCount(kpis.shops),
         sub: t("staff.perf.kpi.sub.shops"),
         icon: <Store size={14} />,
+        tone: "amber",
       },
       {
         label: t("staff.perf.kpi.total_birds"),
         value: initialLoading ? null : formatCount(kpis.birds),
         sub: t("staff.perf.kpi.sub.birds"),
         icon: <ClipboardCheck size={14} />,
+        tone: "emerald",
       },
       {
         label: t("staff.perf.kpi.mortality_rate"),
@@ -282,12 +335,14 @@ const SupervisorPerformancePage = () => {
           : formatMetric("mortalityRate", kpis.mortalityRate),
         sub: t("staff.perf.kpi.sub.mortality"),
         icon: <Scale size={14} />,
+        tone: "rose",
       },
       {
         label: t("staff.perf.kpi.weight_loss"),
         value: initialLoading ? null : formatKg(kpis.weightLoss),
         sub: t("staff.perf.kpi.sub.weight_loss"),
         icon: <TrendingUp size={14} />,
+        tone: "violet",
       },
     ],
     [t, kpis, initialLoading],
@@ -299,11 +354,19 @@ const SupervisorPerformancePage = () => {
     () => toWeeklyAxisRows(data.weekly, dateLocale),
     [data.weekly, dateLocale],
   );
-  // Three-series view per product decision: the Birds bar carries the weekly
-  // volume (left axis); Mortality and Weight-loss are the two loss trends on
-  // the compact right axis. Lines can never visually overpower the volume
-  // they belong to. (Delivered weight remains in the KPIs, the table and the
-  // tooltip's derived average — it is only dropped as a chart series.)
+  /* The week that is still running (if the range reaches into it): drawn in a
+     paler shade and called out under the plot. */
+  const inProgressWeek = useMemo(() => inProgressWeekKey(data.weekly), [data.weekly]);
+  const inProgressNote = useMemo(() => {
+    if (inProgressWeek == null) return undefined;
+    const row = chartRows.find((point) => String(point.week) === String(inProgressWeek));
+    return t("staff.perf.weekly.in_progress", { week: row?.label ?? "" });
+  }, [inProgressWeek, chartRows, t]);
+  /* One chart, three series, three rulers: Birds are the weekly volume (bars,
+     left), Mortality and Weight loss are the two loss trends — each on its own
+     colour-matched axis, so a red or violet trend can never be squashed under
+     a 5,000-bird bar. (Delivered weight remains in the KPIs, the table and the
+     tooltip's derived average — it is only dropped as a chart series.) */
   const chartSeries = useMemo<WeeklyChartSeries[]>(
     () => [
       {
@@ -317,7 +380,7 @@ const SupervisorPerformancePage = () => {
       {
         key: "mortality",
         label: t("staff.perf.weekly.mortality"),
-        color: "#ef4444",
+        color: "#f43f5e",
         axis: "right",
         kind: "line",
         format: (value) => formatCount(value),
@@ -326,8 +389,9 @@ const SupervisorPerformancePage = () => {
         key: "weightLoss",
         label: t("staff.perf.weekly.weight_loss"),
         color: "#8b5cf6",
-        axis: "right",
+        axis: "third",
         kind: "line",
+        zeroFloor: false,
         format: (value) => `${formatDecimal(value, 1)} kg`,
       },
     ],
@@ -403,7 +467,44 @@ const SupervisorPerformancePage = () => {
   );
   const personDetail = detailQuery.detail;
 
+  // Rows are WARMED before they are opened (hover that settles, keyboard focus,
+  // and the open pop-up's neighbours), so the details pop-up renders complete on
+  // its first frame — no skeleton, no reflow. Deduped against the shared detail
+  // cache, so warming can never double a request or re-render the table.
+  const { warmOnHover, warmNow, cancelWarmup } = usePerformanceRowWarmup(
+    "supervisors",
+    applied.fromDate,
+    applied.toDate,
+  );
+
+
   // ‹ › traversal across the award-ordered rows (rank literal order).
+  // With the pop-up open, quietly warm its ‹ › neighbours on idle, so stepping
+  // through people is instant as well. Same cache/in-flight guard — never a
+  // duplicate request, nothing runs once the pop-up closes.
+  // Once THIS page's data is on screen, warm the sibling page's default
+  // dataset on idle (driver ⇄ supervisor): switching tabs then renders the
+  // table from cache on its first frame — no loading state, no flash. One
+  // request, deduped by the shared cache, skipped when it is already warm.
+  useEffect(() => {
+    if (perf.loading) return;
+    return runWhenIdle(() => prefetchStaffPerformance("drivers"));
+  }, [perf.loading]);
+
+  const neighbourIds = useMemo(() => {
+    if (!selectedEntry) return [];
+    const index = rowsView.findIndex((entry) => entry.row.supervisorId === selectedEntry.row.supervisorId);
+    if (index < 0) return [];
+    return [rowsView[index - 1]?.row.supervisorId, rowsView[index + 1]?.row.supervisorId].filter(
+      (id): id is number => typeof id === "number",
+    );
+  }, [selectedEntry, rowsView]);
+
+  useEffect(() => {
+    if (neighbourIds.length === 0) return;
+    return runWhenIdle(() => neighbourIds.forEach((id) => warmNow(id)));
+  }, [neighbourIds, warmNow]);
+
   const drawerNavigation = useMemo(() => {
     if (!selectedEntry) return undefined;
     const index = rowsView.findIndex((entry) => entry.row.supervisorId === selectedEntry.row.supervisorId);
@@ -521,15 +622,25 @@ const SupervisorPerformancePage = () => {
         </div>
       )}
 
-      {/* KPI cards — reflect the applied dataset */}
-      <PerformanceKpiCards kpis={kpiCards} columns={5} />
+      {/* KPI cards — only for a single supervisor. They describe ONE person's
+          numbers, so they appear when that supervisor is picked in the filter
+          and stay away for the whole-fleet view (and for a search-only filter).
+          While the data loads they show the calm static placeholders. */}
+      {applied.personId != null && (
+        <PerformanceKpiCards kpis={kpiCards} columns={5} />
+      )}
 
       {/* Supervisor Weekly Performance */}
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card">
-        <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-slate-200 px-4 py-3 sm:px-5">
-          <h2 className="text-[13px] font-bold tracking-tight text-slate-800">
-            {t("staff.perf.weekly.supervisor_header")}
-          </h2>
+        <header
+          className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-b px-4 py-3 sm:px-5 ${CARD_HEADER_TONE.sky}`}
+        >
+          <div className="flex min-w-0 items-center gap-2.5">
+            <PerformanceCardMark icon={UserCheck} tone="sky" />
+            <h2 className="min-w-0 text-base font-bold text-slate-800 tracking-tight">
+              {t("staff.perf.weekly.supervisor_header")}
+            </h2>
+          </div>
           <p className="text-[11px] font-medium tabular-nums text-slate-500">
             <span className="text-slate-400">{t("staff.perf.weekly.reporting_weeks")}: </span>
             {periodsLine || appliedRangeLabel}
@@ -543,18 +654,24 @@ const SupervisorPerformancePage = () => {
             weekTrips={chartWeekTrips}
             emptyText={t("staff.perf.weekly.empty")}
             loading={initialLoading}
-            heightClass="h-72 sm:h-80"
             ariaLabel={t("staff.perf.weekly.aria_supervisor", { range: appliedRangeLabel })}
+            inProgressWeek={inProgressWeek}
+            inProgressNote={inProgressNote}
           />
         </div>
       </section>
 
       {/* Supervisor Performance table */}
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card">
-        <header className="flex flex-wrap items-baseline gap-x-2 border-b border-slate-200 px-4 py-3 sm:px-5">
-          <h2 className="text-[13px] font-bold tracking-tight text-slate-800">
-            {t("staff.perf.supervisor_title")}
-          </h2>
+        <header
+          className={`flex flex-wrap items-center gap-x-2.5 gap-y-1.5 border-b px-4 py-3 sm:px-5 ${CARD_HEADER_TONE.sky}`}
+        >
+          <div className="flex min-w-0 items-center gap-2.5">
+            <PerformanceCardMark icon={UserCheck} tone="sky" />
+            <h2 className="min-w-0 text-base font-bold text-slate-800 tracking-tight">
+              {t("staff.perf.supervisor_title")}
+            </h2>
+          </div>
           <span className="min-w-0 text-[11px] font-medium text-slate-500">
             <span aria-hidden="true">—&nbsp;</span>
             {summaryLine}
@@ -562,9 +679,7 @@ const SupervisorPerformancePage = () => {
         </header>
 
         {showTableSkeleton ? (
-          <div className="p-4 sm:p-5">
-            <TableSkeleton rows={6} columns={6} label={t("common.loading")} />
-          </div>
+          <TableLoading label={t("staff.table.loading.supervisor_perf")} />
         ) : showNoMatch ? (
           <EmptyState
             variant="no-search"
@@ -596,7 +711,7 @@ const SupervisorPerformancePage = () => {
               <table className="min-w-full border-collapse text-left">
                 <thead className={uiTableHeadClass}>
                   <tr>
-                    <th scope="col" className={`${uiTableThClass} w-12 text-left`}>
+                    <th scope="col" className={`${perfThClass} w-12 text-left`}>
                       {t("staff.perf.table.rank")}
                     </th>
                     <SortableHeader
@@ -633,8 +748,13 @@ const SupervisorPerformancePage = () => {
                       <tr
                         key={row.supervisorId}
                         tabIndex={0}
-                        aria-label={t("staff.perf.table.row_aria", { name: row.supervisorName })}
+                        aria-label={t("staff.perf.table.row_aria", {
+                          name: personNameLabel(t, language, row.supervisorName),
+                        })}
                         onClick={toggle}
+                        onPointerEnter={() => warmOnHover(row.supervisorId)}
+                        onPointerLeave={cancelWarmup}
+                        onFocus={() => warmNow(row.supervisorId)}
                         onKeyDown={(event) => {
                           if (event.key === "Enter" || event.key === " ") {
                             event.preventDefault(); // exactly one activation
@@ -648,33 +768,32 @@ const SupervisorPerformancePage = () => {
                           selected && uiTableRowSelectedClass,
                         )}
                       >
-                        <td className={`${uiTableTdClass} text-center text-xs font-bold tabular-nums text-slate-500`}>
+                        <td className={`${perfTdClass} text-center text-sm font-bold tabular-nums text-slate-500`}>
                           {rank}
                         </td>
-                        <td className={`${uiTableTdClass} whitespace-nowrap text-[13px] font-semibold text-slate-900`}>
-                          {row.supervisorName}
+                        <td className={`${perfTdClass} whitespace-nowrap text-sm font-semibold text-slate-900`}>
+                          {personNameLabel(t, language, row.supervisorName)}
                         </td>
-                        <td className={`${uiTableTdClass} whitespace-nowrap text-xs text-slate-500`}>
-                          {row.employeeStatus}
+                        <td className={`${perfTdClass} whitespace-nowrap text-[13px] text-slate-500`}>
+                          {translateStatus(t, row.employeeStatus)}
                         </td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatCount(row.trips)}</td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatCount(row.shops)}</td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatCount(row.birds)}</td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatCount(row.weight)}</td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatCount(row.mortality)}</td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatPercent(row.mortalityRate)}</td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatDecimal(row.weightLoss, 1)}</td>
-                        <td className={`${uiTableTdClass} text-center`}>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatCount(row.trips)}</td>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatCount(row.shops)}</td>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatCount(row.birds)}</td>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatCount(row.weight)}</td>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatCount(row.mortality)}</td>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatPercent(row.mortalityRate)}</td>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatDecimal(row.weightLoss, 1)}</td>
+                        <td className={`${perfTdClass} text-center`}>
                           {grade == null ? (
                             <span
-                              title={t("staff.perf.grade.unranked")}
-                              className="text-xs font-semibold text-slate-300"
+                              className="text-sm font-semibold text-slate-300"
                             >
                               —
                             </span>
                           ) : (
                             <span
-                              className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${gradeBadgeClass(grade)}`}
+                              className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${gradeBadgeClass(grade)}`}
                             >
                               {translateGrade(grade, t)}
                             </span>
@@ -706,7 +825,10 @@ const SupervisorPerformancePage = () => {
       <PerformanceDrawer
         open={selectedEntry != null}
         onClose={closeDrawer}
-        title={selectedEntry?.row.supervisorName ?? ""}
+        icon={UserCheck}
+        sectionLabel={t("staff.perf.supervisor_title")}
+        tone="sky"
+        title={personNameLabel(t, language, selectedEntry?.row.supervisorName ?? "")}
         subtitle={`${drawerT("staff.perf.drawer.period")}: ${drawerRangeLabel}`}
         rankBadge={
           selectedEntry ? (
@@ -750,8 +872,9 @@ const SupervisorPerformancePage = () => {
         {selectedEntry && detailQuery.loading && (
           <div className="space-y-3" aria-busy="true">
             <p className="sr-only">{drawerT("staff.perf.drawer.detail_loading")}</p>
-            <div className="h-16 animate-pulse rounded-xl bg-slate-100" />
-            <div className="h-40 animate-pulse rounded-xl bg-slate-100" />
+            {/* Static blocks: the drawer shows its shape without pulsing. */}
+            <div className="h-16 rounded-xl bg-slate-100" />
+            <div className="h-40 rounded-xl bg-slate-100" />
           </div>
         )}
         {selectedEntry && detailQuery.error && !personDetail && (
@@ -768,7 +891,7 @@ const SupervisorPerformancePage = () => {
         )}
         {selectedEntry && personDetail && (
           <section aria-label={drawerT("staff.perf.drawer.recent_trips")}>
-            <h3 className="mb-2 text-[11px] font-bold uppercase tracking-widest text-slate-400">
+            <h3 className="mb-2 text-xs font-bold uppercase tracking-widest text-slate-400">
               {drawerT("staff.perf.drawer.recent_trips")}
             </h3>
             <RecentTripsTable

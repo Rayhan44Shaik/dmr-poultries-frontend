@@ -11,6 +11,7 @@ import {
   formatBusinessDate,
   formatPeriodAxisLabel,
   formatPeriodLabel,
+  inProgressWeekKey,
   lastWeekPeriods,
   periodsForRange,
   weekPeriodContaining,
@@ -112,6 +113,31 @@ test("weeklyBucketLabel derives the Mon–Sat window from a date label", () => {
   assert.equal(weeklyBucketLabel(null), "—");
   // An impossible date must fall back to the raw label, never throw.
   assert.equal(weeklyBucketLabel("2026-09-31"), "2026-09-31");
+});
+
+test("inProgressWeekKey marks the running week and only that week", () => {
+  const weekly = [
+    { week: "2026-08-24" },
+    { week: "2026-08-31" },
+    { week: "2026-09-07" },
+    { week: "2026-09-14" },
+  ];
+  // Tuesday inside 14–19 Sep: that bucket still has days to come.
+  assert.equal(inProgressWeekKey(weekly, "2026-09-15"), "2026-09-14");
+  assert.equal(inProgressWeekKey(weekly, "2026-09-14"), "2026-09-14");
+  // Saturday closes the week, and a Sunday belongs to the week before it.
+  assert.equal(inProgressWeekKey(weekly, "2026-09-19"), undefined);
+  assert.equal(inProgressWeekKey(weekly, "2026-09-20"), undefined);
+  // A completed range, a missing bucket and an empty list stay unflagged.
+  assert.equal(inProgressWeekKey(weekly, "2026-09-12"), undefined);
+  assert.equal(inProgressWeekKey(weekly.slice(0, 3), "2026-09-15"), undefined);
+  assert.equal(inProgressWeekKey([], "2026-09-15"), undefined);
+  assert.equal(inProgressWeekKey(undefined, "2026-09-15"), undefined);
+  // ISO timestamps (the other shape the API uses) resolve to the same bucket.
+  assert.equal(
+    inProgressWeekKey([{ week: "2026-09-14T00:00:00.000Z" }], "2026-09-15"),
+    "2026-09-14T00:00:00.000Z",
+  );
 });
 
 test("labels are stable: same input, same label", () => {

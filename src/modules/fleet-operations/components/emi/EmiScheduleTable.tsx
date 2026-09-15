@@ -1,6 +1,7 @@
 import { memo, useState } from 'react';
 import { format, setDate, addMonths, isPast, isAfter } from 'date-fns';
 import { CreditCard, Truck } from 'lucide-react';
+import { useI18n } from '../../../../i18n';
 import {
   paginationBarClass,
   paginationNavBtnClass,
@@ -22,6 +23,7 @@ const EmiScheduleTable = ({
   pageSize = 10,
   showAllVehicles = false,
 }: EmiScheduleTableProps) => {
+  const { t } = useI18n();
   const [currentPage, setCurrentPage] = useState(1);
 
   const dataSource = showAllVehicles
@@ -197,11 +199,13 @@ const EmiScheduleTable = ({
       {shouldShowPagination(totalRecords) && (
         <div className={paginationBarClass}>
           <button
+            type="button"
             onClick={() => goToPage(currentPage - 1)}
             disabled={currentPage === 1}
             className={paginationNavBtnClass}
+            aria-label={t('common.previous_page')}
           >
-            Previous
+            {t('common.previous')}
           </button>
           {getPageNumbers().map((page) => (
             <button
@@ -213,11 +217,13 @@ const EmiScheduleTable = ({
             </button>
           ))}
           <button
+            type="button"
             onClick={() => goToPage(currentPage + 1)}
             disabled={currentPage === totalPages}
             className={paginationNavBtnClass}
+            aria-label={t('common.next_page')}
           >
-            Next
+            {t('common.next')}
           </button>
         </div>
       )}

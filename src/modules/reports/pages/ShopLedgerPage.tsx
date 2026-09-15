@@ -30,6 +30,7 @@ import Select, { type StylesConfig } from "react-select";
 import { useShops } from "../../masters/shops/hooks/useShops";
 import type { Shop } from "../../masters/shops/types/shop";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
+import { useI18n } from "../../../i18n";
 import { DatePicker } from "../../../components/common/DatePicker";
 import { apiPost } from "../../../api";
 import {
@@ -277,6 +278,7 @@ function buildWhatsAppMessage(
 }
 
 const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
+  const { t } = useI18n();
   const { showNotification } = useSafeNotification();
   const { shops } = useShops();
 
@@ -1656,7 +1658,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   setPageSize(Number(e.target.value));
                   setCurrentPage(1);
                 }}
-                aria-label="Rows per page"
+                aria-label={t("common.rows_per_page")}
                 className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/25"
               >
                 {PAGE_SIZES.map((size) => (
@@ -1670,8 +1672,9 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                 disabled={safePage <= 1}
                 onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                 className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                aria-label={t("common.previous_page")}
               >
-                Previous
+                {t("common.previous")}
               </button>
               <span className="px-2 text-xs font-medium text-slate-600">{safePage} / {totalPages}</span>
               <button
@@ -1679,8 +1682,9 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                 disabled={safePage >= totalPages}
                 onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                 className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
+                aria-label={t("common.next_page")}
               >
-                Next
+                {t("common.next")}
               </button>
             </div>
           </div>

@@ -560,7 +560,7 @@ export const uiPaginationSummaryClass =
 export const uiPaginationNavButtonClass = [
   controlHeight.sm,
   "inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white",
-  "px-2.5 text-xs font-semibold text-slate-700",
+  "px-2.5 text-xs font-semibold text-slate-700 whitespace-nowrap",
   uiTransition,
   "transition-[color,background-color,border-color,box-shadow,transform] duration-150 ease-out",
   "hover:-translate-y-px hover:bg-slate-50 hover:border-slate-300 hover:shadow-sm active:translate-y-0 active:scale-[0.98]",
@@ -591,6 +591,34 @@ export const uiPaginationSizeSelectClass = [
   "rounded-lg border border-slate-200 bg-white px-2 pr-6 text-xs font-semibold text-slate-700",
   uiFocusInset,
   uiTransition,
+].join(" ");
+
+/* ---------------------------------------------------------------------------
+ * 9c. FILTER-BAR ACTIONS (search / reset / big search field)
+ * ---------------------------------------------------------------------------
+ * One definition for the three controls every filter card ends with, so the
+ * Trip List, Leave and the performance pages cannot drift apart:
+ *   • the primary Search submit (40px, emerald),
+ *   • its neutral Reset twin (40px, bordered, same metrics),
+ *   • the 44px search field with room for a leading glyph and a trailing clear.
+ * ------------------------------------------------------------------------- */
+export const uiFilterSearchButtonClass = `${uiButton("primary", "lg")} group`;
+
+export const uiFilterResetButtonClass = [
+  "group relative inline-flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-lg",
+  "border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-xs",
+  "transition hover:border-slate-300 hover:bg-slate-50 hover:text-slate-900 active:bg-slate-100",
+  "focus-visible:ring-2 focus-visible:ring-emerald-300",
+].join(" ");
+
+export const uiFilterSearchFieldClass = [
+  "h-11 w-full min-w-0 rounded-lg border border-slate-300 bg-white pl-11 pr-10",
+  "text-sm font-medium text-slate-800",
+  "placeholder:font-normal placeholder:text-slate-400",
+  uiFocusInset,
+  uiTransition,
+  uiDisabled,
+  "shadow-xs",
 ].join(" ");
 
 /* ---------------------------------------------------------------------------

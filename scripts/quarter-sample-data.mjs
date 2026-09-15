@@ -549,7 +549,9 @@ for (const date of OP_DATES) {
     }
 
     const openingMeter = VEHICLE_METER.get(vehicle.id);
-    const totalKm = between(r, 90, 340);
+    // Round 12: the driver-performance view's lagging-trip cards are easier to
+    // read when the sample distances sit in one band (they stay deterministic).
+    const totalKm = between(r, 190, 330);
     const closingMeter = openingMeter + totalKm;
     VEHICLE_METER.set(vehicle.id, closingMeter);
 
@@ -921,14 +923,17 @@ function shopSaleNo(tripNo, sequence) {
 const SHOP_SALES = [];
 for (const t of COMPLETED_TRIPS) {
   deliveriesByCapturedTime(t.deliveries).forEach((d, i) => {
+    const editable = dayDiff(t.tripDate, TODAY) <= 10;
     SHOP_SALES.push({
       id: d.id,
       saleNo: shopSaleNo(t.tripNo, i + 1),
       tripId: t.id,
       tripNo: t.tripNo,
-      // `saleDate` / `birds` / `weight` / `remarks` are the public Shop
-      // Sales API contract. The trip-* aliases stay available because older
-      // dashboard/report adapters read them during their migration window.
+      // Both spellings are emitted on purpose: `saleDate` / `birds` / `weight`
+      // / `remarks` are the public Shop Sales API contract the page maps from
+      // (see shopSaleMapping.ApiShopSale), while the trip-* aliases are still
+      // read by the internal aggregations (shop ledger, pending collections)
+      // and by older dashboard/report adapters during their migration window.
       saleDate: t.tripDate,
       tripDate: t.tripDate,
       deliveryTime: d.autoCaptureTime ?? null,
@@ -953,11 +958,13 @@ for (const t of COMPLETED_TRIPS) {
       status: "Approved",
       deleted: false,
       deletedReason: null,
-      editable: dayDiff(t.tripDate, TODAY) <= 10,
+      editable,
       windowExpiresAt: addDays(t.tripDate, 10),
       tripDeleted: false,
-      lockReason:
-        dayDiff(t.tripDate, TODAY) > 10 ? "Editing period has expired." : null,
+      lockReason: editable ? null : "Editing period has expired.",
+      // The page's lock state reads the correction window explicitly.
+      correctionWindowExpired: !editable,
+      correctionWindowClosesAt: addDays(t.tripDate, 10),
       rateCompleted: true,
       rateLocked: true,
       rateLockedAt: t.rateLockedAt,
@@ -1409,7 +1416,19 @@ for (const date of OP_DATES) {
       referenceNo: `REF${between(r, 10000000, 99999999)}`,
       category: type === "Farmer Payment" ? "Procurement" : "Operations",
       remarks: i % 5 === 0 ? "Settled against quarter dues" : "",
-      status: dayDiff(date, TODAY) <= 2 && i % 4 === 0 ? "Approved" : "Paid",
+      // Lifecycle: Draft (awaiting sign-off in the Payment Register's default
+      // "Pending" view + the shell's approval bell) → Approved → Paid. Recent
+      // days carry the open drafts, older days are settled history.
+      status:
+        dayDiff(date, TODAY) <= 2
+          ? i % 4 === 0
+            ? "Approved"
+            : i % 4 === 1
+              ? "Draft"
+              : "Paid"
+          : dayDiff(date, TODAY) <= 10 && i % 6 === 0
+            ? "Approved"
+            : "Paid",
       createdBy: "Office",
       createdAt: ts(date, "16:00:00"),
       updatedAt: ts(date, "16:05:00"),
@@ -1652,9 +1671,16 @@ const ADVANCES = EMPLOYEES.filter((_, i) => i % 4 === 0).map((e, i) => {
 
 const inRange = (d, from, to) => (!from || d >= from) && (!to || d <= to);
 
+/**
+ * Trip rows used by every aggregation (dashboards, performance, analytics).
+ *
+ * ORD-* order containers are NOT trips: they carry no vehicle, no driver and
+ * no distance — they exist only to hold a day's order plan for the Orders
+ * page. They are excluded here for the same reason `/api/operations/trip-list`
+ * and Recent Transit exclude them, so no phantom "0" driver / "0" vehicle row
+ * and no inflated trip count can leak into a KPI or a report.
+ */
 function tripsIn(from, to) {
-  // Orders uses vehicle-less ORD-* rows as planning containers. They are not
-  // dispatches and must never inflate operation/report/dashboard trip KPIs.
   return TRIPS.filter(
     (t) => !t.deleted && !isOrderContainerRow(t) && inRange(t.tripDate, from, to)
   );
@@ -1937,7 +1963,21 @@ function fleetAnalytics(params) {
   const litres = round(fuel.reduce((a, f) => a + f.liters, 0), 2);
   const fuelCost = round(fuel.reduce((a, f) => a + f.amount, 0), 2);
   const maintenanceCost = round(mnt.reduce((a, m) => a + m.totalCost, 0), 2);
-  const emiDue = round(EMIS.reduce((a, e) => a + e.emiAmount * 3, 0), 2);
+  // EMI is a monthly charge: only the installments that actually fall due
+  // inside the requested range count. Charging the whole loan (or a flat
+  // three months) made a two-day range carry a quarter of EMIs, which pushed
+  // the fleet total and cost/km far away from every other cost view.
+  const emiForVehicle = (id) => {
+    const emi = EMIS.find((e) => e.vehicleId === id);
+    if (!emi) return 0;
+    return round(
+      emiSchedule(emi)
+        .filter((installment) => inRange(installment.dueDate, from, to))
+        .reduce((a, installment) => a + installment.amount, 0),
+      2
+    );
+  };
+  const emiDue = round(EMIS.reduce((a, e) => a + emiForVehicle(e.vehicleId), 0), 2);
   const tollCost = round(trips.reduce((a, t) => a + t.deliveryTolls + t.pickupTolls, 0), 2);
   const otherCost = round(trips.reduce((a, t) => a + (t.meals ?? 0) + (t.loading ?? 0), 0), 2);
   const totalExpense = round(fuelCost + maintenanceCost + emiDue + tollCost + otherCost, 2);
@@ -1985,7 +2025,18 @@ function fleetAnalytics(params) {
     e.maintenanceCost += m.totalCost;
     perVehicle.set(m.vehicleId, e);
   }
-  const vehicleStats = [...perVehicle.entries()].map(([id, v]) => ({
+  // One row per fleet vehicle (not only the ones that moved): the page's
+  // "vehicle utilization" is active ÷ total, so the total has to be the whole
+  // fleet. Vehicles with no activity in the range keep a zero row.
+  const perVehicleRows = new Map(perVehicle);
+  if (!vehicleId) {
+    for (const v of VEHICLES) {
+      if (!perVehicleRows.has(v.id)) {
+        perVehicleRows.set(v.id, { trips: 0, distance: 0, fuelLitres: 0, fuelCost: 0, maintenanceCost: 0, tollCost: 0, otherCost: 0 });
+      }
+    }
+  }
+  const vehicleStats = [...perVehicleRows.entries()].map(([id, v]) => ({
     vehicleId: id,
     vehicleNumber: VEHICLE_BY_ID.get(id)?.vehicleNumber ?? String(id),
     trips: v.trips,
@@ -1993,7 +2044,7 @@ function fleetAnalytics(params) {
     fuelLitres: round(v.fuelLitres, 2),
     fuelCost: round(v.fuelCost, 2),
     maintenanceCost: round(v.maintenanceCost, 2),
-    emiCost: round((EMIS.find((e) => e.vehicleId === id)?.emiAmount ?? 0) * 3, 2),
+    emiCost: emiForVehicle(id),
     tollCost: round(v.tollCost, 2),
     otherCost: round(v.otherCost, 2),
     totalExpense: round(v.fuelCost + v.maintenanceCost + v.tollCost + v.otherCost, 2),
@@ -2072,7 +2123,21 @@ function driverPerformance(params) {
   const from = params.get("fromDate") || QUARTER.fromDate;
   const to = params.get("toDate") || QUARTER.toDate;
   const driverId = params.get("driverId") ? Number(params.get("driverId")) : null;
-  const trips = tripsIn(from, to);
+  /* Free-text filter, applied the same way the list pages do it: match the
+     driver's name or any vehicle he drove, case-insensitively. Without this the
+     Driver Performance filter bar's Search field asked for something the API
+     never honoured, so "Search" looked broken. */
+  const search = (params.get("search") || "").trim().toLowerCase();
+  const allTrips = tripsIn(from, to);
+  const matchesSearch = (trip) => {
+    if (!search) return true;
+    const name = EMP_BY_ID.get(trip.driverId)?.employeeName ?? "";
+    if (name.toLowerCase().includes(search)) return true;
+    return (trip.vehicleNo ?? "").toLowerCase().includes(search);
+  };
+  const trips = allTrips.filter(
+    (t) => (!driverId || t.driverId === driverId) && matchesSearch(t),
+  );
   const perDriver = new Map();
   for (const t of trips) {
     const e =
@@ -2130,6 +2195,17 @@ function driverPerformance(params) {
     const e = weeks.get(w) ?? { trips: 0, distance: 0, fuelLitres: 0 };
     e.trips += 1;
     e.distance += t.totalKm;
+    weeks.set(w, e);
+  }
+  /* Weekly fuel was never aggregated here, so the chart's fuel/mileage series
+     was 0 for every week. Bucket the SAME fuel rows the row totals use (the
+     drivers already selected by the filter) by the bill date's week. */
+  for (const f of FUEL_EXPENSES) {
+    if (!inRange(f.billDate, from, to) || !f.driverId) continue;
+    if (!perDriver.has(f.driverId)) continue;
+    const w = weekKey(f.billDate);
+    const e = weeks.get(w) ?? { trips: 0, distance: 0, fuelLitres: 0 };
+    e.fuelLitres += f.liters;
     weeks.set(w, e);
   }
   const selected = driverId ? rows.find((r) => r.driverId === driverId) : null;
@@ -2202,7 +2278,17 @@ function supervisorPerformance(params) {
   const from = params.get("fromDate") || QUARTER.fromDate;
   const to = params.get("toDate") || QUARTER.toDate;
   const supervisorId = params.get("supervisorId") ? Number(params.get("supervisorId")) : null;
-  const trips = tripsIn(from, to).filter((t) => t.deliveryStepSubmitted);
+  /* Same contract as the driver endpoint: a name search narrows the whole
+     payload (rows, KPIs and the weekly series), not just the detail block. */
+  const search = (params.get("search") || "").trim().toLowerCase();
+  const trips = tripsIn(from, to)
+    .filter((t) => t.deliveryStepSubmitted)
+    .filter((t) => !supervisorId || t.supervisorId === supervisorId)
+    .filter((t) => {
+      if (!search) return true;
+      const name = EMP_BY_ID.get(t.supervisorId)?.employeeName ?? "";
+      return name.toLowerCase().includes(search);
+    });
   const per = new Map();
   for (const t of trips) {
     const e = per.get(t.supervisorId) ?? { trips: 0, shops: 0, birds: 0, weight: 0, mortality: 0, weightLoss: 0 };
@@ -2334,22 +2420,35 @@ function attendanceSummary(month) {
   const monthDates = DATES.filter((d) => monthOf(d) === m);
   return EMPLOYEES.filter((e) => e.status === "Active").map((e) => {
     const rows = monthDates.map((d) => (DUTY_BY_DATE.get(d) ?? []).find((a) => a.employeeId === e.id));
-    const present = rows.filter((a) => a && !["WeeklyOff", "Rest"].includes(a.dutyType)).length;
+    // The salary register derives its Working / Present / Leave columns from
+    // THIS summary, so the two must apply one rule:
+    //   workingDays  = calendar days in the month − weekly offs (Sundays)
+    //   presentDays  = workingDays − approved leave days
+    // Rostered "Rest" days are paid working days, and an unassigned future
+    // cell in the planner is not an absence — counting either as one made the
+    // summary disagree with the register it is the authority for.
     const weeklyOff = rows.filter((a) => a && a.dutyType === "WeeklyOff").length;
+    const rosteredDutyDays = rows.filter((a) => a && a.dutyType !== "WeeklyOff").length;
     const leaveDays = LEAVES.filter(
       (l) => l.employeeId === e.id && l.status === "Approved" && monthOf(l.fromDate) === m
     ).reduce((a, l) => a + l.days, 0);
+    const workingDays = monthDates.length - weeklyOff;
     return {
       employeeId: e.id,
       employeeNo: e.employeeNo,
       employeeName: e.employeeName,
       department: e.department,
       month: m,
-      workingDays: monthDates.length - weeklyOff,
-      presentDays: Math.max(0, present - leaveDays),
+      workingDays,
+      presentDays: Math.max(0, workingDays - leaveDays),
       leaveDays,
       weeklyOffDays: weeklyOff,
-      absentDays: Math.max(0, monthDates.length - weeklyOff - present),
+      // Unapproved absence is not modelled in this dataset.
+      absentDays: 0,
+      // Informational: how many of the working days the roster itself fills.
+      // A gap is a pending planner cell, never an absence.
+      rosterDutyDays: rosteredDutyDays,
+      unassignedDays: Math.max(0, workingDays - rosteredDutyDays),
     };
   });
 }
@@ -4336,6 +4435,34 @@ const server = http.createServer(async (req, res) => {
       }
       return send(200, publicShopSale(sale));
     }
+    // Edit one sale line (Shop Sales page): birds / weight / mortality /
+    // remarks / bird type are editable inside the 10-day window; amount is
+    // recomputed from weight × rate exactly like the backend does, and the
+    // row comes back in the same shape GET returns.
+    if (m(/^\/api\/operations\/shop-sales\/(\d+)$/) && ["PUT", "PATCH"].includes(method)) {
+      const id = Number(m(/^\/api\/operations\/shop-sales\/(\d+)$/)[1]);
+      const row = SHOP_SALES.find((s) => s.id === id);
+      if (!row) return send(404, { error: "not_found" });
+      if (!row.editable) return send(409, { error: row.lockReason || "Editing period has expired." });
+      const body = await readBody(req);
+      const previousAmount = row.amount;
+      if (body?.birds != null) row.birds = row.totalBirds = Number(body.birds) || 0;
+      if (body?.weight != null) row.weight = row.totalWeight = Number(body.weight) || 0;
+      if (body?.rate != null) row.rate = Number(body.rate) || 0;
+      if (body?.mortality != null) row.mortality = Number(body.mortality) || 0;
+      if (body?.remarks != null) row.remarks = row.remark = String(body.remarks);
+      if (body?.birdType != null) row.birdType = String(body.birdType);
+      if (body?.birdTypeId != null) row.birdTypeId = Number(body.birdTypeId);
+      row.amount = round((row.weight ?? 0) * (row.rate ?? 0), 2);
+      row.updatedAt = nowIso();
+      // Shop ledger + pending balance read the same rows, so keep the books
+      // tied out after an edit (shop balance moves with the amount).
+      const delta = round(row.amount - previousAmount, 2);
+      SALES_BY_SHOP.set(row.shopId, round((SALES_BY_SHOP.get(row.shopId) ?? 0) + delta, 2));
+      const shop = SHOP_BY_ID.get(row.shopId);
+      if (shop) shop.currentBalance = round(shop.currentBalance + delta, 2);
+      return send(200, row);
+    }
 
     if (p === "/api/operations/collection-entry" && method === "GET") {
       // `status` lets the app shell count only the rows waiting for approval
@@ -4419,6 +4546,9 @@ const server = http.createServer(async (req, res) => {
       return send(200, rows);
     }
     if (p === "/api/operations/collection-entry/pending-summary") {
+      // Contract expected by collectionService.fetchPendingSummary(); the
+      // shared builder keeps the week bounds, the approved-only sales split and
+      // the recovery percentage in ONE place for every caller.
       return send(200, collectionPendingSummary(q.get("date") || q.get("asOfDate") || TODAY));
     }
     if (m(/^\/api\/operations\/collection-entry\/pending\/(\d+)$/)) {

@@ -12,7 +12,7 @@ const LANGUAGES: { code: Language; label: string; short: string }[] = [
 ];
 
 export default function LanguageSwitcher() {
-  const { language, setLanguage } = useI18n();
+  const { language, setLanguage, t } = useI18n();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -58,7 +58,7 @@ export default function LanguageSwitcher() {
       <button
         type="button"
         onClick={() => setOpen((prev) => !prev)}
-        aria-label="Change language"
+        aria-label={t('header.changeLanguage')}
         title={active.label}
         className={buttonClass}
       >

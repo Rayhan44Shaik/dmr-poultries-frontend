@@ -16,8 +16,12 @@ import { useI18n } from "../../../i18n";
 export interface MasterDropdownOption {
   value: string;
   label: string;
-  /** Raw/source label retained for type-ahead when the displayed text is localized. */
+  /** Raw/source text retained for type-ahead once the label is translated —
+   *  a Telugu name shows, but typing "anil" still finds him. Matching is always
+   *  case-insensitive. Both spellings are kept (older call sites use one or the
+   *  other) and both are matched. */
   searchText?: string;
+  keywords?: string;
   disabled?: boolean;
   icon?: ReactNode;
 }
@@ -43,6 +47,12 @@ interface MasterDropdownProps {
   required?: boolean;
   error?: string;
   hideLabel?: boolean;
+  /**
+   * Id for the trigger button so an external <label htmlFor> can name it —
+   * this is what makes clicking the filter name open the dropdown. Defaults to
+   * a generated id.
+   */
+  triggerId?: string;
   labelStyle?: "filter" | "field";
   className?: string;
   /**
@@ -77,6 +87,7 @@ export default function MasterDropdown({
   required = false,
   error,
   hideLabel = false,
+  triggerId,
   labelStyle = "filter",
   className = "",
   triggerClassName = "",
@@ -84,7 +95,8 @@ export default function MasterDropdown({
   portal = true,
 }: MasterDropdownProps) {
   const { t } = useI18n();
-  const id = useId();
+  const autoId = useId();
+  const id = triggerId ?? autoId;
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [active, setActive] = useState(-1);
@@ -118,7 +130,8 @@ export default function MasterDropdown({
       return (
         option.label.toLocaleLowerCase().includes(keyword) ||
         option.searchText?.toLocaleLowerCase().includes(keyword) ||
-        option.value.toLocaleLowerCase().includes(keyword)
+        option.value.toLocaleLowerCase().includes(keyword) ||
+        (option.keywords?.toLocaleLowerCase().includes(keyword) ?? false)
       );
     });
   }, [items, query, allowClear]);
@@ -378,7 +391,8 @@ export default function MasterDropdown({
                     (allowClear && option.value === "") ||
                     !keyword ||
                     option.label.toLocaleLowerCase().includes(keyword) ||
-                    option.value.toLocaleLowerCase().includes(keyword),
+                    option.value.toLocaleLowerCase().includes(keyword) ||
+                    (option.keywords?.toLocaleLowerCase().includes(keyword) ?? false),
                 );
                 setActive(
                   matches.findIndex(

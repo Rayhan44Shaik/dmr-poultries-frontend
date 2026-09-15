@@ -19,29 +19,40 @@
 //     deterministic presentation scorer in `utils/performanceGrading`.
 // ============================================================================
 
-import { memo, useCallback, useMemo, useState } from "react";
+import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   AlertTriangle,
+  Fuel,
   Gauge,
+  IndianRupee,
   Route,
+  Scale,
   TrendingUp,
   Truck,
   Users,
+  Wrench,
 } from "lucide-react";
 import { te as teDateLocale } from "date-fns/locale";
 import type { Locale } from "date-fns";
 
-import { makeT, useI18n, type Language } from "../../../i18n";
-import { useStaffPerformance } from "../hooks/useStaffPerformance";
+import { makeT, translateStatus, useI18n, type Language } from "../../../i18n";
+import {
+  prefetchStaffPerformance,
+  useStaffPerformance,
+} from "../hooks/useStaffPerformance";
 import { usePerformanceDetail } from "../hooks/usePerformanceDetail";
+import { usePerformanceRowWarmup } from "../hooks/usePerformanceRowWarmup";
+import { runWhenIdle } from "../utils/idle";
 import { useStaffDirectory } from "../hooks/useStaffDirectory";
 import { rankDriverRows } from "../utils/performanceGrading";
 import SortableHeader, {
   type SortState,
 } from "../components/performance/PerformanceSortableHeader";
+import type { DriverVehicleDetail } from "../types/performance";
 import {
   formatBusinessDate,
   formatPeriodLabel,
+  inProgressWeekKey,
   periodsForRange,
   toWeeklyAxisRows,
 } from "../utils/performancePeriods";
@@ -60,6 +71,8 @@ import {
   isMeasurable,
   translateGrade,
 } from "../utils/performanceView";
+import PerformanceCardMark from "../components/performance/PerformanceCardMark";
+import { CARD_HEADER_TONE } from "../components/performance/performanceCardTone";
 import PerformanceFilterBar, {
   type PerformanceDraftFilters,
 } from "../components/performance/PerformanceFilterBar";
@@ -70,12 +83,20 @@ import WeeklyPerformanceChart, {
   type WeeklyChartPoint,
   type WeeklyChartSeries,
 } from "../components/performance/WeeklyPerformanceChart";
+import { personNameLabel } from "../utils/leaveDisplay";
+import {
+  perfTdClass,
+  perfTdNumericClass,
+  perfThClass,
+} from "../components/performance/tableRhythm";
 import PerformanceDrawer from "../components/performance/PerformanceDrawer";
 import RecentTripsTable from "../components/performance/RecentTripsTable";
 import Pagination from "../components/common/Pagination";
 import RefreshToast from "../components/common/RefreshToast";
-import { EmptyState, TableSkeleton } from "../../../ui";
+import { EmptyState } from "../../../ui";
+import TableLoading from "../components/common/TableLoading";
 import { cn } from "../../../utils/cn";
+import { formatVehicleNumber } from "../../../utils/format";
 import {
   uiTableHeadClass,
   uiTableRowClass,
@@ -83,8 +104,10 @@ import {
   uiTableRowSelectedClass,
   uiTableTdClass,
   uiTableTdNumericClass,
-  uiTableThClass,
 } from "../../../shared/ui/uiTokens";
+
+/** Typing pause before the search reaches the API (Leave page parity). */
+const SEARCH_DEBOUNCE_MS = 300;
 
 const ITEMS_PER_PAGE = 10;
 
@@ -106,48 +129,80 @@ const DriverPerformancePage = () => {
     search: applied.search,
   }));
 
-  // Re-seed the draft + reset pagination when the applied set changes
-  // (Search / Clear). Done with the render-phase adjustment pattern (the
-  // official alternative to setState-in-effect): `applied` identity changes
-  // exactly once per apply/clear, never while typing.
+  /* Reset to page 1 whenever a new query is applied (a filter change is a new
+     list). Detected with the render-phase adjustment pattern — the official
+     alternative to setState-in-effect. The draft is NOT re-seeded from the
+     applied set: it is what we just sent, and copying it back would overwrite
+     characters typed while the request was in flight. */
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(ITEMS_PER_PAGE);
   const [lastApplied, setLastApplied] = useState(applied);
   if (lastApplied !== applied) {
     setLastApplied(applied);
-    setDraft({
-      fromDate: applied.fromDate,
-      toDate: applied.toDate,
-      personId: applied.personId,
-      search: applied.search,
-    });
     setCurrentPage(1);
   }
 
-  const updateDraft = useCallback((patch: Partial<PerformanceDraftFilters>) => {
-    setDraft((current) => {
-      const next = { ...current, ...patch };
-      // Keep the draft range ordered while editing (the hook re-validates on
-      // apply as well).
+  /** Always the freshest draft — the debounce below reads it without re-running. */
+  const draftRef = useRef(draft);
+
+  const runQuery = useCallback(
+    (next: PerformanceDraftFilters) => {
+      perf.applyFilters({
+        fromDate: next.fromDate,
+        toDate: next.toDate,
+        personId: next.personId,
+        search: next.search,
+      });
+    },
+    [perf],
+  );
+
+  /**
+   * Filters apply the moment they change — there is no Search button.
+   * A date or a driver is a discrete choice, so it goes to the API at once;
+   * typing waits out the same 300 ms pause the Leave page uses (one request
+   * per typing burst, never one per character). `applyFilters` ignores an
+   * identical set, so an immediate apply plus the trailing debounce cannot
+   * duplicate a request.
+   */
+  const updateDraft = useCallback(
+    (patch: Partial<PerformanceDraftFilters>) => {
+      const next = { ...draftRef.current, ...patch };
+      // Keep the range ordered while editing (the hook re-validates too).
       if (next.fromDate && next.toDate && next.fromDate > next.toDate) {
         if (patch.fromDate) next.toDate = next.fromDate;
         else next.fromDate = next.toDate;
       }
-      return next;
-    });
-  }, []);
+      draftRef.current = next;
+      setDraft(next);
+      if (!("search" in patch)) runQuery(next);
+    },
+    [runQuery],
+  );
 
+  // Typing: apply once the user pauses.
+  useEffect(() => {
+    const timer = window.setTimeout(() => runQuery(draftRef.current), SEARCH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+  }, [draft.search, runQuery]);
+
+  /** Enter commits immediately (the trailing debounce then finds nothing to do). */
   const handleApply = useCallback(() => {
-    perf.applyFilters({
-      fromDate: draft.fromDate,
-      toDate: draft.toDate,
-      personId: draft.personId,
-      search: draft.search,
-    });
-  }, [perf, draft]);
+    runQuery(draftRef.current);
+  }, [runQuery]);
 
   const handleClear = useCallback(() => {
     perf.clearFilters();
+    /* Reset restores the draft as well, so a driver picked but not yet applied
+       does not survive it. */
+    const restored: PerformanceDraftFilters = {
+      fromDate: perf.defaultFilters.fromDate,
+      toDate: perf.defaultFilters.toDate,
+      personId: perf.defaultFilters.personId,
+      search: perf.defaultFilters.search,
+    };
+    draftRef.current = restored;
+    setDraft(restored);
   }, [perf]);
 
   const handleRefresh = useCallback(() => {
@@ -207,6 +262,7 @@ const DriverPerformancePage = () => {
     setSort(next);
     setCurrentPage(1);
   }, []);
+
 
   const driverSortAccessors = useMemo<
     Record<string, (entry: (typeof rowsView)[number]) => number | string>
@@ -269,30 +325,35 @@ const DriverPerformancePage = () => {
         value: initialLoading ? null : formatCount(kpis.drivers),
         sub: t("staff.perf.kpi.sub.participating"),
         icon: <Users size={14} />,
+        tone: "sky",
       },
       {
         label: t("staff.perf.kpi.total_trips"),
         value: initialLoading ? null : formatCount(kpis.trips),
         sub: t("staff.perf.kpi.sub.trips"),
         icon: <Route size={14} />,
+        tone: "emerald",
       },
       {
         label: t("staff.perf.kpi.total_distance"),
         value: initialLoading ? null : formatKm(kpis.distance),
         sub: t("staff.perf.kpi.sub.distance"),
         icon: <Truck size={14} />,
+        tone: "indigo",
       },
       {
         label: t("staff.perf.kpi.avg_mileage"),
         value: initialLoading ? null : formatMileage(kpis.mileage),
         sub: t("staff.perf.kpi.sub.mileage"),
         icon: <Gauge size={14} />,
+        tone: "amber",
       },
       {
         label: t("staff.perf.kpi.cost_per_km"),
         value: initialLoading ? null : formatCostPerKm(kpis.costPerKm),
         sub: t("staff.perf.kpi.sub.cost_per_km"),
         icon: <TrendingUp size={14} />,
+        tone: "rose",
       },
     ],
     [t, kpis, initialLoading],
@@ -301,15 +362,34 @@ const DriverPerformancePage = () => {
   /* ------------------------------- chart -------------------------------- */
 
   const chartRows = useMemo(
-    () => toWeeklyAxisRows(data.weekly, dateLocale),
+    () =>
+      toWeeklyAxisRows(data.weekly, dateLocale).map((row) => ({
+        ...row,
+        /* Weekly mileage = the week's real distance ÷ its real fuel (the same
+           derivation the tooltip always used). A week without fuel stays blank
+           instead of pretending to be 0 km/L. */
+        mileage: row.fuelLitres > 0 ? row.distance / row.fuelLitres : undefined,
+      })),
     [data.weekly, dateLocale],
   );
+  /* The week that is still running (if the range reaches into it): drawn in a
+     paler shade and called out under the plot. */
+  const inProgressWeek = useMemo(() => inProgressWeekKey(data.weekly), [data.weekly]);
+  const inProgressNote = useMemo(() => {
+    if (inProgressWeek == null) return undefined;
+    const row = chartRows.find((point) => String(point.week) === String(inProgressWeek));
+    return t("staff.perf.weekly.in_progress", { week: row?.label ?? "" });
+  }, [inProgressWeek, chartRows, t]);
+  /* One chart, three series, three rulers: Distance + Fuel as grouped bars
+     (each on its own axis so both volumes stay visible) and Mileage as a line.
+     Bars keep 0 as their floor; mileage hugs its own range so a 4.24 → 4.36
+     km/L week does not flat-line. */
   const chartSeries = useMemo<WeeklyChartSeries[]>(
     () => [
       {
         key: "distance",
         label: t("staff.perf.weekly.distance"),
-        color: "#2563eb",
+        color: "#6366f1",
         kind: "bar",
         axis: "left",
         format: (value) => `${formatCount(value)} km`,
@@ -322,25 +402,24 @@ const DriverPerformancePage = () => {
         axis: "right",
         format: (value) => formatLitres(value),
       },
+      {
+        key: "mileage",
+        label: t("staff.perf.weekly.mileage"),
+        color: "#10b981",
+        kind: "line",
+        axis: "third",
+        zeroFloor: false,
+        format: (value) => `${formatDecimal(value, 2)} km/L`,
+      },
     ],
     [t],
   );
+  /* Mileage is a series of its own now, so the tooltip only adds what the
+     series cannot carry: the week's trip count. */
   const chartTooltipExtras = useCallback(
-    (point: WeeklyChartPoint) => {
-      const extraRows: Array<{ label: string; value: string }> = [
-        { label: t("staff.perf.weekly.trips"), value: formatCount(Number(point.trips ?? 0)) },
-      ];
-      const distance = Number(point.distance ?? 0);
-      const fuel = Number(point.fuelLitres ?? 0);
-      // Derived from the same real values — never fabricated.
-      if (distance > 0 && fuel > 0) {
-        extraRows.push({
-          label: t("staff.perf.weekly.mileage"),
-          value: `${formatDecimal(distance / fuel, 2)} km/L`,
-        });
-      }
-      return extraRows;
-    },
+    (point: WeeklyChartPoint) => [
+      { label: t("staff.perf.weekly.trips"), value: formatCount(Number(point.trips ?? 0)) },
+    ],
     [t],
   );
 
@@ -393,6 +472,57 @@ const DriverPerformancePage = () => {
   );
   const personDetail = detailQuery.detail;
 
+  // Rows are WARMED before they are opened (hover that settles, keyboard focus,
+  // and the open pop-up's neighbours), so the details pop-up renders complete on
+  // its first frame — no skeleton, no reflow. Requests are deduped against the
+  // shared detail cache, so warming can never double a call or re-render the
+  // table.
+  const { warmOnHover, warmNow, cancelWarmup } = usePerformanceRowWarmup(
+    "drivers",
+    applied.fromDate,
+    applied.toDate,
+  );
+
+
+  /* Vehicle Breakdown sorts on its own — the page's award order never moves. */
+  const [vehicleSort, setVehicleSort] = useState<SortState | null>(null);
+  const vehicleSortAccessors = useMemo<
+    Record<string, (vehicle: DriverVehicleDetail) => number | string>
+  >(
+    () => ({
+      vehicle_no: (vehicle) => vehicle.vehicleNo,
+      trips: (vehicle) => vehicle.trips,
+      distance: (vehicle) => vehicle.distance,
+      avg_per_trip: (vehicle) => vehicle.avgDistancePerTrip,
+      fuel: (vehicle) => vehicle.fuelLitres,
+      fuel_cost: (vehicle) => vehicle.fuelCost,
+      maintenance_cost: (vehicle) => vehicle.maintenanceCost,
+      total_cost: (vehicle) => vehicle.totalCost,
+      mileage: (vehicle) => vehicle.mileage,
+    }),
+    [],
+  );
+
+  const sortedVehicles = useMemo(() => {
+    const vehicles = personDetail?.vehicles ?? [];
+    if (!vehicleSort) return vehicles;
+    const accessor = vehicleSortAccessors[vehicleSort.key];
+    if (!accessor) return vehicles;
+    const dir = vehicleSort.dir === "asc" ? 1 : -1;
+    return [...vehicles].sort((a, b) => {
+      const av = accessor(a);
+      const bv = accessor(b);
+      if (typeof av === "string" || typeof bv === "string") {
+        return String(av).localeCompare(String(bv), undefined, {
+          sensitivity: "accent",
+          numeric: true,
+        }) * dir;
+      }
+      return (av - bv) * dir;
+    });
+  }, [personDetail?.vehicles, vehicleSort, vehicleSortAccessors]);
+
+
   // ‹ › traversal across the award-ordered rows (rank literal order).
   const drawerNavigation = useMemo(() => {
     if (!selectedEntry) return undefined;
@@ -415,6 +545,32 @@ const DriverPerformancePage = () => {
   }, [selectedEntry, rowsView, perf, drawerT]);
 
 
+
+  // With the pop-up open, quietly warm its ‹ › neighbours on idle, so stepping
+  // through people with the arrows is instant too. Same cache/in-flight guard —
+  // never a duplicate request, and nothing runs after the pop-up closes.
+  // Once THIS page's data is on screen, warm the sibling page's default
+  // dataset on idle (driver ⇄ supervisor): switching tabs then renders the
+  // table from cache on its first frame — no loading state, no flash. One
+  // request, deduped by the shared cache, skipped when it is already warm.
+  useEffect(() => {
+    if (perf.loading) return;
+    return runWhenIdle(() => prefetchStaffPerformance("supervisors"));
+  }, [perf.loading]);
+
+  const neighbourIds = useMemo(() => {
+    if (!selectedEntry) return [];
+    const index = rowsView.findIndex((entry) => entry.row.driverId === selectedEntry.row.driverId);
+    if (index < 0) return [];
+    return [rowsView[index - 1]?.row.driverId, rowsView[index + 1]?.row.driverId].filter(
+      (id): id is number => typeof id === "number",
+    );
+  }, [selectedEntry, rowsView]);
+
+  useEffect(() => {
+    if (neighbourIds.length === 0) return;
+    return runWhenIdle(() => neighbourIds.forEach((id) => warmNow(id)));
+  }, [neighbourIds, warmNow]);
 
   const drawerSummary = useMemo(() => {
     if (!selectedEntry) return [];
@@ -510,15 +666,25 @@ const DriverPerformancePage = () => {
         </div>
       )}
 
-      {/* KPI cards — reflect the applied dataset */}
-      <PerformanceKpiCards kpis={kpiCards} columns={5} />
+      {/* KPI cards — only for a single driver. They describe ONE person's
+          numbers, so they appear when that driver is picked in the filter and
+          stay away for the whole-fleet view (and for a search-only filter).
+          While the driver's data loads they show the calm static placeholders. */}
+      {applied.personId != null && (
+        <PerformanceKpiCards kpis={kpiCards} columns={5} />
+      )}
 
       {/* Driver Weekly Performance */}
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card">
-        <header className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-slate-200 px-4 py-3 sm:px-5">
-          <h2 className="text-[13px] font-bold tracking-tight text-slate-800">
-            {t("staff.perf.weekly.driver_header")}
-          </h2>
+        <header
+          className={`flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-b px-4 py-3 sm:px-5 ${CARD_HEADER_TONE.orange}`}
+        >
+          <div className="flex min-w-0 items-center gap-2.5">
+            <PerformanceCardMark icon={Truck} tone="orange" />
+            <h2 className="min-w-0 text-base font-bold text-slate-800 tracking-tight">
+              {t("staff.perf.weekly.driver_header")}
+            </h2>
+          </div>
           <p className="text-[11px] font-medium tabular-nums text-slate-500">
             <span className="text-slate-400">{t("staff.perf.weekly.reporting_weeks")}: </span>
             {periodsLine || appliedRangeLabel}
@@ -533,16 +699,23 @@ const DriverPerformancePage = () => {
             emptyText={t("staff.perf.weekly.empty")}
             loading={initialLoading}
             ariaLabel={t("staff.perf.weekly.aria_driver", { range: appliedRangeLabel })}
+            inProgressWeek={inProgressWeek}
+            inProgressNote={inProgressNote}
           />
         </div>
       </section>
 
       {/* Driver Performance table */}
       <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-card">
-        <header className="flex flex-wrap items-baseline gap-x-2 border-b border-slate-200 px-4 py-3 sm:px-5">
-          <h2 className="text-[13px] font-bold tracking-tight text-slate-800">
-            {t("staff.perf.driver_title")}
-          </h2>
+        <header
+          className={`flex flex-wrap items-center gap-x-2.5 gap-y-1.5 border-b px-4 py-3 sm:px-5 ${CARD_HEADER_TONE.orange}`}
+        >
+          <div className="flex min-w-0 items-center gap-2.5">
+            <PerformanceCardMark icon={Truck} tone="orange" />
+            <h2 className="min-w-0 text-base font-bold text-slate-800 tracking-tight">
+              {t("staff.perf.driver_title")}
+            </h2>
+          </div>
           <span className="min-w-0 text-[11px] font-medium text-slate-500">
             <span aria-hidden="true">—&nbsp;</span>
             {summaryLine}
@@ -550,9 +723,7 @@ const DriverPerformancePage = () => {
         </header>
 
         {showTableSkeleton ? (
-          <div className="p-4 sm:p-5">
-            <TableSkeleton rows={6} columns={6} label={t("common.loading")} />
-          </div>
+          <TableLoading label={t("staff.table.loading.driver_perf")} />
         ) : showNoMatch ? (
           <EmptyState
             variant="no-search"
@@ -584,7 +755,7 @@ const DriverPerformancePage = () => {
               <table className="min-w-full border-collapse text-left">
                 <thead className={uiTableHeadClass}>
                   <tr>
-                    <th scope="col" className={`${uiTableThClass} w-12 text-left`}>
+                    <th scope="col" className={`${perfThClass} w-12 text-left`}>
                       {t("staff.perf.table.rank")}
                     </th>
                     <SortableHeader
@@ -622,8 +793,13 @@ const DriverPerformancePage = () => {
                       <tr
                         key={row.driverId}
                         tabIndex={0}
-                        aria-label={t("staff.perf.table.row_aria", { name: row.driverName })}
+                        aria-label={t("staff.perf.table.row_aria", {
+                          name: personNameLabel(t, language, row.driverName),
+                        })}
                         onClick={toggle}
+                        onPointerEnter={() => warmOnHover(row.driverId)}
+                        onPointerLeave={cancelWarmup}
+                        onFocus={() => warmNow(row.driverId)}
                         onKeyDown={(event) => {
                           if (event.key === "Enter" || event.key === " ") {
                             event.preventDefault(); // exactly one activation
@@ -637,36 +813,35 @@ const DriverPerformancePage = () => {
                           selected && uiTableRowSelectedClass,
                         )}
                       >
-                        <td className={`${uiTableTdClass} text-center text-xs font-bold tabular-nums text-slate-500`}>
+                        <td className={`${perfTdClass} text-center text-sm font-bold tabular-nums text-slate-500`}>
                           {rank}
                         </td>
-                        <td className={`${uiTableTdClass} whitespace-nowrap text-[13px] font-semibold text-slate-900`}>
-                          {row.driverName}
+                        <td className={`${perfTdClass} whitespace-nowrap text-sm font-semibold text-slate-900`}>
+                          {personNameLabel(t, language, row.driverName)}
                         </td>
-                        <td className={`${uiTableTdClass} whitespace-nowrap text-xs text-slate-500`}>
-                          {row.employeeStatus}
+                        <td className={`${perfTdClass} whitespace-nowrap text-[13px] text-slate-500`}>
+                          {translateStatus(t, row.employeeStatus)}
                         </td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatCount(row.trips)}</td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatCount(row.distance)}</td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatDecimal(row.avgDistancePerTrip, 1)}</td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatCount(row.vehicles)}</td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatDecimal(row.fuelLitres, 1)}</td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap font-bold`}>{formatMoney(row.totalCost)}</td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatCount(row.trips)}</td>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatCount(row.distance)}</td>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatDecimal(row.avgDistancePerTrip, 1)}</td>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatCount(row.vehicles)}</td>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatDecimal(row.fuelLitres, 1)}</td>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap font-bold`}>{formatMoney(row.totalCost)}</td>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>
                           {isMeasurable(row.costPerKm) ? formatDecimal(row.costPerKm, 1) : "—"}
                         </td>
-                        <td className={`${uiTableTdNumericClass} whitespace-nowrap`}>{formatMileage(row.mileage)}</td>
-                        <td className={`${uiTableTdClass} text-center`}>
+                        <td className={`${perfTdNumericClass} whitespace-nowrap`}>{formatMileage(row.mileage)}</td>
+                        <td className={`${perfTdClass} text-center`}>
                           {grade == null ? (
                             <span
-                              title={t("staff.perf.grade.unranked")}
-                              className="text-xs font-semibold text-slate-300"
+                              className="text-sm font-semibold text-slate-300"
                             >
                               —
                             </span>
                           ) : (
                             <span
-                              className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide ${gradeBadgeClass(grade)}`}
+                              className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full border px-2 py-0.5 text-[11px] font-bold uppercase tracking-wide ${gradeBadgeClass(grade)}`}
                             >
                               {translateGrade(grade, t)}
                             </span>
@@ -698,7 +873,10 @@ const DriverPerformancePage = () => {
       <PerformanceDrawer
         open={selectedEntry != null}
         onClose={closeDrawer}
-        title={selectedEntry?.row.driverName ?? ""}
+        icon={Truck}
+        sectionLabel={t("staff.perf.driver_title")}
+        tone="orange"
+        title={personNameLabel(t, language, selectedEntry?.row.driverName ?? "")}
         subtitle={`${drawerT("staff.perf.drawer.period")}: ${drawerRangeLabel}`}
         rankBadge={
           selectedEntry ? (
@@ -742,8 +920,9 @@ const DriverPerformancePage = () => {
         {selectedEntry && detailQuery.loading && (
           <div className="space-y-3" aria-busy="true">
             <p className="sr-only">{drawerT("staff.perf.drawer.detail_loading")}</p>
-            <div className="h-16 animate-pulse rounded-xl bg-slate-100" />
-            <div className="h-40 animate-pulse rounded-xl bg-slate-100" />
+            {/* Static blocks: the drawer shows its shape without pulsing. */}
+            <div className="h-16 rounded-xl bg-slate-100" />
+            <div className="h-40 rounded-xl bg-slate-100" />
           </div>
         )}
         {selectedEntry && detailQuery.error && !personDetail && (
@@ -761,75 +940,122 @@ const DriverPerformancePage = () => {
         {selectedEntry && personDetail && (
           <div className="space-y-5">
             <section aria-label={drawerT("staff.perf.drawer.vehicles")}>
-              <h3 className="text-[11px] font-bold uppercase tracking-widest text-slate-400">
+              <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400">
                 {drawerT("staff.perf.drawer.vehicles")}
               </h3>
               {personDetail.vehicles.length === 0 ? (
-                <p className="mt-2 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-3 py-2.5 text-xs font-medium text-slate-400">
+                <p className="mt-2 rounded-lg border border-dashed border-slate-200 bg-slate-50/60 px-3 py-2.5 text-[13px] font-medium text-slate-400">
                   {drawerT("staff.perf.vehicle.empty")}
                 </p>
               ) : (
                 <div className="mt-2 overflow-x-auto rounded-xl border border-slate-200">
                   <table className="min-w-full divide-y divide-slate-100">
                     <thead className="bg-slate-50/80">
+                      {/* Every column carries its own glyph and sorts, exactly
+                          like the Trip List table. */}
                       <tr>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-left`}>
-                          {drawerT("staff.perf.vehicle.col.vehicle_no")}
-                        </th>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>
-                          {drawerT("staff.perf.vehicle.col.trips")}
-                        </th>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>
-                          {drawerT("staff.perf.vehicle.col.distance")}
-                        </th>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>
-                          {drawerT("staff.perf.vehicle.col.avg_per_trip")}
-                        </th>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>
-                          {drawerT("staff.perf.vehicle.col.fuel")}
-                        </th>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>
-                          {drawerT("staff.perf.vehicle.col.fuel_cost")}
-                        </th>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>
-                          {drawerT("staff.perf.vehicle.col.maintenance_cost")}
-                        </th>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>
-                          {drawerT("staff.perf.vehicle.col.total_cost")}
-                        </th>
-                        <th scope="col" className={`${uiTableThClass} px-3 py-2 text-right`}>
-                          {drawerT("staff.perf.vehicle.col.mileage")}
-                        </th>
+                        <SortableHeader
+                          label={drawerT("staff.perf.vehicle.col.vehicle_no")}
+                          sortKey="vehicle_no"
+                          sort={vehicleSort}
+                          onSortChange={setVehicleSort}
+                          firstDir="asc"
+                          icon={<Truck size={14} className="shrink-0 text-indigo-500" />}
+                        />
+                        <SortableHeader
+                          label={drawerT("staff.perf.vehicle.col.trips")}
+                          sortKey="trips"
+                          sort={vehicleSort}
+                          onSortChange={setVehicleSort}
+                          align="right"
+                          icon={<Route size={14} className="shrink-0 text-emerald-500" />}
+                        />
+                        <SortableHeader
+                          label={drawerT("staff.perf.vehicle.col.distance")}
+                          sortKey="distance"
+                          sort={vehicleSort}
+                          onSortChange={setVehicleSort}
+                          align="right"
+                          icon={<Gauge size={14} className="shrink-0 text-sky-500" />}
+                        />
+                        <SortableHeader
+                          label={drawerT("staff.perf.vehicle.col.avg_per_trip")}
+                          sortKey="avg_per_trip"
+                          sort={vehicleSort}
+                          onSortChange={setVehicleSort}
+                          align="right"
+                          icon={<TrendingUp size={14} className="shrink-0 text-violet-500" />}
+                        />
+                        <SortableHeader
+                          label={drawerT("staff.perf.vehicle.col.fuel")}
+                          sortKey="fuel"
+                          sort={vehicleSort}
+                          onSortChange={setVehicleSort}
+                          align="right"
+                          icon={<Fuel size={14} className="shrink-0 text-amber-500" />}
+                        />
+                        <SortableHeader
+                          label={drawerT("staff.perf.vehicle.col.fuel_cost")}
+                          sortKey="fuel_cost"
+                          sort={vehicleSort}
+                          onSortChange={setVehicleSort}
+                          align="right"
+                          icon={<IndianRupee size={14} className="shrink-0 text-teal-500" />}
+                        />
+                        <SortableHeader
+                          label={drawerT("staff.perf.vehicle.col.maintenance_cost")}
+                          sortKey="maintenance_cost"
+                          sort={vehicleSort}
+                          onSortChange={setVehicleSort}
+                          align="right"
+                          icon={<Wrench size={14} className="shrink-0 text-orange-500" />}
+                        />
+                        <SortableHeader
+                          label={drawerT("staff.perf.vehicle.col.total_cost")}
+                          sortKey="total_cost"
+                          sort={vehicleSort}
+                          onSortChange={setVehicleSort}
+                          align="right"
+                          icon={<Scale size={14} className="shrink-0 text-rose-500" />}
+                        />
+                        <SortableHeader
+                          label={drawerT("staff.perf.vehicle.col.mileage")}
+                          sortKey="mileage"
+                          sort={vehicleSort}
+                          onSortChange={setVehicleSort}
+                          align="right"
+                          icon={<Gauge size={14} className="shrink-0 text-cyan-500" />}
+                        />
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100 bg-white">
-                      {personDetail.vehicles.map((vehicle) => (
+                      {sortedVehicles.map((vehicle) => (
                         <tr key={vehicle.vehicleNo} className="transition-colors hover:bg-slate-50/70">
-                          <td className={`${uiTableTdClass} whitespace-nowrap px-3 py-2 text-xs font-bold text-slate-800`}>
-                            {vehicle.vehicleNo}
+                          <td className={`${uiTableTdClass} whitespace-nowrap px-3 py-2 text-[13px] font-bold tabular-nums text-slate-800`}>
+                            {formatVehicleNumber(vehicle.vehicleNo)}
                           </td>
-                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>
+                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>
                             {formatCount(vehicle.trips)}
                           </td>
-                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>
+                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>
                             {formatCount(vehicle.distance)}
                           </td>
-                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>
+                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>
                             {formatDecimal(vehicle.avgDistancePerTrip, 1)}
                           </td>
-                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>
+                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>
                             {formatDecimal(vehicle.fuelLitres, 1)}
                           </td>
-                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>
+                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>
                             {formatMoney(vehicle.fuelCost)}
                           </td>
-                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>
+                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>
                             {formatMoney(vehicle.maintenanceCost)}
                           </td>
                           <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs font-bold`}>
                             {formatMoney(vehicle.totalCost)}
                           </td>
-                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-xs`}>
+                          <td className={`${uiTableTdNumericClass} whitespace-nowrap px-3 py-2 text-[13px]`}>
                             {formatMileage(vehicle.mileage)}
                           </td>
                         </tr>

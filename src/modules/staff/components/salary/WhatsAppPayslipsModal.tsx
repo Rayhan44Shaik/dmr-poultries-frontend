@@ -173,7 +173,6 @@ export function WhatsAppPayslipsModal({
               onClick={() => void handleDownloadAll()}
               disabled={downloading || records.length === 0}
               loading={downloading}
-              title="Download the A4 payslip PDFs to send from any WhatsApp client"
               icon={<Download size={14} />}
             >
               {downloading ? "Preparing…" : "Download PDFs"}

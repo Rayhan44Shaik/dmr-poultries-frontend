@@ -1,5 +1,6 @@
 import {
   useContext,
+  useEffect,
   useMemo,
   useState,
   type ReactNode,
@@ -98,6 +99,16 @@ export const I18nProvider = ({ children }: I18nProviderProps) => {
 
   const toggleLanguage = () => setLanguage(language === 'en' ? 'te' : 'en');
 
+  /**
+   * Keep `<html lang>` in step with the active language — including the case
+   * where Telugu comes from `localStorage` rather than the switcher. The
+   * attribute decides which font the browser picks for Telugu script, so it has
+   * to be right on the first paint, not only after someone flips the toggle.
+   */
+  useEffect(() => {
+    document.documentElement.lang = language === 'te' ? 'te' : 'en';
+  }, [language]);
+
   const t = useMemo(
     () =>
       (key: string, params?: Record<string, string | number>): string => {
@@ -182,6 +193,21 @@ export const getLanguage = (): Language => activeLanguage;
  * Translate a status value coming from the backend/database.
  * Only the display string changes — the underlying value is untouched.
  */
+/**
+ * Platform roles arrive as `OWNER`, `Accountant`, `supervisor`, … — normalise
+ * them to `role.<lowercase>` and fall back to the raw value when there is no
+ * copy for that role yet (same contract as `translateStatus`).
+ */
+export const translateRole = (
+  t: (key: string) => string,
+  value: string
+): string => {
+  if (!value) return value;
+  const key = `role.${value.toLowerCase()}`;
+  const translated = t(key);
+  return translated === key ? value : translated;
+};
+
 export const translateStatus = (
   t: (key: string) => string,
   value: string

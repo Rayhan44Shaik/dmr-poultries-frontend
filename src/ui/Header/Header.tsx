@@ -31,9 +31,11 @@ import {
 } from "lucide-react";
 import { QUICK_ACTIONS, resolveRoute } from "../../routes/navigation";
 import { useTheme } from "../../providers/ThemeProvider";
-import { useI18n } from "../../i18n";
+import { translateRole, useI18n } from "../../i18n";
+import { personNameLabel } from "../../i18n/displayNames";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { getPendingCollectionSnapshot, subscribePendingCollectionSnapshot } from "../../modules/operations/collections/services/collectionSnapshot";
+import { useViewLayerOpen } from "../../shared/ui/viewLayer";
 import { usePendingApprovals } from "../../modules/approvals/hooks/usePendingApprovals";
 import { startApprovalPolling } from "../../modules/approvals/services/approvalSnapshot";
 import { PENDING_LEAVES_PATH } from "../../modules/staff/utils/leaveDeepLink";
@@ -145,15 +147,22 @@ function IconButton({
 /* ------------------------------------------------------------------ */
 function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
   const location = useLocation();
+  /* A full-screen view (Trip List view, Driver/Supervisor details, …) renders
+     above the page but below this header, so search, language and the
+     notification dropdown keep working while it is open. */
+  const viewOpen = useViewLayerOpen();
   const { theme, toggleTheme } = useTheme();
   const { language, t } = useI18n();
+  const roleLabel = (role: string) => translateRole(t, role);
 
   const route = useMemo(() => resolveRoute(location.pathname + location.search), [location.pathname, location.search]);
 
   const user = getCurrentUser();
-  const displayName = "Owner";
+  /* The account chip follows the language too: the demo account is the Owner,
+     so the name reads యజమాని in Telugu and the avatar initial follows it. */
+  const displayName = personNameLabel(t, language, "Owner");
   const displayRole = "Owner";
-  const initials = "O";
+  const initials = displayName.charAt(0).toUpperCase();
 
   /* ----- Browser/page title from route metadata (translated) ----- */
   useEffect(() => {
@@ -348,7 +357,9 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
 
 
   return (
-    <header className="sticky top-0 z-40 flex h-16 shrink-0 items-center gap-2 border-b border-slate-200/80 bg-white/85 px-4 backdrop-blur-md sm:gap-3 sm:px-6 dark:border-slate-800 dark:bg-slate-900/85">
+    <header
+      className={`sticky top-0 ${viewOpen ? "z-[55]" : "z-40"} flex h-16 shrink-0 items-center gap-2 border-b border-slate-200/80 bg-white/85 px-4 backdrop-blur-md sm:gap-3 sm:px-6 dark:border-slate-800 dark:bg-slate-900/85`}
+    >
       {/* Menu — every viewport, because it is the way back to a collapsed or
           hidden sidebar. Below `lg` it opens the floating popup; from `lg` up
           it steps the persistent panel (see DashboardLayout), so it must never
@@ -543,7 +554,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
               </span>
               <span className="flex items-center gap-1 text-[11px] font-medium text-slate-400">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                {displayRole}
+                {roleLabel(displayRole)}
               </span>
             </span>
             <ChevronDown size={14} className={`text-slate-400 transition-transform ${open ? "rotate-180" : ""}`} />
@@ -565,7 +576,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
               <UserRound size={13} className="text-brand-600 dark:text-brand-400" />
               <span className="text-[11.5px] font-medium text-slate-500 dark:text-slate-300">{t("header.role")}</span>
               <span className="ml-auto rounded-full bg-brand-100 px-2 py-px text-[10.5px] font-semibold text-brand-800 dark:bg-brand-500/15 dark:text-brand-300">
-                {displayRole}
+                {roleLabel(displayRole)}
               </span>
             </div>
             <div className="my-1.5 h-px bg-slate-100 dark:bg-slate-700" />

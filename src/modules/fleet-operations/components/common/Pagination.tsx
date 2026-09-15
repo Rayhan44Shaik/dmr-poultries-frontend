@@ -1,4 +1,5 @@
 import React from "react";
+import { useI18n } from "../../../../i18n";
 import { PageSizeSelect } from "../../../../shared/ui/PageSizeSelect";
 import {
   paginationBarClass,
@@ -27,6 +28,8 @@ const Pagination: React.FC<PaginationProps> = ({
   pageSize,
   onPageSizeChange,
 }) => {
+  const { t } = useI18n();
+
   if (!shouldShowPagination(totalItems ?? 0)) return null;
 
   const getPageNumbers = (): number[] => {
@@ -53,7 +56,7 @@ const Pagination: React.FC<PaginationProps> = ({
     <div className={paginationBarClass}>
       {onPageSizeChange && pageSize != null && (
         <div className="mr-auto flex items-center gap-2">
-          <span className="text-[13px] font-semibold text-slate-600">Rows Per Page</span>
+          <span className="text-[13px] font-semibold text-slate-600">{t("common.rows_per_page")}</span>
           <PageSizeSelect value={pageSize} onChange={onPageSizeChange} />
         </div>
       )}
@@ -62,8 +65,9 @@ const Pagination: React.FC<PaginationProps> = ({
         onClick={() => onPageChange(currentPage - 1)}
         disabled={currentPage === 1}
         className={paginationNavBtnClass}
+        aria-label={t("common.previous_page")}
       >
-        Previous
+        {t("common.previous")}
       </button>
 
       {getPageNumbers().map((page) => (
@@ -82,8 +86,9 @@ const Pagination: React.FC<PaginationProps> = ({
         onClick={() => onPageChange(currentPage + 1)}
         disabled={currentPage === totalPages}
         className={paginationNavBtnClass}
+        aria-label={t("common.next_page")}
       >
-        Next
+        {t("common.next")}
       </button>
     </div>
   );

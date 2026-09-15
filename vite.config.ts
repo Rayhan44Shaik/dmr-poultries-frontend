@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import { ServerResponse } from 'node:http'
 import { defineConfig } from 'vite'
+import type { ProxyOptions } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
@@ -37,6 +38,28 @@ const OPTIMIZE_DEPS = [
   'pdfjs-dist/legacy/build/pdf.mjs',
   'react-date-range',
 ]
+
+// Browser-facing code uses a relative /api URL (VITE_API_BASE_URL=/api); Vite
+// reaches the backend on this host, never browser localhost. Defined once and
+// shared by the dev server AND `vite preview`, so the production build is
+// verified against exactly the same backend contract as dev.
+const API_PROXY: Record<string, ProxyOptions> = {
+  '/api': {
+    target: 'http://127.0.0.1:4000',
+    changeOrigin: false,
+    // When the backend is not running, answer /api requests with a clean
+    // 502 JSON instead of letting the SPA history fallback return
+    // index.html (which would confuse API consumers).
+    configure: (proxy) => {
+      proxy.on('error', (err, _req, res) => {
+        if (res instanceof ServerResponse) {
+          res.writeHead(502, { 'Content-Type': 'application/json' })
+          res.end(JSON.stringify({ error: 'backend_unavailable', message: err.message }))
+        }
+      })
+    },
+  },
+}
 
 /**
  * Stamps the running tab with the dev-server instance id and serves
@@ -87,7 +110,7 @@ const dmrInstanceStamp = {
       },
     ]
   },
-  configureServer(server: { middlewares: { use: (path: string, handler: (req: import('node:http').IncomingHttpMessage, res: import('node:http').ServerResponse) => void) => void } }) {
+  configureServer(server: { middlewares: { use: (path: string, handler: (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => void) => void } }) {
     server.middlewares.use('/__dmr/ping', (_req, res) => {
       res.setHeader('Content-Type', 'application/json')
       res.setHeader('Cache-Control', 'no-store')
@@ -115,29 +138,13 @@ export default defineConfig({
     warmup: {
       clientFiles: ['./index.html', './src/main.tsx'],
     },
-    // Browser-facing code uses a relative /api URL (VITE_API_BASE_URL=/api);
-    // Vite reaches the backend on this host, never browser localhost.
-    // (Also covers the relative /api/mobile URLs used by mobile code.)
-    proxy: {
-      "/api": {
-        target: "http://127.0.0.1:4000",
-        changeOrigin: false,
-        // When the backend is not running, answer /api requests with a clean
-        // 502 JSON instead of letting the SPA history fallback return
-        // index.html (which would confuse API consumers).
-        configure: (proxy) => {
-          proxy.on("error", (err, _req, res) => {
-            if (res instanceof ServerResponse) {
-              res.writeHead(502, { "Content-Type": "application/json" });
-              res.end(JSON.stringify({ error: "backend_unavailable", message: err.message }));
-            }
-          });
-        },
-      },
-    },
+    // Also covers the relative /api/mobile URLs used by mobile code.
+    proxy: API_PROXY,
   },
   preview: {
     host: true,
     allowedHosts: ['.e2b.app', 'localhost'],
+    // Same backend contract as dev: the built bundle is testable end-to-end.
+    proxy: API_PROXY,
   },
 })

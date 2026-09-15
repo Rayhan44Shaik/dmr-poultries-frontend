@@ -82,4 +82,6 @@ export interface FleetAnalyticsResponse {
   costCenters: AnalyticsCostCenter[];
   topPerformers: AnalyticsTopPerformer[];
   highestExpense: AnalyticsHighestExpense[];
+  /** Full per-vehicle rollup for the selected range (every vehicle). */
+  vehicleStats?: AnalyticsVehicleStat[];
 }

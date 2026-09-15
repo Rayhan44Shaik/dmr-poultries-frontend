@@ -2,7 +2,6 @@ import { memo, useState, useRef, useEffect, useId, type ReactNode } from 'react'
 import { ChevronDown, ChevronLeft, ChevronRight, RotateCcw, UsersRound, X, Search, FileSpreadsheet, LoaderCircle, Calendar, CalendarCheck2, CalendarRange, ArrowRight } from 'lucide-react';
 import { DatePicker } from '../../../../components/common/DatePicker';
 import { uiExcelButtonClass, uiFilterLabelClass, uiInputClass, uiResetButtonClass } from '../../../../shared/ui/uiTokens';
-import { ActionTooltip } from '../../../../ui/ActionTooltip';
 import { BrandRefreshButton } from '../../../../ui';
 import type { DutyReportRange } from '../../services/dutyReport';
 import { useDutyPlannerText } from '../../hooks/useDutyPlannerText';
@@ -16,14 +15,14 @@ interface Props {
   canDownloadExcel: boolean; exporting: boolean;
   onRefresh?: () => void; refreshing?: boolean;
   view: DutyPlannerView; onViewChange: (view: DutyPlannerView) => void;
-  periodLabel: string; periodTitle: string;
+  periodLabel: string;
   onPreviousPeriod: () => void; onNextPeriod: () => void; onCurrentPeriod?: () => void;
   customRange: DutyReportRange; onCustomRangeChange: (range: DutyReportRange) => void;
   periodMeta?: ReactNode; feedback?: ReactNode;
 }
 const views = ['week', 'month', 'custom'] as const;
 
-function DutyPlannerFilters({ role, roles, searchQuery, onSearchChange, onRoleChange, onReset, onDownloadExcel, canDownloadExcel, exporting, onRefresh, refreshing, view, onViewChange, periodLabel, periodTitle, onPreviousPeriod, onNextPeriod, onCurrentPeriod, customRange, onCustomRangeChange, periodMeta, feedback }: Props) {
+function DutyPlannerFilters({ role, roles, searchQuery, onSearchChange, onRoleChange, onReset, onDownloadExcel, canDownloadExcel, exporting, onRefresh, refreshing, view, onViewChange, periodLabel, onPreviousPeriod, onNextPeriod, onCurrentPeriod, customRange, onCustomRangeChange, periodMeta, feedback }: Props) {
   const { language, t } = useDutyPlannerText();
   const [open, setOpen] = useState(false);
   const dropdown = useRef<HTMLDivElement>(null);
@@ -82,15 +81,15 @@ function DutyPlannerFilters({ role, roles, searchQuery, onSearchChange, onRoleCh
             <span>{t('dateRange')}</span>
             {periodMeta && <span className="ml-auto flex min-w-0 items-center gap-1 normal-case tracking-normal">{periodMeta}</span>}
           </div>
-          {view === 'custom' ? <div role="group" aria-label={t('customDates')} className="flex min-w-0 items-center gap-1.5" title={t('bothDates')}>
+          {view === 'custom' ? <div role="group" aria-label={t('customDates')} className="flex min-w-0 items-center gap-1.5">
             <div className="min-w-0 flex-1"><label htmlFor="duty-report-from" className="sr-only">{t('fromDate')}</label><DatePicker id="duty-report-from" value={customRange.fromDate} onChange={(fromDate) => onCustomRangeChange({ ...customRange, fromDate })} minDate="1900-01-01" required hideClear language={language} className="w-full" popupClassName="max-w-[calc(100vw_-_4rem)]" /></div>
             <ArrowRight size={12} aria-hidden="true" className="shrink-0 text-slate-300" />
             <div className="min-w-0 flex-1"><label htmlFor="duty-report-to" className="sr-only">{t('toDate')}</label><DatePicker id="duty-report-to" value={customRange.toDate} onChange={(toDate) => onCustomRangeChange({ ...customRange, toDate })} minDate="1900-01-01" required hideClear language={language} className="w-full" popupClassName="!left-auto !right-0 max-w-[calc(100vw_-_4rem)]" /></div>
           </div> : <div role="group" aria-label={t('displayedPeriod')} className="flex h-10 w-full max-w-[260px] items-center gap-0.5 rounded-lg border border-slate-200 px-0.5">
             <button type="button" onClick={onPreviousPeriod} aria-label={t(view === 'week' ? 'previousWeek' : 'previousMonth')} className="flex h-8 w-7 shrink-0 items-center justify-center rounded text-slate-500 hover:bg-slate-100"><ChevronLeft size={14} /></button>
-            <span title={periodTitle} className="min-w-0 flex-1 text-center text-[11px] font-semibold leading-4 text-slate-700">{periodLabel}</span>
+            <span className="min-w-0 flex-1 text-center text-[11px] font-semibold leading-4 text-slate-700">{periodLabel}</span>
             <button type="button" onClick={onNextPeriod} aria-label={t(view === 'week' ? 'nextWeek' : 'nextMonth')} className="flex h-8 w-7 shrink-0 items-center justify-center rounded text-slate-500 hover:bg-slate-100"><ChevronRight size={14} /></button>
-            {onCurrentPeriod && <button type="button" onClick={onCurrentPeriod} aria-label={t('currentWeek')} title={t('currentWeek')} className="flex h-8 w-7 shrink-0 items-center justify-center border-l border-slate-200 text-emerald-600 hover:bg-emerald-50"><CalendarCheck2 size={13} /></button>}
+            {onCurrentPeriod && <button type="button" onClick={onCurrentPeriod} aria-label={t('currentWeek')} className="flex h-8 w-7 shrink-0 items-center justify-center border-l border-slate-200 text-emerald-600 hover:bg-emerald-50"><CalendarCheck2 size={13} /></button>}
           </div>}
         </div>
 
@@ -109,7 +108,6 @@ function DutyPlannerFilters({ role, roles, searchQuery, onSearchChange, onRoleCh
           <button type="button" onClick={onReset} className={`group relative ${uiResetButtonClass}`} aria-label={t('reset')}>
             <span className="inline-flex group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>
             {t('reset')}
-            <ActionTooltip label={t('reset')} />
           </button>
           {onRefresh && <BrandRefreshButton loading={refreshing} onClick={onRefresh} ariaLabel={t('refreshData')}>{t('refresh')}</BrandRefreshButton>}
           <button type="button" onClick={onDownloadExcel} disabled={!canDownloadExcel || exporting} aria-busy={exporting} className={`group relative ${uiExcelButtonClass}`} aria-label={t('download')}>
@@ -117,7 +115,6 @@ function DutyPlannerFilters({ role, roles, searchQuery, onSearchChange, onRoleCh
               {exporting ? <LoaderCircle size={15} className="animate-spin" /> : <FileSpreadsheet size={15} />}
             </span>
             {exporting ? t('preparing') : t('excel')}
-            <ActionTooltip label={t('download')} />
           </button>
         </div>
       </div>

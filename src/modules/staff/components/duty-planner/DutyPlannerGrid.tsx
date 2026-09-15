@@ -2,6 +2,7 @@ import { memo, useState } from 'react';
 import { getShiftConfigsForRole } from '../../services/staffService';
 import { getCoreDutyRole } from '../../services/dutyRules';
 import { isDateLocked } from '../../hooks/useDutyPlanner';
+import TableLoading from '../common/TableLoading';
 import { useDutyPlannerText } from '../../hooks/useDutyPlannerText';
 import { dutyDisplayValue } from '../../i18n/dutyPlannerCopy';
 import { countDutyCells, dutyDisplayName, formatDutyWeekday, getDutyLabel, todayStr, type DutyReportCell, type DutyReportEmployee } from '../../services/dutyReport';
@@ -31,7 +32,7 @@ function DutyPlannerGrid({ employees, weekDays, getDutyCell, onCellClick, loadin
   // Drag & drop state: the cell being dragged and the cell under the pointer.
   const [dragKey, setDragKey] = useState<string | null>(null);
   const [overKey, setOverKey] = useState<string | null>(null);
-  if (loading) return <div role="status" className="p-10 text-center text-sm text-slate-500">{t('loading')}</div>;
+  if (loading) return <TableLoading label={t('loading')} />;
   if (!employees.length) return <div className="p-10 text-center text-sm text-slate-500">{t('noEmployees')}</div>;
   return (
     <div className="overflow-x-auto">
@@ -98,7 +99,6 @@ function DutyPlannerGrid({ employees, weekDays, getDutyCell, onCellClick, loadin
                           const [employeeId, ...rest] = sourceKey.split(':');
                           onDropDuty({ employeeId: Number(employeeId), date: rest.join(':') }, { employeeId: employee.id, date });
                         }}
-                        title={`${label}${pending ? ` · ${t('pendingCell')}` : ''}${cell?.automatic && !future ? ` · ${t('automaticHint')}` : ''}${draggable ? ` · ${t('dragHint')}` : ''}`}
                         aria-label={`${dutyDisplayName(employee, language)} · ${date} · ${label}${pending ? ` · ${t('pendingCell')}` : ''}`}
                         className={`min-h-10 w-full rounded-lg border px-2 py-1 text-xs font-medium transition-colors ${colors} ${locked ? 'cursor-default' : 'hover:brightness-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300'} ${draggable ? 'cursor-grab active:cursor-grabbing' : ''} ${dragKey === key ? 'opacity-40' : ''} ${overKey === key ? 'ring-2 ring-emerald-400 ring-offset-1' : ''}`}
                       >{empty ? (pending ? '—' : null) : getDutyLabel(cell?.dutyType ?? null, language)}</button>

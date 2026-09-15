@@ -169,7 +169,7 @@ export function Pagination({
           aria-label={t("common.previous_page", "Previous page")}
         >
           <ChevronLeft aria-hidden="true" />
-          <span className="hidden sm:inline">{t("common.previous", "Previous")}</span>
+          <span>{t("common.previous", "Previous")}</span>
         </button>
 
         {items.map((item, index) =>
@@ -199,7 +199,7 @@ export function Pagination({
           className={uiPaginationNavButtonClass}
           aria-label={t("common.next_page", "Next page")}
         >
-          <span className="hidden sm:inline">{t("common.next", "Next")}</span>
+          <span>{t("common.next", "Next")}</span>
           <ChevronRight aria-hidden="true" />
         </button>
       </nav>

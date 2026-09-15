@@ -50,6 +50,30 @@ reach them. Each was a pass-through/flag change only:
 `tsc -p tsconfig.app.json --noEmit` reports **no new errors** (only the
 repository's pre-existing unused-import warnings).
 
+### Quarter-data sync pass — every page now reads the dataset, and the books tie out
+
+A verification sweep of every nav page against the running sample API found seven
+places where the dataset and the page had drifted apart. All of them are data /
+pass-through fixes — no business rule, layout or validation was touched.
+
+| Where | Was | Now |
+|---|---|---|
+| `scripts/quarter-sample-data.mjs` · `tripsIn()` | ORD-* order containers were counted as trips, so a phantom `0` driver (Driver Performance, 30 rows) and a phantom `0` vehicle (Vehicle Analytics, 25 rows) appeared, and trips were over-counted by 8 | Containers are excluded from every aggregation, exactly like `/operations/trip-list` and Recent Transit already did → 29 drivers, 24 vehicles, trip counts match Trip List |
+| `scripts/quarter-sample-data.mjs` · `/operations/collection-entry/pending-summary` | Returned `{ data, rows, totalPending, shops: <count> }` — the page reads `shops[]` + `totals`, so the Pending Collections table (200 shops) rendered "No shops found" with ₹0 KPIs | Returns the documented contract: `{ weekStart, weekEnd, shops: [{ balance, weeklySales, weeklyApprovedCollections, weeklyPendingCollections, recoveryPercentage, overdueDays, hasPendingCollections, lastCollectionDate }], totals }` → 197 shops, ₹1.16 Cr outstanding, ₹9.02 L week collections |
+| `scripts/quarter-sample-data.mjs` · `PAYMENTS` | Only `Approved` / `Paid`, so the Payment Register's default **Pending** view (which filters `Draft`) showed "No payments found" | Lifecycle is now Draft → Approved → Paid (3 open drafts in the last two days), so the register's Pending tab and the shell's "payments to approve" bell resolve against the same rows |
+| `scripts/quarter-sample-data.mjs` · Shop Sales rows | Emitted internal field names only (`tripDate`/`totalBirds`/`totalWeight`/`remark`), so the Shop Sales page — which maps the PostgreSQL contract — showed Day `—`, Weight `0.00` and an empty Remark next to correct amounts | Rows carry both spellings, plus `saleDate`, `vehicleNo`, `farmName`, `deleted`, `approvedAt` and the correction-window fields; `PUT /operations/shop-sales/:id` is implemented (10-day window, 409 outside it, amount recomputed and the shop balance/ledger kept in step) |
+| `scripts/quarter-sample-data.mjs` · `attendanceSummary()` / `fleetAnalytics()` | Roster gaps were reported as `absentDays` (70 salary rows disagreed with the attendance summary) and a range-independent flat 3 × EMI was added to every fleet range (a 2-day range carried a quarter of the loan) | Attendance follows the salary rule (`presentDays = workingDays − approved leave`, `absentDays` stays 0 and roster gaps are reported as `unassignedDays`), and EMI counts only the installments that fall **due inside the range** |
+| `fleet-operations/hooks/useAnalyticsData.ts` · `analytics.ts` | The mapper rebuilt the vehicle table from the top-5 list and hard-coded `trips: 0` / `emiCost: 0`, so Vehicle Analytics showed 19 of 24 vehicles with zero trips and 91.6 % of the cost pie as EMI | The payload's full `vehicleStats` rollup is rendered as-is (24 vehicles, real trips and EMI share); the top-5 fallback remains for payloads that do not ship it |
+| `approvals/services/approvalSnapshot.ts` | In dev it swapped the payments queue for the bundled demo rows, so the bell disagreed with the register | Reads the real `/accounts/payments` list in every environment |
+
+Verification (live, both processes up): 17/17 cross-module checks pass — shop
+balance closes across Masters → Shop Ledger → Pending Collections; trip → sale →
+ledger; trip diesel → Fuel Expenses (litres × rate = trip amount); trip
+mortality → Mortality Analysis; roster → salary days for Jul/Aug/Sep; leaves →
+salary leave days; fleet cost centres sum to the fleet total (100 %); dashboard
+KPIs equal the Collection Report and pending-summary totals; driver/vehicle
+performance trip counts equal the Trip List.
+
 ### Masters paged envelope — fixes `Cannot read properties of undefined (reading 'map')`
 
 The Masters tabs do **not** consume the plain master arrays. `useMasterRecords`

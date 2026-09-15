@@ -770,7 +770,6 @@ export function DatePicker({
               type="button"
               onClick={clearDate}
               className="rounded p-0.5 text-slate-400 hover:text-slate-600 transition"
-              title={copy.clearDate}
               aria-label={copy.clearDate}
               tabIndex={-1}
             >
@@ -785,7 +784,6 @@ export function DatePicker({
               setOpen(!isOpen);
             }}
             className="rounded p-0.5 text-slate-400 hover:text-slate-600 transition disabled:opacity-40"
-            title={copy.open}
             aria-label={copy.open}
             tabIndex={-1}
           >
@@ -893,7 +891,6 @@ export function DatePicker({
                   type="button"
                   onClick={() => clearDate()}
                   className="flex items-center justify-center gap-1 rounded-lg bg-white border border-slate-200 px-2 py-1.5 text-xs font-semibold text-slate-500 hover:bg-slate-50 transition"
-                  title={copy.clear}
                 >
                   <Eraser size={12} />
                   {copy.clear}

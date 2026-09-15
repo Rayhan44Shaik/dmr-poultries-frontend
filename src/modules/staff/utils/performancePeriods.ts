@@ -66,7 +66,10 @@ export function lastWeekPeriods(
   today: Date | string = new Date(),
 ): WeekPeriod[] {
   const total = Math.max(1, Math.trunc(count));
-  const anchor = mondayOf(parseOrToday(typeof today === "string" ? today : "", new Date()));
+  // `mondayOf` already understands both a business-date string and a Date —
+  // passing the reference straight through keeps an explicit `today` honest
+  // (the old Date branch silently fell back to the real current day).
+  const anchor = mondayOf(today);
   const periods: WeekPeriod[] = [];
   for (let offset = total - 1; offset >= 0; offset -= 1) {
     const monday = subWeeks(anchor, offset);
@@ -182,6 +185,38 @@ export function weeklyBucketLabel(
   }
   if (/^\d+$/.test(text)) return `W${Number(text)}`;
   return text;
+}
+
+/**
+ * Raw `week` value of the bucket whose reporting week is still running — the
+ * Monday → Saturday window that contains `today`, while that window has days
+ * left in it. `undefined` when every bucket is complete: on the closing
+ * Saturday itself, and on a Sunday (it belongs to the week that ended the day
+ * before). Display-only: the bucket's own numbers are never touched, they are
+ * only drawn in a paler shade so a two-day-old week cannot read as a collapse.
+ */
+export function inProgressWeekKey<T extends { week: string | number }>(
+  weekly: readonly T[] | undefined,
+  today: Date | string = new Date(),
+): string | number | undefined {
+  if (!Array.isArray(weekly) || weekly.length === 0) return undefined;
+  const now =
+    typeof today === "string" ? (parseBusinessDate(today) ?? new Date()) : today;
+  const openPeriod = weekPeriodContaining(now);
+  const from = parseBusinessDate(openPeriod.from);
+  const to = parseBusinessDate(openPeriod.to);
+  if (!from || !to) return undefined;
+  // The final day of the window closes it — only a week with days still to
+  // come is drawn as in progress.
+  if (now.getTime() >= to.getTime()) return undefined;
+  for (const point of weekly) {
+    const match = INLINE_ISO_DATE.exec(String(point.week ?? ""));
+    if (!match) continue;
+    const parsed = parseBusinessDate(match[0]);
+    if (!parsed) continue;
+    if (weekPeriodContaining(parsed).from === openPeriod.from) return point.week;
+  }
+  return undefined;
 }
 
 /**
