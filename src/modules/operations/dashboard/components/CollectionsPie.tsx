@@ -7,20 +7,19 @@ const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
 /* ------------------------------------------------------------------ *
  * 3D pie geometry — fixed viewBox stage (pure SVG, no chart library).
  *
- * The pie is a flattened ellipse (top face) extruded straight down by
- * DEPTH, like a classic infographic 3D pie: the top is squashed for a
- * strong perspective and the front walls are thick, so every side
- * reads as a solid object. A lit top-face gradient, a deep wall
- * shadow, a soft ground shadow, and a big colour-matched % label
- * floating outside every slice at its own mid-angle.
+ * The pie is an ellipse (top face) extruded straight down by DEPTH,
+ * like a classic infographic 3D pie: a gradient top face, darker
+ * extruded side walls on the front (lower) half, a soft ground
+ * shadow, and a big colour-matched % label floating outside every
+ * slice at its own mid-angle.
  * ------------------------------------------------------------------ */
 const W = 480;
 const H = 330;
 const CX = W / 2;
-const CY = 127; // top-face centre
+const CY = 139; // top-face centre
 const RX = 148; // top-face horizontal radius
-const RY = 54; // top-face vertical radius — flattened for a strong 3D view
-const DEPTH = 76; // vertical extrusion — thick, solid walls
+const RY = 66; // top-face vertical radius (flattened = perspective)
+const DEPTH = 52; // vertical extrusion
 const GAP_DEG = 3.5; // angular gap between slices
 const LABEL_GAP = 14; // label distance outside the pie edge
 
@@ -176,27 +175,26 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
                   x2={CX}
                   y2={CY + RY}
                 >
-                  <stop offset="0%" stopColor={shade(s.color, 0.34)} />
-                  <stop offset="55%" stopColor={shade(s.color, 0.1)} />
-                  <stop offset="100%" stopColor={shade(s.color, -0.06)} />
+                  <stop offset="0%" stopColor={shade(s.color, 0.24)} />
+                  <stop offset="100%" stopColor={s.color} />
                 </linearGradient>
                 <linearGradient
                   id={`cs3d-wall-${i}`}
                   gradientUnits="userSpaceOnUse"
                   x1={CX}
-                  y1={CY + 10}
+                  y1={CY + 8}
                   x2={CX}
                   y2={CY + RY + DEPTH}
                 >
-                  <stop offset="0%" stopColor={shade(s.color, -0.12)} />
-                  <stop offset="100%" stopColor={shade(s.color, -0.46)} />
+                  <stop offset="0%" stopColor={shade(s.color, -0.16)} />
+                  <stop offset="100%" stopColor={shade(s.color, -0.36)} />
                 </linearGradient>
               </g>
             ))}
           </defs>
 
           {/* Soft ground shadow under the pie. */}
-          <ellipse cx={CX} cy={CY + RY + DEPTH + 7} rx={RX * 0.99} ry={14} fill="rgba(15,23,42,0.08)" />
+          <ellipse cx={CX} cy={CY + RY + DEPTH + 7} rx={RX * 0.99} ry={13} fill="rgba(15,23,42,0.07)" />
 
           {/* Slices, back to front: side wall + gradient top face. */}
           {drawOrder.map(({ s, i }) => {
@@ -217,8 +215,8 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
                 <path
                   d={topFacePath(gA0, gA1)}
                   fill={`url(#cs3d-top-${i})`}
-                  stroke="rgba(255,255,255,0.75)"
-                  strokeWidth={1.2}
+                  stroke="rgba(255,255,255,0.7)"
+                  strokeWidth={1}
                   strokeLinejoin="round"
                 />
               </g>
