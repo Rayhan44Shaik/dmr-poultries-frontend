@@ -1,5 +1,5 @@
 import React, { Component } from 'react';
-import { Home, RefreshCw, Unplug, Wrench } from 'lucide-react';
+import { Home, RefreshCw, ShieldCheck, Unplug, Wrench } from 'lucide-react';
 import { translate } from '../../i18n';
 import {
   ChunkLoadError,
@@ -20,21 +20,27 @@ interface ErrorBoundaryState {
   reloading: boolean;
   /** Server/tunnel cannot be reached — auto-reconnect in progress. */
   reconnecting: boolean;
+  /** Seconds left until the stale-tab screen reloads itself (null = idle). */
+  staleCountdown: number | null;
 }
 
 const ENTRY_PROBE = '/src/main.tsx';
+/** How long the stale-version screen waits before reloading by itself. */
+const STALE_AUTO_RELOAD_SECONDS = 6;
 
 export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
   private reconnectTimer: number | null = null;
   private reconnectAttempts = 0;
+  private staleTimer: number | null = null;
 
   constructor(props: ErrorBoundaryProps) {
     super(props);
-    this.state = { hasError: false, reloading: false, reconnecting: false };
+    this.state = { hasError: false, reloading: false, reconnecting: false, staleCountdown: null };
   }
 
   componentWillUnmount(): void {
     if (this.reconnectTimer !== null) window.clearInterval(this.reconnectTimer);
+    if (this.staleTimer !== null) window.clearInterval(this.staleTimer);
   }
 
   static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
@@ -45,7 +51,31 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
     console.error('Error caught by ErrorBoundary:', error, errorInfo);
     if (isChunkLoadError(error)) {
       void this.recoverFromChunkError(error);
+      if (error instanceof ChunkLoadError && error.kind === 'stale') {
+        this.startStaleCountdown();
+      }
     }
+  }
+
+  /** A stale tab heals itself: count down and reload, so the user never has
+   *  to notice or click anything (a "Reload now" button is still offered). */
+  private startStaleCountdown(): void {
+    if (this.staleTimer !== null) return;
+    this.setState({ staleCountdown: STALE_AUTO_RELOAD_SECONDS });
+    this.staleTimer = window.setInterval(() => {
+      this.setState((prev) => {
+        if (prev.staleCountdown === null) return prev;
+        if (prev.staleCountdown <= 1) {
+          if (this.staleTimer !== null) {
+            window.clearInterval(this.staleTimer);
+            this.staleTimer = null;
+          }
+          forceReload();
+          return prev;
+        }
+        return { ...prev, staleCountdown: prev.staleCountdown - 1 };
+      });
+    }, 1000);
   }
 
   /** Chunk failures: diagnose (waiting out cold tunnels), then either
@@ -198,28 +228,51 @@ export default class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBo
     }
 
     if (isChunkLoadError(error)) {
-      return this.shell(
-        <>
-          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-amber-50 text-amber-600 ring-1 ring-amber-100">
-            <RefreshCw size={26} />
+      const countdown = this.state.staleCountdown;
+      return (
+        <div className="relative flex min-h-screen items-center justify-center overflow-hidden bg-slate-50 p-6">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(58%_46%_at_50%_38%,rgba(16,185,129,0.09),transparent_72%)]" />
+          <div className="relative w-full max-w-md rounded-3xl border border-slate-200/80 bg-white p-8 text-center shadow-card-lg">
+            <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-50 text-emerald-600 ring-1 ring-emerald-100">
+              <RefreshCw className="h-7 w-7 animate-spin" style={{ animationDuration: '2.4s' }} />
+            </div>
+            <h2 className="text-xl font-extrabold tracking-tight text-slate-900">
+              The app was updated while this tab was open
+            </h2>
+            <p className="mt-2.5 text-sm leading-relaxed text-slate-500">
+              This page is still running an older version of the app. Reloading loads the latest one
+              instantly — your data and work are completely safe.
+            </p>
+            <div className="mt-4 inline-flex items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700 ring-1 ring-emerald-100">
+              <ShieldCheck size={14} />
+              Your data is safe — nothing is lost
+            </div>
+            {countdown !== null && (
+              <div className="mt-6">
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className="h-full rounded-full bg-emerald-500 transition-all duration-1000 ease-linear"
+                    style={{ width: `${(countdown / STALE_AUTO_RELOAD_SECONDS) * 100}%` }}
+                  />
+                </div>
+                <p className="mt-2 text-xs font-medium text-slate-400">
+                  Reloading automatically in {countdown}s…
+                </p>
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => forceReload()}
+              className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-xl bg-emerald-600 px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-emerald-700"
+            >
+              <RefreshCw size={16} />
+              Reload now
+            </button>
+            <p className="mt-4 text-[11px] leading-relaxed text-slate-400">
+              If this keeps happening, close this tab and open the latest preview link again.
+            </p>
           </div>
-          <h2 className="text-lg font-extrabold tracking-tight text-slate-900">
-            The app was updated while this tab was open
-          </h2>
-          <p className="mt-2 text-sm leading-relaxed text-slate-500">
-            This page references an old version of the application modules. A refresh loads the
-            latest version — your data is unaffected. If it keeps happening, close this tab and open
-            the latest preview link again.
-          </p>
-          <button
-            type="button"
-            onClick={() => forceReload()}
-            className="mt-5 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-emerald-600 px-4 text-sm font-bold text-white shadow-sm transition-colors hover:bg-emerald-700"
-          >
-            <RefreshCw size={16} />
-            Reload application
-          </button>
-        </>
+        </div>
       );
     }
 
