@@ -86,24 +86,15 @@ interface RecentTripsTableProps {
 type Translate = ReturnType<typeof usePerformanceI18n>['t'];
 
 /** Tile colours — the KPI card recipe, one step smaller. */
+// Each metric tile is a plain white box: the figure, its label, and the metric's
+// own glyph — only the glyph chip carries a colour. No colour bar, no tinted
+// figure, nothing under the box.
 const TILE_TONE = {
-  sky: { value: 'text-sky-600', chip: 'border-sky-100 bg-sky-50 text-sky-600', bar: 'bg-sky-500' },
-  emerald: {
-    value: 'text-emerald-600',
-    chip: 'border-emerald-100 bg-emerald-50 text-emerald-600',
-    bar: 'bg-emerald-500',
-  },
-  rose: { value: 'text-rose-600', chip: 'border-rose-100 bg-rose-50 text-rose-600', bar: 'bg-rose-500' },
-  violet: {
-    value: 'text-violet-600',
-    chip: 'border-violet-100 bg-violet-50 text-violet-600',
-    bar: 'bg-violet-500',
-  },
-  indigo: {
-    value: 'text-indigo-600',
-    chip: 'border-indigo-100 bg-indigo-50 text-indigo-600',
-    bar: 'bg-indigo-500',
-  },
+  sky: { chip: 'border-sky-100 bg-sky-50 text-sky-600' },
+  emerald: { chip: 'border-emerald-100 bg-emerald-50 text-emerald-600' },
+  rose: { chip: 'border-rose-100 bg-rose-50 text-rose-600' },
+  violet: { chip: 'border-violet-100 bg-violet-50 text-violet-600' },
+  indigo: { chip: 'border-indigo-100 bg-indigo-50 text-indigo-600' },
 } as const;
 
 function PaceChip({ offPace }: { offPace: boolean }) {
@@ -151,14 +142,12 @@ function LaggingTripCard({
   const { mRate, lossPct } = tripRateTiles(trip);
   const isDriver = paceKind === 'drivers';
 
-  // Five metric tiles, each wearing the house KPI recipe (white card, quiet
-  // uppercase label, tone figure, colour chip + a small bar on the bottom).
-  // The lagging dimension keeps the amber accent, exactly as before.
+  // Five metric tiles, each a plain white box: quiet uppercase label, the
+  // figure, its secondary line and the metric's own glyph chip.
   const tiles: Array<{
     label: string;
     value: string;
     sub?: string;
-    accent?: boolean;
     tone: 'sky' | 'emerald' | 'rose' | 'violet' | 'indigo';
     icon: typeof ShoppingBag;
   }> = [
@@ -168,7 +157,6 @@ function LaggingTripCard({
       label: t('staff.perf.trips.col.mortality'),
       value: fmt(trip.totalMortality),
       sub: `${formatDecimal(mRate, 2)}%`,
-      accent: paceKind === 'supervisors',
       tone: 'rose',
       icon: HeartPulse,
     },
@@ -176,7 +164,6 @@ function LaggingTripCard({
       label: t('staff.perf.trips.col.weight_loss'),
       value: `${fmt(trip.weightLoss, 1)} kg`,
       sub: `${formatDecimal(lossPct, 2)}%`,
-      accent: paceKind === 'supervisors',
       tone: 'violet',
       icon: Scale,
     },
@@ -184,7 +171,6 @@ function LaggingTripCard({
       label: t('staff.perf.trips.col.km'),
       value: `${fmt(trip.totalKm)} km`,
       sub: isDriver ? entry.headline : undefined,
-      accent: isDriver,
       tone: 'indigo',
       icon: Route,
     },
@@ -216,18 +202,14 @@ function LaggingTripCard({
           return (
             <div
               key={tile.label}
-              className={`relative overflow-hidden rounded-xl border bg-white shadow-xs ${
-                tile.accent ? 'border-amber-200' : 'border-slate-200'
-              }`}
+              className="rounded-xl border border-slate-200 bg-white shadow-xs"
             >
-              <div className="flex items-start justify-between gap-2 px-3 pb-3.5 pt-2.5">
+              <div className="flex items-start justify-between gap-2 px-3 py-2.5">
                 <div className="min-w-0">
                   <p className="truncate text-[10px] font-bold uppercase tracking-wider text-slate-400">
                     {tile.label}
                   </p>
-                  <p
-                    className={`mt-1 truncate text-[17px] font-bold leading-none tracking-tight tabular-nums ${tone.value}`}
-                  >
+                  <p className="mt-1 truncate text-[17px] font-bold leading-none tracking-tight tabular-nums text-slate-900">
                     {tile.value}
                   </p>
                   {tile.sub && (
@@ -243,7 +225,6 @@ function LaggingTripCard({
                   <TileIcon />
                 </span>
               </div>
-              <span className={`absolute inset-x-2.5 bottom-0 h-1 rounded-full ${tone.bar}`} />
             </div>
           );
         })}
