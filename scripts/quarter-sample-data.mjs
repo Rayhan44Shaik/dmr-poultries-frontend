@@ -509,7 +509,9 @@ for (const date of OP_DATES) {
     }
 
     const openingMeter = VEHICLE_METER.get(vehicle.id);
-    const totalKm = between(r, 90, 340);
+    // Round 12: the driver-performance view's lagging-trip cards are easier to
+    // read when the sample distances sit in one band (they stay deterministic).
+    const totalKm = between(r, 190, 330);
     const closingMeter = openingMeter + totalKm;
     VEHICLE_METER.set(vehicle.id, closingMeter);
 
