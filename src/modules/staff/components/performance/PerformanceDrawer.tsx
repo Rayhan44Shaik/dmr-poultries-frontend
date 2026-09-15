@@ -169,6 +169,8 @@ export function PerformanceDrawer({
 }: PerformanceDrawerProps) {
   const { t } = useI18n();
   const panelRef = useRef<HTMLDivElement>(null);
+  /** The scrollable body — the view can be read with the wheel or the keyboard. */
+  const bodyRef = useRef<HTMLDivElement>(null);
 
   useFocusTrap({
     active: open,
@@ -183,16 +185,66 @@ export function PerformanceDrawer({
   const canPrev = navigation != null && navigation.index > 0;
   const canNext = navigation != null && navigation.index < navigation.total - 1;
 
+  /** One keyboard step for the arrow keys (px) — matches a table row's pitch. */
+  const KEY_LINE = 56;
+
   // Arrow keys flip people while the pop-up is open (no modifiers, so plain
   // left/right anywhere inside the dialog — Tab/Escape stay with the trap).
+  // Up/down/PageUp/PageDown/Home/End scroll the body, so a long driver card
+  // (vehicle breakdown + recent trips) can be read without a mouse.
   const handleKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
-    if (navigation == null || event.altKey || event.ctrlKey || event.metaKey) return;
-    if (event.key === "ArrowLeft" && canPrev) {
+    if (event.altKey || event.ctrlKey || event.metaKey) return;
+    const target = event.target as HTMLElement | null;
+    const typing =
+      target != null &&
+      (target.tagName === "INPUT" ||
+        target.tagName === "TEXTAREA" ||
+        target.tagName === "SELECT" ||
+        target.isContentEditable);
+    if (typing) return;
+
+    if (event.key === "ArrowLeft" && navigation != null && canPrev) {
       event.preventDefault();
       navigation.onPrev();
-    } else if (event.key === "ArrowRight" && canNext) {
+      return;
+    }
+    if (event.key === "ArrowRight" && navigation != null && canNext) {
       event.preventDefault();
       navigation.onNext();
+      return;
+    }
+
+    const body = bodyRef.current;
+    if (!body) return;
+    const scroll = (top: number, smooth = true) =>
+      body.scrollTo({ top, behavior: smooth ? "smooth" : "auto" });
+    switch (event.key) {
+      case "ArrowDown":
+        event.preventDefault();
+        body.scrollBy({ top: KEY_LINE, behavior: "smooth" });
+        break;
+      case "ArrowUp":
+        event.preventDefault();
+        body.scrollBy({ top: -KEY_LINE, behavior: "smooth" });
+        break;
+      case "PageDown":
+        event.preventDefault();
+        body.scrollBy({ top: body.clientHeight * 0.9, behavior: "smooth" });
+        break;
+      case "PageUp":
+        event.preventDefault();
+        body.scrollBy({ top: -body.clientHeight * 0.9, behavior: "smooth" });
+        break;
+      case "Home":
+        event.preventDefault();
+        scroll(0);
+        break;
+      case "End":
+        event.preventDefault();
+        scroll(body.scrollHeight);
+        break;
+      default:
+        break;
     }
   };
 
@@ -204,7 +256,8 @@ export function PerformanceDrawer({
     <div
       ref={panelRef}
       tabIndex={-1}
-      className="flex h-full min-h-0 w-full flex-col overflow-hidden rounded-2xl bg-white"
+      className="flex min-h-0 w-full flex-1 flex-col overflow-hidden rounded-2xl bg-white"
+      data-performance-view
     >
       {/* Header — the Trip List view's band: 48px tile, title + badges, and the
           pop-up controls (scoped language switch, ‹ › people, close). */}
@@ -294,7 +347,11 @@ export function PerformanceDrawer({
       </div>
 
       {/* Scrollable body — two columns on desktop, stacked on phones */}
-      <div className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-6 py-5 md:px-8">
+      <div
+        ref={bodyRef}
+        tabIndex={-1}
+        className="min-h-0 flex-1 space-y-5 overflow-y-auto overscroll-contain px-6 py-5 outline-none md:px-8"
+      >
         {unscoredNote && (
           <p className="rounded-lg border border-slate-200 bg-slate-50/70 px-3 py-2 text-[11px] font-medium leading-relaxed text-slate-500">
             {unscoredNote}
@@ -412,7 +469,14 @@ export function PerformanceDrawer({
       panelClassName="bg-white"
       ariaLabelledBy="performance-drawer-title"
     >
-      <div onKeyDown={handleKeyDown} className="h-full w-full">
+      {/* `min-h-0 overflow-hidden` on this wrapper is what makes the body a real
+          scroll area: a flex item with visible overflow refuses to shrink below
+          its content, which left the whole pop-up clipped and unscrollable
+          (the Recent Trips table could not be dragged into view). */}
+      <div
+        onKeyDown={handleKeyDown}
+        className="flex h-full min-h-0 w-full flex-col overflow-hidden"
+      >
         {scoped ? (
           <PerformanceI18nContext.Provider value={performanceScopeFor(language)}>
             {panel}
