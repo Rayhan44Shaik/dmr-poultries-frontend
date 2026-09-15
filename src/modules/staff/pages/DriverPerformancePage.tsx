@@ -36,8 +36,13 @@ import { te as teDateLocale } from "date-fns/locale";
 import type { Locale } from "date-fns";
 
 import { makeT, translateStatus, useI18n, type Language } from "../../../i18n";
-import { useStaffPerformance } from "../hooks/useStaffPerformance";
+import {
+  prefetchStaffPerformance,
+  useStaffPerformance,
+} from "../hooks/useStaffPerformance";
 import { usePerformanceDetail } from "../hooks/usePerformanceDetail";
+import { usePerformanceRowWarmup } from "../hooks/usePerformanceRowWarmup";
+import { runWhenIdle } from "../utils/idle";
 import { useStaffDirectory } from "../hooks/useStaffDirectory";
 import { rankDriverRows } from "../utils/performanceGrading";
 import SortableHeader, {
@@ -467,6 +472,18 @@ const DriverPerformancePage = () => {
   );
   const personDetail = detailQuery.detail;
 
+  // Rows are WARMED before they are opened (hover that settles, keyboard focus,
+  // and the open pop-up's neighbours), so the details pop-up renders complete on
+  // its first frame — no skeleton, no reflow. Requests are deduped against the
+  // shared detail cache, so warming can never double a call or re-render the
+  // table.
+  const { warmOnHover, warmNow, cancelWarmup } = usePerformanceRowWarmup(
+    "drivers",
+    applied.fromDate,
+    applied.toDate,
+  );
+
+
   /* Vehicle Breakdown sorts on its own — the page's award order never moves. */
   const [vehicleSort, setVehicleSort] = useState<SortState | null>(null);
   const vehicleSortAccessors = useMemo<
@@ -528,6 +545,32 @@ const DriverPerformancePage = () => {
   }, [selectedEntry, rowsView, perf, drawerT]);
 
 
+
+  // With the pop-up open, quietly warm its ‹ › neighbours on idle, so stepping
+  // through people with the arrows is instant too. Same cache/in-flight guard —
+  // never a duplicate request, and nothing runs after the pop-up closes.
+  // Once THIS page's data is on screen, warm the sibling page's default
+  // dataset on idle (driver ⇄ supervisor): switching tabs then renders the
+  // table from cache on its first frame — no loading state, no flash. One
+  // request, deduped by the shared cache, skipped when it is already warm.
+  useEffect(() => {
+    if (perf.loading) return;
+    return runWhenIdle(() => prefetchStaffPerformance("supervisors"));
+  }, [perf.loading]);
+
+  const neighbourIds = useMemo(() => {
+    if (!selectedEntry) return [];
+    const index = rowsView.findIndex((entry) => entry.row.driverId === selectedEntry.row.driverId);
+    if (index < 0) return [];
+    return [rowsView[index - 1]?.row.driverId, rowsView[index + 1]?.row.driverId].filter(
+      (id): id is number => typeof id === "number",
+    );
+  }, [selectedEntry, rowsView]);
+
+  useEffect(() => {
+    if (neighbourIds.length === 0) return;
+    return runWhenIdle(() => neighbourIds.forEach((id) => warmNow(id)));
+  }, [neighbourIds, warmNow]);
 
   const drawerSummary = useMemo(() => {
     if (!selectedEntry) return [];
@@ -754,6 +797,9 @@ const DriverPerformancePage = () => {
                           name: personNameLabel(t, language, row.driverName),
                         })}
                         onClick={toggle}
+                        onPointerEnter={() => warmOnHover(row.driverId)}
+                        onPointerLeave={cancelWarmup}
+                        onFocus={() => warmNow(row.driverId)}
                         onKeyDown={(event) => {
                           if (event.key === "Enter" || event.key === " ") {
                             event.preventDefault(); // exactly one activation

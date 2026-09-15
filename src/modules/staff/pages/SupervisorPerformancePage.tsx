@@ -33,9 +33,14 @@ import { te as teDateLocale } from "date-fns/locale";
 import type { Locale } from "date-fns";
 
 import { makeT, translateStatus, useI18n, type Language } from "../../../i18n";
-import { useStaffPerformance } from "../hooks/useStaffPerformance";
+import {
+  prefetchStaffPerformance,
+  useStaffPerformance,
+} from "../hooks/useStaffPerformance";
 import { useStaffDirectory } from "../hooks/useStaffDirectory";
 import { usePerformanceDetail } from "../hooks/usePerformanceDetail";
+import { usePerformanceRowWarmup } from "../hooks/usePerformanceRowWarmup";
+import { runWhenIdle } from "../utils/idle";
 import { rankSupervisorRows } from "../utils/performanceGrading";
 import SortableHeader, {
   type SortState,
@@ -462,7 +467,44 @@ const SupervisorPerformancePage = () => {
   );
   const personDetail = detailQuery.detail;
 
+  // Rows are WARMED before they are opened (hover that settles, keyboard focus,
+  // and the open pop-up's neighbours), so the details pop-up renders complete on
+  // its first frame — no skeleton, no reflow. Deduped against the shared detail
+  // cache, so warming can never double a request or re-render the table.
+  const { warmOnHover, warmNow, cancelWarmup } = usePerformanceRowWarmup(
+    "supervisors",
+    applied.fromDate,
+    applied.toDate,
+  );
+
+
   // ‹ › traversal across the award-ordered rows (rank literal order).
+  // With the pop-up open, quietly warm its ‹ › neighbours on idle, so stepping
+  // through people is instant as well. Same cache/in-flight guard — never a
+  // duplicate request, nothing runs once the pop-up closes.
+  // Once THIS page's data is on screen, warm the sibling page's default
+  // dataset on idle (driver ⇄ supervisor): switching tabs then renders the
+  // table from cache on its first frame — no loading state, no flash. One
+  // request, deduped by the shared cache, skipped when it is already warm.
+  useEffect(() => {
+    if (perf.loading) return;
+    return runWhenIdle(() => prefetchStaffPerformance("drivers"));
+  }, [perf.loading]);
+
+  const neighbourIds = useMemo(() => {
+    if (!selectedEntry) return [];
+    const index = rowsView.findIndex((entry) => entry.row.supervisorId === selectedEntry.row.supervisorId);
+    if (index < 0) return [];
+    return [rowsView[index - 1]?.row.supervisorId, rowsView[index + 1]?.row.supervisorId].filter(
+      (id): id is number => typeof id === "number",
+    );
+  }, [selectedEntry, rowsView]);
+
+  useEffect(() => {
+    if (neighbourIds.length === 0) return;
+    return runWhenIdle(() => neighbourIds.forEach((id) => warmNow(id)));
+  }, [neighbourIds, warmNow]);
+
   const drawerNavigation = useMemo(() => {
     if (!selectedEntry) return undefined;
     const index = rowsView.findIndex((entry) => entry.row.supervisorId === selectedEntry.row.supervisorId);
@@ -710,6 +752,9 @@ const SupervisorPerformancePage = () => {
                           name: personNameLabel(t, language, row.supervisorName),
                         })}
                         onClick={toggle}
+                        onPointerEnter={() => warmOnHover(row.supervisorId)}
+                        onPointerLeave={cancelWarmup}
+                        onFocus={() => warmNow(row.supervisorId)}
                         onKeyDown={(event) => {
                           if (event.key === "Enter" || event.key === " ") {
                             event.preventDefault(); // exactly one activation
