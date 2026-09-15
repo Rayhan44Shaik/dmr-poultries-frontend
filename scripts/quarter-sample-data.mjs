@@ -2707,12 +2707,31 @@ function sumForShop(rows, shopId, predicate, value) {
 function collectionPendingSummary(asOfDate = TODAY) {
   const { asOfDate: normalizedAsOfDate, weekStart, weekEnd } = collectionWeekBounds(asOfDate);
   const shops = SHOPS.map((shop) => {
+    // A sale counts toward the balance only when it is approved and not
+    // deleted. Seeded sales are all Approved, but rows created or edited
+    // during a dev session can sit in another state, so the split is explicit
+    // rather than assumed — `weeklySales` stays the approved-only figure the
+    // outstanding formula depends on.
+    const inWeek = (sale) => inRange(sale.saleDate ?? sale.tripDate, weekStart, weekEnd);
+    const isLiveSale = (sale) => sale.deleted !== true;
+    const isApprovedSale = (sale) => isLiveSale(sale) && String(sale.status ?? "Approved") === "Approved";
+    const isPendingSale = (sale) => isLiveSale(sale) && /pending/i.test(String(sale.status ?? ""));
+
     const weeklySales = sumForShop(
       SHOP_SALES,
       shop.id,
-      (sale) => sale.deleted !== true && inRange(sale.saleDate ?? sale.tripDate, weekStart, weekEnd),
+      (sale) => isApprovedSale(sale) && inWeek(sale),
       (sale) => sale.amount,
     );
+    const weeklyPendingSales = sumForShop(
+      SHOP_SALES,
+      shop.id,
+      (sale) => isPendingSale(sale) && inWeek(sale),
+      (sale) => sale.amount,
+    );
+    const weeklySalesCount = SHOP_SALES.filter(
+      (sale) => sale.shopId === shop.id && isApprovedSale(sale) && inWeek(sale),
+    ).length;
     const weeklyApprovedCollections = sumForShop(
       COLLECTIONS,
       shop.id,
@@ -2731,6 +2750,20 @@ function collectionPendingSummary(asOfDate = TODAY) {
         inRange(collection.collectionDate, weekStart, weekEnd),
       (collection) => collection.amount,
     );
+    const weeklyApprovedCollectionsCount = COLLECTIONS.filter(
+      (collection) =>
+        collection.shopId === shop.id &&
+        collection.deleted !== true &&
+        collection.status === "Approved" &&
+        inRange(collection.collectionDate, weekStart, weekEnd),
+    ).length;
+    const weeklyPendingCollectionsCount = COLLECTIONS.filter(
+      (collection) =>
+        collection.shopId === shop.id &&
+        collection.deleted !== true &&
+        collection.status === "Pending Approval" &&
+        inRange(collection.collectionDate, weekStart, weekEnd),
+    ).length;
     const approvedForShop = COLLECTIONS.filter(
       (collection) =>
         collection.shopId === shop.id &&
@@ -2744,7 +2777,7 @@ function collectionPendingSummary(asOfDate = TODAY) {
     const salesBeforeWeek = sumForShop(
       SHOP_SALES,
       shop.id,
-      (sale) => sale.deleted !== true && String(sale.saleDate ?? sale.tripDate) < weekStart,
+      (sale) => isApprovedSale(sale) && String(sale.saleDate ?? sale.tripDate) < weekStart,
       (sale) => sale.amount,
     );
     const collectionsBeforeWeek = sumForShop(
@@ -2775,9 +2808,17 @@ function collectionPendingSummary(asOfDate = TODAY) {
       openingBalance,
       // This is a live outstanding balance, not a weekly balance.
       balance: syncShopCurrentBalance(shop.id),
+      // The week's own closing figure: opening + approved sales − approved
+      // collections. For the current week this equals `balance`; for a past
+      // week it will differ by whatever happened after that week ended.
+      closingBalance: round(openingBalance + weeklySales - weeklyApprovedCollections, 2),
       weeklySales,
+      weeklyPendingSales,
+      weeklySalesCount,
       weeklyApprovedCollections,
       weeklyPendingCollections,
+      weeklyApprovedCollectionsCount,
+      weeklyPendingCollectionsCount,
       recoveryPercentage: weeklySales > 0 ? round((weeklyApprovedCollections / weeklySales) * 100, 2) : 0,
       overdueDays: lastCollectionDate ? dayDiff(lastCollectionDate, normalizedAsOfDate) : null,
       hasPendingCollections: weeklyPendingCollections > 0,
@@ -2809,10 +2850,12 @@ function collectionPendingSummary(asOfDate = TODAY) {
 }
 
 /** Same source data, shaped for the Collection Entry's selected-shop summary. */
-function weeklyCollectionSummary(shopId, asOfDate = TODAY) {
-  const report = collectionPendingSummary(asOfDate);
-  const shop = report.shops.find((row) => row.shopId === Number(shopId));
-  if (!shop) return null;
+/**
+ * Projects one aggregated shop row onto the Collection Entry weekly-summary
+ * contract. Shared by the single-shop and the all-shops endpoints so both
+ * always expose identical fields.
+ */
+function toWeeklySummaryShape(shop) {
   return {
     shopId: shop.shopId,
     shopName: shop.shopName,
@@ -2821,11 +2864,22 @@ function weeklyCollectionSummary(shopId, asOfDate = TODAY) {
     previousWeekEnd: shop.previousWeekEnd,
     openingBalance: shop.openingBalance,
     balance: shop.balance,
+    closingBalance: shop.closingBalance,
     weeklySales: shop.weeklySales,
+    pendingSales: shop.weeklyPendingSales,
+    salesCount: shop.weeklySalesCount,
     approvedCollections: shop.weeklyApprovedCollections,
     pendingCollections: shop.weeklyPendingCollections,
+    approvedCollectionsCount: shop.weeklyApprovedCollectionsCount,
+    pendingCollectionsCount: shop.weeklyPendingCollectionsCount,
     isCurrentWeek: shop.weekStart === weekKey(TODAY),
   };
+}
+
+function weeklyCollectionSummary(shopId, asOfDate = TODAY) {
+  const report = collectionPendingSummary(asOfDate);
+  const shop = report.shops.find((row) => row.shopId === Number(shopId));
+  return shop ? toWeeklySummaryShape(shop) : null;
 }
 
 function pendingCollections() {
@@ -3495,7 +3549,19 @@ function createCollectionRow(body) {
   const shop =
     SHOP_BY_ID.get(Number(body.shopId)) ??
     ACTIVE_SHOPS.find((s) => s.shopName === body.shopName);
-  const sameDay = COLLECTIONS.filter((c) => c.collectionDate === date).length + 1;
+  // Number from the highest suffix ever issued for this date — NOT from the
+  // current row count. Counting is not collision-free: editing a collection's
+  // date moves it out of its day bucket, which would free its number and let
+  // the next create on that date reuse it. Collection numbers are financial
+  // references and must never be recycled, so scan the whole register
+  // (deleted rows included) and always take the next number up.
+  const datePrefix = `COL-${date.replaceAll("-", "")}-`;
+  const sameDay = COLLECTIONS.reduce((highest, collection) => {
+    const no = String(collection.collectionNo ?? "");
+    if (!no.startsWith(datePrefix)) return highest;
+    const suffix = Number.parseInt(no.slice(datePrefix.length), 10);
+    return Number.isFinite(suffix) && suffix > highest ? suffix : highest;
+  }, 0) + 1;
   const row = {
     id,
     collectionNo: `COL-${date.replaceAll("-", "")}-${pad3(sameDay)}`,
@@ -4288,19 +4354,9 @@ const server = http.createServer(async (req, res) => {
     if (p === "/api/operations/collection-entry/weekly-summaries") {
       const asOfDate = q.get("date") || q.get("asOfDate") || TODAY;
       const report = collectionPendingSummary(asOfDate);
-      return send(200, report.shops.map((shop) => ({
-        shopId: shop.shopId,
-        shopName: shop.shopName,
-        weekStart: shop.weekStart,
-        weekEnd: shop.weekEnd,
-        previousWeekEnd: shop.previousWeekEnd,
-        openingBalance: shop.openingBalance,
-        balance: shop.balance,
-        weeklySales: shop.weeklySales,
-        approvedCollections: shop.weeklyApprovedCollections,
-        pendingCollections: shop.weeklyPendingCollections,
-        isCurrentWeek: shop.weekStart === weekKey(TODAY),
-      })));
+      // Reuse the single-shop shape so the list and detail endpoints can
+      // never drift apart in field names or rounding.
+      return send(200, report.shops.map(toWeeklySummaryShape));
     }
     if (p === "/api/operations/collection-entry/recent") {
       const shopId = Number(q.get("shopId"));

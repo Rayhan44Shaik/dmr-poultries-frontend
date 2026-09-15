@@ -11,6 +11,7 @@ export default {
   'ops.collection.amount_title': 'మొత్తం',
   'ops.collection.approved_collections': 'ఆమోదించిన కలెక్షన్లు',
   'ops.collection.approved_sales': 'ఆమోదించిన అమ్మకాలు',
+  'ops.collection.pending_sales': 'పెండింగ్ అమ్మకాలు',
   'ops.collection.approved_success': 'కలెక్షన్ ఆమోదించాం.',
   'ops.collection.before_collection': 'కలెక్షన్ ముందు',
   'ops.collection.brought_forward_week': 'మునుపటి వారం నుండి తీసుకొచ్చిన బకాయి',

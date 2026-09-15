@@ -26,9 +26,14 @@ const EMPTY_WEEKLY: CollectionWeeklySummary = {
   previousWeekEnd: "",
   openingBalance: 0,
   balance: 0,
+  closingBalance: 0,
   weeklySales: 0,
+  pendingSales: 0,
+  salesCount: 0,
   approvedCollections: 0,
   pendingCollections: 0,
+  approvedCollectionsCount: 0,
+  pendingCollectionsCount: 0,
   isCurrentWeek: false,
 };
 
@@ -297,6 +302,13 @@ export default function useCollectionEntry() {
   const pendingApproval = ledgerLoaded ? weeklySummary.pendingCollections : 0;
   const openingBalance = ledgerLoaded ? weeklySummary.openingBalance : 0;
   const previousWeekEnd = ledgerLoaded ? weeklySummary.previousWeekEnd : "";
+  // Context figures: shown to explain the balance, never part of it.
+  const pendingSales = ledgerLoaded ? weeklySummary.pendingSales : 0;
+  const salesCount = ledgerLoaded ? weeklySummary.salesCount : 0;
+  const approvedCollectionsCount = ledgerLoaded ? weeklySummary.approvedCollectionsCount : 0;
+  const pendingCollectionsCount = ledgerLoaded ? weeklySummary.pendingCollectionsCount : 0;
+  const weekStart = ledgerLoaded ? weeklySummary.weekStart : "";
+  const weekEnd = ledgerLoaded ? weeklySummary.weekEnd : "";
 
   const todayCollection = useMemo(() => Number(entry.amount || 0), [entry.amount]);
 
@@ -684,6 +696,12 @@ export default function useCollectionEntry() {
     // New correct naming for balance calculations
     openingBalance,
     previousWeekEnd,
+    pendingSales,
+    salesCount,
+    approvedCollectionsCount,
+    pendingCollectionsCount,
+    weekStart,
+    weekEnd,
     approvedSales,
     approvedCollections,
     pendingApproval,

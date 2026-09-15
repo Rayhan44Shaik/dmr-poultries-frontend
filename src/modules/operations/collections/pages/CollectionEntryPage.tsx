@@ -78,6 +78,12 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
             periodLabel={vm.weekRangeFormatted}
             periodType="weekly"
             previousWeekEnd={vm.previousWeekEnd}
+            pendingSales={vm.pendingSales}
+            salesCount={vm.salesCount}
+            approvedCollectionsCount={vm.approvedCollectionsCount}
+            pendingCollectionsCount={vm.pendingCollectionsCount}
+            weekStart={vm.weekStart}
+            weekEnd={vm.weekEnd}
           />
         </div>
         <div className="lg:col-span-5 min-w-0">

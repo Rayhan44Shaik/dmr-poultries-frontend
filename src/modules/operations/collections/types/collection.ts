@@ -243,9 +243,23 @@ export interface CollectionWeeklySummary {
   openingBalance: number;
   /** Authoritative live shop outstanding (shops.current_balance) — persistent, never weekly. */
   balance: number;
+  /**
+   * This week's own closing figure: opening + approved sales − approved
+   * collections. Equals `balance` for the current week; for a past week it
+   * differs by whatever was posted after that week ended.
+   */
+  closingBalance: number;
+  /** Approved, non-deleted sales dated inside the week. Drives the balance. */
   weeklySales: number;
+  /** Sales awaiting approval — shown for context, never part of the balance. */
+  pendingSales: number;
+  /** Number of approved sale rows in the week. */
+  salesCount: number;
   approvedCollections: number;
   pendingCollections: number;
+  /** Row counts behind the two collection amounts. */
+  approvedCollectionsCount: number;
+  pendingCollectionsCount: number;
   isCurrentWeek: boolean;
 }
 

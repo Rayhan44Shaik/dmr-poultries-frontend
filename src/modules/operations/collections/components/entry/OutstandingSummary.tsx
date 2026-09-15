@@ -1,4 +1,4 @@
-import { Wallet, ShoppingCart, Download, Calculator, ArrowRight, AlertTriangle } from "lucide-react";
+import { Wallet, ShoppingCart, Download, Calculator, ArrowRight, AlertTriangle, Hourglass } from "lucide-react";
 import { useI18n } from "../../../../../i18n";
 
 interface OutstandingSummaryProps {
@@ -14,6 +14,15 @@ interface OutstandingSummaryProps {
   periodType: "daily" | "weekly";
   /** Last day of the previous week — dates the carried-forward opening balance. */
   previousWeekEnd?: string;
+  /** Sales awaiting approval this week. Context only — never part of the balance. */
+  pendingSales?: number;
+  /** Row counts behind each amount, so the figures are auditable at a glance. */
+  salesCount?: number;
+  approvedCollectionsCount?: number;
+  pendingCollectionsCount?: number;
+  /** This week's own boundaries, used to label the in-week rows. */
+  weekStart?: string;
+  weekEnd?: string;
 }
 
 /** YYYY-MM-DD → DD-MM-YYYY, matching the date format used across Operations. */
@@ -81,6 +90,12 @@ export default function OutstandingSummary({
   periodLabel,
   periodType,
   previousWeekEnd,
+  pendingSales = 0,
+  salesCount = 0,
+  approvedCollectionsCount = 0,
+  pendingCollectionsCount = 0,
+  weekStart,
+  weekEnd,
 }: OutstandingSummaryProps) {
   const { t } = useI18n();
 
@@ -91,6 +106,14 @@ export default function OutstandingSummary({
   const displayCurrentOutstanding = ledgerLoaded ? currentOutstanding : 0;
 
   const periodSubtitle = periodLabel || (periodType === "weekly" ? t("ops.collection.mon_sun_week") : t("ops.collection.daily_period"));
+
+  // "12 Sep 2026 - 18 Sep 2026" style range for the rows that are scoped to
+  // this week, so Opening (before the week) and the in-week rows read as
+  // clearly different periods rather than one undifferentiated list.
+  const weekRange = ledgerLoaded && weekStart && weekEnd ? `${fmtDate(weekStart)} to ${fmtDate(weekEnd)}` : "";
+  const inWeekSubtitle = weekRange || periodSubtitle;
+  const countLabel = (count: number, subtitle: string) =>
+    ledgerLoaded && count > 0 ? `${subtitle} - ${count} ${count === 1 ? "entry" : "entries"}` : subtitle;
 
   return (
     <div className="flex h-full w-full flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
@@ -142,16 +165,29 @@ export default function OutstandingSummary({
           iconBg="bg-blue-100"
           iconColor="text-blue-600"
           icon={<ShoppingCart size={18} />}
-          subtitle={periodSubtitle}
+          subtitle={countLabel(salesCount, inWeekSubtitle)}
           isPositive
         />
+        {/* Sales still awaiting approval. Rendered only when some exist, so
+          * the panel stays compact in the common all-approved case. */}
+        {ledgerLoaded && pendingSales > 0 && (
+          <Row
+            title={t("ops.collection.pending_sales")}
+            value={pendingSales}
+            iconBg="bg-orange-100"
+            iconColor="text-orange-600"
+            icon={<Hourglass size={18} />}
+            subtitle={t("ops.collection.informational_only")}
+            isInfo
+          />
+        )}
         <Row
           title={t("ops.collection.approved_collections")}
           value={displayApprovedCollections}
           iconBg="bg-green-100"
           iconColor="text-green-600"
           icon={<Download size={18} />}
-          subtitle={periodSubtitle}
+          subtitle={countLabel(approvedCollectionsCount, inWeekSubtitle)}
           isNegative
         />
 
@@ -163,7 +199,7 @@ export default function OutstandingSummary({
           iconBg="bg-amber-100"
           iconColor="text-amber-700"
           icon={<AlertTriangle size={18} />}
-          subtitle={t("ops.collection.informational_only")}
+          subtitle={countLabel(pendingCollectionsCount, t("ops.collection.informational_only"))}
           isInfo
         />
 

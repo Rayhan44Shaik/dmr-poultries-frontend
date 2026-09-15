@@ -35,6 +35,7 @@
     "test:e2e:emi": "playwright test --config tests/emi/playwright.config.ts",
     "test:i18n": "tsx --test tests/i18n/context.test.ts",
     "test:collections": "tsx --test src/modules/operations/collections/services/collectionService.contract.test.ts src/modules/operations/collections/services/collectionBalance.ui.test.ts",
+    "test:collection-balances": "node --test scripts/verify-collection-balances.mjs",
     "test:accounts-analysis": "tsx --test src/modules/accounts/utils/periodRanges.test.ts src/shared/kpi/analysisLink.test.ts",
     "test:e2e": "playwright test",
     "mock:backend": "node scripts/quarter-sample-data.mjs",
