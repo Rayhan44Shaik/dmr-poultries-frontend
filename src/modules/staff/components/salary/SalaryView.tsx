@@ -10,10 +10,10 @@
 // Read-only lifecycle notices (paid / correction window / month closed) are
 // listed below the sheet — they are UI state, not part of the formal document.
 //
-// LANGUAGE: the popup owns a scoped EN/తెలుగు toggle (the same pattern as the
-// performance details pop-up). Flipping it translates the popup's chrome,
-// month line and notices alone — the formal payslip document stays in English
-// (like the A4 PDF) and the app behind keeps the global language.
+// LANGUAGE: the footer carries a scoped EN/తెలుగు pill (no tooltip, popup
+// scope only). Flipping it translates the popup's chrome, month line,
+// notices AND the payslip sheet labels/names — the A4 PDF stays in English
+// and the app behind keeps the global language.
 
 import { Lock, Info, FileText, CheckCircle2, X, Loader2 } from "lucide-react";
 import type { SalaryRecord } from "../../types/staffDashboard";
@@ -22,8 +22,9 @@ import { useI18n } from "../../../../i18n";
 import ScopedI18nProvider from "../../../../i18n/ScopedI18nProvider";
 import { uiButton } from "../../../../shared/ui/uiTokens";
 import { ClassicPayslipSheet } from "./ClassicPayslipSheet";
-import { LanguageMiniToggle } from "../performance/LanguageMiniToggle";
+import { ViewLanguageToggle } from "../../../../ui/ViewLanguageToggle";
 import { computePayslipTotals, toAmountValues } from "./payslipModel";
+import { salaryDisplayText, salaryLocale } from "../../utils/salaryDisplay";
 
 /** Render "YYYY-MM-DD" / ISO as "28 Sep 2026". */
 function formatViewDate(raw: string): string {
@@ -62,7 +63,7 @@ function SalaryViewBody({
   onDownload,
   downloading = false,
 }: SalaryViewProps) {
-  const { t, language } = useI18n();
+  const { t, language, toggleLanguage } = useI18n();
   if (!record) return null;
 
   const values = toAmountValues(record);
@@ -77,7 +78,7 @@ function SalaryViewBody({
     if (!record.month) return "";
     const [y, m] = record.month.split("-");
     const d = new Date(Number(y), Number(m) - 1, 1);
-    return d.toLocaleString(language === "te" ? "te-IN" : "en-IN", { month: "long", year: "numeric" });
+    return d.toLocaleString(salaryLocale(language), { month: "long", year: "numeric" });
   })();
 
   return (
@@ -87,13 +88,19 @@ function SalaryViewBody({
       size="xl"
       overlayClassName="backdrop-blur-none bg-black/20"
       closeButtonClassName="text-red-500 hover:bg-red-50 hover:text-red-600"
-      aria-label={`${t("staff.view.payslip")} — ${record.employeeName}`}
-      title={`${t("staff.view.payslip")} — ${record.employeeName}`}
+      aria-label={`${t("staff.view.payslip")} — ${salaryDisplayText(record.employeeName, language)}`}
+      title={`${t("staff.view.payslip")} — ${salaryDisplayText(record.employeeName, language)}`}
       description={`${monthLabel}${record.employeeId != null ? ` · ${t("staff.view.employee_no", { id: record.employeeId })}` : ""}`}
       footer={
         <div className="flex w-full items-center justify-between gap-2">
-          {/* Popup-scoped EN/తెలుగు switch — the app behind is untouched. */}
-          <LanguageMiniToggle className="bg-white" />
+          {/* Popup-scoped EN/తెలుగు pill, no tooltip. */}
+          <ViewLanguageToggle
+            language={language}
+            onToggle={toggleLanguage}
+            tone="emerald"
+            labelMode="target"
+            ariaLabel={t("staff.popup.language_toggle")}
+          />
           <div className="flex items-center gap-2">
             {/* Close and Download PDF carry the same hover "logo animation"
                 language as the register toolbar (Reset / Refresh / Review). */}

@@ -1004,6 +1004,8 @@ export default {
   'ops.rate.modal.clear': 'Clear',
   'ops.rate.modal.rate_range_error': 'Entered rates must be between ₹50 and ₹300. Blank shops can still be saved.',
   'ops.rate.modal.min_rate': 'Min ₹50',
+  'ops.rate.modal.popup_language_toggle': 'Change view language',
+  'ops.rate.modal.popup_language_tooltip': 'Change only this view language',
   'ops.rate.modal.max_rate': 'Max ₹300',
   'ops.rate.market.days': '{count} days',
   'ops.rate.market.footer_reference': 'Rates are read-only reference • Selling rate entry below uses these as suggestion',

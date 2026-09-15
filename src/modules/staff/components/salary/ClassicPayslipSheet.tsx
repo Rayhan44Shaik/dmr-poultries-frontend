@@ -24,6 +24,8 @@
 
 import { useState } from "react";
 import type { ReactNode } from "react";
+import { useI18n, type Language } from "../../../../i18n";
+import { salaryDisplayText, salaryLocale } from "../../utils/salaryDisplay";
 import { amountInWords } from "../../services/payslipPdfDocument";
 import type { SalaryRecord } from "../../types/staffDashboard";
 import {
@@ -55,13 +57,27 @@ const fmtMoney = (value: unknown): string =>
 const toText = (value: unknown): string =>
   value == null || value === "" ? "—" : String(value);
 
-function formatMonthLabel(month: string): string {
+function formatMonthLabel(month: string, language: Language): string {
   if (!month) return "—";
   const [y, m] = month.split("-");
   const d = new Date(Number(y), Number(m) - 1, 1);
   if (Number.isNaN(d.getTime())) return month;
-  return d.toLocaleString("en-IN", { month: "long", year: "numeric" });
+  return d.toLocaleString(salaryLocale(language), { month: "long", year: "numeric" });
 }
+
+/** Payslip field label keys by amount field — Telugu follows the popup scope. */
+const FIELD_LABEL_KEY: Record<AmountFieldKey, string> = {
+  basicSalary: "staff.slip.f_basic",
+  overtime: "staff.slip.f_overtime",
+  incentives: "staff.slip.f_incentives",
+  fuelAllowance: "staff.slip.f_fuel",
+  nightAllowance: "staff.slip.f_night",
+  leaveDeduction: "staff.slip.f_leave",
+  advanceRecovery: "staff.slip.f_advance",
+  loanEMI: "staff.slip.f_emi",
+  latePenalty: "staff.slip.f_late",
+  otherDeductions: "staff.slip.f_other",
+};
 
 /* ---------------------------------------------------------------------------
  * Cells.
@@ -156,7 +172,8 @@ export function ClassicPayslipSheet({
   onFieldChange,
   note,
 }: ClassicPayslipSheetProps) {
-  const titleMonth = formatMonthLabel(record.month).toUpperCase();
+  const { t, language } = useI18n();
+  const titleMonth = formatMonthLabel(record.month, language).toUpperCase();
   const businessName = "DMR POULTRIES";
 
   const earningsRows = EARNING_FIELDS;
@@ -188,7 +205,7 @@ export function ClassicPayslipSheet({
       <div className="px-6 pb-3">
         <div className="flex items-baseline gap-2 border-b-2 pb-2" style={{ borderColor: INK }}>
           <span className="font-extrabold tracking-[0.1em]" style={{ color: INK, fontSize: 16 }}>
-            PAYSLIP
+            {t("staff.slip.payslip")}
           </span>
           <span className="font-semibold tracking-[0.06em]" style={{ color: MUTED, fontSize: 14 }}>
             – {titleMonth}
@@ -206,13 +223,13 @@ export function ClassicPayslipSheet({
             style={{ borderBottom: `1px solid ${BORDER}` }}
           >
             <div className="border-r p-2.5" style={{ borderColor: BORDER }}>
-              <Field label="Employee" value={toText(record.employeeName)} />
+              <Field label={t("staff.slip.employee")} value={toText(salaryDisplayText(record.employeeName, language))} />
             </div>
             <div className="border-r p-2.5" style={{ borderColor: BORDER }}>
-              <Field label="Employee ID" value={record.employeeId != null ? `#${record.employeeId}` : "—"} />
+              <Field label={t("staff.slip.employee_id")} value={record.employeeId != null ? `#${record.employeeId}` : "—"} />
             </div>
             <div className="p-2.5">
-              <Field label="Department" value={toText(record.department)} />
+              <Field label={t("staff.slip.department")} value={toText(salaryDisplayText(record.department, language))} />
             </div>
           </div>
 
@@ -223,7 +240,7 @@ export function ClassicPayslipSheet({
           >
             <div className="py-2">
               <div className="font-semibold uppercase" style={{ color: MUTED, fontSize: 8.5, letterSpacing: "0.06em" }}>
-                Working
+                {t("staff.slip.working")}
               </div>
               <div className="mt-0.5 text-lg font-bold tabular-nums" style={{ color: INK, lineHeight: 1 }}>
                 {record.workingDays ?? "—"}
@@ -231,7 +248,7 @@ export function ClassicPayslipSheet({
             </div>
             <div className="py-2">
               <div className="font-semibold uppercase" style={{ color: MUTED, fontSize: 8.5, letterSpacing: "0.06em" }}>
-                Present
+                {t("staff.slip.present")}
               </div>
               <div className="mt-0.5 text-lg font-bold tabular-nums" style={{ color: INK, lineHeight: 1 }}>
                 {record.presentDays ?? "—"}
@@ -239,7 +256,7 @@ export function ClassicPayslipSheet({
             </div>
             <div className="py-2">
               <div className="font-semibold uppercase" style={{ color: MUTED, fontSize: 8.5, letterSpacing: "0.06em" }}>
-                Leave
+                {t("staff.slip.leave")}
               </div>
               <div className="mt-0.5 text-lg font-bold tabular-nums" style={{ color: INK, lineHeight: 1 }}>
                 {record.leaveDays ?? "—"}
@@ -247,7 +264,7 @@ export function ClassicPayslipSheet({
             </div>
             <div className="py-2">
               <div className="font-semibold uppercase" style={{ color: MUTED, fontSize: 8.5, letterSpacing: "0.06em" }}>
-                Weekly Off
+                {t("staff.slip.weekly_off")}
               </div>
               <div className="mt-0.5 text-lg font-bold tabular-nums" style={{ color: INK, lineHeight: 1 }}>
                 {record.weeklyOffDays ?? "—"}
@@ -261,16 +278,16 @@ export function ClassicPayslipSheet({
           <thead>
             <tr>
               <th className="border-b text-left font-extrabold" style={{ borderColor: BORDER, color: GREEN, padding: cellPad, letterSpacing: "0.05em" }}>
-                EARNINGS
+                {t("staff.slip.earnings")}
               </th>
               <th className="border-b text-right font-semibold" style={{ borderColor: BORDER, color: MUTED, padding: cellPad }}>
-                Amount (Rs.)
+                {t("staff.slip.amount_rs")}
               </th>
               <th className="border-b border-l text-left font-extrabold" style={{ borderColor: BORDER, color: RED, padding: cellPad, letterSpacing: "0.05em" }}>
-                DEDUCTIONS
+                {t("staff.slip.deductions")}
               </th>
               <th className="border-b text-right font-semibold" style={{ borderColor: BORDER, color: MUTED, padding: cellPad }}>
-                Amount (Rs.)
+                {t("staff.slip.amount_rs")}
               </th>
             </tr>
           </thead>
@@ -281,7 +298,7 @@ export function ClassicPayslipSheet({
               return (
                 <tr key={i}>
                   <td className="border-b px-3 py-[5px]" style={{ borderColor: BORDER }}>
-                    <span style={{ color: e ? INK : "transparent" }}>{e ? e.label : "·"}</span>
+                    <span style={{ color: e ? INK : "transparent" }}>{e ? t(FIELD_LABEL_KEY[e.key]) : "·"}</span>
                   </td>
                   <td className="border-b px-3 py-[5px] text-right" style={{ borderColor: BORDER }}>
                     {e ? (
@@ -293,7 +310,7 @@ export function ClassicPayslipSheet({
                     ) : null}
                   </td>
                   <td className="border-b border-l px-3 py-[5px]" style={{ borderColor: BORDER }}>
-                    <span style={{ color: d ? INK : "transparent" }}>{d ? d.label : "·"}</span>
+                    <span style={{ color: d ? INK : "transparent" }}>{d ? t(FIELD_LABEL_KEY[d.key]) : "·"}</span>
                   </td>
                   <td className="border-b px-3 py-[5px] text-right" style={{ borderColor: BORDER }}>
                     {d ? (
@@ -310,13 +327,13 @@ export function ClassicPayslipSheet({
             {/* Totals row */}
             <tr>
               <td className="px-3 py-1.5" style={{ color: INK }}>
-                <span className="font-extrabold" style={{ fontSize: 13 }}>Gross Salary</span>
+                <span className="font-extrabold" style={{ fontSize: 13 }}>{t("staff.slip.gross")}</span>
               </td>
               <td className="px-3 py-1.5 text-right font-extrabold tabular-nums" style={{ color: INK, fontSize: 13 }}>
                 {fmtMoney(gross)}
               </td>
               <td className="border-l px-3 py-1.5" style={{ borderColor: BORDER, color: INK }}>
-                <span className="font-extrabold" style={{ fontSize: 13 }}>Total Deductions</span>
+                <span className="font-extrabold" style={{ fontSize: 13 }}>{t("staff.slip.total_ded")}</span>
               </td>
               <td className="px-3 py-1.5 text-right font-extrabold tabular-nums" style={{ color: INK, fontSize: 13 }}>
                 {fmtMoney(deductions)}
@@ -331,7 +348,7 @@ export function ClassicPayslipSheet({
           style={{ borderColor: INK, borderTopWidth: 2, backgroundColor: "#f4f6f8" }}
         >
           <span className="font-extrabold tracking-[0.05em]" style={{ color: NAVY, fontSize: 13 }}>
-            NET SALARY
+            {t("staff.slip.net_salary")}
           </span>
           <span className="font-extrabold tabular-nums" style={{ color: NAVY, fontSize: 20, lineHeight: 1 }}>
             Rs. {fmtMoney(net)}
@@ -343,21 +360,21 @@ export function ClassicPayslipSheet({
           className="italic"
           style={{ borderTop: `1px solid ${BORDER}`, color: MUTED, fontSize: 11.5, padding: "7px 12px" }}
         >
-          Net salary in words: {amountInWords(Number(net) || 0)}
+          {t("staff.slip.in_words")} {amountInWords(Number(net) || 0)}
         </div>
       </div>
 
       {/* ── Signature ────────────────────────────────────────────────── */}
       <div className="px-6 pb-4">
-        <div className="ml-auto w-[200px] text-center">
+        <div className="ml-auto w-[230px] text-center">
           {/* Open signing space above the rule so the signature fits neatly. */}
           <div aria-hidden="true" style={{ height: 64 }} />
           <div style={{ borderTop: `1px solid ${INK}` }} />
-          <div className="mt-1.5 font-bold" style={{ color: INK, fontSize: 12.5 }}>
-            D. Srinivas Chakrapani
+          <div className="mt-1.5 whitespace-nowrap font-bold" style={{ color: INK, fontSize: 12.5 }}>
+            {salaryDisplayText("D. Srinivas Chakrapani", language)}
           </div>
           <div className="mt-0.5" style={{ color: MUTED, fontSize: 10.5 }}>
-            Authorised Signatory
+            {t("staff.slip.signatory")}
           </div>
         </div>
       </div>
@@ -366,13 +383,15 @@ export function ClassicPayslipSheet({
       <div className="px-6 pb-5">
         <div style={{ borderTop: `1px solid ${BORDER}` }} />
         <div className="pt-1 text-center" style={{ color: MUTED, fontSize: 9.5 }}>
-          This is a computer-generated payslip and does not require a physical signature.
+          {t("staff.slip.footer_note")}
         </div>
         <div className="mt-0.5 text-center" style={{ color: "#94a3b8", fontSize: 9 }}>
-          Generated on {new Date().toLocaleString("en-IN", {
-            day: "2-digit", month: "short", year: "numeric",
-            hour: "2-digit", minute: "2-digit", hour12: true,
-          })} · DMR POULTRIES
+          {t("staff.slip.generated_on", {
+            date: new Date().toLocaleString(salaryLocale(language), {
+              day: "2-digit", month: "short", year: "numeric",
+              hour: "2-digit", minute: "2-digit", hour12: true,
+            }),
+          })}
         </div>
       </div>
 

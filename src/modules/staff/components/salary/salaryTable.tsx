@@ -25,20 +25,24 @@ import {
 } from "lucide-react";
 import { Pagination } from "../../../../ui";
 import { WhatsAppBrandIcon } from "../../../../ui/WhatsAppBrandIcon";
+import { useI18n, type Language } from "../../../../i18n";
+import { salaryDisplayText, salaryLocale } from "../../utils/salaryDisplay";
 import type { SalaryRecord } from "../../types/staffDashboard";
 import { uiBadgeClass, uiCheckClass } from "../../../../shared/ui/uiTokens";
 
-/** Render "YYYY-MM-DD" (or ISO) as a readable "28 Sep 2026" string. */
-function formatDisplayDate(raw: string): string {
+/** Render "YYYY-MM-DD" (or ISO) as a readable "28 Sep 2026" string — Telugu
+ *  month words when asked, but always Latin digits. */
+function formatDisplayDate(raw: string, language: Language): string {
   if (!raw) return raw;
+  const opts = { day: "2-digit", month: "short", year: "numeric" } as const;
   const iso = /^(\d{4})-(\d{2})-(\d{2})/.exec(raw.trim());
   if (iso) {
     const d = new Date(Number(iso[1]), Number(iso[2]) - 1, Number(iso[3]));
-    return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+    return d.toLocaleDateString(salaryLocale(language), opts);
   }
   const d = new Date(raw);
   if (!Number.isNaN(d.getTime())) {
-    return d.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
+    return d.toLocaleDateString(salaryLocale(language), opts);
   }
   return raw;
 }
@@ -64,6 +68,7 @@ type SalaryTableProps = {
 };
 
 function StatusBadge({ record }: { record: SalaryRecord }) {
+  const { t } = useI18n();
   const windowOpen =
     record.status === "Paid" &&
     record.correctionWindowDaysRemaining != null &&
@@ -72,7 +77,7 @@ function StatusBadge({ record }: { record: SalaryRecord }) {
   if (record.status === "Pending" || record.status === "Submitted") {
     return (
       <span className={uiBadgeClass("warning")}>
-        Pending
+        {t("common.pending")}
       </span>
     );
   }
@@ -80,7 +85,7 @@ function StatusBadge({ record }: { record: SalaryRecord }) {
   return (
     <span className={uiBadgeClass(record.monthClosed || !windowOpen ? "neutral" : "success")}>
       <CheckCircle2 size={11} />
-      Paid
+      {t("common.paid")}
       {(record.monthClosed || !windowOpen) && <Lock size={10} />}
     </span>
   );
@@ -124,6 +129,7 @@ export function SalaryTable({
   monthLabel = "",
   paidOnDate,
 }: SalaryTableProps) {
+  const { t, language } = useI18n();
   const selectable = Boolean(selectedIds && onToggleSelect && onToggleSelectAll);
   const formatVal = formatCurrency || ((amount: number) =>
     new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(amount || 0));
@@ -158,7 +164,7 @@ export function SalaryTable({
   if (records.length === 0) {
     return (
       <div className="bg-white rounded-xl border border-slate-200 p-8 text-center text-slate-500 text-sm">
-        No salary records for the selected month.
+        {t("staff.table.no_records")}
       </div>
     );
   }
@@ -173,19 +179,19 @@ export function SalaryTable({
           </div>
           <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5">
             <h3 className="text-base font-bold text-slate-800 tracking-tight whitespace-nowrap">
-              Salary Register
+              {t("staff.table.title")}
               {monthLabel ? <span className="font-semibold text-slate-600"> — {monthLabel}</span> : null}
             </h3>
             {paidOnDate && (
               <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 tabular-nums">
                 <CheckCircle2 size={12} />
-                Paid on {formatDisplayDate(paidOnDate)}
+                {t("staff.table.paid_on", { date: formatDisplayDate(paidOnDate, language) })}
               </span>
             )}
           </div>
         </div>
         <span className="shrink-0 text-[11px] font-semibold text-slate-500 tabular-nums">
-          {records.length} employee{records.length === 1 ? "" : "s"}
+          {records.length} {records.length === 1 ? t("staff.review.employee_one") : t("staff.review.employee_other")}
         </span>
       </div>
 
@@ -217,7 +223,7 @@ export function SalaryTable({
                 <th className="px-3 py-4 text-left">
                   <input
                     type="checkbox"
-                    aria-label="Select all visible salaries"
+                    aria-label={t("staff.table.select_all")}
                     checked={allPageSelected}
                     ref={(el) => {
                       if (el) el.indeterminate = somePageSelected && !allPageSelected;
@@ -230,28 +236,28 @@ export function SalaryTable({
               )}
               <th className={`${TH_CLASS} text-center`}>#</th>
               <th className={`${TH_CLASS} text-left`}>
-                <ColHead icon={<User size={14} className="text-emerald-500 flex-shrink-0" />} label="Employee" />
+                <ColHead icon={<User size={14} className="text-emerald-500 flex-shrink-0" />} label={t("staff.table.employee")} />
               </th>
               <th className={`${TH_CLASS} text-center`}>
-                <ColHead center icon={<Calendar size={14} className="text-blue-500 flex-shrink-0" />} label="Working" />
+                <ColHead center icon={<Calendar size={14} className="text-blue-500 flex-shrink-0" />} label={t("staff.table.working")} />
               </th>
               <th className={`${TH_CLASS} text-center`}>
-                <ColHead center icon={<UserCheck size={14} className="text-cyan-500 flex-shrink-0" />} label="Present" />
+                <ColHead center icon={<UserCheck size={14} className="text-cyan-500 flex-shrink-0" />} label={t("staff.table.present")} />
               </th>
               <th className={`${TH_CLASS} text-center`}>
-                <ColHead center icon={<Clock size={14} className="text-amber-500 flex-shrink-0" />} label="Leave" />
+                <ColHead center icon={<Clock size={14} className="text-amber-500 flex-shrink-0" />} label={t("staff.table.leave")} />
               </th>
               <th className={`${TH_CLASS} text-left`}>
-                <ColHead icon={<Wallet size={14} className="text-indigo-500 flex-shrink-0" />} label="Basic" />
+                <ColHead icon={<Wallet size={14} className="text-indigo-500 flex-shrink-0" />} label={t("staff.table.basic")} />
               </th>
               <th className={`${TH_CLASS} text-left`}>
-                <ColHead icon={<CircleMinus size={14} className="text-rose-500 flex-shrink-0" />} label="Deductions" />
+                <ColHead icon={<CircleMinus size={14} className="text-rose-500 flex-shrink-0" />} label={t("staff.table.deductions")} />
               </th>
               <th className={`${TH_CLASS} text-left`}>
-                <ColHead icon={<IndianRupee size={14} className="text-emerald-600 flex-shrink-0" />} label="Net" />
+                <ColHead icon={<IndianRupee size={14} className="text-emerald-600 flex-shrink-0" />} label={t("staff.table.net")} />
               </th>
               <th className={`${TH_CLASS} text-left`}>
-                <ColHead icon={<ShieldCheck size={14} className="text-purple-500 flex-shrink-0" />} label="Status" />
+                <ColHead icon={<ShieldCheck size={14} className="text-purple-500 flex-shrink-0" />} label={t("staff.table.status")} />
               </th>
               <th className={`${TH_CLASS} text-center`}>
                 <div className="flex items-center justify-center gap-1.5">
@@ -259,7 +265,7 @@ export function SalaryTable({
                     <Mail size={14} className="text-blue-500 flex-shrink-0" />
                     <WhatsAppBrandIcon size={14} className="text-[#1DA851] flex-shrink-0" />
                   </span>
-                  <span>Sent</span>
+                  <span>{t("staff.table.sent")}</span>
                 </div>
               </th>
             </tr>
@@ -284,7 +290,7 @@ export function SalaryTable({
                     <td className="px-3 py-4" onClick={(e) => e.stopPropagation()}>
                       <input
                         type="checkbox"
-                        aria-label={`Select ${record.employeeName}`}
+                        aria-label={t("staff.table.select_one", { name: salaryDisplayText(record.employeeName, language) })}
                         checked={selectedIds!.has(record.id)}
                         disabled={saving}
                         onChange={() => onToggleSelect?.(record.id)}
@@ -294,9 +300,9 @@ export function SalaryTable({
                   )}
                   <td className="px-3 py-4 text-center text-[13px] text-slate-500 font-medium">{serialNo}</td>
                   <td className="px-3 py-4 min-w-0">
-                    <div className="truncate text-[13px] font-bold text-slate-800">{record.employeeName}</div>
+                    <div className="truncate text-[13px] font-bold text-slate-800">{salaryDisplayText(record.employeeName, language)}</div>
                     {record.department ? (
-                      <div className="mt-0.5 truncate text-[11px] font-medium text-slate-500">{record.department}</div>
+                      <div className="mt-0.5 truncate text-[11px] font-medium text-slate-500">{salaryDisplayText(record.department, language)}</div>
                     ) : null}
                   </td>
                   <td className="px-3 py-4 text-center text-[13px] font-medium tabular-nums text-slate-600 whitespace-nowrap">{record.workingDays ?? "—"}</td>
@@ -322,10 +328,9 @@ export function SalaryTable({
                       {onEmail ? (
                         <button
                           type="button"
-                          title={`Email payslip to ${record.employeeName}`}
-                          aria-label={`Email payslip to ${record.employeeName}`}
+                          aria-label={t("staff.table.email_to", { name: salaryDisplayText(record.employeeName, language) })}
                           onClick={() => onEmail(record)}
-                          disabled={saving}
+                          disabled={saving || record.status !== "Paid"}
                           className="group inline-flex items-center gap-1 rounded-full border border-blue-200/80 bg-blue-50/70 px-2 py-0.5 text-blue-700 transition hover:border-blue-300 hover:bg-blue-100/70 disabled:opacity-40"
                         >
                           <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-mail)]"><Mail size={12} /></span>
@@ -340,10 +345,9 @@ export function SalaryTable({
                       {onWhatsApp ? (
                         <button
                           type="button"
-                          title={`WhatsApp payslip to ${record.employeeName}`}
-                          aria-label={`WhatsApp payslip to ${record.employeeName}`}
+                          aria-label={t("staff.table.whatsapp_to", { name: salaryDisplayText(record.employeeName, language) })}
                           onClick={() => onWhatsApp(record)}
-                          disabled={saving}
+                          disabled={saving || record.status !== "Paid"}
                           className="group inline-flex items-center gap-1 rounded-full border border-emerald-200/80 bg-emerald-50/70 px-2 py-0.5 text-[#128C3E] transition hover:border-emerald-300 hover:bg-emerald-100/70 disabled:opacity-40"
                         >
                           <span className="inline-flex text-[#1DA851] motion-safe:group-hover:animate-[var(--animate-action-whatsapp)]"><WhatsAppBrandIcon size={12} /></span>
@@ -365,15 +369,21 @@ export function SalaryTable({
             <tr className="border-t-2 border-slate-200 bg-slate-50">
               {selectable && <td className="px-3 py-4" />}
               <td className="px-3 py-4" />
-              <td className="px-3 py-4 text-[13px] font-bold text-slate-800 whitespace-nowrap">Total ({footer.count})</td>
+              <td className="px-3 py-4 text-[13px] font-bold text-slate-800 whitespace-nowrap">{t("staff.table.total", { count: footer.count })}</td>
               <td className="px-3 py-4 text-center text-[13px] tabular-nums font-bold text-slate-700 whitespace-nowrap">{footer.workingDays}</td>
               <td className="px-3 py-4 text-center text-[13px] tabular-nums font-bold text-slate-700 whitespace-nowrap">{footer.presentDays}</td>
               <td className="px-3 py-4 text-center text-[13px] tabular-nums font-bold text-amber-700 whitespace-nowrap">{footer.leaveDays}</td>
               <td className="px-3 py-4 text-left text-[13px] tabular-nums font-bold text-slate-700 whitespace-nowrap">{formatVal(footer.basicSalary)}</td>
               <td className="px-3 py-4 text-left text-[13px] tabular-nums font-bold text-rose-700 whitespace-nowrap">{formatVal(footer.totalDeductions)}</td>
               <td className="px-3 py-4 text-left text-[13px] tabular-nums font-bold text-emerald-700 whitespace-nowrap">{formatVal(footer.netSalary)}</td>
-              <td className="px-3 py-4 text-[11px] tabular-nums font-semibold text-slate-600 whitespace-nowrap">
-                {footer.pending} Pending · {footer.submitted} Submitted · {footer.paid} Paid
+              <td className="px-3 py-4 text-[11px] tabular-nums font-semibold text-slate-600">
+                <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5 leading-snug">
+                  <span className="whitespace-nowrap">{footer.pending} {t("common.pending")}</span>
+                  <span className="text-slate-300" aria-hidden="true">·</span>
+                  <span className="whitespace-nowrap">{footer.submitted} {t("staff.table.submitted")}</span>
+                  <span className="text-slate-300" aria-hidden="true">·</span>
+                  <span className="whitespace-nowrap">{footer.paid} {t("common.paid")}</span>
+                </span>
               </td>
               <td className="px-3 py-4 text-center whitespace-nowrap">
                 <span className="inline-flex items-center justify-center gap-2.5">

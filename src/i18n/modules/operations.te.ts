@@ -1014,6 +1014,8 @@ export default {
   'ops.rate.modal.clear': 'క్లియర్ చేయి',
   'ops.rate.modal.rate_range_error': 'నమోదు చేసిన రేట్లు ₹50 నుండి ₹300 మధ్య ఉండాలి. ఖాళీ షాపులు అయినా సేవ్ చేయవచ్చు.',
   'ops.rate.modal.min_rate': 'కనిష్ఠం ₹50',
+  'ops.rate.modal.popup_language_toggle': 'వీక్షణ భాష మార్చండి',
+  'ops.rate.modal.popup_language_tooltip': 'ఈ వీక్షణ భాష మాత్రమే మార్చండి',
   'ops.rate.modal.max_rate': 'గరిష్ఠం ₹300',
   'ops.rate.market.days': '{count} రోజులు',
   'ops.rate.market.footer_reference': 'రేట్లు చదవడానికి మాత్రమే రిఫరెన్స్ • కింద ఉన్న అమ్మకం రేటు నమోదు వీటిని సూచనగా ఉపయోగిస్తుంది',

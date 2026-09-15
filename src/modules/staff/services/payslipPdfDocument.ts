@@ -225,6 +225,9 @@ export function drawPayslipPdf(
   };
   autoTable(doc, {
     ...plainTable,
+    // Explicit startY — without it this first grid jumps to the page top and
+    // prints OVER the DMR POULTRIES header + PAYSLIP title.
+    startY: boxTop,
     body: pairs,
     columnStyles: {
       0: { cellWidth: labelCol, fontStyle: "bold", textColor: MUTED },
@@ -238,6 +241,7 @@ export function drawPayslipPdf(
   /* ── Attendance strip ───────────────────────────────────────────────── */
   autoTable(doc, {
     ...plainTable,
+    startY: y,
     head: [["Working Days", "Present Days", "Leave Days", "Weekly Off"]],
     body: [[
       fmt(record.workingDays ?? "—"),
@@ -252,7 +256,7 @@ export function drawPayslipPdf(
       fontStyle: "bold",
       fontSize: 8,
       halign: "center",
-      cellPadding: { top: 2.4, bottom: 2.4 },
+      cellPadding: { top: 2.4, bottom: 2.4, left: 2, right: 2 },
       lineColor: BORDER,
       lineWidth: 0.2,
     },
@@ -261,7 +265,7 @@ export function drawPayslipPdf(
       fontSize: 9,
       halign: "center",
       fontStyle: "bold",
-      cellPadding: { top: 2.6, bottom: 2.6 },
+      cellPadding: { top: 2.6, bottom: 2.6, left: 2, right: 2 },
     },
   });
   y = lastTableY(y) + 5;
@@ -302,6 +306,7 @@ export function drawPayslipPdf(
 
   autoTable(doc, {
     ...plainTable,
+    startY: y,
     head: [["Earnings", "Amount (Rs.)", "Deductions", "Amount (Rs.)"]],
     body: tableBody,
     showHead: "everyPage",
@@ -313,14 +318,14 @@ export function drawPayslipPdf(
       fontSize: 8.5,
       halign: "center",
       valign: "middle",
-      cellPadding: { top: 2.6, bottom: 2.6 },
+      cellPadding: { top: 2.6, bottom: 2.6, left: 3, right: 3 },
       lineColor: BORDER,
       lineWidth: 0.2,
     },
     styles: {
       ...plainTable.styles,
       fontSize: 8.5,
-      cellPadding: { top: 2.2, bottom: 2.2 },
+      cellPadding: { top: 2.2, bottom: 2.2, left: 3, right: 3 },
       valign: "middle",
     },
     columnStyles: {

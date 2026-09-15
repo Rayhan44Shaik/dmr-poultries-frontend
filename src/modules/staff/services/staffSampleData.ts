@@ -285,7 +285,8 @@ export function buildSampleSalaryRecords(month: string, weekStart?: string): Sal
   const week = buildSampleDutyWeek(weekStart ?? toDateStr(mondayOf(new Date())));
   const weekLeaves = buildSampleLeaves(week.weekStart);
   const now = new Date().toISOString();
-  return SAMPLE_EMPLOYEES.map((emp, i) => {
+  // Inactive staff are excluded — the register covers active employees only.
+  return SAMPLE_EMPLOYEES.filter((emp) => emp.status !== "Inactive").map((emp, i) => {
     const att = attendanceFrom(week, emp.id, weekLeaves);
     const basicSalary = emp.salary;
     const overtime = emp.role === "Driver" ? 1200 : 0;

@@ -36,6 +36,7 @@ import {
   FileText,
   RotateCcw,
   Search,
+  Send,
   UserRound,
 } from "lucide-react";
 import { BrandRefreshButton, Button, ConfirmDialog, EmptyState } from "../../../ui";
@@ -48,21 +49,24 @@ import {
   opsSecondaryButtonClass,
 } from "../../../shared/ui/operationsStyles";
 import TableLoading from "../components/common/TableLoading";
-import { useI18n } from "../../../i18n";
+import { useI18n, type Language } from "../../../i18n";
+import { salaryDisplayText, salaryLocale, salaryMatchesQuery } from "../utils/salaryDisplay";
 import { SalaryTable } from "../components/salary/salaryTable";
 import { SalaryView } from "../components/salary/SalaryView";
 import { SalaryReviewModal } from "../components/salary/SalaryReviewModal";
-import { EmailPayslipsModal } from "../components/salary/EmailPayslipsModal";
-import { WhatsAppPayslipsModal } from "../components/salary/WhatsAppPayslipsModal";
+import { SendPayslipsModal } from "../components/salary/SendPayslipsModal";
 import { SAMPLE_EMPLOYEE_LIST } from "../services/staffSampleData";
 import type { SalaryRecord } from "../types/staffDashboard";
 
-function formatMonthName(monthStr: string): string {
+function formatMonthName(monthStr: string, language: Language = "en"): string {
   if (!monthStr) return "";
   const [year, m] = monthStr.split("-");
   const date = new Date(Number(year), Number(m) - 1, 1);
-  return date.toLocaleString("default", { month: "long", year: "numeric" });
+  return date.toLocaleString(salaryLocale(language), { month: "long", year: "numeric" });
 }
+
+// Short month names for the picker grid — Telugu words, Latin digits elsewhere.
+const MONTHS_TE = ["జన", "ఫిబ్ర", "మార్చి", "ఏప్రి", "మే", "జూన్", "జులై", "ఆగ", "సెప్టెం", "అక్టో", "నవం", "డిసెం"];
 
 // Whole-rupee format for the register table — the paise (".00") added no
 // information and made the Basic / Deductions / Net columns overflow their
@@ -91,7 +95,7 @@ const MONTHS = [
 ];
 
 function SalaryRegisterPage() {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const { showNotification } = useSafeNotification();
 
   const getCurrentYearMonth = () => {
@@ -119,7 +123,7 @@ function SalaryRegisterPage() {
     | "leave-asc"
     | "leave-desc"
   >("name-asc");
-  const [masterEmployees, setMasterEmployees] = useState<Array<{ department?: string; employeeName?: string }>>([]);
+  const [masterEmployees, setMasterEmployees] = useState<Array<{ department?: string; employeeName?: string; status?: string }>>([]);
   const [submitMonthOpen, setSubmitMonthOpen] = useState(false);
   const [confirmConfig, setConfirmConfig] = useState<{
     title: string;
@@ -196,7 +200,7 @@ function SalaryRegisterPage() {
     let mounted = true;
     loadEmployees()
       .then((data) => {
-        if (mounted) setMasterEmployees(data as Array<{ department?: string; employeeName?: string }>);
+        if (mounted) setMasterEmployees(data as Array<{ department?: string; employeeName?: string; status?: string }>);
       })
       .catch(() => {
         if (mounted) setMasterEmployees(SAMPLE_EMPLOYEE_LIST);
@@ -209,6 +213,7 @@ function SalaryRegisterPage() {
   const departments = useMemo(() => {
     const set = new Set<string>();
     for (const e of masterEmployees) {
+      if (e.status === "Inactive") continue;
       if (e.department) set.add(e.department);
     }
     for (const r of allRecords) {
@@ -220,6 +225,7 @@ function SalaryRegisterPage() {
   const employeeNames = useMemo(() => {
     const set = new Set<string>();
     for (const e of masterEmployees) {
+      if (e.status === "Inactive") continue;
       if (e.employeeName && (!department || e.department === department)) {
         set.add(e.employeeName);
       }
@@ -233,14 +239,15 @@ function SalaryRegisterPage() {
   }, [masterEmployees, allRecords, department]);
 
   const visibleRecords = useMemo(() => {
-    const q = searchQuery.trim().toLowerCase();
+    const q = searchQuery.trim();
     const filtered = records.filter((r) => {
       if (department && (r.department || "") !== department) return false;
       if (employeeName && (r.employeeName || "") !== employeeName) return false;
       if (!q) return true;
-      const name = (r.employeeName || "").toLowerCase();
+      if (salaryMatchesQuery(r.employeeName || "", q)) return true;
+      if (salaryMatchesQuery(r.department || "", q)) return true;
       const id = String(r.employeeId ?? "").toLowerCase();
-      return name.includes(q) || id.includes(q);
+      return id.includes(q.toLowerCase());
     });
 
     const num = (v: number | undefined | null) => Number(v ?? 0);
@@ -276,7 +283,7 @@ function SalaryRegisterPage() {
       }
     });
     return sorted;
-  }, [records, searchQuery, employeeName, department, sortKey]);
+  }, [records, searchQuery, employeeName, department, sortKey, language]);
 
   const handleRefresh = useCallback(() => {
     void refresh();
@@ -286,38 +293,16 @@ function SalaryRegisterPage() {
   const [viewTarget, setViewTarget] = useState<SalaryRecord | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  const [emailsSent, setEmailsSent] = useState(false);
-  const [emailsSentCount, setEmailsSentCount] = useState(0);
-  const [whatsappSent, setWhatsappSent] = useState(false);
-  const [whatsappSentCount, setWhatsappSentCount] = useState(0);
-  const [emailOpen, setEmailOpen] = useState(false);
-  const [whatsappOpen, setWhatsappOpen] = useState(false);
-  // Which records the send modals act on. Populated either from the Review
-  // & Submit selection or from a single employee's row in the salary table.
-  const [emailTarget, setEmailTarget] = useState<SalaryRecord[]>([]);
-  const [whatsappTarget, setWhatsappTarget] = useState<SalaryRecord[]>([]);
+  // Unified Send Payslips popup — submit-first: it only ever receives
+  // submitted (Paid/Submitted) records, from Review & Submit or one table row.
+  const [sendOpen, setSendOpen] = useState(false);
+  const [sendTarget, setSendTarget] = useState<SalaryRecord[]>([]);
+  const [sendChannel, setSendChannel] = useState<"email" | "whatsapp">("email");
 
-  // A successful payslip send (email OR WhatsApp) is required before the month
-  // can be submitted. The flags reset directly in the selection handlers (not
-  // an effect) so a changed selection can never leave a stale "sent" state.
-  const resetEmailsSent = useCallback(() => {
-    setEmailsSent(false);
-    setEmailsSentCount(0);
-  }, []);
-
-  // Open the email / WhatsApp composer for a chosen set of employees (either
-  // the current selection in Review & Submit, or a single table row).
-  const openEmailFor = useCallback((records: SalaryRecord[]) => {
-    setEmailTarget(records);
-    setEmailOpen(true);
-  }, []);
-  const openWhatsAppFor = useCallback((records: SalaryRecord[]) => {
-    setWhatsappTarget(records);
-    setWhatsappOpen(true);
-  }, []);
-  const resetWhatsappSent = useCallback(() => {
-    setWhatsappSent(false);
-    setWhatsappSentCount(0);
+  const openSendFor = useCallback((targets: SalaryRecord[], channel: "email" | "whatsapp" = "email") => {
+    setSendTarget(targets);
+    setSendChannel(channel);
+    setSendOpen(true);
   }, []);
 
   // Reset every active filter back to its default: the current month (i.e.
@@ -333,10 +318,6 @@ function SalaryRegisterPage() {
     setFilter("All");
     setCurrentPage(1);
     setIsMonthPickerOpen(false);
-    setEmailsSent(false);
-    setEmailsSentCount(0);
-    setWhatsappSent(false);
-    setWhatsappSentCount(0);
   }, [setFilter]);
 
   const confirm = useCallback((title: string, message: string, onConfirm: () => void) => {
@@ -353,14 +334,14 @@ function SalaryRegisterPage() {
 
   const handleGenerate = useCallback(() => {
     confirm(
-      "Generate Salary Register",
-      `Generate salary records for ${formatMonthName(month)} for all employees without one?`,
+      t("staff.register.generate_confirm_title"),
+      t("staff.register.generate_confirm_msg", { month: formatMonthName(month, language) }),
       () => {
         setConfirmConfig(null);
         void runConfirm(generate());
       }
     );
-  }, [confirm, generate, month, runConfirm]);
+  }, [confirm, generate, month, runConfirm, t, language]);
 
   const handleSubmitSelected = useCallback(
     async (ids: string[]) => {
@@ -374,17 +355,17 @@ function SalaryRegisterPage() {
         await refresh();
         setSubmitMonthOpen(false);
         showNotification(
-          `Submitted ${result.updated.length} salary record(s) successfully.`,
+          t("staff.register.submitted_ok", { count: result.updated.length }),
           "success"
         );
       } catch (error) {
         showNotification(
-          (error as Error)?.message || "Unable to submit selected salaries.",
+          (error as Error)?.message || t("staff.register.submit_failed"),
           "error"
         );
       }
     },
-    [refresh, showNotification]
+    [refresh, showNotification, t]
   );
 
   const handleDownload = useCallback(
@@ -393,12 +374,12 @@ function SalaryRegisterPage() {
       try {
         await downloadPayslipPdf(record);
       } catch {
-        showNotification("Unable to download payslip.", "error");
+        showNotification(t("staff.register.download_failed"), "error");
       } finally {
         setDownloadingId(null);
       }
     },
-    [showNotification]
+    [showNotification, t]
   );
 
   const toggleSelect = useCallback((id: string) => {
@@ -408,9 +389,7 @@ function SalaryRegisterPage() {
       else next.add(id);
       return next;
     });
-    resetEmailsSent();
-    resetWhatsappSent();
-  }, [resetEmailsSent, resetWhatsappSent]);
+  }, []);
 
   const toggleSelectAll = useCallback((ids: string[]) => {
     setSelectedIds((prev) => {
@@ -418,9 +397,7 @@ function SalaryRegisterPage() {
         ids.length > 0 && ids.every((id) => prev.has(id));
       return allSelected ? new Set<string>() : new Set(ids);
     });
-    resetEmailsSent();
-    resetWhatsappSent();
-  }, [resetEmailsSent, resetWhatsappSent]);
+  }, []);
 
   const handleDownloadSelected = useCallback(async (ids: string[]) => {
     if (ids.length === 0) return;
@@ -441,11 +418,11 @@ function SalaryRegisterPage() {
       }
     }
     if (downloaded > 0) {
-      showNotification(`Downloaded ${downloaded} payslip PDF(s).`, "success");
+      showNotification(t("staff.register.downloaded_ok", { count: downloaded }), "success");
     } else {
-      showNotification("Unable to download payslips.", "error");
+      showNotification(t("staff.register.download_failed"), "error");
     }
-  }, [allRecords, showNotification]);
+  }, [allRecords, showNotification, t]);
 
   const handleSaveRecord = useCallback(
     async (record: SalaryRecord) => {
@@ -454,16 +431,13 @@ function SalaryRegisterPage() {
       updateRecord(record);
       try {
         await updateSalary(record);
-        showNotification(`Saved payslip changes for ${record.employeeName}.`, "success");
+        showNotification(t("staff.register.save_ok"), "success");
       } catch {
         // Backend unavailable — the edit is still applied locally to the table.
-        showNotification(
-          `Saved locally (backend offline): ${record.employeeName}.`,
-          "info"
-        );
+        showNotification(t("staff.register.save_offline"), "info");
       }
     },
-    [updateRecord, showNotification]
+    [updateRecord, showNotification, t]
   );
 
   // The payment date for the register heading. Shown only when the ENTIRE
@@ -480,6 +454,21 @@ function SalaryRegisterPage() {
     const distinct = new Set(dates);
     return distinct.size === 1 ? dates[0] : null;
   }, [allRecords]);
+
+  // Send-once: submitted (Paid/Submitted) employees whose payslip has NOT
+  // been sent yet on either channel. One successful mail OR WhatsApp send
+  // drops them from this list, so the button count only ever goes down and
+  // the per-row Sent column stays the source of truth for history.
+  const submittedRecords = useMemo(
+    () =>
+      allRecords.filter(
+        (r) =>
+          (r.status === "Paid" || r.status === "Submitted") &&
+          (r.emailsSent ?? 0) === 0 &&
+          (r.whatsappsSent ?? 0) === 0
+      ),
+    [allRecords]
+  );
 
   // Status segmented control — same treatment as the Leave page's status tabs
   // (active = white chip + brand text, inactive = quiet slate).
@@ -510,7 +499,7 @@ function SalaryRegisterPage() {
           <div className="relative" ref={monthPickerRef}>
             <label className={opsFilterLabelClass}>
               <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
-              <span>Month</span>
+              <span>{t("staff.register.month")}</span>
             </label>
             <button
               type="button"
@@ -521,17 +510,17 @@ function SalaryRegisterPage() {
               }}
               aria-haspopup="dialog"
               aria-expanded={isMonthPickerOpen}
-              aria-label={`Select month, currently ${formatMonthName(month)}`}
+              aria-label={t("staff.register.select_month", { month: formatMonthName(month, language) })}
               className={`${opsInputClass} flex items-center justify-between gap-2 text-left`}
             >
-              <span>{formatMonthName(month)}</span>
+              <span>{formatMonthName(month, language)}</span>
               <Calendar size={15} className="text-emerald-500 flex-shrink-0" />
             </button>
 
             {isMonthPickerOpen && (
               <div
                 role="dialog"
-                aria-label="Choose month"
+                aria-label={t("staff.register.choose_month")}
                 className="absolute top-full left-0 mt-2 w-72 bg-white rounded-2xl shadow-lg border border-slate-200 p-4 z-50 space-y-4"
               >
                 <div className="flex items-center justify-between bg-slate-50 px-3 py-2 rounded-xl border border-slate-200/60">
@@ -544,7 +533,7 @@ function SalaryRegisterPage() {
                   </button>
                 </div>
                 <div className="grid grid-cols-4 gap-2">
-                  {MONTHS.map((m) => {
+                  {MONTHS.map((m, mi) => {
                     const isSelected = month === `${pickerYear}-${m.value}`;
                     return (
                       <button
@@ -560,7 +549,7 @@ function SalaryRegisterPage() {
                             : "bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-100"
                         }`}
                       >
-                        {m.name}
+                        {language === "te" ? MONTHS_TE[mi] : m.name}
                       </button>
                     );
                   })}
@@ -576,10 +565,10 @@ function SalaryRegisterPage() {
                     }}
                     className="text-emerald-600 font-semibold hover:underline"
                   >
-                    This Month
+                    {t("staff.register.this_month")}
                   </button>
                   <button type="button" onClick={() => setIsMonthPickerOpen(false)} className="text-slate-400 hover:text-slate-600 font-medium">
-                    Close
+                    {t("common.close")}
                   </button>
                 </div>
               </div>
@@ -589,14 +578,14 @@ function SalaryRegisterPage() {
           <div>
             <label className={opsFilterLabelClass}>
               <Building2 size={17} className="text-emerald-500 flex-shrink-0" />
-              <span>Department</span>
+              <span>{t("staff.register.department")}</span>
             </label>
             <MasterDropdown
               hideLabel
-              label="Department"
+              label={t("staff.register.department")}
               value={department}
-              placeholder="All Departments"
-              options={departments}
+              placeholder={t("staff.register.all_departments")}
+              options={departments.map((d) => ({ value: d, label: salaryDisplayText(d, language) }))}
               onChange={handleDepartmentChange}
               allowClear
               disabled={loading}
@@ -607,14 +596,14 @@ function SalaryRegisterPage() {
           <div>
             <label className={opsFilterLabelClass}>
               <UserRound size={17} className="text-emerald-500 flex-shrink-0" />
-              <span>Employee</span>
+              <span>{t("staff.register.employee")}</span>
             </label>
             <MasterDropdown
               hideLabel
-              label="Employee"
+              label={t("staff.register.employee")}
               value={employeeName}
-              placeholder="All Employees"
-              options={employeeNames}
+              placeholder={t("staff.register.all_employees")}
+              options={employeeNames.map((n) => ({ value: n, label: salaryDisplayText(n, language) }))}
               onChange={handleEmployeeNameChange}
               searchable
               allowClear
@@ -626,46 +615,40 @@ function SalaryRegisterPage() {
           <div>
             <label className={opsFilterLabelClass}>
               <ListFilter size={17} className="text-amber-500 flex-shrink-0" />
-              <span>Status</span>
+              <span>{t("staff.register.status")}</span>
             </label>
             <div
               role="group"
-              aria-label="Filter by status"
+              aria-label={t("staff.register.filter_by_status")}
               className="inline-flex h-10 w-full items-center bg-slate-100/80 p-1 rounded-lg border border-slate-200/60"
             >
-              {statusTab("All", "All", <LayoutGrid size={12} className="text-slate-400" />)}
-              {statusTab("Pending", "Pending", <Clock size={12} className="text-slate-400" />)}
-              {statusTab("Paid", "Paid", <CheckCircle size={12} className="text-slate-400" />)}
+              {statusTab("All", t("common.all"), <LayoutGrid size={12} className="text-slate-400" />)}
+              {statusTab("Pending", t("common.pending"), <Clock size={12} className="text-slate-400" />)}
+              {statusTab("Paid", t("common.paid"), <CheckCircle size={12} className="text-slate-400" />)}
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-end pt-1">
-          <div className="lg:col-span-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-12 gap-3.5 items-end pt-1">
+          <div className="xl:col-span-2">
             <label className={opsFilterLabelClass}>
               <ArrowUpDown size={17} className="text-violet-500 flex-shrink-0" />
-              <span>Sort By</span>
+              <span>{t("staff.register.sort_by")}</span>
             </label>
             <MasterDropdown
               hideLabel
-              label="Sort By"
+              label={t("staff.register.sort_by")}
               value={sortKey}
-              placeholder="Name A–Z"
+              placeholder={t("staff.register.sort_name_az")}
               searchable
               allowClear={false}
               options={[
-                { value: "name-asc", label: "Name — A to Z" },
-                { value: "name-desc", label: "Name — Z to A" },
-                { value: "status-pending-first", label: "Status — Pending first" },
-                { value: "status-paid-first", label: "Status — Paid first" },
-                { value: "salary-asc", label: "Salary — Low to high" },
-                { value: "salary-desc", label: "Salary — High to low" },
-                { value: "deduction-asc", label: "Deductions — Low to high" },
-                { value: "deduction-desc", label: "Deductions — High to low" },
-                { value: "working-asc", label: "Working days — Low to high" },
-                { value: "working-desc", label: "Working days — High to low" },
-                { value: "leave-asc", label: "Leaves — Low to high" },
-                { value: "leave-desc", label: "Leaves — High to low" },
+                { value: "name-asc", label: t("staff.register.sort_name_az") },
+                { value: "name-desc", label: t("staff.register.sort_name_za") },
+                { value: "status-pending-first", label: t("staff.register.sort_status_pending") },
+                { value: "status-paid-first", label: t("staff.register.sort_status_paid") },
+                { value: "salary-desc", label: t("staff.register.sort_salary_high") },
+                { value: "salary-asc", label: t("staff.register.sort_salary_low") },
               ]}
               onChange={(value) => {
                 setSortKey(value as typeof sortKey);
@@ -675,10 +658,10 @@ function SalaryRegisterPage() {
             />
           </div>
 
-          <div className="lg:col-span-4">
+          <div className="min-w-0 xl:col-span-3">
             <label htmlFor="salary-register-search" className={opsFilterLabelClass}>
               <Search size={17} className="text-slate-400 flex-shrink-0" />
-              <span>Search</span>
+              <span>{t("common.search")}</span>
             </label>
             <div className="relative">
               <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
@@ -686,33 +669,43 @@ function SalaryRegisterPage() {
                 id="salary-register-search"
                 value={searchQuery}
                 onChange={(event) => handleSearchChange(event.target.value)}
-                placeholder="Search by employee name..."
+                placeholder={t("staff.register.search_placeholder")}
                 disabled={loading}
                 className={`${opsInputClass} pl-10`}
               />
             </div>
           </div>
 
-          <div className="lg:col-span-5 flex items-center gap-2 justify-end flex-wrap">
+          <div className="md:col-span-2 xl:col-span-7 flex items-center gap-1.5 justify-end flex-nowrap">
             <button
               type="button"
               onClick={handleClearFilters}
               disabled={loading}
-              className={`group relative ${opsSecondaryButtonClass}`}
+              className={`group relative shrink-0 ${opsSecondaryButtonClass}`}
               aria-label={t("common.reset")}
             >
               <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>
               {t("common.reset")}
             </button>
-            <BrandRefreshButton onClick={handleRefresh} loading={refreshing} disabled={saving} />
+            <BrandRefreshButton onClick={handleRefresh} loading={refreshing} disabled={saving} className="shrink-0" />
             <button
               type="button"
               onClick={() => setSubmitMonthOpen(true)}
               disabled={saving || refreshing || allRecords.length === 0}
-              className={`group relative ${uiButton("success", "md")}`}
+              className={`group relative shrink-0 whitespace-nowrap ${uiButton("success", "md")}`}
             >
               <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-approve)]"><ClipboardCheck size={15} /></span>
-              Review and Submit
+              {t("staff.register.review_submit")}
+            </button>
+            <button
+              type="button"
+              onClick={() => openSendFor(submittedRecords, "email")}
+              disabled={saving || refreshing || submittedRecords.length === 0}
+              aria-label={t("staff.register.send_payslips")}
+              className={`group relative shrink-0 whitespace-nowrap ${uiButton("primary", "md")}`}
+            >
+              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-mail)]"><Send size={15} /></span>
+              {t("staff.register.send_payslips")} ({submittedRecords.length})
             </button>
           </div>
         </div>
@@ -735,8 +728,8 @@ function SalaryRegisterPage() {
           <EmptyState
             variant="no-data"
             icon={<FileText />}
-            title={`No salary records for ${formatMonthName(month)}`}
-            description="Generate the register for this month to create salary records for all employees."
+            title={t("staff.register.no_records_title", { month: formatMonthName(month, language) })}
+            description={t("staff.register.no_records_desc")}
             action={
               <Button
                 variant="primary"
@@ -745,7 +738,7 @@ function SalaryRegisterPage() {
                 loading={saving}
                 icon={<Plus size={14} />}
               >
-                Generate Register for this Month
+                {t("staff.register.generate_action")}
               </Button>
             }
           />
@@ -754,8 +747,8 @@ function SalaryRegisterPage() {
         <div className="bg-white rounded-xl border border-slate-200">
           <EmptyState
             variant="no-filters"
-            title="No records match the current filters"
-            description="No salary records match the selected month, department, employee or search. Adjust the filters to see more."
+            title={t("staff.register.no_match_title")}
+            description={t("staff.register.no_match_desc")}
           />
         </div>
       ) : (
@@ -767,9 +760,9 @@ function SalaryRegisterPage() {
           formatCurrency={formatCurrency}
           saving={saving}
           onView={setViewTarget}
-          onEmail={(record) => openEmailFor([record])}
-          onWhatsApp={(record) => openWhatsAppFor([record])}
-          monthLabel={formatMonthName(month)}
+          onEmail={(record) => openSendFor([record], "email")}
+          onWhatsApp={(record) => openSendFor([record], "whatsapp")}
+          monthLabel={formatMonthName(month, language)}
           paidOnDate={monthPaidOnDate}
         />
       )}
@@ -786,83 +779,57 @@ function SalaryRegisterPage() {
 
       {submitMonthOpen && (
         <SalaryReviewModal
-          monthLabel={formatMonthName(month)}
+          monthLabel={formatMonthName(month, language)}
           records={allRecords}
           pendingCount={totals.pendingCount}
           onClose={() => setSubmitMonthOpen(false)}
           onSubmitSelected={(ids) => void handleSubmitSelected(ids)}
           onSaveRecord={(record) => handleSaveRecord(record)}
-          submitDisabled={!emailsSent && !whatsappSent}
           selectedIds={selectedIds}
           onToggleSelect={toggleSelect}
           onToggleSelectAll={toggleSelectAll}
           onDownloadSelected={(ids) => void handleDownloadSelected(ids)}
-          onEmailSelected={() => {
-            openEmailFor(allRecords.filter((r) => selectedIds.has(r.id)));
-          }}
-          onWhatsAppSelected={() => {
-            openWhatsAppFor(allRecords.filter((r) => selectedIds.has(r.id)));
-          }}
-          emailsSentCount={emailsSentCount}
-          whatsappSentCount={whatsappSentCount}
+          onSendPayslips={() => openSendFor(submittedRecords, "email")}
         />
       )}
 
-      {emailOpen && (
-        <EmailPayslipsModal
-          monthLabel={formatMonthName(month)}
-          records={emailTarget}
+      {sendOpen && (
+        <SendPayslipsModal
+          monthLabel={formatMonthName(month, language)}
+          records={sendTarget}
+          initialChannel={sendChannel}
           saving={saving}
           onClose={() => {
-            setEmailOpen(false);
-            setEmailTarget([]);
+            setSendOpen(false);
+            setSendTarget([]);
           }}
-          onSent={(sent, failed) => {
-            // Submit unlocks only once EVERY selected payslip was emailed
-            // successfully. Any failure keeps the modal open for retry.
+          onSent={(sentChannel, sent, failed) => {
+            // Submit-first: counts refresh so the Sent column stays truthful.
+            // Failures keep the popup open for retry.
+            void refresh();
             if (failed === 0 && sent > 0) {
-              setEmailsSentCount(sent);
-              setEmailsSent(true);
-              setEmailOpen(false);
-              setEmailTarget([]);
-              showNotification("All selected payslips emailed. You can now submit the month.", "success");
+              setSendOpen(false);
+              setSendTarget([]);
+              showNotification(
+                t("staff.register.send_ok", {
+                  sent,
+                  channel: t(
+                    sentChannel === "email"
+                      ? "staff.register.channel_email"
+                      : "staff.register.channel_whatsapp"
+                  ),
+                }),
+                "success"
+              );
             } else {
               showNotification(
-                `Email incomplete — ${sent} sent, ${failed} failed. All selected employees must receive their payslip before submitting.`,
+                t("staff.register.send_partial", { sent, failed }),
                 "warning"
               );
             }
           }}
-          onSend={async (ids, payload) => emailSalaryPayslips(ids, payload)}
-        />
-      )}
-
-      {whatsappOpen && (
-        <WhatsAppPayslipsModal
-          monthLabel={formatMonthName(month)}
-          records={whatsappTarget}
-          saving={saving}
-          onClose={() => {
-            setWhatsappOpen(false);
-            setWhatsappTarget([]);
-          }}
-          onSent={(sent, failed) => {
-            // Submit unlocks only once EVERY selected payslip was sent on
-            // WhatsApp. Any failure keeps the modal open for retry.
-            if (failed === 0 && sent > 0) {
-              setWhatsappSentCount(sent);
-              setWhatsappSent(true);
-              setWhatsappOpen(false);
-              setWhatsappTarget([]);
-              showNotification("All selected payslips sent on WhatsApp. You can now submit the month.", "success");
-            } else {
-              showNotification(
-                `WhatsApp incomplete — ${sent} sent, ${failed} failed. All selected employees must receive their payslip before submitting.`,
-                "warning"
-              );
-            }
-          }}
-          onSend={async (ids, payload) => whatsappSalaryPayslips(ids, payload)}
+          onSendEmail={async (ids, payload) => emailSalaryPayslips(ids, payload)}
+          onSendWhatsApp={async (ids, payload) => whatsappSalaryPayslips(ids, payload)}
         />
       )}
 
@@ -871,8 +838,8 @@ function SalaryRegisterPage() {
         title={confirmConfig?.title ?? ""}
         message={confirmConfig?.message}
         tone="primary"
-        confirmLabel="Confirm"
-        cancelLabel="Cancel"
+        confirmLabel={t("common.confirm")}
+        cancelLabel={t("common.cancel")}
         loading={saving}
         onConfirm={confirmConfig ? confirmConfig.onConfirm : () => setConfirmConfig(null)}
         onCancel={() => setConfirmConfig(null)}

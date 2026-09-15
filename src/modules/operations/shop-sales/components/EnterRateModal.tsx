@@ -16,6 +16,8 @@ import {
   ChevronRight,
 } from "lucide-react";
 import AppShellModal from "../../../../ui/AppShellModal";
+import { ViewLanguageToggle } from "../../../../ui/ViewLanguageToggle";
+import { ActionTooltip } from "../../../../ui/ActionTooltip";
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
 import type { Shop } from "../../../masters/shops/types/shop";
 import { useI18n } from "../../../../i18n";
@@ -103,6 +105,7 @@ export default function EnterRateModal({
   const [shopSortKey, setShopSortKey] = useState<ShopSortKey>("time");
   const [shopSortDir, setShopSortDir] = useState<"asc" | "desc">("asc");
   const [shopSearch, setShopSearch] = useState("");
+  const [localLanguage, setLocalLanguage] = useState(language);
 
   const saving = isSaving || busy;
   const rateLocked = trip?.rateCompleted === true;
@@ -117,8 +120,9 @@ export default function EnterRateModal({
     setShopSortKey("time");
     setShopSortDir("asc");
     setShopSearch("");
+    setLocalLanguage(language);
     setDeliveries(trip.deliveries.map((d) => ({ ...d, rate: normalizeRate(d.rate) })));
-  }, [trip]);
+  }, [trip, language]);
 
   const hasInvalidEnteredRate = useMemo(
     () => deliveries.some((row) => { const rate = normalizeRate(row.rate); return rate !== null && !isValidSellingRate(rate); }),
@@ -166,7 +170,7 @@ export default function EnterRateModal({
   }, [deliveries, trip]);
 
   const marketLabels = useMemo(() => {
-    if (language === "te") {
+    if (localLanguage === "te") {
       return {
         companyTitle: "కంపెనీ & అసోసియేషన్ రేట్లు",
         additionalTitle: "అదనపు మెట్రిక్స్ ఎంట్రీ",
@@ -198,7 +202,7 @@ export default function EnterRateModal({
       gun: "Gun",
       rp: "R.P",
     };
-  }, [language]);
+  }, [localLanguage]);
 
   const totals = useMemo(() => {
     let ratedCount = 0;
@@ -416,7 +420,7 @@ export default function EnterRateModal({
                   type="search"
                   value={shopSearch}
                   onChange={(e) => { setShopSearch(e.target.value); setShopPage(1); }}
-                  placeholder={t("ops.trip.search_shop_bird")}
+                  placeholder={localLanguage === "te" ? "షాప్ వెతకండి..." : "Search shops..."}
                   className="w-full h-9 pl-9 pr-9 rounded-xl border border-slate-200 bg-slate-50/80 text-[13px] font-medium text-slate-700 placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100 outline-none transition-all shadow-sm hover:border-slate-300 hover:bg-white"
                 />
                 {shopSearch ? (
@@ -431,6 +435,14 @@ export default function EnterRateModal({
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
+              <ViewLanguageToggle
+                language={localLanguage}
+                onToggle={() => setLocalLanguage((prev) => (prev === "te" ? "en" : "te"))}
+                tone="emerald"
+                labelMode="target"
+                ariaLabel={t("ops.rate.modal.popup_language_toggle")}
+                tooltip={<ActionTooltip label={t("ops.rate.modal.popup_language_tooltip")} side="bottom" />}
+              />
               <div className="hidden sm:flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1">
                 <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 <span className="text-[11px] font-bold text-emerald-800 tabular-nums">{totals.ratedCount}/{deliveries.length} • {totals.progressPct}%</span>
@@ -630,10 +642,10 @@ export default function EnterRateModal({
                         <tr key={delivery.id} className={`border-b border-slate-100 ${missingForLock ? "bg-red-50" : idx % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-slate-50/50 hover:bg-slate-50"}`}>
                           <td className="px-2 py-3.5 text-center text-[13px] font-bold text-slate-700 tabular-nums bg-slate-50/50 border-r border-slate-100">{serialNo}</td>
                           <td className="px-3 py-3.5">
-                            <div className="text-[14px] font-bold text-slate-800 leading-tight truncate">{displayRateEntryShopName(delivery.shopName, language)}</div>
+                            <div className="text-[14px] font-bold text-slate-800 leading-tight truncate">{displayRateEntryShopName(delivery.shopName, localLanguage)}</div>
                             {masterShop && <div className="text-[11px] font-normal text-slate-500 truncate">{displayRateEntryName(masterShop.city, language)}</div>}
                           </td>
-                          <td className="px-2 py-3.5"><span className="inline-flex items-center justify-center rounded-lg border bg-violet-50 border-violet-200 text-violet-800 px-2.5 py-1 text-[12px] font-medium truncate max-w-full">{association ? displayRateEntryName(association, language) : "—"}</span></td>
+                          <td className="px-2 py-3.5"><span className="inline-flex items-center justify-center rounded-lg border bg-violet-50 border-violet-200 text-violet-800 px-2.5 py-1 text-[12px] font-medium truncate max-w-full">{association ? displayRateEntryName(association, localLanguage) : "—"}</span></td>
                           <td className="px-2 py-3.5 text-center"><span className="inline-flex items-center justify-center rounded-lg border bg-sky-50 border-sky-200 text-sky-800 px-2.5 py-1 text-[12px] font-semibold tabular-nums">{hasPaperRate ? paperRate : "—"}</span></td>
                           <td className="px-2 py-3.5 text-center text-[13px] font-normal text-slate-700 tabular-nums">{delivery.birds.toLocaleString()}</td>
                           <td className="px-2 py-3.5 text-center text-[13px] font-normal text-slate-700 tabular-nums">{delivery.weight.toFixed(2)}</td>
