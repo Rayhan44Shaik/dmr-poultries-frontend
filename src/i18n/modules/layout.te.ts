@@ -15,6 +15,11 @@ export default {
   'header.changeLanguage': 'భాష మార్చండి',
   'header.language': 'భాష',
   'header.currentLanguage': 'ప్రస్తుత భాష',
+  'header.fontSize': 'ఫాంట్ పరిమాణం',
+  'header.changeFontSize': 'ఫాంట్ పరిమాణాన్ని మార్చండి',
+  'header.increaseFontSize': 'ఫాంట్ పరిమాణాన్ని పెంచండి',
+  'header.decreaseFontSize': 'ఫాంట్ పరిమాణాన్ని తగ్గించండి',
+  'header.fontSizeHint': 'మొత్తం ERPలో వెంటనే వర్తిస్తుంది; గరిష్టం 150% వరకు పరిమితం.',
 
   // Sidebar
   'sidebar.erpSystem': 'ERP మేనేజ్‌మెంట్ సిస్టమ్',

@@ -5,6 +5,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Check, ChevronDown, Globe } from "lucide-react";
 import { useI18n, type Language } from "../../i18n";
+import FontSizeSwitcher from "./FontSizeSwitcher";
 
 const LANGUAGES: { code: Language; label: string; short: string }[] = [
   { code: "en", label: "English", short: "EN" },
@@ -54,37 +55,43 @@ export default function LanguageSwitcher() {
   }`;
 
   return (
-    <div ref={ref} className="relative">
-      <button
-        type="button"
-        onClick={() => setOpen((prev) => !prev)}
-        aria-label={t('header.changeLanguage')}
-        title={active.label}
-        className={buttonClass}
-      >
-        <Globe size={15} className="shrink-0" />
-        <span className="whitespace-nowrap">{shortLabel}</span>
-        <ChevronDown
-          size={13}
-          className={chevronClass}
-        />
-      </button>
+    <div className="flex items-center gap-1">
+      {/* Font scale is intentionally next to language so the two global
+          accessibility/localisation controls are always easy to find. */}
+      <FontSizeSwitcher />
 
-      {open && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-40 overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-pop animate-scale-in dark:border-slate-700 dark:bg-slate-800">
-          {LANGUAGES.map((lang) => (
-            <button
-              key={lang.code}
-              type="button"
-              onClick={() => choose(lang.code)}
-              className={getLangButtonClass(lang.code)}
-            >
-              <span className="flex-1">{lang.short}</span>
-              {lang.code === language && <Check size={14} />}
-            </button>
-          ))}
-        </div>
-      )}
+      <div ref={ref} className="relative">
+        <button
+          type="button"
+          onClick={() => setOpen((prev) => !prev)}
+          aria-label={t('header.changeLanguage')}
+          title={active.label}
+          className={buttonClass}
+        >
+          <Globe size={15} className="shrink-0" />
+          <span className="whitespace-nowrap">{shortLabel}</span>
+          <ChevronDown
+            size={13}
+            className={chevronClass}
+          />
+        </button>
+
+        {open && (
+          <div className="absolute right-0 top-full z-50 mt-2 w-40 overflow-hidden rounded-xl border border-slate-200/80 bg-white shadow-pop animate-scale-in dark:border-slate-700 dark:bg-slate-800">
+            {LANGUAGES.map((lang) => (
+              <button
+                key={lang.code}
+                type="button"
+                onClick={() => choose(lang.code)}
+                className={getLangButtonClass(lang.code)}
+              >
+                <span className="flex-1">{lang.short}</span>
+                {lang.code === language && <Check size={14} />}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

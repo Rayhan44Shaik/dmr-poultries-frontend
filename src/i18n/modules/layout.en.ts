@@ -15,6 +15,11 @@ export default {
   'header.changeLanguage': 'Change language',
   'header.language': 'Language',
   'header.currentLanguage': 'Current language',
+  'header.fontSize': 'Font size',
+  'header.changeFontSize': 'Change font size',
+  'header.increaseFontSize': 'Increase font size',
+  'header.decreaseFontSize': 'Decrease font size',
+  'header.fontSizeHint': 'Applies instantly across the complete ERP and is limited to 150%.',
 
   // Sidebar
   'sidebar.erpSystem': 'ERP Management System',
