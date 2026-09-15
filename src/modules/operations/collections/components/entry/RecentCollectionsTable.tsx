@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import {
-  Search, X, History, CheckCircle, Clock, AlertCircle, Eye, Pencil, Trash2, Info,
+  Search, X, History, CheckCircle, Clock, AlertCircle, Eye, Pencil,
   Hash, FileText, Calendar, Store, UserCog, IndianRupee, Activity, Settings2,
 } from "lucide-react";
 import TripPagination from "../../../vehicle-trips/components/TripPagination";
@@ -8,7 +8,6 @@ import type { RecentCollection } from "../../types/collection";
 import { useI18n } from "../../../../../i18n";
 import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocalization";
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
-import { getDeleteWindowForStatus } from "../../utils/collectionDeleteWindow";
 import { collectionStatusKey, collectionStatusLabel } from "../../utils/collectionStatusLabel";
 
 interface Props {
@@ -20,14 +19,10 @@ interface Props {
   onApprove: (id: string) => void;
   onReject: (id: string) => void;
   onEdit: (collection: RecentCollection) => void;
-  onDelete: (id: string) => void;
   onViewShop: (shopName: string) => void;
   /** Fires whenever the highlighted row changes, so the page can mirror it. */
   onSelectionChange?: (collection: RecentCollection | null) => void;
 }
-
-/** Approved tab shows only the most recent shops, not the whole history. */
-const APPROVED_SHOP_LIMIT = 10;
 
 const inr = (n: number) =>
   "₹ " + Number(n || 0).toLocaleString("en-IN", {
@@ -56,7 +51,6 @@ export default function RecentCollectionsTable({
   onStatusChange,
   onApprove,
   onEdit,
-  onDelete,
   onViewShop,
   onSelectionChange,
 }: Props) {
@@ -118,55 +112,66 @@ export default function RecentCollectionsTable({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [collections, searchQuery, t, language]);
 
-  /** True while the user is actually searching. */
-  const isSearching = searchQuery.trim().length > 0;
-
   /** Row buckets per tab — computed once so the toggle can show live counts. */
   const buckets = useMemo(() => {
     const pending = filteredBySearch.filter((col) => col.rawStatus === "Pending Approval");
     const deleted = filteredBySearch.filter((col) => col.rawStatus === "Deleted");
 
-    // Approved tab collapses to the latest entry per shop.
+    // Approved tab: one row per shop, showing that shop's MOST RECENT
+    // approved collection.
+    //
+    // Two things matter here and both were previously wrong:
+    //
+    // 1. "Latest" is resolved against the FULL approved set, never the
+    //    search-filtered one. Picking the newest of only the matching rows
+    //    would show an older collection number whenever the search happened
+    //    to exclude the real latest entry — the row would claim to be the
+    //    shop's current state while showing stale figures. The search is
+    //    applied afterwards, to decide which shop rows to display.
+    //
+    // 2. Recency is compared on ONE clock. Mixing approvedDate for one side
+    //    and collectionDate for the other compares different quantities, so
+    //    the winner depended on which rows happened to carry an approvedDate.
+    //    collectionDate is the entry date every row has; the id breaks ties
+    //    within a day, giving a total order that cannot flip between renders.
+    const allApproved = collections.filter((row) => (row.rawStatus || row.status) === "Approved");
+
+    const isNewer = (candidate: RecentCollection, current: RecentCollection) => {
+      const byDate = candidate.collectionDate.localeCompare(current.collectionDate);
+      if (byDate !== 0) return byDate > 0;
+      return (candidate.numericId ?? 0) > (current.numericId ?? 0);
+    };
+
     const shopMap = new Map<string, RecentCollection>();
-    for (const col of filteredBySearch.filter((row) => row.rawStatus === "Approved")) {
+    for (const col of allApproved) {
       const existing = shopMap.get(col.shopName);
-      if (!existing) {
-        shopMap.set(col.shopName, col);
-        continue;
-      }
-      const existingDate = existing.approvedDate || existing.collectionDate;
-      const currentDate = col.approvedDate || col.collectionDate;
-      if (currentDate > existingDate) shopMap.set(col.shopName, col);
-      else if (currentDate === existingDate && (col.numericId ?? 0) > (existing.numericId ?? 0)) {
-        shopMap.set(col.shopName, col);
-      }
+      if (!existing || isNewer(col, existing)) shopMap.set(col.shopName, col);
     }
 
     const sort = (rows: RecentCollection[]) =>
       [...rows].sort((a, b) => b.collectionDate.localeCompare(a.collectionDate));
 
-    const approvedByShop = sort(Array.from(shopMap.values()));
+    // Now apply the search to the one-row-per-shop list.
+    const matchingShops = new Set(
+      filteredBySearch
+        .filter((row) => (row.rawStatus || row.status) === "Approved")
+        .map((row) => row.shopName),
+    );
+
+    const approvedByShop = sort(
+      Array.from(shopMap.values()).filter((row) => matchingShops.has(row.shopName)),
+    );
 
     return {
       Pending: sort(pending),
-      // Idle, this is a "what just happened" panel: the latest entry for each
-      // of the 10 most recently collected shops. While SEARCHING the cap is
-      // lifted, so the box searches the whole approved history instead of
-      // only the ten rows that happen to be on screen — a search that can
-      // only find what you can already see is not a search.
-      Approved: isSearching ? approvedByShop : approvedByShop.slice(0, APPROVED_SHOP_LIMIT),
+      // EVERY shop that has an approved collection appears, one row each,
+      // showing that shop's most recent entry. The row is a doorway: opening
+      // it reveals that shop's latest 10 collections. Pagination keeps the
+      // full list manageable, so no shop is silently withheld.
+      Approved: approvedByShop,
       Deleted: sort(deleted),
     };
-  }, [filteredBySearch, isSearching]);
-
-  /** How many shops the Approved tab is holding back while idle. */
-  const approvedHiddenCount = useMemo(() => {
-    if (isSearching) return 0;
-    const shops = new Set(
-      collections.filter((col) => col.rawStatus === "Approved").map((col) => col.shopName),
-    );
-    return Math.max(0, shops.size - APPROVED_SHOP_LIMIT);
-  }, [collections, isSearching]);
+  }, [collections, filteredBySearch]);
 
   const displayedData = buckets[statusFilter];
 
@@ -371,33 +376,6 @@ export default function RecentCollectionsTable({
         </div>
       </div>
 
-      {/* A quiet caption answering "why is this list short?" — the Approved
-        * tab deliberately shows only the 10 most recent shops, and the search
-        * box deliberately reaches past them into the full history. Saying so
-        * is cheaper than letting someone conclude their data is missing. */}
-      {statusFilter === "Approved" && !isLoading && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-slate-100 bg-slate-50/60 px-6 py-2">
-          <Info size={13} className="shrink-0 text-slate-400" />
-          {isSearching ? (
-            <p className="text-xs font-medium text-slate-500">
-              {t("ops.collection.searching_all")}
-              <span className="ml-1.5 font-semibold text-slate-700">
-                {t("ops.collection.search_results", { count: displayedData.length })}
-              </span>
-            </p>
-          ) : (
-            <p className="text-xs font-medium text-slate-500">
-              {t("ops.collection.approved_cap_note")}
-              {approvedHiddenCount > 0 && (
-                <span className="ml-1.5 rounded-full bg-slate-200/70 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-slate-600">
-                  +{approvedHiddenCount}
-                </span>
-              )}
-            </p>
-          )}
-        </div>
-      )}
-
       {/* Table — column sizing and type scale match Recent Trip Activity. */}
       <div className="overflow-x-auto">
         {/* Column widths are proportioned to what each column actually holds,
@@ -508,20 +486,6 @@ export default function RecentCollectionsTable({
                 const isPending = rawStatus === "Pending Approval";
                 const isDeleted = rawStatus === "Deleted";
                 const statusLabel = collectionStatusLabel(rawStatus, t);
-                // Delete window, from the single source of truth shared with
-                // the view modal and the backend. Pending entries get the
-                // entry day only; approved entries get the full 10 days.
-                const deleteWindow = getDeleteWindowForStatus(col.collectionDate, rawStatus);
-                const canDeleteRow = deleteWindow.canDelete && !isDeleted;
-                const deleteHint = !deleteWindow.canDelete
-                  ? isPending
-                    ? t("ops.collection.delete_today_only")
-                    : t("ops.collection.delete_window_closed")
-                  : isPending
-                    ? t("ops.collection.delete_window_today")
-                    : deleteWindow.daysRemaining === 0
-                      ? t("ops.collection.delete_window_last_day")
-                      : t("ops.collection.delete_window_open", { days: deleteWindow.daysRemaining });
                 const statusIcon = isDeleted ? (
                   <AlertCircle size={12} />
                 ) : isPending ? (
@@ -619,29 +583,9 @@ export default function RecentCollectionsTable({
                           </button>
                         )}
 
-                        {/* Delete lives on every row, not just at the top. It is
-                          * enabled only inside the 10-day window measured from the
-                          * entry date; outside it the icon stays visible but
-                          * disabled, so the rule is legible rather than hidden. */}
-                        {isDeleted ? (
+                        {/* Deleted rows have no actions left to offer. */}
+                        {isDeleted && (
                           <span className="text-xs font-medium text-slate-400">{t("status.deleted")}</span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => canDeleteRow && onDelete(col.id)}
-                            disabled={!canDeleteRow}
-                            aria-label={`${t("common.delete")} — ${deleteHint}`}
-                            aria-disabled={!canDeleteRow}
-                            className={
-                              canDeleteRow
-                                ? "group h-8 w-8 rounded-xl bg-rose-50 hover:bg-rose-500 text-rose-600 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95"
-                                : "h-8 w-8 rounded-xl bg-slate-50 text-slate-300 border border-slate-200 flex items-center justify-center cursor-not-allowed"
-                            }
-                          >
-                            <span className={canDeleteRow ? `inline-flex ${uiActionIconMotionClass.delete}` : "inline-flex"}>
-                              <Trash2 size={14} />
-                            </span>
-                          </button>
                         )}
                       </div>
                     </td>
