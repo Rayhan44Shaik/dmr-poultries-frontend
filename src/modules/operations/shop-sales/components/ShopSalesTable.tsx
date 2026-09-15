@@ -23,6 +23,7 @@ import {
   formatSaleAmount,
   formatSaleRate,
   formatSaleRemark,
+  formatSaleSequence,
   formatSaleWeight,
   shopSaleLockState,
 } from "../utils/shopSaleFormat";
@@ -308,6 +309,7 @@ function ShopSalesTable({
             ) : sales.map((sale, index) => {
               const isSelected = selectedId === sale.id;
               const isEditing = editingId === sale.id;
+              const sequence = formatSaleSequence(sale.saleNo);
               const lock = shopSaleLockState(sale);
               return (
                 <tr
@@ -326,7 +328,16 @@ function ShopSalesTable({
                   } ${!lock.editable && !isSelected ? "opacity-80" : ""}`}
                 >
                   <td className="px-3.5 py-3 text-center text-xs font-semibold text-slate-500">{startIndex + index + 1}</td>
-                  <td className="px-3.5 py-3 text-xs font-semibold text-emerald-600 whitespace-nowrap">{sale.tripNo || "—"}</td>
+                  <td className="px-3.5 py-3 whitespace-nowrap">
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-xs font-semibold text-emerald-600">{sale.tripNo || "—"}</span>
+                      {sequence ? (
+                        <span className="rounded-md border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold tracking-wide text-emerald-700">
+                          {sequence}
+                        </span>
+                      ) : null}
+                    </div>
+                  </td>
                   <td className="px-3.5 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(sale.tripDate)}</td>
                   <td className="px-3.5 py-3 text-xs font-semibold text-slate-700">{cleanDeliveryShopName(sale.shopName) || "—"}</td>
                   <td className="px-3.5 py-3 text-center text-xs font-bold text-cyan-700">{Number(sale.totalBirds || 0).toLocaleString()}</td>

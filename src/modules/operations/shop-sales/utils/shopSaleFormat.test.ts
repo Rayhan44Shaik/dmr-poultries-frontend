@@ -4,6 +4,7 @@ import {
   formatSaleAmount,
   formatSaleRate,
   formatSaleRemark,
+  formatSaleSequence,
   formatSaleWeight,
   shopSaleLockState,
   weekdayShort,
@@ -52,6 +53,15 @@ describe("formats", () => {
     assert.equal(formatSaleRemark("  "), "-");
     assert.equal(formatSaleRemark(undefined), "-");
     assert.equal(formatSaleRemark(null), "-");
+  });
+
+  it("uses a compact S01 sequence for current and legacy Shop Sale numbers", () => {
+    assert.equal(formatSaleSequence("TRP-20260911-001-S01"), "S01");
+    assert.equal(formatSaleSequence("TRP-20260911-001-S001"), "S01");
+    assert.equal(formatSaleSequence("TRP-20260911-001-S12"), "S12");
+    assert.equal(formatSaleSequence("TRP-20260911-001-S100"), "S100");
+    assert.equal(formatSaleSequence("TRP-20260911-001"), null);
+    assert.equal(formatSaleSequence(undefined), null);
   });
 });
 

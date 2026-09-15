@@ -853,12 +853,36 @@ const COMPLETED_TRIPS = TRIPS.filter((t) => t.status === "Completed" && !t._orde
 // 6. SHOP SALES (derived from completed deliveries) + SHOP LEDGER
 // ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * Shop Sale sequence is the actual delivery sequence, not an assignment or
+ * array position. A shop reached first receives S01, then S02, etc. Missing
+ * capture timestamps are deliberately placed last and keep a stable fallback
+ * order, so a newly locked trip is still deterministic while retaining the
+ * time-first business rule whenever time is available.
+ */
+function deliveriesByCapturedTime(deliveries) {
+  return [...(Array.isArray(deliveries) ? deliveries : [])].sort((a, b) => {
+    const aTime = String(a?.autoCaptureTime ?? "").trim();
+    const bTime = String(b?.autoCaptureTime ?? "").trim();
+    if (aTime && bTime && aTime !== bTime) return aTime.localeCompare(bTime);
+    if (aTime !== bTime) return aTime ? -1 : 1;
+    const aSerial = Number(a?.serialNo) || Number.MAX_SAFE_INTEGER;
+    const bSerial = Number(b?.serialNo) || Number.MAX_SAFE_INTEGER;
+    if (aSerial !== bSerial) return aSerial - bSerial;
+    return Number(a?.id) - Number(b?.id);
+  });
+}
+
+function shopSaleNo(tripNo, sequence) {
+  return `${tripNo}-S${String(sequence).padStart(2, "0")}`;
+}
+
 const SHOP_SALES = [];
 for (const t of COMPLETED_TRIPS) {
-  t.deliveries.forEach((d, i) => {
+  deliveriesByCapturedTime(t.deliveries).forEach((d, i) => {
     SHOP_SALES.push({
       id: d.id,
-      saleNo: `${t.tripNo}-S${String(i + 1).padStart(3, "0")}`,
+      saleNo: shopSaleNo(t.tripNo, i + 1),
       tripId: t.id,
       tripNo: t.tripNo,
       // `saleDate` / `birds` / `weight` / `remarks` are the public Shop
@@ -866,6 +890,7 @@ for (const t of COMPLETED_TRIPS) {
       // dashboard/report adapters read them during their migration window.
       saleDate: t.tripDate,
       tripDate: t.tripDate,
+      deliveryTime: d.autoCaptureTime ?? null,
       shopNo: SHOP_BY_ID.get(d.shopId)?.shopNumber ?? "",
       shopId: d.shopId,
       shopName: d.shopName,
@@ -2395,11 +2420,12 @@ function saleFromDelivery(trip, delivery, serialNo) {
   const date = trip.tripDate;
   return {
     id: delivery.id,
-    saleNo: `${trip.tripNo}-S${String(serialNo).padStart(3, "0")}`,
+    saleNo: shopSaleNo(trip.tripNo, serialNo),
     tripId: trip.id,
     tripNo: trip.tripNo,
     saleDate: date,
     tripDate: date,
+    deliveryTime: delivery.autoCaptureTime ?? null,
     shopNo: SHOP_BY_ID.get(delivery.shopId)?.shopNumber ?? "",
     shopId: delivery.shopId,
     shopName: delivery.shopName,
@@ -2483,7 +2509,7 @@ function syncTripDeliveryTotals(trip) {
 function materializeTripSales(trip) {
   syncTripDeliveryTotals(trip);
   const affectedShopIds = new Set();
-  trip.deliveries.forEach((delivery, index) => {
+  deliveriesByCapturedTime(trip.deliveries).forEach((delivery, index) => {
     const next = saleFromDelivery(trip, delivery, index + 1);
     const existing = SHOP_SALES.find((sale) => sale.id === delivery.id);
     if (existing) Object.assign(existing, next, { createdAt: existing.createdAt ?? next.createdAt });

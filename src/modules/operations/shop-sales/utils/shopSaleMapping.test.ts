@@ -7,6 +7,7 @@ function row(overrides: Partial<ApiShopSale> = {}): ApiShopSale {
     id: 42,
     saleNo: "TR-20260820-001-S002",
     saleDate: "2026-08-20",
+    deliveryTime: "2026-08-20T09:15:00",
     shopId: 7,
     shopName: "Maahirah",
     birdTypeId: 3,
@@ -51,6 +52,7 @@ describe("mapApiSaleToShopSale", () => {
   it("keeps backend date, weight, rate and amount untouched", () => {
     const mapped = mapApiSaleToShopSale(row());
     assert.equal(mapped.tripDate, "2026-08-20");
+    assert.equal(mapped.deliveryTime, "2026-08-20T09:15:00");
     assert.equal(mapped.totalWeight, 58.0);
     assert.equal(mapped.rate, 100);
     assert.equal(mapped.amount, 5800);

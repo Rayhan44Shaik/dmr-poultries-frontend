@@ -2,7 +2,7 @@ export interface ShopSale {
 
   id: string;
 
-  /** Backend-authoritative Shop Sales number, e.g. TR-20260820-001-S001.
+  /** Backend-authoritative Shop Sales number, e.g. TR-20260820-001-S01.
    * Never generated/derived in the frontend — the backend is the source.
    * Optional only so unrelated consumers (dashboard demo seed, collections)
    * that construct ShopSale objects without it keep compiling; the Shop
@@ -14,6 +14,9 @@ export interface ShopSale {
   tripNo: string | number;
 
   tripDate: string;
+
+  /** Backend delivery timestamp used to assign this trip's S01, S02… sequence. */
+  deliveryTime?: string | null;
 
   shopNo?: string;
 
