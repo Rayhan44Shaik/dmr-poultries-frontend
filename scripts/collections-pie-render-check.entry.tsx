@@ -35,8 +35,7 @@ export async function runPieRenderCheck(): Promise<void> {
     "Total",
     "recharts-responsive-container",
     "%",
-    topPercent, // biggest share shows in the legend + on its badge
-    "cs-badge-shadow", // badge layer is wired up
+    topPercent, // biggest share shows in the KPI strip
     "cs-pie-spin", // the rotating donut wrapper
   ];
   const missing = [...mustNot.filter((s) => html.includes(s))].map((s) => `"${s}" still present`);
@@ -53,11 +52,11 @@ export async function runPieRenderCheck(): Promise<void> {
     if (!src.includes(marker)) absent.push(`slice colour wiring missing: ${marker}`);
   }
   const modes = data.map((d) => d.name).filter((n) => !html.includes(n)).map((n) => `mode "${n}" missing`);
-  // The % badges are ALWAYS on — one per slice, each seated exactly on its
-  // slice's mid-angle, attached to the donut's own rotating wrapper — so the
-  // static SSR markup must contain exactly one badge rect per slice.
+  // The % toggle badges are GONE (removed on request) — the static SSR
+  // markup must contain no badge rects, and the source no badge layer.
   const badgeRects = (html.match(/x="-26"/g) ?? []).length;
-  if (badgeRects !== data.length) absent.push(`expected ${data.length} badge rects in SSR, found ${badgeRects}`);
+  if (badgeRects !== 0) absent.push(`toggle badges still present in SSR: ${badgeRects} badge rects`);
+  if (src.includes("cs-badge-shadow")) absent.push("toggle badge layer still present in source");
 
   console.log(missing.length + absent.length + modes.length === 0 ? "PIE RENDER CHECK PASS ✔" : "PIE RENDER CHECK FAIL ✖");
   for (const problem of [...missing, ...absent, ...modes]) console.log("  -", problem);

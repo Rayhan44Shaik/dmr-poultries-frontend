@@ -61,33 +61,16 @@ function useCountUp(target: number, duration = 900): number {
 /**
  * Collection Streams — payment-mode donut for the Operations dashboard.
  *
- * The square scene (up to 390 px, centred in the card's middle space) is
- * sized so the donut AND every outer badge fit inside it — no badge can
- * ever be clipped, and nothing can bleed into a neighbouring chart. The
- * legend (HDFC / Cash / Union) sits directly below the donut, and the
- * card height matches the Trips chart's. Slices sweep in on mount /
- * range change.
- *
- * ONE rotation clock, driven by a single requestAnimationFrame loop: the
- * angle is applied to the donut's wrapper AND (as the exact inverse) to
- * every badge pill's counter group in the same frame. Because the badge
- * layer lives INSIDE the rotating wrapper, each badge is attached to its
- * slice's exact mid-angle by construction — no separate orbit, no
- * desync, no drifting — while the counter-rotation keeps every pill
- * perfectly horizontal. The whole thing makes one very slow ambient
- * revolution (8 min per lap, runs always, off with reduced-motion), and
- * the angle is derived from wall-clock time, so even a backgrounded tab
- * snaps back to the correct position the moment it wakes. Slice colours
- * are bound to the slice's own name (stable gradient ids), never to its
- * array position, so a colour can never end up on the wrong slice when
- * the data order changes.
- *
- * EVERY slice always carries a white pop badge with its exact share,
- * outside the ring, its inner edge seated exactly on the ring's outer
- * side (zero gap) at the sector's exact mid-angle. Hovering a slice
- * lifts it out; the other slices stay fully solid (no fading). The centre
- * shows the total with a count-up, the legend lists every mode with exact
- * amount and share, and the card title links to the Collection Report.
+ * Simple & proper by design: a flat 2D donut sitting EXACTLY in the middle
+ * of the card's chart box (the stage fills the free space between the title
+ * and the KPI strip), the period total in the centre with a count-up, and
+ * a KPI strip at the bottom with one box per mode — amount + exact share —
+ * in the same visual language as the Trips chart's KPI row. There are NO
+ * toggle badges on the ring. Slices sweep in on mount / range change; the
+ * ring makes one very slow ambient revolution (8 min per lap, off with
+ * reduced-motion); hovering a slice lifts it out, the others stay solid.
+ * Slice colours are bound to the slice's own name (stable gradient ids),
+ * never to its array position.
  */
 export default function CollectionsPie({ data }: CollectionsPieProps) {
   const { t } = useI18n();
@@ -110,22 +93,8 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
   );
   const animatedTotal = useCountUp(total);
 
-  // Badge positions — the Pie's own layout (0° = 12 o'clock, clockwise, data
-  // order), so each badge sits exactly at its slice's mid-angle.
-  const sliceMids = useMemo(() => {
-    const mids: number[] = [];
-    let acc = 0;
-    for (const d of enrichedData) {
-      const span = total > 0 ? (d.value / total) * 360 : 0;
-      mids.push(acc + span / 2);
-      acc += span;
-    }
-    return mids;
-  }, [enrichedData, total]);
-
   // recharts v3: the per-sector shape gets `isActive` for the hovered slice —
-  // just lift it (bigger outer radius). The % badges live in a separate
-  // overlay layer above the chart, so every one of them always renders.
+  // just lift it (bigger outer radius). The other slices stay fully solid.
   const renderSector = useCallback(
     (props: PieSectorShapeProps) => {
       const { cx, cy, innerRadius, outerRadius, startAngle, endAngle, isActive } = props;
@@ -152,30 +121,22 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
     []
   );
 
-  // ---- one rotation clock (rAF) -------------------------------------------
-  // The donut wrapper rotates; every pill counter-group receives the exact
-  // inverse rotation in the same frame — a single source of truth, so the
-  // badges can never drift from their slices or tilt.
+  // ---- one rotation clock (rAF) — the ring only -------------------------
+  // The donut wrapper makes one very slow ambient revolution; the angle is
+  // derived from wall-clock time, so even a backgrounded tab snaps back to
+  // the correct position the moment it wakes. Off with reduced-motion.
   const spinRef = useRef<HTMLDivElement | null>(null);
-  const counterRefs = useRef<(SVGGElement | null)[]>([]);
 
   useEffect(() => {
     const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
     let frame = 0;
     let running = false;
 
-    const apply = (angle: number) => {
-      if (spinRef.current) spinRef.current.style.transform = `rotate(${angle}deg)`;
-      const inv = `rotate(${-angle}deg)`;
-      for (const g of counterRefs.current) if (g) g.style.transform = inv;
-    };
-
     const stop = () => {
       if (!running) return;
       running = false;
       cancelAnimationFrame(frame);
       if (spinRef.current) spinRef.current.style.transform = "";
-      for (const g of counterRefs.current) if (g) g.style.transform = "";
     };
 
     const start = () => {
@@ -184,7 +145,9 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
       const t0 = performance.now();
       const tick = (now: number) => {
         if (!running) return;
-        apply((((now - t0) / ORBIT_MS) * 360) % 360);
+        if (spinRef.current) {
+          spinRef.current.style.transform = `rotate(${((((now - t0) / ORBIT_MS) * 360) % 360).toFixed(3)}deg)`;
+        }
         frame = requestAnimationFrame(tick);
       };
       frame = requestAnimationFrame(tick);
@@ -209,10 +172,11 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
 
   return (
     <div className="flex w-full min-w-0 flex-1 flex-col">
-      {/* The donut FILLS the card's free space: the stage wrapper takes
-          whatever height is left (title + legend aside) and the square
-          scene grows to the largest size that fits — no leftover white
-          space, on any card size. */}
+      {/* The donut FILLS the card's free space and sits exactly in the
+          middle of the chart box: the stage wrapper takes whatever height
+          is left (title + KPI strip aside) and the square scene grows to
+          the largest size that fits — no leftover white space, on any
+          card size. */}
       <div className="flex min-h-0 flex-1 flex-col items-center gap-4">
         <div className="flex min-h-0 w-full flex-1 items-center justify-center">
           <div className="relative aspect-square max-h-full w-full" style={{ aspectRatio: "1 / 1" }}>
@@ -222,9 +186,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
             <circle cx="200" cy="200" r="91" fill="none" stroke="rgba(241,245,249,0.8)" strokeWidth="33" />
           </svg>
 
-          {/* The rotating wrapper — the rAF loop sets its transform. The
-              badge layer lives INSIDE it, so the badges are attached to
-              their slices by construction. */}
+          {/* The rotating wrapper — the rAF loop sets its transform. */}
           <div ref={spinRef} className="cs-pie-spin h-full w-full">
             <div className="h-full w-full [filter:drop-shadow(0_18px_26px_-16px_rgba(15,23,42,0.35))]">
             <ResponsiveContainer width="100%" height="100%">
@@ -260,75 +222,6 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
               </PieChart>
               </ResponsiveContainer>
             </div>
-
-            {/* White pop badges — one per slice, ALWAYS on. This layer sits
-                inside the rotating wrapper, so each badge is permanently
-                attached to its slice's exact mid-angle, outside the ring
-                and seated on its outer side (zero gap). Each pill's
-                counter group gets the inverse rotation from the same
-                rAF clock, keeping it perfectly horizontal. */}
-            <div className="pointer-events-none absolute inset-0">
-              <svg viewBox="0 0 400 400" className="h-full w-full overflow-visible">
-                <defs>
-                  <filter id="cs-badge-shadow" x="-40%" y="-40%" width="180%" height="180%">
-                    <feDropShadow dx="0" dy="2" stdDeviation="2.4" floodColor="#0f172a" floodOpacity="0.22" />
-                  </filter>
-                </defs>
-                {enrichedData.map((d, i) => {
-                  if (d.percent < 4) return null;
-                  const a = (sliceMids[i] * Math.PI) / 180;
-                  // The pill (52×22) is seated so its inner edge sits EXACTLY
-                  // on the ring's outer side (107.5) at ANY angle: the centre
-                  // is pushed out by the pill's radial half-extent in this
-                  // direction (support function) — zero gap at every angle.
-                  const support = 26 * Math.abs(Math.sin(a)) + 11 * Math.abs(Math.cos(a));
-                  const r = 107.5 + support;
-                  const px = 200 + r * Math.sin(a);
-                  const py = 200 - r * Math.cos(a);
-                  return (
-                    <g key={d.name}>
-                      <g transform={`translate(${px.toFixed(2)}, ${py.toFixed(2)})`}>
-                        <g
-                          className="animate-pop-in"
-                          style={{ transformBox: "view-box", transformOrigin: `${px.toFixed(2)}px ${py.toFixed(2)}px` }}
-                        >
-                          <g
-                            className="cs-badge-counter"
-                            ref={(el) => {
-                              counterRefs.current[i] = el;
-                            }}
-                            style={{ transformBox: "view-box", transformOrigin: `${px.toFixed(2)}px ${py.toFixed(2)}px` }}
-                          >
-                            <rect
-                              x={-26}
-                              y={-11}
-                              width={52}
-                              height={22}
-                              rx={11}
-                              fill="#ffffff"
-                              stroke="rgba(15,23,42,0.08)"
-                              strokeWidth={1}
-                              filter="url(#cs-badge-shadow)"
-                            />
-                            <text
-                              x={0}
-                              y={0.5}
-                              textAnchor="middle"
-                              dominantBaseline="central"
-                              fontSize={11}
-                              fontWeight={800}
-                              fill="#1e293b"
-                            >
-                              {`${d.percent.toFixed(1)}%`}
-                            </text>
-                          </g>
-                        </g>
-                      </g>
-                    </g>
-                  );
-                })}
-              </svg>
-            </div>
           </div>
 
           {/* Centre total — count-up on load / range change (never rotates). */}
@@ -343,29 +236,29 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
         </div>
         </div>
 
-      {/* Legend — every mode with exact amount and share, tight & staggered.
-          Sits beside the donut on wider cards (inside the same flex row). */}
-      <ul className="w-full min-w-0 space-y-1.5">
-        {enrichedData.map((d, index) => (
-          <li
-            key={d.name}
-            className="flex animate-fade-in-up items-center gap-2"
-            style={{ animationDelay: `${260 + index * 90}ms` }}
-          >
-            <span
-              className="h-2 w-2 flex-shrink-0 rounded-[3px]"
-              style={{ background: `linear-gradient(180deg, ${lighten(d.color)}, ${d.color})` }}
-            />
-            <span className="truncate text-[11.5px] font-semibold text-slate-600">{d.name}</span>
-            <span className="ml-auto text-[11.5px] font-bold tabular-nums text-slate-700">
-              {formatINRCompact(d.value)}
-            </span>
-            <span className="w-10 text-right text-[10.5px] font-semibold tabular-nums text-slate-400">
-              {`${d.percent.toFixed(1)}%`}
-            </span>
-          </li>
-        ))}
-      </ul>
+        {/* KPI strip — one box per mode (amount + exact share), in the same
+            simple visual language as the Trips chart's KPI row. */}
+        <div className="grid w-full min-w-0 grid-cols-3 gap-2 border-t border-slate-100 pt-3">
+          {enrichedData.map((d, index) => (
+            <div
+              key={d.name}
+              className="group min-w-0 animate-fade-in-up cursor-default rounded-xl px-2.5 py-2 ring-1 ring-inset ring-slate-100 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+              style={{ backgroundColor: `${d.color}0f`, animationDelay: `${260 + index * 90}ms` }}
+            >
+              <span className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full transition-transform duration-200 group-hover:scale-150"
+                  style={{ backgroundColor: d.color }}
+                />
+                <span className="truncate">{d.name}</span>
+                <span className="ml-auto shrink-0 tabular-nums">{`${d.percent.toFixed(1)}%`}</span>
+              </span>
+              <span className="mt-0.5 block truncate text-[15px] font-black tabular-nums text-slate-800">
+                {formatINRCompact(d.value)}
+              </span>
+            </div>
+          ))}
+        </div>
       </div>
     </div>
   );
