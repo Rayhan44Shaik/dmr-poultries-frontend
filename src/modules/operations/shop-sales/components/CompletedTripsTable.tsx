@@ -1,4 +1,4 @@
-import React, { type ReactNode } from "react";
+import React, { useCallback, useRef, type ReactNode } from "react";
 import {
   IndianRupee,
   Pencil,
@@ -18,7 +18,6 @@ import {
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
 import { formatVehicleNumber } from "../../../../utils/format";
 import { useI18n } from "../../../../i18n";
-import { ActionTooltip } from "../../../../ui/ActionTooltip";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import type { RateEntrySortKey } from "../hooks/useCompletedTrips";
 import { displayRateEntryName, formatRateEntryDay } from "../utils/rateEntryDisplay";
@@ -37,6 +36,8 @@ interface Props {
   children?: ReactNode;
   selectedRowId?: number | null;
   onRowClick?: (trip: Trip) => void;
+  /** Select without toggling, used by keyboard row navigation. */
+  onRowSelect?: (trip: Trip) => void;
   startIndex?: number;
   sortBy?: RateEntrySortKey | null;
   sortDir?: "asc" | "desc";
@@ -62,12 +63,40 @@ function CompletedTripsTable({
   children,
   selectedRowId = null,
   onRowClick,
+  onRowSelect,
   startIndex = 0,
   sortBy = null,
   sortDir = "asc",
   onSortChange,
 }: Props) {
   const { t, language } = useI18n();
+  const rowRefs = useRef(new Map<number, HTMLTableRowElement>());
+
+  const selectRow = useCallback(
+    (trip: Trip) => onRowSelect?.(trip) ?? onRowClick?.(trip),
+    [onRowClick, onRowSelect],
+  );
+
+  const handleRowKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLTableRowElement>, rowIndex: number) => {
+      // Let the Enter Rates / Modify Rates button keep its own keyboard action.
+      if (event.target !== event.currentTarget) return;
+      const currentTrip = trips[rowIndex];
+      if (!currentTrip) return;
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        selectRow(currentTrip);
+        return;
+      }
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+      event.preventDefault();
+      const nextTrip = trips[rowIndex + (event.key === "ArrowDown" ? 1 : -1)];
+      if (!nextTrip) return;
+      selectRow(nextTrip);
+      requestAnimationFrame(() => rowRefs.current.get(nextTrip.id)?.focus());
+    },
+    [selectRow, trips],
+  );
 
   const sortable = (key: RateEntrySortKey, content: React.ReactNode, center = false) => {
     if (!onSortChange) return content;
@@ -76,7 +105,6 @@ function CompletedTripsTable({
       <button
         type="button"
         onClick={() => onSortChange(key)}
-        title={t("common.sort")}
         aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
         className={`group/sort flex items-center gap-2 w-full uppercase tracking-wider font-bold text-[12px] transition-colors hover:text-emerald-700 ${
           center ? "justify-center" : ""
@@ -142,8 +170,15 @@ function CompletedTripsTable({
               return (
                 <tr
                   key={trip.id}
+                  ref={(element) => {
+                    if (element) rowRefs.current.set(trip.id, element);
+                    else rowRefs.current.delete(trip.id);
+                  }}
+                  tabIndex={onRowClick || onRowSelect ? 0 : undefined}
                   onClick={() => onRowClick?.(trip)}
-                  className={`${onRowClick ? "cursor-pointer" : ""} border-t transition-colors duration-150 ${
+                  onKeyDown={(event) => handleRowKeyDown(event, index)}
+                  aria-selected={isSelected}
+                  className={`${onRowClick || onRowSelect ? "cursor-pointer" : ""} outline-none border-t transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
                     isSelected
                       ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200"
                       : `${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"} hover:bg-slate-50/60`
@@ -157,7 +192,7 @@ function CompletedTripsTable({
                   <td className="px-4 py-4 pl-9 text-[13px] font-medium text-slate-600 whitespace-nowrap">
                     {formatRateEntryDay(trip.tripDate, language)}
                   </td>
-                  <td className="px-4 py-4 pl-9 text-[13px] font-medium text-slate-700 whitespace-nowrap">{formatVehicleNumber(trip.vehicleNo)}</td>
+                  <td className="px-4 py-4 pl-9 text-[13px] font-medium text-slate-700 whitespace-nowrap">{displayRateEntryName(formatVehicleNumber(trip.vehicleNo), language)}</td>
                   <td className="px-4 py-4 pl-9 text-[13px] text-slate-600 whitespace-nowrap">{displayRateEntryName(trip.supervisorName, language)}</td>
                   <td className="px-4 py-4 pl-9 text-[13px] text-slate-600 font-medium whitespace-nowrap">
                     {displayRateEntryName(trip.sourceFarm, language)}
@@ -186,7 +221,6 @@ function CompletedTripsTable({
                           <IndianRupee size={15} />
                         </span>
                         {t("ops.rate.enter_rates")}
-                        <ActionTooltip label={t("ops.rate.enter_tooltip")} />
                       </button>
                     ) : canModify ? (
                       <button
@@ -202,7 +236,6 @@ function CompletedTripsTable({
                           <Pencil size={13} />
                         </span>
                         {t("ops.rate.modify_rates")}
-                        <ActionTooltip label={t("ops.rate.modify_tooltip")} />
                       </button>
                     ) : isReadOnly ? (
                       <span className="inline-flex items-center gap-1 rounded-xl bg-slate-100 text-slate-400 px-3 py-2 text-[13px] font-semibold cursor-not-allowed">

@@ -14,8 +14,8 @@ import { isMeterInvalid, meterMustBeGreaterThan } from "../utils/meterValidation
 import { translateValidationMessage } from "../utils/translateValidation";
 import { captureGpsQuiet } from "../utils/captureGps";
 import { useI18n } from "../../../../i18n";
-import { ActionTooltip } from "../../../../ui/ActionTooltip";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
+import { localizeTripViewText } from "../utils/tripViewLocalization";
 
 interface Props {
   trip: Trip;
@@ -57,7 +57,7 @@ export default function StepFarm({
   clearForm: _clearForm,
   showNotification,
 }: Props) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [isSubmitting, setIsSubmitting] = useState(false);
   /** Same-tick double-submit guard (React state lags one frame). */
   const submitLockRef = useRef(false);
@@ -96,7 +96,8 @@ export default function StepFarm({
     .sort((a: any, b: any) => String(a.farmName ?? "").localeCompare(String(b.farmName ?? "")))
     .map((farm: any) => ({
       value: String(farm.id),
-      label: farm.farmName,
+      label: localizeTripViewText(farm.farmName, language),
+      searchText: farm.farmName,
     }));
 
   const birdTypeOptions = birdTypes
@@ -108,7 +109,8 @@ export default function StepFarm({
     .sort((a: any, b: any) => String(a.birdType ?? a.name ?? "").localeCompare(String(b.birdType ?? b.name ?? "")))
     .map((bird: any): DropdownOption => ({
       value: String(bird.id ?? bird.birdTypeId),
-      label: bird.birdType ?? bird.name,
+      label: localizeTripViewText(bird.birdType ?? bird.name, language),
+      searchText: bird.birdType ?? bird.name,
     }));
 
   const fetchCurrentLocation = () => {
@@ -239,7 +241,6 @@ export default function StepFarm({
                 aria-label={t("ops.trip.edit_step")}
               >
                 <Pencil size={14} className={uiActionIconMotionClass.edit} />
-                <ActionTooltip label={t("ops.trip.edit_step")} />
               </button>
             )}
             <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">
@@ -260,19 +261,19 @@ export default function StepFarm({
             icon={Store}
             tone="bg-emerald-50/70 text-emerald-500"
             label={t("common.farm")}
-            value={trip.sourceFarm || t("ops.trip.not_entered")}
+            value={localizeTripViewText(trip.sourceFarm, language) || t("ops.trip.not_entered")}
           />
           <StepKpiCard
             icon={Layers}
             tone="bg-violet-50/70 text-violet-500"
             label={t("operations.bird_type")}
-            value={trip.birdType || t("ops.trip.not_entered")}
+            value={localizeTripViewText(trip.birdType, language) || t("ops.trip.not_entered")}
           />
           <StepKpiCard
             icon={MapPin}
             tone="bg-rose-50/70 text-rose-500"
             label={t("ops.trip.field.farm_address")}
-            value={trip.farmAddress || t("ops.trip.not_entered")}
+            value={localizeTripViewText(trip.farmAddress, language) || t("ops.trip.not_entered")}
           />
           <StepKpiCard
             icon={Gauge}
@@ -398,7 +399,7 @@ export default function StepFarm({
             <div className="flex items-center gap-2 mt-1">
               <div className="flex-1 min-w-0 h-[42px] rounded-xl border border-slate-200 bg-white px-4 text-sm font-medium text-slate-800 flex items-center">
                 {hasGps ? (
-                  <span className="truncate" title={`${Number(trip.farmGpsLat).toFixed(6)}, ${Number(trip.farmGpsLon).toFixed(6)}`}>
+                  <span className="truncate">
                     <GpsAddressText lat={trip.farmGpsLat} lon={trip.farmGpsLon} fallback="ops.trip.location_captured" />
                     {trip.farmGpsAccuracy != null ? ` (±${Number(trip.farmGpsAccuracy).toFixed(1)} m)` : ""}
                   </span>

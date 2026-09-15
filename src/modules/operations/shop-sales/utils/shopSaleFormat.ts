@@ -50,6 +50,20 @@ export function formatSaleRemark(remark: string | null | undefined): string {
   return remark?.trim() ? remark.trim() : "-";
 }
 
+/**
+ * Read the server-authoritative Shop Sale suffix in a compact, user-facing
+ * form. Both legacy `…-S001` and current `…-S01` values render as `S01`, so
+ * delivery sequencing stays clear while the API migrates safely.
+ */
+export function formatSaleSequence(saleNo: string | null | undefined): string | null {
+  const match = String(saleNo ?? "").trim().match(/(?:^|-)S0*(\d+)$/i);
+  if (!match) return null;
+  const sequence = Number(match[1]);
+  return Number.isSafeInteger(sequence) && sequence > 0
+    ? `S${String(sequence).padStart(2, "0")}`
+    : null;
+}
+
 export interface SaleLockState {
   editable: boolean;
   /** Short label shown next to the lock icon / edit button. */

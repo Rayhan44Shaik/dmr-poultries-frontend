@@ -26,7 +26,6 @@ import type { DeliveryEmailStatusValue } from "../services/deliveryEmailService"
 import type { DeliveryWhatsAppStatusValue } from "../services/deliveryWhatsAppService";
 import { useI18n } from "../../../../i18n";
 import { uiActionIconMotionClass, uiSearchInputWithClearClass } from "../../../../shared/ui/uiTokens";
-import { ActionTooltip } from "../../../../ui/ActionTooltip";
 import { cleanDeliveryShopName } from "../utils/shopDisplayName";
 import { formatTripViewStamp } from "../utils/tripViewLocalization";
 
@@ -133,7 +132,6 @@ function CommunicationIcon({
             {sendCount > 9 ? "9+" : sendCount}
           </span>
         )}
-        <ActionTooltip label={tooltip} />
       </button>
       {isFailed && onRetry && (
         <button
@@ -144,7 +142,6 @@ function CommunicationIcon({
           aria-label={t("ops.trip.retry")}
         >
           <RotateCw size={12} className={uiActionIconMotionClass.reset} />
-          <ActionTooltip label={t("ops.trip.retry")} />
         </button>
       )}
     </div>
@@ -248,7 +245,6 @@ export function TripViewShopCards({
               className="group absolute right-2.5 top-1/2 -translate-y-1/2 p-1 rounded-full text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition-colors"
             >
               <X size={13} className={uiActionIconMotionClass.close} />
-              <ActionTooltip label={t("ops.trip.clear_search")} />
             </button>
           )}
         </div>
@@ -291,7 +287,7 @@ export function TripViewShopCards({
                 {/* Header: Shop name, email, delivery mode badge */}
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="text-[15px] font-bold text-slate-800 truncate" title={displayShopName}>
+                    <p className="text-[15px] font-bold text-slate-800 truncate">
                       {displayShopName}
                     </p>
                     <p className="text-[13px] text-slate-500 truncate mt-0.5">
@@ -368,7 +364,7 @@ export function TripViewShopCards({
 
                 {/* Capture info + bird type */}
                 <div className="flex items-center justify-between gap-3 text-[12px] text-slate-400 font-medium pt-0.5">
-                  <div className="flex min-w-0 items-center gap-1 text-slate-600" title={capturedTime}>
+                  <div className="flex min-w-0 items-center gap-1 text-slate-600">
                     <span className="h-4 w-4 rounded bg-indigo-50/70 text-indigo-500 flex items-center justify-center shrink-0">
                       <Clock size={12} />
                     </span>
@@ -385,10 +381,10 @@ export function TripViewShopCards({
 
                 {/* Failure reasons */}
                 {failedReason && (
-                  <p className="text-[12px] text-red-500 px-1 truncate" title={failedReason}>{failedReason}</p>
+                  <p className="text-[12px] text-red-500 px-1 truncate">{failedReason}</p>
                 )}
                 {whatsappFailedReason && (
-                  <p className="text-[12px] text-red-500 px-1 truncate" title={whatsappFailedReason}>{t("ops.trip.whatsapp")}: {whatsappFailedReason}</p>
+                  <p className="text-[12px] text-red-500 px-1 truncate">{t("ops.trip.whatsapp")}: {whatsappFailedReason}</p>
                 )}
 
                 {/* Communication Controls - Icon only */}
@@ -401,7 +397,6 @@ export function TripViewShopCards({
                     aria-label={t("ops.trip.create_pdf")}
                   >
                     <span className={`inline-flex ${uiActionIconMotionClass.pdf}`}><FileDown size={15} /></span>
-                    <ActionTooltip label={t("ops.trip.create_pdf_title")} />
                   </button>
 
                   {/* Email */}

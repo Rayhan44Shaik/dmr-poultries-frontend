@@ -94,6 +94,7 @@ function MasterCard({
   count?: number;
   children: ReactNode;
 }) {
+  const { t } = useI18n();
   const classes = toneClass[tone];
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm flex flex-col">
@@ -105,11 +106,11 @@ function MasterCard({
         <div className="flex items-center gap-1">
           {count != null && (
             <span className="rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
-              {count} days
+              {t("ops.rate.market.days", { count })}
             </span>
           )}
           <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
-            <Database size={10} /> Synced
+            <Database size={10} /> {t("ops.rate.market.synced")}
           </span>
         </div>
       </div>
@@ -125,7 +126,7 @@ export default function RateEntryMarketMasterTables({ master, tripDate, loadErro
     return (
       <div className="px-5 py-3 border-b bg-slate-50 text-xs text-slate-600 flex items-center gap-2">
         <div className="h-3 w-3 rounded-full border-2 border-slate-300 border-t-emerald-500 animate-spin" />
-        {t("ops.rate.market.loading")} — quarter sample syncing...
+        {t("ops.rate.market.loading")} — {t("ops.rate.market.loading_hint")}
       </div>
     );
   }
@@ -144,7 +145,7 @@ export default function RateEntryMarketMasterTables({ master, tripDate, loadErro
         <span className="inline-flex h-6 w-6 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
           <BarChart3 size={12} />
         </span>
-        {t("ops.rate.market.unavailable")} — quarter sample will populate after API sync
+        {t("ops.rate.market.unavailable")} — {t("ops.rate.market.unavailable_hint")}
       </div>
     );
   }
@@ -180,7 +181,7 @@ export default function RateEntryMarketMasterTables({ master, tripDate, loadErro
           <div>
             <h3 className="text-[13px] font-extrabold tracking-tight text-slate-900 flex items-center gap-2">
               {t("ops.rate.market.title")}
-              <span className="rounded-full bg-emerald-600 text-white px-2 py-0.5 text-[10px] font-bold">Quarter Sample Synced</span>
+              <span className="rounded-full bg-emerald-600 text-white px-2 py-0.5 text-[10px] font-bold">{t("ops.rate.market.quarter_synced")}</span>
             </h3>
             <p className="text-[11px] font-medium text-slate-500 flex items-center gap-1.5">
               <span>
@@ -188,14 +189,14 @@ export default function RateEntryMarketMasterTables({ master, tripDate, loadErro
               </span>
               <span className="hidden sm:inline">•</span>
               <span className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-white px-1.5 py-0.5 text-[10px] font-semibold text-slate-600">
-                {master.additionalMetrics.length} days • All modules populated
+                {t("ops.rate.market.modules_synced", { count: master.additionalMetrics.length })}
               </span>
             </p>
           </div>
         </div>
         <div className="flex items-center gap-1.5">
           <span className="inline-flex w-fit items-center rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700">
-            Trip: {formatWindowDate(tripIso)}
+            {t("ops.rate.market.trip")}: {formatWindowDate(tripIso)}
           </span>
         </div>
       </div>
@@ -296,9 +297,9 @@ export default function RateEntryMarketMasterTables({ master, tripDate, loadErro
 
       <div className="mt-2.5 flex items-center justify-between text-[11px] font-medium text-slate-500">
         <span className="flex items-center gap-1">
-          <CheckCircle2 size={12} className="text-emerald-500" /> Market rates from quarter sample • All {master.sizeColumnKeys.length} size columns synced
+          <CheckCircle2 size={12} className="text-emerald-500" /> {t("ops.rate.market.footer_synced", { count: master.sizeColumnKeys.length })}
         </span>
-        <span className="hidden sm:inline">Rates are read-only reference • Selling rate entry below uses these as suggestion</span>
+        <span className="hidden sm:inline">{t("ops.rate.market.footer_reference")}</span>
       </div>
     </div>
   );

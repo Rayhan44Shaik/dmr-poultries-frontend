@@ -311,7 +311,7 @@ export default function GeneralExpensesTable({
             <td className="font-medium text-slate-700 py-2 px-3 align-middle text-[13px]">
               <span className="inline-flex items-center gap-1">
                 {t("ops.trip.start_meter_reading")}
-                <span title={t("ops.trip.locked_from_step1")} className="inline-flex items-center cursor-help">
+                <span className="inline-flex items-center cursor-help">
                   <Lock size={11} className="text-slate-400" />
                 </span>
               </span>
@@ -342,7 +342,6 @@ export default function GeneralExpensesTable({
                   <span
                     className="inline-flex items-center max-w-[min(18rem,55vw)] rounded-md border border-red-100 bg-red-50/70 px-2 py-0.5 text-[11px] font-semibold text-red-500 leading-snug"
                     role="alert"
-                    title={endMeterErrorMsg}
                   >
                     {endMeterErrorMsg}
                   </span>
@@ -391,7 +390,6 @@ export default function GeneralExpensesTable({
                     }
                   }}
                   aria-invalid={isEndMeterInvalid}
-                  title={endMeterErrorMsg || undefined}
                   className={`w-full max-w-[7.5rem] font-semibold text-[13px] tabular-nums outline-none bg-transparent [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none ${
                     isEndMeterInvalid ? "text-red-500" : "text-slate-900"
                   }`}

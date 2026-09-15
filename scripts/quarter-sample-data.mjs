@@ -133,6 +133,44 @@ const monthOf = (s) => s.slice(0, 7);
 const ts = (date, time) => `${date}T${time}`;
 const round = (n, p = 2) => Math.round(n * 10 ** p) / 10 ** p;
 
+/**
+ * The bird equation is invariant for every trip: pickup birds must equal the
+ * sum of delivered birds and mortality. Delivery allocation is generated with
+ * natural variation first, then any small rounding/allocation remainder is
+ * reconciled across the final delivery rows without ever making a count
+ * negative. This keeps the sample as strict as the Shop Sales edit guard.
+ */
+function reconcileDeliveryBirdBalance(deliveries, pickupBirds, averageBirdWeight) {
+  const mortality = deliveries.reduce((total, delivery) => total + Number(delivery.mortality || 0), 0);
+  const delivered = deliveries.reduce((total, delivery) => total + Number(delivery.birds || 0), 0);
+  let adjustment = Number(pickupBirds || 0) - delivered - mortality;
+  if (!adjustment || deliveries.length === 0) return;
+
+  const updateBirds = (delivery, nextBirds) => {
+    const previousBirds = Number(delivery.birds || 0);
+    const weightPerBird = previousBirds > 0
+      ? Number(delivery.weight || 0) / previousBirds
+      : Number(averageBirdWeight || 0);
+    delivery.birds = nextBirds;
+    delivery.weight = round(nextBirds * weightPerBird, 2);
+    delivery.amount = delivery.rate == null ? 0 : round(delivery.weight * Number(delivery.rate), 2);
+  };
+
+  if (adjustment > 0) {
+    const last = deliveries[deliveries.length - 1];
+    updateBirds(last, Number(last.birds || 0) + adjustment);
+    return;
+  }
+
+  for (let index = deliveries.length - 1; index >= 0 && adjustment < 0; index -= 1) {
+    const delivery = deliveries[index];
+    const removable = Math.min(Number(delivery.birds || 0), Math.abs(adjustment));
+    if (!removable) continue;
+    updateBirds(delivery, Number(delivery.birds || 0) - removable);
+    adjustment += removable;
+  }
+}
+
 /** Every calendar date in the quarter. */
 const DATES = [];
 for (let i = 0; i <= dayDiff(QUARTER.fromDate, QUARTER.toDate); i += 1) {
@@ -209,7 +247,9 @@ const SHOPS = Array.from({ length: 200 }, (_, i) => {
     id: n,
     shopNo: n,
     shopNumber: `SHP-${String(n).padStart(3, "0")}`,
-    shopName: `${name} ${String(n).padStart(3, "0")}`,
+    // 25 bases x 8 kinds keeps all 200 names unique on their own, so no
+    // numeric suffix is needed — shops read like real trading names.
+    shopName: name,
     ownerName: `${FIRST[i % FIRST.length]} ${LAST[(i * 3) % LAST.length]}`,
     phoneNumber: mobile,
     secondaryPhoneNumber: String(9700000000 + n * 91),
@@ -588,6 +628,7 @@ for (const date of OP_DATES) {
       }
     }
 
+    reconcileDeliveryBirdBalance(deliveries, totalBirds, avgWeight);
     const deliveredBirds = deliveries.reduce((a, d) => a + d.birds, 0);
     const deliveredWeight = round(deliveries.reduce((a, d) => a + d.weight, 0), 2);
     const mortalityCount = deliveries.reduce((a, d) => a + d.mortality, 0);
@@ -855,27 +896,52 @@ const COMPLETED_TRIPS = TRIPS.filter((t) => t.status === "Completed" && !t._orde
 // 6. SHOP SALES (derived from completed deliveries) + SHOP LEDGER
 // ═══════════════════════════════════════════════════════════════════════════
 
+/**
+ * Shop Sale sequence is the actual delivery sequence, not an assignment or
+ * array position. A shop reached first receives S01, then S02, etc. Missing
+ * capture timestamps are deliberately placed last and keep a stable fallback
+ * order, so a newly locked trip is still deterministic while retaining the
+ * time-first business rule whenever time is available.
+ */
+function deliveriesByCapturedTime(deliveries) {
+  return [...(Array.isArray(deliveries) ? deliveries : [])].sort((a, b) => {
+    const aTime = String(a?.autoCaptureTime ?? "").trim();
+    const bTime = String(b?.autoCaptureTime ?? "").trim();
+    if (aTime && bTime && aTime !== bTime) return aTime.localeCompare(bTime);
+    if (aTime !== bTime) return aTime ? -1 : 1;
+    const aSerial = Number(a?.serialNo) || Number.MAX_SAFE_INTEGER;
+    const bSerial = Number(b?.serialNo) || Number.MAX_SAFE_INTEGER;
+    if (aSerial !== bSerial) return aSerial - bSerial;
+    return Number(a?.id) - Number(b?.id);
+  });
+}
+
+function shopSaleNo(tripNo, sequence) {
+  return `${tripNo}-S${String(sequence).padStart(2, "0")}`;
+}
+
 const SHOP_SALES = [];
 for (const t of COMPLETED_TRIPS) {
-  t.deliveries.forEach((d, i) => {
+  deliveriesByCapturedTime(t.deliveries).forEach((d, i) => {
     const editable = dayDiff(t.tripDate, TODAY) <= 10;
     SHOP_SALES.push({
       id: d.id,
-      saleNo: `${t.tripNo}-S${String(i + 1).padStart(3, "0")}`,
+      saleNo: shopSaleNo(t.tripNo, i + 1),
       tripId: t.id,
       tripNo: t.tripNo,
-      // Both spellings are emitted on purpose: the internal aggregations
-      // (shop ledger, pending collections) read tripDate / totalBirds /
-      // totalWeight / remark, while GET /operations/shop-sales answers the
-      // PostgreSQL contract the Shop Sales page maps from — saleDate / birds /
-      // weight / remarks (see shopSaleMapping.ApiShopSale). Emitting only the
-      // internal names made the page's Day / Weight / Remark columns render
-      // "—" and 0.00 next to correct amounts.
+      // Both spellings are emitted on purpose: `saleDate` / `birds` / `weight`
+      // / `remarks` are the public Shop Sales API contract the page maps from
+      // (see shopSaleMapping.ApiShopSale), while the trip-* aliases are still
+      // read by the internal aggregations (shop ledger, pending collections)
+      // and by older dashboard/report adapters during their migration window.
       saleDate: t.tripDate,
       tripDate: t.tripDate,
+      deliveryTime: d.autoCaptureTime ?? null,
       shopNo: SHOP_BY_ID.get(d.shopId)?.shopNumber ?? "",
       shopId: d.shopId,
       shopName: d.shopName,
+      vehicleNo: t.vehicleNo,
+      farmName: t.sourceFarm,
       birdTypeId: d.birdTypeId,
       birdType: d.birdType,
       birds: d.birds,
@@ -887,23 +953,24 @@ for (const t of COMPLETED_TRIPS) {
       amount: d.amount,
       remarks: d.remarks,
       remark: d.remarks,
-      vehicleNo: t.vehicleNo ?? null,
-      farmName: t.sourceFarm ?? null,
-      status: "Completed",
+      // The Shop Sales client maps backend Approved rows to its Completed
+      // presentation state, exactly as the production endpoint does.
+      status: "Approved",
       deleted: false,
       deletedReason: null,
       editable,
       windowExpiresAt: addDays(t.tripDate, 10),
       tripDeleted: false,
       lockReason: editable ? null : "Editing period has expired.",
+      // The page's lock state reads the correction window explicitly.
       correctionWindowExpired: !editable,
       correctionWindowClosesAt: addDays(t.tripDate, 10),
       rateCompleted: true,
       rateLocked: true,
       rateLockedAt: t.rateLockedAt,
-      rateLockedBy: "Office",
+      rateLockedBy: t.rateLockedBy,
       approvedBy: "Owner",
-      approvedAt: ts(t.tripDate, "21:00:00"),
+      approvedAt: ts(t.tripDate, "20:10:00"),
       createdAt: ts(t.tripDate, "20:20:00"),
       updatedAt: ts(t.tripDate, "20:20:00"),
     });
@@ -957,7 +1024,7 @@ for (const date of OP_DATES) {
       createdBy: collector.employeeName,
       createdAt: ts(date, `1${between(r, 0, 9)}:${String(between(r, 0, 59)).padStart(2, "0")}:00`),
       updatedAt: ts(date, "21:00:00"),
-      canDelete: dayDiff(date, TODAY) <= 3,
+      canDelete: dayDiff(date, TODAY) <= (pendingApproval ? 0 : 10),
     });
   }
 }
@@ -976,11 +1043,37 @@ for (const shop of SHOPS) {
   );
 }
 
+/**
+ * The sample server is intentionally mutable for the life of a dev session.
+ * Keep every operation that changes a sale or an approved collection tied to
+ * the same balance formula used when the quarter is seeded. Re-applying the
+ * formula (rather than adding/subtracting deltas in several endpoints) makes
+ * repeated approve/update/delete calls idempotent and keeps Masters, Pending
+ * Collections, Shop Ledger and both dashboards on one source of truth.
+ */
+function syncShopCurrentBalance(shopId) {
+  const shop = SHOP_BY_ID.get(Number(shopId));
+  if (!shop) return 0;
+  const sales = SHOP_SALES
+    .filter((sale) => sale.shopId === shop.id && sale.deleted !== true)
+    .reduce((total, sale) => total + Number(sale.amount || 0), 0);
+  const collections = COLLECTIONS
+    .filter((collection) =>
+      collection.shopId === shop.id &&
+      collection.deleted !== true &&
+      collection.status === "Approved"
+    )
+    .reduce((total, collection) => total + Number(collection.amount || 0), 0);
+  shop.currentBalance = round(Number(shop.openingBalance || 0) + sales - collections, 2);
+  return shop.currentBalance;
+}
+
 // ── Shop ledger rows (sales debit / collections credit, running balance) ────
 function buildLedger(shopId) {
   const rows = [];
   for (const s of SHOP_SALES) {
     if (shopId && s.shopId !== shopId) continue;
+    if (s.deleted === true) continue;
     rows.push({
       id: s.id,
       shopId: s.shopId,
@@ -1004,7 +1097,7 @@ function buildLedger(shopId) {
   }
   for (const c of COLLECTIONS) {
     if (shopId && c.shopId !== shopId) continue;
-    if (c.status !== "Approved") continue;
+    if (c.deleted === true || c.status !== "Approved") continue;
     rows.push({
       id: 900000 + c.id,
       shopId: c.shopId,
@@ -1589,7 +1682,7 @@ const inRange = (d, from, to) => (!from || d >= from) && (!to || d <= to);
  */
 function tripsIn(from, to) {
   return TRIPS.filter(
-    (t) => !t.deleted && !t._orderContainer && !isOrderContainerRow(t) && inRange(t.tripDate, from, to)
+    (t) => !t.deleted && !isOrderContainerRow(t) && inRange(t.tripDate, from, to)
   );
 }
 
@@ -1597,8 +1690,15 @@ function operationsDashboard(from = QUARTER.fromDate, to = QUARTER.toDate) {
   const trips = tripsIn(from, to);
   // Unfiltered view of the whole dataset, for the "now" KPI tiles below.
   const nowTrips = tripsIn();
-  const sales = SHOP_SALES.filter((s) => inRange(s.tripDate, from, to));
-  const cols = COLLECTIONS.filter((c) => c.status === "Approved" && inRange(c.collectionDate, from, to));
+  const sales = SHOP_SALES.filter(
+    (sale) => sale.deleted !== true && inRange(sale.saleDate ?? sale.tripDate, from, to),
+  );
+  const cols = COLLECTIONS.filter(
+    (collection) =>
+      collection.deleted !== true &&
+      collection.status === "Approved" &&
+      inRange(collection.collectionDate, from, to),
+  );
   const fuel = FUEL_EXPENSES.filter((f) => f.status === "Approved" && inRange(f.billDate, from, to));
   const mnt = MAINTENANCE.filter((x) => inRange(x.date.slice(0, 10), from, to));
   const week = addDays(TODAY, -6);
@@ -1727,6 +1827,7 @@ function collectionReport(params) {
   const mode = params.get("paymentMode") || undefined;
   const rows = COLLECTIONS.filter(
     (c) =>
+      c.deleted !== true &&
       c.status === "Approved" &&
       inRange(c.collectionDate, from, to) &&
       (shopId === undefined || c.shopId === shopId) &&
@@ -2433,21 +2534,485 @@ function applyDeliveryRates(trip, rates) {
   const byId = new Map(
     (Array.isArray(rates) ? rates : []).map((r) => [Number(r.deliveryId), Number(r.rate)]),
   );
+  const affectedShopIds = new Set();
   for (const d of trip.deliveries) {
     const rate = byId.get(d.id);
-    if (Number.isFinite(rate)) {
-      d.rate = rate;
-      d.amount = round((d.weight ?? 0) * rate, 2);
+    if (!Number.isFinite(rate)) continue;
+    d.rate = rate;
+    d.amount = round((d.weight ?? 0) * rate, 2);
+    affectedShopIds.add(d.shopId);
+
+    // A rate may be revised before the trip is locked. If its Shop Sale row
+    // already exists, update that projection in the same operation so Shop
+    // Sales, Ledger, Pending Collections and dashboard sales never diverge.
+    const sale = SHOP_SALES.find((item) => item.id === d.id);
+    if (sale) {
+      sale.rate = d.rate;
+      sale.amount = d.amount;
+      sale.updatedAt = nowIso();
     }
   }
+  for (const shopId of affectedShopIds) syncShopCurrentBalance(shopId);
+}
+
+/** Builds the public Shop Sales API row from a rate-locked delivery. */
+function saleFromDelivery(trip, delivery, serialNo) {
+  const date = trip.tripDate;
+  return {
+    id: delivery.id,
+    saleNo: shopSaleNo(trip.tripNo, serialNo),
+    tripId: trip.id,
+    tripNo: trip.tripNo,
+    saleDate: date,
+    tripDate: date,
+    deliveryTime: delivery.autoCaptureTime ?? null,
+    shopNo: SHOP_BY_ID.get(delivery.shopId)?.shopNumber ?? "",
+    shopId: delivery.shopId,
+    shopName: delivery.shopName,
+    vehicleNo: trip.vehicleNo ?? null,
+    farmName: trip.sourceFarm ?? null,
+    birdTypeId: delivery.birdTypeId ?? null,
+    birdType: delivery.birdType ?? "",
+    birds: Number(delivery.birds ?? 0),
+    totalBirds: Number(delivery.birds ?? 0),
+    weight: Number(delivery.weight ?? 0),
+    totalWeight: Number(delivery.weight ?? 0),
+    mortality: Number(delivery.mortality ?? 0),
+    rate: delivery.rate == null ? null : Number(delivery.rate),
+    amount: Number(delivery.amount ?? 0),
+    remarks: delivery.remarks ?? "",
+    remark: delivery.remarks ?? "",
+    status: "Approved",
+    deleted: false,
+    deletedReason: null,
+    editable: dayDiff(date, TODAY) <= 10,
+    windowExpiresAt: addDays(date, 10),
+    tripDeleted: Boolean(trip.deleted),
+    lockReason: dayDiff(date, TODAY) > 10 ? "Editing period has expired." : null,
+    rateCompleted: true,
+    rateLocked: true,
+    rateLockedAt: trip.rateLockedAt ?? null,
+    rateLockedBy: trip.rateLockedBy ?? null,
+    approvedBy: trip.rateLockedBy ?? "Owner",
+    approvedAt: trip.rateLockedAt ?? ts(date, "20:10:00"),
+    createdAt: ts(date, "20:20:00"),
+    updatedAt: nowIso(),
+  };
+}
+
+/**
+ * Recalculate the trip projection after a Shop Sales correction. Dashboard
+ * trends read the trip totals while Shop Sales reads delivery rows, so both
+ * must be refreshed together when a permitted birds/weight/mortality edit is
+ * made.
+ */
+function syncTripDeliveryTotals(trip) {
+  if (!trip || !Array.isArray(trip.deliveries)) return;
+  const deliveries = trip.deliveries;
+  const totalDeliveredWeight = round(
+    deliveries.reduce((total, delivery) => total + Number(delivery.weight || 0), 0),
+    2,
+  );
+  const totalBirdsDelivered = deliveries.reduce(
+    (total, delivery) => total + Number(delivery.birds || 0),
+    0,
+  );
+  const totalMortalityCount = deliveries.reduce(
+    (total, delivery) => total + Number(delivery.mortality || 0),
+    0,
+  );
+  const totalMortalityWeight = round(
+    deliveries.reduce((total, delivery) => total + Number(delivery.mortKg || 0), 0),
+    2,
+  );
+  trip.totalShops = deliveries.length;
+  trip.totalDeliveredWeight = totalDeliveredWeight;
+  trip.totalBirdsDelivered = totalBirdsDelivered;
+  trip.totalMortality = totalMortalityCount;
+  trip.totalMortalityCount = totalMortalityCount;
+  trip.totalMortalityWeight = totalMortalityWeight;
+  trip.weightLoss = round(
+    Math.max(0, Number(trip.dcWeight || 0) - totalDeliveredWeight - totalMortalityWeight),
+    2,
+  );
+  trip.survivalRate = trip.totalBirds
+    ? round(1 - totalMortalityCount / Number(trip.totalBirds), 4)
+    : 1;
+  trip.lastShop = deliveries.at(-1)?.shopName ?? "";
+}
+
+/**
+ * Rate Entry is the hand-off point from a completed delivery to Shop Sales.
+ * Upsert rather than append so re-lock retries are safe and a rate revision
+ * cannot create duplicate ledger debits.
+ */
+function materializeTripSales(trip) {
+  syncTripDeliveryTotals(trip);
+  const affectedShopIds = new Set();
+  deliveriesByCapturedTime(trip.deliveries).forEach((delivery, index) => {
+    const next = saleFromDelivery(trip, delivery, index + 1);
+    const existing = SHOP_SALES.find((sale) => sale.id === delivery.id);
+    if (existing) Object.assign(existing, next, { createdAt: existing.createdAt ?? next.createdAt });
+    else SHOP_SALES.push(next);
+    affectedShopIds.add(delivery.shopId);
+  });
+  for (const shopId of affectedShopIds) syncShopCurrentBalance(shopId);
+}
+
+/**
+ * Withdraws a trip's sales from the ledger — the exact inverse of
+ * materializeTripSales. Used when an approved trip is moved back to
+ * Draft/Pending: only an approved trip may carry a shop balance, so the money
+ * must come back off the moment approval is revoked.
+ *
+ * Rows are soft-deleted rather than spliced, so Shop Sales history keeps its
+ * audit trail. Balances are then rebuilt from the ledger, which makes repeated
+ * calls idempotent.
+ */
+function dematerializeTripSales(trip) {
+  const affectedShopIds = new Set();
+  for (const sale of SHOP_SALES) {
+    if (Number(sale.tripId) !== Number(trip.id) || sale.deleted === true) continue;
+    sale.deleted = true;
+    sale.deletedReason = "Trip approval revoked";
+    sale.updatedAt = nowIso();
+    affectedShopIds.add(sale.shopId);
+  }
+  for (const shopId of affectedShopIds) syncShopCurrentBalance(shopId);
+}
+
+/**
+ * The Shop Sales edit limit is calculated at request time from the entire
+ * source trip. It therefore cannot be bypassed by paging, filtering, a stale
+ * tab, or a crafted request: delivered birds plus all mortality must never be
+ * greater than the birds picked up for that trip.
+ */
+function shopSaleBirdCapacity(trip, saleId, proposedBirds, proposedMortality) {
+  const pickupBirds = Number(trip?.totalBirds);
+  if (!Number.isSafeInteger(pickupBirds) || pickupBirds < 0) return null;
+
+  const deliveries = Array.isArray(trip?.deliveries) ? trip.deliveries : [];
+  const otherDelivered = deliveries.reduce(
+    (total, delivery) =>
+      Number(delivery.id) === Number(saleId)
+        ? total
+        : total + Number(delivery.birds || 0),
+    0,
+  );
+  const mortality = deliveries.reduce(
+    (total, delivery) =>
+      total + (Number(delivery.id) === Number(saleId)
+        ? Number(proposedMortality ?? delivery.mortality ?? 0)
+        : Number(delivery.mortality || 0)),
+    0,
+  );
+  const maximumBirds = Math.max(0, pickupBirds - otherDelivered - mortality);
+  const nextBirds = proposedBirds == null ? null : Number(proposedBirds);
+  return {
+    pickupBirds,
+    otherDelivered,
+    mortality,
+    maximumBirds,
+    valid: nextBirds == null || (Number.isSafeInteger(nextBirds) && nextBirds >= 0 && nextBirds <= maximumBirds),
+  };
+}
+
+/**
+ * Every completed Trip starts reconciled: pickup birds equal delivered birds
+ * plus mortality. A permitted Shop Sales reduction can deliberately open an
+ * allocation gap. That gap is a workflow state, not merely an informational
+ * value: it must be filled by a shop on the same source trip before a sale on
+ * any other trip may be corrected.
+ */
+function shopSaleAssignment(trip) {
+  const pickupBirds = Number(trip?.totalBirds);
+  if (!Number.isSafeInteger(pickupBirds) || pickupBirds < 0) return null;
+  const deliveries = Array.isArray(trip?.deliveries) ? trip.deliveries : [];
+  const deliveredBirds = deliveries.reduce((total, delivery) => total + Number(delivery.birds || 0), 0);
+  const mortalityBirds = deliveries.reduce((total, delivery) => total + Number(delivery.mortality || 0), 0);
+  return {
+    pickupBirds,
+    deliveredBirds,
+    mortalityBirds,
+    unassignedBirds: Math.max(0, pickupBirds - deliveredBirds - mortalityBirds),
+  };
+}
+
+/** Returns the one Trip that currently owns the reassignment workflow. */
+function currentShopSaleAssignmentLock() {
+  const tripIdsWithSales = new Set(
+    SHOP_SALES.filter((sale) => sale.deleted !== true).map((sale) => Number(sale.tripId)),
+  );
+  return [...TRIP_BY_ID.values()]
+    .filter((trip) => !trip.deleted && tripIdsWithSales.has(Number(trip.id)))
+    .map((trip) => ({ trip, assignment: shopSaleAssignment(trip) }))
+    .filter(({ assignment }) => assignment && assignment.unassignedBirds > 0)
+    .sort((a, b) => String(a.trip.tripDate).localeCompare(String(b.trip.tripDate)) || Number(a.trip.id) - Number(b.trip.id))[0] ?? null;
+}
+
+function assignmentLockMessage(lock) {
+  return `Assign the remaining ${lock.assignment.unassignedBirds} bird${lock.assignment.unassignedBirds === 1 ? "" : "s"} to shops in trip ${lock.trip.tripNo} before editing another trip.`;
+}
+
+/** Public Shop Sales shape enriched with backend-authoritative edit limits and
+ * reassignment workflow facts. The response, rather than a client-side date or
+ * local calculation, is the sole authority for whether a row can be edited. */
+function publicShopSale(sale, assignmentLock = currentShopSaleAssignmentLock()) {
+  const trip = TRIP_BY_ID.get(Number(sale.tripId));
+  const capacity = shopSaleBirdCapacity(trip, sale.id);
+  const assignment = shopSaleAssignment(trip);
+  const blockedByAssignment = Boolean(
+    assignmentLock && Number(assignmentLock.trip.id) !== Number(sale.tripId),
+  );
+  const baseEditable = Boolean(sale.editable && !sale.tripDeleted);
+  return {
+    ...sale,
+    editable: baseEditable && !blockedByAssignment,
+    lockReason: blockedByAssignment ? assignmentLockMessage(assignmentLock) : sale.lockReason,
+    tripPickupBirds: capacity?.pickupBirds ?? null,
+    maxEditableBirds: capacity?.maximumBirds ?? null,
+    tripDeliveredBirds: assignment?.deliveredBirds ?? null,
+    tripMortalityBirds: assignment?.mortalityBirds ?? null,
+    unassignedBirds: assignment?.unassignedBirds ?? null,
+    assignmentComplete: assignment ? assignment.unassignedBirds === 0 : null,
+    assignmentLockTripId: assignmentLock?.trip.id ?? null,
+    assignmentLockTripNo: assignmentLock?.trip.tripNo ?? null,
+    assignmentLockUnassignedBirds: assignmentLock?.assignment.unassignedBirds ?? null,
+  };
+}
+
+/** Keep the Accounts → Farmer Payments register in step with a completed trip. */
+function materializeFarmPayment(trip) {
+  if (!trip?.id || FARM_PAYMENTS.some((payment) => payment.tripId === trip.id)) return;
+  const rate = 92 + (Number(trip.id) % 11);
+  const amount = round(Number(trip.dcWeight || 0) * rate, 2);
+  FARM_PAYMENTS.push({
+    id: nextNumericId(FARM_PAYMENTS),
+    tripId: trip.id,
+    tripNo: trip.tripNo,
+    tripDate: trip.tripDate,
+    farmId: trip.sourceFarmId,
+    farmName: trip.sourceFarm,
+    birdType: trip.birdType,
+    totalBirds: Number(trip.totalBirds || 0),
+    dcWeight: Number(trip.dcWeight || 0),
+    rate,
+    amount,
+    paidAmount: 0,
+    balance: amount,
+    status: "Pending",
+    paymentDate: null,
+    paymentMode: null,
+    referenceNo: null,
+    vehicleNo: trip.vehicleNo,
+    supervisorName: trip.supervisorName,
+  });
+}
+
+function collectionWeekBounds(asOfDate = TODAY) {
+  const value = /^\d{4}-\d{2}-\d{2}$/.test(String(asOfDate)) ? String(asOfDate) : TODAY;
+  const weekStart = weekKey(value);
+  return { asOfDate: value, weekStart, weekEnd: addDays(weekStart, 6) };
+}
+
+function sumForShop(rows, shopId, predicate, value) {
+  return round(
+    rows
+      .filter((row) => row.shopId === shopId && predicate(row))
+      .reduce((total, row) => total + Number(value(row) || 0), 0),
+    2
+  );
+}
+
+/** One aggregated, backend-authoritative row per shop for Pending Collections. */
+function collectionPendingSummary(asOfDate = TODAY) {
+  const { asOfDate: normalizedAsOfDate, weekStart, weekEnd } = collectionWeekBounds(asOfDate);
+  const shops = SHOPS.map((shop) => {
+    // A sale counts toward the balance only when it is approved and not
+    // deleted. Seeded sales are all Approved, but rows created or edited
+    // during a dev session can sit in another state, so the split is explicit
+    // rather than assumed — `weeklySales` stays the approved-only figure the
+    // outstanding formula depends on.
+    const inWeek = (sale) => inRange(sale.saleDate ?? sale.tripDate, weekStart, weekEnd);
+    const isLiveSale = (sale) => sale.deleted !== true;
+    const isApprovedSale = (sale) => isLiveSale(sale) && String(sale.status ?? "Approved") === "Approved";
+    const isPendingSale = (sale) => isLiveSale(sale) && /pending/i.test(String(sale.status ?? ""));
+
+    const weeklySales = sumForShop(
+      SHOP_SALES,
+      shop.id,
+      (sale) => isApprovedSale(sale) && inWeek(sale),
+      (sale) => sale.amount,
+    );
+    const weeklyPendingSales = sumForShop(
+      SHOP_SALES,
+      shop.id,
+      (sale) => isPendingSale(sale) && inWeek(sale),
+      (sale) => sale.amount,
+    );
+    const weeklySalesCount = SHOP_SALES.filter(
+      (sale) => sale.shopId === shop.id && isApprovedSale(sale) && inWeek(sale),
+    ).length;
+    const weeklyApprovedCollections = sumForShop(
+      COLLECTIONS,
+      shop.id,
+      (collection) =>
+        collection.deleted !== true &&
+        collection.status === "Approved" &&
+        inRange(collection.collectionDate, weekStart, weekEnd),
+      (collection) => collection.amount,
+    );
+    const weeklyPendingCollections = sumForShop(
+      COLLECTIONS,
+      shop.id,
+      (collection) =>
+        collection.deleted !== true &&
+        collection.status === "Pending Approval" &&
+        inRange(collection.collectionDate, weekStart, weekEnd),
+      (collection) => collection.amount,
+    );
+    const weeklyApprovedCollectionsCount = COLLECTIONS.filter(
+      (collection) =>
+        collection.shopId === shop.id &&
+        collection.deleted !== true &&
+        collection.status === "Approved" &&
+        inRange(collection.collectionDate, weekStart, weekEnd),
+    ).length;
+    const weeklyPendingCollectionsCount = COLLECTIONS.filter(
+      (collection) =>
+        collection.shopId === shop.id &&
+        collection.deleted !== true &&
+        collection.status === "Pending Approval" &&
+        inRange(collection.collectionDate, weekStart, weekEnd),
+    ).length;
+    const approvedForShop = COLLECTIONS.filter(
+      (collection) =>
+        collection.shopId === shop.id &&
+        collection.deleted !== true &&
+        collection.status === "Approved",
+    );
+    // Opening balance = the closing balance carried forward from the previous
+    // week, i.e. everything that settled strictly BEFORE this week started.
+    // Computed from the ledger rather than derived from the live balance, so
+    // it stays correct even when a back-dated sale or collection lands later.
+    const salesBeforeWeek = sumForShop(
+      SHOP_SALES,
+      shop.id,
+      (sale) => isApprovedSale(sale) && String(sale.saleDate ?? sale.tripDate) < weekStart,
+      (sale) => sale.amount,
+    );
+    const collectionsBeforeWeek = sumForShop(
+      COLLECTIONS,
+      shop.id,
+      (collection) =>
+        collection.deleted !== true &&
+        collection.status === "Approved" &&
+        String(collection.collectionDate) < weekStart,
+      (collection) => collection.amount,
+    );
+    const openingBalance = round(
+      Number(shop.openingBalance || 0) + salesBeforeWeek - collectionsBeforeWeek,
+      2,
+    );
+    const lastCollectionDate = approvedForShop
+      .map((collection) => collection.collectionDate)
+      .sort()
+      .at(-1) ?? null;
+    return {
+      shopId: shop.id,
+      shopName: shop.shopName,
+      weekStart,
+      weekEnd,
+      // Last day of the previous week — labels the carried-forward opening.
+      previousWeekEnd: shiftIso(weekStart, -1),
+      // Closing balance brought forward from the previous week.
+      openingBalance,
+      // This is a live outstanding balance, not a weekly balance.
+      balance: syncShopCurrentBalance(shop.id),
+      // The week's own closing figure: opening + approved sales − approved
+      // collections. For the current week this equals `balance`; for a past
+      // week it will differ by whatever happened after that week ended.
+      closingBalance: round(openingBalance + weeklySales - weeklyApprovedCollections, 2),
+      weeklySales,
+      weeklyPendingSales,
+      weeklySalesCount,
+      weeklyApprovedCollections,
+      weeklyPendingCollections,
+      weeklyApprovedCollectionsCount,
+      weeklyPendingCollectionsCount,
+      recoveryPercentage: weeklySales > 0 ? round((weeklyApprovedCollections / weeklySales) * 100, 2) : 0,
+      overdueDays: lastCollectionDate ? dayDiff(lastCollectionDate, normalizedAsOfDate) : null,
+      hasPendingCollections: weeklyPendingCollections > 0,
+      lastCollectionDate,
+    };
+  });
+  const totals = {
+    weeklySales: round(shops.reduce((total, shop) => total + shop.weeklySales, 0), 2),
+    weeklyApprovedCollections: round(shops.reduce((total, shop) => total + shop.weeklyApprovedCollections, 0), 2),
+    weeklyPendingCollections: round(shops.reduce((total, shop) => total + shop.weeklyPendingCollections, 0), 2),
+    balance: round(shops.reduce((total, shop) => total + shop.balance, 0), 2),
+    recoveryPercentage: 0,
+  };
+  totals.recoveryPercentage = totals.weeklySales > 0
+    ? round((totals.weeklyApprovedCollections / totals.weeklySales) * 100, 2)
+    : 0;
+  return {
+    asOfDate: normalizedAsOfDate,
+    weekStart,
+    weekEnd,
+    shops,
+    totals,
+    // Legacy aliases are retained for consumers written before the canonical
+    // `shops` / `totals` envelope was finalized.
+    data: shops,
+    rows: shops,
+    totalPending: totals.balance,
+  };
+}
+
+/** Same source data, shaped for the Collection Entry's selected-shop summary. */
+/**
+ * Projects one aggregated shop row onto the Collection Entry weekly-summary
+ * contract. Shared by the single-shop and the all-shops endpoints so both
+ * always expose identical fields.
+ */
+function toWeeklySummaryShape(shop) {
+  return {
+    shopId: shop.shopId,
+    shopName: shop.shopName,
+    weekStart: shop.weekStart,
+    weekEnd: shop.weekEnd,
+    previousWeekEnd: shop.previousWeekEnd,
+    openingBalance: shop.openingBalance,
+    balance: shop.balance,
+    closingBalance: shop.closingBalance,
+    weeklySales: shop.weeklySales,
+    pendingSales: shop.weeklyPendingSales,
+    salesCount: shop.weeklySalesCount,
+    approvedCollections: shop.weeklyApprovedCollections,
+    pendingCollections: shop.weeklyPendingCollections,
+    approvedCollectionsCount: shop.weeklyApprovedCollectionsCount,
+    pendingCollectionsCount: shop.weeklyPendingCollectionsCount,
+    isCurrentWeek: shop.weekStart === weekKey(TODAY),
+  };
+}
+
+function weeklyCollectionSummary(shopId, asOfDate = TODAY) {
+  const report = collectionPendingSummary(asOfDate);
+  const shop = report.shops.find((row) => row.shopId === Number(shopId));
+  return shop ? toWeeklySummaryShape(shop) : null;
 }
 
 function pendingCollections() {
   return SHOPS.map((s) => {
-    const last = COLLECTIONS.filter((c) => c.shopId === s.id && c.status === "Approved")
-      .map((c) => c.collectionDate)
-      .sort()
-      .pop();
+    const approved = COLLECTIONS.filter(
+      (c) => c.shopId === s.id && c.deleted !== true && c.status === "Approved",
+    );
+    const last = approved.map((c) => c.collectionDate).sort().at(-1);
+    const totalSales = SHOP_SALES
+      .filter((sale) => sale.shopId === s.id && sale.deleted !== true)
+      .reduce((total, sale) => total + Number(sale.amount || 0), 0);
+    const totalCollections = approved.reduce((total, collection) => total + Number(collection.amount || 0), 0);
     return {
       shopId: s.id,
       shopNo: s.shopNumber,
@@ -2455,10 +3020,10 @@ function pendingCollections() {
       city: s.city,
       ownerName: s.ownerName,
       phoneNumber: s.phoneNumber,
-      totalSales: round(SALES_BY_SHOP.get(s.id) ?? 0, 2),
-      totalCollections: round(COLLECTED_BY_SHOP.get(s.id) ?? 0, 2),
+      totalSales: round(totalSales, 2),
+      totalCollections: round(totalCollections, 2),
       openingBalance: s.openingBalance,
-      currentPending: s.currentBalance,
+      currentPending: syncShopCurrentBalance(s.id),
       pendingAmount: s.currentBalance,
       lastCollectionDate: last ?? "-",
       overdueDays: last ? dayDiff(last, TODAY) : 0,
@@ -2927,15 +3492,15 @@ function generateSalaryMonth(month) {
   return { month, requested: employees.length, generated, skippedExisting: skipped };
 }
 
-// ── Staff: payslip PDF ─────────────────────────────────────────────────────
+// ── Printable document placeholders (payslips, permit scans) ───────────────
 
-/** Minimal, valid one-page A4 PDF with centred text lines (no dependencies). */
-function samplePdf(title, lines) {
+/** Minimal, valid one-page A4 PDF with stacked text lines (no dependencies). */
+function samplePdf(title, lines, subtitle = "Sample payslip - quarter sample data") {
   const esc = (s) => String(s).replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
   const content = [
     "BT",
     "/F1 18 Tf 50 792 Td (DMR POULTRIES) Tj",
-    "/F1 10 Tf 0 -22 Td (Sample payslip - quarter sample data) Tj",
+    `/F1 10 Tf 0 -22 Td (${esc(subtitle)}) Tj`,
     `/F1 14 Tf 0 -34 Td (${esc(title)}) Tj`,
     ...lines.map((line, i) => `/F1 11 Tf 0 ${-24 - i * 18} Td (${esc(line)}) Tj`),
     "ET",
@@ -2959,6 +3524,98 @@ function samplePdf(title, lines) {
     offsets.map((o) => `${String(o).padStart(10, "0")} 00000 n \n`).join("") +
     `trailer\n<< /Size ${objects.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF`;
   return Buffer.from(pdf, "latin1");
+}
+
+// ── Trips: per-delivery dispatch (Email / WhatsApp) ────────────────────────
+//
+// Trip View shows one Email and one WhatsApp chip per shop delivery. The
+// status lives server-side so it survives a refresh; here it is kept in an
+// in-memory map keyed by `tripId:deliveryId:channel`, seeded lazily from the
+// deterministic dataset so completed trips already show a realistic mix of
+// sent / pending rows the first time a trip is opened.
+
+const DELIVERY_DISPATCH = new Map();
+
+const dispatchKey = (tripId, deliveryId, channel) => `${tripId}:${deliveryId}:${channel}`;
+
+/** Shop contact for a delivery, falling back to the shop master record. */
+function deliveryRecipient(delivery, channel) {
+  const shop = SHOP_BY_ID.get(Number(delivery.shopId));
+  if (channel === "email") return delivery.shopEmail ?? shop?.email ?? null;
+  return delivery.shopWhatsApp ?? shop?.whatsappNumber ?? shop?.phoneNumber ?? null;
+}
+
+/** Create (once) and return the stored dispatch state for one delivery. */
+function dispatchState(trip, delivery, channel) {
+  const key = dispatchKey(trip.id, delivery.id, channel);
+  const existing = DELIVERY_DISPATCH.get(key);
+  if (existing) return existing;
+
+  const recipient = deliveryRecipient(delivery, channel);
+  // Seed only finished trips, and only where a contact exists: ~2 of every 3
+  // eligible deliveries read as already sent, the rest stay pending so both
+  // states (and the "Send all" action) are visible on a fresh dataset.
+  const seedSent =
+    trip.status === "Completed" && Boolean(recipient) && (Number(delivery.id) + trip.id) % 3 !== 0;
+  const state = {
+    status: seedSent ? "sent" : "pending",
+    recipient: seedSent ? recipient : null,
+    sentAt: seedSent ? ts(trip.tripDate, "20:30:00") : null,
+    failureReason: null,
+    sendCount: seedSent ? 1 : 0,
+    attemptCount: seedSent ? 1 : 0,
+  };
+  DELIVERY_DISPATCH.set(key, state);
+  return state;
+}
+
+/** Full status list for one trip — the GET /delivery-emails|whatsapp payload. */
+function deliveryDispatchRows(trip, channel) {
+  return (trip.deliveries ?? []).map((delivery) => {
+    const state = dispatchState(trip, delivery, channel);
+    const contactKey = channel === "email" ? "shopEmail" : "shopWhatsApp";
+    return {
+      tripId: trip.id,
+      deliveryId: delivery.id,
+      shopId: delivery.shopId ?? null,
+      shopName: delivery.shopName ?? "",
+      deliveryNo: `${trip.tripNo}-S${pad2(delivery.serialNo ?? 0)}`,
+      [contactKey]: deliveryRecipient(delivery, channel),
+      status: state.status,
+      recipient: state.recipient,
+      sentAt: state.sentAt,
+      failureReason: state.failureReason,
+      sendCount: state.sendCount,
+      attemptCount: state.attemptCount,
+    };
+  });
+}
+
+/** Record one send attempt. Missing contact = a deterministic failure. */
+function recordDeliveryDispatch(trip, delivery, channel) {
+  const state = dispatchState(trip, delivery, channel);
+  const recipient = deliveryRecipient(delivery, channel);
+  state.attemptCount += 1;
+  if (!recipient) {
+    state.status = "failed";
+    state.failureReason =
+      channel === "email"
+        ? "No email address on the shop master record."
+        : "No WhatsApp number on the shop master record.";
+    return { success: false, status: state.status, message: state.failureReason, sendCount: state.sendCount, attemptCount: state.attemptCount };
+  }
+  state.status = "sent";
+  state.recipient = recipient;
+  state.sentAt = nowIso();
+  state.failureReason = null;
+  state.sendCount += 1;
+  return {
+    success: true,
+    status: state.status,
+    message: `Sent to ${recipient}.`,
+    sendCount: state.sendCount,
+    attemptCount: state.attemptCount,
+  };
 }
 
 // ── Trips: wizard writes ───────────────────────────────────────────────────
@@ -3013,7 +3670,19 @@ function createCollectionRow(body) {
   const shop =
     SHOP_BY_ID.get(Number(body.shopId)) ??
     ACTIVE_SHOPS.find((s) => s.shopName === body.shopName);
-  const sameDay = COLLECTIONS.filter((c) => c.collectionDate === date).length + 1;
+  // Number from the highest suffix ever issued for this date — NOT from the
+  // current row count. Counting is not collision-free: editing a collection's
+  // date moves it out of its day bucket, which would free its number and let
+  // the next create on that date reuse it. Collection numbers are financial
+  // references and must never be recycled, so scan the whole register
+  // (deleted rows included) and always take the next number up.
+  const datePrefix = `COL-${date.replaceAll("-", "")}-`;
+  const sameDay = COLLECTIONS.reduce((highest, collection) => {
+    const no = String(collection.collectionNo ?? "");
+    if (!no.startsWith(datePrefix)) return highest;
+    const suffix = Number.parseInt(no.slice(datePrefix.length), 10);
+    return Number.isFinite(suffix) && suffix > highest ? suffix : highest;
+  }, 0) + 1;
   const row = {
     id,
     collectionNo: `COL-${date.replaceAll("-", "")}-${pad3(sameDay)}`,
@@ -3028,20 +3697,28 @@ function createCollectionRow(body) {
     paymentMode: body.paymentMode ?? "Cash",
     referenceNo: body.referenceNo ?? "",
     remarks: body.remarks ?? "",
-    status: "Approved",
+    // New collection entries follow the same approval workflow as production:
+    // they are visible in the Pending tab first and affect financial balances
+    // only after the approve action succeeds.
+    status: body.status ?? "Pending Approval",
     deleted: false,
     isFinancial: true,
     openingBalance: null,
     closingBalance: null,
-    approvedBy: "Owner",
-    approvedAt: nowIso(),
+    approvedBy: null,
+    approvedAt: null,
     createdBy: body.collector ?? "Office",
     createdAt: nowIso(),
     updatedAt: nowIso(),
     canDelete: true,
   };
+  if (row.status === "Approved") {
+    row.approvedBy = body.approvedBy ?? "Owner";
+    row.approvedAt = nowIso();
+  }
   COLLECTIONS.push(row);
-  return row;
+  const currentBalance = syncShopCurrentBalance(row.shopId);
+  return { ...row, currentBalance };
 }
 
 function createFuelRow(body) {
@@ -3493,6 +4170,10 @@ const server = http.createServer(async (req, res) => {
       }
       if (method === "DELETE") {
         trip.deleted = true;
+        trip.deletedAt = nowIso();
+        // A deleted trip is no longer a sale, so its money must leave every
+        // shop's outstanding balance immediately.
+        dematerializeTripSales(trip);
         return send(200, { id: tripId, deleted: true, sample: true });
       }
       return send(200, trip);
@@ -3517,13 +4198,59 @@ const server = http.createServer(async (req, res) => {
       const trip = mergeTripBody(m(/^\/api\/trips\/(\d+)\/diesel(\/[^/]+)?$/)[1], await readBody(req));
       return trip ? send(200, trip) : send(404, { error: "trip_not_found" });
     }
+    // Per-delivery dispatch status (Trip View → Email / WhatsApp columns).
+    // GET  /api/trips/:id/delivery-emails    | /delivery-whatsapp
+    // POST /api/trips/:id/deliveries/:d/email | /whatsapp
+    if (m(/^\/api\/trips\/(\d+)\/delivery-(emails|whatsapp)$/) && method === "GET") {
+      const [, rawTripId, channel] = m(/^\/api\/trips\/(\d+)\/delivery-(emails|whatsapp)$/);
+      const trip = TRIP_BY_ID.get(Number(rawTripId));
+      if (!trip) return send(404, { error: "trip_not_found" });
+      return send(200, deliveryDispatchRows(trip, channel === "emails" ? "email" : "whatsapp"));
+    }
+    if (m(/^\/api\/trips\/(\d+)\/deliveries\/(\d+)\/(email|whatsapp)$/) && method === "POST") {
+      const [, rawTripId, rawDeliveryId, channel] = m(
+        /^\/api\/trips\/(\d+)\/deliveries\/(\d+)\/(email|whatsapp)$/
+      );
+      await readBody(req);
+      const trip = TRIP_BY_ID.get(Number(rawTripId));
+      if (!trip) return send(404, { error: "trip_not_found" });
+      const delivery = (trip.deliveries ?? []).find((d) => Number(d.id) === Number(rawDeliveryId));
+      if (!delivery) return send(404, { error: "delivery_not_found" });
+      return send(200, recordDeliveryDispatch(trip, delivery, channel));
+    }
     // Status transition: PATCH /api/trips/:id/status
     if (m(/^\/api\/trips\/(\d+)\/status$/) && method === "PATCH") {
       const body = await readBody(req);
+      const nextStatus = body?.status;
       const trip = mergeTripBody(m(/^\/api\/trips\/(\d+)\/status$/)[1], {
-        ...(body?.status ? { status: body.status } : {}),
+        ...(nextStatus ? { status: nextStatus } : {}),
       });
-      return trip ? send(200, trip) : send(404, { error: "trip_not_found" });
+      if (!trip) return send(404, { error: "trip_not_found" });
+      // Approving a trip is the financial hand-off: its deliveries become Shop
+      // Sales and must hit the shop's outstanding balance straight away. Only
+      // an APPROVED (Completed) trip may do so — Draft/Pending/Deleted trips
+      // must never touch a balance. Previously only the Rate Entry lock route
+      // materialised sales, so a trip approved from the Trip List left Masters,
+      // Shop Ledger and Collection Entry showing a stale outstanding figure.
+      if (nextStatus === "Completed" && trip.deleted !== true) {
+        trip.approvedBy = body?.approvedBy ?? trip.approvedBy ?? "Owner";
+        trip.approvedAt = nowIso();
+        if (!COMPLETED_TRIPS.some((completed) => completed.id === trip.id)) {
+          COMPLETED_TRIPS.push(trip);
+        }
+        // Idempotent: materializeTripSales upserts by delivery id and then
+        // rebuilds each affected shop balance from the full ledger, so a
+        // repeated approve cannot double-count.
+        materializeTripSales(trip);
+        materializeFarmPayment(trip);
+      }
+      // Un-approving (back to Draft/Pending) or deleting must withdraw the
+      // sales again, otherwise the balance would keep money the business no
+      // longer considers sold.
+      if (nextStatus && nextStatus !== "Completed") {
+        dematerializeTripSales(trip);
+      }
+      return send(200, trip);
     }
 
     // ── Operations ────────────────────────────────────────────────────────
@@ -3571,7 +4298,15 @@ const server = http.createServer(async (req, res) => {
       trip.rateLockedAt = new Date().toISOString();
       trip.rateLockedBy = body?.lockedBy ?? "web-user";
       trip.rateCompleted = true;
+      // A locked Rate Entry is the final business hand-off: the dispatch now
+      // belongs in Shop Sales and every financial/dashboard aggregate.
+      trip.status = "Completed";
       trip.ratesEntered = trip.deliveries.filter((d) => d.rate != null).length;
+      if (!COMPLETED_TRIPS.some((completed) => completed.id === trip.id)) {
+        COMPLETED_TRIPS.push(trip);
+      }
+      materializeTripSales(trip);
+      materializeFarmPayment(trip);
       return send(200, rateEntryTrip(trip, true));
     }
     if (m(/^\/api\/operations\/rate-entry\/(\d+)$/)) {
@@ -3589,7 +4324,9 @@ const server = http.createServer(async (req, res) => {
       const from = q.get("fromDate");
       const to = q.get("toDate");
       const search = (q.get("search") || "").toLowerCase();
-      let rows = SHOP_SALES.filter((s) => inRange(s.tripDate, from, to));
+      let rows = SHOP_SALES.filter(
+        (sale) => sale.deleted !== true && inRange(sale.saleDate ?? sale.tripDate, from, to),
+      );
       if (search)
         rows = rows.filter(
           (s) =>
@@ -3597,7 +4334,106 @@ const server = http.createServer(async (req, res) => {
             s.tripNo.toLowerCase().includes(search) ||
             (s.saleNo ?? "").toLowerCase().includes(search)
         );
-      return send(200, q.get("page") ? paginate(rows, q) : rows);
+      // Resolve the single reassignment lock once for the response rather
+      // than recalculating it for every Shop Sales row.
+      const assignmentLock = currentShopSaleAssignmentLock();
+      const publicRows = rows.map((sale) => publicShopSale(sale, assignmentLock));
+      return send(200, q.get("page") ? paginate(publicRows, q) : publicRows);
+    }
+    if (m(/^\/api\/operations\/shop-sales\/(\d+)$/)) {
+      const id = Number(m(/^\/api\/operations\/shop-sales\/(\d+)$/)[1]);
+      const sale = SHOP_SALES.find((row) => row.id === id && row.deleted !== true);
+      if (!sale) return send(404, { error: "shop_sale_not_found" });
+      const trip = TRIP_BY_ID.get(Number(sale.tripId));
+      if (method === "PUT" || method === "PATCH") {
+        const body = await readBody(req);
+        // Rate, value and owner are locked by Rate Entry. The frontend sends
+        // only changed values, so a present immutable field is a deliberate
+        // validation attempt and should be rejected exactly like production.
+        const immutableFields = ["rate", "amount", "shopId", "shopName", "tripId", "tripNo"];
+        if (immutableFields.some((field) => Object.hasOwn(body, field))) {
+          return send(409, { error: "shop_sale_locked", message: "Rate, amount, shop and trip are locked after Rate Entry." });
+        }
+        if (!sale.editable || sale.tripDeleted) {
+          return send(409, { error: "correction_window_closed", message: sale.lockReason || "Editing period has expired." });
+        }
+        // A reduction can leave birds unassigned. Once that happens, only
+        // deliveries on the source trip may be edited until the exact gap is
+        // allocated again. Enforce before applying any mutation so direct API
+        // calls cannot bypass the Shop Sales table's disabled controls.
+        const assignmentLock = currentShopSaleAssignmentLock();
+        if (assignmentLock && Number(assignmentLock.trip.id) !== Number(sale.tripId)) {
+          return send(409, {
+            error: "trip_assignment_incomplete",
+            message: assignmentLockMessage(assignmentLock),
+            assignmentLockTripId: assignmentLock.trip.id,
+            assignmentLockTripNo: assignmentLock.trip.tripNo,
+            unassignedBirds: assignmentLock.assignment.unassignedBirds,
+          });
+        }
+        const nextBirds = body.birds != null ? Number(body.birds) : Number(sale.birds);
+        const nextMortality = body.mortality != null ? Number(body.mortality) : Number(sale.mortality);
+        if (!Number.isSafeInteger(nextBirds) || nextBirds < 0) {
+          return send(422, { error: "invalid_birds", message: "Birds must be a whole, non-negative number." });
+        }
+        if (!Number.isSafeInteger(nextMortality) || nextMortality < 0) {
+          return send(422, { error: "invalid_mortality", message: "Mortality must be a whole, non-negative number." });
+        }
+        const birdCapacity = shopSaleBirdCapacity(trip, sale.id, nextBirds, nextMortality);
+        if (birdCapacity && !birdCapacity.valid) {
+          return send(422, {
+            error: "trip_bird_limit_exceeded",
+            message: `Birds cannot exceed ${birdCapacity.maximumBirds} for this shop. Delivered birds plus mortality cannot exceed the ${birdCapacity.pickupBirds} birds picked up for this trip.`,
+            tripPickupBirds: birdCapacity.pickupBirds,
+            maxEditableBirds: birdCapacity.maximumBirds,
+          });
+        }
+        if (body.birds != null) {
+          sale.birds = nextBirds;
+          sale.totalBirds = nextBirds;
+        }
+        if (body.weight != null) {
+          const weight = Number(body.weight);
+          if (!Number.isFinite(weight) || weight < 0) return send(422, { error: "invalid_weight" });
+          sale.weight = weight;
+          sale.totalWeight = weight;
+        }
+        if (body.mortality != null) {
+          sale.mortality = nextMortality;
+        }
+        if (body.remarks != null) {
+          sale.remarks = String(body.remarks);
+          sale.remark = sale.remarks;
+        }
+        if (body.birdTypeId != null) sale.birdTypeId = Number(body.birdTypeId);
+        if (body.birdType != null) sale.birdType = String(body.birdType);
+        sale.amount = sale.rate == null ? 0 : round(Number(sale.weight || 0) * Number(sale.rate), 2);
+        sale.updatedAt = nowIso();
+        const delivery = trip?.deliveries?.find((row) => row.id === sale.id);
+        if (delivery) {
+          Object.assign(delivery, {
+            birds: sale.birds,
+            weight: sale.weight,
+            mortality: sale.mortality,
+            birdTypeId: sale.birdTypeId,
+            birdType: sale.birdType,
+            remarks: sale.remarks,
+            rate: sale.rate,
+            amount: sale.amount,
+          });
+          syncTripDeliveryTotals(trip);
+        }
+        syncShopCurrentBalance(sale.shopId);
+        return send(200, publicShopSale(sale));
+      }
+      if (method === "DELETE") {
+        sale.deleted = true;
+        sale.deletedReason = "Removed in sample preview";
+        sale.updatedAt = nowIso();
+        syncShopCurrentBalance(sale.shopId);
+        return send(200, { ok: true, deleted: true, id: sale.id });
+      }
+      return send(200, publicShopSale(sale));
     }
     // Edit one sale line (Shop Sales page): birds / weight / mortality /
     // remarks / bird type are editable inside the 10-day window; amount is
@@ -3634,9 +4470,14 @@ const server = http.createServer(async (req, res) => {
       // ~4.7k rows). Backends that ignore the filter are still handled: the
       // caller re-checks the status itself.
       const status = (q.get("status") || "").trim().toLowerCase();
+      // `includeDeleted=false` is sent explicitly by the register loader; the
+      // deleted rows only ever surface when it asks for them.
+      const includeDeleted = String(q.get("includeDeleted")) === "true";
+      const shopId = Number(q.get("shopId")) || 0;
       const rows = COLLECTIONS.filter(
         (c) =>
-          c.deleted !== true &&
+          (includeDeleted || c.deleted !== true) &&
+          (!shopId || c.shopId === shopId) &&
           inRange(c.collectionDate, q.get("fromDate"), q.get("toDate")) &&
           (!status || String(c.status || "").toLowerCase() === status)
       );
@@ -3650,133 +4491,127 @@ const server = http.createServer(async (req, res) => {
     // Approve / reject: PATCH /api/operations/collection-entry/:id/status
     if (m(/^\/api\/operations\/collection-entry\/(\d+)\/status$/) && method === "PATCH") {
       const id = Number(m(/^\/api\/operations\/collection-entry\/(\d+)\/status$/)[1]);
-      const row = COLLECTIONS.find((c) => c.id === id);
+      const row = COLLECTIONS.find((c) => c.id === id && c.deleted !== true);
       if (!row) return send(404, { error: "not_found" });
       const body = await readBody(req);
-      row.status = body.status ?? row.status;
-      if (row.status === "Approved") {
+      const nextStatus = body.status ?? row.status;
+      row.status = nextStatus;
+      if (nextStatus === "Approved") {
         row.approvedBy = body.approvedBy ?? "Owner";
         row.approvedAt = nowIso();
-        // Keep the shop ledger consistent: collections reduce the balance.
-        const shop = SHOP_BY_ID.get(row.shopId);
-        if (shop) shop.currentBalance = round(shop.currentBalance - row.amount, 2);
       }
-      if (row.status === "Rejected") {
+      if (nextStatus === "Rejected") {
+        row.approvedBy = null;
+        row.approvedAt = null;
         row.rejectionReason = body.reason ?? body.rejectionReason ?? "";
         row.rejectedBy = body.rejectedBy ?? "Owner";
       }
       row.updatedAt = nowIso();
-      return send(200, {
-        ...row,
-        currentBalance: SHOP_BY_ID.get(row.shopId)?.currentBalance ?? 0,
-      });
+      // Rebuild, rather than applying a delta, so duplicate approve retries
+      // and status reversals cannot double-count the shop or dashboard.
+      const currentBalance = syncShopCurrentBalance(row.shopId);
+      return send(200, { ...row, currentBalance });
     }
     if (p === "/api/operations/collection-entry/report") return send(200, collectionReport(q));
     if (p === "/api/operations/collection-entry/week-bounds") {
-      const start = weekKey(q.get("asOfDate") || TODAY);
+      // The Collection Entry client sends `date`; mobile/older clients send
+      // `asOfDate`. Respect either so the shown week always matches the form.
+      const bounds = collectionWeekBounds(q.get("date") || q.get("asOfDate") || TODAY);
       return send(200, {
-        asOfDate: q.get("asOfDate") || TODAY,
-        weekStart: start,
-        weekEnd: addDays(start, 6),
-        isCurrentWeek: true,
+        ...bounds,
+        isCurrentWeek: bounds.weekStart === weekKey(TODAY),
       });
     }
-    if (p === "/api/operations/collection-entry/weekly-summary" ||
-        p === "/api/operations/collection-entry/weekly-summaries") {
-      const weeks = new Map();
-      for (const c of COLLECTIONS) {
-        if (c.status !== "Approved") continue;
-        const w = weekKey(c.collectionDate);
-        const e = weeks.get(w) ?? { total: 0, count: 0 };
-        e.total += c.amount;
-        e.count += 1;
-        weeks.set(w, e);
-      }
-      const list = [...weeks.entries()].sort().map(([weekStart, v]) => ({
-        weekStart,
-        weekEnd: addDays(weekStart, 6),
-        totalAmount: round(v.total, 2),
-        totalCount: v.count,
-      }));
-      return send(200, p.endsWith("summaries") ? list : list[list.length - 1]);
+    if (p === "/api/operations/collection-entry/weekly-summary") {
+      const asOfDate = q.get("date") || q.get("asOfDate") || TODAY;
+      const shopId = Number(q.get("shopId"));
+      const summary = weeklyCollectionSummary(shopId, asOfDate);
+      return summary
+        ? send(200, summary)
+        : send(404, { error: "shop_not_found", message: "Choose a valid shop before loading its weekly summary." });
+    }
+    if (p === "/api/operations/collection-entry/weekly-summaries") {
+      const asOfDate = q.get("date") || q.get("asOfDate") || TODAY;
+      const report = collectionPendingSummary(asOfDate);
+      // Reuse the single-shop shape so the list and detail endpoints can
+      // never drift apart in field names or rounding.
+      return send(200, report.shops.map(toWeeklySummaryShape));
     }
     if (p === "/api/operations/collection-entry/recent") {
       const shopId = Number(q.get("shopId"));
       const limit = Math.min(Number(q.get("limit") || 20), 500);
-      const rows = COLLECTIONS.filter((c) => !shopId || c.shopId === shopId)
+      const rows = COLLECTIONS.filter((c) => c.deleted !== true && (!shopId || c.shopId === shopId))
         .sort((a, b) => b.collectionDate.localeCompare(a.collectionDate))
         .slice(0, limit);
       return send(200, rows);
     }
     if (p === "/api/operations/collection-entry/pending-summary") {
-      // Contract expected by collectionService.fetchPendingSummary():
-      //   { weekStart, weekEnd, shops: [{ shopId, shopName, weekStart, weekEnd,
-      //     balance, weeklySales, weeklyApprovedCollections,
-      //     weeklyPendingCollections, recoveryPercentage, overdueDays,
-      //     hasPendingCollections, lastCollectionDate }], totals: {...} }
-      // The page renders exactly these fields (it must not recompute them).
-      const asOf = q.get("date") || TODAY;
-      const weekStart = weekKey(asOf);
-      const weekEnd = addDays(weekStart, 6);
-      const shops = pendingCollections()
-        .filter((r) => r.currentPending > 0)
-        .map((r) => {
-          const weeklySales = round(
-            SHOP_SALES.filter((s) => s.shopId === r.shopId && inRange(s.tripDate, weekStart, weekEnd)).reduce(
-              (a, s) => a + s.amount,
-              0
-            ),
-            2
-          );
-          const weekCollections = COLLECTIONS.filter(
-            (c) => !c.deleted && c.shopId === r.shopId && inRange(c.collectionDate, weekStart, weekEnd)
-          );
-          const weeklyApprovedCollections = round(
-            weekCollections.filter((c) => c.status === "Approved").reduce((a, c) => a + c.amount, 0),
-            2
-          );
-          const weeklyPendingCollections = round(
-            weekCollections.filter((c) => c.status === "Pending Approval").reduce((a, c) => a + c.amount, 0),
-            2
-          );
-          return {
-            shopId: r.shopId,
-            shopName: r.shopName,
-            weekStart,
-            weekEnd,
-            balance: round(r.currentPending, 2),
-            weeklySales,
-            weeklyApprovedCollections,
-            weeklyPendingCollections,
-            // Backend-authoritative recovery: approved weekly collections vs
-            // weekly sales (0 % when nothing was sold in the week).
-            recoveryPercentage: weeklySales ? round((weeklyApprovedCollections / weeklySales) * 100, 2) : 0,
-            overdueDays: r.overdueDays ?? 0,
-            hasPendingCollections: weeklyPendingCollections > 0,
-            lastCollectionDate: r.lastCollectionDate && r.lastCollectionDate !== "-" ? r.lastCollectionDate : null,
-          };
-        })
-        .sort((a, b) => b.balance - a.balance);
-      const sum = (pick) => round(shops.reduce((a, s) => a + pick(s), 0), 2);
-      const totals = {
-        weeklySales: sum((s) => s.weeklySales),
-        weeklyApprovedCollections: sum((s) => s.weeklyApprovedCollections),
-        weeklyPendingCollections: sum((s) => s.weeklyPendingCollections),
-        balance: sum((s) => s.balance),
-        recoveryPercentage: 0,
-      };
-      totals.recoveryPercentage = totals.weeklySales
-        ? round((totals.weeklyApprovedCollections / totals.weeklySales) * 100, 2)
-        : 0;
-      return send(200, { weekStart, weekEnd, shops, totals });
+      // Contract expected by collectionService.fetchPendingSummary(); the
+      // shared builder keeps the week bounds, the approved-only sales split and
+      // the recovery percentage in ONE place for every caller.
+      return send(200, collectionPendingSummary(q.get("date") || q.get("asOfDate") || TODAY));
     }
     if (m(/^\/api\/operations\/collection-entry\/pending\/(\d+)$/)) {
       const id = Number(m(/^\/api\/operations\/collection-entry\/pending\/(\d+)$/)[1]);
-      return send(200, pendingCollections().find((r) => r.shopId === id) ?? {});
+      const row = COLLECTIONS.find((collection) => collection.id === id && collection.deleted !== true);
+      if (!row) return send(404, { error: "collection_not_found" });
+      if (method === "DELETE") {
+        // Pending Collection's delete flow is deliberately limited to the
+        // backend-owned eligibility window. The client uses `canDelete` only
+        // as a convenience check; this endpoint remains authoritative.
+        if (dayDiff(row.collectionDate, TODAY) > 10) {
+          return send(409, { error: "delete_window_closed", message: "This collection is outside the 10-day deletion window." });
+        }
+        row.deleted = true;
+        row.deletedBy = "web-user";
+        row.deletedAt = nowIso();
+        row.updatedAt = nowIso();
+        syncShopCurrentBalance(row.shopId);
+        return send(200, { ok: true, deleted: true, id: row.id, currentBalance: SHOP_BY_ID.get(row.shopId)?.currentBalance ?? 0 });
+      }
+      return send(200, row);
     }
     if (m(/^\/api\/operations\/collection-entry\/(\d+)$/)) {
       const id = Number(m(/^\/api\/operations\/collection-entry\/(\d+)$/)[1]);
-      return send(200, COLLECTIONS.find((c) => c.id === id) ?? {});
+      const row = COLLECTIONS.find((collection) => collection.id === id && collection.deleted !== true);
+      if (!row) return send(404, { error: "collection_not_found" });
+      if (method === "PUT" || method === "PATCH") {
+        const body = await readBody(req);
+        Object.assign(row, {
+          collectionDate: body.collectionDate ?? row.collectionDate,
+          amount: body.amount == null ? row.amount : Number(body.amount),
+          amountCollected: body.amount == null ? row.amountCollected : Number(body.amount),
+          collector: body.collector ?? row.collector,
+          paymentMode: body.paymentMode ?? row.paymentMode,
+          referenceNo: body.referenceNo ?? row.referenceNo,
+          remarks: body.remarks ?? row.remarks,
+          updatedAt: nowIso(),
+        });
+        const currentBalance = syncShopCurrentBalance(row.shopId);
+        return send(200, { ...row, currentBalance });
+      }
+      if (method === "DELETE") {
+        // The entry date is the only clock that counts, and the backend stays
+        // authoritative. Pending entries may be removed on their entry day
+        // only; approved entries get the full 10 days.
+        const isPendingRow = String(row.status || "").toLowerCase().startsWith("pending");
+        const windowDays = isPendingRow ? 0 : 10;
+        if (dayDiff(row.collectionDate, TODAY) > windowDays) {
+          return send(409, {
+            error: "delete_window_closed",
+            message: isPendingRow
+              ? "Pending collections can only be deleted on the day they were entered."
+              : "This collection is outside the 10-day deletion window.",
+          });
+        }
+        row.deleted = true;
+        row.deletedBy = "web-user";
+        row.deletedAt = nowIso();
+        row.updatedAt = nowIso();
+        const currentBalance = syncShopCurrentBalance(row.shopId);
+        return send(200, { ok: true, deleted: true, id: row.id, currentBalance });
+      }
+      return send(200, row);
     }
     if (p === "/api/operations/collections/pending") return send(200, pendingCollections());
     if (p === "/api/operations/collections/report") return send(200, collectionReport(q));
@@ -3786,7 +4621,10 @@ const server = http.createServer(async (req, res) => {
       const from = q.get("fromDate");
       const to = q.get("toDate");
       let rows = FUEL_EXPENSES.filter((f) => inRange(f.billDate, from, to));
+      if (q.get("vehicleId")) rows = rows.filter((f) => f.vehicleId === Number(q.get("vehicleId")));
       if (q.get("vehicleNo")) rows = rows.filter((f) => f.vehicleNo === q.get("vehicleNo"));
+      if (q.get("tripNo")) rows = rows.filter((f) => f.tripNo === q.get("tripNo"));
+      if (q.get("billNo")) rows = rows.filter((f) => f.billNo === q.get("billNo"));
       if (q.get("sourceType")) rows = rows.filter((f) => f.sourceType === q.get("sourceType"));
       if (q.get("status") && q.get("status") !== "All") rows = rows.filter((f) => f.status === q.get("status"));
       if (q.get("search")) {
@@ -3934,18 +4772,38 @@ const server = http.createServer(async (req, res) => {
 
     // ── Fleet ─────────────────────────────────────────────────────────────
     if (p === "/api/fleet/maintenance" && method === "GET") {
-      let rows = MAINTENANCE.filter((x) => !x.deleted && inRange(x.date.slice(0, 10), q.get("fromDate"), q.get("toDate")));
+      // The Maintenance History page asks for deleted rows explicitly (the
+      // "Deleted" / "all" status tabs); every other view wants them hidden.
+      const includeDeleted = String(q.get("includeDeleted")) === "true";
+      let rows = MAINTENANCE.filter(
+        (x) =>
+          (includeDeleted || !x.deleted) &&
+          inRange(x.date.slice(0, 10), q.get("fromDate"), q.get("toDate"))
+      );
       if (q.get("vehicleId")) rows = rows.filter((x) => x.vehicleId === Number(q.get("vehicleId")));
-      if (q.get("status")) rows = rows.filter((x) => x.paymentStatus === q.get("status"));
+      if (q.get("driverId")) rows = rows.filter((x) => x.driverId === Number(q.get("driverId")));
+      // The UI sends title-case statuses ("Approved"), the rows store
+      // lower-case ones — compare case-insensitively so neither side has to
+      // know about the other's casing.
+      const status = (q.get("status") || "").trim().toLowerCase();
+      if (status) rows = rows.filter((x) => String(x.paymentStatus || "").toLowerCase() === status);
+      if (q.get("search")) {
+        const needle = q.get("search").toLowerCase();
+        rows = rows.filter((x) =>
+          [x.billNo, x.vehicleNo, x.garage, x.mechanic, x.driverName, x.maintenanceType]
+            .some((field) => String(field ?? "").toLowerCase().includes(needle))
+        );
+      }
       if (String(q.get("latestApproved")) === "true") {
         const latest = new Map();
         for (const row of rows.filter((x) => x.paymentStatus === "approved")) {
-          const prev = latest.get(x.vehicleId);
-          if (!prev || String(prev.date) < String(row.date)) latest.set(x.vehicleId, row);
+          const prev = latest.get(row.vehicleId);
+          if (!prev || String(prev.date) < String(row.date)) latest.set(row.vehicleId, row);
         }
         rows = [...latest.values()];
       }
-      return send(200, rows);
+      rows = [...rows].sort((a, b) => String(b.date).localeCompare(String(a.date)));
+      return send(200, q.get("page") ? paginate(rows, q) : rows);
     }
     // Maintenance entry (multipart): create with bill/spare-part documents.
     if (p === "/api/fleet/maintenance" && method === "POST") {
@@ -3968,6 +4826,10 @@ const server = http.createServer(async (req, res) => {
       row.approvedAt = nowIso();
       row.updatedAt = nowIso();
       return send(200, row);
+    }
+    if (m(/^\/api\/fleet\/maintenance\/(\d+)$/) && method === "GET") {
+      const row = MAINTENANCE.find((x) => Number(x.id) === Number(m(/^\/api\/fleet\/maintenance\/(\d+)$/)[1]));
+      return row ? send(200, row) : send(404, { error: "not_found" });
     }
     if (m(/^\/api\/fleet\/maintenance\/(\d+)$/) && ["PUT", "PATCH"].includes(method)) {
       const row = MAINTENANCE.find((x) => Number(x.id) === Number(m(/^\/api\/fleet\/maintenance\/(\d+)$/)[1]));
@@ -4017,7 +4879,101 @@ const server = http.createServer(async (req, res) => {
       }
       return send(200, { total: PERMITS.length, byType });
     }
-    if (p === "/api/fleet/emis") return send(200, EMIS);
+    // Per-vehicle document record: GET / PUT (upsert) / DELETE, keyed by
+    // vehicleId + docType exactly like the Documents page calls it.
+    if (m(/^\/api\/fleet\/permits\/(\d+)\/([A-Za-z]+)$/)) {
+      const [, rawVehicleId, rawDocType] = m(/^\/api\/fleet\/permits\/(\d+)\/([A-Za-z]+)$/);
+      const vehicleId = Number(rawVehicleId);
+      const docType = rawDocType.toLowerCase();
+      const index = PERMITS.findIndex((x) => x.vehicleId === vehicleId && x.docType === docType);
+      const existing = index >= 0 ? PERMITS[index] : null;
+
+      if (method === "PUT") {
+        const isMultipart = String(req.headers["content-type"] ?? "").includes("multipart/form-data");
+        const { fields, documents } = isMultipart
+          ? await parseMultipart(req, req.headers["content-type"])
+          : { fields: await readBody(req), documents: [] };
+        const upload = documents[0] ?? null;
+        const removeDocument = String(fields.removeDocument ?? "") === "true";
+        const vehicle = VEHICLES.find((v) => v.id === vehicleId);
+        const row = {
+          ...(existing ?? {
+            id: PERMITS.length ? Math.max(...PERMITS.map((x) => x.id)) + 1 : 1,
+            createdAt: nowIso(),
+            createdBy: fields.createdBy ?? "web-user",
+          }),
+          vehicleId,
+          vehicleNo: vehicle?.vehicleNumber ?? existing?.vehicleNo ?? "",
+          docType,
+          documentNumber: fields.documentNumber ?? existing?.documentNumber ?? "",
+          validFrom: fields.validFrom ?? existing?.validFrom ?? null,
+          expiryDate: fields.expiryDate ?? existing?.expiryDate ?? TODAY,
+          remarks: fields.remarks ?? existing?.remarks ?? "",
+          updatedAt: nowIso(),
+        };
+        if (upload) {
+          Object.assign(row, {
+            hasDocument: true,
+            fileName: upload.fileName,
+            mimeType: upload.mimeType,
+            fileSize: upload.fileSize,
+          });
+        } else if (removeDocument) {
+          Object.assign(row, { hasDocument: false, fileName: null, mimeType: null, fileSize: null });
+        }
+        if (index >= 0) PERMITS[index] = row;
+        else PERMITS.push(row);
+        return send(index >= 0 ? 200 : 201, row);
+      }
+
+      if (method === "DELETE") {
+        if (index < 0) return send(404, { error: "not_found" });
+        PERMITS.splice(index, 1);
+        return send(200, { ok: true, deleted: true, sample: true });
+      }
+
+      return existing ? send(200, existing) : send(404, { error: "not_found" });
+    }
+    // Binary scan for <img> / <iframe> / download links. The sample dataset has
+    // no real scans, so a valid one-page PDF placeholder is streamed back and
+    // the viewer/download flows work end to end.
+    if (m(/^\/api\/fleet\/permits\/(\d+)\/([A-Za-z]+)\/document$/) && method === "GET") {
+      const [, rawVehicleId, rawDocType] = m(/^\/api\/fleet\/permits\/(\d+)\/([A-Za-z]+)\/document$/);
+      const row = PERMITS.find(
+        (x) => x.vehicleId === Number(rawVehicleId) && x.docType === rawDocType.toLowerCase()
+      );
+      if (!row || !row.hasDocument) return send(404, { error: "not_found" });
+      const pdf = samplePdf(
+        `${row.docType.toUpperCase()} - ${row.vehicleNo}`,
+        [
+          `Document No: ${row.documentNumber || "-"}`,
+          `Valid From: ${row.validFrom || "-"}`,
+          `Expiry Date: ${row.expiryDate || "-"}`,
+        ],
+        "Sample vehicle document - quarter sample data"
+      );
+      res.writeHead(200, {
+        "Content-Type": row.mimeType || "application/pdf",
+        "Content-Disposition": `inline; filename="${row.fileName || `${row.docType}.pdf`}"`,
+        "Access-Control-Allow-Origin": "*",
+      });
+      return res.end(pdf);
+    }
+    if (p === "/api/fleet/emis") {
+      const vehicleId = q.get("vehicleId");
+      const status = (q.get("status") || "").trim().toLowerCase();
+      let rows = EMIS;
+      if (vehicleId) rows = rows.filter((e) => e.vehicleId === Number(vehicleId));
+      if (status && status !== "all")
+        rows = rows.filter((e) => String(e.status || "").toLowerCase() === status);
+      if (q.get("search")) {
+        const needle = q.get("search").toLowerCase();
+        rows = rows.filter((e) =>
+          [e.vehicleNo, e.financeCompany].some((f) => String(f ?? "").toLowerCase().includes(needle))
+        );
+      }
+      return send(200, rows);
+    }
     if (m(/^\/api\/fleet\/emis\/(\d+)\/schedule$/)) {
       const id = Number(m(/^\/api\/fleet\/emis\/(\d+)\/schedule$/)[1]);
       const emi = EMIS.find((e) => e.id === id);

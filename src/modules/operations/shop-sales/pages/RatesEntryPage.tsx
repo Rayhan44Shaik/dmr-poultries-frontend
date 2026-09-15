@@ -1,5 +1,5 @@
-import { useRef, useState, type ComponentProps } from "react";
-import { IndianRupee, Store } from "lucide-react";
+import { useEffect, useRef, useState, type ComponentProps } from "react";
+import { IndianRupee, LoaderCircle, Store } from "lucide-react";
 import useCompletedTrips from "../hooks/useCompletedTrips";
 import CompletedTripsFilters from "../components/CompletedTripsFilters";
 import CompletedTripsTable from "../components/CompletedTripsTable";
@@ -45,7 +45,20 @@ export default function RatesEntryPage({ embedded = false }: Props) {
   const { t, language } = useI18n();
   const { showNotification } = useSafeNotification();
   const exportBusyRef = useRef<"pdf" | "excel" | null>(null);
+  const tableContainerRef = useRef<HTMLDivElement>(null);
   const [selectedRowId, setSelectedRowId] = useState<number | null>(null);
+
+  // A selection belongs only to this table. Clicking elsewhere clears its
+  // highlight, matching Recent Trip Activity and Trip List.
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (!tableContainerRef.current?.contains(event.target as Node)) {
+        setSelectedRowId(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const {
     filteredTrips,
@@ -223,26 +236,31 @@ export default function RatesEntryPage({ embedded = false }: Props) {
       )}
 
       {/* Table — separate card like trip list, Rate Entry on top of table */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        {/* Rate Entry header on top of table — perfect light background + animated ₹ */}
+      <div ref={tableContainerRef} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+        {/* Rate Entry table title: intentionally static; other page animations are unchanged. */}
         <div className="flex items-center px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-emerald-50/60 via-white to-emerald-50/40">
           <div className="flex items-center gap-3">
-            <div className="group h-9 w-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-inner">
-              <span className="inline-flex motion-safe:animate-[var(--animate-action-view)]">
-                <IndianRupee className="w-5 h-5" />
-              </span>
+            <div className="h-9 w-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-inner">
+              <IndianRupee className="w-5 h-5" />
             </div>
-            <h3 className="text-base font-bold text-slate-800 tracking-tight">Rate Entry</h3>
+            <h3 className="text-base font-bold text-slate-800 tracking-tight">{t("ops.rate.title")}</h3>
           </div>
         </div>
 
-        {filteredTrips.length === 0 && !loadError ? (
+        {isLoading ? (
+          <div className="py-16 text-center text-sm font-medium text-slate-400">
+            <span className="inline-flex items-center gap-2">
+              <LoaderCircle size={16} className="animate-spin text-emerald-600" aria-hidden="true" />
+              {t("ops.rate.loading_table")}
+            </span>
+          </div>
+        ) : filteredTrips.length === 0 && !loadError ? (
           <div className="flex flex-col items-center justify-center gap-2 px-6 py-12 text-center">
             <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-slate-100 text-slate-400">
               <Store size={20} />
             </span>
             <p className="font-semibold text-slate-700">{t("ops.rate.no_trips")}</p>
-            <p className="text-xs font-medium text-slate-500">No pending trips awaiting rates</p>
+            <p className="text-xs font-medium text-slate-500">{t("ops.rate.no_waiting_trips")}</p>
           </div>
         ) : (
           <>
@@ -253,6 +271,7 @@ export default function RatesEntryPage({ embedded = false }: Props) {
               startIndex={startIndex}
               selectedRowId={selectedRowId}
               onRowClick={(trip) => setSelectedRowId((current) => (current === trip.id ? null : trip.id))}
+              onRowSelect={(trip) => setSelectedRowId(trip.id)}
               sortBy={sortBy}
               sortDir={sortDir}
               onSortChange={handleSortChange}

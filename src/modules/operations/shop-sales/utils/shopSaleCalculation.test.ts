@@ -104,6 +104,19 @@ describe("filterShopSales", () => {
     assert.deepEqual(asc.map((s) => s.amount), [4221, 5330, 5800]);
   });
 
+  it("sorts unique Shop Sale No., birds, weight, rate and remark columns", () => {
+    const sortable = [
+      sale({ id: "a", saleNo: "TRP-20260911-001-S10", totalBirds: 100, totalWeight: 120, rate: 90, remark: "Zulu" }),
+      sale({ id: "b", saleNo: "TRP-20260911-001-S02", totalBirds: 50, totalWeight: 70, rate: 110, remark: "Alpha" }),
+    ];
+    assert.deepEqual(filterShopSales(sortable, { ...baseFilter, sortBy: "sale_asc" }).map((row) => row.id), ["b", "a"]);
+    assert.deepEqual(filterShopSales(sortable, { ...baseFilter, sortBy: "sale_desc" }).map((row) => row.id), ["a", "b"]);
+    assert.deepEqual(filterShopSales(sortable, { ...baseFilter, sortBy: "birds_desc" }).map((row) => row.id), ["a", "b"]);
+    assert.deepEqual(filterShopSales(sortable, { ...baseFilter, sortBy: "weight_asc" }).map((row) => row.id), ["b", "a"]);
+    assert.deepEqual(filterShopSales(sortable, { ...baseFilter, sortBy: "rate_desc" }).map((row) => row.id), ["b", "a"]);
+    assert.deepEqual(filterShopSales(sortable, { ...baseFilter, sortBy: "remark_asc" }).map((row) => row.id), ["b", "a"]);
+  });
+
   it("does not mutate the input list", () => {
     const copy = [...list];
     filterShopSales(list, { ...baseFilter, sortBy: "amount_asc" });

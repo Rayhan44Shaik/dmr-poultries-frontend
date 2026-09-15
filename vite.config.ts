@@ -1,8 +1,16 @@
+import { randomUUID } from 'node:crypto'
 import { ServerResponse } from 'node:http'
 import { defineConfig } from 'vite'
 import type { ProxyOptions } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
+
+// Fresh on every dev-server (re)start. Injected into every transformed
+// module (see the `dmr-instance-stamp` plugin below) so a running tab can
+// tell when the server serving its port is a *different* instance than the
+// one that served its modules — i.e. the dev server restarted underneath
+// it and the tab is still executing the previous instance's old JS/CSS.
+const DMR_INSTANCE_ID = randomUUID()
 
 // Heavy runtime deps, pre-bundled up-front (at server start) so the first
 // browser request never triggers a re-optimization + mid-session reload.
@@ -24,13 +32,17 @@ const OPTIMIZE_DEPS = [
   'exceljs',
   'jspdf',
   'jspdf-autotable',
+  // Deep subpath imported lazily by the PDF previewer — pre-bundled up-front
+  // so opening the Reports pages can never trigger a dependency re-scan (and
+  // the "app was updated while this tab was open" full reload) after first load.
+  'pdfjs-dist/legacy/build/pdf.mjs',
   'react-date-range',
 ]
 
 // Browser-facing code uses a relative /api URL (VITE_API_BASE_URL=/api); Vite
-// reaches the backend on this host, never browser localhost. Shared by the dev
-// server AND `vite preview`, so the production build is verified against the
-// same backend the dev server uses.
+// reaches the backend on this host, never browser localhost. Defined once and
+// shared by the dev server AND `vite preview`, so the production build is
+// verified against exactly the same backend contract as dev.
 const API_PROXY: Record<string, ProxyOptions> = {
   '/api': {
     target: 'http://127.0.0.1:4000',
@@ -49,11 +61,70 @@ const API_PROXY: Record<string, ProxyOptions> = {
   },
 }
 
+/**
+ * Stamps the running tab with the dev-server instance id and serves
+ * `GET /__dmr/ping` -> { instance } (no-store). A running tab that polls this
+ * and gets an id different from the one baked into its own modules knows the
+ * dev server was restarted underneath it and it must reload (its in-memory
+ * JS/CSS belong to the previous instance, even though API calls transparently
+ * reach the new one). See `InstanceWatchdog`.
+ *
+ * The stamp ships as a virtual module (not `define`) because Vite 8 does not
+ * apply bare-identifier `define` replacements to client (browser) modules in
+ * dev — a virtual module is transformed like any other, so it reaches every
+ * browser bundle.
+ */
+const DMR_INSTANCE_VIRTUAL = 'virtual:dmr-instance'
+const DMR_INSTANCE_RESOLVED = '\0' + DMR_INSTANCE_VIRTUAL
+
+const dmrInstanceStamp = {
+  name: 'dmr-instance-stamp',
+  resolveId(id: string) {
+    if (id === DMR_INSTANCE_VIRTUAL) return DMR_INSTANCE_RESOLVED
+    return null
+  },
+  load(id: string) {
+    if (id === DMR_INSTANCE_RESOLVED) {
+      return `export const INSTANCE_ID = ${JSON.stringify(DMR_INSTANCE_ID)};`
+    }
+    return null
+  },
+  // Stamps the served HTML with this instance and adds a tiny inline check:
+  // the app records the instance it is running (sessionStorage). When a tab
+  // reloads and the HTML's instance differs from the recorded one, the
+  // recorded value is updated and the page is reloaded once more — so a
+  // reload can never land on a mix of a new document and old app code.
+  // One extra load maximum (the stored value always converges to the meta).
+  transformIndexHtml() {
+    return [
+      {
+        tag: 'meta',
+        attrs: { name: 'dmr-instance', content: DMR_INSTANCE_ID },
+        injectTo: 'head-prepend',
+      },
+      {
+        tag: 'script',
+        attrs: {},
+        children: `(function(){try{var m=document.querySelector('meta[name="dmr-instance"]');var id=m&&m.content;if(!id)return;var K="dmr:instance";var p=null;try{p=sessionStorage.getItem(K)}catch(e){}if(p===null){try{sessionStorage.setItem(K,id)}catch(e){}return}if(p!==id){try{sessionStorage.setItem(K,id)}catch(e){}location.replace(location.href)}}catch(e){}})()`,
+        injectTo: 'head-prepend',
+      },
+    ]
+  },
+  configureServer(server: { middlewares: { use: (path: string, handler: (req: import('node:http').IncomingMessage, res: import('node:http').ServerResponse) => void) => void } }) {
+    server.middlewares.use('/__dmr/ping', (_req, res) => {
+      res.setHeader('Content-Type', 'application/json')
+      res.setHeader('Cache-Control', 'no-store')
+      res.end(JSON.stringify({ instance: DMR_INSTANCE_ID }))
+    })
+  },
+}
+
 export default defineConfig({
   base: './',
   plugins: [
     react(),
     tailwindcss(),
+    dmrInstanceStamp,
   ],
   optimizeDeps: {
     include: OPTIMIZE_DEPS,

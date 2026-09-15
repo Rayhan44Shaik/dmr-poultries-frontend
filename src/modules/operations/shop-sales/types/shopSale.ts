@@ -2,7 +2,7 @@ export interface ShopSale {
 
   id: string;
 
-  /** Backend-authoritative Shop Sales number, e.g. TR-20260820-001-S001.
+  /** Backend-authoritative Shop Sales number, e.g. TR-20260820-001-S01.
    * Never generated/derived in the frontend — the backend is the source.
    * Optional only so unrelated consumers (dashboard demo seed, collections)
    * that construct ShopSale objects without it keep compiling; the Shop
@@ -14,6 +14,9 @@ export interface ShopSale {
   tripNo: string | number;
 
   tripDate: string;
+
+  /** Backend delivery timestamp used to assign this trip's S01, S02… sequence. */
+  deliveryTime?: string | null;
 
   shopNo?: string;
 
@@ -45,6 +48,21 @@ amount: number;
   numericTripId?: number | null;
   numericShopId?: number | null;
   mortality?: number;
+  /** Server-reported pickup quantity for the sale's source trip. */
+  tripPickupBirds?: number | null;
+  /** Server-computed maximum birds for this shop after all other deliveries
+   * and the trip's total mortality are accounted for. */
+  maxEditableBirds?: number | null;
+  /** Server-authoritative allocation facts. When `unassignedBirds` is above
+   * zero, this source trip is the only trip whose Shop Sales rows can be
+   * corrected until its remaining birds are allocated. */
+  tripDeliveredBirds?: number | null;
+  tripMortalityBirds?: number | null;
+  unassignedBirds?: number | null;
+  assignmentComplete?: boolean | null;
+  assignmentLockTripId?: number | null;
+  assignmentLockTripNo?: string | null;
+  assignmentLockUnassignedBirds?: number | null;
   birdTypeId?: number | null;
   /** Whether the backend currently allows editing/deleting this sale
    * (Rate Entry locked + within the 10-day window). Backend remains the
@@ -94,7 +112,7 @@ export interface ShopSaleFilter {
    * Shop Name, Trip No and remarks (backend ILIKE). */
   search: string;
 
-  /** One of: latest | oldest | shop_asc | shop_desc | amount_desc | amount_asc */
+  /** One of: latest | oldest | sale_asc | sale_desc | shop_asc | shop_desc | amount_desc | amount_asc */
   sortBy: string;
 
 }

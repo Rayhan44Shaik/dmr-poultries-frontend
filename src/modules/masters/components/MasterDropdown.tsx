@@ -16,11 +16,11 @@ import { useI18n } from "../../../i18n";
 export interface MasterDropdownOption {
   value: string;
   label: string;
-  /**
-   * Stored text the option must keep matching while its label is translated —
-   * e.g. the Telugu name shows, but typing "anil" still finds him. Matching is
-   * always case-insensitive.
-   */
+  /** Raw/source text retained for type-ahead once the label is translated —
+   *  a Telugu name shows, but typing "anil" still finds him. Matching is always
+   *  case-insensitive. Both spellings are kept (older call sites use one or the
+   *  other) and both are matched. */
+  searchText?: string;
   keywords?: string;
   disabled?: boolean;
   icon?: ReactNode;
@@ -129,6 +129,7 @@ export default function MasterDropdown({
       if (!keyword) return true;
       return (
         option.label.toLocaleLowerCase().includes(keyword) ||
+        option.searchText?.toLocaleLowerCase().includes(keyword) ||
         option.value.toLocaleLowerCase().includes(keyword) ||
         (option.keywords?.toLocaleLowerCase().includes(keyword) ?? false)
       );

@@ -7,6 +7,7 @@ function row(overrides: Partial<ApiShopSale> = {}): ApiShopSale {
     id: 42,
     saleNo: "TR-20260820-001-S002",
     saleDate: "2026-08-20",
+    deliveryTime: "2026-08-20T09:15:00",
     shopId: 7,
     shopName: "Maahirah",
     birdTypeId: 3,
@@ -21,6 +22,15 @@ function row(overrides: Partial<ApiShopSale> = {}): ApiShopSale {
     rate: 100,
     amount: 5800,
     mortality: 0,
+    tripPickupBirds: 600,
+    maxEditableBirds: 84,
+    tripDeliveredBirds: 596,
+    tripMortalityBirds: 0,
+    unassignedBirds: 4,
+    assignmentComplete: false,
+    assignmentLockTripId: 9,
+    assignmentLockTripNo: "TR-20260820-001",
+    assignmentLockUnassignedBirds: 4,
     remarks: "Urgent delivery",
     status: "Approved",
     deleted: false,
@@ -51,10 +61,13 @@ describe("mapApiSaleToShopSale", () => {
   it("keeps backend date, weight, rate and amount untouched", () => {
     const mapped = mapApiSaleToShopSale(row());
     assert.equal(mapped.tripDate, "2026-08-20");
+    assert.equal(mapped.deliveryTime, "2026-08-20T09:15:00");
     assert.equal(mapped.totalWeight, 58.0);
     assert.equal(mapped.rate, 100);
     assert.equal(mapped.amount, 5800);
     assert.equal(mapped.totalBirds, 58);
+    assert.equal(mapped.tripPickupBirds, 600);
+    assert.equal(mapped.maxEditableBirds, 84);
     assert.equal(mapped.remark, "Urgent delivery");
   });
 
@@ -63,6 +76,17 @@ describe("mapApiSaleToShopSale", () => {
     assert.equal(mapped.numericId, 42);
     assert.equal(mapped.numericTripId, 9);
     assert.equal(mapped.numericShopId, 7);
+  });
+
+  it("maps the server-authoritative reassignment workflow facts", () => {
+    const mapped = mapApiSaleToShopSale(row());
+    assert.equal(mapped.tripDeliveredBirds, 596);
+    assert.equal(mapped.tripMortalityBirds, 0);
+    assert.equal(mapped.unassignedBirds, 4);
+    assert.equal(mapped.assignmentComplete, false);
+    assert.equal(mapped.assignmentLockTripId, 9);
+    assert.equal(mapped.assignmentLockTripNo, "TR-20260820-001");
+    assert.equal(mapped.assignmentLockUnassignedBirds, 4);
   });
 
   it("maps editable + tripDeleted + lockReason", () => {

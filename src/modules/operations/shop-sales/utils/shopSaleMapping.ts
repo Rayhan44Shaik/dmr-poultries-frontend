@@ -2,7 +2,7 @@
 // Pure mapper between the backend Shop Sale row (camelCase, PostgreSQL) and
 // the frontend ShopSale shape. No axios/React imports — unit-testable with
 // node:test. The backend response is authoritative: saleNo (the Shop Sales
-// number, e.g. TR-20260820-001-S001) and the editability/lock fields are
+// number, e.g. TR-20260820-001-S01) and the editability/lock fields are
 // mapped verbatim and never re-derived.
 
 import type { ShopSale } from "../types/shopSale";
@@ -12,6 +12,8 @@ export interface ApiShopSale {
   id: number;
   saleNo: string;
   saleDate: string;
+  /** Original per-shop Step 4 delivery capture timestamp. */
+  deliveryTime?: string | null;
   shopId: number | null;
   shopName: string;
   birdTypeId: number | null;
@@ -26,6 +28,16 @@ export interface ApiShopSale {
   rate: number;
   amount: number;
   mortality: number;
+  /** Server-computed trip-wide bird validation facts for Shop Sales editing. */
+  tripPickupBirds?: number | null;
+  maxEditableBirds?: number | null;
+  tripDeliveredBirds?: number | null;
+  tripMortalityBirds?: number | null;
+  unassignedBirds?: number | null;
+  assignmentComplete?: boolean | null;
+  assignmentLockTripId?: number | null;
+  assignmentLockTripNo?: string | null;
+  assignmentLockUnassignedBirds?: number | null;
   remarks: string;
   status: string;
   deleted: boolean;
@@ -62,6 +74,7 @@ export function mapApiSaleToShopSale(row: ApiShopSale): ShopSale {
     tripId: row.tripId == null ? "" : String(row.tripId),
     tripNo: row.tripNo,
     tripDate: row.saleDate,
+    deliveryTime: row.deliveryTime ?? null,
     shopId: row.shopId == null ? "" : String(row.shopId),
     shopNo: row.shopNo ?? "",
     shopName: row.shopName,
@@ -76,6 +89,15 @@ export function mapApiSaleToShopSale(row: ApiShopSale): ShopSale {
     numericTripId: row.tripId,
     numericShopId: row.shopId,
     mortality: num(row.mortality),
+    tripPickupBirds: row.tripPickupBirds ?? null,
+    maxEditableBirds: row.maxEditableBirds ?? null,
+    tripDeliveredBirds: row.tripDeliveredBirds ?? null,
+    tripMortalityBirds: row.tripMortalityBirds ?? null,
+    unassignedBirds: row.unassignedBirds ?? null,
+    assignmentComplete: row.assignmentComplete ?? null,
+    assignmentLockTripId: row.assignmentLockTripId ?? null,
+    assignmentLockTripNo: row.assignmentLockTripNo ?? null,
+    assignmentLockUnassignedBirds: row.assignmentLockUnassignedBirds ?? null,
     birdTypeId: row.birdTypeId,
     editable: row.editable,
     windowExpiresAt: row.windowExpiresAt,

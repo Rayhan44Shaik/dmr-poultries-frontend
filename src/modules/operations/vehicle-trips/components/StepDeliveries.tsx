@@ -9,7 +9,6 @@ import { getDeliveriesBalanceError } from "../../../../shared/trip/validation";
 import { StepCloseButton } from "./WizardStepUI";
 import { TripNoBadge } from "./TripNoBadge";
 import { useI18n } from "../../../../i18n";
-import { ActionTooltip } from "../../../../ui/ActionTooltip";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import type { DeliveryEmailStatusValue } from "../services/deliveryEmailService";
 import type { DeliveryWhatsAppStatusValue } from "../services/deliveryWhatsAppService";
@@ -188,7 +187,6 @@ export default function StepDeliveries({
                   aria-label={t("ops.trip.edit_step")}
                 >
                   <Pencil size={14} className={uiActionIconMotionClass.edit} />
-                  <ActionTooltip label={t("ops.trip.edit_step")} />
                 </button>
               )}
               <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap">

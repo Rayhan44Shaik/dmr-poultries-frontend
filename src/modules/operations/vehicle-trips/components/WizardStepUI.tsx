@@ -1,7 +1,6 @@
 import { Check, CircleAlert, CircleX, Loader2, Save, Send, X } from "lucide-react";
 import { useI18n } from "../../../../i18n";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
-import { ActionTooltip } from "../../../../ui/ActionTooltip";
 export { TripNoBadge } from "./TripNoBadge";
 
 /**
@@ -33,7 +32,6 @@ export function StepCloseButton({
         size={14}
         className={animated ? uiActionIconMotionClass.close : undefined}
       />
-      <ActionTooltip label={t("common.close")} />
     </button>
   );
 }

@@ -19,7 +19,6 @@ export function TripTimestampDisplay({ value, empty = "—", className }: TripTi
 
   return (
     <span
-      title={text}
       className={cn(
         "inline-block max-w-full min-w-0 text-[12px] font-extrabold leading-snug tracking-[-0.025em] text-slate-900 tabular-nums whitespace-nowrap",
         className,

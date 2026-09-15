@@ -228,12 +228,15 @@ function mapRawSale(raw: Record<string, unknown>): ShopSale {
     id: String(raw.id),
     tripId: raw.tripId != null ? String(raw.tripId) : (raw.trip_id != null ? String(raw.trip_id) : ""),
     tripNo: String(raw.tripNo ?? raw.trip_no ?? ""),
+    // Production exposes saleDate/birds/weight. The explicit fallbacks keep
+    // the cache compatible with the rolling-quarter API during upgrades, so
+    // collection totals never silently become zero while Shop Sales is full.
     tripDate: String(raw.saleDate ?? raw.tripDate ?? raw.trip_date ?? ""),
     shopId: raw.shopId != null ? String(raw.shopId) : (raw.shop_id != null ? String(raw.shop_id) : ""),
     shopName: String(raw.shopName ?? raw.shop_name ?? ""),
     birdType: String(raw.birdType ?? raw.bird_type ?? ""),
-    totalBirds: Number(raw.birds ?? 0),
-    totalWeight: Number(raw.weight ?? 0),
+    totalBirds: Number(raw.birds ?? raw.totalBirds ?? 0),
+    totalWeight: Number(raw.weight ?? raw.totalWeight ?? 0),
     rate: raw.rate == null ? null : Number(raw.rate),
     amount: Number(raw.amount ?? 0),
     remark: String(raw.remarks ?? raw.remark ?? ""),
@@ -663,10 +666,24 @@ function mapWeeklySummary(data: CollectionWeeklySummary): CollectionWeeklySummar
     shopName: String(data.shopName ?? ""),
     weekStart: String(data.weekStart),
     weekEnd: String(data.weekEnd),
+    previousWeekEnd: String(data.previousWeekEnd ?? ""),
+    openingBalance: Number(data.openingBalance ?? 0),
     balance: Number(data.balance ?? 0),
+    // Backends that predate `closingBalance` still reconcile: fall back to the
+    // same arithmetic the panel displays.
+    closingBalance: Number(
+      data.closingBalance ??
+        Number(data.openingBalance ?? 0) +
+          Number(data.weeklySales ?? 0) -
+          Number(data.approvedCollections ?? 0),
+    ),
     weeklySales: Number(data.weeklySales ?? 0),
+    pendingSales: Number(data.pendingSales ?? 0),
+    salesCount: Number(data.salesCount ?? 0),
     approvedCollections: Number(data.approvedCollections ?? 0),
     pendingCollections: Number(data.pendingCollections ?? 0),
+    approvedCollectionsCount: Number(data.approvedCollectionsCount ?? 0),
+    pendingCollectionsCount: Number(data.pendingCollectionsCount ?? 0),
     isCurrentWeek: Boolean(data.isCurrentWeek),
   };
 }

@@ -1,43 +1,36 @@
 import React from "react";
-import { useI18n } from "../../../../i18n";
 import { PageSizeSelect } from "../../../../shared/ui/PageSizeSelect";
 import {
   paginationBarClass,
   paginationNavBtnClass,
   paginationPageBtnClass,
 } from "../../../../shared/ui/paginationStyles";
+import { useI18n } from "../../../../i18n";
 
 interface Props {
   currentPage: number;
   totalPages: number;
   onPageChange: (page: number) => void;
-  /** Pass with onPageSizeChange to show the global rows-per-page control. */
   pageSize?: number;
   onPageSizeChange?: (pageSize: number) => void;
 }
 
+/** Same compact, bounded page navigator used by Trip List. */
 function ShopSalesPagination({ currentPage, totalPages, onPageChange, pageSize, onPageSizeChange }: Props) {
   const { t } = useI18n();
+  const safeTotalPages = Math.max(1, totalPages);
+  const safeCurrentPage = Math.min(Math.max(1, currentPage), safeTotalPages);
+  const hasMultiplePages = safeTotalPages > 1;
 
-  // Build a window of up to 10 pages around the current page
-  const getPageNumbers = () => {
-    const pages = [];
-    const maxVisible = 10;
-    const half = Math.floor(maxVisible / 2);
-    let start = Math.max(1, currentPage - half);
-    let end = Math.min(totalPages, start + maxVisible - 1);
-    if (end - start < maxVisible - 1) {
-      start = Math.max(1, end - maxVisible + 1);
-    }
-    for (let i = start; i <= end; i++) {
-      pages.push(i);
-    }
-    return pages;
-  };
-
-  const visiblePages = getPageNumbers();
-  const showFirstEllipsis = visiblePages[0] > 1;
-  const showLastEllipsis = visiblePages[visiblePages.length - 1] < totalPages;
+  const visiblePages = (() => {
+    const maxVisible = 5;
+    let start = Math.max(1, safeCurrentPage - Math.floor(maxVisible / 2));
+    let end = Math.min(safeTotalPages, start + maxVisible - 1);
+    if (end - start < maxVisible - 1) start = Math.max(1, end - maxVisible + 1);
+    return Array.from({ length: end - start + 1 }, (_, index) => start + index);
+  })();
+  const showFirstEllipsis = hasMultiplePages && visiblePages[0] > 1;
+  const showLastEllipsis = hasMultiplePages && visiblePages[visiblePages.length - 1] < safeTotalPages;
 
   return (
     <div className={paginationBarClass}>
@@ -49,8 +42,8 @@ function ShopSalesPagination({ currentPage, totalPages, onPageChange, pageSize, 
       )}
       <button
         type="button"
-        disabled={currentPage === 1}
-        onClick={() => onPageChange(currentPage - 1)}
+        disabled={safeCurrentPage === 1}
+        onClick={() => onPageChange(safeCurrentPage - 1)}
         className={paginationNavBtnClass}
         aria-label={t("common.previous_page")}
       >
@@ -59,20 +52,13 @@ function ShopSalesPagination({ currentPage, totalPages, onPageChange, pageSize, 
 
       {showFirstEllipsis && (
         <>
-          <button type="button" onClick={() => onPageChange(1)} className={paginationPageBtnClass(false)}>
-            1
-          </button>
+          <button type="button" onClick={() => onPageChange(1)} className={paginationPageBtnClass(false)}>1</button>
           <span className="px-1 text-slate-400">…</span>
         </>
       )}
 
       {visiblePages.map((page) => (
-        <button
-          type="button"
-          key={page}
-          onClick={() => onPageChange(page)}
-          className={paginationPageBtnClass(page === currentPage)}
-        >
+        <button type="button" key={page} onClick={() => onPageChange(page)} className={paginationPageBtnClass(page === safeCurrentPage)}>
           {page}
         </button>
       ))}
@@ -80,16 +66,14 @@ function ShopSalesPagination({ currentPage, totalPages, onPageChange, pageSize, 
       {showLastEllipsis && (
         <>
           <span className="px-1 text-slate-400">…</span>
-          <button type="button" onClick={() => onPageChange(totalPages)} className={paginationPageBtnClass(false)}>
-            {totalPages}
-          </button>
+          <button type="button" onClick={() => onPageChange(safeTotalPages)} className={paginationPageBtnClass(false)}>{safeTotalPages}</button>
         </>
       )}
 
       <button
         type="button"
-        disabled={currentPage === totalPages}
-        onClick={() => onPageChange(currentPage + 1)}
+        disabled={safeCurrentPage === safeTotalPages}
+        onClick={() => onPageChange(safeCurrentPage + 1)}
         className={paginationNavBtnClass}
         aria-label={t("common.next_page")}
       >

@@ -17,7 +17,7 @@ const VISIBLE_ITEMS = 5;
 const ITEM_HEIGHT = 36; // h-9
 const LIST_MAX_HEIGHT = VISIBLE_ITEMS * ITEM_HEIGHT;
 
-export type DropdownOption = { value: string; label: string; chipLabel?: string };
+export type DropdownOption = { value: string; label: string; chipLabel?: string; /** Original-language term retained for search. */ searchText?: string };
 
 /** Soft-coloured icon chip ("logo") shown beside every field label. */
 export const FieldLabel = React.memo(function FieldLabel({
@@ -65,7 +65,6 @@ export const StepKpiCard = React.memo(function StepKpiCard({
   value,
   valueClass,
   cardClass,
-  title,
 }: {
   icon: React.ComponentType<{ size?: number | string; className?: string }>;
   /** Icon chip tone, e.g. "bg-sky-50/70 text-sky-500". */
@@ -74,12 +73,10 @@ export const StepKpiCard = React.memo(function StepKpiCard({
   value: React.ReactNode;
   valueClass?: string;
   cardClass?: string;
-  title?: string;
 }) {
   return (
     <div
       className={`group relative overflow-hidden bg-white border border-slate-200/80 p-3 rounded-xl shadow-2xs transition-all duration-200 hover:shadow-sm hover:border-slate-300/80 ${cardClass ?? ""}`}
-      title={title}
     >
       <span className="text-xs uppercase font-semibold text-slate-400 flex items-center gap-1.5 mb-1.5">
         <span className={`h-5 w-5 rounded-md flex items-center justify-center shrink-0 ${tone}`}>
@@ -353,7 +350,6 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
                     }}
                     className="rounded-full p-0.5 text-slate-400 transition-colors hover:bg-red-50/70 hover:text-red-500"
                     aria-label={`Remove ${label}`}
-                    title={`Remove ${label}`}
                   >
                     <X size={11} strokeWidth={2.75} />
                   </button>

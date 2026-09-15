@@ -1,4 +1,4 @@
-import { Calculator, AlertTriangle, CheckCircle, Clock, ArrowRight } from "lucide-react";
+import { Calculator, AlertTriangle, CheckCircle, Clock, ArrowRight, X, Save, Loader2 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useI18n } from "../../../../../i18n";
 
@@ -190,54 +190,54 @@ export default function CollectionAmount({
       </div>
 
       {/* Collection Preview Calculation */}
-      <div className="mt-5 flex-1 rounded-xl border border-emerald-200 bg-emerald-50 p-4">
-        <h3 className="mb-3 text-base font-bold text-emerald-800 flex items-center gap-2">
-          <Calculator size={16} />
+      <div className="mt-4 rounded-xl border border-emerald-100 bg-emerald-50/40 p-3">
+        <h3 className="mb-2.5 text-sm font-bold text-emerald-800 flex items-center gap-2">
+          <Calculator size={14} />
           {t("ops.collection.preview")}
         </h3>
         
         {/* BEFORE COLLECTION */}
-        <div className="space-y-2">
+        <div className="space-y-2.5">
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium text-slate-600">{t("ops.collection.before_collection")}</span>
             <span className="font-bold text-emerald-700">{t("ops.collection.current_outstanding")}</span>
           </div>
-          <div className="flex items-center justify-between text-base font-bold text-slate-800 bg-white rounded-lg px-3 py-2 border border-slate-200">
-            <span>{t("ops.collection.current_outstanding")}</span>
-            <span>{inr(displayOutstanding)}</span>
+          <div className="flex items-center justify-between gap-3 text-sm font-bold text-slate-800 bg-white rounded-lg px-3 py-2 border border-slate-200">
+            <span className="min-w-0 truncate">{t("ops.collection.current_outstanding")}</span>
+            <span className="shrink-0 tabular-nums">{inr(displayOutstanding)}</span>
           </div>
 
-          <div className="my-2 border-t border-dashed border-slate-200" />
+          <div className="my-1.5 border-t border-dashed border-slate-200" />
 
           {/* COLLECTION */}
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium text-slate-600">{t("ops.collection.collection_entry")}</span>
             <span className="font-bold text-emerald-700">{t("ops.collection.pending_approval")}</span>
           </div>
-          <div className="flex items-center justify-between text-base font-bold text-emerald-700 bg-white rounded-lg px-3 py-2 border border-emerald-200">
-            <span className="flex items-center gap-1.5">
-              <ArrowRight size={14} className="text-emerald-600" />
-              {t("ops.collection.received_today")}
+          <div className="flex items-center justify-between gap-3 text-sm font-bold text-emerald-700 bg-white rounded-lg px-3 py-2 border border-emerald-100">
+            <span className="flex min-w-0 items-center gap-1.5">
+              <ArrowRight size={14} className="shrink-0 text-emerald-600" />
+              <span className="truncate">{t("ops.collection.received_today")}</span>
             </span>
-            <span>{inr(displayReceived)}</span>
+            <span className="shrink-0 tabular-nums">{inr(displayReceived)}</span>
           </div>
 
-          <div className="my-2 border-t border-dashed border-slate-200" />
+          <div className="my-1.5 border-t border-dashed border-slate-200" />
 
           {/* AFTER APPROVAL */}
           <div className="flex items-center justify-between text-sm">
             <span className="font-medium text-slate-600">{t("ops.collection.after_approval")}</span>
             <span className="font-bold text-slate-700">{t("ops.collection.projected_balance")}</span>
           </div>
-          <div className="flex items-center justify-between text-base font-extrabold bg-white rounded-lg px-3 py-2 border border-slate-200">
-            <span>{t("ops.collection.projected_after_approval")}</span>
-            <span className={displayProjected < 0 ? "text-blue-600" : displayProjected === 0 ? "text-emerald-700" : "text-rose-600"}>
+          <div className="flex items-center justify-between gap-3 text-sm font-extrabold bg-white rounded-lg px-3 py-2 border border-slate-200">
+            <span className="min-w-0 truncate">{t("ops.collection.projected_after_approval")}</span>
+            <span className={`shrink-0 tabular-nums ${displayProjected < 0 ? "text-blue-600" : displayProjected === 0 ? "text-emerald-700" : "text-rose-600"}`}>
               {formattedProjected}
             </span>
           </div>
 
           {/* Status Badge */}
-          <div className="pt-2">
+          <div className="pt-1.5">
             <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium border ${statusClass}`}>
               {statusIcon}
               {statusText}
@@ -263,25 +263,38 @@ export default function CollectionAmount({
         </div>
       </div>
 
-      {/* Actions */}
-      <div className="mt-5 flex justify-end gap-3">
+      {/* Actions. Icons animate on hover using the same vocabulary as the Trip
+        * wizard: the X rotates a quarter turn, Save lifts slightly, and a
+        * spinner replaces Save while the request is in flight. */}
+      <div className="mt-auto pt-4 flex justify-end gap-3">
         <button
           type="button"
           onClick={onCancel}
-          className="rounded-md border border-slate-300 px-5 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+          className="group inline-flex items-center gap-2 rounded-md border border-slate-300 px-5 py-2 text-sm font-medium text-slate-700 transition hover:border-slate-400 hover:bg-slate-50"
         >
+          <X size={15} className="shrink-0 transition-transform duration-200 group-hover:rotate-90" aria-hidden />
           {t("common.cancel")}
         </button>
         <button
           type="button"
           onClick={onSave}
           disabled={disableSave || isSaving}
-          className={`rounded-md px-5 py-2 text-sm font-medium text-white transition ${
+          aria-busy={isSaving || undefined}
+          className={`group inline-flex items-center gap-2 rounded-md px-5 py-2 text-sm font-medium text-white transition ${
             disableSave || isSaving
               ? "cursor-not-allowed bg-slate-400"
               : "bg-emerald-700 hover:bg-emerald-800"
           }`}
         >
+          {isSaving ? (
+            <Loader2 size={15} className="shrink-0 animate-spin" aria-hidden />
+          ) : (
+            <Save
+              size={15}
+              className="shrink-0 transition-transform duration-200 group-hover:-translate-y-0.5"
+              aria-hidden
+            />
+          )}
           {isSaving ? t("common.saving") : t("ops.collection.save_collection")}
         </button>
       </div>
