@@ -231,7 +231,7 @@ export default {
   'staff.leave.reject_aria': 'Reject leave for {name}',
   'staff.leave.delete_aria': 'Delete leave for {name}',
   'staff.leave.select_first': 'Select a leave request first.',
-  'staff.leave.hint': 'Click a row · ↑ ↓ to move · Enter to open',
+  'staff.leave.hint': 'Click a row · ↑ ↓ to move · Enter to open · Esc or click outside to deselect',
   'staff.leave.col_no': 'Leave No.',
   'staff.leave.col_period': 'From → To',
   'staff.leave.empty_title': 'No leave requests found',

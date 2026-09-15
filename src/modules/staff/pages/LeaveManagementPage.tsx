@@ -1,6 +1,6 @@
 // src/modules/staff/pages/LeaveManagementPage.tsx
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { CheckCircle2, X } from 'lucide-react';
 import { useLeaveManagement } from '../hooks/useLeaveManagement';
@@ -68,6 +68,9 @@ function LeaveManagementPage() {
   const [historyFor, setHistoryFor] = useState<LeaveRequest | null>(null);
   const [rejecting, setRejecting] = useState<LeaveRequest | null>(null);
 
+  /** The table card — the only place a click keeps the row selected. */
+  const tableAreaRef = useRef<HTMLDivElement | null>(null);
+
   /* Derived, never mirrored in state: a row that is no longer on the page simply
      has no selection, so a refresh or a filter change can never leave a phantom
      "selected" row behind. */
@@ -75,6 +78,36 @@ function LeaveManagementPage() {
     () => leaves.find((leave) => leave.id === selectedRowId) ?? null,
     [leaves, selectedRowId]
   );
+
+  /**
+   * Click anywhere outside the grid and the selected row lets go — the same
+   * gesture the Trip List uses. Clicks that belong to the row (its action
+   * cluster in the filter bar, the dialogs it opens, the undo notification)
+   * keep it selected; a press on the table itself is handled by the row.
+   * Escape is the keyboard twin of that click, and steps aside while one of the
+   * row's dialogs is open so Escape keeps closing the dialog first.
+   */
+  useEffect(() => {
+    const handleOutsideClick = (event: MouseEvent) => {
+      const target = event.target as HTMLElement | null;
+      if (!target) return;
+      if (tableAreaRef.current?.contains(target)) return;
+      if (target.closest('[data-leave-actions]')) return;
+      if (target.closest('[role="dialog"]')) return;
+      setSelectedRowId(null);
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      if (document.querySelector('[role="dialog"]')) return;
+      setSelectedRowId(null);
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, []);
 
   // Auto-hide the refresh toast
   useEffect(() => {
@@ -240,7 +273,10 @@ function LeaveManagementPage() {
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-brand-600" />
         </div>
       ) : (
-        <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+        <div
+          ref={tableAreaRef}
+          className="overflow-hidden rounded-xl border border-slate-200 bg-white"
+        >
           <LeaveTableHeader status={filters.status} onStatusChange={onStatusChange} count={total} />
           {/* Fixed-height progress line: it never pushes the table down, so a
               re-fetch shows activity without a gap or a jump. */}
@@ -301,7 +337,11 @@ function LeaveManagementPage() {
 
       {/* Refresh Toast — top right notification with close X */}
       {refreshToast && (
-        <div className="fixed right-4 top-4 z-[200] flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-lg animate-in fade-in slide-in-from-top-2 duration-200">
+        <div
+          role="status"
+          aria-live="polite"
+          className="fixed right-4 top-4 z-[200] flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-lg animate-in fade-in slide-in-from-top-2 duration-200"
+        >
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
             <CheckCircle2 size={16} />
           </span>

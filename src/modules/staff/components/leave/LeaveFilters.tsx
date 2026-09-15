@@ -219,7 +219,10 @@ function MonthPicker({
  *
  * When a table row is selected its actions appear in that same cluster, beside
  * Reset, instead of being repeated on every row: View (always), and Approve /
- * Reject / Delete while the request is still Pending.
+ * Reject / Delete while the request is still Pending. The cluster carries
+ * `data-leave-actions`, which is how the page knows a click landed on the row's
+ * own controls and must therefore keep the selection (any other click outside
+ * the grid deselects it).
  */
 function LeaveFilters({
   filters,
@@ -360,6 +363,7 @@ function LeaveFilters({
           {selected && (
             <div
               role="group"
+              data-leave-actions=""
               aria-label={t('staff.leave.actions_for', {
                 name: personNameLabel(t, language, selected.employeeName),
               })}
@@ -417,6 +421,13 @@ function LeaveFilters({
                 </>
               )}
             </div>
+          )}
+
+          {/* The selected row's actions and the filter's own actions are two
+              different groups — a hairline keeps them from reading as one long
+              button bar once a row is picked. */}
+          {selected && (
+            <span aria-hidden="true" className="mx-0.5 hidden h-6 w-px shrink-0 bg-slate-200 sm:block" />
           )}
 
           <button

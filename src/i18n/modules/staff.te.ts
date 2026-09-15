@@ -231,7 +231,7 @@ export default {
   'staff.leave.reject_aria': '{name} సెలవును తిరస్కరించండి',
   'staff.leave.delete_aria': '{name} సెలవును తొలగించండి',
   'staff.leave.select_first': 'ముందు ఒక సెలవు అభ్యర్థనను ఎంచుకోండి.',
-  'staff.leave.hint': 'వరుసపై క్లిక్ చేయండి · ↑ ↓ తో కదలండి · తెరవడానికి ఎంటర్',
+  'staff.leave.hint': 'వరుసపై క్లిక్ చేయండి · ↑ ↓ తో కదలండి · తెరవడానికి ఎంటర్ · ఎంపిక తీసేయడానికి Esc లేదా బయట క్లిక్',
   'staff.leave.col_no': 'సెలవు నంబర్',
   'staff.leave.col_period': 'నుండి → వరకు',
   'staff.leave.empty_title': 'సెలవు అభ్యర్థనలు లేవు',

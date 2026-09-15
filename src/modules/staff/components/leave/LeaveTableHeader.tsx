@@ -1,7 +1,6 @@
 import { memo } from 'react';
 import { CalendarOff, MousePointerClick } from 'lucide-react';
 import { useI18n } from '../../../../i18n';
-import LanguageMiniToggle from '../performance/LanguageMiniToggle';
 import { leaveStatusLabel } from '../../utils/leaveDisplay';
 import type { LeaveFilters } from '../../hooks/useLeaveManagement';
 
@@ -41,9 +40,8 @@ const TAB_KEY: Record<LeaveStatusTab, string> = {
  * colour (Pending orange, Approved green, Rejected light red), plus the
  * selected-status count chip beside the title.
  *
- * Everything here follows the project language switch, and the EN / తెలుగు
- * toggle sits in this bar so the page can be read in either language without
- * leaving it.
+ * Everything here follows the project language switch — the switch itself lives
+ * once, in the global header, so no page repeats a second toggle of its own.
  */
 function LeaveTableHeader({ status, onStatusChange, count }: Props) {
   const { t } = useI18n();
@@ -99,13 +97,11 @@ function LeaveTableHeader({ status, onStatusChange, count }: Props) {
 
       <div className="flex flex-wrap items-center justify-end gap-3">
         {/* Row-selection keyboard hint — click a row, then ArrowUp/ArrowDown to
-            move, Enter to open. */}
+            move, Enter to open. Clicking anywhere outside the grid deselects. */}
         <span className="hidden items-center gap-1.5 text-[11px] font-medium text-slate-400 xl:inline-flex">
           <MousePointerClick size={13} className="shrink-0" />
           <span>{t('staff.leave.hint')}</span>
         </span>
-        {/* Language — flips the whole project, exactly like the header menu. */}
-        <LanguageMiniToggle />
       </div>
     </div>
   );
