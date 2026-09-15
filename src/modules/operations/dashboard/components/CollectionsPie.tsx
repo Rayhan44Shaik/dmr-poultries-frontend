@@ -61,10 +61,13 @@ function useCountUp(target: number, duration = 900): number {
 /**
  * Collection Streams — payment-mode donut for the Operations dashboard.
  *
- * The square scene (up to 400 px, scaling down with the card) is sized so
- * the donut AND every outer badge fit inside it — no badge can ever be
- * clipped, and nothing can bleed into a neighbouring chart. Slices sweep in
- * on mount / range change.
+ * Compact side-by-side layout: the square scene (fixed 250 px stage on
+ * wider cards, stacking below the legend on narrow ones) is sized so the
+ * donut AND every outer badge fit inside it — no badge can ever be
+ * clipped, and nothing can bleed into a neighbouring chart. The legend
+ * sits beside the donut (below it on narrow screens), keeping the card
+ * short so it matches the Trips chart's height. Slices sweep in on mount
+ * / range change.
  *
  * ONE rotation clock, driven by a single requestAnimationFrame loop: the
  * angle is applied to the donut's wrapper AND (as the exact inverse) to
@@ -207,9 +210,11 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
 
   return (
     <div className="flex w-full min-w-0 flex-1 flex-col">
-      {/* Donut — square stage that scales with the card, generous white space. */}
-      <div className="flex min-h-0 flex-1 items-center justify-center py-3">
-        <div className="relative aspect-square w-full max-w-[400px]" style={{ aspectRatio: "1 / 1" }}>
+      {/* Compact row: the fixed 250 px donut stage sits beside the legend
+          (stacks below it on narrow screens). The whole row is centred in
+          whatever height the card gives it, so the card stays short. */}
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4 @md:flex-row">
+        <div className="relative aspect-square w-full max-w-[240px] shrink-0" style={{ aspectRatio: "1 / 1" }}>
           {/* Soft background track behind the ring (same 74.24–107.5 band).
               SVG circle so it scales with the scene at every card width. */}
           <svg viewBox="0 0 400 400" className="absolute inset-0 h-full w-full" aria-hidden="true">
@@ -335,10 +340,10 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
             </span>
           </div>
         </div>
-      </div>
 
-      {/* Legend — every mode with exact amount and share, tight & staggered. */}
-      <ul className="mt-2 w-full flex-shrink-0 space-y-1 border-t border-slate-100 pt-2.5">
+      {/* Legend — every mode with exact amount and share, tight & staggered.
+          Sits beside the donut on wider cards (inside the same flex row). */}
+      <ul className="w-full min-w-0 space-y-1.5 @md:w-auto @md:flex-1">
         {enrichedData.map((d, index) => (
           <li
             key={d.name}
@@ -359,6 +364,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
           </li>
         ))}
       </ul>
+      </div>
     </div>
   );
 }
