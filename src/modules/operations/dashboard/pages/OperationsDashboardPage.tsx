@@ -852,9 +852,8 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
           </div>
         </div>
         
-        {/* No overflow-hidden on the card itself: the donut and its
-            shrink-0 KPI panel share one responsive stage, so the values stay
-            visible beside the chart without clipping. */}
+        {/* No overflow-hidden on the card itself: the donut has a centered
+            chart stage and the shrink-0 KPI footer below it stays visible. */}
         <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-5 w-full min-w-0 xl:h-[530px]">
           <Link
             to="/operations?tab=collection-report"

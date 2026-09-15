@@ -58,15 +58,47 @@ function useCountUp(target: number, duration = 900): number {
   return value;
 }
 
+function CollectionStat({
+  name,
+  value,
+  percent,
+  color,
+}: Pick<EnrichedMode, "name" | "value" | "percent" | "color">) {
+  const shown = useCountUp(value);
+
+  return (
+    <div
+      className="group min-w-0 cursor-default rounded-xl px-2.5 py-2 ring-1 ring-inset ring-slate-100 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
+      style={{ backgroundColor: `${color}0f` }}
+    >
+      <span className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">
+        <span
+          className="h-1.5 w-1.5 shrink-0 rounded-full transition-transform duration-200 group-hover:scale-150"
+          style={{ backgroundColor: color }}
+        />
+        <span className="truncate">{name}</span>
+      </span>
+      <span className="mt-0.5 flex items-baseline justify-between gap-1">
+        <span className="block truncate text-[15px] font-black tabular-nums text-slate-800">
+          {formatINRCompact(shown)}
+        </span>
+        <span className="shrink-0 text-[10px] font-bold tabular-nums text-slate-500">
+          {`${percent.toFixed(1)}%`}
+        </span>
+      </span>
+    </div>
+  );
+}
+
 /**
  * Collection Streams — payment-mode donut for the Operations dashboard.
  *
  * Simple & proper by design:
- *  • A flat 2D donut sitting EXACTLY beside the payment-mode KPI panel on
- *    wider cards, with a stacked fallback on narrow screens.
- *  • One KPI box per mode with its exact amount and share, in the same visual
- *    language as the Trips chart's KPI row. The panel is `shrink-0`, so it
- *    stays readable beside the chart instead of being squeezed below it.
+ *  • A flat 2D donut centered in the chart stage, with the payment-mode KPI
+ *    row beneath it, matching the Trip Movement chart's footer geometry.
+ *  • One KPI box per mode with its exact amount and share, using the same
+ *    spacing, typography, border, animation, and grid treatment as Trip
+ *    Movement. The row is `shrink-0`, so it stays readable and in sync.
  *  • Loading: an animated donut skeleton (soft track + orbiting arc +
  *    pulsing KPI boxes) until the first data arrives.
  *  • Every load / range change replays a choreographed entrance: the donut
@@ -99,7 +131,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
   const animatedTotal = useCountUp(total);
 
   // Signature of the exact data on screen. When a NEW range's data lands the
-  // signature changes, which re-keys the scene + KPI panel and replays the
+  // signature changes, which re-keys the scene + KPI footer and replays the
   // whole entrance choreography. Identical data (session-cache hits) keeps
   // the same signature — no flicker on instant range switches.
   const signature = useMemo(
@@ -176,47 +208,26 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
     };
   }, []);
 
-  // Payment-mode KPIs live beside the donut on wider cards and fall below it
-  // on narrow screens. Keeping the values in one fixed side panel makes the
-  // pie and its exact Cash / Union Bank / HDFC totals readable together.
+  // The collection KPI row follows the same footer contract as Trip Movement:
+  // full width, fixed below the chart, and keyed to the exact data signature.
   const modeKpis = (
     <div
       key={`kpi-${signature}`}
       aria-label={t("ops.dashboard.collection_streams")}
-      className="grid w-full shrink-0 grid-cols-3 gap-2 border-t border-slate-100 pt-3 sm:w-[172px] sm:grid-cols-1 sm:content-center sm:border-l sm:border-t-0 sm:pl-3 sm:pt-0"
+      className="mt-3 grid w-full shrink-0 grid-cols-2 gap-2 border-t border-slate-100 pt-3 sm:grid-cols-3"
     >
-      {enrichedData.map((d, index) => (
-        <div
-          key={d.name}
-          className="group min-w-0 animate-fade-in-up cursor-default rounded-xl px-2.5 py-2.5 ring-1 ring-inset ring-slate-100 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md"
-          style={{ backgroundColor: `${d.color}0f`, animationDelay: `${260 + index * 90}ms` }}
-        >
-          <span className="flex items-center gap-1.5 text-[10px] font-extrabold uppercase tracking-wide text-slate-400">
-            <span
-              className="h-1.5 w-1.5 shrink-0 rounded-full transition-transform duration-200 group-hover:scale-150"
-              style={{ backgroundColor: d.color }}
-            />
-            <span className="truncate">{d.name}</span>
-          </span>
-          <span className="mt-1 flex items-baseline justify-between gap-1">
-            <span className="block truncate text-[14px] font-black tabular-nums text-slate-800">
-              {formatINRCompact(d.value)}
-            </span>
-            <span className="shrink-0 text-[10px] font-bold tabular-nums text-slate-500">
-              {`${d.percent.toFixed(1)}%`}
-            </span>
-          </span>
-        </div>
+      {enrichedData.map((d) => (
+        <CollectionStat key={d.name} {...d} />
       ))}
     </div>
   );
 
-  // ── Loading / empty: preserve the same side-by-side card geometry. ─────
+  // ── Loading / empty: preserve the same chart-then-footer geometry. ─────
   if (chartData.length === 0) {
     return (
-      <div className="flex w-full min-w-0 flex-1 flex-col gap-3 sm:flex-row" aria-busy="true">
-        <div className="flex min-h-[250px] min-w-0 flex-1 items-center justify-center">
-          <div className="relative aspect-square w-full max-w-[300px]" style={{ aspectRatio: "1 / 1" }}>
+      <div className="flex w-full min-w-0 flex-1 flex-col" aria-busy="true">
+        <div className="flex min-h-0 w-full flex-1 items-center justify-center">
+          <div className="relative aspect-square w-full max-w-[470px]" style={{ aspectRatio: "1 / 1" }}>
             <svg viewBox="0 0 400 400" className="h-full w-full" aria-hidden="true">
               <circle cx="200" cy="200" r="91" fill="none" stroke="#eef2f7" strokeWidth="33" />
               <g
@@ -243,9 +254,9 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
             </div>
           </div>
         </div>
-        <div className="grid w-full shrink-0 grid-cols-3 gap-2 sm:w-[172px] sm:grid-cols-1 sm:content-center sm:border-l sm:border-slate-100 sm:pl-3">
+        <div className="mt-3 grid w-full shrink-0 grid-cols-2 gap-2 border-t border-slate-100 pt-3 sm:grid-cols-3">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-[58px] animate-pulse rounded-xl bg-slate-100/80" />
+            <div key={i} className="h-[52px] animate-pulse rounded-xl bg-slate-100/80" />
           ))}
         </div>
       </div>
@@ -253,14 +264,14 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
   }
 
   return (
-    <div className="flex w-full min-w-0 flex-1 flex-col gap-3 sm:flex-row">
+    <div className="flex w-full min-w-0 flex-1 flex-col">
 
-      {/* The donut and its payment-mode KPIs share one row on wider cards,
-          so the chart is never separated from the values it explains. */}
-      <div className="flex min-h-0 min-w-0 flex-1 items-center justify-center">
+      {/* The donut stays centered in the available chart stage. Its KPI row
+          follows underneath with the same spacing used by Trip Movement. */}
+      <div className="flex min-h-0 w-full flex-1 items-center justify-center">
         <div
           key={signature}
-          className="relative aspect-square max-h-full w-full max-w-[350px] animate-fade-in"
+          className="relative aspect-square max-h-full w-full max-w-[470px] animate-fade-in"
           style={{ aspectRatio: "1 / 1" }}
         >
           {/* Soft background track behind the ring (same 74.24–107.5 band).
