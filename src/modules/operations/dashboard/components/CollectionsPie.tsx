@@ -213,7 +213,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
           space between the title and the legend (HDFC / Cash / Union sit
           directly below it). */}
       <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-4">
-        <div className="relative aspect-square w-full max-w-[300px] shrink-0" style={{ aspectRatio: "1 / 1" }}>
+        <div className="relative aspect-square w-full max-w-[280px] shrink-0" style={{ aspectRatio: "1 / 1" }}>
           {/* Soft background track behind the ring (same 74.24–107.5 band).
               SVG circle so it scales with the scene at every card width. */}
           <svg viewBox="0 0 400 400" className="absolute inset-0 h-full w-full" aria-hidden="true">
