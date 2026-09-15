@@ -86,12 +86,15 @@ export default function useCollectionEntry() {
       .then(() => {
         const shopNames = shopService.getAll().map((s) => s.shopName).sort();
         setShops(shopNames);
-        const allEmployees = getEmployees();
-        const collectorNames = allEmployees
+        // Collector is strictly the Collection department from the Employee
+        // master. There is deliberately NO fallback to the full employee list:
+        // offering drivers/loaders here would let a collection be booked
+        // against someone who never collects money.
+        const collectorNames = getEmployees()
           .filter((emp) => (emp.department ?? "").toLowerCase() === "collection")
           .map((emp) => emp.employeeName)
           .sort();
-        setCollectors(collectorNames.length > 0 ? collectorNames : allEmployees.map((e) => e.employeeName).sort());
+        setCollectors(collectorNames);
         const modes: PaymentMode[] = [{ id: "cash", name: "Cash" }];
         getBanks()
           .slice()
