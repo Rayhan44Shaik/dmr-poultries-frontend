@@ -1017,7 +1017,7 @@ for (const date of OP_DATES) {
       createdBy: collector.employeeName,
       createdAt: ts(date, `1${between(r, 0, 9)}:${String(between(r, 0, 59)).padStart(2, "0")}:00`),
       updatedAt: ts(date, "21:00:00"),
-      canDelete: dayDiff(date, TODAY) <= 3,
+      canDelete: dayDiff(date, TODAY) <= 10,
     });
   }
 }
@@ -4429,8 +4429,8 @@ const server = http.createServer(async (req, res) => {
         // Pending Collection's delete flow is deliberately limited to the
         // backend-owned eligibility window. The client uses `canDelete` only
         // as a convenience check; this endpoint remains authoritative.
-        if (row.canDelete === false || dayDiff(row.collectionDate, TODAY) > 7) {
-          return send(409, { error: "delete_window_closed", message: "This collection is outside the 7-day deletion window." });
+        if (dayDiff(row.collectionDate, TODAY) > 10) {
+          return send(409, { error: "delete_window_closed", message: "This collection is outside the 10-day deletion window." });
         }
         row.deleted = true;
         row.deletedBy = "web-user";
@@ -4461,6 +4461,11 @@ const server = http.createServer(async (req, res) => {
         return send(200, { ...row, currentBalance });
       }
       if (method === "DELETE") {
+        // Same 10-day window as the pending endpoint. The entry date is the
+        // only clock that counts, and the backend stays authoritative.
+        if (dayDiff(row.collectionDate, TODAY) > 10) {
+          return send(409, { error: "delete_window_closed", message: "This collection is outside the 10-day deletion window." });
+        }
         row.deleted = true;
         row.deletedBy = "web-user";
         row.deletedAt = nowIso();
