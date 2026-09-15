@@ -15,7 +15,6 @@ import {
 } from "../../../../shared/trip/definitions";
 import { useI18n } from "../../../../i18n";
 import { compressImageFile } from "../../../../utils/compressImage";
-import { ActionTooltip } from "../../../../ui/ActionTooltip";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import { formatTripViewStamp } from "../utils/tripViewLocalization";
 import { TripTimestampDisplay } from "./TripTimestampDisplay";
@@ -615,7 +614,6 @@ export default function StepPickup({
                 aria-label={t("ops.trip.edit_step")}
               >
                 <Pencil size={14} className={uiActionIconMotionClass.edit} />
-                <ActionTooltip label={t("ops.trip.edit_step")} />
               </button>
             )}
             <span className="bg-slate-100 border border-slate-200 text-slate-700 px-3 py-1.5 rounded-full text-[13px] font-semibold whitespace-nowrap">
@@ -631,7 +629,6 @@ export default function StepPickup({
             tone="bg-blue-50/70 text-blue-500"
             label={t("ops.trip.captured_time")}
             value={<TripTimestampDisplay value={officialPickupTime} empty="--" />}
-            title={officialPickupTime || undefined}
             cardClass="col-span-2 sm:col-span-1"
             valueClass="overflow-visible whitespace-normal text-[12px] leading-none"
           />
@@ -740,7 +737,6 @@ export default function StepPickup({
                 className="group relative flex items-center justify-center p-2 bg-emerald-500 hover:bg-emerald-600 text-white rounded-lg shadow-xs transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
               >
                 <Download size={16} className={busyAction === "image" ? "animate-pulse" : uiActionIconMotionClass.view} />
-                <ActionTooltip label={t("ops.trip.download_image")} />
               </button>
             )}
             <button
@@ -751,7 +747,6 @@ export default function StepPickup({
               className="group relative flex items-center justify-center p-2 bg-blue-500 hover:bg-blue-600 text-white rounded-lg shadow-xs transition-all active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed disabled:active:scale-100"
             >
               <FileText size={16} className={busyAction === "pdf" ? "animate-pulse" : uiActionIconMotionClass.pdf} />
-              <ActionTooltip label={t("ops.trip.download_pdf")} />
             </button>
           </div>
         </div>
@@ -867,7 +862,6 @@ export default function StepPickup({
               <TripTimestampDisplay value={officialPickupTime} />
               <span
                 className="flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-slate-400 bg-slate-100 border border-slate-200 rounded-full px-2 py-0.5"
-                title={t("ops.trip.time_locked_hint")}
               >
                 <Lock size={9} /> {t("ops.trip.time_locked")}
               </span>
@@ -898,7 +892,6 @@ export default function StepPickup({
                     type="button"
                     onClick={() => void removeImage(p.key)}
                     className="absolute -top-1.5 -right-1.5 bg-red-500 hover:bg-red-600 text-white rounded-full w-5 h-5 text-[11px] leading-5 shadow-sm transition-all active:scale-90"
-                    title={t("ops.trip.remove_photo")}
                   >
                     ×
                   </button>
@@ -912,7 +905,6 @@ export default function StepPickup({
                   type="button"
                   onClick={() => openFilePicker(slot)}
                   className="h-24 w-24 rounded-xl border-2 border-dashed border-slate-300 hover:border-sky-400 hover:bg-sky-50/60 text-slate-400 hover:text-sky-500 flex flex-col items-center justify-center gap-1 transition-all active:scale-95"
-                  title={t("ops.trip.choose_image")}
                 >
                   <Camera size={18} />
                   <span className="text-[11px] font-bold uppercase tracking-wide">{t("ops.trip.add_photo")}</span>
@@ -1016,7 +1008,6 @@ export default function StepPickup({
                               onClick={() => removeRow(row.uid)}
                               disabled={rows.length === 1}
                               className="mini-delete shrink-0"
-                              title={t("ops.trip.delete_box")}
                             >
                               <Trash2 size={12} />
                             </button>

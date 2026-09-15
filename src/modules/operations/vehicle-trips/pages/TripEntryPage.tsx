@@ -64,6 +64,16 @@ type EntryScreen = "prompt" | "form";
 
 function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const { t } = useI18n();
+  const localizedStepLabels = useMemo(
+    () => [
+      t("ops.trip.step.start"),
+      t("ops.trip.step.farm"),
+      t("ops.trip.step.pickup"),
+      t("ops.trip.step.deliveries"),
+      t("ops.trip.step.expenses"),
+    ],
+    [t],
+  );
   const location = useLocation();
   const navigate = useNavigate();
   const { farms } = useFarms();
@@ -674,7 +684,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
         ) : (
           <>
             <TripWizardStepper
-              steps={TRIP_STEP_LABELS}
+              steps={localizedStepLabels}
               // Always highlight the step the user is viewing (not forced to 5).
               currentStep={effectiveViewStepIndex}
               completedMask={getTripWizardCompletedMask(trip)}

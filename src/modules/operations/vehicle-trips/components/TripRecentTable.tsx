@@ -6,6 +6,7 @@ import { Eye, Pencil, History, Trash2, Clock, AlertCircle, Search, FileText, Che
 import type { Trip } from "../types/trip";
 import { canEditItem, canDeleteItem } from "../../../../utils/dateUtils";
 import { formatTripListDay } from "../utils/formatTripListDay";
+import { localizeTripViewText } from "../utils/tripViewLocalization";
 import { formatVehicleNumber } from "../../../../utils/format";
 import TripPagination from "./TripPagination";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
@@ -15,7 +16,6 @@ import { useI18n } from "../../../../i18n";
 import { notify as globalNotify } from "../../../../ui/notifications/notificationStore";
 import { uniqueTripsById } from "../services/tripHeaderApiService";
 import { BrandRefreshButton } from "../../../../ui";
-import { ActionTooltip } from "../../../../ui/ActionTooltip";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import { isOrderContainer } from "../../orders/ordersUtils";
 
@@ -39,7 +39,7 @@ function TripRecentTable({
   onDelete,
   onStatusChange,
 }: Props) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   // Recent Trips lists REAL vehicle trips (TRP-*) only. The trips feed also
   // carries Orders collection containers (ORD-*): rows with no vehicle that
   // exist purely to hold a day's order plan. They are not trips, so they must
@@ -287,7 +287,6 @@ function TripRecentTable({
             {/* Selected-tab count beside the title (updates when Draft/Pending/Deleted is clicked) */}
             <span
               className="inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 rounded-full shadow-sm tabular-nums"
-              title={statusFilter}
             >
               {selectedTabCount}
             </span>
@@ -338,12 +337,10 @@ function TripRecentTable({
               <button type="button" onClick={handleEditClick} disabled={!canEdit} className={`group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canEdit ? "bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-500 border border-emerald-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`} aria-label={t("ops.trip.edit_selected_trip")}>
                 <span className={`inline-flex ${canEdit ? uiActionIconMotionClass.edit : ""}`}><Pencil size={13} /></span>
                 <span className="hidden md:inline">{t("common.edit")}</span>
-                <ActionTooltip label={t("ops.trip.edit_selected_trip")} />
               </button>
               <button type="button" onClick={openDeleteModal} disabled={!canDelete} className={`group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canDelete ? "bg-rose-50/70 hover:bg-rose-50/80 text-rose-500 border border-rose-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`} aria-label={t("ops.trip.delete_selected_trip")}>
                 <span className={`inline-flex ${canDelete ? uiActionIconMotionClass.delete : ""}`}><Trash2 size={13} /></span>
                 <span className="hidden md:inline">{t("common.delete")}</span>
-                <ActionTooltip label={t("ops.trip.delete_selected_trip")} />
               </button>
               <BrandRefreshButton onClick={() => onRefresh()} />
             </div>
@@ -379,13 +376,13 @@ function TripRecentTable({
                   return (
                     <tr key={trip.id} onClick={() => handleRowClick(trip)} className={`cursor-pointer transition-colors duration-150 ${isDeleted ? "bg-red-50/50 hover:bg-red-50/80 border-l-4 border-l-red-400" : isSelected ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200" : "hover:bg-slate-50/80"}`}>
                       <td className={`px-4 py-3 font-bold text-emerald-500 text-xs whitespace-nowrap ${isDeleted ? "opacity-60 line-through" : ""}`}>
-                        {trip.tripNo}
+                        {localizeTripViewText(trip.tripNo, language)}
                       </td>
-                      <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(trip.tripDate)}</td>
-                      <td className="px-4 py-3 text-xs font-medium text-slate-700 whitespace-nowrap">{formatVehicleNumber(trip.vehicleNo)}</td>
-                      <td className="px-4 py-3 text-xs text-slate-600">{trip.driverName}</td>
-                      <td className="px-4 py-3 text-xs text-slate-600">{trip.supervisorName}</td>
-                      <td className="px-4 py-3 text-xs text-slate-600 font-medium">{trip.sourceFarm}</td>
+                      <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">{formatTripListDay(trip.tripDate, language)}</td>
+                      <td className="px-4 py-3 text-xs font-medium text-slate-700 whitespace-nowrap">{localizeTripViewText(formatVehicleNumber(trip.vehicleNo), language)}</td>
+                      <td className="px-4 py-3 text-xs text-slate-600">{localizeTripViewText(trip.driverName, language)}</td>
+                      <td className="px-4 py-3 text-xs text-slate-600">{localizeTripViewText(trip.supervisorName, language)}</td>
+                      <td className="px-4 py-3 text-xs text-slate-600 font-medium">{localizeTripViewText(trip.sourceFarm, language)}</td>
                       <td className="px-4 py-3 text-center text-xs font-bold text-slate-700">{trip.totalShops}</td>
                       <td className="px-4 py-3 text-center text-xs font-bold text-blue-500">{trip.totalBirds.toLocaleString()}</td>
                       <td className="px-4 py-3 text-center text-xs font-bold text-amber-500">{trip.totalWeight.toFixed(2)}</td>
@@ -415,7 +412,6 @@ function TripRecentTable({
                                   value="Pending"
                                   onChange={(e) => handleStatusChange(trip, e.target.value as TripStatus)}
                                   className="w-full appearance-none rounded-xl px-3 py-1.5 text-xs font-bold border transition-all shadow-sm cursor-pointer pr-8 focus:outline-none focus:ring-2 focus:ring-offset-1 text-orange-700 border-orange-200 bg-orange-50 focus:ring-orange-500"
-                                  title={tSafe("ops.trip.move_to_completed") || "Move to Completed"}
                                 >
                                   <option value="Pending" className="font-semibold bg-white text-orange-700">
                                     ⏳ {tSafe("status.pending") || "Pending"}
@@ -450,7 +446,7 @@ function TripRecentTable({
                         })()}
                       </td>
                       <td className="text-center px-4 py-3">
-                        <button type="button" onClick={(e) => { e.stopPropagation(); onView(trip); }} className="group relative h-8 w-8 rounded-xl bg-violet-50 hover:bg-violet-500 text-violet-600 hover:text-white flex items-center justify-center mx-auto transition-all shadow-sm active:scale-95" aria-label={t("ops.trip.view_trip_details")}><span className={`inline-flex ${uiActionIconMotionClass.view}`}><Eye size={14} /></span><ActionTooltip label={t("ops.trip.view_trip_details")} /></button>
+                        <button type="button" onClick={(e) => { e.stopPropagation(); onView(trip); }} className="group relative h-8 w-8 rounded-xl bg-violet-50 hover:bg-violet-500 text-violet-600 hover:text-white flex items-center justify-center mx-auto transition-all shadow-sm active:scale-95" aria-label={t("ops.trip.view_trip_details")}><span className={`inline-flex ${uiActionIconMotionClass.view}`}><Eye size={14} /></span></button>
                       </td>
                     </tr>
                   );
@@ -493,7 +489,7 @@ function TripRecentTable({
             <div className="flex items-start gap-3">
               <div className="h-10 w-10 rounded-xl bg-rose-50/70 border border-rose-100 flex items-center justify-center text-rose-500"><Trash2 size={20} /></div>
               <div className="flex-1"><h3 className="text-lg font-bold text-slate-800">{t("ops.trip.delete_trip")}</h3><p className="text-sm text-slate-500 mt-1">{t("ops.trip.delete_trip_about", { no: tripToDelete?.tripNo ?? "" })}</p></div>
-              <button type="button" onClick={cancelDelete} className="group relative h-8 w-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-rose-500" aria-label={t("common.close")}><X size={18} className={uiActionIconMotionClass.close} /><ActionTooltip label={t("common.close")} /></button>
+              <button type="button" onClick={cancelDelete} className="group relative h-8 w-8 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-rose-500" aria-label={t("common.close")}><X size={18} className={uiActionIconMotionClass.close} /></button>
             </div>
             <div className="mt-4">
               <label htmlFor="deleteReason" className="block text-sm font-medium text-slate-700">{t("ops.trip.reason")} <span className="text-rose-500">*</span></label>

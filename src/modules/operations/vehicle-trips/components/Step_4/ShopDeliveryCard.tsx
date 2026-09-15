@@ -4,9 +4,8 @@ import type { ShopDeliveryWithExtra } from "./useShopDeliveryForm";
 import { useI18n } from "../../../../../i18n";
 import { cleanDeliveryShopName } from "../../utils/shopDisplayName";
 import { WhatsAppIcon } from "../../../../../ui/WhatsAppIcon";
-import { ActionTooltip } from "../../../../../ui/ActionTooltip";
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
-import { formatTripViewStamp } from "../../utils/tripViewLocalization";
+import { formatTripViewStamp, localizeTripViewText } from "../../utils/tripViewLocalization";
 import type { DeliveryEmailStatusValue } from "../../services/deliveryEmailService";
 import type { DeliveryWhatsAppStatusValue } from "../../services/deliveryWhatsAppService";
 
@@ -46,7 +45,7 @@ function DeliveryCommunicationButton({
   sending = false,
   sendCount = 0,
   disabled = false,
-  title,
+  ariaLabel,
   onClick,
 }: {
   channel: "mail" | "whatsapp";
@@ -54,7 +53,7 @@ function DeliveryCommunicationButton({
   sending?: boolean;
   sendCount?: number;
   disabled?: boolean;
-  title: string;
+  ariaLabel: string;
   onClick: () => void;
 }) {
   const isWhatsApp = channel === "whatsapp";
@@ -77,7 +76,7 @@ function DeliveryCommunicationButton({
       className={`group relative p-1.5 rounded-lg border transition-colors flex items-center justify-center active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${className} ${
         isSending ? "motion-safe:animate-pulse" : ""
       }`}
-      aria-label={title}
+      aria-label={ariaLabel}
     >
       {isSending ? (
         <Loader2 size={13} className="animate-spin stroke-[2.5]" />
@@ -93,7 +92,6 @@ function DeliveryCommunicationButton({
           {visibleCount > 9 ? "9+" : visibleCount}
         </span>
       )}
-      <ActionTooltip label={title} />
     </button>
   );
 }
@@ -125,9 +123,9 @@ export default function ShopDeliveryCard({
   const mortKg = row.mortKg ?? 0;
   const display = (value: string | number | null | undefined) => {
     if (value == null || value === "" || (typeof value === "number" && Number.isNaN(value))) return t("ops.trip.not_entered");
-    return String(value);
+    return localizeTripViewText(String(value), language);
   };
-  const displayShopName = cleanDeliveryShopName(row.shopName) || t("ops.trip.not_entered");
+  const displayShopName = localizeTripViewText(cleanDeliveryShopName(row.shopName), language, { cleanShopCode: true }) || t("ops.trip.not_entered");
   const capturedTime = row.autoCaptureTime ? formatTripViewStamp(row.autoCaptureTime, language) : "—";
 
   return (
@@ -142,11 +140,10 @@ export default function ShopDeliveryCard({
                   ? "bg-purple-50/70 text-purple-500 border-purple-100"
                   : "bg-blue-50/70 text-blue-500 border-blue-100"
               }`}
-              title={isWeightMode ? t("ops.trip.weight_mode") : t("ops.trip.box_mode")}
             >
               {isWeightMode ? <Scale size={15} /> : <Box size={15} />}
             </div>
-            <p className="font-bold text-slate-800 text-[13px] truncate leading-tight" title={displayShopName}>
+            <p className="font-bold text-slate-800 text-[13px] truncate leading-tight">
               {displayShopName}
             </p>
           </div>
@@ -159,7 +156,7 @@ export default function ShopDeliveryCard({
                 sending={emailSending}
                 sendCount={emailSendCount}
                 disabled={emailDisabled}
-                title={emailFailureReason || t("ops.trip.send_email")}
+                ariaLabel={t("ops.trip.send_email")}
                 onClick={() => onSendEmail(row)}
               />
             )}
@@ -170,7 +167,7 @@ export default function ShopDeliveryCard({
                 sending={whatsappSending}
                 sendCount={whatsappSendCount}
                 disabled={whatsappDisabled}
-                title={whatsappFailureReason || t("ops.trip.send_whatsapp")}
+                ariaLabel={t("ops.trip.send_whatsapp")}
                 onClick={() => onSendWhatsApp(row)}
               />
             )}
@@ -182,7 +179,6 @@ export default function ShopDeliveryCard({
                 aria-label={t("ops.trip.edit_shop_delivery")}
               >
                 <span className={`inline-flex ${uiActionIconMotionClass.edit}`}><Pencil size={13} className="stroke-[2]" /></span>
-                <ActionTooltip label={t("ops.trip.edit_shop_delivery")} />
               </button>
             )}
             <button
@@ -192,7 +188,6 @@ export default function ShopDeliveryCard({
               aria-label={t("ops.trip.download_pdf")}
             >
               <span className={`inline-flex ${uiActionIconMotionClass.pdf}`}><FileText size={13} className="stroke-[2]" /></span>
-              <ActionTooltip label={t("ops.trip.download_pdf")} />
             </button>
           </div>
         </div>
@@ -255,7 +250,7 @@ export default function ShopDeliveryCard({
         )}
 
         {row.remarks ? (
-          <p className="text-[10px] text-slate-500 px-0.5 truncate" title={row.remarks}>
+          <p className="text-[10px] text-slate-500 px-0.5 truncate">
             <span className="font-semibold text-slate-400 uppercase text-[9px]">{t("common.remarks")}: </span>
             {row.remarks}
           </p>
@@ -267,7 +262,6 @@ export default function ShopDeliveryCard({
           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             {mortalityCount > 0 && (
               <span
-                title={t("operations.mortality_count")}
                 className="px-1.5 py-px rounded bg-rose-50/70 text-rose-500 border border-rose-100 shrink-0 flex items-center gap-1 text-[10px] font-bold"
               >
                 <AlertCircle size={11} className="text-rose-300 stroke-[2.5]" />
@@ -280,7 +274,7 @@ export default function ShopDeliveryCard({
               </span>
             ) : null}
           </div>
-          <div className="ml-auto flex shrink-0 items-center justify-end gap-1 text-slate-600" title={capturedTime}>
+          <div className="ml-auto flex shrink-0 items-center justify-end gap-1 text-slate-600">
             <span className="h-4 w-4 rounded bg-indigo-50/70 text-indigo-500 flex items-center justify-center shrink-0">
               <Clock size={11} className="stroke-[2]" />
             </span>

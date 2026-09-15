@@ -19,7 +19,6 @@ export function TripNoBadge({
   return (
     <span
       className={`inline-flex items-center gap-1 max-w-full rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 tabular-nums tracking-tight shadow-sm ${className}`}
-      title={`${t("operations.trip_no")}: ${value}`}
       aria-label={`${t("operations.trip_no")} ${value}`}
     >
       <Hash size={11} className="shrink-0 text-emerald-600" strokeWidth={2.5} />

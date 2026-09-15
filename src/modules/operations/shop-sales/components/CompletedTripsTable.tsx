@@ -18,7 +18,6 @@ import {
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
 import { formatVehicleNumber } from "../../../../utils/format";
 import { useI18n } from "../../../../i18n";
-import { ActionTooltip } from "../../../../ui/ActionTooltip";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import type { RateEntrySortKey } from "../hooks/useCompletedTrips";
 import { displayRateEntryName, formatRateEntryDay } from "../utils/rateEntryDisplay";
@@ -76,7 +75,6 @@ function CompletedTripsTable({
       <button
         type="button"
         onClick={() => onSortChange(key)}
-        title={t("common.sort")}
         aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
         className={`group/sort flex items-center gap-2 w-full uppercase tracking-wider font-bold text-[12px] transition-colors hover:text-emerald-700 ${
           center ? "justify-center" : ""
@@ -157,7 +155,7 @@ function CompletedTripsTable({
                   <td className="px-4 py-4 pl-9 text-[13px] font-medium text-slate-600 whitespace-nowrap">
                     {formatRateEntryDay(trip.tripDate, language)}
                   </td>
-                  <td className="px-4 py-4 pl-9 text-[13px] font-medium text-slate-700 whitespace-nowrap">{formatVehicleNumber(trip.vehicleNo)}</td>
+                  <td className="px-4 py-4 pl-9 text-[13px] font-medium text-slate-700 whitespace-nowrap">{displayRateEntryName(formatVehicleNumber(trip.vehicleNo), language)}</td>
                   <td className="px-4 py-4 pl-9 text-[13px] text-slate-600 whitespace-nowrap">{displayRateEntryName(trip.supervisorName, language)}</td>
                   <td className="px-4 py-4 pl-9 text-[13px] text-slate-600 font-medium whitespace-nowrap">
                     {displayRateEntryName(trip.sourceFarm, language)}
@@ -186,7 +184,6 @@ function CompletedTripsTable({
                           <IndianRupee size={15} />
                         </span>
                         {t("ops.rate.enter_rates")}
-                        <ActionTooltip label={t("ops.rate.enter_tooltip")} />
                       </button>
                     ) : canModify ? (
                       <button
@@ -202,7 +199,6 @@ function CompletedTripsTable({
                           <Pencil size={13} />
                         </span>
                         {t("ops.rate.modify_rates")}
-                        <ActionTooltip label={t("ops.rate.modify_tooltip")} />
                       </button>
                     ) : isReadOnly ? (
                       <span className="inline-flex items-center gap-1 rounded-xl bg-slate-100 text-slate-400 px-3 py-2 text-[13px] font-semibold cursor-not-allowed">

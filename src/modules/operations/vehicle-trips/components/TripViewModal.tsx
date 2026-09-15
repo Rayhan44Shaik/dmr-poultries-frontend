@@ -15,7 +15,6 @@ import {
   Loader2,
   UserCheck,
   FileDown,
-  Languages,
   X,
 } from "lucide-react";
 import AppShellModal from "../../../../ui/AppShellModal";
@@ -35,8 +34,7 @@ import { useTripDeliveryWhatsApps } from "../hooks/useTripDeliveryWhatsApps";
 import { cleanDeliveryShopName } from "../utils/shopDisplayName";
 import { localizeBirdTypesForView, localizeShopsForView, localizeTripForView, localizeTripViewText } from "../utils/tripViewLocalization";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
-import { ScopedI18nProvider, useI18n } from "../../../../i18n";
-import { ActionTooltip } from "../../../../ui/ActionTooltip";
+import { useI18n } from "../../../../i18n";
 import StepStart from "./StepStart";
 import StepFarm from "./StepFarm";
 import StepPickup from "./StepPickup";
@@ -219,7 +217,7 @@ function TripViewModal({
   initialStep,
   showCommunicationStatus = true,
 }: Props) {
-  const { t, language, toggleLanguage } = useI18n();
+  const { t, language } = useI18n();
   const initialViewStep = (trip: Trip | null) => {
     if (initialStep != null) return initialStep;
     return trip && trip.status === "Completed" && isTripWizardComplete(trip) ? 3 : 0;
@@ -261,7 +259,6 @@ function TripViewModal({
   const statusKey = `status.${String(trip.status || "pending").toLowerCase().replace(/\s+/g, "_")}`;
   const translatedStatus = t(statusKey);
   const viewStatus = language === "te" && translatedStatus !== statusKey ? translatedStatus : trip.status;
-  const popupLanguageLabel = language === "te" ? "ఇంగ్లీష్" : t("settings.telugu");
   const isCompleted = trip.status === "Completed" && isTripWizardComplete(trip);
 
   const isStartCompleted = Boolean(trip.startStepSubmitted);
@@ -402,18 +399,6 @@ function TripViewModal({
                 )}
                 <button
                   type="button"
-                  onClick={toggleLanguage}
-                  className="group relative inline-flex items-center gap-2 rounded-full border border-emerald-100 bg-white px-3 py-1.5 text-xs font-bold text-emerald-700 shadow-sm shadow-emerald-100/60 transition-all hover:-translate-y-0.5 hover:bg-emerald-50 active:scale-95"
-                  aria-label={t("ops.trip.popup_language_toggle")}
-                >
-                  <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]">
-                    <Languages size={13} />
-                  </span>
-                  {popupLanguageLabel}
-                  <ActionTooltip label={t("ops.trip.popup_language_tooltip")} side="bottom" />
-                </button>
-                <button
-                  type="button"
                   onClick={onClose}
                   className="group relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:-translate-y-0.5 hover:border-red-100 hover:bg-red-50 hover:text-red-500 active:scale-95"
                   aria-label={t("ops.trip.close_view")}
@@ -421,7 +406,6 @@ function TripViewModal({
                   <span className={`inline-flex ${uiActionIconMotionClass.close}`}>
                     <X size={16} />
                   </span>
-                  <ActionTooltip label={t("ops.trip.close_view")} side="bottom" />
                 </button>
               </div>
             </div>
@@ -474,7 +458,6 @@ function TripViewModal({
                     >
                       {emailState.isBulkSending ? <Loader2 size={14} className="animate-spin" /> : <span className={`inline-flex ${uiActionIconMotionClass.mail}`}><Mail size={14} /></span>}
                       {emailState.isBulkSending ? `${t("ops.trip.sending")}...` : t("ops.trip.send_all_email")}
-                      <ActionTooltip label={t("ops.trip.send_email_all")} side="bottom" />
                     </button>
                   )}
                   {showCommunicationStatus && whatsappCounts.total > 0 && (
@@ -487,7 +470,6 @@ function TripViewModal({
                     >
                       {whatsappState.isBulkSending ? <Loader2 size={14} className="animate-spin" /> : <span className={`inline-flex ${uiActionIconMotionClass.whatsapp}`}><WhatsAppIcon size={14} /></span>}
                       {whatsappState.isBulkSending ? `${t("ops.trip.sending")}...` : t("ops.trip.send_all_whatsapp")}
-                      <ActionTooltip label={t("ops.trip.send_whatsapp_all")} side="bottom" />
                     </button>
                   )}
                   <button
@@ -497,7 +479,6 @@ function TripViewModal({
                     aria-label={t("ops.trip.create_pdf")}
                   >
                     <span className={`inline-flex ${uiActionIconMotionClass.pdf}`}><FileDown size={16} /></span>
-                    <ActionTooltip label={t("ops.trip.create_pdf_title")} side="bottom" />
                   </button>
                 </div>
               </div>
@@ -534,7 +515,6 @@ function TripViewModal({
                 <X size={15} />
               </span>
               {t("common.close")}
-              <ActionTooltip label={t("ops.trip.close_view")} side="top" />
             </button>
           </div>
         </div>
@@ -572,7 +552,7 @@ function TripViewModal({
                   {communicationFeedback.channel === "whatsapp" ? t("ops.trip.whatsapp") : t("ops.trip.email")}
                 </p>
                 <p className="mt-1 text-sm font-bold text-slate-800">{communicationFeedback.message}</p>
-                <p className="mt-1 text-xs font-medium text-slate-500 truncate" title={communicationFeedback.shopName}>
+                <p className="mt-1 text-xs font-medium text-slate-500 truncate">
                   {communicationFeedback.shopName}
                 </p>
                 {communicationFeedback.type === "success" && communicationFeedback.count ? (
@@ -602,21 +582,12 @@ function TripViewModal({
   );
 }
 
-function ScopedTripViewModal(props: Props) {
-  const { language } = useI18n();
-  return (
-    <ScopedI18nProvider initialLanguage={language}>
-      <TripViewModal {...props} />
-    </ScopedI18nProvider>
-  );
-}
-
 export function RecentTripViewModal(props: Props) {
-  return <ScopedTripViewModal {...props} showCommunicationStatus={false} />;
+  return <TripViewModal {...props} showCommunicationStatus={false} />;
 }
 
 export function TripHistoryViewModal(props: Props) {
-  return <ScopedTripViewModal {...props} showCommunicationStatus />;
+  return <TripViewModal {...props} showCommunicationStatus />;
 }
 
 export default React.memo(TripHistoryViewModal);

@@ -13,8 +13,8 @@ import {
 } from "../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../i18n";
 import { BrandRefreshButton } from "../../../../ui";
-import { ActionTooltip } from "../../../../ui/ActionTooltip";
 import MasterDropdown, { type MasterDropdownOption } from "../../../masters/components/MasterDropdown";
+import { localizeTripViewText } from "../utils/tripViewLocalization";
 
 interface Props {
   fromDate: string;
@@ -70,7 +70,7 @@ function TripFilters({
   hasFilters = false,
   viewButtonRef,
 }: Props) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   // Option lists may be either legacy strings or id-backed dropdown options.
   // The "All ..." sentinels are represented as an empty value so the dropdown
   // shows its placeholder and the clear affordance behaves correctly.
@@ -78,9 +78,15 @@ function TripFilters({
     options: readonly (string | MasterDropdownOption)[],
     sentinel: string
   ) => options.filter((option) => (typeof option === "string" ? option !== sentinel : option.value !== sentinel));
-  const vehicleOptions = withoutSentinel(vehicles || [], "All Vehicles");
-  const supervisorOptions = withoutSentinel(supervisors || [], "All Supervisors");
-  const farmOptions = withoutSentinel(farms || [], "All Sources");
+  const localizeOptions = (options: readonly (string | MasterDropdownOption)[]) => options.map((option) => {
+    const raw = typeof option === "string" ? option : option.label;
+    return typeof option === "string"
+      ? { value: option, label: localizeTripViewText(raw, language), searchText: raw }
+      : { ...option, label: localizeTripViewText(raw, language), searchText: option.searchText || raw };
+  });
+  const vehicleOptions = localizeOptions(withoutSentinel(vehicles || [], "All Vehicles"));
+  const supervisorOptions = localizeOptions(withoutSentinel(supervisors || [], "All Supervisors"));
+  const farmOptions = localizeOptions(withoutSentinel(farms || [], "All Sources"));
 
   return (
     <div className={opsFilterCardClass}>
@@ -194,32 +200,27 @@ function TripFilters({
             >
               <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]"><Eye size={15} /></span>
               {t("ops.trip.view_selected")}
-              <ActionTooltip label={t("ops.trip.view_selected")} />
             </button>
           )}
           <button type="button" onClick={onSearch} className={`group relative ${opsPrimaryButtonClass}`} aria-label={t("common.search")}>
             <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-search)]"><Search size={15} /></span>
             {t("common.search")}
-            <ActionTooltip label={t("common.search")} />
           </button>
           <button type="button" onClick={onReset} className={`group relative ${opsSecondaryButtonClass}`} aria-label={t("common.reset")}>
             <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>
             {t("common.reset")}
-            <ActionTooltip label={t("common.reset")} />
           </button>
           {onRefresh && <BrandRefreshButton onClick={onRefresh} />}
           {onExportPDF && (
             <button type="button" onClick={onExportPDF} disabled={!hasFilters} className={`group relative ${opsPdfButtonClass}`} aria-label={t("reports.export_pdf") || "PDF"}>
               <span className={`inline-flex ${hasFilters ? "motion-safe:group-hover:animate-[var(--animate-action-pdf)]" : ""}`}><FileText size={15} /></span>
               PDF
-              <ActionTooltip label={t("reports.export_pdf") || "PDF"} />
             </button>
           )}
           {onExportExcel && (
             <button type="button" onClick={onExportExcel} disabled={!hasFilters} className={`group relative ${opsExcelButtonClass}`} aria-label={t("reports.export_excel") || "Excel"}>
               <span className={`inline-flex ${hasFilters ? "motion-safe:group-hover:animate-[var(--animate-action-excel)]" : ""}`}><FileSpreadsheet size={15} /></span>
               Excel
-              <ActionTooltip label={t("reports.export_excel") || "Excel"} />
             </button>
           )}
         </div>

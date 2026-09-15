@@ -200,7 +200,6 @@ img{max-width:100%;max-height:calc(100vh - 64px);object-fit:contain;border-radiu
                 className="block w-full p-2.5 bg-white text-left cursor-zoom-in border-0"
                 onClick={openLightbox}
                 onMouseDown={(e) => e.preventDefault()}
-                title={t("ops.trip.bill_open_full")}
               >
                 <img
                   src={href}
@@ -223,7 +222,6 @@ img{max-width:100%;max-height:calc(100vh - 64px);object-fit:contain;border-radiu
                   onClick={openInNewTab}
                   onMouseDown={(e) => e.preventDefault()}
                   className="h-8 px-2.5 rounded-lg border border-emerald-100 bg-white hover:bg-emerald-50/70 text-emerald-500 text-[12px] font-bold inline-flex items-center gap-1"
-                  title={t("ops.trip.bill_open_new_tab")}
                 >
                   <ExternalLink size={12} />
                   <span className="hidden sm:inline">{t("ops.trip.bill_open_new_tab")}</span>
@@ -259,7 +257,7 @@ img{max-width:100%;max-height:calc(100vh - 64px);object-fit:contain;border-radiu
                   <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
                     {t("ops.trip.bill_uploaded_row")}
                   </p>
-                  <p className="text-[15px] font-semibold text-slate-800 truncate" title={fileName}>
+                  <p className="text-[15px] font-semibold text-slate-800 truncate">
                     {fileName || t("ops.trip.bill_uploaded_short")}
                   </p>
                 </div>
@@ -268,7 +266,6 @@ img{max-width:100%;max-height:calc(100vh - 64px);object-fit:contain;border-radiu
                     type="button"
                     onClick={openInNewTab}
                     className="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-emerald-100 bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-500 text-[13px] font-bold shadow-sm"
-                    title={t("ops.trip.bill_open_new_tab")}
                   >
                     <ExternalLink size={14} strokeWidth={2.25} />
                     <span>{t("ops.trip.bill_open_new_tab")}</span>
@@ -277,7 +274,6 @@ img{max-width:100%;max-height:calc(100vh - 64px);object-fit:contain;border-radiu
                     type="button"
                     onClick={closeLightbox}
                     className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-slate-600"
-                    title={t("common.close")}
                     aria-label={t("common.close")}
                   >
                     <X size={16} />
@@ -330,7 +326,6 @@ img{max-width:100%;max-height:calc(100vh - 64px);object-fit:contain;border-radiu
           className ||
           "inline-flex items-center gap-0.5 text-[12px] text-emerald-500 font-semibold underline decoration-emerald-300/70 hover:decoration-emerald-600 leading-tight whitespace-nowrap cursor-pointer bg-transparent border-0 p-0.5 rounded hover:bg-emerald-50/70"
         }
-        title={t("ops.trip.bill_open_full")}
       >
         {t("ops.trip.bill_uploaded_short")}
       </button>

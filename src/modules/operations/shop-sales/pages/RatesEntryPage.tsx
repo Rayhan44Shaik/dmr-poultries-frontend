@@ -224,15 +224,13 @@ export default function RatesEntryPage({ embedded = false }: Props) {
 
       {/* Table — separate card like trip list, Rate Entry on top of table */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        {/* Rate Entry header on top of table — perfect light background + animated ₹ */}
+        {/* Rate Entry table title: intentionally static; other page animations are unchanged. */}
         <div className="flex items-center px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-emerald-50/60 via-white to-emerald-50/40">
           <div className="flex items-center gap-3">
-            <div className="group h-9 w-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-inner">
-              <span className="inline-flex motion-safe:animate-[var(--animate-action-view)]">
-                <IndianRupee className="w-5 h-5" />
-              </span>
+            <div className="h-9 w-9 rounded-xl bg-emerald-50 border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-inner">
+              <IndianRupee className="w-5 h-5" />
             </div>
-            <h3 className="text-base font-bold text-slate-800 tracking-tight">Rate Entry</h3>
+            <h3 className="text-base font-bold text-slate-800 tracking-tight">{t("ops.rate.title")}</h3>
           </div>
         </div>
 
@@ -242,7 +240,7 @@ export default function RatesEntryPage({ embedded = false }: Props) {
               <Store size={20} />
             </span>
             <p className="font-semibold text-slate-700">{t("ops.rate.no_trips")}</p>
-            <p className="text-xs font-medium text-slate-500">No pending trips awaiting rates</p>
+            <p className="text-xs font-medium text-slate-500">{t("ops.rate.no_waiting_trips")}</p>
           </div>
         ) : (
           <>

@@ -962,6 +962,7 @@ export default {
   'ops.rate.modal.saving': 'సేవ్ అవుతోంది...',
   'ops.rate.modal.lock_submit': 'సేవ్ & లాక్',
   'ops.rate.modal.reset_rates': 'రీసెట్',
+  'ops.rate.modal.clear': 'క్లియర్ చేయి',
   'ops.rate.modal.rate_range_error': 'నమోదు చేసిన రేట్లు ₹50 నుండి ₹300 మధ్య ఉండాలి. ఖాళీ షాపులు అయినా సేవ్ చేయవచ్చు.',
   'ops.rate.modal.min_rate': 'కనిష్ఠం ₹50',
   'ops.rate.modal.max_rate': 'గరిష్ఠం ₹300',

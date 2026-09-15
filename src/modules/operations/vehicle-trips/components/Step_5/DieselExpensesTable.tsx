@@ -916,11 +916,6 @@ export default function DieselExpensesTable({
                   ? "bg-emerald-500 hover:bg-emerald-600 text-white active:scale-95 cursor-pointer"
                   : "bg-slate-100 text-slate-400 cursor-not-allowed border border-slate-200"
               }`}
-              title={
-                canAddDieselRow
-                  ? t("ops.trip.add_diesel_entry")
-                  : t("ops.trip.submit_diesel_first")
-              }
             >
               <Plus size={14} />
               <span>{t("ops.trip.add_diesel_entry")}</span>
@@ -1082,7 +1077,6 @@ export default function DieselExpensesTable({
                   <td className="py-2 px-1.5 align-middle">
                     <div
                       className="w-full min-w-0 tabular-nums text-right pl-1.5 pr-2 py-1.5 rounded-md border border-slate-200 bg-slate-50 text-[13px] font-bold text-slate-800 truncate"
-                      title={amountDisplay === "—" ? undefined : `${ltrNum || 0} L × ₹${rateNum || 0} = ₹${amountDisplay}`}
                     >
                       {amountDisplay === "—" ? "—" : `₹ ${amountDisplay}`}
                     </div>
@@ -1109,7 +1103,6 @@ export default function DieselExpensesTable({
                           }
                         }}
                         placeholder="0"
-                        title={hasError ? liveMeterErr || undefined : rowMinAllowed > 0 ? `> ${rowMinAllowed}` : undefined}
                         className={`${inputBase} ${hasError ? inputErr : inputOk} pr-8`}
                         aria-label={t("ops.trip.diesel_reading")}
                         aria-invalid={hasError}
@@ -1127,7 +1120,6 @@ export default function DieselExpensesTable({
                       placeholder={t("ops.trip.bunk_placeholder")}
                       disabled={locked || isFetching}
                       value={bunkVal}
-                      title={bunkVal}
                       maxLength={40}
                       onChange={(e) => handleFieldChange(`dieselBunk${num}`, num, e.target.value)}
                       className="w-full min-w-0 px-1.5 py-1.5 rounded-md border border-slate-200 bg-white text-[12px] font-medium outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-400/15 disabled:bg-slate-100 disabled:text-slate-600 truncate"
@@ -1142,8 +1134,7 @@ export default function DieselExpensesTable({
                           <GpsAddressText
                             lat={gpsLat}
                             lon={gpsLon}
-                            className="block text-[12px] text-emerald-500 font-semibold underline decoration-emerald-300/80 hover:decoration-emerald-600 leading-snug cursor-help"
-                            withTooltip
+                            className="block text-[12px] text-emerald-500 font-semibold leading-snug"
                             maxLines={2}
                           />
                         ) : (
@@ -1160,7 +1151,6 @@ export default function DieselExpensesTable({
                               ? "bg-white text-slate-700 border-slate-200 hover:bg-slate-50"
                               : "bg-red-50/70 text-red-500 border-red-100 hover:bg-red-50/80"
                           }`}
-                          title={t("ops.trip.gps_must_captured")}
                         >
                           {isFetching ? <Loader2 size={11} className="animate-spin" /> : <MapPin size={11} className={gpsOk ? "text-emerald-500" : "text-red-500"} />}
                           GPS
@@ -1194,7 +1184,6 @@ export default function DieselExpensesTable({
                               type="button"
                               onClick={() => openBillPicker(num)}
                               className="inline-flex items-center justify-center gap-0.5 rounded-md border border-emerald-100 bg-emerald-50/70 hover:bg-emerald-50/70 px-1.5 py-0.5 text-[11px] font-bold text-emerald-500"
-                              title={t("ops.trip.upload_bill")}
                             >
                               <Upload size={11} strokeWidth={2.5} />
                               <span>{t("ops.trip.upload_bill")}</span>
@@ -1215,7 +1204,6 @@ export default function DieselExpensesTable({
                                 }
                               }}
                               className="text-[11px] font-medium text-slate-400 hover:text-red-500"
-                              title={t("common.delete")}
                             >
                               {t("common.remove")}
                             </button>
@@ -1227,7 +1215,6 @@ export default function DieselExpensesTable({
                         type="button"
                         onClick={() => openBillPicker(num)}
                         className="inline-flex items-center justify-center gap-1 rounded-lg border border-emerald-400 bg-emerald-50/70 hover:bg-emerald-50/70 px-2 py-1 text-[11px] font-bold text-emerald-500 shadow-sm active:scale-[0.98] whitespace-nowrap"
-                        title={t("ops.trip.upload_bill")}
                       >
                         <Upload size={12} strokeWidth={2.5} />
                         <span>{t("ops.trip.upload_bill")}</span>
@@ -1243,7 +1230,6 @@ export default function DieselExpensesTable({
                       <div className="inline-flex items-center justify-center gap-1">
                         <span
                           className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-emerald-50/80 text-emerald-500 border border-emerald-100"
-                          title={t("ops.trip.submitted")}
                           aria-label={t("ops.trip.submitted")}
                         >
                           <CheckCircle2 size={15} strokeWidth={2.25} />
@@ -1254,7 +1240,6 @@ export default function DieselExpensesTable({
                               type="button"
                               onClick={() => startEdit(num)}
                               className="w-7 h-7 flex items-center justify-center border border-slate-200 rounded-full bg-white hover:bg-slate-50 text-slate-600"
-                              title={t("ops.trip.edit_row")}
                             >
                               <Pencil size={13} />
                             </button>
@@ -1263,7 +1248,6 @@ export default function DieselExpensesTable({
                               onClick={() => requestDelete(num, { label: t("ops.trip.deleting_diesel_row", { row: num }) })}
                               disabled={busyRow === num}
                               className="w-7 h-7 flex items-center justify-center border border-slate-200 rounded-full bg-white hover:bg-rose-50/70 text-slate-500 hover:text-rose-500"
-                              title={t("ops.trip.delete_row")}
                             >
                               <Trash2 size={13} />
                             </button>
@@ -1273,7 +1257,6 @@ export default function DieselExpensesTable({
                     ) : (
                       <span
                         className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-100 text-slate-400 border border-slate-200"
-                        title={t("status.draft")}
                         aria-label={t("status.draft")}
                       >
                         <Circle size={14} strokeWidth={2} />

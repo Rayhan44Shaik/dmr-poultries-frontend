@@ -952,6 +952,7 @@ export default {
   'ops.rate.modal.saving': 'Saving...',
   'ops.rate.modal.lock_submit': 'Save & Lock',
   'ops.rate.modal.reset_rates': 'Reset',
+  'ops.rate.modal.clear': 'Clear',
   'ops.rate.modal.rate_range_error': 'Entered rates must be between ₹50 and ₹300. Blank shops can still be saved.',
   'ops.rate.modal.min_rate': 'Min ₹50',
   'ops.rate.modal.max_rate': 'Max ₹300',

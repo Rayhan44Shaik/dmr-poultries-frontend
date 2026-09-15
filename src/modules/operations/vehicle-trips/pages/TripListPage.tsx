@@ -529,7 +529,7 @@ function TripListPage({ embedded = false }: TripListPageProps) {
             <div className="h-9 w-9 rounded-xl bg-blue-50/70 border border-blue-100 flex items-center justify-center text-blue-500 shadow-inner">
               <History className="w-5 h-5" />
             </div>
-            <h3 className="text-base font-bold text-slate-800 tracking-tight">Trip List</h3>
+            <h3 className="text-base font-bold text-slate-800 tracking-tight">{t("ops.trip.trip_list")}</h3>
           </div>
         </div>
 

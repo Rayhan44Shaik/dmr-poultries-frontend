@@ -2,7 +2,6 @@ import React, { useCallback } from "react";
 import { Pencil, X } from "lucide-react";
 import type { Trip } from "../types/trip";
 import { useI18n } from "../../../../i18n";
-import { ActionTooltip } from "../../../../ui/ActionTooltip";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 
 interface Props {
@@ -43,7 +42,6 @@ function TripEditModal({ open, trip, onClose, onEdit }: Props) {
             aria-label={t("common.close")}
           >
             <X size={20} className={uiActionIconMotionClass.close} />
-            <ActionTooltip label={t("common.close")} side="bottom" />
           </button>
         </div>
         <div className="px-6 py-6 space-y-5">
@@ -77,7 +75,6 @@ function TripEditModal({ open, trip, onClose, onEdit }: Props) {
             aria-label={t("common.cancel")}
           >
             {t("common.cancel")}
-            <ActionTooltip label={t("common.cancel")} />
           </button>
           <button
             type="button"
@@ -87,7 +84,6 @@ function TripEditModal({ open, trip, onClose, onEdit }: Props) {
           >
             <Pencil size={14} className={uiActionIconMotionClass.edit} />
             {t("ops.trip.edit_trip")}
-            <ActionTooltip label={t("ops.trip.edit_trip")} />
           </button>
         </div>
       </div>

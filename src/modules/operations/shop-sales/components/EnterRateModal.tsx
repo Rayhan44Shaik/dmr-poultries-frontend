@@ -14,7 +14,6 @@ import {
   Calculator,
   ChevronLeft,
   ChevronRight,
-  Languages,
 } from "lucide-react";
 import AppShellModal from "../../../../ui/AppShellModal";
 import type { Trip } from "../../vehicle-trips/types/trip.ts";
@@ -104,7 +103,6 @@ export default function EnterRateModal({
   const [shopSortKey, setShopSortKey] = useState<ShopSortKey>("time");
   const [shopSortDir, setShopSortDir] = useState<"asc" | "desc">("asc");
   const [shopSearch, setShopSearch] = useState("");
-  const [localLanguage, setLocalLanguage] = useState(language);
 
   const saving = isSaving || busy;
   const rateLocked = trip?.rateCompleted === true;
@@ -119,9 +117,8 @@ export default function EnterRateModal({
     setShopSortKey("time");
     setShopSortDir("asc");
     setShopSearch("");
-    setLocalLanguage(language);
     setDeliveries(trip.deliveries.map((d) => ({ ...d, rate: normalizeRate(d.rate) })));
-  }, [trip, language]);
+  }, [trip]);
 
   const hasInvalidEnteredRate = useMemo(
     () => deliveries.some((row) => { const rate = normalizeRate(row.rate); return rate !== null && !isValidSellingRate(rate); }),
@@ -169,7 +166,7 @@ export default function EnterRateModal({
   }, [deliveries, trip]);
 
   const marketLabels = useMemo(() => {
-    if (localLanguage === "te") {
+    if (language === "te") {
       return {
         companyTitle: "కంపెనీ & అసోసియేషన్ రేట్లు",
         additionalTitle: "అదనపు మెట్రిక్స్ ఎంట్రీ",
@@ -201,7 +198,7 @@ export default function EnterRateModal({
       gun: "Gun",
       rp: "R.P",
     };
-  }, [localLanguage]);
+  }, [language]);
 
   const totals = useMemo(() => {
     let ratedCount = 0;
@@ -393,14 +390,14 @@ export default function EnterRateModal({
                 <h3 className="text-lg font-bold text-slate-800">{t("ops.rate.modal.locking_title")}</h3>
                 <p className="text-sm text-slate-600 mt-1">{t("ops.rate.modal.locking_desc")}</p>
                 <div className="mt-3 rounded-xl bg-slate-50 border border-slate-200 p-2.5 text-xs">
-                  <div className="flex justify-between"><span className="text-slate-500">Total Weight</span><span className="font-bold text-slate-800">{totals.totalWeight.toFixed(2)} KG</span></div>
-                  <div className="flex justify-between mt-1"><span className="text-slate-500">Grand Amount</span><span className="font-bold text-emerald-700">₹ {formatInr(totals.totalAmount)}</span></div>
+                  <div className="flex justify-between"><span className="text-slate-500">{t("ops.rate.modal.total_weight")}</span><span className="font-bold text-slate-800">{totals.totalWeight.toFixed(2)} {t("common.kg")}</span></div>
+                  <div className="flex justify-between mt-1"><span className="text-slate-500">{t("ops.rate.modal.grand_amount")}</span><span className="font-bold text-emerald-700">₹ {formatInr(totals.totalAmount)}</span></div>
                 </div>
               </div>
             </div>
             <div className="mt-6 flex justify-end gap-3">
-              <button onClick={() => setShowConfirm(false)} className="group relative inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 cancel-anim"><span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-close)]"><X size={14} /></span> Cancel</button>
-              <button onClick={() => confirmSave("lock")} disabled={saving} className="group relative inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-orange-50 border border-orange-300 text-orange-800 text-sm font-bold shadow-sm hover:bg-orange-100 hover:shadow-md lock-anim"><span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-white border border-orange-200 text-orange-600 shadow-sm lock-icon-wrap"><Lock size={16} /></span> Lock</button>
+              <button onClick={() => setShowConfirm(false)} className="group relative inline-flex items-center gap-2 px-4 py-2 rounded-xl border border-slate-200 text-sm font-medium text-slate-600 hover:bg-slate-50 cancel-anim"><span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-close)]"><X size={14} /></span>{t("common.cancel")}</button>
+              <button onClick={() => confirmSave("lock")} disabled={saving} className="group relative inline-flex items-center gap-2 px-5 py-2.5 rounded-xl bg-orange-50 border border-orange-300 text-orange-800 text-sm font-bold shadow-sm hover:bg-orange-100 hover:shadow-md lock-anim"><span className="inline-flex items-center justify-center h-6 w-6 rounded-full bg-white border border-orange-200 text-orange-600 shadow-sm lock-icon-wrap"><Lock size={16} /></span>{t("ops.rate.modal.lock_submit")}</button>
             </div>
           </div>
         </div>, document.body
@@ -412,15 +409,14 @@ export default function EnterRateModal({
           <div className="bg-white border-b border-slate-200 px-5 py-3 flex items-center justify-between shrink-0 rounded-t-2xl gap-3">
             <div className="flex items-center gap-3 group flex-1 min-w-0">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-emerald-600 text-white shadow-sm group-hover:animate-[var(--animate-brand-dance)] motion-safe:group-hover:animate-[var(--animate-brand-dance)] shrink-0"><Store size={17} className="group-hover:animate-[var(--animate-action-search)]" /></span>
-              <h2 className="text-[15px] font-bold tracking-tight text-slate-900 shrink-0">Enter shop wise rate</h2>
-              {/* Search shop at top beside title - same animation as trip list */}
+              <h2 className="text-[15px] font-bold tracking-tight text-slate-900 shrink-0">{rateLocked ? t("ops.rate.modal.title_readonly") : t("ops.rate.modal.title_enter")}</h2>
               <div className="relative flex-1 max-w-[320px] ml-2 group/search">
                 <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 group-hover/search:animate-[var(--animate-action-search)] motion-safe:group-hover/search:animate-[var(--animate-action-search)]"><Store size={14} /></span>
                 <input
                   type="search"
                   value={shopSearch}
                   onChange={(e) => { setShopSearch(e.target.value); setShopPage(1); }}
-                  placeholder={localLanguage === "te" ? "షాప్ వెతకండి..." : "Search shops..."}
+                  placeholder={t("ops.trip.search_shop_bird")}
                   className="w-full h-9 pl-9 pr-9 rounded-xl border border-slate-200 bg-slate-50/80 text-[13px] font-medium text-slate-700 placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:ring-2 focus:ring-emerald-100 outline-none transition-all shadow-sm hover:border-slate-300 hover:bg-white"
                 />
                 {shopSearch ? (
@@ -435,15 +431,6 @@ export default function EnterRateModal({
               </div>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <button
-                type="button"
-                onClick={() => setLocalLanguage((prev) => (prev === "te" ? "en" : "te"))}
-                className="group inline-flex items-center gap-1.5 rounded-full border border-violet-200 bg-violet-50 px-3 py-1.5 text-[11px] font-bold text-violet-700 hover:bg-violet-100 hover:border-violet-300 transition-all btn-anim"
-                title="Switch Telugu only for this view"
-              >
-                <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]"><Languages size={12} /></span>
-                {localLanguage === "te" ? "తెలుగు" : "EN"}
-              </button>
               <div className="hidden sm:flex items-center gap-2 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1">
                 <div className="h-1.5 w-1.5 rounded-full bg-emerald-500 animate-pulse" />
                 <span className="text-[11px] font-bold text-emerald-800 tabular-nums">{totals.ratedCount}/{deliveries.length} • {totals.progressPct}%</span>
@@ -456,19 +443,19 @@ export default function EnterRateModal({
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 px-5 py-3 shrink-0 bg-slate-50/70 border-b border-slate-100">
             <div className="flex items-center gap-3 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 shadow-sm btn-anim">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white border border-emerald-200 text-emerald-700 shadow-sm"><PackageCheck size={16} /></span>
-              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-emerald-700/70 font-semibold">Trip No</p><p className="text-[13px] font-bold text-emerald-900 truncate">{trip.tripNo}</p></div>
+              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-emerald-700/70 font-semibold">{t("ops.rate.modal.trip_number")}</p><p className="text-[13px] font-bold text-emerald-900 truncate">{displayRateEntryName(trip.tripNo, language)}</p></div>
             </div>
             <div className="flex items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 shadow-sm btn-anim">
               <div className="h-9 w-9 rounded-lg bg-white border border-sky-200 flex items-center justify-center text-sky-700 shadow-sm"><Truck size={16} /></div>
-              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-sky-700/70 font-semibold">Vehicle</p><p className="text-[13px] font-bold text-sky-900 truncate">{formatVehicleNumber(trip.vehicleNo)}</p></div>
+              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-sky-700/70 font-semibold">{t("ops.rate.modal.vehicle_no")}</p><p className="text-[13px] font-bold text-sky-900 truncate">{displayRateEntryName(formatVehicleNumber(trip.vehicleNo), language)}</p></div>
             </div>
             <div className="flex items-center gap-3 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 shadow-sm btn-anim">
               <div className="h-9 w-9 rounded-lg bg-white border border-violet-200 flex items-center justify-center text-violet-700 shadow-sm"><CalendarDays size={16} /></div>
-              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-violet-700/70 font-semibold">Date</p><p className="text-[13px] font-bold text-violet-900 truncate">{formatRateEntryTripDate(trip.tripDate)}</p></div>
+              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-violet-700/70 font-semibold">{t("ops.rate.modal.trip_date")}</p><p className="text-[13px] font-bold text-violet-900 truncate">{formatRateEntryTripDate(trip.tripDate)}</p></div>
             </div>
             <div className="flex items-center gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 shadow-sm btn-anim">
               <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-white border border-amber-200 text-amber-700 shadow-sm"><Calculator size={16} /></span>
-              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-amber-700/70 font-semibold">Total</p><p className="text-[12px] font-bold text-amber-900 tabular-nums leading-tight">{totals.totalBirds.toLocaleString()} birds • {totals.totalWeight.toFixed(1)} KG</p></div>
+              <div className="min-w-0"><p className="text-[10px] uppercase tracking-wider text-amber-700/70 font-semibold">{t("common.total")}</p><p className="text-[12px] font-bold text-amber-900 tabular-nums leading-tight">{totals.totalBirds.toLocaleString()} {t("common.birds")} • {totals.totalWeight.toFixed(1)} {t("common.kg")}</p></div>
             </div>
           </div>
 
@@ -476,7 +463,7 @@ export default function EnterRateModal({
           {marketThreeDays.length > 0 && (
             <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 shrink-0 max-h-[18vh] overflow-auto scroll-perf scroll-smooth">
               <div className="grid grid-cols-1 xl:grid-cols-3 gap-3">
-                {/* Company & Association Rates - Telugu supported via localLanguage */}
+                {/* Company & Association Rates - Telugu supported via language */}
                 <div className="rounded-xl border border-emerald-200 bg-white shadow-sm overflow-hidden">
                   <div className="flex items-center justify-between px-3 py-2 bg-emerald-50/80 border-b border-emerald-100">
                     <div className="flex items-center gap-2">
@@ -595,7 +582,7 @@ export default function EnterRateModal({
             <div className="px-5 py-2 flex items-center gap-2 shrink-0 bg-white border-b border-slate-100">
               <span className="text-[11px] font-medium text-violet-600">Filtered: "{shopSearch}" • {filteredSortedDeliveries.length} shops</span>
               <button type="button" onClick={() => { setShopSearch(""); setShopPage(1); }} className="ml-2 group relative inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-600 hover:bg-slate-50 reset-anim">
-                <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><X size={12} /></span> Clear
+                <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><X size={12} /></span> {t("ops.rate.modal.clear")}
               </button>
             </div>
           )}
@@ -607,22 +594,22 @@ export default function EnterRateModal({
                 <table className="w-full table-fixed text-[13.5px]">
                   <thead className="bg-slate-50 sticky top-0 z-[1]">
                     <tr className="border-b border-slate-200">
-                      <th className="w-[7%] px-2 py-3 text-center text-[12px] font-bold uppercase tracking-wider text-slate-600">S.No</th>
+                      <th className="w-[7%] px-2 py-3 text-center text-[12px] font-bold uppercase tracking-wider text-slate-600">{t("ops.rate.modal.s_no")}</th>
                       <th className="w-[22%] px-2 py-3 text-left">
                         <button type="button" onClick={() => toggleShopSort("shopName")} className={`flex items-center gap-1 rounded-md px-2 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "shopName" ? "bg-slate-100 text-slate-700 ring-1 ring-slate-200" : "text-slate-600 hover:text-slate-700 hover:bg-slate-100"}`}>
-                          Shop Name {shopSortKey === "shopName" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
+                          {t("ops.rate.modal.shop_name")} {shopSortKey === "shopName" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
-                      <th className="w-[13%] px-2 py-3 text-left text-[12px] font-bold uppercase tracking-wider text-slate-600">Association</th>
+                      <th className="w-[13%] px-2 py-3 text-left text-[12px] font-bold uppercase tracking-wider text-slate-600">{t("ops.rate.modal.association")}</th>
                       <th className="w-[10%] px-2 py-3 text-center">
                         <button type="button" onClick={() => toggleShopSort("paperRate")} className={`w-full flex items-center justify-center gap-1 rounded-md px-1 py-1 text-[12px] font-bold uppercase tracking-wider ${shopSortKey === "paperRate" ? "bg-sky-100 text-sky-800 ring-1 ring-sky-200" : "text-slate-600 hover:text-slate-700 hover:bg-slate-100"}`}>
-                          Paper Rate {shopSortKey === "paperRate" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
+                          {t("ops.rate.modal.paper_rate")} {shopSortKey === "paperRate" && <span>{shopSortDir === "asc" ? "↑" : "↓"}</span>}
                         </button>
                       </th>
-                      <th className="w-[8%] px-2 py-3 text-center text-[12px] font-bold uppercase tracking-wider text-slate-600">Birds</th>
-                      <th className="w-[10%] px-2 py-3 text-center text-[12px] font-bold uppercase tracking-wider text-slate-600">Weight</th>
-                      <th className="w-[15%] px-2 py-3 text-center text-[12px] font-bold uppercase tracking-wider text-slate-600">Rate</th>
-                      <th className="w-[15%] px-2 py-3 text-center text-[12px] font-bold uppercase tracking-wider text-slate-600">Amount</th>
+                      <th className="w-[8%] px-2 py-3 text-center text-[12px] font-bold uppercase tracking-wider text-slate-600">{t("common.birds")}</th>
+                      <th className="w-[10%] px-2 py-3 text-center text-[12px] font-bold uppercase tracking-wider text-slate-600">{t("common.weight")}</th>
+                      <th className="w-[15%] px-2 py-3 text-center text-[12px] font-bold uppercase tracking-wider text-slate-600">{t("ops.rate.modal.rate")}</th>
+                      <th className="w-[15%] px-2 py-3 text-center text-[12px] font-bold uppercase tracking-wider text-slate-600">{t("ops.rate.modal.amount")}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -643,10 +630,10 @@ export default function EnterRateModal({
                         <tr key={delivery.id} className={`border-b border-slate-100 ${missingForLock ? "bg-red-50" : idx % 2 === 0 ? "bg-white hover:bg-slate-50" : "bg-slate-50/50 hover:bg-slate-50"}`}>
                           <td className="px-2 py-3.5 text-center text-[13px] font-bold text-slate-700 tabular-nums bg-slate-50/50 border-r border-slate-100">{serialNo}</td>
                           <td className="px-3 py-3.5">
-                            <div className="text-[14px] font-bold text-slate-800 leading-tight truncate">{displayRateEntryShopName(delivery.shopName, localLanguage)}</div>
-                            {masterShop && <div className="text-[11px] font-normal text-slate-500 truncate">{masterShop.city}</div>}
+                            <div className="text-[14px] font-bold text-slate-800 leading-tight truncate">{displayRateEntryShopName(delivery.shopName, language)}</div>
+                            {masterShop && <div className="text-[11px] font-normal text-slate-500 truncate">{displayRateEntryName(masterShop.city, language)}</div>}
                           </td>
-                          <td className="px-2 py-3.5"><span className="inline-flex items-center justify-center rounded-lg border bg-violet-50 border-violet-200 text-violet-800 px-2.5 py-1 text-[12px] font-medium truncate max-w-full">{association ? displayRateEntryName(association, localLanguage) : "—"}</span></td>
+                          <td className="px-2 py-3.5"><span className="inline-flex items-center justify-center rounded-lg border bg-violet-50 border-violet-200 text-violet-800 px-2.5 py-1 text-[12px] font-medium truncate max-w-full">{association ? displayRateEntryName(association, language) : "—"}</span></td>
                           <td className="px-2 py-3.5 text-center"><span className="inline-flex items-center justify-center rounded-lg border bg-sky-50 border-sky-200 text-sky-800 px-2.5 py-1 text-[12px] font-semibold tabular-nums">{hasPaperRate ? paperRate : "—"}</span></td>
                           <td className="px-2 py-3.5 text-center text-[13px] font-normal text-slate-700 tabular-nums">{delivery.birds.toLocaleString()}</td>
                           <td className="px-2 py-3.5 text-center text-[13px] font-normal text-slate-700 tabular-nums">{delivery.weight.toFixed(2)}</td>
@@ -669,8 +656,8 @@ export default function EnterRateModal({
                                   }}
                                   className={`rate-input-market h-8 w-full max-w-[100px] text-[13px] no-spinner ${rate == null ? "" : isValid ? "valid" : "invalid"}`}
                                 />
-                                {belowMin && <p className="mt-0.5 text-[9px] text-red-500">Min 50</p>}
-                                {aboveMax && <p className="mt-0.5 text-[9px] text-red-500">Max 300</p>}
+                                {belowMin && <p className="mt-0.5 text-[9px] text-red-500">{t("ops.rate.modal.min_rate")}</p>}
+                                {aboveMax && <p className="mt-0.5 text-[9px] text-red-500">{t("ops.rate.modal.max_rate")}</p>}
                               </div>
                             )}
                           </td>
@@ -683,14 +670,14 @@ export default function EnterRateModal({
                       );
                     })}
                     {pagedDeliveries.length === 0 && (
-                      <tr><td colSpan={8} className="py-10 text-center text-slate-400 text-[12px]">No shops</td></tr>
+                      <tr><td colSpan={8} className="py-10 text-center text-slate-400 text-[12px]">{t("empty.no_shops")}</td></tr>
                     )}
                   </tbody>
                   <tfoot>
                     <tr className="bg-gradient-to-r from-emerald-50/80 via-white to-amber-50/60 border-t-2 border-emerald-200">
                       <td className="px-2 py-3 text-center text-[11px] font-bold text-slate-400">—</td>
-                      <td className="px-3 py-3"><div className="flex flex-col"><span className="text-[13px] font-bold text-slate-800">Total: {deliveries.length} shops • {trip.tripNo}</span><span className="text-[11px] font-medium text-slate-500">{totals.totalBirds.toLocaleString()} birds • {totals.totalWeight.toFixed(2)} KG</span></div></td>
-                      <td className="px-2 py-3"><span className="inline-flex items-center justify-center rounded-lg border bg-violet-50 border-violet-200 text-violet-800 px-2.5 py-1 text-[11px] font-bold">Assoc • {totals.totalBirds.toLocaleString()}</span></td>
+                      <td className="px-3 py-3"><div className="flex flex-col"><span className="text-[13px] font-bold text-slate-800">{t("common.total")}: {deliveries.length} {t("ops.trip.shops")} • {displayRateEntryName(trip.tripNo, language)}</span><span className="text-[11px] font-medium text-slate-500">{totals.totalBirds.toLocaleString()} {t("common.birds")} • {totals.totalWeight.toFixed(2)} {t("common.kg")}</span></div></td>
+                      <td className="px-2 py-3"><span className="inline-flex items-center justify-center rounded-lg border bg-violet-50 border-violet-200 text-violet-800 px-2.5 py-1 text-[11px] font-bold">{t("ops.rate.modal.association_short")} • {totals.totalBirds.toLocaleString()}</span></td>
                       <td className="px-2 py-3 text-center"><span className="inline-flex items-center justify-center rounded-lg border bg-sky-50 border-sky-200 text-sky-800 px-2.5 py-1 text-[11px] font-bold tabular-nums">{totals.totalBirds > 0 ? (totals.totalWeight / totals.totalBirds * 1).toFixed(2) : "—"}</span></td>
                       <td className="px-2 py-3 text-center"><span className="inline-flex items-center justify-center rounded-lg bg-slate-100 border border-slate-200 text-slate-700 px-2.5 py-1 text-[12px] font-bold tabular-nums">{totals.totalBirds.toLocaleString()}</span></td>
                       <td className="px-2 py-3 text-center"><span className="inline-flex items-center justify-center rounded-lg bg-slate-100 border border-slate-200 text-slate-700 px-2.5 py-1 text-[12px] font-bold tabular-nums">{totals.totalWeight.toFixed(2)}</span></td>
@@ -706,13 +693,13 @@ export default function EnterRateModal({
               <div className="mt-3 flex items-center justify-end">
                 <div className="flex items-center gap-1 rounded-lg border border-emerald-200 bg-white px-1.5 py-1 shadow-sm">
                   <button type="button" onClick={() => setShopPage((p) => Math.max(1, p - 1))} disabled={shopPage <= 1 || saving} className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-semibold hover:bg-emerald-100 disabled:opacity-40 btn-anim">
-                    <ChevronLeft size={12} /> Previous
+                    <ChevronLeft size={12} /> {t("common.previous")}
                   </button>
                   {pageNumbers.map((num) => (
                     <button key={num} type="button" onClick={() => setShopPage(num)} disabled={saving} className={`h-7 w-7 rounded-md text-[11px] font-bold tabular-nums btn-anim ${num === shopPage ? "bg-emerald-600 text-white" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"}`}>{num}</button>
                   ))}
                   <button type="button" onClick={() => setShopPage((p) => Math.min(shopPageCount, p + 1))} disabled={shopPage >= shopPageCount || saving} className="inline-flex items-center gap-1 h-7 px-2.5 rounded-md bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-semibold hover:bg-emerald-100 disabled:opacity-40 btn-anim">
-                    Next <ChevronRight size={12} />
+                    {t("common.next")} <ChevronRight size={12} />
                   </button>
                 </div>
               </div>
@@ -721,18 +708,18 @@ export default function EnterRateModal({
 
           <div className="bg-white border-t border-slate-200 px-5 py-3 shrink-0 rounded-b-2xl">
             {rateLocked ? (
-              <div className="flex justify-end"><button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-[13px] font-medium text-slate-700 hover:bg-slate-50 btn-anim">Close</button></div>
+              <div className="flex justify-end"><button type="button" onClick={onClose} className="px-4 py-2 rounded-lg border border-slate-300 bg-white text-[13px] font-medium text-slate-700 hover:bg-slate-50 btn-anim">{t("common.close")}</button></div>
             ) : (
               <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                 <div className="flex items-center gap-2">
                   <button type="button" onClick={resetRates} disabled={saving} className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-slate-200 bg-white text-[14px] font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-50 reset-anim min-w-[100px]">
-                    <RotateCcw size={16} /> Reset
+                    <RotateCcw size={16} /> {t("ops.rate.modal.reset_rates")}
                   </button>
                 </div>
                 <div className="flex items-center gap-3">
-                  <button type="button" onClick={onClose} className="group relative inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-slate-300 bg-white text-[14px] font-semibold text-slate-600 hover:bg-slate-50 cancel-anim min-w-[110px]"><span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-close)]"><X size={14} /></span> Cancel</button>
+                  <button type="button" onClick={onClose} className="group relative inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl border border-slate-300 bg-white text-[14px] font-semibold text-slate-600 hover:bg-slate-50 cancel-anim min-w-[110px]"><span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-close)]"><X size={14} /></span>{t("common.cancel")}</button>
                   <button type="button" onClick={() => confirmSave("save")} disabled={saving || !isDirty || hasInvalidEnteredRate} className={`group relative inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-xl border text-[14px] font-bold disabled:opacity-50 save-anim min-w-[130px] ${isDirty ? "border-amber-300 bg-amber-50 text-amber-800" : "border-emerald-200 bg-emerald-50 text-emerald-700"}`}>
-                    <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-edit)]"><Save size={16} /></span> Save
+                    <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-edit)]"><Save size={16} /></span>{t("ops.rate.modal.save_progress")}
                   </button>
                   <button
                     type="button"
@@ -752,7 +739,7 @@ export default function EnterRateModal({
                     disabled={saving}
                     className="group relative inline-flex items-center justify-center gap-2.5 px-8 py-3.5 rounded-xl bg-orange-50 border border-orange-300 text-orange-800 text-[15px] font-extrabold shadow-lg hover:bg-orange-100 hover:shadow-xl hover:border-orange-400 disabled:opacity-50 lock-anim min-w-[190px]"
                   >
-                    <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-white border border-orange-200 text-orange-600 shadow-sm lock-icon-wrap"><Lock size={20} /></span> Save & Lock
+                    <span className="inline-flex items-center justify-center h-8 w-8 rounded-full bg-white border border-orange-200 text-orange-600 shadow-sm lock-icon-wrap"><Lock size={20} /></span>{t("ops.rate.modal.lock_submit")}
                   </button>
                 </div>
               </div>

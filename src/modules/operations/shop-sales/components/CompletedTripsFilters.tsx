@@ -13,8 +13,8 @@ import {
 } from "../../../../shared/ui/operationsStyles";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import { BrandRefreshButton } from "../../../../ui";
-import { ActionTooltip } from "../../../../ui/ActionTooltip";
 import MasterDropdown, { type MasterDropdownOption } from "../../../masters/components/MasterDropdown";
+import { displayRateEntryName } from "../utils/rateEntryDisplay";
 
 interface Props {
   fromDate: string;
@@ -68,12 +68,18 @@ function CompletedTripsFilters({
   onExportPDF,
   onExportExcel,
 }: Props) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   // Exports should be available whenever there is data, not only when filtered
   const enableExports = pendingTrips > 0;
   void hasFilters;
-  const vehicleOptions = withoutSentinel(vehicleList || [], "All Vehicles");
-  const supervisorOptions = withoutSentinel(supervisorList || [], "All Supervisors");
+  const localizeOptions = (options: readonly (string | MasterDropdownOption)[]) => options.map((option) => {
+    const raw = typeof option === "string" ? option : option.label;
+    return typeof option === "string"
+      ? { value: option, label: displayRateEntryName(raw, language), searchText: raw }
+      : { ...option, label: displayRateEntryName(raw, language), searchText: option.searchText || raw };
+  });
+  const vehicleOptions = localizeOptions(withoutSentinel(vehicleList || [], "All Vehicles"));
+  const supervisorOptions = localizeOptions(withoutSentinel(supervisorList || [], "All Supervisors"));
 
   return (
     <div className={opsFilterCardClass}>
@@ -173,12 +179,10 @@ function CompletedTripsFilters({
           <button type="button" onClick={onSearch} className={`group relative ${opsPrimaryButtonClass}`} aria-label={t("ops.rate.search_tooltip")}>
             <span className={`inline-flex ${uiActionIconMotionClass.search}`}><Search size={15} /></span>
             {t("common.search")}
-            <ActionTooltip label={t("ops.rate.search_tooltip")} />
           </button>
           <button type="button" onClick={onReset} className={`group relative ${opsSecondaryButtonClass}`} aria-label={t("ops.rate.reset_tooltip")}>
             <span className={`inline-flex ${uiActionIconMotionClass.reset}`}><RotateCcw size={14} /></span>
             {t("common.reset")}
-            <ActionTooltip label={t("ops.rate.reset_tooltip")} />
           </button>
           {onRefresh && (
             <BrandRefreshButton onClick={onRefresh} loading={refreshing} ariaLabel={t("common.refresh")}>
@@ -189,14 +193,12 @@ function CompletedTripsFilters({
             <button type="button" onClick={onExportPDF} disabled={!enableExports} className={`group relative ${opsPdfButtonClass}`} aria-label={t("ops.rate.export_pdf")}>
               <span className={`inline-flex ${enableExports ? uiActionIconMotionClass.pdf : ""}`}><FileText size={15} /></span>
               PDF
-              <ActionTooltip label={t("ops.rate.export_pdf")} />
             </button>
           )}
           {onExportExcel && (
             <button type="button" onClick={onExportExcel} disabled={!enableExports} className={`group relative ${opsExcelButtonClass}`} aria-label={t("ops.rate.export_excel")}>
               <span className={`inline-flex ${enableExports ? uiActionIconMotionClass.excel : ""}`}><FileSpreadsheet size={15} /></span>
               Excel
-              <ActionTooltip label={t("ops.rate.export_excel")} />
             </button>
           )}
         </div>

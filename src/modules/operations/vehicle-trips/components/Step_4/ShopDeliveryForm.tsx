@@ -169,11 +169,11 @@ export default function ShopDeliveryForm({
   // the same searchable dropdowns used by Step 1 / Step 2.
   const shopDropdownOptions: DropdownOption[] = shopOptions
     .filter((o: any) => o && Number(o.value) > 0 && !o.isDisabled)
-    .map((o: any) => ({ value: String(o.value), label: o.label }));
+    .map((o: any) => ({ value: String(o.value), label: o.label, searchText: o.searchText || o.label }));
 
   const birdDropdownOptions: DropdownOption[] = birdOptions
     .filter((o: any) => o && Number(o.value) > 0 && !o.isDisabled)
-    .map((o: any) => ({ value: String(o.value), label: o.label }));
+    .map((o: any) => ({ value: String(o.value), label: o.label, searchText: o.searchText || o.label }));
 
   // Same availability rule as the old BoxSelector: boxes already consumed by
   // another delivery stay hidden unless they are currently selected.
@@ -260,7 +260,6 @@ export default function ShopDeliveryForm({
             <button
               type="button"
               onClick={() => setMode("box")}
-              title={t("ops.trip.box_mode")}
               aria-label={t("ops.trip.box_mode")}
               className={`flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition-all h-[32px] px-3 whitespace-nowrap ${
                 mode === "box"
@@ -274,7 +273,6 @@ export default function ShopDeliveryForm({
             <button
               type="button"
               onClick={() => setMode("weight")}
-              title={t("ops.trip.weight_mode")}
               aria-label={t("ops.trip.weight_mode")}
               className={`flex items-center justify-center gap-1.5 rounded-lg text-xs font-semibold transition-all h-[32px] px-3 whitespace-nowrap ${
                 mode === "weight"
@@ -363,7 +361,6 @@ export default function ShopDeliveryForm({
                 type="button"
                 onClick={() => handleBoxSelection([])}
                 className="ml-auto inline-flex h-6 items-center gap-1 rounded-md border border-slate-200 bg-white px-2 text-[11px] font-semibold text-slate-500 transition-colors hover:border-rose-100 hover:bg-rose-50/70 hover:text-rose-500"
-                title={t("ops.trip.clear_selected_boxes")}
               >
                 <X size={11} />
                 {t("common.clear")}
@@ -392,7 +389,6 @@ export default function ShopDeliveryForm({
                       onClick={() => handleBoxSelection(selectedBoxIds.filter((x) => x !== id))}
                       className="rounded p-0.5 opacity-60 transition-colors hover:opacity-100 hover:bg-black/5"
                       aria-label={`${t("common.remove")} ${String(id).padStart(2, "0")}`}
-                      title={`${t("common.remove")} ${String(id).padStart(2, "0")}`}
                     >
                       <X size={10} strokeWidth={2.75} />
                     </button>
