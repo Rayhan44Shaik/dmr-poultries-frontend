@@ -28,6 +28,7 @@ import {
 import { DatePicker } from "../../../../components/common/DatePicker";
 import { useI18n } from "../../../../i18n";
 import { getQuarterSampleInfo, type SampleQuarter } from "../../../../sample/quarterSample";
+import { weekRange } from "../../../../utils/businessDate";
 import { FIXED_DASHBOARD_GREETING } from "../../../settings/services";
 import { kickApprovalSnapshot } from "../../../approvals/services/approvalSnapshot";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
@@ -52,13 +53,16 @@ const todayMidnight = (): Date => {
   return d;
 };
 
-// The overview always opens on one complete, inclusive seven-day window.
-// The end is the business "today" date (from the sample manifest when present)
-// so the default never includes future days or depends on a browser timezone.
-const getDefaultWeekRange = (anchor = todayMidnight()) => ({
-  startDate: addDays(anchor, -6),
-  endDate: anchor,
-});
+// The overview always opens on the complete Monday–Sunday business week that
+// contains the business "today" date (from the sample manifest when present).
+// `weekRange` is the shared calendar source used across the app.
+const getDefaultWeekRange = (anchor = todayMidnight()) => {
+  const { from, to } = weekRange(anchor);
+  return {
+    startDate: parseInputDateString(from) ?? anchor,
+    endDate: parseInputDateString(to) ?? anchor,
+  };
+};
 
 // -------- Helper: Format Date to YYYY-MM-DD safely --------
 const toInputDateString = (date: Date | undefined): string => {
@@ -475,14 +479,14 @@ type TrendPreset = "today" | "week" | "month";
  *  global calendar" — that is the default, and it is never remembered. */
 type TrendView = TrendPreset | null;
 
-/** Today is one day, a week is the last seven days, a month is the calendar
- *  month to date — the same windows the trip counters count, so the number on
- *  a chip is the number the card then totals. */
+/** Today is one day, a week is its complete Monday–Sunday calendar week, and
+ *  a month is month to date. These are the same windows the trip counters
+ *  count, so a chip's number matches the card total. */
 const windowForView = (view: TrendPreset, anchor = todayMidnight()): { from: string; to: string } => {
   const today = anchor;
   const to = toInputDateString(today);
   if (view === "today") return { from: to, to };
-  if (view === "week") return { from: toInputDateString(addDays(today, -6)), to };
+  if (view === "week") return weekRange(today);
   return { from: toInputDateString(startOfMonth(today)), to };
 };
 
@@ -617,10 +621,10 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   const [comparisonPeriod] = useState<"7d" | "15d" | "30d">("7d");
 
   // The sample server owns its business date. Resolve it before the first
-  // request so a pinned fixture still opens on exactly one completed week.
-  // The manifest keeps its exact endpoints for the QTR shortcut; it no longer
-  // overrides the dashboard's production default range. Holding the first
-  // request prevents a browser-clock warmup and a second repaint.
+  // request so a pinned fixture still opens on its containing Monday–Sunday
+  // week. The manifest keeps its exact endpoints for the QTR shortcut; it no
+  // longer overrides the dashboard's production default range. Holding the
+  // first request prevents a browser-clock warmup and a second repaint.
   const [sampleResolved, setSampleResolved] = useState(false);
   useEffect(() => {
     let active = true;
@@ -634,9 +638,9 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
       if (info) {
         setSampleQuarter(info.quarter);
         if (!rangeTouchedRef.current) {
-          // Default to the last seven inclusive calendar days ending on the
-          // sample business date. QTR remains a separate, exact-manifest
-          // shortcut in the picker below.
+          // Default to the Monday–Sunday week containing the sample business
+          // date. QTR remains a separate, exact-manifest shortcut in the
+          // picker below.
           const sampleToday = parseInputDateString(info.quarter.today);
           if (sampleToday) {
             const week = getDefaultWeekRange(sampleToday);
@@ -677,7 +681,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
      smallest window covering today, the week and the month supplies all three,
      so every chip agrees with the totals underneath. */
   const counterToday = toInputDateString(dashboardAnchor);
-  const counterWeekFrom = toInputDateString(addDays(dashboardAnchor, -6));
+  const counterWeekFrom = weekRange(dashboardAnchor).from;
   const counterMonthFrom = toInputDateString(startOfMonth(dashboardAnchor));
   const countersQuery = useOperationalTrends(
     (counterWeekFrom < counterMonthFrom ? counterWeekFrom : counterMonthFrom) || undefined,
@@ -706,7 +710,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
 
   // The card reads the SAME calendar window as the KPI cards until a chip is
   // tapped; then the whole card — bars and the totals underneath — moves to
-  // today, the last seven days or this calendar month. The choice is never
+  // today, its Monday–Sunday week, or this calendar month. The choice is never
   // remembered, so a reload or a hard refresh lands on the calendar's window.
   const [trendView, setTrendView] = useState<TrendView>(null);
   const calendarFrom = toInputDateString(startDate);
