@@ -13,7 +13,7 @@
 
 import assert from "node:assert/strict";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { drawPayslipPdf, amountInWords } from "../../src/modules/staff/services/payslipPdfDocument.ts";
+import { drawPayslipPdf, drawCombinedPayslipsPdf, amountInWords } from "../../src/modules/staff/services/payslipPdfDocument.ts";
 
 const record = {
   id: "sal-1",
@@ -104,9 +104,36 @@ assert.ok(
 // ── File name ─────────────────────────────────────────────────────────────
 assert.equal(fileName, "DMR-Poultries-Payslip-Ramesh-Kumar-2026-09.pdf");
 
-// Keep the artefact for manual inspection.
+// Keep the artefacts for manual inspection.
 mkdirSync("tests/payslip/out", { recursive: true });
+
+// ── Combined register PDF — one A4 page per employee in ONE document ──────
+const second = {
+  ...record,
+  id: "sal-2",
+  employeeId: 8,
+  employeeName: "Lakshmi Devi",
+  netSalary: 22100,
+};
+const combined = drawCombinedPayslipsPdf([record, second, { ...record, id: "sal-3", employeeId: 9, employeeName: "Suresh Babu" }]);
+assert.equal(combined.doc.getNumberOfPages(), 3, "combined PDF: one page per employee");
+assert.equal(
+  combined.fileName,
+  "DMR-Poultries-Payslips-2026-09-3-employees.pdf",
+  "combined PDF file name"
+);
+const combinedPdf = await pdfjs.getDocument({ data: new Uint8Array(combined.doc.output("arraybuffer")) }).promise;
+assert.equal(combinedPdf.numPages, 3, "pdfjs also sees 3 pages");
+for (const [pageNum, name] of [[1, "Ramesh Kumar"], [2, "Lakshmi Devi"], [3, "Suresh Babu"]]) {
+  const pageText = await (await combinedPdf.getPage(pageNum)).getTextContent();
+  const pageStr = pageText.items.map((item) => item.str).join(" ");
+  assert.ok(pageStr.includes(name), `page ${pageNum} carries ${name}`);
+  assert.ok(pageStr.includes("DMR POULTRIES"), `page ${pageNum} keeps the brand header`);
+}
+writeFileSync("tests/payslip/out/sample-payslips-combined.pdf", Buffer.from(combined.doc.output("arraybuffer")));
+
 writeFileSync("tests/payslip/out/sample-payslip.pdf", Buffer.from(doc.output("arraybuffer")));
 
 console.log(`OK — 1 A4 portrait page, brand first, all sections in order.`);
-console.log(`    sample written to tests/payslip/out/sample-payslip.pdf`);
+console.log(`OK — combined PDF: 3 employees on 3 pages, brand on every page.`);
+console.log(`    samples written to tests/payslip/out/`);

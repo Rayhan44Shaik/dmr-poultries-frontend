@@ -131,17 +131,23 @@ export type PayslipPdfDocument = {
  * Draws the formal A4 portrait payslip for one salary record.
  *
  * @param record  the salary row (from the register table)
+ * @param target  optional existing document — the payslip is drawn onto its
+ *                CURRENT page (pass a doc + addPage() between employees to
+ *                compose one combined file for the whole register)
  */
 export function drawPayslipPdf(
-  record: SalaryRecord
+  record: SalaryRecord,
+  target?: jsPDF
 ): PayslipPdfDocument {
-  const doc = createDmrPoultryPdf("portrait");
-  doc.setProperties({
-    title: `Payslip — ${record.employeeName} — ${record.month}`,
-    subject: "DMR POULTRIES salary payslip",
-    author: "DMR POULTRIES",
-    creator: "DMR POULTRIES",
-  });
+  const doc = target ?? createDmrPoultryPdf("portrait");
+  if (!target) {
+    doc.setProperties({
+      title: `Payslip — ${record.employeeName} — ${record.month}`,
+      subject: "DMR POULTRIES salary payslip",
+      author: "DMR POULTRIES",
+      creator: "DMR POULTRIES",
+    });
+  }
 
   const pageWidth = doc.internal.pageSize.getWidth();
   const pageHeight = doc.internal.pageSize.getHeight();
@@ -444,5 +450,35 @@ export function drawPayslipPdf(
     .replace(/\s+/g, "-");
   const fileName = `DMR-Poultries-Payslip-${safeName}-${record.month}.pdf`;
 
+  return { doc, fileName };
+}
+
+/**
+ * Draws payslips for MANY employees into ONE combined A4 document —
+ * one full page per employee, same formal layout as the single payslip.
+ * Used by the register's "All in One PDF" download.
+ *
+ * @param records  the salary rows to include (in register order)
+ */
+export function drawCombinedPayslipsPdf(
+  records: SalaryRecord[]
+): PayslipPdfDocument {
+  const [first] = records;
+  if (!first) throw new Error("drawCombinedPayslipsPdf requires at least one record");
+
+  const doc = createDmrPoultryPdf("portrait");
+  doc.setProperties({
+    title: `Payslips — ${first.month} — ${records.length} employees`,
+    subject: "DMR POULTRIES salary payslips",
+    author: "DMR POULTRIES",
+    creator: "DMR POULTRIES",
+  });
+
+  records.forEach((record, index) => {
+    if (index > 0) doc.addPage();
+    drawPayslipPdf(record, doc);
+  });
+
+  const fileName = `DMR-Poultries-Payslips-${first.month}-${records.length}-employees.pdf`;
   return { doc, fileName };
 }

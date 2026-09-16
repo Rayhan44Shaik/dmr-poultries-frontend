@@ -52,27 +52,31 @@ import type { SalaryRecord } from "../../types/staffDashboard";
 
 export type SendChannel = "email" | "whatsapp";
 
+// Payslip cover messages — short, warm and professional, in English and
+// Telugu. {name} is replaced per recipient at preview/edit time; {month} is
+// filled at seed time. Email stays formal; WhatsApp reads like a friendly
+// note from the office.
 const EMAIL_TEMPLATES: Record<Language, { subject: string; body: (name: string, month: string) => string }> = {
   en: {
-    subject: "Your Salary Payslip — {month}",
+    subject: "Salary Payslip — {month}",
     body: (name, month) =>
-      `Dear ${name},\n\nPlease find attached your salary payslip for ${month}.\n\nRegards,\nDMR POULTRIES`,
+      `Dear ${name},\n\nYour salary payslip for ${month} is attached.\n\nThank you for your hard work and dedication.\n\nWarm regards,\nDMR Poultries`,
   },
   te: {
-    subject: "మీ జీతం పేస్లిప్ — {month}",
+    subject: "జీతం పేస్లిప్ — {month}",
     body: (name, month) =>
-      `ప్రియమైన ${name},\n\n${month} నెలకు సంబంధించిన మీ జీతం పేస్లిప్ జతచేయబడింది. దయచేసి అటాచ్మెంట్ను చూడండి.\n\nధన్యవాదాలు,\nDMR POULTRIES`,
+      `ప్రియమైన ${name},\n\n${month} నెల మీ జీతం పేస్లిప్ జతచేయబడింది. దయచేసి చూడండి.\n\nమీ కృషికి మరియు అంకితభావానికి ధన్యవాదాలు.\n\nగౌరవంతో,\nDMR Poultries`,
   },
 };
 
 const WA_TEMPLATES: Record<Language, { body: (name: string, month: string) => string }> = {
   en: {
     body: (name, month) =>
-      `Dear ${name},\n\nYour salary payslip for ${month} is attached with this message.\n\nRegards,\nDMR POULTRIES`,
+      `Hello ${name}! 👋\n\nYour salary payslip for ${month} is attached with this message.\n\nThank you for your hard work — proud to have you on the team. 🙏\n\n— DMR Poultries`,
   },
   te: {
     body: (name, month) =>
-      `ప్రియమైన ${name},\n\n${month} నెలకు సంబంధించిన మీ జీతం పేస్లిప్ ఈ మెసేజ్తో జతచేయబడింది.\n\nధన్యవాదాలు,\nDMR POULTRIES`,
+      `నమస్కారం ${name}! 👋\n\n${month} నెల మీ జీతం పేస్లిప్ ఈ మెసేజ్‌తో జతచేయబడింది.\n\nమీ కృషికి ధన్యవాదాలు — మీరు మా టీమ్‌లో భాగమవడం మా గర్వం. 🙏\n\n— DMR Poultries`,
   },
 };
 
@@ -207,9 +211,6 @@ function SendPayslipsDialog({
     setEmailBody(EMAIL_TEMPLATES[language].body("{name}", monthLabel));
     setWaBody(WA_TEMPLATES[language].body("{name}", monthLabel));
   }
-
-  const contactOf = (employeeId: number, ch: SendChannel): string =>
-    ch === "email" ? emails[employeeId] ?? "" : phones[employeeId] ?? "";
 
   const recipients = useMemo(
     () =>
@@ -451,53 +452,52 @@ function SendPayslipsDialog({
           </div>
         ) : (
           <>
-            {/* Channel tabs — Mail / WhatsApp switch. */}
-            <div
-              role="tablist"
-              aria-label={t("staff.send.title")}
-              className="grid shrink-0 grid-cols-2 gap-2 border-b border-slate-100 bg-slate-50/60 px-6 py-2.5 md:px-8"
-            >
-              {(["email", "whatsapp"] as SendChannel[]).map((ch) => {
-                const active = channel === ch;
-                const count = withContact(ch);
-                return (
-                  <button
-                    key={ch}
-                    role="tab"
-                    type="button"
-                    aria-selected={active}
-                    onClick={() => setChannel(ch)}
-                    className={`flex h-10 items-center justify-center gap-2 rounded-xl border text-[13px] font-bold transition-all active:scale-[0.98] ${
-                      active
-                        ? ch === "email"
-                          ? "border-emerald-300 bg-emerald-50 text-emerald-700 shadow-sm"
-                          : "border-[#25D366]/40 bg-[#25D366]/10 text-[#128C3E] shadow-sm"
-                        : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-                    }`}
-                  >
-                    {ch === "email" ? <Mail size={15} /> : <WhatsAppBrandIcon size={15} />}
-                    {t(ch === "email" ? "staff.send.channel_email" : "staff.send.channel_whatsapp")}
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums ${
+            {/* Channel toggle — one neat centred segmented control; the freed
+                band height goes to the message / PDF preview below. */}
+            <div className="flex shrink-0 justify-center border-b border-slate-100 bg-slate-50/60 px-6 py-2 md:px-8">
+              <div
+                role="tablist"
+                aria-label={t("staff.send.title")}
+                className="inline-flex h-9 items-center gap-1 rounded-xl border border-slate-200 bg-white p-1 shadow-sm"
+              >
+                {(["email", "whatsapp"] as SendChannel[]).map((ch) => {
+                  const active = channel === ch;
+                  const count = withContact(ch);
+                  return (
+                    <button
+                      key={ch}
+                      role="tab"
+                      type="button"
+                      aria-selected={active}
+                      onClick={() => setChannel(ch)}
+                      className={`flex h-7 items-center gap-1.5 rounded-lg px-4 text-[12px] font-bold transition-all active:scale-[0.98] ${
                         active
                           ? ch === "email"
-                            ? "bg-emerald-600 text-white"
-                            : "bg-[#25D366] text-white"
-                          : "bg-slate-100 text-slate-500"
+                            ? "bg-emerald-600 text-white shadow-sm"
+                            : "bg-[#25D366] text-white shadow-sm"
+                          : "text-slate-500 hover:bg-slate-100 hover:text-slate-700"
                       }`}
                     >
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
+                      {ch === "email" ? <Mail size={13} /> : <WhatsAppBrandIcon size={13} />}
+                      {t(ch === "email" ? "staff.send.channel_email" : "staff.send.channel_whatsapp")}
+                      <span
+                        className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums ${
+                          active ? "bg-white/25 text-white" : "bg-slate-100 text-slate-500"
+                        }`}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
             </div>
 
             {/* Body — recipient selection + message (panels scroll inside). */}
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
               <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
                 {/* LEFT: recipient selection */}
-                <aside className="flex w-full shrink-0 flex-col overflow-hidden border-b border-slate-200 bg-slate-50/60 lg:w-80 lg:border-b-0 lg:border-r">
+                <aside className="flex w-full shrink-0 flex-col overflow-hidden border-b border-slate-200 bg-slate-50/60 lg:w-96 lg:border-b-0 lg:border-r">
                   <div className="border-b border-slate-200 bg-white px-4 py-3">
                     <h3 className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
                       <ListChecks size={15} className="text-emerald-600" />

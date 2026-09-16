@@ -52,6 +52,8 @@ type SalaryTableProps = {
   currentPage: number;
   setCurrentPage?: (page: number) => void;
   itemsPerPage: number;
+  /** Rows-per-page change — renders the global Rows-per-page select (Trip List style). */
+  onPageSizeChange?: (pageSize: number) => void;
   formatCurrency?: (amount: number) => string;
   saving?: boolean;
   selectedIds?: ReadonlySet<string>;
@@ -118,6 +120,7 @@ export function SalaryTable({
   currentPage,
   setCurrentPage = () => {},
   itemsPerPage,
+  onPageSizeChange,
   formatCurrency,
   saving = false,
   selectedIds,
@@ -207,15 +210,18 @@ export function SalaryTable({
           <colgroup>
             {selectable && <col className="w-10" />}
             <col className="w-11" />
-            <col className="w-[19%]" />
+            {/* Employee slims down (names are short); the freed space is
+                divided EQUALLY among the three money columns so amounts get
+                the room the old layout wasted. */}
+            <col className="w-[15%]" />
             <col className="w-[8%]" />
             <col className="w-[8%]" />
             <col className="w-[8%]" />
-            <col className="w-[11%]" />
-            <col className="w-[11%]" />
-            <col className="w-[11%]" />
-            <col className="w-[11%]" />
             <col className="w-[13%]" />
+            <col className="w-[13%]" />
+            <col className="w-[13%]" />
+            <col className="w-[11%]" />
+            <col className="w-[11%]" />
           </colgroup>
           <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-600">
             <tr className="whitespace-nowrap">
@@ -400,12 +406,18 @@ export function SalaryTable({
         </table>
       </div>
 
-      {records.length > itemsPerPage && (
+      {/* Global pagination — the Trip List bar: "Showing 1–10 of 150",
+          Rows per page select, and the numbered page window. Always rendered
+          while the register has rows, exactly like the Trip List. */}
+      {records.length > 0 && (
         <Pagination
-          page={currentPage}
+          page={safePage}
           pageSize={itemsPerPage}
           totalItems={records.length}
           onPageChange={setCurrentPage}
+          onPageSizeChange={onPageSizeChange}
+          disabled={saving}
+          ariaLabel={t("staff.table.title")}
         />
       )}
     </div>
