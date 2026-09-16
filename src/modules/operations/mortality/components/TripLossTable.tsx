@@ -352,7 +352,7 @@ export default function TripLossTable({
               {COLUMNS.map((col) => (
                 <th
                   key={col.key}
-                  className={`px-2.5 py-2.5 align-middle text-[12px] font-bold uppercase tracking-wider ${alignClass(
+                  className={`px-3 py-3 align-middle text-[12px] font-bold uppercase tracking-wider ${alignClass(
                     col.align
                   )} ${col.key === "serial" ? "w-12" : ""}`}
                 >
@@ -367,7 +367,7 @@ export default function TripLossTable({
               <>
                 {[0, 1, 2, 3, 4, 5].map((rowIndex) => (
                   <tr key={`skeleton-${rowIndex}`}>
-                    <td colSpan={COLUMNS.length} className="px-2.5 py-2.5">
+                    <td colSpan={COLUMNS.length} className="px-3 py-3.5">
                       <div className="h-5 w-full animate-pulse rounded-md bg-slate-100" />
                     </td>
                   </tr>
@@ -433,7 +433,7 @@ export default function TripLossTable({
                         isOpen ? "bg-slate-50/60" : index % 2 === 0 ? "bg-white" : "bg-slate-50/20"
                       }`}
                     >
-                      <td className="w-12 px-2.5 py-2.5">
+                      <td className="w-12 px-3 py-3.5">
                         <span className="flex items-center justify-center gap-1.5">
                           <button
                             type="button"
@@ -450,62 +450,62 @@ export default function TripLossTable({
                         </span>
                       </td>
 
-                      <td className="whitespace-nowrap px-2.5 py-2.5 font-bold text-indigo-600">{r.tripNo}</td>
+                      <td className="whitespace-nowrap px-3 py-3.5 font-bold text-indigo-600">{r.tripNo}</td>
 
-                      <td className="whitespace-nowrap px-2.5 py-2.5 font-medium text-slate-600">
+                      <td className="whitespace-nowrap px-3 py-3.5 font-medium text-slate-600">
                         {formatTripListDay(r.tripDate, language)}
                       </td>
 
                       <td
-                        className="max-w-[170px] truncate px-2.5 py-2.5 font-medium text-slate-700"
+                        className="max-w-[170px] truncate px-3 py-3.5 font-medium text-slate-700"
                         title={r.sourceFarm || undefined}
                       >
                         {r.sourceFarm || "—"}
                       </td>
 
                       <td
-                        className="max-w-[130px] truncate px-2.5 py-2.5 text-slate-600"
+                        className="max-w-[130px] truncate px-3 py-3.5 text-slate-600"
                         title={r.supervisorName || undefined}
                       >
                         {r.supervisorName || "—"}
                       </td>
 
-                      <td className="whitespace-nowrap px-2.5 py-2.5 text-center font-semibold tabular-nums text-amber-700">
+                      <td className="whitespace-nowrap px-3 py-3.5 text-center font-semibold tabular-nums text-amber-700">
                         {formatNumber(r.farmBirds)}
                       </td>
 
-                      <td className="whitespace-nowrap px-2.5 py-2.5 text-center tabular-nums text-amber-700">
+                      <td className="whitespace-nowrap px-3 py-3.5 text-center tabular-nums text-amber-700">
                         {formatWeight(r.farmWeight)}
                       </td>
 
                       {/* Plain number — the ShoppingBag glyph already names this
                           column in the header; repeating a badge on every row
                           is what made the grid noisy. */}
-                      <td className="whitespace-nowrap px-2.5 py-2.5 text-center font-semibold tabular-nums text-slate-700">
+                      <td className="whitespace-nowrap px-3 py-3.5 text-center font-semibold tabular-nums text-slate-700">
                         {formatNumber(r.deliveryShops)}
                       </td>
 
-                      <td className="whitespace-nowrap px-2.5 py-2.5 text-center font-semibold tabular-nums text-sky-700">
+                      <td className="whitespace-nowrap px-3 py-3.5 text-center font-semibold tabular-nums text-sky-700">
                         {formatNumber(r.deliveredBirds)}
                       </td>
 
-                      <td className="whitespace-nowrap px-2.5 py-2.5 text-center tabular-nums text-sky-700">
+                      <td className="whitespace-nowrap px-3 py-3.5 text-center tabular-nums text-sky-700">
                         {formatWeight(r.deliveredWeight)}
                       </td>
 
-                      <td className="whitespace-nowrap px-2.5 py-2.5 text-center font-semibold tabular-nums text-orange-600">
+                      <td className="whitespace-nowrap px-3 py-3.5 text-center font-semibold tabular-nums text-orange-600">
                         {formatNumber(r.mortalityCount)}
                       </td>
 
-                      <td className="whitespace-nowrap px-2.5 py-2.5 text-center tabular-nums text-orange-600">
+                      <td className="whitespace-nowrap px-3 py-3.5 text-center tabular-nums text-orange-600">
                         {formatWeight(r.mortalityWeight)}
                       </td>
 
-                      <td className="whitespace-nowrap px-2.5 py-2.5 text-center font-semibold tabular-nums text-rose-600">
+                      <td className="whitespace-nowrap px-3 py-3.5 text-center font-semibold tabular-nums text-rose-600">
                         {formatWeight(r.weightLoss)}
                       </td>
 
-                      <td className="whitespace-nowrap px-2.5 py-2.5 text-center tabular-nums text-rose-600">
+                      <td className="whitespace-nowrap px-3 py-3.5 text-center tabular-nums text-rose-600">
                         {r.weightLossPercentage.toFixed(2)}%
                       </td>
                     </tr>
