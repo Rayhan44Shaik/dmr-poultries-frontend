@@ -937,7 +937,6 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
             summary={paymentRegister}
             loading={paymentRegisterLoading}
             error={paymentRegisterError}
-            onRetry={loadPaymentRegister}
           />
         </div>
       </div>

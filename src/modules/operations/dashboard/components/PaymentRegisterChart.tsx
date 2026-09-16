@@ -1,7 +1,17 @@
-import { useMemo, useRef, useState, type CSSProperties } from "react";
+import { useMemo } from "react";
 import { AlertCircle, ArrowUpRight, WalletCards } from "lucide-react";
 import { Link } from "react-router-dom";
-import { BrandRefreshButton } from "../../../../ui";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  LabelList,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import { formatINR, formatINRCompact } from "../../../../utils/format";
 import type {
   PaymentRegisterSummary,
@@ -26,67 +36,33 @@ interface PaymentRegisterChartProps {
   summary: PaymentRegisterSummary | null;
   loading: boolean;
   error?: string | null;
-  onRetry?: () => void;
 }
 
 interface PaymentTypeChartRow extends PaymentRegisterTypeSummary {
   colour: string;
   shortType: string;
-  barPercent: number;
-}
-
-interface PaymentTypeTooltipState {
-  row: PaymentTypeChartRow;
-  left: number;
-  top: number;
-  placement: "top" | "bottom";
 }
 
 const PAYMENT_REGISTER_ANIMATION_STYLES = `
-@keyframes payment-register-card-in {
-  0% { opacity: 0; transform: translateY(12px) scale(0.965); }
-  55% { opacity: 1; transform: translateY(2px) scale(1.01); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
-}
-@keyframes payment-register-bar-fill {
-  from { width: 0%; }
-  to { width: var(--payment-register-bar-width); }
-}
 @keyframes payment-register-value-pop {
   0% { opacity: 0; transform: scale(0.78); }
   70% { opacity: 1; transform: scale(1.05); }
   100% { opacity: 1; transform: scale(1); }
 }
-@keyframes payment-register-tooltip-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
 @keyframes payment-register-refresh-sheen {
   0% { transform: translateX(-130%); opacity: 0; }
-  18% { opacity: 0.9; }
+  18% { opacity: 0.85; }
   100% { transform: translateX(130%); opacity: 0; }
-}
-.payment-register-type-card {
-  animation: payment-register-card-in 760ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.payment-register-bar-fill {
-  animation: payment-register-bar-fill 1120ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .payment-register-value {
   animation: payment-register-value-pop 720ms cubic-bezier(0.16, 1, 0.3, 1) 160ms both;
   transform-origin: center;
 }
-.payment-register-tooltip {
-  animation: payment-register-tooltip-in 160ms ease-out both;
-}
 .payment-register-refresh-sheen {
   animation: payment-register-refresh-sheen 1.2s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) {
-  .payment-register-type-card,
-  .payment-register-bar-fill,
   .payment-register-value,
-  .payment-register-tooltip,
   .payment-register-refresh-sheen {
     animation: none !important;
   }
@@ -152,6 +128,63 @@ function PaymentModeStat({ mode, amount, percent }: { mode: string; amount: numb
   );
 }
 
+function TypeTooltip({
+  active,
+  payload,
+}: {
+  active?: boolean;
+  payload?: Array<{ payload?: unknown }>;
+}) {
+  if (!active) return null;
+  const item = payload?.[0]?.payload as Partial<PaymentTypeChartRow> | undefined;
+  if (!item || typeof item.type !== "string") return null;
+
+  const amount = Number(item.amount) || 0;
+  const percent = Number(item.percent) || 0;
+  const count = Number(item.count) || 0;
+  const colour = typeof item.colour === "string" ? item.colour : "#64748b";
+  const payees = Array.isArray(item.payees) ? item.payees : [];
+
+  return (
+    <div className="max-h-[12rem] w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 text-[10px] text-slate-500 shadow-xl shadow-slate-900/12">
+      <div className="flex min-w-0 items-start justify-between gap-2 border-b border-slate-100 pb-2">
+        <p className="min-w-0 break-words text-[12px] font-bold leading-snug text-slate-800">
+          {item.type}
+        </p>
+        <span className="shrink-0 rounded-full px-2 py-1 text-[11px] font-black tabular-nums ring-1 ring-inset ring-slate-100" style={{ color: colour, backgroundColor: `${colour}12` }}>
+          {percent.toFixed(1)}%
+        </span>
+      </div>
+      <dl className="mt-2 grid grid-cols-2 gap-1.5">
+        <div className="rounded-lg bg-slate-50 px-2 py-1.5">
+          <dt className="font-black uppercase tracking-wide text-slate-400">Amount</dt>
+          <dd className="mt-0.5 font-bold tabular-nums text-slate-800">{formatINR(amount)}</dd>
+        </div>
+        <div className="rounded-lg bg-sky-50 px-2 py-1.5">
+          <dt className="font-black uppercase tracking-wide text-sky-500">Entries</dt>
+          <dd className="mt-0.5 font-bold tabular-nums text-sky-700">{count}</dd>
+        </div>
+      </dl>
+      <div className="mt-1.5 rounded-lg bg-slate-50 px-2 py-1.5 ring-1 ring-inset ring-slate-100">
+        <p className="font-black uppercase tracking-wide text-slate-400">Paid to</p>
+        <div className="mt-1 space-y-1">
+          {payees.slice(0, 4).map((payee) => (
+            <div key={payee.paidTo} className="flex min-w-0 items-center justify-between gap-2">
+              <span className="min-w-0 truncate font-semibold text-slate-600">{payee.paidTo}</span>
+              <strong className="shrink-0 tabular-nums text-slate-800">{formatINRCompact(payee.amount)}</strong>
+            </div>
+          ))}
+          {payees.length > 4 ? (
+            <p className="text-[9.5px] font-semibold text-slate-400">
+              +{payees.length - 4} more payee{payees.length - 4 === 1 ? "" : "s"}
+            </p>
+          ) : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function PaymentSkeleton() {
   return (
     <>
@@ -167,11 +200,7 @@ function PaymentSkeleton() {
           </div>
         </div>
         <div className="flex flex-1 flex-col p-2.5">
-          <div className="space-y-1.5">
-            {[0, 1, 2, 3, 4, 5, 6].map((item) => (
-              <span key={item} className="block h-10 animate-pulse rounded-xl bg-slate-100" />
-            ))}
-          </div>
+          <div className="mt-3 flex-1 animate-pulse rounded-2xl bg-slate-100" />
           <div className="mt-auto grid grid-cols-2 gap-2 border-t border-slate-100 pt-2 sm:grid-cols-3">
             {[0, 1, 2].map((item) => <span key={item} className="h-[3.25rem] animate-pulse rounded-xl bg-slate-100" />)}
           </div>
@@ -181,32 +210,20 @@ function PaymentSkeleton() {
   );
 }
 
-function EmptyState({ error, onRetry }: { error?: string | null; onRetry?: () => void }) {
+function EmptyState({ error }: { error?: string | null }) {
   return (
     <>
       <style>{PAYMENT_REGISTER_ANIMATION_STYLES}</style>
       <div className="flex h-full min-h-[31rem] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
         <header className="border-b border-slate-100 bg-gradient-to-r from-slate-50/90 via-white to-sky-50/30 px-4 py-2.5">
-          <div className="flex min-w-0 items-start justify-between gap-2">
-            <div className="min-w-0">
-              <Link to="/accounts?tab=paid-payments" className="group/title inline-flex min-w-0 items-center gap-1.5">
-                <h2 className="truncate text-base font-black tracking-tight text-slate-900 transition-colors group-hover/title:text-sky-700">
-                  Payment Register
-                </h2>
-                <ArrowUpRight size={13} className="shrink-0 text-slate-300 group-hover/title:text-sky-600" aria-hidden="true" />
-              </Link>
-              <span aria-hidden="true" className="mt-1.5 block h-0.5 w-10 rounded-full bg-sky-400" />
-            </div>
-            {onRetry ? (
-              <BrandRefreshButton
-                loading={false}
-                onClick={onRetry}
-                ariaLabel="Refresh payment register"
-                className="!h-8 shrink-0 !gap-1 !pl-2 !pr-2 text-[9.5px] font-black"
-              >
-                Refresh
-              </BrandRefreshButton>
-            ) : null}
+          <div className="min-w-0">
+            <Link to="/accounts?tab=paid-payments" className="group/title inline-flex min-w-0 items-center gap-1.5">
+              <h2 className="truncate text-base font-black tracking-tight text-slate-900 transition-colors group-hover/title:text-sky-700">
+                Payment Register
+              </h2>
+              <ArrowUpRight size={13} className="shrink-0 text-slate-300 group-hover/title:text-sky-600" aria-hidden="true" />
+            </Link>
+            <span aria-hidden="true" className="mt-1.5 block h-0.5 w-10 rounded-full bg-sky-400" />
           </div>
         </header>
         <div className="flex flex-1 flex-col items-center justify-center p-4 text-center text-slate-400">
@@ -215,7 +232,7 @@ function EmptyState({ error, onRetry }: { error?: string | null; onRetry?: () =>
             {error ? "Payment register is unavailable" : "No payment data in this period"}
           </p>
           <p className="mx-auto mt-1 max-w-sm text-xs font-semibold text-slate-500">
-            {error ?? "Refresh after changing payment records to sync this dashboard chart."}
+            {error ?? "Change the dashboard date range or refresh the dashboard to sync payment totals."}
           </p>
         </div>
       </div>
@@ -223,18 +240,12 @@ function EmptyState({ error, onRetry }: { error?: string | null; onRetry?: () =>
   );
 }
 
-export default function PaymentRegisterChart({ summary, loading, error, onRetry }: PaymentRegisterChartProps) {
-  const chartRef = useRef<HTMLElement | null>(null);
-  const [typeTooltip, setTypeTooltip] = useState<PaymentTypeTooltipState | null>(null);
-
+export default function PaymentRegisterChart({ summary, loading, error }: PaymentRegisterChartProps) {
   const chartRows = useMemo<PaymentTypeChartRow[]>(() => {
-    const rows = summary?.typeRows ?? [];
-    const maxAmount = rows.reduce((max, row) => Math.max(max, row.amount), 0);
-    return rows.map((row, index) => ({
+    return (summary?.typeRows ?? []).map((row, index) => ({
       ...row,
       colour: TYPE_COLOURS[index % TYPE_COLOURS.length],
       shortType: shortenType(row.type),
-      barPercent: maxAmount > 0 ? Math.max(7, (row.amount / maxAmount) * 100) : 0,
     }));
   }, [summary]);
 
@@ -252,42 +263,13 @@ export default function PaymentRegisterChart({ summary, loading, error, onRetry 
   const totalCount = summary?.totalCount ?? 0;
   const dataKey = `${summary?.fromDate ?? ""}:${summary?.toDate ?? ""}:${chartRows.map((row) => `${row.type}-${Math.round(row.amount)}`).join("|")}`;
 
-  const showTypeTooltip = (row: PaymentTypeChartRow, target: HTMLElement) => {
-    const chart = chartRef.current;
-    if (!chart) return;
-    const rect = target.getBoundingClientRect();
-    const chartRect = chart.getBoundingClientRect();
-    const tooltipWidth = 256;
-    const tooltipHeight = 176;
-    const inset = 10;
-    const targetTop = rect.top - chartRect.top;
-    const targetBottom = rect.bottom - chartRect.top;
-    const centeredLeft = rect.left - chartRect.left + rect.width / 2;
-    const left = Math.min(
-      Math.max(centeredLeft, tooltipWidth / 2 + inset),
-      chartRect.width - tooltipWidth / 2 - inset,
-    );
-    const bottomTop = targetBottom + 8;
-    const topTop = targetTop - tooltipHeight - 8;
-    const bottomFits = bottomTop + tooltipHeight <= chartRect.height - inset;
-    const topFits = topTop >= inset;
-    const placement: PaymentTypeTooltipState["placement"] = bottomFits || !topFits ? "bottom" : "top";
-    const preferredTop = placement === "bottom" ? bottomTop : topTop;
-    const top = Math.min(
-      Math.max(preferredTop, inset),
-      Math.max(inset, chartRect.height - tooltipHeight - inset),
-    );
-
-    setTypeTooltip({ row, left, top, placement });
-  };
-
   if (loading && !summary) return <PaymentSkeleton />;
-  if (error || !summary || summary.totalCount === 0) return <EmptyState error={error} onRetry={onRetry} />;
+  if (error || !summary || summary.totalCount === 0) return <EmptyState error={error} />;
 
   return (
     <>
       <style>{PAYMENT_REGISTER_ANIMATION_STYLES}</style>
-      <section ref={chartRef} className="relative flex h-full min-h-[31rem] min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-900/5">
+      <section className="relative flex h-full min-h-[31rem] min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-900/5">
         <header className="border-b border-slate-100 bg-gradient-to-r from-slate-50/90 via-white to-sky-50/30 px-4 py-2.5">
           <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
@@ -303,29 +285,17 @@ export default function PaymentRegisterChart({ summary, loading, error, onRetry 
               </p>
             </div>
 
-            <div className="flex w-full min-w-0 flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-center sm:justify-end">
-              <div className="flex shrink-0 items-center gap-1 rounded-lg border border-sky-100 bg-sky-50/65 px-1.5 py-1">
-                <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white text-sky-600 shadow-sm ring-1 ring-inset ring-sky-100">
-                  <WalletCards className="h-4 w-4" aria-hidden="true" />
-                </span>
-                <p className="leading-tight">
-                  <span className="block text-[8px] font-black uppercase tracking-wide text-sky-700">Payments</span>
-                  <strong className="payment-register-value block text-[12.5px] font-black tabular-nums text-slate-800">
-                    {formatINRCompact(totalAmount)}
-                  </strong>
-                  <span className="block text-[8.5px] font-bold tabular-nums text-slate-400">{totalCount} entries</span>
-                </p>
-              </div>
-              {onRetry ? (
-                <BrandRefreshButton
-                  loading={loading}
-                  onClick={onRetry}
-                  ariaLabel="Refresh payment register"
-                  className="!h-8 shrink-0 !gap-1 !pl-2 !pr-2 text-[9.5px] font-black"
-                >
-                  Refresh
-                </BrandRefreshButton>
-              ) : null}
+            <div className="flex shrink-0 items-center gap-1 rounded-lg border border-sky-100 bg-sky-50/65 px-1.5 py-1">
+              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white text-sky-600 shadow-sm ring-1 ring-inset ring-sky-100">
+                <WalletCards className="h-4 w-4" aria-hidden="true" />
+              </span>
+              <p className="leading-tight">
+                <span className="block text-[8px] font-black uppercase tracking-wide text-sky-700">Payments</span>
+                <strong className="payment-register-value block text-[12.5px] font-black tabular-nums text-slate-800">
+                  {formatINRCompact(totalAmount)}
+                </strong>
+                <span className="block text-[8.5px] font-bold tabular-nums text-slate-400">{totalCount} entries</span>
+              </p>
             </div>
           </div>
         </header>
@@ -335,123 +305,51 @@ export default function PaymentRegisterChart({ summary, loading, error, onRetry 
             <span className="payment-register-refresh-sheen pointer-events-none absolute left-3 right-3 top-2 z-10 h-px rounded-full bg-gradient-to-r from-transparent via-sky-300 to-transparent" aria-hidden="true" />
           ) : null}
 
-          <div
-            key={`${dataKey}-${loading ? "loading" : "ready"}`}
-            className="grid gap-1.5"
-            aria-label="Payments by payment type"
-          >
-            {chartRows.map((row, index) => {
-              const barStyle = {
-                width: `${row.barPercent}%`,
-                backgroundColor: row.colour,
-                "--payment-register-bar-width": `${row.barPercent}%`,
-              } as CSSProperties;
-              return (
-                <article
-                  key={row.type}
-                  tabIndex={0}
-                  aria-label={`${row.type}: ${formatINR(row.amount)}, ${row.percent.toFixed(1)} percent, paid to ${row.topPayee}`}
-                  className="payment-register-type-card group relative min-w-0 rounded-xl border border-slate-100 bg-gradient-to-r from-white to-slate-50/60 px-2.5 py-1.5 shadow-xs transition-colors duration-150 hover:from-sky-50/40 hover:to-white focus:bg-sky-50/35"
-                  style={{ animationDelay: `${index * 80}ms` }}
-                  onFocus={(event) => showTypeTooltip(row, event.currentTarget)}
-                  onBlur={() => setTypeTooltip(null)}
-                  onMouseEnter={(event) => showTypeTooltip(row, event.currentTarget)}
-                  onMouseLeave={() => setTypeTooltip(null)}
+          <div key={dataKey} className="min-h-0 flex-1 animate-fade-in rounded-2xl border border-slate-100 bg-slate-50/60 p-2">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart
+                data={chartRows}
+                layout="vertical"
+                margin={{ top: 8, right: 20, bottom: 8, left: 2 }}
+                barGap={7}
+              >
+                <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 5" horizontal={false} />
+                <XAxis type="number" hide domain={[0, "dataMax"]} />
+                <YAxis
+                  type="category"
+                  dataKey="shortType"
+                  width={86}
+                  tickLine={false}
+                  axisLine={false}
+                  tick={{ fill: "#64748b", fontSize: 10, fontWeight: 700 }}
+                />
+                <Tooltip content={<TypeTooltip />} cursor={{ fill: "rgba(226,232,240,0.35)" }} />
+                <Bar
+                  dataKey="amount"
+                  radius={[0, 12, 12, 0]}
+                  barSize={11}
+                  animationBegin={120}
+                  animationDuration={1050}
+                  animationEasing="ease-out"
                 >
-                  <div className="flex min-w-0 items-center justify-between gap-2">
-                    <div className="flex min-w-0 items-center gap-1.5">
-                      <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-white text-[9.5px] font-black tabular-nums shadow-sm ring-1 ring-inset ring-slate-100" style={{ color: row.colour }}>
-                        {index + 1}
-                      </span>
-                      <div className="min-w-0">
-                        <p className="truncate text-[12.5px] font-medium leading-tight text-slate-700 transition-colors group-hover:text-slate-900">
-                          {row.shortType}
-                        </p>
-                        <p className="mt-0.5 truncate text-[10px] font-semibold text-slate-400">
-                          {row.count} entries · to {row.topPayee}
-                        </p>
-                      </div>
-                    </div>
-                    <strong className="shrink-0 rounded-full bg-white px-1.5 py-1 text-[10.5px] font-black tabular-nums text-slate-800 ring-1 ring-inset ring-slate-100">
-                      {formatINRCompact(row.amount)}
-                    </strong>
-                  </div>
-                  <div className="mt-1.5 flex items-center gap-2">
-                    <span className="h-1.5 min-w-0 flex-1 overflow-hidden rounded-full bg-slate-100">
-                      <span className="payment-register-bar-fill block h-full rounded-full" style={barStyle} />
-                    </span>
-                    <span className="w-10 text-right text-[10px] font-black tabular-nums" style={{ color: row.colour }}>
-                      {row.percent.toFixed(1)}%
-                    </span>
-                  </div>
-                </article>
-              );
-            })}
+                  {chartRows.map((row) => <Cell key={row.type} fill={row.colour} />)}
+                  <LabelList
+                    dataKey="amount"
+                    position="right"
+                    formatter={(value: unknown) => formatINRCompact(Number(value) || 0)}
+                    className="fill-slate-500 text-[10px] font-black tabular-nums"
+                  />
+                </Bar>
+              </BarChart>
+            </ResponsiveContainer>
           </div>
 
-          <div className="mt-auto grid w-full shrink-0 grid-cols-2 gap-2 border-t border-slate-100 pt-2 sm:grid-cols-3">
+          <div className="mt-2 grid w-full shrink-0 grid-cols-2 gap-2 border-t border-slate-100 pt-2 sm:grid-cols-3">
             {modeRows.map((mode) => (
               <PaymentModeStat key={mode.mode} mode={mode.mode} amount={mode.amount} percent={mode.percent} />
             ))}
           </div>
         </div>
-
-        {typeTooltip ? (
-          <div
-            role="tooltip"
-            className="payment-register-tooltip pointer-events-none absolute z-50 max-h-[11rem] w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 text-[10px] text-slate-500 shadow-xl shadow-slate-900/12"
-            style={{
-              left: typeTooltip.left,
-              top: typeTooltip.top,
-              transform: "translateX(-50%)",
-            }}
-          >
-            <span
-              className={`absolute left-1/2 h-2.5 w-2.5 -translate-x-1/2 rotate-45 border-slate-200 bg-white ${
-                typeTooltip.placement === "top"
-                  ? "-bottom-1.5 border-b border-r"
-                  : "-top-1.5 border-l border-t"
-              }`}
-              aria-hidden="true"
-            />
-            <div className="relative">
-              <div className="flex min-w-0 items-start justify-between gap-2 border-b border-slate-100 pb-2">
-                <p className="min-w-0 break-words text-[12px] font-bold leading-snug text-slate-800">
-                  {typeTooltip.row.type}
-                </p>
-                <span className="shrink-0 rounded-full px-2 py-1 text-[11px] font-black tabular-nums ring-1 ring-inset ring-slate-100" style={{ color: typeTooltip.row.colour, backgroundColor: `${typeTooltip.row.colour}12` }}>
-                  {typeTooltip.row.percent.toFixed(1)}%
-                </span>
-              </div>
-              <dl className="mt-2 grid grid-cols-2 gap-1.5">
-                <div className="rounded-lg bg-slate-50 px-2 py-1.5">
-                  <dt className="font-black uppercase tracking-wide text-slate-400">Amount</dt>
-                  <dd className="mt-0.5 font-bold tabular-nums text-slate-800">{formatINR(typeTooltip.row.amount)}</dd>
-                </div>
-                <div className="rounded-lg bg-sky-50 px-2 py-1.5">
-                  <dt className="font-black uppercase tracking-wide text-sky-500">Entries</dt>
-                  <dd className="mt-0.5 font-bold tabular-nums text-sky-700">{typeTooltip.row.count}</dd>
-                </div>
-              </dl>
-              <div className="mt-1.5 rounded-lg bg-slate-50 px-2 py-1.5 ring-1 ring-inset ring-slate-100">
-                <p className="font-black uppercase tracking-wide text-slate-400">Paid to</p>
-                <div className="mt-1 space-y-1">
-                  {typeTooltip.row.payees.slice(0, 3).map((payee) => (
-                    <div key={payee.paidTo} className="flex min-w-0 items-center justify-between gap-2">
-                      <span className="min-w-0 truncate font-semibold text-slate-600">{payee.paidTo}</span>
-                      <strong className="shrink-0 tabular-nums text-slate-800">{formatINRCompact(payee.amount)}</strong>
-                    </div>
-                  ))}
-                  {typeTooltip.row.payees.length > 3 ? (
-                    <p className="text-[9.5px] font-semibold text-slate-400">
-                      +{typeTooltip.row.payees.length - 3} more payee{typeTooltip.row.payees.length - 3 === 1 ? "" : "s"}
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-            </div>
-          </div>
-        ) : null}
       </section>
     </>
   );
