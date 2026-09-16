@@ -21,6 +21,12 @@ const OPTIMIZE_DEPS = [
   'lucide-react',
   'axios',
   'date-fns',
+  // Barrel sub-path imported by lazy pages (DatePicker, Staff performance).
+  // If it is not pre-bundled here, opening such a page discovers it at
+  // runtime → Vite re-optimizes → forces a full reload → the next lazy chunk
+  // finds another missing dep → the preview keeps "loading" forever.
+  'date-fns/locale',
+  'zod',
   'localforage',
   'react-select',
   'react-datepicker',
