@@ -64,6 +64,51 @@ const summaryModule = await server.ssrLoadModule("/src/modules/operations/mortal
   ok("no-KPI: LossKpiCards.tsx is deleted", !existsSync("src/modules/operations/mortality/components/LossKpiCards.tsx"), "component still on disk");
 }
 const pageSource = (await import("node:fs")).readFileSync("src/modules/operations/mortality/pages/MortalityEntryPage.tsx", "utf8");
+const hookSource = (await import("node:fs")).readFileSync("src/modules/operations/mortality/hooks/useTripLossAnalysis.ts", "utf8");
+{
+  // ONE request per screen: no second "totals" call, no unfiltered peek, no
+  // duplicate fetch on Reset — the payload already carries rows + totals + masters.
+  ok("instant: exactly one fetch call site", (hookSource.match(/fetchMortalityAnalysis\(/g) || []).length === 1, `calls=${(hookSource.match(/fetchMortalityAnalysis\(/g) || []).length}`);
+  ok("instant: the cache is painted before the fetch", hookSource.indexOf("if (cached)") > 0 && hookSource.indexOf("if (cached)") < hookSource.indexOf("fetchMortalityAnalysis("), "cache read is not first");
+  ok("instant: a fresh screen skips the network", hookSource.includes("shouldRevalidate(cached.at, forced)") && hookSource.includes("return;"), "fresh-cache short circuit missing");
+  ok("instant: rows on screen are never replaced by the skeleton", hookSource.includes("if (hasRows) setReloading(true);") && hookSource.includes("else setLoading(true);"), "loading/reloading split missing");
+  ok("instant: a background failure keeps the rows", hookSource.includes("if (!screenRef.current || forced) setError(messageOf(err));"), "background failure would blank the grid");
+  ok("instant: Reset is one state update", hookSource.includes("setFilters(defaults);") && hookSource.includes("setAppliedFilters(defaults);") && hookSource.includes("setSummaryVisible(false);"), "reset does not clear everything together");
+  ok("instant: Refresh drops the cache and forces a read", hookSource.includes("cacheRef.current.clear();") && hookSource.includes("forceRef.current = true;"), "refresh would serve the cache");
+  ok("instant: the summary waits for its own totals", hookSource.includes("summaryReady: summaryVisible && totalsReady"), "stale totals could show");
+  ok("dupes: the response path de-duplicates by trip", hookSource.includes("data: uniqueTrips(res.data),"), "no de-duplication");
+  ok("instant: Search and Reset skip the coalescing delay", (hookSource.match(/immediateRef\.current = true;/g) || []).length === 2 && hookSource.includes("immediate ? 0 : COALESCE_MS"), "committed actions still wait on a timer");
+  ok("instant: no cascading page-sync render", hookSource.includes("const effectivePage = Math.min(Math.max(1, page), totalPages);") && !hookSource.includes("setPage((p) => Math.min"), "page is still synced from an effect");
+  ok("instant: the query runs on the clamped page", hookSource.includes("page: effectivePage,") && hookSource.includes("${effectivePage}"), "query does not use the shown page");
+  {
+  const { readFileSync: read } = await import("node:fs");
+  const surface = ["pages/MortalityEntryPage.tsx", "components/LossFilters.tsx", "components/TripLossTable.tsx", "components/CumulativeSummary.tsx"]
+    .map((file) => read(`src/modules/operations/mortality/${file}`, "utf8"))
+    .join("\n");
+  ok("instant: no page reload anywhere in the mortality surface", !/location\s*\.\s*(reload|replace|assign)|window\s*\.\s*location\s*=/.test(surface), "a page reload survives in the mortality surface");
+}
+}
+
+/* ── 4b. The query rules, exercised directly ──────────────────────────── */
+{
+  const { shouldRevalidate, uniqueTrips } = await server.ssrLoadModule("/src/modules/operations/mortality/hooks/useTripLossAnalysis.ts");
+  const now = 1_000_000;
+  ok("reset: a fresh screen is served without a request", shouldRevalidate(now - 1_000, false, now) === false, "fresh entry revalidated");
+  ok("reset: a stale screen revalidates behind the rows", shouldRevalidate(now - 60_000, false, now) === true, "stale entry trusted");
+  ok("reset: Refresh always re-reads the server", shouldRevalidate(now - 1_000, true, now) === true, "forced read skipped");
+  ok("reset: an unknown screen is fetched", shouldRevalidate(undefined, false, now) === true, "missing entry trusted");
+
+  const rows = [
+    { tripId: 7, tripNo: "TRP-7" },
+    { tripId: 9, tripNo: "TRP-9" },
+    { tripId: 7, tripNo: "TRP-7" },
+    { tripId: 7, tripNo: "TRP-7" },
+    { tripId: 11, tripNo: "TRP-11" },
+  ];
+  const deduped = uniqueTrips(rows);
+  ok("dupes: a repeated trip renders once", deduped.length === 3 && deduped.every((row, i) => row.tripId === [7, 9, 11][i]), JSON.stringify(deduped.map((r) => r.tripId)));
+  ok("dupes: every surviving row is unique", new Set(deduped.map((r) => r.tripId)).size === deduped.length, "duplicate survived");
+}
 ok("no-KPI: the page never references the KPI cards", !pageSource.includes("LossKpiCards"), "KPI import/render still present");
 ok("no-KPI: the page has no KPI section", !pageSource.includes("ops.mortality.kpi.filtered_summary"), "KPI section still rendered");
 {
@@ -71,7 +116,8 @@ ok("no-KPI: the page has no KPI section", !pageSource.includes("ops.mortality.kp
   const tableSectionEnd = pageSource.indexOf("</section>", tableAt);
   const summaryAt = pageSource.indexOf("<CumulativeSummary");
   ok("cumulative: rendered below the table", tableAt > 0 && summaryAt > tableSectionEnd, `table@${tableAt} sectionEnd@${tableSectionEnd} summary@${summaryAt}`);
-  ok("cumulative: only after a Search", pageSource.includes("analysis.summaryVisible &&"), "gate missing");
+  ok("cumulative: only after a Search", pageSource.includes("analysis.summaryReady &&"), "gate missing");
+  ok("instant: the grid is told when a background query runs", pageSource.includes("reloading={analysis.reloading}"), "no background flag");
   ok("cumulative: fed the whole filtered set", pageSource.includes("totalRecords={analysis.totalRecords}"), "whole-set props missing");
 }
 const filtersModule = await server.ssrLoadModule("/src/modules/operations/mortality/components/LossFilters.tsx");
@@ -286,6 +332,25 @@ ok("cumulative: weight-loss row has no bird count", summaryHtml.includes("7,769.
 ok("cumulative: survival closes the summary", summaryHtml.includes("97.11%"), "survival row missing");
 ok("cumulative: weights read like the panel", summaryHtml.includes("100.00%") && summaryHtml.includes("95.90%") && summaryHtml.includes("2.89%") && summaryHtml.includes("1.64%"), "percent row missing");
 
+/* ── 4c. A background query keeps the grid, a first load may not ────────── */
+{
+  const visible = { key: "tripDate", dir: "desc" };
+  const rows = [{ id: 1 }];
+  const tableProps = {
+    records: [{ tripId: 1, tripNo: "TRP-20260101-001", tripDate: "2026-01-01", sourceFarm: "A Farms", supervisorName: "S", vehicleNo: "V", driverName: "D", loaders: [], helpers: [], status: "Completed", farmBirds: 1, farmWeight: 1, deliveryShops: 1, deliveredBirds: 1, deliveredWeight: 1, mortalityCount: 0, mortalityWeight: 0, weightLoss: 0, weightLossPercentage: 0, mortalityPercentage: 0, survivalRate: 1 }],
+    sort: visible, setSort: noop, page: 1, totalPages: 1, totalRecords: 1, pageSize: 10,
+    onPageChange: noop, onPageSizeChange: noop, emptyAll: false, filtersApplied: false,
+  };
+  const background = render(React.createElement(tableModule.default, { ...tableProps, loading: false, reloading: true }));
+  ok("reset: a background query keeps every row", background.includes("TRP-20260101-001"), "rows disappeared behind a reloading flag");
+  ok("reset: a background query shows no skeleton", !background.includes("animate-pulse rounded-md bg-slate-100"), "skeleton rendered over live rows");
+  ok("reset: a background query is announced, not faked", background.includes('aria-busy="true"') && background.includes('role="progressbar"') && background.includes("Updating…"), "no quiet activity line");
+  const firstLoad = render(React.createElement(tableModule.default, { ...tableProps, loading: true, reloading: false }));
+  ok("reset: only a first load shows the skeleton", firstLoad.includes("animate-pulse rounded-md bg-slate-100") && !firstLoad.includes("TRP-20260101-001"), "first load has no skeleton");
+  ok("reset: an idle grid claims nothing", !render(React.createElement(tableModule.default, { ...tableProps, loading: false, reloading: false })).includes("progressbar"), "idle grid announces activity");
+  void rows;
+}
+
 /* ── 5. Applied-filters indicator ─────────────────────────────────────── */
 const indicatorHtml = render(
   React.createElement(indicatorModule.default, {
@@ -412,6 +477,19 @@ try {
   ok("live: supervisor filter narrows the set", bySupervisor.meta.total > 0 && bySupervisor.meta.total < payload.meta.total, `${bySupervisor.meta.total} of ${payload.meta.total}`);
   const byPair = await (await fetch(`${API}/operations/mortality-analysis?limit=1&farm=${encodeURIComponent(first.sourceFarm)}&supervisor=${encodeURIComponent(first.supervisorName)}`)).json();
   ok("live: farm + supervisor pair narrows the set", byPair.meta.total > 0 && byPair.meta.total <= byFarm.meta.total, `${byPair.meta.total} of ${byFarm.meta.total}`);
+  // COMPLETED ONLY, NEVER DUPLICATED — asserted over the whole quarter set.
+  ok("live: every row is a completed trip", allRows.data.every((row) => row.status === "Completed"), [...new Set(allRows.data.map((row) => row.status))].join(","));
+  ok("live: no trip appears twice in the set", new Set(allRows.data.map((row) => row.tripId)).size === allRows.data.length, `${new Set(allRows.data.map((row) => row.tripId)).size} of ${allRows.data.length}`);
+  ok("live: no trip number appears twice", new Set(allRows.data.map((row) => row.tripNo)).size === allRows.data.length, "duplicate trip number");
+  {
+    // Pages must not overlap either — a duplicated row would be the same trip
+    // rendered twice to the operator.
+    const pages = [];
+    for (let p = 1; p <= 4; p += 1) pages.push((await (await fetch(`${API}/operations/mortality-analysis?limit=10&page=${p}&sortBy=tripDate&sortDir=desc`)).json()).data);
+    const ids = pages.flat().map((row) => row.tripId);
+    ok("live: consecutive pages share no trip", new Set(ids).size === ids.length, `${new Set(ids).size} of ${ids.length}`);
+  }
+
   const searched = await (await fetch(`${API}/operations/mortality-analysis?limit=1&search=${encodeURIComponent(first.tripNo)}`)).json();
   ok("live: search by trip number finds it", searched.meta.total >= 1 && searched.data[0].tripNo === first.tripNo, `${searched.meta.total} rows`);
 
@@ -462,6 +540,18 @@ try {
     ok("telugu: figures stay numeric", tePanelHtml.includes(formatNumberEn(row.farmBirds)) && tePanelHtml.includes(row.farmWeight.toFixed(2)) && teTableHtml.includes(formatNumberEn(row.farmBirds)), "figures changed");
     ok("telugu: weights use the Telugu unit", tePanelHtml.includes("కేజీ") && teSummaryHtml.includes("కేజీ") && !tePanelHtml.includes(" kg"), "unit not localised");
     ok("telugu: cumulative labels translated", teSummaryHtml.includes("మొత్తం సారాంశం") && teSummaryHtml.includes("పేరు") && teSummaryHtml.includes("పక్షులు"), "summary labels still English");
+
+    // The background-query line is part of the page: it must read Telugu as well.
+    const teBusyHtml = renderTe(
+      React.createElement(tableModule.default, {
+        records: pageOne.data, sort: { key: "tripDate", dir: "desc" }, setSort: noop, page: 1,
+        totalPages: pageOne.meta.totalPages, totalRecords: pageOne.meta.total, pageSize: 10,
+        onPageChange: noop, onPageSizeChange: noop, loading: false, reloading: true,
+        emptyAll: false, filtersApplied: true, weightUnit: "కేజీ",
+      }),
+    );
+    ok("telugu: the activity line is translated", teBusyHtml.includes("నవీకరిస్తోంది") && !teBusyHtml.includes("Updating"), "activity label still English");
+    noEnglish("the table while it updates", teBusyHtml);
 
     teRender("the page shell", React.createElement(pageModule.default), (html) => noEnglish("the page shell", html));
     teRender(

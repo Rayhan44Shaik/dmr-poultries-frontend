@@ -131,6 +131,7 @@ export default function MortalityEntryPage() {
             onPageChange={analysis.setPage}
             onPageSizeChange={analysis.setPageSize}
             loading={analysis.loading}
+            reloading={analysis.reloading}
             emptyAll={showEmptyAll}
             filtersApplied={analysis.summaryVisible}
             onReset={handleReset}
@@ -142,7 +143,7 @@ export default function MortalityEntryPage() {
       {/* ── 3. CUMULATIVE SUMMARY — below the table, only after a Search with a
              real filter, and always the totals for EVERY page of the filtered
              set (the server aggregates before paging). ─────────────────── */}
-      {analysis.summaryVisible && !analysis.error && analysis.totalRecords > 0 && (
+      {analysis.summaryReady && !analysis.error && analysis.totalRecords > 0 && (
         <CumulativeSummary
           kpis={analysis.kpis}
           totalRecords={analysis.totalRecords}

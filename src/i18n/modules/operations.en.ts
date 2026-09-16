@@ -956,6 +956,8 @@ export default {
   'ops.mortality.toast.reset': 'Filters reset.',
   'ops.mortality.error.title': 'Unable to load completed trips',
   'ops.mortality.loading': 'Loading completed trips…',
+  // A background re-read: the rows stay on screen while this is up.
+  'ops.mortality.updating': 'Updating…',
   'ops.mortality.aria.expand': 'Expand trip',
   'ops.mortality.aria.collapse': 'Collapse trip',
 

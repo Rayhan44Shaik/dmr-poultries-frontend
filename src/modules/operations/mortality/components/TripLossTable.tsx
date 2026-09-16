@@ -59,6 +59,9 @@ interface TripLossTableProps {
   onPageChange: (page: number) => void;
   onPageSizeChange: (size: number) => void;
   loading?: boolean;
+  /** A later query is in flight behind rows already on screen. The grid keeps
+   *  its rows; only the first load (nothing to keep) shows the skeleton. */
+  reloading?: boolean;
   /** No completed trips exist at all (regardless of current filters). */
   emptyAll?: boolean;
   /** A real filter has been applied via Search (shows "no results for filter" state). */
@@ -233,6 +236,7 @@ export default function TripLossTable({
   onPageChange,
   onPageSizeChange,
   loading = false,
+  reloading = false,
   emptyAll = false,
   filtersApplied,
   weightUnit = "kg",
@@ -398,8 +402,21 @@ export default function TripLossTable({
         </p>
       </div>
 
+      {/* A background re-fetch is stated as a single quiet line rather than a
+          skeleton: the operator keeps reading the rows they already have, and a
+          Reset never looks like the page reloading itself. */}
+      <div className="h-0.5 w-full overflow-hidden bg-transparent" aria-hidden={!reloading}>
+        {reloading && (
+          <div
+            className="h-full w-full animate-pulse bg-emerald-500/70"
+            role="progressbar"
+            aria-label={t("ops.mortality.updating")}
+          />
+        )}
+      </div>
+
       <div ref={scrollRef} className="w-full overflow-x-auto">
-        <table className="min-w-full border-collapse text-left text-[13px]">
+        <table className="min-w-full border-collapse text-left text-[13px]" aria-busy={reloading}>
           <thead className="border-b border-slate-200 bg-slate-50/80 text-slate-600">
             <tr className="whitespace-nowrap">
               {COLUMNS.map((col) => (

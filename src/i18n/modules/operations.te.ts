@@ -1002,6 +1002,7 @@ export default {
   'ops.mortality.toast.reset': 'ఫిల్టర్లు రీసెట్ చేయబడ్డాయి.',
   'ops.mortality.error.title': 'పూర్తయిన ట్రిప్పులను లోడ్ చేయలేకపోయాము',
   'ops.mortality.loading': 'పూర్తయిన ట్రిప్పులు లోడ్ అవుతున్నాయి…',
+  'ops.mortality.updating': 'నవీకరిస్తోంది…',
   'ops.mortality.aria.expand': 'ట్రిప్‌ను విస్తరించండి',
   'ops.mortality.aria.collapse': 'ట్రిప్‌ను కుదించండి',
 
