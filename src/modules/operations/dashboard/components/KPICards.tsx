@@ -263,6 +263,8 @@ const KPICard = memo(function KPICard({
   const baseline = prevValue > 0;
   const days = rangeDays && rangeDays > 0 ? rangeDays : 7;
   const periodLabel = `${days}d`;
+  const periodChip = t("ops.dashboard.kpi_period_days", { days });
+  const compactPeriodChip = `~ ${days}d`;
   const rangeLabel = t("ops.dashboard.vs_prev", { days });
 
   /* The badge now owns the tile's third line, so it never has to fight the logo
@@ -342,37 +344,47 @@ const KPICard = memo(function KPICard({
      full figure plus the full comparison always sit in the tooltips. */
   const cardContent = (
     <div
-      className={`@container group relative flex h-full min-h-[6.875rem] min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${
+      className={`@container group relative flex h-full min-h-[7.35rem] min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${
         /* Every tile is a link now, so the pointer leads; only a non-clickable
            Expenses tile would keep the "hover me for the breakdown" cursor. */
         showBreakdown ? (to ? "cursor-pointer" : "cursor-help") : ""
       }`}
     >
       <div className="absolute inset-0 bg-gradient-to-br from-white via-white to-slate-50 opacity-80" />
+      <div className={`absolute -right-5 -top-5 h-16 w-16 rounded-full ${config.bg} opacity-[0.08] blur-sm transition-opacity duration-300 group-hover:opacity-[0.14]`} />
 
       <div className="relative flex h-full min-w-0 flex-col justify-between gap-1.5">
-        {/* line 1 — logo + name */}
-        <div className="flex min-w-0 items-center gap-1 @min-[96px]:gap-2 @min-[120px]:gap-2.5">
+        {/* line 1 — name on the left, icon on the right, just like a KPI tile */}
+        <div className="flex min-w-0 items-start justify-between gap-1.5">
+          <div className="min-w-0 pr-1">
+            <span
+              className="block min-w-0 text-[8px] leading-snug font-semibold break-words text-slate-500 @min-[96px]:text-[10px] @min-[120px]:text-[11px]"
+              title={t(kpiCardLabel(label))}
+            >
+              {t(kpiCardShortLabel(label))}
+            </span>
+            <span
+              className="mt-1 inline-flex max-w-full items-center rounded-full bg-slate-50 px-1.5 py-0.5 text-[7.5px] font-black uppercase tracking-[0.06em] text-slate-400 ring-1 ring-inset ring-slate-100 @min-[96px]:text-[8px] @min-[120px]:text-[8.5px]"
+              title={periodChip}
+            >
+              <span className="hidden truncate @min-[120px]:inline">{periodChip}</span>
+              <span className="truncate @min-[120px]:hidden">{compactPeriodChip}</span>
+            </span>
+          </div>
           <div
-            className={`${config.bg} flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md shadow-md transition-transform duration-300 group-hover:scale-110 @min-[96px]:h-[1.625rem] @min-[96px]:w-[1.625rem] @min-[96px]:rounded-lg @min-[120px]:h-8 @min-[120px]:w-8`}
+            className={`${config.bg} flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-lg shadow-md transition-transform duration-300 group-hover:scale-110 @min-[96px]:h-[1.875rem] @min-[96px]:w-[1.875rem] @min-[120px]:h-9 @min-[120px]:w-9`}
           >
             <Icon
-              className="h-3 w-3 text-white @min-[96px]:h-3.5 @min-[96px]:w-3.5 @min-[120px]:h-4 @min-[120px]:w-4"
-              size={12}
+              className="h-3.5 w-3.5 text-white @min-[96px]:h-4 @min-[96px]:w-4 @min-[120px]:h-[18px] @min-[120px]:w-[18px]"
+              size={14}
             />
           </div>
-          <span
-            className="min-w-0 text-[8px] leading-snug font-semibold break-words text-slate-500 @min-[96px]:text-[10px] @min-[120px]:text-[11px]"
-            title={t(kpiCardLabel(label))}
-          >
-            {t(kpiCardShortLabel(label))}
-          </span>
         </div>
 
         {/* line 2 — the figure, big and unclipped */}
         <div
-          className={`min-w-0 truncate text-[14px] font-bold leading-none tracking-tight @min-[96px]:text-[19px] @min-[120px]:text-[24px] ${config.text}`}
-          title={`${t(kpiCardLabel(label))} · ${exactValue}`}
+          className={`min-w-0 truncate text-[14px] font-bold leading-none tracking-tight @min-[96px]:text-[19px] @min-[120px]:text-[23px] ${config.text}`}
+          title={`${t(kpiCardLabel(label))} · ${exactValue} · ${periodChip}`}
         >
           {displayMain}
           {displaySuffix && (
