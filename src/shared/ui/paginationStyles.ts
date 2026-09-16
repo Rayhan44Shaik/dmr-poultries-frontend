@@ -95,6 +95,34 @@ export function pageRecordRange(
  * the last page and a window around the current page, with `null` marking a
  * gap. Bounded so a 500-page directory cannot render 500 buttons.
  */
+/**
+ * Compact page window — `1 2 … 20`, the numbering the Recent Collections
+ * table uses.
+ *
+ * The first two pages and the last page are always reachable, plus whatever
+ * page the operator is on and its neighbours; everything between collapses to
+ * a single ellipsis. A long register therefore renders four or five buttons
+ * instead of a full run of numbers.
+ */
+export function compactPageWindow(page: number, totalPages: number): (number | null)[] {
+  const total = Math.max(1, totalPages);
+  const current = clampPage(page, total);
+  if (total <= 4) return Array.from({ length: total }, (_, i) => i + 1);
+
+  const wanted = new Set<number>([1, 2, total]);
+  for (const candidate of [current - 1, current, current + 1]) {
+    if (candidate >= 1 && candidate <= total) wanted.add(candidate);
+  }
+
+  const sorted = [...wanted].sort((left, right) => left - right);
+  const items: (number | null)[] = [];
+  sorted.forEach((value, index) => {
+    if (index > 0 && value - sorted[index - 1] > 1) items.push(null);
+    items.push(value);
+  });
+  return items;
+}
+
 export function pageWindow(
   page: number,
   totalPages: number,

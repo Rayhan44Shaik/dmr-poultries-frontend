@@ -419,9 +419,6 @@ export default function PendingCollectionsPage() {
         weeklySales={totalWeeklySales}
         weeklyCollections={totalWeeklyCollections}
         weeklyRecovery={avgRecovery}
-        fromDate={appliedFromDate}
-        toDate={appliedToDate}
-        shopName={appliedShopName}
         isLoading={firstLoad}
       />
 
@@ -437,6 +434,7 @@ export default function PendingCollectionsPage() {
         />
         {shouldShowPagination(totalItems) && (
           <Pagination
+            compact
             page={currentPage}
             pageSize={pageSize}
             totalItems={totalItems}

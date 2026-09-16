@@ -1,94 +1,93 @@
 import React from "react";
-import { IndianRupee, ShoppingBag, CreditCard, TrendingUp } from "lucide-react";
+import { CreditCard, IndianRupee, ShoppingBag, TrendingUp } from "lucide-react";
 import { useI18n } from "../../../../../i18n";
-
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    minimumFractionDigits: 2,
-  }).format(amount);
+import { KpiCardGrid, type KpiCardItem } from "../../../../../ui";
 
 interface Props {
   totalOutstanding: number;
   weeklySales: number;
   weeklyCollections: number;
   weeklyRecovery: number;
-  fromDate: string;
-  toDate: string;
-  shopName: string;
   isLoading?: boolean;
 }
 
+/**
+ * Pending Collections KPI strip — the Trip List KPI surface, tone for tone.
+ *
+ * Rendered through the shared `KpiCardGrid`, so the cards are the same object
+ * here as on the Trip List: pastel tone, icon tile, coloured value, accent bar
+ * and the exact figure on hover. Money reads as the full rupee figure in the
+ * Indian grouping (`₹1,48,74,969.98`) — digits and ₹ only, so the strip stays
+ * readable in Telugu too.
+ */
 function PendingCollectionsSummary({
   totalOutstanding,
   weeklySales,
   weeklyCollections,
   weeklyRecovery,
-  fromDate,
-  toDate,
-  shopName,
   isLoading = false,
 }: Props) {
   const { t } = useI18n();
+
   if (isLoading) {
     return (
-      <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 text-center text-slate-400">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-sm p-4 text-center text-sm font-medium text-slate-400">
         {t("ops.collection.loading_summary")}
       </div>
     );
   }
 
-  const cards = [
+  const inr = (value: number) =>
+    `₹${Number(value || 0).toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`;
+  const outstanding = inr(totalOutstanding);
+  const sales = inr(weeklySales);
+  const collections = inr(weeklyCollections);
+  const recovery = `${Number(weeklyRecovery || 0).toFixed(2)}%`;
+
+  const cards: KpiCardItem[] = [
     {
-      title: t("ops.collection.total_outstanding"),
-      value: formatCurrency(totalOutstanding),
-      icon: <IndianRupee size={18} />,
-      bg: "bg-red-50",
-      text: "text-red-700",
+      id: "outstanding",
+      label: t("ops.collection.total_outstanding"),
+      value: <span className="tabular-nums">{outstanding}</span>,
+      tooltip: `${t("ops.collection.total_outstanding")}: ${outstanding}`,
+      Icon: IndianRupee,
+      tone: "rose",
     },
     {
-      title: t("ops.collection.this_week_sales"),
-      value: formatCurrency(weeklySales),
-      icon: <ShoppingBag size={18} />,
-      bg: "bg-blue-50",
-      text: "text-blue-700",
+      id: "sales",
+      label: t("ops.collection.this_week_sales"),
+      value: <span className="tabular-nums">{sales}</span>,
+      tooltip: `${t("ops.collection.this_week_sales")}: ${sales}`,
+      Icon: ShoppingBag,
+      tone: "blue",
     },
     {
-      title: t("ops.collection.this_week_collections"),
-      value: formatCurrency(weeklyCollections),
-      icon: <CreditCard size={18} />,
-      bg: "bg-green-50",
-      text: "text-green-700",
+      id: "collections",
+      label: t("ops.collection.this_week_collections"),
+      value: <span className="tabular-nums">{collections}</span>,
+      tooltip: `${t("ops.collection.this_week_collections")}: ${collections}`,
+      Icon: CreditCard,
+      tone: "emerald",
     },
     {
-      title: t("ops.collection.recovery_pct"),
-      value: `${weeklyRecovery.toFixed(2)}%`,
-      icon: <TrendingUp size={18} />,
-      bg: "bg-purple-50",
-      text: "text-purple-700",
+      id: "recovery",
+      label: t("ops.collection.recovery_pct"),
+      value: <span className="tabular-nums">{recovery}</span>,
+      tooltip: `${t("ops.collection.recovery_pct")}: ${recovery}`,
+      Icon: TrendingUp,
+      tone: "violet",
     },
   ];
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-3">
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-        {cards.map((card) => (
-          <div
-            key={card.title}
-            className={`${card.bg} rounded-lg border border-slate-200 px-2.5 py-2 flex items-center justify-between hover:shadow-sm transition-all`}
-          >
-            <div>
-              <div className="text-[9px] font-medium text-slate-500 uppercase tracking-wider">{card.title}</div>
-              <div className={`text-sm font-bold mt-0.5 ${card.text}`}>{card.value}</div>
-            </div>
-            <div className={`h-7 w-7 rounded-full flex items-center justify-center ${card.bg} ${card.text}`}>
-              {card.icon}
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+    <KpiCardGrid
+      items={cards}
+      gridClassName="lg:grid-cols-4"
+      ariaLabel={t("operations.pending_collections")}
+    />
   );
 }
 
