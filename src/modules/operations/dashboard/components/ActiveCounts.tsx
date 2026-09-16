@@ -15,10 +15,11 @@ import type {
  * Tiles: Vehicles, Drivers, Supervisors, Helpers, Loaders — shops are
  * deliberately not part of this panel.
  *
- * Hovering (or keyboard-focusing) a tile opens a tooltip listing exactly WHO
- * ran in the span, busiest first, with their per-span detail (trips, shops
- * delivered, farms covered, kg hauled) in the Collection Recovery card's
- * popover style.
+ * Hovering (or keyboard-focusing) a tile reveals a roster overlay rendered
+ * strictly INSIDE the tile's own box (absolute inset, no pop-out): it lists
+ * exactly WHO ran in the span, busiest first, with their per-span detail
+ * (trips, shops delivered, farms covered, kg hauled). Nothing is drawn
+ * outside the tiles' grid, so the panel never overlaps neighbouring cards.
  */
 interface ActiveCountsProps {
   rosters: DashboardSpanFleet;
@@ -44,22 +45,6 @@ const TILES: TileDef[] = [
 
 const EMPTY: SpanFleetRoster = { worked: 0, activeTotal: 0, items: [], overflow: 0 };
 
-/**
- * Keep the centered tooltip inside the panel for the edge tiles: the first
- * column pins left, the last pins right, everyone else stays centered.
- */
-function tooltipAlign(index: number, total: number): string {
-  if (index === 0) return "left-0";
-  if (index === total - 1) return "right-0";
-  return "left-1/2 -translate-x-1/2";
-}
-
-function arrowAlign(index: number, total: number): string {
-  if (index === 0) return "left-6";
-  if (index === total - 1) return "right-6";
-  return "left-1/2 -translate-x-1/2";
-}
-
 export default function ActiveCounts({ rosters }: ActiveCountsProps) {
   const { t } = useI18n();
 
@@ -79,7 +64,7 @@ export default function ActiveCounts({ rosters }: ActiveCountsProps) {
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4">
-      {TILES.map((tile, index) => {
+      {TILES.map((tile) => {
         const Icon = tile.icon;
         const stat: SpanFleetRoster = rosters[tile.key] ?? EMPTY;
         // The share of the active register that ran this span.
@@ -117,27 +102,20 @@ export default function ActiveCounts({ rosters }: ActiveCountsProps) {
                 style={{ width: `${Math.min(percent, 100)}%` }}
               />
             </div>
-            <div className="mt-1.5 w-full text-center text-[10.5px] leading-tight text-slate-400">
-              {t("ops.dashboard.on_trips_range")}
-            </div>
 
-            {/* ── Span-roster tooltip (on hover/focus; exactly who ran trips
-                  inside the selected window, busiest first) ──────────────── */}
+            {/* ── Span-roster tooltip rendered INSIDE the tile on hover/focus
+                  (absolute inset — it can never grow outside the tile) ─────── */}
             <div
               role="tooltip"
-              className={`pointer-events-none invisible absolute bottom-[calc(100%+10px)] z-50 w-56 rounded-2xl border border-slate-200 bg-white p-3 text-left text-[10px] text-slate-500 opacity-0 shadow-xl shadow-slate-900/12 transition-opacity duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100 ${tooltipAlign(index, TILES.length)}`}
+              aria-hidden="true"
+              className="pointer-events-none invisible absolute inset-0 z-10 flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white/95 p-2 text-left text-[10px] text-slate-500 opacity-0 shadow-lg backdrop-blur-[1px] transition-opacity duration-150 group-hover:visible group-hover:opacity-100 group-focus-within:visible group-focus-within:opacity-100"
             >
-              <span
-                aria-hidden="true"
-                className={`absolute top-full h-2.5 w-2.5 -translate-y-1/2 rotate-45 border-b border-r border-slate-200 bg-white ${arrowAlign(index, TILES.length)}`}
-              />
-
-              <div className="relative flex min-w-0 items-center justify-between gap-2 border-b border-slate-100 pb-1.5">
-                <span className="truncate text-[11.5px] font-bold text-slate-800">
+              <div className="flex shrink-0 min-w-0 items-center justify-between gap-1.5 border-b border-slate-100 pb-1">
+                <span className="truncate text-[11px] font-bold text-slate-800">
                   {registerLabel}
                 </span>
                 <span
-                  className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black tabular-nums ring-1 ring-inset ${
+                  className={`shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-black tabular-nums ring-1 ring-inset ${
                     stat.worked > 0
                       ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
                       : "bg-slate-50 text-slate-500 ring-slate-100"
@@ -148,7 +126,7 @@ export default function ActiveCounts({ rosters }: ActiveCountsProps) {
               </div>
 
               {stat.items.length > 0 ? (
-                <ul className="relative mt-1.5 max-h-44 space-y-1 overflow-y-auto pr-0.5">
+                <ul className="mt-1 min-h-0 flex-1 space-y-1 overflow-y-auto pr-0.5">
                   {stat.items.map((item) => (
                     <li key={`${tile.key}-${item.name}`} className="flex items-start gap-1.5">
                       <span aria-hidden="true" className="mt-[4.5px] h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
@@ -169,7 +147,7 @@ export default function ActiveCounts({ rosters }: ActiveCountsProps) {
                   )}
                 </ul>
               ) : (
-                <p className="relative mt-1.5 text-slate-400">
+                <p className="mt-1 flex min-h-0 flex-1 items-center justify-center text-center text-slate-400">
                   {t("ops.dashboard.no_trips_range")}
                 </p>
               )}

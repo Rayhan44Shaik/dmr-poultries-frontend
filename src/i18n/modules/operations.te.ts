@@ -212,7 +212,6 @@ export default {
   'ops.dashboard.inactive_count': '{count} ఇన్‌యాక్టివ్',
   'ops.dashboard.all_active': 'అన్నీ యాక్టివ్',
   'ops.dashboard.in_period': 'ఈ కాలావధిలో {count}',
-  'ops.dashboard.on_trips_range': 'ఈ కాలావధిలో ట్రిప్‌ల్లో',
   'ops.dashboard.on_trips_count': '{count} ట్రిప్‌లు',
   'ops.dashboard.no_trips_range': 'ఈ కాలావధిలో ట్రిప్‌లు లేవు',
   'ops.dashboard.more_items': '+ ఇంకా {count}',

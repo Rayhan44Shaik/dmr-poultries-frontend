@@ -212,7 +212,6 @@ export default {
   'ops.dashboard.inactive_count': '{count} inactive',
   'ops.dashboard.all_active': 'All active',
   'ops.dashboard.in_period': '{count} in period',
-  'ops.dashboard.on_trips_range': 'on trips this range',
   'ops.dashboard.on_trips_count': '{count} on trips',
   'ops.dashboard.no_trips_range': 'No trips in this range',
   'ops.dashboard.more_items': '+ {count} more',
