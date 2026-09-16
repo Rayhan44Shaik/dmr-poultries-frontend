@@ -57,11 +57,9 @@ export async function runOperationsSyncCheck(): Promise<void> {
   }
 
   // ── 2. Trip Entry / Recent Trips ──────────────────────────────────────────
-  let firstDraftOrPendingTripId: number | null = null;
   try {
     const trips = await listTrips({});
     const statuses = new Set(trips.map((t) => t.status));
-    firstDraftOrPendingTripId = trips.find((t) => t.status !== "Completed")?.id ?? trips[0]?.id ?? null;
     record(
       "trip-entry",
       "listTrips() → GET /trips",
@@ -211,6 +209,62 @@ export async function runOperationsSyncCheck(): Promise<void> {
     );
   } catch (err) {
     record("fuel-expenses", "fuelExpenseService.list() → GET /operations/fuel-expenses", false, String(err));
+  }
+
+  // ── 12. Shop Ledger — weekly continuity guarantee ─────────────────────────
+  // The previous week's CLOSING balance must be exactly this week's OPENING
+  // balance for every shop, so statements never lose or invent money across
+  // week boundaries.
+  try {
+    const shift = (value: string, days: number): string => {
+      const [y, m, d] = value.split("-").map(Number);
+      const dt = new Date(Date.UTC(y, m - 1, d));
+      dt.setUTCDate(dt.getUTCDate() + days);
+      return dt.toISOString().slice(0, 10);
+    };
+    const mondayOf = (value: string): string => {
+      const [y, m, d] = value.split("-").map(Number);
+      const dow = new Date(Date.UTC(y, m - 1, d)).getUTCDay(); // 0 = Sun
+      return shift(value, dow === 0 ? -6 : 1 - dow);
+    };
+    const thisMonday = mondayOf(today);
+    const prevMonday = shift(thisMonday, -7);
+    const prevSunday = shift(thisMonday, -1);
+    const mismatches: string[] = [];
+    let checked = 0;
+    for (const shopId of [1, 2, 3, 4, 5]) {
+      // Previous period = everything up to and including last Sunday; its
+      // closing figure is the last running balance (or the quarter opening
+      // when the shop had no activity yet).
+      const prevRes = await apiGet<{ openingBalance: number; data: { balance: number }[] }>(
+        "/operations/shop-ledger",
+        { params: { shopId, fromDate: q.quarter.fromDate, toDate: prevSunday, limit: 100000 } },
+      );
+      const prevRows = prevRes.data ?? [];
+      const prevClosing = prevRows.length
+        ? Number(prevRows[prevRows.length - 1].balance)
+        : Number(prevRes.openingBalance) || 0;
+      // Current period = Monday → today; its opening comes from the backend.
+      const thisRes = await apiGet<{ openingBalance: number }>(
+        "/operations/shop-ledger",
+        { params: { shopId, fromDate: thisMonday, toDate: today } },
+      );
+      const thisOpening = Number(thisRes.openingBalance) || 0;
+      checked += 1;
+      if (Math.abs(prevClosing - thisOpening) > 0.01) {
+        mismatches.push(`shop ${shopId}: prev closing ${prevClosing} ≠ opening ${thisOpening}`);
+      }
+    }
+    record(
+      "shop-ledger",
+      "previous week closing = this week opening",
+      mismatches.length === 0,
+      mismatches.length > 0
+        ? mismatches.join("; ")
+        : `${checked} shops continuous · prev week ${prevMonday}→${prevSunday} · this week ${thisMonday}→${today}`
+    );
+  } catch (err) {
+    record("shop-ledger", "previous week closing = this week opening", false, String(err));
   }
 
   const failed = results.filter((r) => !r.ok);

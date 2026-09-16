@@ -1,5 +1,5 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { format, subDays } from "date-fns";
+import { format } from "date-fns";
 import {
   ArrowDown,
   ArrowDownLeft,
@@ -53,6 +53,7 @@ import { shouldShowPagination, PAGINATION_DEFAULT_PAGE_SIZE } from "../../../sha
 import { exportToExcel } from "../../../utils/exportUtils";
 import {
   fetchShopLedger,
+  type ShopLedgerResponse,
   type ShopLedgerRow,
 } from "../services/shopLedgerService";
 import { generateShopLedgerPDF, prepareShopLedgerPdfAssets } from "../components/ShopLedgerPDF";
@@ -186,22 +187,15 @@ function mondayOf(date: Date): Date {
 }
 
 /**
- * Default ledger window — one full Monday → Sunday week.
+ * Default ledger window — the CURRENT week, Monday → TODAY.
  *
- * If the current week is already complete (today IS Sunday) it is used;
- * while a week is still in progress the ledger defaults to the PREVIOUS
- * complete week, so the statement always covers a finished Mon–Sun cycle.
+ * From = this week's Monday; To = today. When today IS Sunday the range is
+ * the complete Monday → Sunday week; on any other day it runs from Monday up
+ * to the present moment, so the statement always starts on a week boundary.
  */
 function defaultWeekRange(): { from: string; to: string } {
   const now = new Date();
-  const monday = mondayOf(now);
-  if (now.getDay() === 0) {
-    return { from: format(monday, "yyyy-MM-dd"), to: format(now, "yyyy-MM-dd") };
-  }
-  return {
-    from: format(subDays(monday, 7), "yyyy-MM-dd"),
-    to: format(subDays(monday, 1), "yyyy-MM-dd"),
-  };
+  return { from: format(mondayOf(now), "yyyy-MM-dd"), to: format(now, "yyyy-MM-dd") };
 }
 
 const toDateDefault = () => defaultWeekRange().to;
@@ -223,6 +217,35 @@ const weekdayOf = (value: string): string => {
   const [year, month, day] = parts;
   return WEEKDAY_SHORT[new Date(year, month - 1, day).getDay()];
 };
+
+/** Shift a yyyy-MM-dd date by N days on the local calendar. */
+const shiftDateIso = (value: string, days: number): string => {
+  const parts = value.split("-").map(Number);
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return value;
+  const [year, month, day] = parts;
+  return format(new Date(year, month - 1, day + days), "yyyy-MM-dd");
+};
+
+const round2 = (value: number): number => Math.round(value * 100) / 100;
+
+/** Fetch the COMPLETE ledger, walking server pagination until every row has
+ *  arrived — without this, All-Shops ranges with more than one page of
+ *  transactions would silently truncate at the server's page size. */
+async function fetchAllLedgerPages(filters: {
+  shopId?: number;
+  fromDate: string;
+  toDate: string;
+}): Promise<ShopLedgerResponse> {
+  const first = await fetchShopLedger({ ...filters, page: 1, limit: 500 });
+  const totalPages = Math.max(1, first.meta?.totalPages ?? 1);
+  if (totalPages <= 1) return first;
+  const rest = await Promise.all(
+    Array.from({ length: totalPages - 1 }, (_, index) =>
+      fetchShopLedger({ ...filters, page: index + 2, limit: 500 }),
+    ),
+  );
+  return { ...first, data: [...first.data, ...rest.flatMap((page) => page.data)] };
+}
 
 const normalizePaymentMode = (value?: string): string => {
   const raw = String(value ?? "").trim();
@@ -410,7 +433,59 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
   const buildLedger = useCallback(
     async (from: string, to: string, shopId?: number): Promise<LedgerTransaction[]> => {
-      const res = await fetchShopLedger({ fromDate: from, toDate: to, shopId });
+      const res = await fetchAllLedgerPages({ fromDate: from, toDate: to, shopId });
+
+      let openingTotal: number;
+      let body: LedgerTransaction[];
+
+      if (shopId != null) {
+        // Single shop — the backend returns the authoritative opening balance
+        // and true per-row running balances. By construction the previous
+        // week's closing is exactly this week's opening.
+        openingTotal = Number(res.openingBalance) || 0;
+        body = res.data.map(mapRowToTx);
+      } else {
+        // ALL SHOPS — the backend's combined ledger mixes balances across
+        // shops, so rebuild the TRUE per-shop running balances client-side.
+        // Each shop's opening at `from` = its master opening + its own net
+        // activity before `from`, so for every shop the previous period's
+        // closing carries forward as this period's opening.
+        const history = await fetchAllLedgerPages({
+          fromDate: shiftDateIso(from, -365),
+          toDate: shiftDateIso(from, -1),
+        });
+        const preNetByShop = new Map<number, number>();
+        for (const row of history.data) {
+          const sid = Number(row.shopId ?? 0);
+          preNetByShop.set(sid, (preNetByShop.get(sid) ?? 0) + row.debit - row.credit);
+        }
+        const openingByShop = new Map<number, number>();
+        let aggregateOpening = 0;
+        for (const shop of shops) {
+          const opening = (Number(shop.openingBalance) || 0) + (preNetByShop.get(shop.id) ?? 0);
+          openingByShop.set(shop.id, opening);
+          aggregateOpening += opening;
+        }
+        // Defensive: shops with pre-range activity missing from the master.
+        for (const [sid, net] of preNetByShop) {
+          if (!openingByShop.has(sid)) {
+            openingByShop.set(sid, net);
+            aggregateOpening += net;
+          }
+        }
+        // Rows arrive chronologically — thread each shop's own balance.
+        const running = new Map<number, number>(openingByShop);
+        body = res.data.map((row) => {
+          const sid = Number(row.shopId ?? 0);
+          const next = round2((running.get(sid) ?? 0) + row.debit - row.credit);
+          running.set(sid, next);
+          const tx = mapRowToTx(row);
+          tx.balance = next;
+          return tx;
+        });
+        openingTotal = round2(aggregateOpening);
+      }
+
       const openingRow: LedgerTransaction = {
         date: from,
         particulars: "Opening Balance",
@@ -419,12 +494,12 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         rate: 0,
         debit: 0,
         credit: 0,
-        balance: Number(res.openingBalance) || 0,
+        balance: openingTotal,
         type: "sale",
       };
-      return [openingRow, ...res.data.map(mapRowToTx)];
+      return [openingRow, ...body];
     },
-    []
+    [shops]
   );
 
   useEffect(() => {
@@ -523,19 +598,15 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     const totalWeight = tx
       .filter((t) => t.type === "sale")
       .reduce((sum, t) => sum + t.weight, 0);
-    const closingBalance =
-      filteredLedger.length > 0
-        ? filteredLedger[filteredLedger.length - 1].balance
-        : 0;
-    return { totalDebit, totalCredit, totalBirds, totalWeight, closingBalance };
+    // Opening row is always pinned first — single shop: backend-authoritative;
+    // all shops: aggregate of every shop's carried-forward opening.
+    const openingBalance = filteredLedger.length > 0 ? filteredLedger[0].balance : 0;
+    // The accounting identity: Closing = Opening + Sales − Collections. For a
+    // single shop this equals the last running balance; for All Shops it is
+    // the combined closing outstanding across every shop.
+    const closingBalance = round2(openingBalance + totalDebit - totalCredit);
+    return { openingBalance, totalDebit, totalCredit, totalBirds, totalWeight, closingBalance };
   }, [filteredLedger]);
-
-  // KPIs are calculated only when the user applies a meaningful filter:
-  // a custom date range or a specific shop. These are committed on Search.
-  const hasKpiFilter =
-    appliedDateFrom !== toWeekAgoDefault() ||
-    appliedDateTo !== toDateDefault() ||
-    appliedSelectedShop !== "All Shops";
 
   const resetPage = useCallback(() => setCurrentPage(1), []);
 
@@ -1786,37 +1857,48 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         </div>
       )}
 
-        {/* ── KPI CARDS (only for an applied date/shop filter) ── */}
-        {hasKpiFilter ? (
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-            <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-              <p className="text-xs text-slate-500">Total Debit (Sales)</p>
-              <p className="text-xl font-bold text-emerald-600">{formatAmount(summary.totalDebit)}</p>
-            </div>
-            <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-              <p className="text-xs text-slate-500">Total Credit (Collections)</p>
-              <p className="text-xl font-bold text-blue-600">{formatAmount(summary.totalCredit)}</p>
-            </div>
-            <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-              <p className="text-xs text-slate-500">Total Birds</p>
-              <p className="text-xl font-bold text-slate-800">{summary.totalBirds}</p>
-            </div>
-            <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-              <p className="text-xs text-slate-500">Total Weight (KG)</p>
-              <p className="text-xl font-bold text-slate-800">{summary.totalWeight.toFixed(2)}</p>
-            </div>
-            <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-              <p className="text-xs text-slate-500">Closing Balance</p>
-              <p className={`text-xl font-bold ${summary.closingBalance >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-                {formatAmount(summary.closingBalance)}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-2.5 text-xs font-medium text-slate-500">
-            KPI totals appear after you filter by a date range or select a shop.
-          </div>
-        )}
+      {/* ── OVERVIEW — opening → sales → collections → closing for the whole
+             filtered scope (one shop, or every shop when All Shops) ──────── */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+          <p className="flex items-center gap-1.5 text-xs text-slate-500">
+            <Scale size={13} className="text-indigo-500" /> Opening Balance
+          </p>
+          <p className="text-xl font-bold text-indigo-600 tabular-nums">{formatAmount(summary.openingBalance)}</p>
+        </div>
+        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+          <p className="flex items-center gap-1.5 text-xs text-slate-500">
+            <ArrowUpRight size={13} className="text-emerald-500" /> Total Sales (Debit)
+          </p>
+          <p className="text-xl font-bold text-emerald-600 tabular-nums">{formatAmount(summary.totalDebit)}</p>
+        </div>
+        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+          <p className="flex items-center gap-1.5 text-xs text-slate-500">
+            <ArrowDownLeft size={13} className="text-blue-500" /> Total Collections (Credit)
+          </p>
+          <p className="text-xl font-bold text-blue-600 tabular-nums">{formatAmount(summary.totalCredit)}</p>
+        </div>
+        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+          <p className="flex items-center gap-1.5 text-xs text-slate-500">
+            <Bird size={13} className="text-amber-500" /> Total Birds
+          </p>
+          <p className="text-xl font-bold text-slate-800 tabular-nums">{summary.totalBirds.toLocaleString()}</p>
+        </div>
+        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+          <p className="flex items-center gap-1.5 text-xs text-slate-500">
+            <Weight size={13} className="text-cyan-500" /> Total Weight (KG)
+          </p>
+          <p className="text-xl font-bold text-slate-800 tabular-nums">{summary.totalWeight.toFixed(2)}</p>
+        </div>
+        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+          <p className="flex items-center gap-1.5 text-xs text-slate-500">
+            <IndianRupee size={13} className="text-violet-500" /> Closing Balance
+          </p>
+          <p className={`text-xl font-bold tabular-nums ${summary.closingBalance >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+            {formatAmount(summary.closingBalance)}
+          </p>
+        </div>
+      </div>
 
       {/* ── TABLE — same card & header treatment as the Trip List ────────── */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden text-xs md:text-sm">
