@@ -39,7 +39,7 @@ import { useI18n } from "../../../../i18n";
  * details, weights and rates — so hovering marks exactly the row being read and
  * the label stays with its value.
  */
-const LINE_HOVER = "transition-colors duration-150 hover:bg-emerald-50/50";
+const LINE_HOVER = "transition-colors duration-150 hover:bg-emerald-50/60";
 
 interface TripLossRowExpandProps {
   record: TripLossAnalysis;
@@ -272,16 +272,16 @@ export default function TripLossRowExpand({ record, weightUnit = "kg" }: TripLos
               title={t("ops.mortality.detail.rates")}
               colSpan={4}
             />
-            <tr className="group">
+            <tr className="bg-emerald-50/70 transition-colors duration-150 hover:bg-emerald-100/70">
               <th
                 scope="row"
-                className="w-1/4 bg-emerald-50/70 px-3 py-2.5 text-left align-middle text-[10.5px] font-bold uppercase leading-tight tracking-wide text-emerald-700 transition-colors duration-150 group-hover:bg-emerald-100/70"
+                className="w-1/4 px-3 py-2.5 text-left align-middle text-[10.5px] font-bold uppercase leading-tight tracking-wide text-emerald-700"
               >
                 {t("ops.mortality.field.survival_rate")}
               </th>
               <td
                 colSpan={3}
-                className="bg-emerald-50/70 px-3 py-2.5 text-left align-middle text-[15px] font-extrabold tabular-nums text-emerald-700 transition-colors duration-150 group-hover:bg-emerald-100/70"
+                className="px-3 py-2.5 text-left align-middle text-[15px] font-extrabold tabular-nums text-emerald-700"
               >
                 {(record.survivalRate * 100).toFixed(2)}%
               </td>
