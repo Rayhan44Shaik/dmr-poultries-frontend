@@ -211,6 +211,7 @@ export default {
   'ops.dashboard.kpi_compare_title': '{current} vs {previous} · గత {days} రోజులు',
   'ops.dashboard.kpi_no_baseline': 'గత {days} రోజులకు పూర్తి డేటా లేదు',
   'ops.dashboard.kpi_no_change': 'మార్పు లేదు',
+  'ops.dashboard.kpi_period_days': '~ గత {days} రోజులు',
   'ops.dashboard.kpi_prev_value': 'గతం {value}',
   'ops.dashboard.vs_prev': 'గత {days} రోజులతో',
   'ops.dashboard.kpi_pending_collections': 'పెండింగ్ కలెక్షన్లు',
