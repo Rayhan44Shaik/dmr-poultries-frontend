@@ -73,8 +73,11 @@ export default function MortalityEntryPage() {
       <LossFilters
         filters={analysis.filters}
         setFilters={analysis.setFilters}
+        appliedFilters={analysis.appliedFilters}
         farmOptions={analysis.farmOptions}
         supervisorOptions={analysis.supervisorOptions}
+        sort={analysis.sort}
+        setSort={analysis.setSort}
         onApply={handleApply}
         onReset={handleReset}
         onRefresh={handleRefresh}
@@ -99,14 +102,10 @@ export default function MortalityEntryPage() {
         </section>
       )}
 
-      {/* ── 3. COMPLETED TRIPS — always visible ───────────────────── */}
-      <section className="space-y-3">
-        <div className="flex items-baseline justify-between gap-3">
-          <h3 className="text-[13px] font-bold uppercase tracking-wide text-slate-700">
-            {t("ops.mortality.section.completed_trips")}
-          </h3>
-        </div>
-
+      {/* ── 3. COMPLETED TRIPS — always visible. The card carries its own
+             header bar (glyph + title + count), exactly like the Trip List, so
+             no duplicate heading is rendered above it. ───────────────── */}
+      <section>
         {analysis.error ? (
           <div className="flex flex-col items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50/50 px-4 py-10 text-center">
             <span className="flex h-10 w-10 items-center justify-center rounded-full bg-rose-100 text-rose-600">

@@ -43,7 +43,7 @@
 //   REFRESH:
 //     - Re-fetches data preserving current applied filters and page
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DatePickerUtils } from "../../../../components/common/DatePicker";
 import {
   fetchMortalityAnalysis,
@@ -172,6 +172,19 @@ export function useTripLossAnalysis() {
 
   /** Bumped by Refresh / Retry to force a re-fetch of both queries. */
   const [reloadToken, setReloadToken] = useState(0);
+  /**
+   * Callers waiting on `refresh()`. The table query settles in an effect, so
+   * Refresh cannot be a fire-and-forget spinner: the BrandRefreshButton keeps
+   * its hen dancing and its toast honest only if the returned promise resolves
+   * when the reload has actually finished. Each resolver is settled from the
+   * query's own `finally`, so it inherits the abort/stale guards.
+   */
+  const refreshResolversRef = useRef<Array<() => void>>([]);
+  const settleRefresh = useCallback(() => {
+    const pending = refreshResolversRef.current;
+    refreshResolversRef.current = [];
+    for (const resolve of pending) resolve();
+  }, []);
 
   // Guards against a rejected/aborted older response overwriting a newer one.
   const requestIdRef = useRef(0);
@@ -226,14 +239,19 @@ export function useTripLossAnalysis() {
         .finally(() => {
           if (controller.signal.aborted || requestId !== requestIdRef.current) return;
           setLoading(false);
+          // Release anyone awaiting refresh() only after this query — the last
+          // one to run — has fully settled.
+          settleRefresh();
         });
     }, 200);
 
     return () => {
       clearTimeout(timer);
       controller.abort();
+      // A superseded request must never leave a Refresh spinner hanging: the
+      // replacement query settles and resolves the same waiters.
     };
-  }, [sort, page, pageSize, reloadToken, appliedFilters]);
+  }, [sort, page, pageSize, reloadToken, appliedFilters, settleRefresh]);
 
   // ── KPI query — runs ONLY when a real filter is applied ───────────────────
   // Reflects the *applied* subset (date range and/or farm and/or supervisor and/or
@@ -320,10 +338,17 @@ export function useTripLossAnalysis() {
     setPage(1);
   }, []);
 
-  /** REFRESH — reload from the server, preserving the applied filter + page. */
-  const refresh = useCallback(() => {
-    setReloadToken((t) => t + 1);
-  }, []);
+  /** REFRESH — reload from the server, preserving the applied filter + page.
+   *  Resolves once the reload has settled, so callers can bind a real spinner
+   *  (and a success/failure toast) to it instead of guessing a delay. */
+  const refresh = useCallback(
+    () =>
+      new Promise<void>((resolve) => {
+        refreshResolversRef.current.push(resolve);
+        setReloadToken((t) => t + 1);
+      }),
+    []
+  );
 
   return {
     loading,

@@ -38,25 +38,34 @@ export default function AppliedFiltersIndicator({
   if (parts.length === 0) return null;
 
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2">
+    <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2">
       <Filter size={14} className="flex-shrink-0 text-amber-600" />
-      <span className="text-[11px] font-semibold text-amber-700">{t("ops.mortality.applied_filters.label")}:</span>
-      <span className="flex items-center gap-1.5 text-[11px] text-amber-700">
-        {parts.map((part, i) => (
-          <span key={part.label} className="flex items-center gap-1">
-            {i > 0 && <span className="text-amber-400">·</span>}
-            <span className="font-medium">{part.label}:</span>
-            <span className="font-mono">{part.value}</span>
+      <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700">
+        {t("ops.mortality.applied_filters.label")}
+      </span>
+      {/* One pill per active filter — the value is the loud part, the field name
+          the quiet one, so a long date range never reads as one run-on line. */}
+      <span className="flex flex-wrap items-center gap-1.5">
+        {parts.map((part) => (
+          <span
+            key={part.label}
+            className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-white/80 px-2.5 py-0.5 text-[11px] leading-5 text-amber-800"
+          >
+            <span className="font-medium text-amber-600">{part.label}</span>
+            <span className="font-semibold tabular-nums">{part.value}</span>
           </span>
         ))}
       </span>
       <button
         type="button"
         onClick={onClear}
-        className="flex-shrink-0 ml-1 rounded-md p-1 text-amber-500 transition-colors hover:bg-amber-100 hover:text-amber-700"
+        className="group ml-auto flex-shrink-0 rounded-md p-1 text-amber-500 transition-colors hover:bg-amber-100 hover:text-amber-700"
         aria-label={t("common.clear")}
+        title={t("common.clear")}
       >
-        <X size={12} strokeWidth={2.5} />
+        <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-close)]">
+          <X size={13} strokeWidth={2.5} />
+        </span>
       </button>
     </div>
   );

@@ -875,9 +875,11 @@ export default {
   'ops.mortality.filter.all_farms': 'All Farms',
   'ops.mortality.filter.all_supervisors': 'All Supervisors',
   'ops.mortality.filter.search_placeholder': 'Trip, farm, supervisor...',
+  'ops.mortality.filter.pending_changes': '{count} filter change(s) — press Search to apply',
 
   // Section heading
   'ops.mortality.section.completed_trips': 'Completed Trips',
+  'ops.mortality.section.count': '{count} trips',
 
   // KPI cards
   'ops.mortality.kpi.completed_trips': 'Completed Trips',

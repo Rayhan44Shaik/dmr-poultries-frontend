@@ -4,34 +4,42 @@
 // Farm input -> delivery output (shop COUNT only) -> mortality -> weight loss.
 // Individual shop names live in the expandable detail, never in this table.
 //
-// The table shell is ALWAYS rendered. Empty states, loading and the
-// pagination footer all live INSIDE it, so the grid never disappears.
+// SURFACE — identical to the Trip List table:
+//   • one white card with a tinted header bar (brand glyph + title + count)
+//   • 12px uppercase column headers, each with its own coloured glyph
+//   • paired ↑↓ sort arrows on every sortable column
+//   • a serial "#" column (which is also the expand affordance)
+//   • "Day" — weekday + date — instead of a bare date
+//   • one global <Pagination /> footer, never a bespoke pager
+//
+// The table shell is ALWAYS rendered. Empty states, loading and the pagination
+// footer all live INSIDE it, so the grid never disappears.
 
 import { Fragment, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
-  ArrowUpDown,
   Bird,
-  CalendarDays,
+  Calendar,
   ChevronDown,
   ChevronRight,
   Feather,
-  Package,
+  Hash,
   Percent,
-  RotateCcw,
-  Route as RouteIcon,
+  Scale,
   SearchX,
+  ShoppingBag,
   Store,
   TrendingDown,
-  UserCheck,
+  UserCog,
   Warehouse,
-  Weight,
 } from "lucide-react";
 import type { LossSort, TripLossAnalysis } from "../hooks/useTripLossAnalysis";
 import type { SortBy } from "../services/mortalityAnalysisApi";
-import { formatDateShort, formatNumber, formatWeight } from "../../../../utils/format";
-import TripPagination from "../../vehicle-trips/components/TripPagination";
+import { formatNumber, formatWeight } from "../../../../utils/format";
+import { formatTripListDay } from "../../vehicle-trips/utils/formatTripListDay";
+import { Pagination } from "../../../../ui";
+import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import TripLossRowExpand from "./TripLossRowExpand";
 import { useI18n } from "../../../../i18n";
 
@@ -59,10 +67,10 @@ type Column = {
   key: string;
   /** i18n key for the header label. Empty = icon-only control column. */
   labelKey?: string;
-  /** Hard-coded label used when no i18n key is defined (e.g. unit suffixes). */
+  /** Hard-coded label used when no i18n key is defined (e.g. the serial "#"). */
   label?: string;
   icon?: typeof Bird;
-  /** Colour family for the header glyph chip. */
+  /** Colour family for the header glyph, written as a literal text colour. */
   tone?: IconTone;
   /** Full-name i18n key shown as a hover tooltip on abbreviated headers. */
   titleKey?: string;
@@ -71,36 +79,35 @@ type Column = {
 };
 
 /**
- * Header icon tints — each column family owns one colour so the eye can track
- * a metric group across the grid. Written as literal class strings (never
- * interpolated) so Tailwind's scanner always emits them.
+ * Header glyph tints — each column family owns one colour so the eye can track
+ * a metric group across the grid. Literal class strings (never interpolated) so
+ * Tailwind's scanner always emits them.
  *   indigo  = trip identity      | violet = date
  *   amber   = farm input         | emerald = people
  *   sky     = delivery output    | orange = mortality | rose = weight loss
  */
 const ICON_TONES = {
-  indigo: "bg-indigo-50 text-indigo-600",
-  violet: "bg-violet-50 text-violet-600",
-  amber: "bg-amber-50 text-amber-600",
-  emerald: "bg-emerald-50 text-emerald-600",
-  sky: "bg-sky-50 text-sky-600",
-  orange: "bg-orange-50 text-orange-600",
-  rose: "bg-rose-50 text-rose-600",
+  indigo: "text-indigo-500",
+  violet: "text-violet-500",
+  amber: "text-amber-500",
+  emerald: "text-emerald-500",
+  sky: "text-sky-500",
+  orange: "text-orange-500",
+  rose: "text-rose-500",
 } as const;
 
 type IconTone = keyof typeof ICON_TONES;
 
 /**
  * Every column carries a semantically-correct glyph:
- *   Route = trip  · CalendarDays = date · Warehouse = farm · UserCheck = supervisor
- *   Bird  = live birds           · Weight = a weight figure
- *   Store = shops receiving      · Package = delivered goods
- *   Skull = mortality            · TrendingDown = loss · Percent = percentage
+ *   Hash = trip · Calendar = day · Warehouse = farm · UserCog = supervisor
+ *   Bird = live birds · Scale = a weight figure
+ *   ShoppingBag = shops receiving · TrendDown = loss · Percent = percentage
  */
 const COLUMNS: Column[] = [
-  { key: "expand", label: "" },
-  { key: "tripNo", labelKey: "table.trip_no", icon: RouteIcon, tone: "indigo", sortKey: "tripNo" },
-  { key: "tripDate", labelKey: "common.date", icon: CalendarDays, tone: "violet", sortKey: "tripDate" },
+  { key: "serial", label: "#", align: "center" },
+  { key: "tripNo", labelKey: "table.trip_no", icon: Hash, tone: "indigo", sortKey: "tripNo" },
+  { key: "tripDate", labelKey: "ops.trip.day", icon: Calendar, tone: "violet", sortKey: "tripDate" },
   {
     key: "sourceFarm",
     labelKey: "ops.mortality.col.source_farm",
@@ -109,30 +116,30 @@ const COLUMNS: Column[] = [
     tone: "amber",
     sortKey: "sourceFarm",
   },
-  { key: "supervisorName", labelKey: "common.supervisor", icon: UserCheck, tone: "emerald", sortKey: "supervisorName" },
+  { key: "supervisorName", labelKey: "common.supervisor", icon: UserCog, tone: "emerald", sortKey: "supervisorName" },
   {
     key: "farmBirds",
     labelKey: "ops.mortality.col.farm_birds",
     titleKey: "ops.mortality.kpi.farm_birds",
     icon: Bird,
-    tone: "indigo",
+    tone: "amber",
     sortKey: "farmBirds",
-    align: "right",
+    align: "center",
   },
   {
     key: "farmWeight",
     labelKey: "ops.mortality.col.farm_weight",
     titleKey: "ops.mortality.kpi.farm_weight",
-    icon: Weight,
+    icon: Scale,
     tone: "amber",
     sortKey: "farmWeight",
-    align: "right",
+    align: "center",
   },
   {
     key: "deliveryShops",
     labelKey: "ops.mortality.col.delivery_shops",
     titleKey: "ops.mortality.kpi.delivery_shops",
-    icon: Store,
+    icon: ShoppingBag,
     tone: "sky",
     sortKey: "deliveryShops",
     align: "center",
@@ -144,16 +151,16 @@ const COLUMNS: Column[] = [
     icon: Bird,
     tone: "sky",
     sortKey: "deliveredBirds",
-    align: "right",
+    align: "center",
   },
   {
     key: "deliveredWeight",
     labelKey: "ops.mortality.col.delivery_weight",
     titleKey: "ops.mortality.kpi.delivery_weight",
-    icon: Package,
+    icon: Scale,
     tone: "sky",
     sortKey: "deliveredWeight",
-    align: "right",
+    align: "center",
   },
   {
     key: "mortalityCount",
@@ -162,16 +169,16 @@ const COLUMNS: Column[] = [
     icon: Feather,
     tone: "orange",
     sortKey: "mortalityCount",
-    align: "right",
+    align: "center",
   },
   {
     key: "mortalityWeight",
     labelKey: "ops.mortality.col.mortality_weight",
     titleKey: "ops.mortality.kpi.mortality_weight",
-    icon: Weight,
+    icon: Scale,
     tone: "orange",
     sortKey: "mortalityWeight",
-    align: "right",
+    align: "center",
   },
   {
     key: "weightLoss",
@@ -180,7 +187,7 @@ const COLUMNS: Column[] = [
     icon: TrendingDown,
     tone: "rose",
     sortKey: "weightLoss",
-    align: "right",
+    align: "center",
   },
   {
     key: "weightLossPercentage",
@@ -189,29 +196,31 @@ const COLUMNS: Column[] = [
     icon: Percent,
     tone: "rose",
     sortKey: "weightLossPercentage",
-    align: "right",
+    align: "center",
   },
 ];
 
-const PAGE_SIZE_OPTIONS = [10, 15, 20];
-
-function SortGlyph({ active, dir }: { active: boolean; dir: "asc" | "desc" }) {
-  // Inactive columns still show the up/down pair so every sortable header is
-  // discoverable — but in a muted slate rather than the active emerald.
-  if (!active) return <ArrowUpDown size={12} className="text-slate-400" />;
-  return dir === "asc" ? (
-    <ArrowUp size={12} className="text-emerald-600" />
-  ) : (
-    <ArrowDown size={12} className="text-emerald-600" />
+/** Paired ↑↓ arrows — identical to the Trip List header indicator. */
+function SortArrows({ active, dir }: { active: boolean; dir?: "asc" | "desc" }) {
+  const base = "h-3.5 w-3.5 shrink-0 transition-colors";
+  const on = "text-emerald-600";
+  const off = "text-slate-400 group-hover/sort:text-slate-600";
+  return (
+    <span className="inline-flex shrink-0 items-center gap-0.5" aria-hidden="true">
+      <ArrowUp size={13} strokeWidth={2.7} className={`${base} ${active && dir === "asc" ? on : off}`} />
+      <ArrowDown size={13} strokeWidth={2.7} className={`${base} ${active && dir === "desc" ? on : off}`} />
+    </span>
   );
 }
+
+const alignClass = (align?: Align) =>
+  align === "right" ? "text-right" : align === "center" ? "text-center" : "text-left";
 
 export default function TripLossTable({
   records,
   sort,
   setSort,
   page,
-  totalPages,
   totalRecords,
   pageSize,
   onPageChange,
@@ -221,7 +230,7 @@ export default function TripLossTable({
   filtersApplied = false,
   onReset,
 }: TripLossTableProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
   const toggle = (id: number) =>
@@ -241,72 +250,94 @@ export default function TripLossTable({
     );
   };
 
-  const rangeStart = totalRecords === 0 ? 0 : (page - 1) * pageSize + 1;
-  const rangeEnd = Math.min(page * pageSize, totalRecords);
+  /** Header cell in the Trip List idiom: glyph + label + paired sort arrows. */
+  const sortable = (col: Column) => {
+    const active = Boolean(col.sortKey) && sort.key === col.sortKey;
+    const content = (
+      <>
+        {col.icon && <col.icon size={14} className={`shrink-0 ${col.tone ? ICON_TONES[col.tone] : "text-slate-400"}`} />}
+        <span>{col.labelKey ? t(col.labelKey) : col.label}</span>
+        {col.sortKey && <SortArrows active={active} dir={sort.dir} />}
+      </>
+    );
+    const innerClass = `flex w-full items-center gap-1.5 ${alignClass(col.align)} ${
+      col.align === "center" ? "justify-center" : ""
+    }`;
+
+    if (!col.sortKey) {
+      return (
+        <span className={innerClass} title={col.titleKey ? t(col.titleKey) : undefined}>
+          {content}
+        </span>
+      );
+    }
+
+    return (
+      <button
+        type="button"
+        onClick={() => onSort(col)}
+        title={col.titleKey ? t(col.titleKey) : undefined}
+        aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
+        className={`group/sort ${innerClass} uppercase tracking-wider text-[12px] font-bold transition-colors hover:text-emerald-700 ${
+          active ? "text-emerald-700" : ""
+        }`}
+      >
+        {content}
+      </button>
+    );
+  };
+
   const showEmptyAll = !loading && emptyAll;
   const showEmptyFiltered = !loading && filtersApplied && records.length === 0;
 
   return (
-    <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[1140px] border-collapse text-left">
-          <thead>
-            <tr className="border-b border-slate-200 bg-slate-50/80">
+    <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white text-xs shadow-sm md:text-sm">
+      {/* ── Table header bar — the Trip List surface ─────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-gradient-to-r from-rose-50/60 via-white to-rose-50/40 px-6 py-3">
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-rose-100 bg-rose-50/70 text-rose-500 shadow-inner">
+            <Scale className="h-5 w-5" />
+          </div>
+          <h3 className="text-base font-bold tracking-tight text-slate-800">
+            {t("ops.mortality.section.completed_trips")}
+          </h3>
+        </div>
+        <span className="rounded-full border border-rose-100 bg-rose-50/70 px-2.5 py-1 text-[11px] font-bold tabular-nums text-rose-600">
+          {t("ops.mortality.section.count", { count: formatNumber(totalRecords) })}
+        </span>
+      </div>
+
+      <div className="w-full overflow-x-auto">
+        <table className="min-w-full border-collapse text-left text-[13px]">
+          <thead className="border-b border-slate-200 bg-slate-50/80 text-slate-600">
+            <tr className="whitespace-nowrap">
               {COLUMNS.map((col) => (
                 <th
                   key={col.key}
-                  onClick={() => onSort(col)}
-                  title={col.titleKey ? t(col.titleKey) : undefined}
-                  className={`whitespace-nowrap border-b border-slate-200 px-3 py-3 text-[10px] font-bold uppercase tracking-wider text-slate-500 ${
-                    col.align === "right"
-                      ? "text-right"
-                      : col.align === "center"
-                      ? "text-center"
-                      : "text-left"
-                  } ${col.sortKey ? "cursor-pointer select-none hover:text-slate-700" : ""}`}
-                  aria-sort={
-                    col.sortKey && sort.key === col.sortKey
-                      ? sort.dir === "asc"
-                        ? "ascending"
-                        : "descending"
-                      : undefined
-                  }
+                  className={`px-4 py-4 align-middle text-[12px] font-bold uppercase tracking-wider ${alignClass(col.align)} ${
+                    col.key === "serial" ? "w-16" : ""
+                  }`}
                 >
-                  <span
-                    className={`inline-flex items-center gap-1.5 ${
-                      col.align === "right" ? "flex-row-reverse" : ""
-                    }`}
-                  >
-                    {col.icon && (
-                      <span
-                        className={`inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-md ${
-                          col.tone ? ICON_TONES[col.tone] : "bg-slate-100 text-slate-400"
-                        }`}
-                      >
-                        <col.icon size={11} strokeWidth={2.4} />
-                      </span>
-                    )}
-                    <span>{col.labelKey ? t(col.labelKey) : col.label}</span>
-                    {col.sortKey && <SortGlyph active={sort.key === col.sortKey} dir={sort.dir} />}
-                  </span>
+                  {sortable(col)}
                 </th>
               ))}
             </tr>
           </thead>
 
-          <tbody className="divide-y divide-slate-100 text-[13px]">
+          <tbody className="divide-y divide-slate-100">
             {loading ? (
               <>
-                {[0, 1, 2, 3, 4].map((i) => (
-                  <tr key={`skeleton-${i}`}>
-                    <td colSpan={COLUMNS.length} className="px-3 py-2.5">
+                {[0, 1, 2, 3, 4].map((rowIndex) => (
+                  <tr key={`skeleton-${rowIndex}`}>
+                    <td colSpan={COLUMNS.length} className="px-4 py-4">
                       <div className="h-6 w-full animate-pulse rounded-lg bg-slate-100" />
                     </td>
                   </tr>
                 ))}
                 <tr>
-                  <td colSpan={COLUMNS.length} className="px-3 py-3 text-center">
-                    <span className="animate-pulse text-xs font-semibold uppercase tracking-widest text-slate-400">
+                  <td colSpan={COLUMNS.length} className="px-4 py-2 text-center">
+                    <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-400">
+                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600" aria-hidden="true" />
                       {t("ops.mortality.loading")}
                     </span>
                   </td>
@@ -319,12 +350,8 @@ export default function TripLossTable({
                     <span className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-400">
                       <SearchX size={18} />
                     </span>
-                    <p className="text-[13px] font-semibold text-slate-700">
-                      {t("ops.mortality.empty.title")}
-                    </p>
-                    <p className="max-w-md text-xs text-slate-400">
-                      {t("ops.mortality.empty.hint")}
-                    </p>
+                    <p className="text-[13px] font-semibold text-slate-700">{t("ops.mortality.empty.title")}</p>
+                    <p className="max-w-md text-xs text-slate-400">{t("ops.mortality.empty.hint")}</p>
                   </div>
                 </td>
               </tr>
@@ -338,90 +365,100 @@ export default function TripLossTable({
                     <p className="text-[13px] font-semibold text-slate-700">
                       {t("ops.mortality.empty.filtered_title")}
                     </p>
-                    <p className="max-w-md text-xs text-slate-400">
-                      {t("ops.mortality.empty.hint")}
-                    </p>
+                    <p className="max-w-md text-xs text-slate-400">{t("ops.mortality.empty.hint")}</p>
+                    {onReset && (
+                      <button
+                        type="button"
+                        onClick={onReset}
+                        className="group mt-1 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[12px] font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:text-slate-800"
+                      >
+                        <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]">
+                          <TrendingDown size={13} />
+                        </span>
+                        {t("common.reset")}
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
             ) : (
-              records.map((r) => {
+              records.map((r, index) => {
                 const isOpen = expanded.has(r.tripId);
+                const serialNo = (page - 1) * pageSize + index + 1;
                 return (
                   <Fragment key={r.tripId}>
                     <tr
-                      className={`transition-colors hover:bg-slate-50/70 ${
-                        isOpen ? "bg-slate-50/60" : ""
+                      className={`transition-colors duration-150 hover:bg-slate-50/60 ${
+                        isOpen ? "bg-slate-50/60" : index % 2 === 0 ? "bg-white" : "bg-slate-50/20"
                       }`}
                     >
-                      <td className="px-2 py-2.5">
-                        <button
-                          type="button"
-                          onClick={() => toggle(r.tripId)}
-                          className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-                          aria-label={
-                            isOpen
-                              ? t("ops.mortality.aria.collapse")
-                              : t("ops.mortality.aria.expand")
-                          }
-                          aria-expanded={isOpen}
-                        >
-                          {isOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
-                        </button>
-                      </td>
-
-                      <td className="whitespace-nowrap px-3 py-2.5">
-                        <span className="font-semibold tabular-nums text-slate-800">{r.tripNo}</span>
-                      </td>
-
-                      <td className="whitespace-nowrap px-3 py-2.5 text-slate-600">
-                        {formatDateShort(r.tripDate)}
-                      </td>
-
-                      <td className="max-w-[160px] truncate px-3 py-2.5 font-medium text-slate-700">
-                        {r.sourceFarm || "—"}
-                      </td>
-
-                      <td className="max-w-[150px] truncate px-3 py-2.5 text-slate-600">
-                        {r.supervisorName || "—"}
-                      </td>
-
-                      <td className="px-3 py-2.5 text-right font-medium tabular-nums text-slate-700">
-                        {formatNumber(r.farmBirds)}
-                      </td>
-
-                      <td className="px-3 py-2.5 text-right tabular-nums text-slate-600">
-                        {formatWeight(r.farmWeight)}
-                      </td>
-
-                      <td className="px-3 py-2.5 text-center">
-                        <span className="inline-flex items-center gap-1 rounded-md bg-sky-50 px-2 py-0.5 text-[12px] font-semibold tabular-nums text-slate-700">
-                          <Store size={11} className="text-sky-600" />
-                          {r.deliveryShops}
+                      <td className="w-16 px-4 py-4">
+                        <span className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => toggle(r.tripId)}
+                            className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                            aria-label={isOpen ? t("ops.mortality.aria.collapse") : t("ops.mortality.aria.expand")}
+                            aria-expanded={isOpen}
+                          >
+                            {isOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
+                          </button>
+                          <span className="text-[13px] font-medium tabular-nums text-slate-500">
+                            {formatNumber(serialNo)}
+                          </span>
                         </span>
                       </td>
 
-                      <td className="px-3 py-2.5 text-right font-medium tabular-nums text-sky-700">
+                      <td className="whitespace-nowrap px-4 py-4 font-bold text-indigo-600">{r.tripNo}</td>
+
+                      <td className="whitespace-nowrap px-4 py-4 font-medium text-slate-600">
+                        {formatTripListDay(r.tripDate, language)}
+                      </td>
+
+                      <td className="max-w-[180px] truncate px-4 py-4 font-medium text-slate-700">
+                        {r.sourceFarm || "—"}
+                      </td>
+
+                      <td className="max-w-[160px] truncate px-4 py-4 text-slate-600">
+                        {r.supervisorName || "—"}
+                      </td>
+
+                      <td className="whitespace-nowrap px-4 py-4 text-center font-semibold tabular-nums text-amber-700">
+                        {formatNumber(r.farmBirds)}
+                      </td>
+
+                      <td className="whitespace-nowrap px-4 py-4 text-center tabular-nums text-amber-700">
+                        {formatWeight(r.farmWeight)}
+                      </td>
+
+                      <td className="whitespace-nowrap px-4 py-4 text-center">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-sky-50 px-2 py-0.5 text-[12px] font-semibold tabular-nums text-slate-700">
+                          <Store size={11} className="text-sky-600" />
+                          {formatNumber(r.deliveryShops)}
+                        </span>
+                      </td>
+
+                      <td className="whitespace-nowrap px-4 py-4 text-center font-semibold tabular-nums text-sky-700">
                         {formatNumber(r.deliveredBirds)}
                       </td>
 
-                      <td className="px-3 py-2.5 text-right tabular-nums text-sky-700">
+                      <td className="whitespace-nowrap px-4 py-4 text-center tabular-nums text-sky-700">
                         {formatWeight(r.deliveredWeight)}
                       </td>
 
-                      <td className="px-3 py-2.5 text-right font-medium tabular-nums text-orange-600">
+                      <td className="whitespace-nowrap px-4 py-4 text-center font-semibold tabular-nums text-orange-600">
                         {formatNumber(r.mortalityCount)}
                       </td>
 
-                      <td className="px-3 py-2.5 text-right tabular-nums text-orange-600">
+                      <td className="whitespace-nowrap px-4 py-4 text-center tabular-nums text-orange-600">
                         {formatWeight(r.mortalityWeight)}
                       </td>
 
-                      <td className="px-3 py-2.5 text-right font-semibold tabular-nums text-rose-600">
+                      <td className="whitespace-nowrap px-4 py-4 text-center font-semibold tabular-nums text-rose-600">
                         {formatWeight(r.weightLoss)}
                       </td>
 
-                      <td className="px-3 py-2.5 text-right tabular-nums text-rose-600">
+                      <td className="whitespace-nowrap px-4 py-4 text-center tabular-nums text-rose-600">
                         {r.weightLossPercentage.toFixed(2)}%
                       </td>
                     </tr>
@@ -441,44 +478,21 @@ export default function TripLossTable({
         </table>
       </div>
 
-      {/* GLOBAL PAGINATION — sorts the FULL filtered set, then paginates.
-          When the result set is empty the "Showing …" label renders nothing. */}
-      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50/50 px-3 py-2">
-        <div className="flex flex-wrap items-center gap-3">
-          <p className="text-xs font-medium text-slate-500">
-            {totalRecords === 0
-              ? ""
-              : t("ops.mortality.pagination.showing", {
-                  start: formatNumber(rangeStart),
-                  end: formatNumber(rangeEnd),
-                  total: formatNumber(totalRecords),
-                })}
-          </p>
-
-          <label className="flex items-center gap-1.5 text-xs font-medium text-slate-500">
-            <span className="whitespace-nowrap">{t("ops.mortality.pagination.rows_per_page")}</span>
-            <select
-              value={pageSize}
-              onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              className="cursor-pointer rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-semibold text-slate-700 shadow-sm outline-none transition-colors hover:border-slate-300 focus:border-emerald-400"
-              aria-label={t("ops.mortality.pagination.rows_per_page")}
-            >
-              {PAGE_SIZE_OPTIONS.map((size) => (
-                <option key={size} value={size}>
-                  {size}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-
-        <TripPagination
-          currentPage={page}
-          totalPages={totalPages}
+      {/* GLOBAL PAGINATION — the one pager used by the Trip List and every other
+          module. Hidden for short result sets where paging adds noise. */}
+      {shouldShowPagination(totalRecords) && (
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          totalItems={totalRecords}
           onPageChange={onPageChange}
-          hidePageInfo
+          onPageSizeChange={(size) => {
+            onPageSizeChange(size);
+            onPageChange(1);
+          }}
+          disabled={loading}
         />
-      </div>
+      )}
     </div>
   );
 }

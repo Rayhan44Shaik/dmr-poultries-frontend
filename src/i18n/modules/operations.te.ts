@@ -915,9 +915,11 @@ export default {
   'ops.mortality.filter.all_farms': 'అన్ని ఫారాలు',
   'ops.mortality.filter.all_supervisors': 'అన్ని సూపర్వైజర్లు',
   'ops.mortality.filter.search_placeholder': 'ట్రిప్, ఫారం, సూపర్వైజర్...',
+  'ops.mortality.filter.pending_changes': '{count} ఫిల్టర్ మార్పులు — వర్తించడానికి Search నొక్కండి',
 
   // Section heading
   'ops.mortality.section.completed_trips': 'పూర్తయిన ట్రిప్పులు',
+  'ops.mortality.section.count': '{count} ట్రిప్పులు',
 
   // KPI cards
   'ops.mortality.kpi.completed_trips': 'పూర్తయిన ట్రిప్పులు',
