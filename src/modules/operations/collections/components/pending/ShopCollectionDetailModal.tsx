@@ -41,7 +41,6 @@ import { shouldShowPagination } from "../../../../../shared/ui/paginationStyles"
 import { KpiCardGrid, Pagination, type KpiCardItem } from "../../../../../ui";
 import AppShellModal from "../../../../../ui/AppShellModal";
 import { ViewLanguageToggle } from "../../../../../ui/ViewLanguageToggle";
-import { ActionTooltip } from "../../../../../ui/ActionTooltip";
 import { ScopedI18nProvider, useI18n } from "../../../../../i18n";
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocalization";
@@ -356,7 +355,6 @@ function ShopCollectionDetailView({
       id: "outstanding",
       label: t("ops.collection.current_outstanding"),
       value: <span className="tabular-nums">{outstanding}</span>,
-      tooltip: `${t("ops.collection.current_outstanding")}: ${outstanding}`,
       Icon: IndianRupee,
       tone: "rose",
     },
@@ -364,7 +362,6 @@ function ShopCollectionDetailView({
       id: "collections",
       label: t("ops.collection.total_collections"),
       value: <span className="tabular-nums">{collectionsValue}</span>,
-      tooltip: `${t("ops.collection.total_collections")}: ${collectionsValue}`,
       Icon: Wallet,
       tone: "emerald",
     },
@@ -372,7 +369,6 @@ function ShopCollectionDetailView({
       id: "last",
       label: t("ops.collection.last_collection"),
       value: <span className="text-base">{formatDate(lastCollectionDate)}</span>,
-      tooltip: `${t("ops.collection.last_collection")}: ${formatDate(lastCollectionDate)}`,
       Icon: Calendar,
       tone: "blue",
     },
@@ -440,7 +436,6 @@ function ShopCollectionDetailView({
                 type="button"
                 onClick={() => onNavigateShop(-1)}
                 disabled={!canGoPrev}
-                title={t("ops.collection.previous_shop")}
                 aria-label={t("ops.collection.previous_shop")}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition-all hover:bg-emerald-50 hover:text-emerald-600 active:scale-95 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent"
               >
@@ -455,7 +450,6 @@ function ShopCollectionDetailView({
                 type="button"
                 onClick={() => onNavigateShop(1)}
                 disabled={!canGoNext}
-                title={t("ops.collection.next_shop")}
                 aria-label={t("ops.collection.next_shop")}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-full text-slate-500 transition-all hover:bg-emerald-50 hover:text-emerald-600 active:scale-95 disabled:cursor-not-allowed disabled:text-slate-300 disabled:hover:bg-transparent"
               >
@@ -470,7 +464,6 @@ function ShopCollectionDetailView({
             tone="emerald"
             labelMode="target"
             ariaLabel={t("ops.trip.popup_language_toggle")}
-            tooltip={<ActionTooltip label={t("ops.trip.popup_language_tooltip")} side="bottom" />}
           />
           <button
             type="button"
@@ -662,7 +655,7 @@ function ShopCollectionDetailView({
                               {startIndex + index + 1}
                             </td>
                             <td className={`${CELL_PADDING_X} py-3 text-xs font-medium tabular-nums text-slate-700`}>
-                              <span className="block truncate" title={col.collectionNo || "-"}>
+                              <span className="block truncate">
                                 {col.collectionNo || "-"}
                               </span>
                             </td>
@@ -678,7 +671,7 @@ function ShopCollectionDetailView({
                               </span>
                             </td>
                             <td className={`${CELL_PADDING_X} py-3 text-xs font-medium text-slate-600`}>
-                              <span className="block truncate" title={col.collector || "-"}>
+                              <span className="block truncate">
                                 {localizeTripViewText(col.collector || "-", language)}
                               </span>
                             </td>
@@ -706,7 +699,6 @@ function ShopCollectionDetailView({
                                       })
                                     }
                                     disabled={!canDelete || isCounting || isCommitting}
-                                    title={deleteHint}
                                     aria-label={`${t("ops.collection.delete_collection")} — ${deleteHint}`}
                                     className="group inline-flex h-8 w-8 items-center justify-center rounded-xl border border-rose-100 bg-rose-50 text-rose-500 shadow-sm transition-all hover:bg-rose-500 hover:text-white active:scale-95 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-50 disabled:text-slate-300 disabled:shadow-none disabled:hover:bg-slate-50 disabled:hover:text-slate-300"
                                   >

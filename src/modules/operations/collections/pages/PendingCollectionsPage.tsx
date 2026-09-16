@@ -18,22 +18,22 @@ import PendingCollectionsSummary from "../components/pending/PendingCollectionsS
 import PendingCollectionsTable from "../components/pending/PendingCollectionsTable";
 import { Pagination } from "../../../../ui";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
+import { todayBusinessDate, weekRange } from "../../../../utils/businessDate";
 import { useI18n } from "../../../../i18n";
 
+/**
+ * The default window: THIS week, Monday → Sunday.
+ *
+ * It reads the shared business-date helper rather than formatting dates by
+ * hand. The old hand-rolled version ran the dates through `toISOString()`,
+ * which converts to UTC: a Monday 00:00 IST becomes the Sunday before it, so
+ * the page opened on a Sunday → Sunday range (eight days, the wrong week's
+ * start) without anyone touching a filter. `weekRange()` works in local
+ * business dates, so Monday is Monday.
+ */
 const getCurrentWeekRange = (): { fromDate: string; toDate: string } => {
-  const today = new Date();
-  const day = today.getDay();
-  const diffToMonday = day === 0 ? -6 : 1 - day;
-  const monday = new Date(today);
-  monday.setDate(today.getDate() + diffToMonday);
-  monday.setHours(0, 0, 0, 0);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  sunday.setHours(23, 59, 59, 999);
-  return {
-    fromDate: monday.toISOString().split("T")[0],
-    toDate: sunday.toISOString().split("T")[0],
-  };
+  const { from, to } = weekRange();
+  return { fromDate: from, toDate: to };
 };
 
 const DEFAULT_PAGE_SIZE = 15;
@@ -146,6 +146,24 @@ export default function PendingCollectionsPage() {
   }, [loadData]);
 
   /**
+   * The day the backend summary is read FOR: the applied To Date, never later
+   * than today.
+   *
+   * The default window ends on Sunday, so for most of the week the To Date is
+   * still ahead of us. The summary answers "how many days has this shop been
+   * sitting on its dues AS OF <date>", so reading it for a future date made
+   * every shop overdue by the distance to Sunday — today's payers showed as
+   * "4 days overdue" and the cumulative counted all 128 rows as overdue. The
+   * overdue column, the chip in the cumulative row and the row balances now
+   * all answer for today, while the weekly figures stay the week's own.
+   */
+  const summaryAsOfDate = useCallback(() => {
+    const today = todayBusinessDate();
+    if (!appliedToDate) return today;
+    return appliedToDate < today ? appliedToDate : today;
+  }, [appliedToDate]);
+
+  /**
    * Approving or deleting a collection anywhere moves the balance this page
    * reports. Re-reading the register keeps the rows and the KPI strip honest
    * without a manual refresh; `useShops` re-reads the shop side of the same
@@ -160,7 +178,7 @@ export default function PendingCollectionsPage() {
         // too — an approval must move these figures immediately.
         if (!appliedToDate) return;
         void collectionService
-          .fetchPendingSummary(appliedToDate)
+          .fetchPendingSummary(summaryAsOfDate())
           .then((payload) => {
             setPendingSummaryRows(payload.shops);
           })
@@ -168,7 +186,7 @@ export default function PendingCollectionsPage() {
             /* keep the last good summary rather than blanking the table */
           });
       }),
-    [loadData, appliedToDate],
+    [loadData, appliedToDate, summaryAsOfDate],
   );
 
   // Initialize default date range (current week Mon-Sun)
@@ -216,14 +234,14 @@ export default function PendingCollectionsPage() {
   useEffect(() => {
     if (!appliedFromDate || !appliedToDate) return;
     setSummaryLoading(true);
-    void collectionService.fetchPendingSummary(appliedToDate).then((payload) => {
+    void collectionService.fetchPendingSummary(summaryAsOfDate()).then((payload) => {
       setPendingSummaryRows(payload.shops);
     }).catch(() => {
       setPendingSummaryRows([]);
     }).finally(() => {
       setSummaryLoading(false);
     });
-  }, [appliedFromDate, appliedToDate]);
+  }, [appliedFromDate, appliedToDate, summaryAsOfDate]);
 
 // Build the complete report from ALL shops + backend data
   const reportData = useMemo((): PendingReportRow[] => {
@@ -355,9 +373,19 @@ export default function PendingCollectionsPage() {
   const totalOutstanding = filteredData.reduce((sum, s) => sum + s.balance, 0);
   const totalWeeklySales = filteredData.reduce((sum, s) => sum + s.weeklySales, 0);
   const totalWeeklyCollections = filteredData.reduce((sum, s) => sum + s.weeklyApprovedCollections, 0);
-  const avgRecovery = filteredData.length > 0
-    ? filteredData.reduce((sum, s) => sum + s.recoveryPercentage, 0) / filteredData.length
-    : 0;
+  /**
+   * Recovery for the strip: approved collections ÷ sales, over exactly the
+   * rows on screen — the same formula the backend's `totals.recoveryPercentage`
+   * and the dashboard's collection-performance card use.
+   *
+   * It used to be the MEAN of each shop's own percentage, and that is what made
+   * the KPI impossible to reconcile: 90 of the 128 shops in the default week
+   * collected against older dues while selling nothing this week, every one of
+   * them reading 0%, so the average landed on 49.9% beside ₹14,60,000 collected
+   * on ₹4,74,014 of sales. Dividing the two figures the strip already shows
+   * gives the honest 308.01% for the same rows.
+   */
+  const overallRecovery = totalWeeklySales > 0 ? (totalWeeklyCollections / totalWeeklySales) * 100 : 0;
 
   /**
    * The cumulative that closes the table. Summed over `filteredData` — the
@@ -375,11 +403,11 @@ export default function PendingCollectionsPage() {
       balance: totalOutstanding,
       weeklySales: totalWeeklySales,
       weeklyApprovedCollections: totalWeeklyCollections,
-      recoveryPercentage: avgRecovery,
+      recoveryPercentage: overallRecovery,
       lastCollectionDate: collectionDates.length > 0 ? collectionDates[collectionDates.length - 1] : null,
       overdueShops: filteredData.filter((row) => (row.overdueDays ?? 0) > 0).length,
     };
-  }, [filteredData, totalOutstanding, totalWeeklySales, totalWeeklyCollections, avgRecovery]);
+  }, [filteredData, totalOutstanding, totalWeeklySales, totalWeeklyCollections, overallRecovery]);
 
   /** Header click: ascending → descending → back to the register order. */
   const handleSortChange = useCallback((key: PendingShopSortKey) => {
@@ -444,7 +472,7 @@ export default function PendingCollectionsPage() {
       setAllCollections(all);
       if (appliedFromDate && appliedToDate) {
         try {
-          const payload = await collectionService.fetchPendingSummary(appliedToDate);
+          const payload = await collectionService.fetchPendingSummary(summaryAsOfDate());
           setPendingSummaryRows(payload.shops);
         } catch {
           // Keep prior summaries if refetch fails
@@ -510,7 +538,7 @@ export default function PendingCollectionsPage() {
         totalOutstanding={totalOutstanding}
         weeklySales={totalWeeklySales}
         weeklyCollections={totalWeeklyCollections}
-        weeklyRecovery={avgRecovery}
+        recoveryPercentage={overallRecovery}
         isLoading={firstLoad}
       />
 

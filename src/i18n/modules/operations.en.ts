@@ -135,6 +135,7 @@ export default {
   'ops.collection.recent_collections': 'Recent Collections',
   'ops.collection.recent_transactions': 'Recent Transactions',
   'ops.collection.recovery_pct': 'Recovery %',
+  'ops.collection.recovery_formula': 'Recovery % (collections ÷ sales)',
   'ops.collection.refreshed': 'Refreshed.',
   'ops.collection.rejected_success': 'Collection rejected successfully.',
   'ops.collection.reloaded': 'Data reloaded.',

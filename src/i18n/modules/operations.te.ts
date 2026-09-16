@@ -135,6 +135,7 @@ export default {
   'ops.collection.recent_collections': 'ఇటీవలి కలెక్షన్లు',
   'ops.collection.recent_transactions': 'ఇటీవలి లావాదేవీలు',
   'ops.collection.recovery_pct': 'రికవరీ %',
+  'ops.collection.recovery_formula': 'రికవరీ % (కలెక్షన్లు ÷ అమ్మకాలు)',
   'ops.collection.refreshed': 'రిఫ్రెష్ చేయబడింది.',
   'ops.collection.rejected_success': 'కలెక్షన్ విజయవంతంగా తిరస్కరించబడింది.',
   'ops.collection.reloaded': 'డేటా మళ్లీ లోడ్ చేయబడింది.',

@@ -7,7 +7,9 @@ interface Props {
   totalOutstanding: number;
   weeklySales: number;
   weeklyCollections: number;
-  weeklyRecovery: number;
+  /** Approved collections ÷ sales, as a percentage (the figure in `weeklyCollections`
+   *  over the figure in `weeklySales` — never an average of per-shop percentages). */
+  recoveryPercentage: number;
   isLoading?: boolean;
 }
 
@@ -15,16 +17,20 @@ interface Props {
  * Pending Collections KPI strip — the Trip List KPI surface, tone for tone.
  *
  * Rendered through the shared `KpiCardGrid`, so the cards are the same object
- * here as on the Trip List: pastel tone, icon tile, coloured value, accent bar
- * and the exact figure on hover. Money reads as the full rupee figure in the
- * Indian grouping (`₹1,48,74,969.98`) — digits and ₹ only, so the strip stays
- * readable in Telugu too.
+ * here as on the Trip List: pastel tone, icon tile, coloured value and accent
+ * bar. Money reads as the full rupee figure in the Indian grouping
+ * (`₹1,48,74,969.98`) — digits and ₹ only, so the strip stays readable in
+ * Telugu too.
+ *
+ * NOTHING on this strip is a hover tooltip. Every figure is the whole figure,
+ * written out, and the one number that could be read two ways — recovery — says
+ * its own formula in its label.
  */
 function PendingCollectionsSummary({
   totalOutstanding,
   weeklySales,
   weeklyCollections,
-  weeklyRecovery,
+  recoveryPercentage,
   isLoading = false,
 }: Props) {
   const { t } = useI18n();
@@ -45,14 +51,13 @@ function PendingCollectionsSummary({
   const outstanding = inr(totalOutstanding);
   const sales = inr(weeklySales);
   const collections = inr(weeklyCollections);
-  const recovery = `${Number(weeklyRecovery || 0).toFixed(2)}%`;
+  const recovery = `${Number(recoveryPercentage || 0).toFixed(2)}%`;
 
   const cards: KpiCardItem[] = [
     {
       id: "outstanding",
       label: t("ops.collection.total_outstanding"),
       value: <span className="tabular-nums">{outstanding}</span>,
-      tooltip: `${t("ops.collection.total_outstanding")}: ${outstanding}`,
       Icon: IndianRupee,
       tone: "rose",
     },
@@ -60,7 +65,6 @@ function PendingCollectionsSummary({
       id: "sales",
       label: t("ops.collection.this_week_sales"),
       value: <span className="tabular-nums">{sales}</span>,
-      tooltip: `${t("ops.collection.this_week_sales")}: ${sales}`,
       Icon: ShoppingBag,
       tone: "blue",
     },
@@ -68,15 +72,13 @@ function PendingCollectionsSummary({
       id: "collections",
       label: t("ops.collection.this_week_collections"),
       value: <span className="tabular-nums">{collections}</span>,
-      tooltip: `${t("ops.collection.this_week_collections")}: ${collections}`,
       Icon: CreditCard,
       tone: "emerald",
     },
     {
       id: "recovery",
-      label: t("ops.collection.recovery_pct"),
+      label: t("ops.collection.recovery_formula"),
       value: <span className="tabular-nums">{recovery}</span>,
-      tooltip: `${t("ops.collection.recovery_pct")}: ${recovery}`,
       Icon: TrendingUp,
       tone: "violet",
     },

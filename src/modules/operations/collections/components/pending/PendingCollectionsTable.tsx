@@ -303,7 +303,6 @@ function PendingCollectionsTable({
                       <td className="px-3.5 py-3 text-center">
                         <button
                           onClick={(e) => { e.stopPropagation(); onView(shop.shopName); }}
-                          title={t("ops.collection.view_details")}
                           aria-label={t("ops.collection.view_details")}
                           className="inline-flex h-8 w-8 items-center justify-center rounded-lg text-blue-600 hover:bg-blue-50 transition"
                         >
@@ -334,12 +333,11 @@ function PendingCollectionsTable({
                   </td>
                   <td className="px-3.5 py-3 text-right tabular-nums text-blue-700">{money(overall.weeklySales)}</td>
                   <td className="px-3.5 py-3 text-right tabular-nums text-green-700">{money(overall.weeklyApprovedCollections)}</td>
-                  <td className="px-3.5 py-3 text-right tabular-nums text-purple-700">{overall.recoveryPercentage.toFixed(1)}%</td>
+                  <td className="px-3.5 py-3 text-right tabular-nums text-purple-700">{overall.recoveryPercentage.toFixed(2)}%</td>
                   <td className="px-3.5 py-3 text-center tabular-nums text-slate-700">{formatDate(overall.lastCollectionDate)}</td>
                   <td className="px-3.5 py-3 text-center">
                     {overall.overdueShops > 0 ? (
                       <span
-                        title={`${overall.overdueShops} ${t("ops.collection.shops_overdue")}`}
                         className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 text-[11px] font-bold text-red-600"
                       >
                         {overall.overdueShops} {t("ops.collection.shops_overdue")}
