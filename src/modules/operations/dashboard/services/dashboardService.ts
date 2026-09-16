@@ -90,6 +90,12 @@ export interface DashboardData {
   usedHelpers: number;
   usedShops: number;
   usedFarms: number;
+  /**
+   * Active-out-of-total per register behind the Active Fleet panel. Present
+   * whenever the masters API answered (sample server or real backend); the
+   * panel falls back to the legacy active-only API counters when it is not.
+   */
+  fleetCounts?: DashboardFleetCounts;
   /** Non-null only when these numbers came from the quarter sample API. */
   sampleQuarter: SampleQuarter | null;
 }
@@ -117,6 +123,87 @@ interface DashboardPendingLookupRow {
   shopId?: number;
   shopName: string;
   currentPending: number;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Active Fleet register counts — ACTIVE out of the WHOLE register     */
+/* ------------------------------------------------------------------ */
+/** One register's headcount split: how many are Active out of every row. */
+export interface RegisterCount {
+  active: number;
+  total: number;
+}
+
+/**
+ * The Active Fleet panel's truth table: Shops and Vehicles from their masters
+ * (Inactive rows included, so "192 / 200" means the full register, not just
+ * the active subset), and the four crew registers grouped from the employee
+ * master's department (farms are intentionally not part of this panel).
+ */
+export interface DashboardFleetCounts {
+  shops: RegisterCount;
+  vehicles: RegisterCount;
+  drivers: RegisterCount;
+  supervisors: RegisterCount;
+  helpers: RegisterCount;
+  loaders: RegisterCount;
+}
+
+/** Count rows and their Active share. A master stores only Active/Inactive. */
+function registerCount(rows: readonly Record<string, unknown>[]): RegisterCount {
+  return {
+    total: rows.length,
+    active: rows.filter((row) => row.status === "Active").length,
+  };
+}
+
+/** Crew headcount for one department, tolerating "Driver"/"Drivers" either way. */
+function crewCount(rows: readonly Record<string, unknown>[], department: string): RegisterCount {
+  const want = department.toLowerCase();
+  const subset = rows.filter((row) => {
+    const dept = String(row.department ?? row.role ?? "").trim().toLowerCase();
+    return dept === want || `${dept}s` === want || dept === `${want}s`;
+  });
+  return registerCount(subset);
+}
+
+/** Assemble the six register counts from the already-fetched master rows. */
+function buildFleetCounts(
+  shops: readonly DashboardShopLookupRow[],
+  vehicles: readonly Record<string, unknown>[],
+  employees: readonly Record<string, unknown>[],
+): DashboardFleetCounts {
+  return {
+    shops: {
+      total: shops.length,
+      active: shops.filter((shop) => shop.shopStatus === "Active").length,
+    },
+    vehicles: registerCount(vehicles),
+    drivers: crewCount(employees, "Driver"),
+    supervisors: crewCount(employees, "Supervisor"),
+    helpers: crewCount(employees, "Helper"),
+    loaders: crewCount(employees, "Loader"),
+  };
+}
+
+/** Raw vehicle master rows (only `status` matters for the register split). */
+async function fetchDashboardVehicles(): Promise<Record<string, unknown>[]> {
+  try {
+    const { data } = await apiGet<Record<string, unknown>[]>("/masters/vehicles");
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Raw employee master rows (`department` + `status` drive the crew counts). */
+async function fetchDashboardEmployees(): Promise<Record<string, unknown>[]> {
+  try {
+    const { data } = await apiGet<Record<string, unknown>[]>("/masters/employees");
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
 }
 
 const shopLookupKey = (shopName: string): string => shopName.trim().toLocaleLowerCase("en-IN");
@@ -225,12 +312,14 @@ function enrichCollectionPerformanceRows(
 }
 
 async function enrichOperationsDashboardData(data: DashboardData): Promise<DashboardData> {
-  const [shops, pendingRows] = await Promise.all([
+  const [shops, pendingRows, vehicles, employees] = await Promise.all([
     fetchDashboardShops(),
     fetchDashboardPendingCollections(),
+    fetchDashboardVehicles(),
+    fetchDashboardEmployees(),
   ]);
 
-  if (shops.length === 0 && pendingRows.length === 0) return data;
+  if (shops.length === 0 && pendingRows.length === 0 && vehicles.length === 0 && employees.length === 0) return data;
 
   return {
     ...data,
@@ -239,6 +328,11 @@ async function enrichOperationsDashboardData(data: DashboardData): Promise<Dashb
       shops,
       pendingRows,
     ),
+    // The Active Fleet panel keeps a register-wide truth even on narrow date
+    // windows: a master count never changes because the calendar moved.
+    ...(shops.length > 0 || vehicles.length > 0 || employees.length > 0
+      ? { fleetCounts: buildFleetCounts(shops, vehicles, employees) }
+      : {}),
   };
 }
 

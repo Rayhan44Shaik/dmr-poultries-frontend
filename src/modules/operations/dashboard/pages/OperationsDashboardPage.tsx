@@ -957,17 +957,25 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
           <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.active_ecosystem")}</span>
           <h3 className="text-sm font-black text-slate-800 mt-0.5">{t("ops.dashboard.active_fleet")}</h3>
         </div>
+        {/* Active out of the WHOLE register (inactive rows included) for
+            Shops · Vehicles · Drivers · Supervisors · Helpers · Loaders.
+            When the masters register could not be read, fall back to the
+            dashboard API's own active counters so the panel never blanks. */}
         <ActiveCounts
-          vehicles={data?.activeVehicles || 0}
-          drivers={data?.activeDrivers || 0}
-          helpers={data?.activeHelpers || 0}
-          shops={data?.totalShops || 0}
-          farms={data?.totalFarms || 0}
-          usedVehicles={data?.usedVehicles || 0}
-          usedDrivers={data?.usedDrivers || 0}
-          usedHelpers={data?.usedHelpers || 0}
-          usedShops={data?.usedShops || 0}
-          usedFarms={data?.usedFarms || 0}
+          counts={{
+            shops: data.fleetCounts?.shops ?? { active: data?.totalShops ?? 0, total: data?.totalShops ?? 0 },
+            vehicles: data.fleetCounts?.vehicles ?? { active: data?.activeVehicles ?? 0, total: data?.activeVehicles ?? 0 },
+            drivers: data.fleetCounts?.drivers ?? { active: data?.activeDrivers ?? 0, total: data?.activeDrivers ?? 0 },
+            supervisors: data.fleetCounts?.supervisors ?? { active: 0, total: 0 },
+            helpers: data.fleetCounts?.helpers ?? { active: data?.activeHelpers ?? 0, total: data?.activeHelpers ?? 0 },
+            loaders: data.fleetCounts?.loaders ?? { active: 0, total: 0 },
+          }}
+          used={{
+            shops: data?.usedShops ?? 0,
+            vehicles: data?.usedVehicles ?? 0,
+            drivers: data?.usedDrivers ?? 0,
+            helpers: data?.usedHelpers ?? 0,
+          }}
         />
       </div>
     </div>
