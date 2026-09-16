@@ -9,23 +9,24 @@ import type {
 } from "../services/dashboardService";
 
 /**
- * Active Fleet — span-scoped roster tiles. Only the people and vehicles that
- * actually ran a trip inside the selected date window are counted (the panel
- * below the "Active Fleet" heading names the same span); the active masters
- * register rides along as the small "of N active" denominator for context.
- * Tiles: Vehicles, Drivers, Supervisors, Helpers, Loaders — shops are
- * deliberately not part of this panel.
+ * Active Fleet — span-scoped roster tiles with INLINE lists (no tooltips).
+ * Only the people and vehicles that actually ran a trip inside the selected
+ * date window are counted (the line under the "Active Fleet" heading names
+ * the same span); the active masters register rides along as the small
+ * "of N active" denominator for context. Tiles: Vehicles, Drivers,
+ * Supervisors, Helpers, Loaders — shops are deliberately not part of it.
  *
- * Two ways to read the roster, both staying inside the panel:
- *  - HOVER/FOCUS a tile → an overlay rendered strictly INSIDE the tile lists
- *    who ran in the span, busiest first, with trips / shops / farms / kg.
- *  - CLICK a tile (e.g. Active Loaders) → a details panel opens BELOW the
- *    tiles: the selected register's worked list, then a divider, then the
- *    "did not run in this range" members as a one-by-one HORIZONTAL scroll
- *    line. Selecting the tile again closes the panel; selecting another
- *    register switches it. Register-Inactive (out of service) members carry
- *    an "Inactive" badge, so they are never confused with actives that were
- *    merely idle in the window.
+ * Directly below the tiles the ACTIVE (worked) lists of the whole fleet are
+ * always on screen — one column per register, busiest first, each row with
+ * its per-span detail (trips / shops delivered / farms covered / kg hauled).
+ * No hover or focus is needed to read them.
+ *
+ * CLICK a tile (e.g. Active Loaders) → the register's "did not run in this
+ * range" members appear below the active lists as a one-by-one HORIZONTAL
+ * scroll line; selecting the tile again closes it, selecting another
+ * register switches it. Register-Inactive (out of service) members carry an
+ * "Inactive" badge, so they are never confused with actives that were
+ * merely idle in the window.
  */
 interface ActiveCountsProps {
   rosters: DashboardSpanFleet;
@@ -53,7 +54,7 @@ const EMPTY: SpanFleetRoster = { worked: 0, activeTotal: 0, items: [], overflow:
 
 export default function ActiveCounts({ rosters }: ActiveCountsProps) {
   const { t } = useI18n();
-  /** Selected tile drives the details panel; clicking it again closes it. */
+  /** Selected tile drives the idle line; clicking it again closes it. */
   const [selected, setSelected] = useState<RosterKey | null>(null);
 
   /** Per-span detail for one participant, shaped by what the register knows. */
@@ -92,7 +93,7 @@ export default function ActiveCounts({ rosters }: ActiveCountsProps) {
               onClick={() => setSelected(isSelected ? null : tile.key)}
               aria-pressed={isSelected}
               aria-label={`${registerLabel}: ${stat.activeTotal > 0 ? `${stat.worked} / ${stat.activeTotal}` : stat.worked}`}
-              className={`group relative flex flex-col items-center p-3 rounded-xl border transition-shadow outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 ${
+              className={`flex flex-col items-center p-3 rounded-xl border transition-shadow outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 ${
                 isSelected
                   ? "border-emerald-300 bg-emerald-50/40 shadow-md"
                   : "border-slate-100 hover:shadow-md"
@@ -122,143 +123,107 @@ export default function ActiveCounts({ rosters }: ActiveCountsProps) {
                   style={{ width: `${Math.min(percent, 100)}%` }}
                 />
               </div>
-
-              {/* ── Span-roster overlay rendered INSIDE the tile on hover/focus
-                    (absolute inset — it can never grow outside the tile) ─────── */}
-              <div
-                role="tooltip"
-                aria-hidden="true"
-                className="pointer-events-none invisible absolute inset-0 z-10 flex flex-col overflow-hidden rounded-xl border border-slate-200 bg-white/95 p-2 text-left text-[10px] text-slate-500 opacity-0 shadow-lg backdrop-blur-[1px] transition-opacity duration-150 group-hover:visible group-hover:opacity-100 group-focus-visible:visible group-focus-visible:opacity-100"
-              >
-                <div className="flex shrink-0 min-w-0 items-center justify-between gap-1.5 border-b border-slate-100 pb-1">
-                  <span className="truncate text-[11px] font-bold text-slate-800">
-                    {registerLabel}
-                  </span>
-                  <span
-                    className={`shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-black tabular-nums ring-1 ring-inset ${
-                      stat.worked > 0
-                        ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
-                        : "bg-slate-50 text-slate-500 ring-slate-100"
-                    }`}
-                  >
-                    {t("ops.dashboard.on_trips_count", { count: stat.worked })}
-                  </span>
-                </div>
-
-                {stat.items.length > 0 ? (
-                  <ul className="mt-1 min-h-0 flex-1 space-y-1 overflow-y-auto pr-0.5">
-                    {stat.items.map((item) => (
-                      <li key={`${tile.key}-${item.name}`} className="flex items-start gap-1.5">
-                        <span aria-hidden="true" className="mt-[4.5px] h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
-                        <span className="min-w-0">
-                          <span className="block truncate font-semibold text-slate-700">
-                            {item.name}
-                          </span>
-                          <span className="block truncate tabular-nums text-slate-400">
-                            {participantDetail(tile.key, item)}
-                          </span>
-                        </span>
-                      </li>
-                    ))}
-                    {stat.overflow > 0 && (
-                      <li className="pt-0.5 text-center font-bold text-slate-400">
-                        {t("ops.dashboard.more_items", { count: stat.overflow })}
-                      </li>
-                    )}
-                  </ul>
-                ) : (
-                  <p className="mt-1 flex min-h-0 flex-1 items-center justify-center text-center text-slate-400">
-                    {t("ops.dashboard.no_trips_range")}
-                  </p>
-                )}
-              </div>
             </button>
           );
         })}
       </div>
 
-      {/* ── Selected-register details: worked list, then the one-by-one
-            HORIZONTAL line of who did not run in this range ────────────────── */}
+      {/* ── The ACTIVE (worked-in-span) lists of the whole fleet, always
+            on screen below the tiles — one column per register, busiest
+            first. No tooltip: the lists ARE the details. ───────────────────── */}
+      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 border-t border-slate-100 pt-3">
+        {TILES.map((tile) => {
+          const stat: SpanFleetRoster = rosters[tile.key] ?? EMPTY;
+          const registerLabel = t(`ops.dashboard.active_${tile.key}`);
+          return (
+            <div key={`list-${tile.key}`} className="min-w-0">
+              <div className="flex items-center justify-between gap-1.5 border-b border-slate-100 pb-1">
+                <span className="truncate text-[11px] font-bold text-slate-800">{registerLabel}</span>
+                <span
+                  className={`shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-black tabular-nums ring-1 ring-inset ${
+                    stat.worked > 0
+                      ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
+                      : "bg-slate-50 text-slate-500 ring-slate-100"
+                  }`}
+                >
+                  {t("ops.dashboard.on_trips_count", { count: stat.worked })}
+                </span>
+              </div>
+              {stat.items.length > 0 ? (
+                <ul className="mt-1.5 max-h-48 space-y-1 overflow-y-auto pr-0.5 text-[10px] text-slate-500">
+                  {stat.items.map((item) => (
+                    <li key={`${tile.key}-${item.name}`} className="flex items-start gap-1.5">
+                      <span aria-hidden="true" className="mt-[4.5px] h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
+                      <span className="min-w-0">
+                        <span className="block truncate font-semibold text-slate-700">
+                          {item.name}
+                        </span>
+                        <span className="block truncate tabular-nums text-slate-400">
+                          {participantDetail(tile.key, item)}
+                        </span>
+                      </span>
+                    </li>
+                  ))}
+                  {stat.overflow > 0 && (
+                    <li className="pt-0.5 text-center font-bold text-slate-400">
+                      {t("ops.dashboard.more_items", { count: stat.overflow })}
+                    </li>
+                  )}
+                </ul>
+              ) : (
+                <p className="mt-1.5 text-[10px] text-slate-400">
+                  {t("ops.dashboard.no_trips_range")}
+                </p>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      {/* ── Selected register's "did not run in this range" line — chips in a
+            one-by-one HORIZONTAL scroll row, toggled by the tile click ────── */}
       {selected && selectedRoster && (
-        <div className="mt-4 rounded-xl border border-slate-100 bg-slate-50/60 p-3.5">
+        <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3.5">
           <div className="flex items-center justify-between gap-2">
-            <h4 className="text-[11.5px] font-black text-slate-800 truncate">
-              {selectedLabel}
-            </h4>
-            <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-black tabular-nums text-emerald-700 ring-1 ring-inset ring-emerald-100">
-              {t("ops.dashboard.on_trips_count", { count: selectedRoster.worked })}
+            <span className="truncate text-[10.5px] font-bold text-slate-500">
+              {selectedLabel} · {t("ops.dashboard.idle_list")}
+            </span>
+            <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black tabular-nums text-slate-500 ring-1 ring-inset ring-slate-200/70">
+              {idleTotal}
             </span>
           </div>
 
-          {selectedRoster.items.length > 0 ? (
-            <ul className="mt-2 grid max-h-48 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-4 gap-y-1.5 overflow-y-auto pr-1 text-[10.5px]">
-              {selectedRoster.items.map((item) => (
-                <li key={`panel-${selected}-${item.name}`} className="flex items-start gap-1.5">
-                  <span aria-hidden="true" className="mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
-                  <span className="min-w-0">
-                    <span className="block truncate font-semibold text-slate-700">
-                      {item.name}
-                    </span>
-                    <span className="block truncate tabular-nums text-slate-400">
-                      {participantDetail(selected, item)}
-                    </span>
+          {selectedRoster.idle.length > 0 ? (
+            <ul className="mt-1.5 flex gap-2 overflow-x-auto pb-1">
+              {selectedRoster.idle.map((item) => (
+                <li
+                  key={`idle-${selected}-${item.name}`}
+                  className="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] shadow-sm"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <span className="truncate font-semibold text-slate-700">{item.name}</span>
+                    {item.registerInactive && (
+                      <span className="shrink-0 rounded-full bg-rose-50 px-1.5 py-px text-[9px] font-black text-rose-600 ring-1 ring-inset ring-rose-100">
+                        {t("common.inactive")}
+                      </span>
+                    )}
                   </span>
+                  {item.detail ? (
+                    <span className="block truncate tabular-nums text-slate-400">{item.detail}</span>
+                  ) : null}
                 </li>
               ))}
-              {selectedRoster.overflow > 0 && (
-                <li className="self-center text-center font-bold text-slate-400">
-                  {t("ops.dashboard.more_items", { count: selectedRoster.overflow })}
+              {selectedRoster.idleOverflow > 0 && (
+                <li className="shrink-0 self-center rounded-lg border border-dashed border-slate-200 px-2.5 py-1.5 text-[10px] font-bold text-slate-400">
+                  {t("ops.dashboard.more_items", { count: selectedRoster.idleOverflow })}
                 </li>
               )}
             </ul>
           ) : (
-            <p className="mt-2 text-[10.5px] text-slate-400">
-              {t("ops.dashboard.no_trips_range")}
+            <p className="mt-1.5 text-[10.5px] text-slate-400">
+              {t("ops.dashboard.everyone_ran")}
             </p>
           )}
-
-          <div className="mt-3 border-t border-slate-200/70 pt-2.5">
-            <div className="flex items-center justify-between gap-2">
-              <span className="text-[10.5px] font-bold text-slate-500">
-                {t("ops.dashboard.idle_list")}
-              </span>
-              <span className="shrink-0 rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-black tabular-nums text-slate-500 ring-1 ring-inset ring-slate-200/70">
-                {idleTotal}
-              </span>
-            </div>
-
-            {selectedRoster.idle.length > 0 ? (
-              <ul className="mt-1.5 flex gap-2 overflow-x-auto pb-1">
-                {selectedRoster.idle.map((item) => (
-                  <li
-                    key={`idle-${selected}-${item.name}`}
-                    className="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] shadow-sm"
-                  >
-                    <span className="flex items-center gap-1.5">
-                      <span className="truncate font-semibold text-slate-700">{item.name}</span>
-                      {item.registerInactive && (
-                        <span className="shrink-0 rounded-full bg-rose-50 px-1.5 py-px text-[9px] font-black text-rose-600 ring-1 ring-inset ring-rose-100">
-                          {t("common.inactive")}
-                        </span>
-                      )}
-                    </span>
-                    {item.detail ? (
-                      <span className="block truncate tabular-nums text-slate-400">{item.detail}</span>
-                    ) : null}
-                  </li>
-                ))}
-                {selectedRoster.idleOverflow > 0 && (
-                  <li className="shrink-0 self-center rounded-lg border border-dashed border-slate-200 px-2.5 py-1.5 text-[10px] font-bold text-slate-400">
-                    {t("ops.dashboard.more_items", { count: selectedRoster.idleOverflow })}
-                  </li>
-                )}
-              </ul>
-            ) : (
-              <p className="mt-1.5 text-[10.5px] text-slate-400">
-                {t("ops.dashboard.everyone_ran")}
-              </p>
-            )}
-          </div>
         </div>
       )}
     </>
