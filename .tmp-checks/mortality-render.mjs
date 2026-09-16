@@ -244,6 +244,19 @@ ok("table: header glyphs are coloured lucide icons", (tableHtml.match(/text-(ind
   ok("keys: Enter/Space opens and Escape closes the panel", source.includes('event.key === "Enter" || event.key === " "') && source.includes('event.key === "Escape"') && source.includes("toggle(row.tripId)"), "open/close keys missing");
   ok("keys: focused row is visible (focus ring)", tableHtml.includes("focus-visible:ring-inset focus-visible:ring-emerald-400"), "no focus ring");
 
+  // ── THE ROW HIGHLIGHT: one band, all fourteen columns, nothing else ─────
+  ok("highlight: the row carries the band on hover", tableHtml.includes("hover:bg-emerald-50/60"), "no row highlight on hover");
+  ok("highlight: the band stays on the row that was clicked", tableHtml.includes("focus:bg-emerald-50/60"), "highlight lost as soon as the pointer leaves");
+  {
+    // The open trip's band only exists once a row is opened, so it is asserted
+    // against the source that renders it.
+    const { readFileSync: readRows } = await import("node:fs");
+    const rowSource = readRows("src/modules/operations/mortality/components/TripLossTable.tsx", "utf8");
+    ok("highlight: the open trip's band deepens", rowSource.includes('isOpen ? "bg-emerald-50/70"'), "the open row is not marked");
+  }
+  ok("highlight: the row is still the click target", tableHtml.includes("cursor-pointer") && tableHtml.includes("select-none"), "row affordances missing");
+  ok("highlight: nothing else rides on the row", !tableHtml.includes("Previous trip") && !tableHtml.includes("Next trip") && !tableHtml.includes("border-l-2"), "extra per-row chrome came back");
+
   // ── MOUSE: the row is the click target, and a click arms the keyboard ────
   ok("mouse: the trip row shows a pointer", tableHtml.includes("cursor-pointer"), "row does not look clickable");
   ok("mouse: grid text is not drag-selected into a toggle", tableHtml.includes("select-none"), "row would toggle on a text drag");

@@ -549,8 +549,13 @@ export default function TripLossTable({
                         event.currentTarget.focus();
                         toggle(r.tripId);
                       }}
-                      className={`cursor-pointer select-none outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 hover:bg-slate-50/60 ${
-                        isOpen ? "bg-slate-50/60" : index % 2 === 0 ? "bg-white" : "bg-slate-50/20"
+                      // ONE job for this row: carry the eye across all fourteen
+                      // columns. The band follows the pointer, stays on the trip
+                      // that was clicked (a click focuses the row) and deepens on
+                      // the open trip, so a whole line of figures can be read
+                      // without losing your place.
+                      className={`cursor-pointer select-none outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 hover:bg-emerald-50/60 focus:bg-emerald-50/60 ${
+                        isOpen ? "bg-emerald-50/70" : index % 2 === 0 ? "bg-white" : "bg-slate-50/20"
                       }`}
                     >
                       <td className="w-12 px-3 py-3.5">
