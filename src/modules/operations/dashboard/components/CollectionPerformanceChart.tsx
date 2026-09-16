@@ -20,7 +20,7 @@ interface CollectionPerformanceChartProps {
   toDate: string;
 }
 
-const MAX_VISIBLE_SHOPS = 3;
+const MAX_VISIBLE_SHOPS = 4;
 const PENDING_COLLECTIONS_URL = "/operations?tab=pending-collections";
 
 const safeAmount = (value: number): number =>
@@ -62,18 +62,13 @@ export default function CollectionPerformanceChart({
 
   return (
     <section className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
-      <header className="border-b border-slate-100 bg-gradient-to-r from-white to-emerald-50/60 px-4 py-3.5">
-        <div className="flex min-w-0 items-center justify-between gap-2">
-          <p className="truncate text-[9px] font-black uppercase tracking-[0.15em] text-emerald-600">
-            {t("ops.dashboard.collection_performance.eyebrow")}
-          </p>
-          <span className="shrink-0 text-[8.5px] font-bold tabular-nums text-slate-400">
-            {formatPeriod(fromDate, toDate, language)}
-          </span>
-        </div>
-        <h2 className="mt-1 truncate text-sm font-black tracking-tight text-slate-900">
+      <header className="flex min-w-0 items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-white to-emerald-50/60 px-4 py-3.5">
+        <h2 className="truncate text-sm font-black tracking-tight text-slate-900">
           {t("ops.dashboard.collection_performance.title")}
         </h2>
+        <span className="shrink-0 text-[8.5px] font-bold tabular-nums text-slate-400">
+          {formatPeriod(fromDate, toDate, language)}
+        </span>
       </header>
 
       <div className="flex flex-1 flex-col p-4">

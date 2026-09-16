@@ -30,6 +30,7 @@ import { useI18n } from "../../../../i18n";
 import { getQuarterSampleInfo, type SampleQuarter } from "../../../../sample/quarterSample";
 import { kickApprovalSnapshot } from "../../../approvals/services/approvalSnapshot";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
+import { formatINRCompact } from "../../../../utils/format";
 
 // -------- Helper: render a dashboard date as "12 Sep 2026" --------
 const formatDashboardDate = (value: string, locale = "en-IN"): string => {
@@ -402,6 +403,7 @@ function RangeDatePicker({
 
 /** The three quick windows the chips offer. */
 type TrendPreset = "today" | "week" | "month";
+type CollectionChartOrder = "mode" | "amount";
 
 /** The window the Operational Trends card reads. `null` means "follow the
  *  global calendar" — that is the default, and it is never remembered. */
@@ -613,6 +615,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   // today, the last seven days or this calendar month. The choice is never
   // remembered, so a reload or a hard refresh lands on the calendar's window.
   const [trendView, setTrendView] = useState<TrendView>(null);
+  const [collectionChartOrder, setCollectionChartOrder] = useState<CollectionChartOrder>("mode");
   const calendarFrom = toInputDateString(startDate);
   const calendarTo = toInputDateString(endDate);
 
@@ -855,26 +858,45 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
         {/* No overflow-hidden on the card itself: the donut has a centered
             chart stage and the shrink-0 KPI footer below it stays visible. */}
         <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-5 w-full min-w-0 xl:h-[33.125rem]">
-          <Link
-            to="/operations?tab=collection-report"
-            title={t("nav.collectionReport")}
-            className="group/title -mt-1 inline-flex w-fit items-center gap-1.5"
-          >
-            <h3 className="text-sm font-black text-slate-800 transition-colors group-hover/title:text-emerald-600">
-              {t("ops.dashboard.collection_streams")}
-            </h3>
-            <ArrowUpRight
-              size={13}
-              strokeWidth={2.6}
-              className="text-slate-300 transition-all duration-150 group-hover/title:-translate-y-[1px] group-hover/title:translate-x-[1px] group-hover/title:text-emerald-600"
-            />
-          </Link>
-          <CollectionsPie data={data?.collectionsByMode || []} />
+          <div className="-mt-1 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <Link
+                to="/operations?tab=collection-report"
+                title={t("nav.collectionReport")}
+                className="group/title inline-flex min-w-0 items-center gap-1.5"
+              >
+                <h3 className="truncate text-sm font-black text-slate-800 transition-colors group-hover/title:text-emerald-600">
+                  {t("ops.dashboard.collection_streams")}
+                </h3>
+                <ArrowUpRight
+                  size={13}
+                  strokeWidth={2.6}
+                  className="shrink-0 text-slate-300 transition-all duration-150 group-hover/title:-translate-y-[1px] group-hover/title:translate-x-[1px] group-hover/title:text-emerald-600"
+                />
+              </Link>
+              <p className="mt-0.5 truncate text-[10px] font-semibold text-slate-400">
+                {t("ops.dashboard.collection_streams_total")}: {formatINRCompact(data.totalCollections)}
+              </p>
+            </div>
+            <label className="flex h-8 shrink-0 items-center rounded-lg border border-slate-200 bg-slate-50 px-2.5 shadow-xs">
+              <span className="sr-only">{t("ops.dashboard.collection_streams_order")}</span>
+              <select
+                value={collectionChartOrder}
+                onChange={(event) => setCollectionChartOrder(event.target.value as CollectionChartOrder)}
+                className="cursor-pointer border-0 bg-transparent p-0 text-[9.5px] font-bold text-slate-600 outline-none"
+                aria-label={t("ops.dashboard.collection_streams_order")}
+              >
+                <option value="mode">{t("ops.dashboard.collection_streams_by_mode")}</option>
+                <option value="amount">{t("ops.dashboard.collection_streams_by_amount")}</option>
+              </select>
+            </label>
+          </div>
+          <CollectionsPie data={data.collectionsByMode || []} order={collectionChartOrder} />
         </div>
       </div>
 
       <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-12">
-        <div className="min-w-0 lg:col-span-4">
+        <div className="min-w-0 lg:col-span-5">
           <CollectionPerformanceChart
             data={data.collectionPerformanceByShop}
             totalSales={data.totalSalesAmount}
@@ -884,7 +906,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
           />
         </div>
 
-        <div className="flex min-w-0 flex-col justify-start gap-4 rounded-2xl border border-slate-200/60 bg-white p-5 shadow-sm transition-shadow hover:shadow-md lg:col-span-8">
+        <div className="flex min-w-0 flex-col justify-start gap-4 rounded-2xl border border-slate-200/60 bg-white p-5 shadow-sm transition-shadow hover:shadow-md lg:col-span-7">
           <div className="flex items-center justify-between">
             <div>
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.live_infrastructure")}</span>
