@@ -346,7 +346,7 @@ export default function CollectionPerformanceChart({
   return (
     <>
       <style>{COLLECTION_RECOVERY_ANIMATION_STYLES}</style>
-      <section ref={chartRef} className="relative flex min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
+      <section ref={chartRef} className="relative flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
       <header className="border-b border-slate-100 bg-gradient-to-r from-slate-50/90 via-white to-emerald-50/30 px-4 py-2.5">
         <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">

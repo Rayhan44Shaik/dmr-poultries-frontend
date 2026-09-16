@@ -31,17 +31,6 @@ export interface PaymentRegisterModeSummary {
   percent: number;
 }
 
-export interface PaymentRegisterLatestRow {
-  id: string;
-  paymentNo: string;
-  paymentDate: string;
-  paymentType: string;
-  paymentMode: string;
-  paidTo: string;
-  amount: number;
-  referenceNo: string;
-}
-
 export interface PaymentRegisterSummary {
   fromDate: string;
   toDate: string;
@@ -49,7 +38,6 @@ export interface PaymentRegisterSummary {
   totalCount: number;
   typeRows: PaymentRegisterTypeSummary[];
   modeRows: PaymentRegisterModeSummary[];
-  latestRows: PaymentRegisterLatestRow[];
 }
 
 const APPROVED_PAYMENT_STATUS = "approved";
@@ -79,16 +67,20 @@ function normalisePaymentType(value: unknown): string {
   return raw;
 }
 
-function normalisePayment(row: PaymentRegisterApiRow): PaymentRegisterLatestRow & { status: string } {
+interface NormalisedPaymentRow {
+  paymentType: string;
+  paymentMode: string;
+  paidTo: string;
+  amount: number;
+  status: string;
+}
+
+function normalisePayment(row: PaymentRegisterApiRow): NormalisedPaymentRow {
   return {
-    id: text(row.id, text(row.paymentNo, "payment")),
-    paymentNo: text(row.paymentNo),
-    paymentDate: text(row.paymentDate, ""),
     paymentType: normalisePaymentType(row.paymentType ?? row.category),
     paymentMode: text(row.paymentMode, "Other"),
     paidTo: text(row.paidTo, "Unknown payee"),
     amount: toAmount(row.amount),
-    referenceNo: text(row.referenceNo),
     status: text(row.status, "").toLocaleLowerCase("en-IN"),
   };
 }
@@ -148,21 +140,6 @@ function buildSummary(
     }))
     .sort((a, b) => b.amount - a.amount || a.mode.localeCompare(b.mode, "en-IN"));
 
-  const latestRows = approved
-    .slice()
-    .sort((a, b) => b.paymentDate.localeCompare(a.paymentDate) || b.id.localeCompare(a.id))
-    .slice(0, 4)
-    .map((row) => ({
-      id: row.id,
-      paymentNo: row.paymentNo,
-      paymentDate: row.paymentDate,
-      paymentType: row.paymentType,
-      paymentMode: row.paymentMode,
-      paidTo: row.paidTo,
-      amount: row.amount,
-      referenceNo: row.referenceNo,
-    }));
-
   return {
     fromDate,
     toDate,
@@ -170,7 +147,6 @@ function buildSummary(
     totalCount,
     typeRows,
     modeRows,
-    latestRows,
   };
 }
 
