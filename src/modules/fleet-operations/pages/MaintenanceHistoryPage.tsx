@@ -7,6 +7,7 @@ import ErrorBoundary from "../components/common/ErrorBoundary";
 import MaintenanceFilters, {
   type MaintenanceSortKey,
 } from "../components/maintenance/MaintenanceFilters";
+import MaintenanceKPICards from "../components/maintenance/MaintenanceKPICards";
 import MaintenanceTimeline, {
   type VehicleMeterEvent,
 } from "../components/maintenance/MaintenanceTimeline";
@@ -35,6 +36,62 @@ function sortMaintenanceRecords(
         .localeCompare(
           String(right.date || right.createdAt || "").slice(0, 10),
         ) * multiplier,
+  );
+}
+
+const meterDateKey = (event: VehicleMeterEvent) =>
+  String(event.eventDate || event.eventInstant || "").slice(0, 10);
+
+const withinDateRange = (
+  date: string,
+  fromDate: string,
+  toDate: string,
+) =>
+  Boolean(date) &&
+  (!fromDate || date >= fromDate) &&
+  (!toDate || date <= toDate);
+
+/**
+ * Sum only completed trips whose start and end readings are inside the active
+ * calendar range. This avoids inventing partial-trip mileage at a range edge
+ * and keeps the KPI equal to the trip distances shown in the timeline.
+ */
+function completedTripDistance(
+  meterEvents: readonly VehicleMeterEvent[],
+  fromDate: string,
+  toDate: string,
+): number {
+  const trips = new Map<
+    string,
+    { start?: VehicleMeterEvent; end?: VehicleMeterEvent }
+  >();
+
+  meterEvents.forEach((event) => {
+    if (event.sourceType !== "TRIP_START" && event.sourceType !== "TRIP_END") {
+      return;
+    }
+    const key = `${event.vehicleId}:${event.ref}`;
+    const trip = trips.get(key) || {};
+    if (event.sourceType === "TRIP_START") trip.start = event;
+    if (event.sourceType === "TRIP_END") trip.end = event;
+    trips.set(key, trip);
+  });
+
+  return Math.round(
+    [...trips.values()].reduce((total, trip) => {
+      const start = trip.start;
+      const end = trip.end;
+      if (
+        !start ||
+        !end ||
+        !withinDateRange(meterDateKey(start), fromDate, toDate) ||
+        !withinDateRange(meterDateKey(end), fromDate, toDate)
+      ) {
+        return total;
+      }
+      const distance = Number(end.meter) - Number(start.meter);
+      return Number.isFinite(distance) && distance > 0 ? total + distance : total;
+    }, 0),
   );
 }
 
@@ -187,6 +244,22 @@ const MaintenanceHistoryPage = ({
     sortDir,
   ]);
 
+  const timelineStats = useMemo(
+    () => ({
+      totalCost: timelineEvents.reduce(
+        (sum, record) => sum + Number(record.totalCost || 0),
+        0,
+      ),
+      totalServices: timelineEvents.length,
+      totalDistance: completedTripDistance(
+        meterEvents,
+        data.fromDate,
+        data.toDate,
+      ),
+    }),
+    [data.fromDate, data.toDate, meterEvents, timelineEvents],
+  );
+
   const visibleUpcoming = useMemo(() => {
     let services = data.upcomingServices;
     if (data.selectedVehicle !== "all") {
@@ -280,6 +353,8 @@ const MaintenanceHistoryPage = ({
           onRefresh={handleRefresh}
         />
 
+
+        {resultsReady ? <MaintenanceKPICards {...timelineStats} /> : null}
 
         {data.historyError || data.error ? (
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">

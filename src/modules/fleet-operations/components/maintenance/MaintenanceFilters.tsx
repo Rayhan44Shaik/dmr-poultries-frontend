@@ -52,8 +52,8 @@ type Props = {
 /**
  * A precise two-row maintenance filter surface: the date range, vehicle and
  * driver share the first row; maintenance type, timeline sort and search share
- * the second. Status, Service Type and record-count clutter are intentionally
- * excluded from this focused history workspace.
+ * the second; Reset and Refresh form a compact third row. Status, Service Type
+ * and record-count clutter are intentionally excluded from this workspace.
  */
 function MaintenanceFilters({
   fromDate,
@@ -168,7 +168,7 @@ function MaintenanceFilters({
         </div>
       </div>
 
-      <div className="grid grid-cols-1 items-end gap-3 border-t border-slate-100 pt-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.25fr)_auto]">
+      <div className="grid grid-cols-1 items-end gap-3 border-t border-slate-100 pt-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)]">
         <div>
           <label className={opsFilterLabelClass}>
             <Wrench size={17} className="shrink-0 text-violet-500" />
@@ -234,20 +234,21 @@ function MaintenanceFilters({
             ) : null}
           </div>
         </div>
-        <div className="flex shrink-0 items-center justify-start gap-2 xl:justify-end">
-          <button
-            type="button"
-            onClick={onReset}
-            className={`group relative ${opsSecondaryButtonClass}`}
-            aria-label={t("common.reset")}
-          >
-            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]">
-              <RotateCcw size={14} />
-            </span>
-            {t("common.reset")}
-          </button>
-          <BrandRefreshButton loading={loading} onClick={onRefresh} />
-        </div>
+      </div>
+
+      <div className="flex items-center justify-start gap-2 border-t border-slate-100 pt-3">
+        <button
+          type="button"
+          onClick={onReset}
+          className={`group relative ${opsSecondaryButtonClass}`}
+          aria-label={t("common.reset")}
+        >
+          <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]">
+            <RotateCcw size={14} />
+          </span>
+          {t("common.reset")}
+        </button>
+        <BrandRefreshButton loading={loading} onClick={onRefresh} />
       </div>
     </section>
   );
