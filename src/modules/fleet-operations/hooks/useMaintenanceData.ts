@@ -201,7 +201,13 @@ export function useMaintenanceData(scope: 'entry' | 'history' | 'all' = 'all') {
     if (selectedStatus === 'Pending' && (record.paymentStatus !== 'pending' || record.deletedAt)) return false;
     if (selectedStatus === 'Approved' && (record.paymentStatus !== 'approved' || record.deletedAt)) return false;
     if (selectedStatus === 'all' && record.deletedAt) return false;
-    if (selectedMaintenanceType !== 'all' && !String(record.maintenanceType || '').split(',').map((value) => value.trim()).includes(selectedMaintenanceType)) return false;
+    if (selectedMaintenanceType !== 'all') {
+      // Multi-select stores choices pipe-separated; a record matches when ANY
+      // of its comma-separated types is picked.
+      const wanted = selectedMaintenanceType.split('|').map((value) => value.trim()).filter(Boolean);
+      const recordTypes = String(record.maintenanceType || '').split(',').map((value) => value.trim());
+      if (wanted.length > 0 && !recordTypes.some((type) => wanted.includes(type))) return false;
+    }
     if (selectedServiceType !== 'all' && String(record.serviceType || '') !== selectedServiceType) return false;
     if (searchQuery.trim()) {
       const needle = searchQuery.trim().toLowerCase();
