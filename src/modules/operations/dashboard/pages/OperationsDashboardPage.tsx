@@ -1,6 +1,6 @@
 // src/modules/operations/dashboard/pages/OperationsDashboardPage.tsx
 
-import { useState, useRef, useEffect, useMemo, type CSSProperties } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { addDays, startOfMonth, subMonths } from "date-fns";
 import { useDashboardData } from "../hooks/useDashboardData";
@@ -9,6 +9,7 @@ import OperationalTrendsChart from "../components/OperationalTrendsChart";
 import { useOperationalTrends } from "../hooks/useOperationalTrends";
 import { granularityForRange, type Granularity } from "../utils/trendSeries";
 import CollectionsPie from "../components/CollectionsPie";
+import PaymentRegisterChart from "../components/PaymentRegisterChart";
 import RecentTripsTable from "../components/RecentTripsTable";
 import ActiveCounts from "../components/ActiveCounts";
 import CollectionPerformanceChart from "../components/CollectionPerformanceChart";
@@ -30,6 +31,10 @@ import { useI18n } from "../../../../i18n";
 import { getQuarterSampleInfo, type SampleQuarter } from "../../../../sample/quarterSample";
 import { kickApprovalSnapshot } from "../../../approvals/services/approvalSnapshot";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
+import {
+  loadPaymentRegisterSummary,
+  type PaymentRegisterSummary,
+} from "../services/paymentRegisterSummary";
 
 // -------- Helper: render a dashboard date as "12 Sep 2026" --------
 const formatDashboardDate = (value: string, locale = "en-IN"): string => {
@@ -616,6 +621,43 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   const calendarFrom = toInputDateString(startDate);
   const calendarTo = toInputDateString(endDate);
 
+  const [paymentRegister, setPaymentRegister] = useState<PaymentRegisterSummary | null>(null);
+  const [paymentRegisterLoading, setPaymentRegisterLoading] = useState(true);
+  const [paymentRegisterError, setPaymentRegisterError] = useState<string | null>(null);
+  const paymentRegisterRequestRef = useRef(0);
+
+  const loadPaymentRegister = useCallback(async () => {
+    if (!calendarFrom || !calendarTo) {
+      setPaymentRegister(null);
+      setPaymentRegisterLoading(false);
+      return;
+    }
+
+    const requestId = ++paymentRegisterRequestRef.current;
+    setPaymentRegisterLoading(true);
+    setPaymentRegisterError(null);
+    try {
+      const summary = await loadPaymentRegisterSummary(calendarFrom, calendarTo);
+      if (requestId !== paymentRegisterRequestRef.current) return;
+      setPaymentRegister(summary);
+    } catch (err) {
+      if (requestId !== paymentRegisterRequestRef.current) return;
+      setPaymentRegister(null);
+      setPaymentRegisterError(err instanceof Error ? err.message : "Unable to load approved payments");
+    } finally {
+      if (requestId === paymentRegisterRequestRef.current) {
+        setPaymentRegisterLoading(false);
+      }
+    }
+  }, [calendarFrom, calendarTo]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadPaymentRegister();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadPaymentRegister]);
+
   /* The window on screen, handed to the KPI tiles: each tile deep-links to its
      analysis page filtered to these exact dates, and the link also carries the
      equal-length window before them, so the analysis page can compare the same
@@ -691,7 +733,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
     if (refreshing) return;
     setRefreshing(true);
     try {
-      await Promise.all([refetch(), kickApprovalSnapshot()]);
+      await Promise.all([refetch(), kickApprovalSnapshot(), loadPaymentRegister()]);
       showNotification("Dashboard refreshed — pending counts and charts are up to date", "success", 3200);
     } catch {
       showNotification("Could not refresh — please try again", "error", 3200);
@@ -890,18 +932,27 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
           />
         </div>
 
-        <div className="flex min-w-0 flex-col justify-start gap-4 rounded-2xl border border-slate-200/60 bg-white p-5 shadow-sm transition-shadow hover:shadow-md lg:col-span-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.live_infrastructure")}</span>
-              <h3 className="mt-0.5 text-sm font-black text-slate-800">{t("ops.dashboard.recent_transit")}</h3>
+        <div className="flex min-w-0 flex-col gap-6 lg:col-span-5">
+          <PaymentRegisterChart
+            summary={paymentRegister}
+            loading={paymentRegisterLoading}
+            error={paymentRegisterError}
+            onRetry={loadPaymentRegister}
+          />
+
+          <div className="flex min-w-0 flex-col justify-start gap-4 rounded-2xl border border-slate-200/60 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+            <div className="flex items-center justify-between">
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.live_infrastructure")}</span>
+                <h3 className="mt-0.5 text-sm font-black text-slate-800">{t("ops.dashboard.recent_transit")}</h3>
+              </div>
+              <div className="flex items-center gap-1.5 rounded-full border border-slate-100 bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-500">
+                <ArrowRightLeft size={10} className="text-slate-400" /> {t("ops.dashboard.auto_updates")}
+              </div>
             </div>
-            <div className="flex items-center gap-1.5 rounded-full border border-slate-100 bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-500">
-              <ArrowRightLeft size={10} className="text-slate-400" /> {t("ops.dashboard.auto_updates")}
+            <div className="w-full overflow-x-auto rounded-xl border border-slate-100 text-xs">
+              <RecentTripsTable trips={data.recentTrips || []} />
             </div>
-          </div>
-          <div className="w-full overflow-x-auto rounded-xl border border-slate-100 text-xs">
-            <RecentTripsTable trips={data.recentTrips || []} />
           </div>
         </div>
       </div>
