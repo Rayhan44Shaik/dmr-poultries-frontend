@@ -20,6 +20,9 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const read = (rel: string) =>
   readFileSync(join(__dirname, rel), "utf8");
 
+const enDictSrc = read("../../../../i18n/modules/operations.en.ts");
+// Shared keys (operations.*) live in the main dictionary.
+const enMainDictSrc = read("../../../../i18n/en.ts");
 const entryHookSrc = read("../hooks/useCollectionEntry.ts");
 const summarySrc = read("../components/entry/OutstandingSummary.tsx");
 const amountSrc = read("../components/entry/CollectionAmount.tsx");
@@ -28,17 +31,24 @@ const tableSrc = read("../components/entry/RecentCollectionsTable.tsx");
 const serviceSrc = read("./collectionService.ts");
 
 test("Opening Balance is correctly displayed as a carried-forward figure", () => {
-  // Outstanding Summary now correctly shows "Opening Balance"
-  assert.match(summarySrc, /Opening Balance/);
-  assert.match(summarySrc, /Brought forward/);
+  // The summary renders "Opening Balance" + "Brought forward …" through the
+  // shared i18n keys; the EN dictionary carries the expected wording.
+  assert.match(summarySrc, /t\("ops\.collection\.opening_balance"\)/);
+  assert.match(summarySrc, /t\("ops\.collection\.brought_forward_week"\)/);
+  assert.match(enDictSrc, /'ops\.collection\.opening_balance':\s*'Opening Balance'/);
+  assert.match(enDictSrc, /'ops\.collection\.brought_forward_week':\s*'Brought forward/);
   // The hook calculates openingBalance from the weekly summary
   assert.match(entryHookSrc, /openingBalance/);
 });
 
 test("The Collection page balance is the backend-authoritative live balance, not a weekly figure", () => {
-  // Outstanding Summary's main KPI is `currentOutstanding` (shops.current_balance).
-  assert.match(summarySrc, /Current Outstanding/);
-  assert.match(summarySrc, /Outstanding Amount \(Approved Only\)/);
+  // Outstanding Summary's main KPI is `currentOutstanding` (shops.current_balance),
+  // rendered through i18n keys — EN values: "Current Outstanding" /
+  // "Outstanding Amount (Approved Only)".
+  assert.match(summarySrc, /t\("ops\.collection\.current_outstanding"\)/);
+  assert.match(summarySrc, /t\("ops\.collection\.outstanding_approved_only"\)/);
+  assert.match(enDictSrc, /'ops\.collection\.current_outstanding':\s*'Current Outstanding'/);
+  assert.match(enDictSrc, /'ops\.collection\.outstanding_approved_only':\s*'Outstanding includes approved sales only'/);
   // The hook reads `weeklySummary.balance` for the live balance and computes openingBalance.
   assert.match(entryHookSrc, /weeklySummary\.balance/);
   assert.match(entryHookSrc, /currentOutstanding/);
@@ -52,22 +62,25 @@ test("No weekly opening-balance calculation remains in the frontend (balance is 
 });
 
 test("Weekly cards (Approved Sales / Approved Collections / Pending Approval) are week-scoped and informational", () => {
-  assert.match(summarySrc, /Approved Sales/);
-  assert.match(summarySrc, /Approved Collections/);
-  assert.match(summarySrc, /Pending Approval/);
+  assert.match(summarySrc, /t\("ops\.collection\.approved_sales"\)/);
+  assert.match(summarySrc, /t\("ops\.collection\.approved_collections"\)/);
+  assert.match(summarySrc, /t\("operations\.pending_approval"\)/);
+  assert.match(enDictSrc, /'ops\.collection\.approved_sales':\s*'Approved Sales'/);
+  assert.match(enDictSrc, /'ops\.collection\.approved_collections':\s*'Approved Collections'/);
+  assert.match(enMainDictSrc, /'operations\.pending_approval':\s*'Pending Approval'/);
   // The week range label is displayed on the weekly cards only.
   assert.match(summarySrc, /periodLabel/);
 });
 
 test("Current Outstanding KPI is the primary summary figure (highlighted, bottom of summary)", () => {
   // Current Outstanding is the bottom-line figure in the summary card (highlighted in emerald)
-  assert.match(summarySrc, /Current Outstanding/);
-  assert.match(summarySrc, /Outstanding Amount \(Approved Only\)/);
+  assert.match(summarySrc, /t\("ops\.collection\.current_outstanding"\)/);
+  assert.match(summarySrc, /t\("ops\.collection\.outstanding_approved_only"\)/);
   assert.match(summarySrc, /text-emerald-700/);  // Highlighted in emerald
   assert.match(summarySrc, /font-extrabold/);   // Large font
   // It is the last financial row (after the weekly cards)
-  const outstandingIndex = summarySrc.lastIndexOf("Current Outstanding");
-  const salesIndex = summarySrc.indexOf("Approved Sales");
+  const outstandingIndex = summarySrc.lastIndexOf('t("ops.collection.current_outstanding")');
+  const salesIndex = summarySrc.indexOf('t("ops.collection.approved_sales")');
   assert.ok(outstandingIndex !== -1 && salesIndex !== -1);
   assert.ok(outstandingIndex > salesIndex, "Current Outstanding must be the final summary row");
 });
