@@ -61,13 +61,6 @@ interface ShopTooltipState {
   placement: "top" | "bottom";
 }
 
-interface ActionTooltipState {
-  label: string;
-  left: number;
-  top: number;
-  placement: "top" | "bottom";
-}
-
 const COLLECTION_RECOVERY_ANIMATION_STYLES = `
 @keyframes collection-recovery-card-in {
   0% { opacity: 0; transform: translateY(14px) scale(0.965); }
@@ -177,7 +170,6 @@ export default function CollectionPerformanceChart({
   const [selectedShop, setSelectedShop] = useState("");
   const [sortAnimationId, setSortAnimationId] = useState(0);
   const [shopTooltip, setShopTooltip] = useState<ShopTooltipState | null>(null);
-  const [actionTooltip, setActionTooltip] = useState<ActionTooltipState | null>(null);
   const [localSnapshot, setLocalSnapshot] = useState<{ key: string; snapshot: CollectionRecoverySnapshot } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const chartRef = useRef<HTMLElement | null>(null);
@@ -280,7 +272,6 @@ export default function CollectionPerformanceChart({
     if (!sortOptions.some((option) => option.value === nextSort)) return;
     if (nextSort === sortBy) return;
     setShopTooltip(null);
-    setActionTooltip(null);
     setSortBy(nextSort);
     setSortAnimationId((current) => current + 1);
   };
@@ -289,7 +280,6 @@ export default function CollectionPerformanceChart({
     if (value && !shopOptions.some((option) => option.value === value)) return;
     if (value === selectedShop) return;
     setShopTooltip(null);
-    setActionTooltip(null);
     setSelectedShop(value);
     setSortAnimationId((current) => current + 1);
   };
@@ -297,7 +287,6 @@ export default function CollectionPerformanceChart({
   const resetView = () => {
     if (!selectedShop && sortBy === "outstanding") return;
     setShopTooltip(null);
-    setActionTooltip(null);
     setSelectedShop("");
     setSortBy("outstanding");
     setSortAnimationId((current) => current + 1);
@@ -307,7 +296,6 @@ export default function CollectionPerformanceChart({
   const refreshChart = async () => {
     if (refreshing) return;
     setShopTooltip(null);
-    setActionTooltip(null);
     setRefreshing(true);
     try {
       const nextSnapshot = await loadCollectionRecoveryData(fromDate, toDate);
@@ -319,31 +307,6 @@ export default function CollectionPerformanceChart({
     } finally {
       setRefreshing(false);
     }
-  };
-
-  const showActionTooltip = (label: string, target: HTMLElement) => {
-    const chart = chartRef.current;
-    if (!chart) return;
-    const rect = target.getBoundingClientRect();
-    const chartRect = chart.getBoundingClientRect();
-    const tooltipWidth = 118;
-    const tooltipHeight = 34;
-    const inset = 8;
-    const centeredLeft = rect.left - chartRect.left + rect.width / 2;
-    const left = Math.min(
-      Math.max(centeredLeft, tooltipWidth / 2 + inset),
-      chartRect.width - tooltipWidth / 2 - inset,
-    );
-    const bottomTop = rect.bottom - chartRect.top + 6;
-    const topTop = rect.top - chartRect.top - tooltipHeight - 6;
-    const bottomFits = bottomTop + tooltipHeight <= chartRect.height - inset;
-    const topFits = topTop >= inset;
-    const placement: ActionTooltipState["placement"] = bottomFits || !topFits ? "bottom" : "top";
-    const top = Math.min(
-      Math.max(placement === "bottom" ? bottomTop : topTop, inset),
-      Math.max(inset, chartRect.height - tooltipHeight - inset),
-    );
-    setActionTooltip({ label, left, top, placement });
   };
 
   const showShopTooltip = (
@@ -445,10 +408,6 @@ export default function CollectionPerformanceChart({
             onClick={resetView}
             disabled={!hasViewFilter}
             aria-label={t("common.reset")}
-            onFocus={(event) => showActionTooltip(t("common.reset"), event.currentTarget)}
-            onBlur={() => setActionTooltip(null)}
-            onMouseEnter={(event) => showActionTooltip(t("common.reset"), event.currentTarget)}
-            onMouseLeave={() => setActionTooltip(null)}
             className="group flex h-8 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-[9.5px] font-black text-slate-500 shadow-xs transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:bg-white disabled:hover:text-slate-500"
           >
             <RotateCcw
@@ -462,10 +421,6 @@ export default function CollectionPerformanceChart({
             loading={refreshing}
             onClick={refreshChart}
             ariaLabel={t("common.refresh")}
-            onFocus={(event) => showActionTooltip(t("common.refresh"), event.currentTarget)}
-            onBlur={() => setActionTooltip(null)}
-            onMouseEnter={(event) => showActionTooltip(t("common.refresh"), event.currentTarget)}
-            onMouseLeave={() => setActionTooltip(null)}
             className="!h-8 shrink-0 !gap-1 !pl-2 !pr-2 text-[9.5px] font-black"
           >
             {t("common.refresh")}
@@ -543,28 +498,6 @@ export default function CollectionPerformanceChart({
         )}
 
       </div>
-
-      {actionTooltip ? (
-        <div
-          role="tooltip"
-          className="collection-recovery-tooltip pointer-events-none absolute z-50 w-[7.375rem] rounded-xl border border-slate-200 bg-slate-900/95 px-2.5 py-1.5 text-center text-[10px] font-bold text-white shadow-lg"
-          style={{
-            left: actionTooltip.left,
-            top: actionTooltip.top,
-            transform: "translateX(-50%)",
-          }}
-        >
-          <span
-            className={`absolute left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-slate-900/95 bg-slate-900/95 ${
-              actionTooltip.placement === "top"
-                ? "-bottom-1"
-                : "-top-1"
-            }`}
-            aria-hidden="true"
-          />
-          <span className="relative">{actionTooltip.label}</span>
-        </div>
-      ) : null}
 
       {shopTooltip ? (
       <div
