@@ -19,6 +19,25 @@ export interface DashboardRecentTrip {
   status: string;
 }
 
+/**
+ * Record totals owned by the Operations registers for the selected window.
+ *
+ * The sample API calculates these while it calculates the headline KPIs. They
+ * are kept separate because a register can intentionally include audit rows
+ * (for example, Trip List includes deleted trips) while a KPI counts only
+ * live financial activity.
+ */
+export interface OperationsModuleCounts {
+  tripRecords: number;
+  rateEntries: number;
+  shopSales: number;
+  collections: number;
+  pendingShops: number;
+  mortalityTrips: number;
+  fuelBills: number;
+  orders: number;
+}
+
 /** Raw contract from GET /api/operations/dashboard */
 export type OperationsDashboardApiResponse = {
   totalTrips?: number;
@@ -56,6 +75,8 @@ export type OperationsDashboardApiResponse = {
   usedHelpers?: number;
   usedShops?: number;
   usedFarms?: number;
+  /** Record-level counts for the Operations register navigation map. */
+  moduleCounts?: Partial<OperationsModuleCounts>;
 };
 
 /** UI shape used by Operations Dashboard components. */
@@ -90,6 +111,11 @@ export interface DashboardData {
   usedHelpers: number;
   usedShops: number;
   usedFarms: number;
+  /**
+   * Register-level counts returned with the same selected-range dashboard
+   * aggregation. `null` means the backend does not expose this optional map.
+   */
+  moduleCounts: OperationsModuleCounts | null;
   /**
    * Who actually RAN during the selected span, per register (vehicles,
    * drivers, supervisors, helpers, loaders — no shops). Present whenever the
@@ -653,6 +679,37 @@ function deriveLegacyCollectionPerformance(
   return [...byShop.values()];
 }
 
+/**
+ * Preserve the API's register counts without guessing them from KPI totals.
+ * A partial / older backend payload remains `null`, so it never renders a
+ * misleading set of zeroes in the overview navigation map.
+ */
+function mapModuleCounts(value: OperationsDashboardApiResponse["moduleCounts"]): OperationsModuleCounts | null {
+  if (!value || typeof value !== "object") return null;
+  const keys: (keyof OperationsModuleCounts)[] = [
+    "tripRecords",
+    "rateEntries",
+    "shopSales",
+    "collections",
+    "pendingShops",
+    "mortalityTrips",
+    "fuelBills",
+    "orders",
+  ];
+  if (!keys.every((key) => value[key] != null)) return null;
+
+  return {
+    tripRecords: toNumber(value.tripRecords),
+    rateEntries: toNumber(value.rateEntries),
+    shopSales: toNumber(value.shopSales),
+    collections: toNumber(value.collections),
+    pendingShops: toNumber(value.pendingShops),
+    mortalityTrips: toNumber(value.mortalityTrips),
+    fuelBills: toNumber(value.fuelBills),
+    orders: toNumber(value.orders),
+  };
+}
+
 /** Map API fields onto the existing dashboard UI shape. */
 export function mapDashboardResponse(
   raw: OperationsDashboardApiResponse | null | undefined
@@ -698,6 +755,7 @@ export function mapDashboardResponse(
     usedHelpers: toNumber(raw?.usedHelpers),
     usedShops: toNumber(raw?.usedShops),
     usedFarms: toNumber(raw?.usedFarms),
+    moduleCounts: mapModuleCounts(raw?.moduleCounts),
     // Only the sample server flags itself; a real backend leaves this null so
     // no "sample data" badge is ever shown against production numbers.
     sampleQuarter: raw?.sample === true && raw?.quarter ? raw.quarter : null,
@@ -916,7 +974,7 @@ function demoDashboard(from: Date | null, to: Date | null): DashboardData {
     collectionsByMode: [], expensesByCategory: [], mortalityData: [], recentTrips: [],
     activeVehicles: 18, activeDrivers: 24, activeHelpers: 31, totalShops: 100, totalFarms: 24,
     collectionPerformanceByShop: [], usedVehicles: 14, usedDrivers: 20, usedHelpers: 26,
-    usedShops: 38, usedFarms: 12, sampleQuarter: null,
+    usedShops: 38, usedFarms: 12, moduleCounts: null, sampleQuarter: null,
   };
   if (days.length === 0) return empty;
 
@@ -997,6 +1055,7 @@ function demoDashboard(from: Date | null, to: Date | null): DashboardData {
     usedHelpers: 26,
     usedShops: 38,
     usedFarms: 12,
+    moduleCounts: null,
     sampleQuarter: null,
   };
 }
@@ -1077,6 +1136,7 @@ function offlineDashboard(): DashboardData {
     usedHelpers: 0,
     usedShops: 0,
     usedFarms: 0,
+    moduleCounts: null,
     sampleQuarter: null,
   };
 }
