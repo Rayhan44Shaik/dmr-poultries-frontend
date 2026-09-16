@@ -1420,11 +1420,11 @@ for (const t of TRIPS) {
       gpsLon: d.gpsLon,
       gpsAccuracy: d.gpsAccuracy,
       gpsCapturedAt: d.gpsCapturedAt,
-      status: dayDiff(t.tripDate, TODAY) <= 2 && fuelSeq % 5 === 0 ? "Pending" : "Approved",
+      status: "Approved",
       createdAt: ts(t.tripDate, "07:50:00"),
       createdBy: t.supervisorName,
       approvedAt: ts(t.tripDate, "21:10:00"),
-      approvedBy: "Owner",
+      approvedBy: "Trip Completion",
       updatedAt: ts(t.tripDate, "21:10:00"),
     });
   }

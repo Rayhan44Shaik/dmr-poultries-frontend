@@ -21,12 +21,12 @@ import {
   Route,
   Clock,
   Sparkles,
+  Fuel,
 } from "lucide-react";
 import type { FuelExpense, FuelSortKey } from "../types/fuelExpense";
 import type { FuelQuickTab } from "../utils/filterFuelExpenses";
 import { formatVehicleNumber } from "../../../../utils/format";
 import { useI18n } from "../../../../i18n";
-import BrandMark from "../../../../ui/BrandMark";
 
 interface Props {
   bills: FuelExpense[];
@@ -154,28 +154,18 @@ export function FuelBillTable({
 
   return (
     <div className="w-full">
-      {/* ── Table Card Top Bar with DMR Brand Logo & Status Pills ── */}
-      <div className="border-b border-slate-200/80 bg-gradient-to-r from-emerald-50/50 via-white to-blue-50/40 px-4 py-3.5 sm:px-6">
+      {/* ── Table Card Top Bar with Respective Fuel Logo & Status Pills ── */}
+      <div className="border-b border-slate-200/80 bg-gradient-to-r from-emerald-50/60 via-white to-blue-50/40 px-4 py-3 sm:px-6">
         <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           
-          {/* Brand Mark & Title */}
+          {/* Respective Fuel Logo & Title (without extra description) */}
           <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-white shadow-sm ring-1 ring-slate-200/80 p-1">
-              <BrandMark size="xs" variant="plain" />
+            <div className="h-9 w-9 rounded-xl bg-emerald-50/80 border border-emerald-200 flex items-center justify-center text-emerald-600 shadow-inner">
+              <Fuel className="w-5 h-5" />
             </div>
-            <div>
-              <div className="flex items-center gap-2">
-                <h3 className="text-base font-bold tracking-tight text-slate-800">
-                  Fuel Expenses Register
-                </h3>
-                <span className="inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
-                  {tabCounts.all} Total
-                </span>
-              </div>
-              <p className="text-xs text-slate-500">
-                Fleet diesel consumption, meter readings & bunk receipts
-              </p>
-            </div>
+            <h3 className="text-base font-bold text-slate-800 tracking-tight">
+              Fuel Bill Table
+            </h3>
           </div>
 
           {/* Quick Status & Source Filter Toggle Pills */}
@@ -252,7 +242,7 @@ export function FuelBillTable({
                 </button>
               )}
 
-              {onEdit && (
+              {selectedBill.sourceType !== "TRIP" && onEdit && (
                 <button
                   type="button"
                   onClick={() => onEdit(selectedBill)}
@@ -273,7 +263,7 @@ export function FuelBillTable({
                 </button>
               )}
 
-              {onDelete && (
+              {selectedBill.sourceType !== "TRIP" && onDelete && (
                 <button
                   type="button"
                   onClick={() => onDelete(selectedBill)}
@@ -294,7 +284,14 @@ export function FuelBillTable({
                 </button>
               )}
 
-              {selectedBill.status === "Pending" && selectedBill.sourceType !== "TRIP" && (
+              {selectedBill.sourceType === "TRIP" && (
+                <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
+                  <CheckCircle size={13} className="text-emerald-600" />
+                  Auto Approved with Trip
+                </span>
+              )}
+
+              {selectedBill.sourceType === "MANUAL" && selectedBill.status === "Pending" && (
                 <>
                   {onApprove && (
                     <button
@@ -603,7 +600,7 @@ export function FuelBillTable({
                     <td className="px-3.5 py-3.5 text-center whitespace-nowrap">
                       <span
                         className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                          bill.status === "Approved"
+                          isTrip || bill.status === "Approved"
                             ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20"
                             : bill.status === "Rejected"
                             ? "bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-600/20"
@@ -612,14 +609,14 @@ export function FuelBillTable({
                       >
                         <span
                           className={`h-1.5 w-1.5 rounded-full ${
-                            bill.status === "Approved"
+                            isTrip || bill.status === "Approved"
                               ? "bg-emerald-500"
                               : bill.status === "Rejected"
                               ? "bg-rose-500"
                               : "bg-amber-500 animate-pulse"
                           }`}
                         />
-                        <span>{bill.sourceType === "TRIP" && bill.status === "Approved" ? "AUTO APPROVED" : bill.status}</span>
+                        <span>{isTrip ? "Approved" : bill.status}</span>
                       </span>
                     </td>
                   </tr>
@@ -634,3 +631,4 @@ export function FuelBillTable({
 }
 
 export default React.memo(FuelBillTable);
+

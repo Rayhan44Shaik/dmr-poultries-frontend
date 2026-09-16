@@ -157,8 +157,8 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
   const tabCounts = useMemo(() => {
     return {
       all: baseFilteredBills.length,
-      pending: baseFilteredBills.filter((b) => b.status === "Pending").length,
-      approved: baseFilteredBills.filter((b) => b.status === "Approved").length,
+      pending: baseFilteredBills.filter((b) => b.sourceType === "MANUAL" && b.status === "Pending").length,
+      approved: baseFilteredBills.filter((b) => b.status === "Approved" || b.sourceType === "TRIP").length,
       trip: baseFilteredBills.filter((b) => b.sourceType === "TRIP").length,
       manual: baseFilteredBills.filter((b) => b.sourceType === "MANUAL").length,
     };
