@@ -31,8 +31,10 @@ import {
 } from "lucide-react";
 import { QUICK_ACTIONS, resolveRoute } from "../../routes/navigation";
 import { useTheme } from "../../providers/ThemeProvider";
+import { SHOW_THEME_CONTROLS } from "../../providers/themeControls";
 import { translateRole, useI18n } from "../../i18n";
 import { personNameLabel } from "../../i18n/displayNames";
+import FontScaleControl from "./FontScaleControl";
 import LanguageSwitcher from "./LanguageSwitcher";
 import { getPendingCollectionSnapshot, subscribePendingCollectionSnapshot } from "../../modules/operations/collections/services/collectionSnapshot";
 import { useViewLayerOpen } from "../../shared/ui/viewLayer";
@@ -364,7 +366,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
 
   return (
     <header
-      className={`sticky top-0 ${viewOpen ? "z-[55]" : "z-40"} flex h-16 shrink-0 items-center gap-2 border-b border-slate-200/80 bg-white/85 px-4 backdrop-blur-md sm:gap-3 sm:px-6 dark:border-slate-800 dark:bg-slate-900/85`}
+      className={`dmr-app-header sticky top-0 ${viewOpen ? "z-[55]" : "z-40"} flex h-16 shrink-0 items-center gap-2 border-b border-slate-200/80 bg-white/85 px-4 backdrop-blur-md sm:gap-3 sm:px-6 dark:border-slate-800 dark:bg-slate-900/85`}
     >
       {/* Menu — every viewport, because it is the way back to a collapsed or
           hidden sidebar. Below `lg` it opens the floating popup; from `lg` up
@@ -414,16 +416,20 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
           ⌘K
         </kbd>
       </button>
-      <IconButton label={t("header.search_short")} onClick={onOpenCommand} className="md:hidden">
+      <IconButton label={t("header.search_short")} onClick={onOpenCommand} className="dmr-header-search-mobile md:hidden">
         <Search size={18} />
       </IconButton>
 
-      {/* Theme toggle */}
-      <IconButton label={theme === "dark" ? t("header.theme_light") : t("header.theme_dark")} onClick={toggleTheme}>
-        {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
-      </IconButton>
+      {/* Theme toggle is intentionally hidden; ThemeProvider and this guarded
+          control stay in place so the existing implementation can return later. */}
+      {SHOW_THEME_CONTROLS ? (
+        <IconButton label={theme === "dark" ? t("header.theme_light") : t("header.theme_dark")} onClick={toggleTheme}>
+          {theme === "dark" ? <Sun size={18} /> : <Moon size={18} />}
+        </IconButton>
+      ) : null}
 
-      {/* Language switcher */}
+      {/* Global UI scale sits immediately beside language. */}
+      <FontScaleControl />
       <LanguageSwitcher />
 
       {/* Notifications */}
@@ -543,6 +549,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
       </Dropdown>
 
       {/* Profile */}
+      <div className="dmr-header-profile shrink-0">
       <Dropdown
         width="w-64"
         trigger={(open, toggle) => (
@@ -596,6 +603,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
           </div>
         )}
       </Dropdown>
+      </div>
     </header>
   );
 }

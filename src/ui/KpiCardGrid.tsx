@@ -79,7 +79,7 @@ interface Props {
 /** Per-density card, label, value, icon-tile, glow and accent classes. */
 const densityClasses = {
   default: {
-    card: "min-h-[108px] rounded-2xl p-4",
+    card: "min-h-[6.75rem] rounded-2xl p-4",
     label: "text-[11px]",
     value: "mt-2 text-2xl",
     iconTile: "h-11 w-11 rounded-xl",
@@ -89,13 +89,13 @@ const densityClasses = {
     grid: "gap-3",
   },
   compact: {
-    card: "min-h-[84px] rounded-xl px-3.5 py-3",
+    card: "min-h-[5.25rem] rounded-xl px-3.5 py-3",
     label: "text-[10px]",
     value: "mt-1.5 text-lg",
     iconTile: "h-8 w-8 rounded-lg",
     iconSize: 16,
     glow: "-right-5 -top-5 h-16 w-16",
-    accent: "h-[3px]",
+    accent: "h-[0.1875rem]",
     grid: "gap-2.5",
   },
 } as const;

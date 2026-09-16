@@ -6,8 +6,18 @@
 import { apiGet, handleApiError } from "../../../../api";
 import { toBusinessDate } from '../../../../utils/businessDate';
 import type { SampleQuarter } from "../../../../sample/quarterSample";
+import type { CollectionPerformanceDatum } from "../utils/collectionPerformance";
 
 const DASHBOARD_PATH = "/operations/dashboard";
+
+export interface DashboardRecentTrip {
+  id: number;
+  tripNo: string;
+  vehicleNo: string;
+  shopName: string;
+  weight: number;
+  status: string;
+}
 
 /** Raw contract from GET /api/operations/dashboard */
 export type OperationsDashboardApiResponse = {
@@ -28,8 +38,10 @@ export type OperationsDashboardApiResponse = {
   collectionsByMode?: { name: string; value: number }[];
   expensesByCategory?: { name: string; value: number }[];
   mortalityData?: { date: string; mortality: number }[];
-  recentTrips?: unknown[];
+  recentTrips?: DashboardRecentTrip[];
   pendingCollectionsByShop?: { shopName: string; pendingAmount: number }[];
+  /** Exact selected-period sales/collection recovery for the overview chart. */
+  collectionPerformanceByShop?: CollectionPerformanceDatum[];
   /** Present only on the quarter sample API (scripts/quarter-sample-data.mjs). */
   sample?: boolean;
   today?: string;
@@ -44,21 +56,7 @@ export type OperationsDashboardApiResponse = {
   usedHelpers?: number;
   usedShops?: number;
   usedFarms?: number;
-  /** Sample-only row counts for the Operations module map. */
-  moduleCounts?: Partial<OperationsModuleCounts> | null;
 };
-
-/** Row counts behind each Operations page for the selected dashboard range. */
-export interface OperationsModuleCounts {
-  tripRecords: number;
-  rateEntries: number;
-  shopSales: number;
-  collections: number;
-  pendingShops: number;
-  mortalityTrips: number;
-  fuelBills: number;
-  orders: number;
-}
 
 /** UI shape used by Operations Dashboard components. */
 export interface DashboardData {
@@ -80,20 +78,18 @@ export interface DashboardData {
   collectionsByMode: { name: string; value: number }[];
   expensesByCategory: { name: string; value: number }[];
   mortalityData: { date: string; mortality: number }[];
-  recentTrips: any[];
+  recentTrips: DashboardRecentTrip[];
   activeVehicles: number;
   activeDrivers: number;
   activeHelpers: number;
   totalShops: number;
   totalFarms: number;
-  pendingCollectionsByShop: { shopName: string; pendingAmount: number }[];
+  collectionPerformanceByShop: CollectionPerformanceDatum[];
   usedVehicles: number;
   usedDrivers: number;
   usedHelpers: number;
   usedShops: number;
   usedFarms: number;
-  /** Sample-only record counts linking the overview to every Operations page. */
-  moduleCounts: OperationsModuleCounts | null;
   /** Non-null only when these numbers came from the quarter sample API. */
   sampleQuarter: SampleQuarter | null;
 }
@@ -103,20 +99,43 @@ function toNumber(value: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-function mapModuleCounts(
-  raw: Partial<OperationsModuleCounts> | null | undefined
-): OperationsModuleCounts | null {
-  if (!raw) return null;
-  return {
-    tripRecords: toNumber(raw.tripRecords),
-    rateEntries: toNumber(raw.rateEntries),
-    shopSales: toNumber(raw.shopSales),
-    collections: toNumber(raw.collections),
-    pendingShops: toNumber(raw.pendingShops),
-    mortalityTrips: toNumber(raw.mortalityTrips),
-    fuelBills: toNumber(raw.fuelBills),
-    orders: toNumber(raw.orders),
-  };
+/**
+ * Older dashboard APIs expose only top sales and live pending lists. Keep the
+ * new chart useful against that contract while preferring the exact-period
+ * collectionPerformanceByShop series whenever the API supplies it.
+ */
+function deriveLegacyCollectionPerformance(
+  raw: OperationsDashboardApiResponse | null | undefined,
+): CollectionPerformanceDatum[] {
+  const byShop = new Map<string, CollectionPerformanceDatum>();
+  for (const sale of raw?.topShops ?? []) {
+    const shopName = String(sale.shopName ?? "").trim();
+    if (!shopName) continue;
+    byShop.set(shopName.toLocaleLowerCase("en-IN"), {
+      shopName,
+      salesAmount: toNumber(sale.amount),
+      collectionAmount: 0,
+      outstandingAmount: 0,
+    });
+  }
+  for (const pending of raw?.pendingCollectionsByShop ?? []) {
+    const shopName = String(pending.shopName ?? "").trim();
+    if (!shopName) continue;
+    const key = shopName.toLocaleLowerCase("en-IN");
+    const current = byShop.get(key) ?? {
+      shopName,
+      salesAmount: 0,
+      collectionAmount: 0,
+      outstandingAmount: 0,
+    };
+    current.outstandingAmount += toNumber(pending.pendingAmount);
+    current.salesAmount = Math.max(current.salesAmount, current.outstandingAmount);
+    byShop.set(key, current);
+  }
+  return [...byShop.values()].map((row) => ({
+    ...row,
+    collectionAmount: Math.max(0, row.salesAmount - row.outstandingAmount),
+  }));
 }
 
 /** Map API fields onto the existing dashboard UI shape. */
@@ -157,13 +176,13 @@ export function mapDashboardResponse(
     activeHelpers: toNumber(raw?.activeHelpers),
     totalShops: toNumber(raw?.totalShops),
     totalFarms: toNumber(raw?.totalFarms),
-    pendingCollectionsByShop: raw?.pendingCollectionsByShop ?? [],
+    collectionPerformanceByShop:
+      raw?.collectionPerformanceByShop ?? deriveLegacyCollectionPerformance(raw),
     usedVehicles: toNumber(raw?.usedVehicles),
     usedDrivers: toNumber(raw?.usedDrivers),
     usedHelpers: toNumber(raw?.usedHelpers),
     usedShops: toNumber(raw?.usedShops),
     usedFarms: toNumber(raw?.usedFarms),
-    moduleCounts: raw?.sample === true ? mapModuleCounts(raw.moduleCounts) : null,
     // Only the sample server flags itself; a real backend leaves this null so
     // no "sample data" badge is ever shown against production numbers.
     sampleQuarter: raw?.sample === true && raw?.quarter ? raw.quarter : null,
@@ -329,8 +348,8 @@ function demoDashboard(from: Date | null, to: Date | null): DashboardData {
     todaysTrips: 0, weeklyTrips: 0, monthlyTrips: 0, trendData: [], topShops: [],
     collectionsByMode: [], expensesByCategory: [], mortalityData: [], recentTrips: [],
     activeVehicles: 18, activeDrivers: 24, activeHelpers: 31, totalShops: 100, totalFarms: 24,
-    pendingCollectionsByShop: [], usedVehicles: 14, usedDrivers: 20, usedHelpers: 26,
-    usedShops: 38, usedFarms: 12, moduleCounts: null, sampleQuarter: null,
+    collectionPerformanceByShop: [], usedVehicles: 14, usedDrivers: 20, usedHelpers: 26,
+    usedShops: 38, usedFarms: 12, sampleQuarter: null,
   };
   if (days.length === 0) return empty;
 
@@ -400,15 +419,17 @@ function demoDashboard(from: Date | null, to: Date | null): DashboardData {
     activeHelpers: 31,
     totalShops: 100,
     totalFarms: 24,
-    pendingCollectionsByShop: DEMO_SHOPS
-      .map((shopName, idx) => ({ shopName, pendingAmount: shopPendingTotals[idx] }))
-      .sort((a, b) => b.pendingAmount - a.pendingAmount),
+    collectionPerformanceByShop: DEMO_SHOPS.map((shopName, idx) => ({
+      shopName,
+      salesAmount: shopSalesTotals[idx],
+      collectionAmount: Math.max(0, shopSalesTotals[idx] - shopPendingTotals[idx]),
+      outstandingAmount: shopPendingTotals[idx],
+    })),
     usedVehicles: 14,
     usedDrivers: 20,
     usedHelpers: 26,
     usedShops: 38,
     usedFarms: 12,
-    moduleCounts: null,
     sampleQuarter: null,
   };
 }
@@ -429,8 +450,8 @@ function offlineDashboard(): DashboardData {
   };
 
   type TripRow = { tripDate?: string; status?: string; totalWeight?: number; totalDeliveredWeight?: number; totalBirds?: number };
-  type SaleRow = { tripDate?: string; totalWeight?: number; totalBirds?: number; amount?: number };
-  type CollectionRow = { collectionDate?: string; amount?: number; status?: string };
+  type SaleRow = { tripDate?: string; shopName?: string; totalWeight?: number; totalBirds?: number; amount?: number };
+  type CollectionRow = { collectionDate?: string; shopName?: string; amount?: number; status?: string };
   type FuelRow = { date?: string; amount?: number };
 
   const trips = read<TripRow>("vehicleTrips");
@@ -443,12 +464,28 @@ function offlineDashboard(): DashboardData {
   const monthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
 
   const sumRows = (rows: { amount?: number }[]) => rows.reduce((acc, r) => acc + num(r.amount), 0);
+  const approvedCollections = collections.filter((c) => (c.status ?? "Approved") === "Approved");
+  const shopNames = new Set([
+    ...sales.map((row) => String(row.shopName ?? "").trim()),
+    ...approvedCollections.map((row) => String(row.shopName ?? "").trim()),
+  ]);
+  shopNames.delete("");
+  const collectionPerformanceByShop = [...shopNames].map((shopName) => {
+    const salesAmount = sumRows(sales.filter((row) => row.shopName === shopName));
+    const collectionAmount = sumRows(approvedCollections.filter((row) => row.shopName === shopName));
+    return {
+      shopName,
+      salesAmount,
+      collectionAmount,
+      outstandingAmount: Math.max(0, salesAmount - collectionAmount),
+    };
+  });
 
   return {
     totalTrips: trips.length,
     totalSalesWeight: sales.reduce((acc, s) => acc + num(s.totalWeight), 0),
     totalSalesAmount: sumRows(sales),
-    totalCollections: sumRows(collections.filter((c) => (c.status ?? "Approved") === "Approved")),
+    totalCollections: sumRows(approvedCollections),
     pendingCollections: sumRows(collections.filter((c) => c.status === "Pending")),
     totalExpenses: sumRows(fuel),
     fuelExpense: sumRows(fuel),
@@ -467,13 +504,12 @@ function offlineDashboard(): DashboardData {
     activeHelpers: 0,
     totalShops: 0,
     totalFarms: 0,
-    pendingCollectionsByShop: [],
+    collectionPerformanceByShop,
     usedVehicles: 0,
     usedDrivers: 0,
     usedHelpers: 0,
     usedShops: 0,
     usedFarms: 0,
-    moduleCounts: null,
     sampleQuarter: null,
   };
 }

@@ -26,11 +26,8 @@ interface SearchableSelectProps {
   searchPlaceholder?: string;
 }
 
-/** How many option rows are visible before the list scrolls. */
-const VISIBLE_ITEMS = 5;
-/** Fixed row height so VISIBLE_ITEMS maps to an exact pixel height. */
-const ITEM_HEIGHT = 36; // h-9
-const LIST_MAX_HEIGHT = VISIBLE_ITEMS * ITEM_HEIGHT;
+/** Five 36px-at-default rows; rem keeps the visible window in scale. */
+const LIST_MAX_HEIGHT = "11.25rem";
 
 const SearchableSelect = ({
   label,
@@ -144,7 +141,7 @@ const SearchableSelect = ({
 
           <ul
             className="overflow-y-auto overscroll-contain scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent"
-            style={{ maxHeight: `${LIST_MAX_HEIGHT}px` }}
+            style={{ maxHeight: LIST_MAX_HEIGHT }}
           >
             {filtered.map((opt) => {
               const isSelected = value === opt.value;

@@ -39,7 +39,7 @@ function KpiCard({ kpi, index = 0 }: KpiCardProps) {
        Padding stays p-3 at every tier on purpose: container queries read the
        content-box width, so tiering the padding would move the measurement. */
     <div
-      className="@container group relative flex h-full min-h-[112px] min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white p-3 shadow-card transition-all duration-200 hover:-translate-y-px hover:border-slate-300/80 hover:shadow-card-lg animate-fade-in-up dark:border-slate-800 dark:bg-slate-900"
+      className="@container group relative flex h-full min-h-[7rem] min-w-0 flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white p-3 shadow-card transition-all duration-200 hover:-translate-y-px hover:border-slate-300/80 hover:shadow-card-lg animate-fade-in-up dark:border-slate-800 dark:bg-slate-900"
       style={{ animationDelay: `${Math.min(index * 40, 320)}ms` }}
     >
       <div className={`flex min-w-0 flex-1 flex-col ${hasSpark ? "pb-6" : ""}`}>
@@ -53,7 +53,7 @@ function KpiCard({ kpi, index = 0 }: KpiCardProps) {
           <span
             className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg @min-[100px]:h-7 @min-[100px]:w-7 ${tone.icon}`}
           >
-            <Icon size={13} className="h-[13px] w-[13px] @min-[100px]:h-3.5 @min-[100px]:w-3.5" />
+            <Icon size={13} className="h-[0.8125rem] w-[0.8125rem] @min-[100px]:h-3.5 @min-[100px]:w-3.5" />
           </span>
         </div>
 

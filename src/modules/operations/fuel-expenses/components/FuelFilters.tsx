@@ -39,11 +39,11 @@ export function FuelFilters({
   const selectStyles = {
     control: (base: any) => ({
       ...base,
-      borderRadius: 8,
+      borderRadius: "0.5rem",
       borderColor: "#e2e8f0",
       boxShadow: "none",
-      minHeight: 40,
-      fontSize: "14px",
+      minHeight: "2.5rem",
+      fontSize: "0.875rem",
       "&:hover": { borderColor: "#94a3b8" },
       "&:focus-within": { borderColor: "#3b82f6", boxShadow: "0 0 0 2px rgba(59, 130, 246, 0.15)" },
     }),
@@ -51,11 +51,11 @@ export function FuelFilters({
       ...base,
       backgroundColor: isSelected ? "#2563eb" : isFocused ? "#eff6ff" : "white",
       color: isSelected ? "white" : "#1e293b",
-      fontSize: "14px",
-      padding: "10px 12px", // Adjusted padding to ensure ~40px height per item
+      fontSize: "0.875rem",
+      padding: "0.625rem 0.75rem", // Adjusted padding to ensure ~40px height per item
     }),
     menu: (base: any) => ({ ...base, zIndex: 50 }),
-    placeholder: (base: any) => ({ ...base, color: "#94a3b8", fontSize: "14px" }),
+    placeholder: (base: any) => ({ ...base, color: "#94a3b8", fontSize: "0.875rem" }),
     multiValue: (base: any) => ({
       ...base,
       backgroundColor: "#e0f2fe",

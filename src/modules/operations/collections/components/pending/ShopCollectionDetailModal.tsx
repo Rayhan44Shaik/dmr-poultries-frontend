@@ -543,7 +543,7 @@ function ShopCollectionDetailView({
                 <div className="overflow-x-auto">
                   {/* S.No is a narrow rail; the seven data columns then share the
                     * remaining width EQUALLY, so every column is spaced the same. */}
-                  <table className="min-w-[1320px] w-full table-fixed divide-y divide-slate-100">
+                  <table className="min-w-[82.5rem] w-full table-fixed divide-y divide-slate-100">
                     <colgroup>
                       <col className="w-[6%]" />
                       <col className="w-[13.4286%]" />
