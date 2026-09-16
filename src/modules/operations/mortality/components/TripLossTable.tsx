@@ -19,7 +19,7 @@
 // The table shell is ALWAYS rendered. Empty states, loading and the pagination
 // footer all live INSIDE it, so the grid never disappears.
 
-import { Fragment, useState } from "react";
+import { Fragment, useEffect, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -236,6 +236,28 @@ export default function TripLossTable({
 }: TripLossTableProps) {
   const { t, language } = useI18n();
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  /**
+   * Width of the VISIBLE table area.
+   *
+   * The grid has fourteen columns and can therefore be wider than the box that
+   * scrolls it. An expanded row is a <td colSpan> inside that same table, so it
+   * would inherit that full — partly off-screen — width and push its right-hand
+   * half out of view. The panel is pinned to the scroller's left edge and given
+   * the measured width instead, so it always fits exactly under the grid.
+   */
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [panelWidth, setPanelWidth] = useState(0);
+
+  useEffect(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+    const sync = () => setPanelWidth(element.clientWidth);
+    sync();
+    if (typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(sync);
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, []);
 
   const toggle = (id: number) =>
     setExpanded((prev) => {
@@ -323,14 +345,14 @@ export default function TripLossTable({
         </p>
       </div>
 
-      <div className="w-full overflow-x-auto">
+      <div ref={scrollRef} className="w-full overflow-x-auto">
         <table className="min-w-full border-collapse text-left text-[13px]">
           <thead className="border-b border-slate-200 bg-slate-50/80 text-slate-600">
             <tr className="whitespace-nowrap">
               {COLUMNS.map((col) => (
                 <th
                   key={col.key}
-                  className={`px-3 py-2.5 align-middle text-[12px] font-bold uppercase tracking-wider ${alignClass(
+                  className={`px-2.5 py-2.5 align-middle text-[12px] font-bold uppercase tracking-wider ${alignClass(
                     col.align
                   )} ${col.key === "serial" ? "w-12" : ""}`}
                 >
@@ -345,13 +367,13 @@ export default function TripLossTable({
               <>
                 {[0, 1, 2, 3, 4, 5].map((rowIndex) => (
                   <tr key={`skeleton-${rowIndex}`}>
-                    <td colSpan={COLUMNS.length} className="px-3 py-2.5">
+                    <td colSpan={COLUMNS.length} className="px-2.5 py-2.5">
                       <div className="h-5 w-full animate-pulse rounded-md bg-slate-100" />
                     </td>
                   </tr>
                 ))}
                 <tr>
-                  <td colSpan={COLUMNS.length} className="px-3 py-2 text-center">
+                  <td colSpan={COLUMNS.length} className="px-2.5 py-2 text-center">
                     <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-400">
                       <span
                         className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600"
@@ -411,7 +433,7 @@ export default function TripLossTable({
                         isOpen ? "bg-slate-50/60" : index % 2 === 0 ? "bg-white" : "bg-slate-50/20"
                       }`}
                     >
-                      <td className="w-12 px-3 py-2.5">
+                      <td className="w-12 px-2.5 py-2.5">
                         <span className="flex items-center justify-center gap-1.5">
                           <button
                             type="button"
@@ -428,62 +450,62 @@ export default function TripLossTable({
                         </span>
                       </td>
 
-                      <td className="whitespace-nowrap px-3 py-2.5 font-bold text-indigo-600">{r.tripNo}</td>
+                      <td className="whitespace-nowrap px-2.5 py-2.5 font-bold text-indigo-600">{r.tripNo}</td>
 
-                      <td className="whitespace-nowrap px-3 py-2.5 font-medium text-slate-600">
+                      <td className="whitespace-nowrap px-2.5 py-2.5 font-medium text-slate-600">
                         {formatTripListDay(r.tripDate, language)}
                       </td>
 
                       <td
-                        className="max-w-[190px] truncate px-3 py-2.5 font-medium text-slate-700"
+                        className="max-w-[170px] truncate px-2.5 py-2.5 font-medium text-slate-700"
                         title={r.sourceFarm || undefined}
                       >
                         {r.sourceFarm || "—"}
                       </td>
 
                       <td
-                        className="max-w-[150px] truncate px-3 py-2.5 text-slate-600"
+                        className="max-w-[130px] truncate px-2.5 py-2.5 text-slate-600"
                         title={r.supervisorName || undefined}
                       >
                         {r.supervisorName || "—"}
                       </td>
 
-                      <td className="whitespace-nowrap px-3 py-2.5 text-center font-semibold tabular-nums text-amber-700">
+                      <td className="whitespace-nowrap px-2.5 py-2.5 text-center font-semibold tabular-nums text-amber-700">
                         {formatNumber(r.farmBirds)}
                       </td>
 
-                      <td className="whitespace-nowrap px-3 py-2.5 text-center tabular-nums text-amber-700">
+                      <td className="whitespace-nowrap px-2.5 py-2.5 text-center tabular-nums text-amber-700">
                         {formatWeight(r.farmWeight)}
                       </td>
 
                       {/* Plain number — the ShoppingBag glyph already names this
                           column in the header; repeating a badge on every row
                           is what made the grid noisy. */}
-                      <td className="whitespace-nowrap px-3 py-2.5 text-center font-semibold tabular-nums text-slate-700">
+                      <td className="whitespace-nowrap px-2.5 py-2.5 text-center font-semibold tabular-nums text-slate-700">
                         {formatNumber(r.deliveryShops)}
                       </td>
 
-                      <td className="whitespace-nowrap px-3 py-2.5 text-center font-semibold tabular-nums text-sky-700">
+                      <td className="whitespace-nowrap px-2.5 py-2.5 text-center font-semibold tabular-nums text-sky-700">
                         {formatNumber(r.deliveredBirds)}
                       </td>
 
-                      <td className="whitespace-nowrap px-3 py-2.5 text-center tabular-nums text-sky-700">
+                      <td className="whitespace-nowrap px-2.5 py-2.5 text-center tabular-nums text-sky-700">
                         {formatWeight(r.deliveredWeight)}
                       </td>
 
-                      <td className="whitespace-nowrap px-3 py-2.5 text-center font-semibold tabular-nums text-orange-600">
+                      <td className="whitespace-nowrap px-2.5 py-2.5 text-center font-semibold tabular-nums text-orange-600">
                         {formatNumber(r.mortalityCount)}
                       </td>
 
-                      <td className="whitespace-nowrap px-3 py-2.5 text-center tabular-nums text-orange-600">
+                      <td className="whitespace-nowrap px-2.5 py-2.5 text-center tabular-nums text-orange-600">
                         {formatWeight(r.mortalityWeight)}
                       </td>
 
-                      <td className="whitespace-nowrap px-3 py-2.5 text-center font-semibold tabular-nums text-rose-600">
+                      <td className="whitespace-nowrap px-2.5 py-2.5 text-center font-semibold tabular-nums text-rose-600">
                         {formatWeight(r.weightLoss)}
                       </td>
 
-                      <td className="whitespace-nowrap px-3 py-2.5 text-center tabular-nums text-rose-600">
+                      <td className="whitespace-nowrap px-2.5 py-2.5 text-center tabular-nums text-rose-600">
                         {r.weightLossPercentage.toFixed(2)}%
                       </td>
                     </tr>
@@ -491,7 +513,12 @@ export default function TripLossTable({
                     {isOpen && (
                       <tr>
                         <td colSpan={COLUMNS.length} className="p-0">
-                          <TripLossRowExpand record={r} />
+                          <div
+                            className="sticky left-0"
+                            style={panelWidth > 0 ? { width: `${panelWidth}px` } : undefined}
+                          >
+                            <TripLossRowExpand record={r} />
+                          </div>
                         </td>
                       </tr>
                     )}

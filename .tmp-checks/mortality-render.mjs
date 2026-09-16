@@ -160,6 +160,16 @@ ok("table: global pagination renders", tableHtml.includes("Showing") && tableHtm
 ok("table: rows-per-page control from the global pager", tableHtml.includes("Rows per page"), "rows per page missing");
 ok("table: header glyphs are coloured lucide icons", (tableHtml.match(/text-(indigo|violet|amber|emerald|sky|orange|rose)-500/g) || []).length >= 10, "icon tones missing");
 ok("table: expand affordance kept", tableHtml.includes("Expand trip") && tableHtml.includes("aria-expanded"), "expand control missing");
+// The expanded cell belongs to a table that can be wider than its scroller, so
+// the panel must be pinned to the scroller's edge — otherwise its right half
+// (and the last table columns) render outside the visible card. The panel only
+// exists once a row is expanded, so this one is asserted against the source.
+{
+  const { readFileSync } = await import("node:fs");
+  const source = readFileSync("src/modules/operations/mortality/components/TripLossTable.tsx", "utf8");
+  ok("table: expanded row is pinned to the visible area", source.includes('className="sticky left-0"') && source.includes("width: `${panelWidth}px`"), "panel is not pinned; it will overflow the card");
+  ok("table: the scroller is measured for the panel width", source.includes("new ResizeObserver") && source.includes("clientWidth") && tableHtml.includes("overflow-x-auto"), "scroll container is not measured");
+}
 
 /* ── 3b. The expanded row panel (the "dropdown") ──────────────────────── */
 {
@@ -172,7 +182,8 @@ ok("table: expand affordance kept", tableHtml.includes("Expand trip") && tableHt
   ok("panel: trip facts use the shared labels", expandHtml.includes("Vehicle") && expandHtml.includes("Supervisor") && expandHtml.includes("Source Farm") && expandHtml.includes("Driver") && expandHtml.includes("Loaders") && expandHtml.includes("Helpers"));
   // The reference idiom: label left, value RIGHT — nothing is left dangling.
   ok("panel: label/value cells are justify-between (value right-aligned)", (expandHtml.match(/justify-between/g) || []).length >= 8, `cells=${(expandHtml.match(/justify-between/g) || []).length}`);
-  ok("panel: two label/value pairs per row, split by a divider", (expandHtml.match(/sm:grid-cols-2/g) || []).length === 4 && expandHtml.includes("sm:divide-x"));
+  ok("panel: facts sit four-up on wide screens (labels stay next to values)", (expandHtml.match(/lg:grid-cols-4/g) || []).length === 2 && expandHtml.includes("sm:divide-x"));
+  ok("panel: weights columns are fixed so one cannot swallow the width", expandHtml.includes("table-fixed") && (expandHtml.match(/w-\[(34|20|26)%\]/g) || []).length === 4);
   ok("panel: rows are one line tall", expandHtml.includes("py-1.5") && !expandHtml.includes("py-2 text-\[13px\]"));
   ok("panel: survival rate closes the weights card as a tinted strip", expandHtml.includes("bg-emerald-50/70") && expandHtml.includes("Survival Rate"));
 }

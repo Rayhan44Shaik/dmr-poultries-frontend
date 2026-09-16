@@ -88,12 +88,13 @@ export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
   const crew = (names?: string[]) => (names && names.length > 0 ? names.join(", ") : "—");
   const farmWeight = Math.max(record.farmWeight, 1);
 
-  const detailRows: Array<[DetailField, DetailField]> = [
+  // Four facts per row on anything wide: with two per row each cell spanned
+  // half the card, so the label sat at one end and its value at the other with a
+  // band of nothing between them. Four keeps every label next to its value.
+  const detailRows: DetailField[][] = [
     [
       { label: t("ops.mortality.field.trip_no"), value: record.tripNo, tone: "text-indigo-600" },
       { label: t("ops.trip.day"), value: formatTripListDay(record.tripDate, language) },
-    ],
-    [
       { label: t("common.vehicle"), value: record.vehicleNo || "—", title: record.vehicleNo || undefined },
       { label: t("common.supervisor"), value: record.supervisorName || "—" },
     ],
@@ -104,8 +105,6 @@ export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
         value: record.sourceFarm || "—",
         title: record.sourceFarm || undefined,
       },
-    ],
-    [
       { label: t("ops.trip.field.loaders"), value: crew(record.loaders), wrap: true },
       { label: t("ops.trip.field.helpers"), value: crew(record.helpers), wrap: true },
     ],
@@ -166,12 +165,12 @@ export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
           }
         >
           <div className="divide-y divide-slate-100">
-            {detailRows.map((pair, rowIndex) => (
+            {detailRows.map((row, rowIndex) => (
               <div
                 key={rowIndex}
-                className="grid grid-cols-1 divide-y divide-slate-100 sm:grid-cols-2 sm:divide-x sm:divide-y-0"
+                className="grid grid-cols-1 divide-y divide-slate-100 sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-4"
               >
-                {pair.map((field, cellIndex) => (
+                {row.map((field, cellIndex) => (
                   <Cell key={cellIndex} field={field} />
                 ))}
               </div>
@@ -181,13 +180,13 @@ export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
 
         {/* ── 2. WEIGHTS ──────────────────────────────────────────────── */}
         <Card icon={Scale} tone="text-rose-500" title={t("ops.mortality.detail.weight_summary")}>
-          <table className="w-full border-collapse text-[13px]">
+          <table className="w-full table-fixed border-collapse text-[13px]">
             <thead>
               <tr className="border-b border-slate-100 text-[11px] uppercase tracking-wider text-slate-400">
-                <th className="px-4 py-1.5 text-left font-semibold">{t("common.name")}</th>
-                <th className="px-4 py-1.5 text-right font-semibold">{t("common.birds")}</th>
-                <th className="px-4 py-1.5 text-right font-semibold">{t("common.weight")}</th>
-                <th className="w-[110px] px-4 py-1.5 text-right font-semibold">%</th>
+                <th className="w-[34%] px-4 py-1.5 text-left font-semibold">{t("common.name")}</th>
+                <th className="w-[20%] px-4 py-1.5 text-right font-semibold">{t("common.birds")}</th>
+                <th className="w-[26%] px-4 py-1.5 text-right font-semibold">{t("common.weight")}</th>
+                <th className="w-[20%] px-4 py-1.5 text-right font-semibold">%</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
