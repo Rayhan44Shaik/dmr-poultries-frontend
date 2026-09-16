@@ -21,7 +21,6 @@ import ChartCard from "./components/ChartCard";
 import TodayTripsTable from "./components/TodayTripsTable";
 import PendingCollectionsCard from "./components/PendingCollectionsCard";
 import FleetStatusCard from "./components/FleetStatusCard";
-import ActiveResourcesCard from "./components/ActiveResourcesCard";
 import ActivityTimeline from "./components/ActivityTimeline";
 import DashboardSkeleton from "./components/DashboardSkeleton";
 import {
@@ -192,14 +191,8 @@ function DashboardPage() {
           {/* Fleet overview                                          */}
           {/* ------------------------------------------------------ */}
           <FleetStatusCard fleet={derived.fleet} />
-
-          {/* ------------------------------------------------------ */}
-          {/* Active network & workforce — active-out-of-total for      */}
-          {/* shops, vehicles, drivers, supervisors, helpers, loaders   */}
-          {/* ------------------------------------------------------ */}
-          <ActiveResourcesCard stats={derived.workforce} />
         </>
-      ) : (
+) : (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-slate-200 bg-white/60 px-4 py-16 text-center dark:border-slate-800 dark:bg-slate-900/60">
           <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t("dashboard.something_wrong")}</p>
           <p className="text-xs text-slate-400">{t("common.try_again")}</p>

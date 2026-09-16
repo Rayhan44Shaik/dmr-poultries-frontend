@@ -49,8 +49,6 @@ export async function runDashboardSyncCheck(): Promise<void> {
     hasAnyData: derived.hasAnyData,
     todayTrips: derived.todayTrips.length,
     latestTrips: derived.latestTrips.length,
-    // Active network & workforce card — active out of total per masters register.
-    workforce: derived.workforce.map((w) => ({ key: w.key, active: w.active, total: w.total, inactive: w.total - w.active })),
     fleet: derived.fleet.map((f) => ({ no: f.number, status: f.status, driver: f.driver, km: f.km, note: f.maintenanceNote })),
     vehicleActivity: derived.vehicleActivity,
     seriesSales: derived.salesVsCollections.map((s) => ({ d: s.date, sales: s.sales, collections: s.collections })),
