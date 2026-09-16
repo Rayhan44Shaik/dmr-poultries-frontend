@@ -220,6 +220,8 @@ export default function CollectionPerformanceChart({
   );
   const propSnapshotKey = useMemo(() => {
     const firstShop = data[0]?.shopName ?? "";
+    // Array.prototype.at() needs lib ES2022; the root tsconfig pins ES2020,
+    // so index the final row directly (identical semantics).
     const lastShop = data[data.length - 1]?.shopName ?? "";
     return [fromDate, toDate, totalSales, totalCollections, totalPending, data.length, firstShop, lastShop].join("|");
   }, [data, fromDate, toDate, totalSales, totalCollections, totalPending]);

@@ -65,6 +65,12 @@ export interface ActivityItem {
   title: string;
   description: string;
   time: string;
+  /**
+   * ISO date/time used for ordering — the rendered `time` is a localized
+   * label ("Today", "14 Sep"), which cannot be sorted as text without
+   * mixing same-day and dated entries out of order.
+   */
+  sortKey: string;
   tone: "brand" | "sky" | "amber" | "rose" | "violet" | "slate";
   icon: LucideIcon;
 }
@@ -281,6 +287,7 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
           weight: formatWeight(t.totalDeliveredWeight || 0),
         }),
         time: tFunc("time.today"),
+        sortKey: t.tripDate || today,
         tone: "brand",
         icon: Truck,
       });
@@ -298,6 +305,7 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
           paymentMode: c.paymentModeName,
         }),
         time: tFunc("time.today"),
+        sortKey: c.collectionDate || c.createdDate || today,
         tone: "sky",
         icon: CreditCard,
       });
@@ -316,6 +324,7 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
           amount: formatINR(Number(f.amount) || 0),
         }),
         time: tFunc("time.today"),
+        sortKey: f.date || today,
         tone: "amber",
         icon: Bird,
       });
@@ -332,12 +341,16 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
         // The fleet API stamps jobs with a full ISO date-time; show the same
         // short date label the rest of the timeline uses.
         time: m.date ? formatDateShort(m.date) : "",
+        sortKey: m.date ?? "",
         tone: "violet",
         icon: Truck,
       });
     });
 
-  activity.sort((a, b) => b.time.localeCompare(a.time));
+  // Order by the real business date, not the localized label — comparing the
+  // rendered text ("Today" vs "14 Sep") alphabetically scattered same-day
+  // items between dated maintenance entries.
+  activity.sort((a, b) => b.sortKey.localeCompare(a.sortKey));
 
   /* ----- KPIs ----- */
   const kpis: KpiDatum[] = [

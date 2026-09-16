@@ -304,6 +304,8 @@
 
   --animate-fade-in: fade-in 0.18s ease-out both;
   --animate-fade-in-up: fade-in-up 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
+  /* KPI tile entrance — a little rise with a soft settle, staggered per tile. */
+  --animate-kpi-tile: kpi-tile-in 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-scale-in: scale-in 0.14s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-slide-down: slide-down 0.18s cubic-bezier(0.16, 1, 0.3, 1) both;
   --animate-slide-in-left: slide-in-left 0.2s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -334,6 +336,10 @@
   @keyframes fade-in-up {
     from { opacity: 0; transform: translateY(6px); }
     to { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes kpi-tile-in {
+    from { opacity: 0; transform: translateY(10px) scale(0.97); }
+    to { opacity: 1; transform: translateY(0) scale(1); }
   }
   @keyframes scale-in {
     from { opacity: 0; transform: scale(0.98); }

@@ -84,7 +84,12 @@ const initialData: DashboardData = {
 export function useDashboardData(
   _fromDate: Date | null,
   _toDate: Date | null,
-  _comparisonPeriod: "7d" | "15d" | "30d"
+  _comparisonPeriod: "7d" | "15d" | "30d",
+  /** Gate the first load: callers that need to pin the analysis window first
+   *  (e.g. waiting on the sample quarter's business date) hold this false so
+   *  the dashboard loads ONCE with the final dates instead of loading a
+   *  browser-clock window and immediately throwing it away. */
+  _ready = true
 ) {
   const [data, setData] = useState<DashboardData>(initialData);
   /* The comparison window: the equal-length stretch immediately BEFORE the one
@@ -163,7 +168,9 @@ export function useDashboardData(
     }
     try {
       const [baseline, baselineBirds] = await Promise.all([
-        loadOperationsDashboard(previousWindow.from, previousWindow.to),
+        // The comparison window feeds only KPI deltas — it never renders the
+        // span rosters, so skip the trip-list pulls (no background duplication).
+        loadOperationsDashboard(previousWindow.from, previousWindow.to, { withSpanFleet: false }),
         withBirds(previousWindow),
       ]);
       if (requestId !== requestRef.current) return;
@@ -180,8 +187,9 @@ export function useDashboardData(
   }, [_fromDate, _toDate, previousWindow]);
 
   useEffect(() => {
+    if (!_ready) return;
     void loadData();
-  }, [loadData]);
+  }, [loadData, _ready]);
 
   const refetch = useCallback(() => {
     void loadData();
