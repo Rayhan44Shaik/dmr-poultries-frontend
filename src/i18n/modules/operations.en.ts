@@ -923,6 +923,7 @@ export default {
   'ops.mortality.detail.farm': 'Farm',
   'ops.mortality.detail.delivered': 'Delivered',
   'ops.mortality.detail.weight_summary': 'Weights',
+  'ops.mortality.detail.rates': 'Rates',
   'ops.mortality.detail.farm_input': 'Farm Input',
   'ops.mortality.detail.mortality': 'Mortality',
   'ops.mortality.detail.weight_loss': 'Weight Loss',

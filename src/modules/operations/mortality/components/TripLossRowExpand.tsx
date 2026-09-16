@@ -89,7 +89,6 @@ function Cell({ field }: { field: DetailField }) {
 export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
   const { t, language } = useI18n();
   const crew = (names?: string[]) => (names && names.length > 0 ? names.join(", ") : "—");
-  const farmWeight = Math.max(record.farmWeight, 1);
 
   // TWO label/value pairs per row — trip no + day, vehicle + supervisor, then
   // driver + farm and the crew. Two columns keep each line short enough that the
@@ -117,49 +116,39 @@ export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
     ],
   ];
 
-  const weightRows: Array<{
-    label: string;
-    birds: React.ReactNode;
-    weight: string;
-    pct: string;
-    tone: string;
-    pctTone?: string;
-  }> = [
+  // Quantities only — the percentages live in the Rates box beside this table,
+  // so no figure is printed twice inside the same panel.
+  const weightRows: Array<{ label: string; birds: React.ReactNode; weight: string; tone: string }> = [
     {
       label: t("ops.mortality.detail.farm"),
       birds: formatNumber(record.farmBirds),
       weight: formatWeight(record.farmWeight),
-      pct: "100.00%",
       tone: "text-amber-700",
-      pctTone: "text-slate-400",
     },
     {
       label: t("ops.mortality.detail.delivered"),
       birds: formatNumber(record.deliveredBirds),
       weight: formatWeight(record.deliveredWeight),
-      pct: `${((record.deliveredWeight / farmWeight) * 100).toFixed(2)}%`,
       tone: "text-sky-700",
     },
     {
       label: t("ops.mortality.detail.mortality"),
       birds: formatNumber(record.mortalityCount),
       weight: formatWeight(record.mortalityWeight),
-      pct: `${record.mortalityPercentage.toFixed(2)}%`,
       tone: "text-orange-600",
     },
     {
       label: t("ops.mortality.detail.weight_loss"),
-      // Loss is a weight-and-percentage figure; it has no bird count of its own.
+      // Loss is a weight figure; it has no bird count of its own.
       birds: <span className="text-slate-300">—</span>,
       weight: formatWeight(record.weightLoss),
-      pct: `${record.weightLossPercentage.toFixed(2)}%`,
       tone: "text-rose-600",
     },
   ];
 
   return (
     <div className="border-t border-slate-200/80 bg-slate-100/60 px-3 py-2.5">
-      <div className="space-y-2.5">
+      <div className="space-y-2">
         {/* ── 1. TRIP DETAILS ─────────────────────────────────────────── */}
         <Card
           icon={Truck}
@@ -185,56 +174,67 @@ export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
           </div>
         </Card>
 
-        {/* ── 2. WEIGHTS ──────────────────────────────────────────────── */}
-        <Card icon={Scale} tone="text-rose-500" title={t("ops.mortality.detail.weight_summary")}>
-          {/* Columns are sized to their content and packed together; the last
-              cell is an invisible filler that absorbs the remaining width, so
-              the numbers never drift away from their headings. table-fixed
-              guarantees the widths hold whatever the values are. */}
-          <table className="w-full table-fixed border-collapse text-[13px]">
-            <thead>
-              <tr className="border-b border-slate-100 text-[11px] uppercase tracking-wider text-slate-600">
-                <th className="w-[22%] px-3 py-1.5 text-left font-bold">{t("common.name")}</th>
-                <th className="w-[11%] px-3 py-1.5 text-right font-bold">{t("common.birds")}</th>
-                <th className="w-[14%] px-3 py-1.5 text-right font-bold">{t("common.weight")}</th>
-                <th className="w-[11%] px-3 py-1.5 text-right font-bold">%</th>
-                <th className="w-[42%]" aria-hidden="true" />
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100">
-              {weightRows.map((row) => (
-                <tr key={row.label}>
-                  <td className="px-3 py-1.5 font-medium text-slate-700">{row.label}</td>
-                  <td className={`px-3 py-1.5 text-right font-semibold tabular-nums ${row.tone}`}>
-                    {row.birds}
-                  </td>
-                  <td className={`px-3 py-1.5 text-right font-semibold tabular-nums ${row.tone}`}>
-                    {row.weight}
-                  </td>
-                  <td
-                    className={`px-3 py-1.5 text-right font-semibold tabular-nums ${
-                      row.pctTone ?? row.tone
-                    }`}
-                  >
-                    {row.pct}
-                  </td>
-                  <td aria-hidden="true" />
+        {/* ── 2. WEIGHTS + RATES ──────────────────────────────────────── */}
+        {/* Two small boxes side by side rather than one wide one: the table
+            holds the quantities, the box beside it holds the rates. Rows are
+            one line tall and the columns are sized to their content, so each
+            box is only as big as what it prints. */}
+        <div className="grid gap-2.5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+          <Card icon={Scale} tone="text-rose-500" title={t("ops.mortality.detail.weight_summary")}>
+            <table className="w-full table-fixed border-collapse text-[12.5px]">
+              <thead>
+                <tr className="border-b border-slate-100 text-[10.5px] uppercase tracking-wider text-slate-600">
+                  <th className="w-[46%] px-3 py-1 text-left font-bold">{t("common.name")}</th>
+                  <th className="w-[24%] px-3 py-1 text-right font-bold">{t("common.birds")}</th>
+                  <th className="w-[30%] px-3 py-1 text-right font-bold">{t("common.weight")}</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {weightRows.map((row) => (
+                  <tr key={row.label}>
+                    <td className="px-3 py-1 font-medium text-slate-700">{row.label}</td>
+                    <td className={`px-3 py-1 text-right font-semibold tabular-nums ${row.tone}`}>
+                      {row.birds}
+                    </td>
+                    <td className={`px-3 py-1 text-right font-semibold tabular-nums ${row.tone}`}>
+                      {row.weight}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
 
-          {/* Headline strip — one tinted bar, like a detail card's total row. */}
-          <div className="flex items-center justify-between gap-3 border-t border-emerald-100 bg-emerald-50/70 px-4 py-2">
-            <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-emerald-700">
-              <HeartPulse size={13} aria-hidden="true" />
-              {t("ops.mortality.field.survival_rate")}
-            </span>
-            <span className="text-[15px] font-extrabold tabular-nums text-emerald-700">
-              {(record.survivalRate * 100).toFixed(2)}%
-            </span>
-          </div>
-        </Card>
+          {/* The rates the trip is judged on, as one small box. */}
+          <Card icon={HeartPulse} tone="text-emerald-600" title={t("ops.mortality.detail.rates")}>
+            <div className="flex items-center justify-between gap-3 border-b border-emerald-100 bg-emerald-50/70 px-3 py-1.5">
+              <span className="text-[10.5px] font-bold uppercase tracking-wide text-emerald-700">
+                {t("ops.mortality.field.survival_rate")}
+              </span>
+              <span className="text-[17px] font-extrabold leading-none tabular-nums text-emerald-700">
+                {(record.survivalRate * 100).toFixed(2)}%
+              </span>
+            </div>
+            <div className="divide-y divide-slate-100">
+              <div className="flex items-center justify-between gap-3 px-3 py-1">
+                <span className="text-[10.5px] font-bold uppercase tracking-wide text-slate-600">
+                  {t("ops.mortality.field.mortality_pct")}
+                </span>
+                <span className="text-[13px] font-bold tabular-nums text-orange-600">
+                  {record.mortalityPercentage.toFixed(2)}%
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3 px-3 py-1">
+                <span className="text-[10.5px] font-bold uppercase tracking-wide text-slate-600">
+                  {t("ops.mortality.field.weight_loss_pct")}
+                </span>
+                <span className="text-[13px] font-bold tabular-nums text-rose-600">
+                  {record.weightLossPercentage.toFixed(2)}%
+                </span>
+              </div>
+            </div>
+          </Card>
+        </div>
       </div>
     </div>
   );

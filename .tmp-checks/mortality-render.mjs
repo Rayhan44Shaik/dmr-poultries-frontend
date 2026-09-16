@@ -176,7 +176,7 @@ ok("table: expand affordance kept", tableHtml.includes("Expand trip") && tableHt
   const expandModule = await server.ssrLoadModule("/src/modules/operations/mortality/components/TripLossRowExpand.tsx");
   const expandHtml = render(React.createElement(expandModule.default, { record: rows[0] }));
   ok("panel: trip + vehicle facts", expandHtml.includes(rows[0].tripNo) && expandHtml.includes(rows[0].vehicleNo) && expandHtml.includes(rows[0].driverName));
-  ok("panel: two cards, stacked", (expandHtml.match(/<h4/g) || []).length === 2, `h4=${(expandHtml.match(/<h4/g) || []).length}`);
+  ok("panel: three small cards (trip + weights + rates)", (expandHtml.match(/<h4/g) || []).length === 3, `h4=${(expandHtml.match(/<h4/g) || []).length}`);
   ok("panel: no shop-wise delivery card", !expandHtml.includes("Delivery Output") && !expandHtml.includes("Total Delivery") && !expandHtml.includes(">Shop<"), "the shop table is still mounted");
   ok("panel: weights table is a plain table — no bars", !expandHtml.includes('style="width') && !expandHtml.includes("animate-pulse"));
   ok("panel: trip facts use the shared labels", expandHtml.includes("Vehicle") && expandHtml.includes("Supervisor") && expandHtml.includes("Source Farm") && expandHtml.includes("Driver") && expandHtml.includes("Loaders") && expandHtml.includes("Helpers"));
@@ -184,7 +184,10 @@ ok("table: expand affordance kept", tableHtml.includes("Expand trip") && tableHt
   ok("panel: value follows its label (nothing stretched to the cell edge)", (expandHtml.match(/w-\[104px\]/g) || []).length === 8, `cells=${(expandHtml.match(/w-\[104px\]/g) || []).length}`);
   ok("panel: trip details are TWO columns, not four", (expandHtml.match(/sm:grid-cols-2/g) || []).length === 4 && !expandHtml.includes("lg:grid-cols-4"));
   ok("panel: headings are brightened", expandHtml.includes("text-slate-500") && expandHtml.includes("text-slate-600"), "heading tints missing");
-  ok("panel: weights columns are compact + fixed, filler absorbs the rest", expandHtml.includes("table-fixed") && (expandHtml.match(/w-\[(22|11|14|42)%\]/g) || []).length === 5, `cols=${(expandHtml.match(/w-\[[0-9]+%\]/g) || []).length}`);
+  ok("panel: weights box is small — three content-sized columns, no % column", expandHtml.includes("table-fixed") && (expandHtml.match(/w-\[(46|24|30)%\]/g) || []).length === 3 && !expandHtml.includes(">%<"), `cols=${(expandHtml.match(/w-\[[0-9]+%\]/g) || []).length}`);
+  ok("panel: weights and rates are two small boxes side by side (no 42% filler card)", expandHtml.includes("lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]") && !expandHtml.includes("w-[42%]"));
+  ok("panel: rates box carries survival + mortality % + loss %", expandHtml.includes("Survival Rate") && expandHtml.includes("Mortality %") && expandHtml.includes("Loss %"));
+  ok("panel: compact rows (py-1)", (expandHtml.match(/py-1 /g) || []).length >= 8, `compact rows=${(expandHtml.match(/py-1 /g) || []).length}`);
   ok("panel: rows are one line tall", expandHtml.includes("py-1.5") && !expandHtml.includes("py-2 text-\[13px\]"));
   ok("panel: survival rate closes the weights card as a tinted strip", expandHtml.includes("bg-emerald-50/70") && expandHtml.includes("Survival Rate"));
 }

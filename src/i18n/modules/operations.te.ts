@@ -970,6 +970,7 @@ export default {
   'ops.mortality.detail.farm': 'ఫారం',
   'ops.mortality.detail.delivered': 'డెలివరీ',
   'ops.mortality.detail.weight_summary': 'బరువులు',
+  'ops.mortality.detail.rates': 'రేట్లు',
   'ops.mortality.detail.farm_input': 'ఫారం ఇన్‌పుట్',
   'ops.mortality.detail.mortality': 'మరణాలు',
   'ops.mortality.detail.weight_loss': 'బరువు నష్టం',
