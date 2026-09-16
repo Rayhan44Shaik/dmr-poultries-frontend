@@ -382,6 +382,7 @@ const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
         {/* Latest Records Table */}
         <LatestMaintenanceTable
           records={displayRecords}
+          allRecords={maintenance}
           vehicles={vehicles}
           viewMode={viewMode}
           onView={handleView}
@@ -405,7 +406,7 @@ const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
             record={viewRecord}
             vehicles={vehicles}
             onClose={() => setViewModalOpen(false)}
-            canEdit={viewRecord.paymentStatus !== 'approved' && !viewRecord.deletedAt && isEditable(viewRecord.date)}
+            canEdit={viewRecord.paymentStatus !== 'approved' && !viewRecord.deletedAt}
             onEdit={(rec) => { setViewModalOpen(false); handleEdit(rec); }}
           />
         )}

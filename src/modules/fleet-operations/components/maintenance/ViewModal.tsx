@@ -110,13 +110,14 @@ const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose, canEdi
               {statusPill.icon}
               {statusLabel}
             </span>
+            {/* Trip-view close: white circle, red on hover, lifts on hover */}
             <button
               type="button"
               onClick={onClose}
               aria-label={t('common.close')}
-              className="group relative rounded-xl p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+              className="group relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:-translate-y-0.5 hover:border-red-100 hover:bg-red-50 hover:text-red-500 active:scale-95"
             >
-              <span className={`inline-flex ${uiActionIconMotionClass.close}`}><X size={18} /></span>
+              <span className={`inline-flex ${uiActionIconMotionClass.close}`}><X size={16} /></span>
             </button>
           </div>
         </div>

@@ -1,9 +1,10 @@
 import { memo, useState, useMemo, useEffect, useRef } from 'react';
 import {
-  Eye, Trash2, CheckCircle2,
+  Eye, Trash2, CheckCircle2, ChevronDown, Truck,
   Search, Paperclip, Hash, Calendar, Wrench, Store, User, Gauge, Clock, Wallet, History, X, RotateCcw
 } from 'lucide-react';
 import { useI18n, translateStatus } from '../../../../i18n';
+import { safeDate } from '../../utils/maintenanceHelpers';
 // Recent-Trip-Activity chrome + global pagination standard.
 import { Pagination } from '../../../../ui';
 import { BrandRefreshButton } from '../../../../ui';
@@ -18,6 +19,9 @@ export type ViewMode = 'pending' | 'approved' | 'deleted';
 
 interface LatestMaintenanceTableProps {
   records: MaintenanceEvent[];
+  /** FULL maintenance list — powers the Approved tab's per-vehicle expansion
+   *  (one row per vehicle, expand to see every record of that vehicle). */
+  allRecords?: MaintenanceEvent[];
   vehicles: any[];
   viewMode: ViewMode;
   onView: (record: MaintenanceEvent) => void;
@@ -36,6 +40,7 @@ interface LatestMaintenanceTableProps {
 
 const LatestMaintenanceTable = ({
   records,
+  allRecords = [],
   vehicles,
   viewMode,
   onView,
@@ -52,6 +57,8 @@ const LatestMaintenanceTable = ({
   const { t, language } = useI18n();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  // Approved tab expansion — which vehicle's full record list is open.
+  const [expandedVehicle, setExpandedVehicle] = useState<string | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
 
   const { requestDelete, cancel, isPending, pendingItems } = usePendingDelete<string>(async (id) => {
@@ -70,6 +77,24 @@ const LatestMaintenanceTable = ({
     if (rec.vehicleNo) return String(rec.vehicleNo);
     return '—';
   };
+
+  /** Every maintenance record per vehicle id, newest first — the Approved tab
+   *  shows one row per vehicle and expands to this list (collection-entry
+   *  approved pattern: one row per shop → all records inside). */
+  const vehicleHistory = useMemo(() => {
+    const map = new Map<string, MaintenanceEvent[]>();
+    for (const rec of allRecords) {
+      if (!rec.vehicleId) continue;
+      const key = String(rec.vehicleId);
+      const list = map.get(key);
+      if (list) list.push(rec);
+      else map.set(key, [rec]);
+    }
+    for (const list of map.values()) {
+      list.sort((a, b) => safeDate(b.date).getTime() - safeDate(a.date).getTime());
+    }
+    return map;
+  }, [allRecords]);
 
   const filteredRecords = useMemo(() => {
     const term = searchTerm.trim().toLowerCase();
@@ -178,7 +203,7 @@ const LatestMaintenanceTable = ({
               <button
                 key={mode}
                 type="button"
-                onClick={() => onToggleView(mode)}
+                onClick={() => { setExpandedVehicle(null); onToggleView(mode); }}
                 aria-pressed={viewMode === mode}
                 className={`inline-flex items-center px-5 py-1.5 text-xs font-semibold rounded-md transition-all ${
                   viewMode === mode
@@ -393,11 +418,24 @@ const LatestMaintenanceTable = ({
                           ? 'bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200'
                           : 'border-l-4 border-l-transparent'
                       }`}
-                      onClick={() => handleRowClick(rec.id)}
+                      onClick={() => {
+                        handleRowClick(rec.id);
+                        if (viewMode === 'approved') {
+                          setExpandedVehicle((current) => (current === String(rec.vehicleId) ? null : String(rec.vehicleId)));
+                        }
+                      }}
                     >
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex items-start gap-1.5">
-                          <div className="w-[13px] shrink-0 mt-0.5" />
+                          {viewMode === 'approved' ? (
+                            <span className={`mt-1 inline-flex shrink-0 text-slate-400 transition-transform duration-200 ${
+                              expandedVehicle === String(rec.vehicleId) ? 'rotate-180 text-blue-500' : ''
+                            }`}>
+                              <ChevronDown size={13} />
+                            </span>
+                          ) : (
+                            <div className="w-[13px] shrink-0 mt-0.5" />
+                          )}
                           <div className="flex flex-col items-start gap-1">
                             <span className={`inline-flex items-center gap-1.5 text-xs font-bold rounded-md px-2 py-0.5 border ${
                               isDeleted
@@ -489,6 +527,71 @@ const LatestMaintenanceTable = ({
                     </tr>
                   );
                 })}
+                {viewMode === 'approved' &&
+                  expandedVehicle &&
+                  paginatedRecords.some((r) => String(r.vehicleId) === expandedVehicle) &&
+                  (() => {
+                    const history = vehicleHistory.get(expandedVehicle) ?? [];
+                    const vehicle = vehicles.find((v) => String(v.id) === expandedVehicle);
+                    const label = vehicle?.vehicleNumber || history[0]?.vehicleNo || expandedVehicle;
+                    const colSpan = 9;
+                    return (
+                      <tr key={`history-${expandedVehicle}`}>
+                        <td colSpan={colSpan} className="bg-slate-50/80 p-0">
+                          <div className="animate-fade-in-up border-y border-slate-100">
+                            <p className="flex items-center gap-2 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                              <Truck size={13} className="text-slate-400" />
+                              {label}
+                              <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-slate-500 ring-1 ring-slate-200 tabular-nums">
+                                {history.length}
+                              </span>
+                              <span className="font-medium normal-case text-slate-400">
+                                — scroll to see all records
+                              </span>
+                            </p>
+                            <div className="max-h-72 overflow-y-auto">
+                              <table className="min-w-full text-sm">
+                                <tbody className="divide-y divide-slate-100 bg-white">
+                                  {history.map((sub) => (
+                                    <tr
+                                      key={sub.id}
+                                      className="cursor-pointer transition-colors hover:bg-blue-50/40"
+                                      onClick={(e) => { e.stopPropagation(); onView(sub); }}
+                                    >
+                                      <td className="px-4 py-2 pl-10 text-xs font-medium text-slate-600 whitespace-nowrap">
+                                        {formatTripListDay(sub.date || sub.createdAt, language)}
+                                      </td>
+                                      <td className="px-4 py-2 text-xs">
+                                        <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-bold ${
+                                          sub.paymentStatus === 'approved'
+                                            ? 'border-emerald-100/80 bg-emerald-50 text-emerald-700'
+                                            : sub.deletedAt
+                                              ? 'border-rose-100/80 bg-rose-50 text-rose-700'
+                                              : 'border-orange-100/80 bg-orange-50 text-orange-700'
+                                        }`}>
+                                          {sub.billNumber || '—'}
+                                        </span>
+                                      </td>
+                                      <td className="px-4 py-2 text-xs text-slate-600">{(sub.maintenanceType || '—').split(',')[0]}</td>
+                                      <td className="px-4 py-2 text-xs text-slate-500">{sub.garage || '—'}</td>
+                                      <td className="px-4 py-2 text-right text-xs font-semibold text-slate-700 tabular-nums">{Number(sub.currentKM || 0).toLocaleString()}</td>
+                                      <td className="px-4 py-2 text-right text-xs font-bold text-blue-700 tabular-nums">₹{Number(sub.totalCost || 0).toFixed(2)}</td>
+                                      <td className="px-4 py-2 text-right">
+                                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-500">
+                                          <Eye size={12} />
+                                          {t('common.view')}
+                                        </span>
+                                      </td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })()}
               </tbody>
             </table>
           </div>
