@@ -13,6 +13,7 @@ import MaintenanceForm from '../components/maintenance/MaintenanceForm';
 import LatestMaintenanceTable, { type ViewMode } from '../components/maintenance/LatestMaintenanceTable';
 import ViewModal from '../components/maintenance/ViewModal';
 import { MAINTENANCE_TYPES } from '../utils/constants';
+import { formatVehicleNumber } from '../../../utils/format';
 import type { MaintenanceEvent } from '../types';
 import { RotateCcw, Save, Wrench, X, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { opsSecondaryButtonClass } from '../../../shared/ui/operationsStyles';
@@ -230,7 +231,7 @@ const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
       return;
     }
     const vehicle = vehicles.find((v: any) => String(v.id) === String(record.vehicleId));
-    const vehicleDisplay = vehicle?.vehicleNumber || record.vehicleNo || record.vehicleId || t('fleet.maintenance_entry.unknown_vehicle');
+    const vehicleDisplay = formatVehicleNumber(String(vehicle?.vehicleNumber || record.vehicleNo || record.vehicleId || '')) || t('fleet.maintenance_entry.unknown_vehicle');
     setApproveDialog({
       open: true,
       record,

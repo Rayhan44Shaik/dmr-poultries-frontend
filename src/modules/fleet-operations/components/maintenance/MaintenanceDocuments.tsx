@@ -69,7 +69,6 @@ const MaintenanceDocuments = ({ maintenanceId, documents, allowRemove = true, on
             <div key={doc.id} className="group overflow-hidden rounded-xl border border-slate-200 bg-slate-50 transition hover:border-blue-300 hover:shadow-sm">
               <button
                 type="button"
-                title={doc.fileName}
                 onClick={() => setPreviewDoc((current) => (current?.id === doc.id ? null : doc))}
                 className={`flex h-24 w-full items-center justify-center overflow-hidden bg-slate-100 transition-all ${
                   previewDoc?.id === doc.id ? 'ring-2 ring-inset ring-blue-400' : ''
@@ -77,13 +76,13 @@ const MaintenanceDocuments = ({ maintenanceId, documents, allowRemove = true, on
                 {isImage ? <img src={url} alt={doc.fileName} className="h-full w-full object-cover transition-transform group-hover:scale-105" /> : <div className="flex flex-col items-center text-slate-400"><FileText size={26} /><span className="mt-1 text-[10px] uppercase">PDF</span></div>}
               </button>
               <div className="p-2">
-                <p className="flex items-center gap-1 truncate text-xs font-medium text-slate-700" title={doc.fileName}><Paperclip size={11} className="shrink-0 text-slate-400" /><span className="truncate">{doc.fileName}</span></p>
+                <p className="flex items-center gap-1 truncate text-xs font-medium text-slate-700"><Paperclip size={11} className="shrink-0 text-slate-400" /><span className="truncate">{doc.fileName}</span></p>
                 <div className="mt-1 flex items-center justify-between">
                   <span className="text-[10px] text-slate-400">{formatFileSize(doc.fileSize)}</span>
                   <div className="flex items-center gap-1">
                     <span className={`inline-flex text-slate-300 transition-transform duration-200 ${previewDoc?.id === doc.id ? 'rotate-180 text-blue-400' : ''}`}><ChevronDown size={12} /></span>
-                    <button type="button" onClick={() => maintenanceApi.downloadDocument(maintenanceId, doc).catch((cause) => showNotification(handleApiError(cause), 'error'))} className="rounded p-1 text-slate-400 hover:bg-blue-50 hover:text-blue-600" title={t('common.download')}><Download size={13} /></button>
-                    {allowRemove && <button type="button" disabled={removingId === doc.id} onClick={() => void remove(doc)} className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50" title={t('common.remove')}>{removingId === doc.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}</button>}
+                    <button type="button" onClick={() => maintenanceApi.downloadDocument(maintenanceId, doc).catch((cause) => showNotification(handleApiError(cause), 'error'))} className="rounded p-1 text-slate-400 hover:bg-blue-50 hover:text-blue-600"><Download size={13} /></button>
+                    {allowRemove && <button type="button" disabled={removingId === doc.id} onClick={() => void remove(doc)} className="rounded p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 disabled:opacity-50">{removingId === doc.id ? <Loader2 size={13} className="animate-spin" /> : <Trash2 size={13} />}</button>}
                   </div>
                 </div>
               </div>
@@ -117,7 +116,6 @@ const MaintenanceDocuments = ({ maintenanceId, documents, allowRemove = true, on
                 <button
                   type="button"
                   onClick={() => setPreviewDoc(null)}
-                  title={t('common.close')}
                   aria-label={t('common.close')}
                   className="group relative flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:border-red-100 hover:bg-red-50 hover:text-red-500 active:scale-95"
                 >

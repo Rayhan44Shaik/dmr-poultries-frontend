@@ -496,7 +496,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                     )}
                   </div>
                   <div className="p-2">
-                    <p className="text-xs font-medium text-slate-700 truncate" title={doc.fileName}>
+                    <p className="text-xs font-medium text-slate-700 truncate">
                       {doc.fileName}
                     </p>
                     <div className="flex items-center justify-between mt-1">
@@ -516,7 +516,6 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
                               : onRemoveDocument(doc.key)
                           }
                           className="text-slate-400 hover:text-red-500 transition"
-                          title={t('fleet.maintenance_form.remove_document')}
                         >
                           <Trash2 size={14} />
                         </button>

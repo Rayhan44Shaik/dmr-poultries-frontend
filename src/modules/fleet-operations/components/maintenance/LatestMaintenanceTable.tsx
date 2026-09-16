@@ -12,6 +12,7 @@ import { BrandRefreshButton } from '../../../../ui';
 import { uiActionIconMotionClass } from '../../../../shared/ui/uiTokens';
 import { shouldShowPagination, PAGINATION_DEFAULT_PAGE_SIZE } from '../../../../shared/ui/paginationStyles';
 import { formatTripListDay } from '../../../operations/vehicle-trips/utils/formatTripListDay';
+import { formatVehicleNumber } from "../../../../utils/format";
 import { localizeMaintenanceText, localizeMaintenanceName } from '../../utils/maintenanceLocalization';
 import { usePendingDelete } from '../../../../hooks/usePendingDelete';
 import { PendingDeleteNotification } from '../../../../components/common/PendingDeleteNotification';
@@ -71,9 +72,8 @@ const LatestMaintenanceTable = ({
    * valid vehicle exists. */
   const resolveVehicleNumber = (rec: MaintenanceEvent): string => {
     const vehicle = vehicles.find((v: any) => String(v.id) === String(rec.vehicleId));
-    if (vehicle?.vehicleNumber) return String(vehicle.vehicleNumber);
-    if (rec.vehicleNo) return String(rec.vehicleNo);
-    return '—';
+    const raw = vehicle?.vehicleNumber ? String(vehicle.vehicleNumber) : rec.vehicleNo ? String(rec.vehicleNo) : '';
+    return raw ? formatVehicleNumber(raw) : '—';
   };
 
   const filteredRecords = useMemo(() => {
@@ -148,10 +148,6 @@ const LatestMaintenanceTable = ({
     if (!types) return '-';
     const parts = types.split(',').map(s => s.trim());
     return parts[0] || '-';
-  };
-
-  const getAllMaintenanceTypes = (types: string): string => {
-    return types || '-';
   };
 
   const getEmptyText = () => {
@@ -247,7 +243,6 @@ const LatestMaintenanceTable = ({
                   onPageChange(1);
                 }}
                 className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-slate-400 hover:text-slate-600 bg-white hover:bg-slate-100 rounded-md transition-colors"
-                title={t('fleet.maintenance_table.clear_search')}
               >
                 <X size={13} />
               </button>
@@ -266,7 +261,6 @@ const LatestMaintenanceTable = ({
                 onPageChange(1);
               }}
               className="group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200/70 active:scale-95"
-              title={t('common.reset')}
             >
               <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={13} /></span>
               <span className="hidden md:inline">{t('common.reset')}</span>
@@ -380,7 +374,6 @@ const LatestMaintenanceTable = ({
                 ) : (
                 paginatedRecords.map((rec, index) => {
                   const firstType = getFirstMaintenanceType(rec.maintenanceType);
-                  const allTypes = getAllMaintenanceTypes(rec.maintenanceType);
                   const isDeleted = viewMode === 'deleted';
                   const typeCount = rec.maintenanceType
                     ? rec.maintenanceType.split(',').filter(s => s.trim()).length
@@ -418,7 +411,7 @@ const LatestMaintenanceTable = ({
                       </td>
 
                       <td className="px-4 py-3 text-left whitespace-nowrap">
-                        <span title={allTypes} className="text-xs text-slate-600 cursor-help">
+                        <span className="text-xs text-slate-600">
                           {localizeMaintenanceText(firstType, language)}
                           {typeCount > 1 && (
                             <span className="text-xs text-slate-400 ml-1">
@@ -461,7 +454,6 @@ const LatestMaintenanceTable = ({
                           <button
                             onClick={(e) => { e.stopPropagation(); e.preventDefault(); onView(rec); }}
                             className="group relative inline-flex items-center justify-center gap-1 px-2.5 py-1 text-xs font-semibold text-violet-600 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-500 hover:text-white transition-all shadow-sm active:scale-95"
-                            title={t('fleet.maintenance_table.documents_attached', { count: rec.documents.length })}
                           >
                             <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]"><Paperclip size={12} /></span>
                             {rec.documents.length}
@@ -480,7 +472,6 @@ const LatestMaintenanceTable = ({
                             <button
                               type="button"
                               onClick={(e) => { e.stopPropagation(); e.preventDefault(); onApprove(rec); }}
-                              title={t('common.approve')}
                               aria-label={t('common.approve')}
                               className="group relative h-8 w-8 rounded-xl flex items-center justify-center transition-all shadow-sm bg-emerald-50/70 hover:bg-emerald-500 text-emerald-600 hover:text-white border border-emerald-200/60 active:scale-95"
                             >
@@ -490,7 +481,6 @@ const LatestMaintenanceTable = ({
                               type="button"
                               onClick={(e) => { e.stopPropagation(); e.preventDefault(); if (rec.id) requestDelete(rec.id, { label: t('fleet.maintenance_table.deleting', { vehicle: resolveVehicleNumber(rec) }) }); }}
                               disabled={!rec.id || isPending(rec.id)}
-                              title={t('common.delete')}
                               aria-label={t('common.delete')}
                               className="group relative h-8 w-8 rounded-xl flex items-center justify-center transition-all shadow-sm bg-rose-50/70 hover:bg-rose-500 text-rose-500 hover:text-white border border-rose-200/60 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
                             >

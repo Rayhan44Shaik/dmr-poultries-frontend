@@ -17,11 +17,11 @@ import { generateMaintenancePdf } from '../../utils/generateMaintenancePdf';
 import AppShellModal from '../../../../ui/AppShellModal';
 import { ScopedI18nProvider } from '../../../../i18n';
 import { ViewLanguageToggle } from '../../../../ui/ViewLanguageToggle';
-import { ActionTooltip } from '../../../../ui/ActionTooltip';
 import { uiPdfButtonClass } from '../../../../shared/ui/uiTokens';
 import { useI18n, translateStatus } from '../../../../i18n';
 import { uiActionIconMotionClass } from '../../../../shared/ui/uiTokens';
 import { formatTripListDay } from '../../../operations/vehicle-trips/utils/formatTripListDay';
+import { formatVehicleNumber } from '../../../../utils/format';
 import { localizeMaintenanceText, localizeMaintenanceName } from '../../utils/maintenanceLocalization';
 import type { MaintenanceEvent } from '../../types';
 import MaintenanceDocuments from './MaintenanceDocuments';
@@ -85,7 +85,7 @@ const ViewModalInner: React.FC<ViewModalProps> = ({ record, vehicles, onClose, c
   };
 
   const vehicle = vehicles.find((v: any) => String(v.id) === String(active.vehicleId));
-  const vehicleNumber = vehicle?.vehicleNumber || active.vehicleNo || '—';
+  const vehicleNumber = formatVehicleNumber(vehicle?.vehicleNumber || active.vehicleNo || '');
 
   const handlePdf = async () => {
     if (pdfBusy) return;
@@ -152,7 +152,6 @@ const ViewModalInner: React.FC<ViewModalProps> = ({ record, vehicles, onClose, c
               tone="emerald"
               labelMode="target"
               ariaLabel={t('fleet.maintenance_view.popup_language_toggle')}
-              tooltip={<ActionTooltip label={t('fleet.maintenance_view.popup_language_tooltip')} side="bottom" />}
             />
             {/* Trip-view close: white circle, red on hover, lifts on hover */}
             <button
