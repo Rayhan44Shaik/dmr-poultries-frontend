@@ -386,28 +386,29 @@ const KPICard = memo(function KPICard({
           </span>
         </div>
 
-        {/* line 2 — the figure, big and unclipped; previous value sits just under it */}
+        {/* line 2 — the main figure, enlarged and centred in the remaining space */}
         <div className="my-auto min-w-0">
           <div
-            className={`min-w-0 truncate text-[16px] font-bold leading-none tracking-tight @min-[96px]:text-[21px] @min-[120px]:text-[25px] ${config.text}`}
+            className={`min-w-0 truncate text-[18px] font-bold leading-none tracking-tight @min-[96px]:text-[23px] @min-[120px]:text-[27px] ${config.text}`}
             title={`${t(kpiCardLabel(label))} · ${exactValue} · ${rangeLabel}`}
           >
             {displayMain}
             {displaySuffix && (
-              <span className="ml-0.5 text-[8.5px] font-medium text-slate-400 @min-[96px]:text-[11px] @min-[120px]:text-[13px]">
+              <span className="ml-0.5 text-[9.5px] font-medium text-slate-400 @min-[96px]:text-[12px] @min-[120px]:text-[14px]">
                 {displaySuffix}
               </span>
             )}
           </div>
-          {baseline ? (
-            <span
-              className={`mt-1.5 block min-w-0 max-w-full truncate text-[9.5px] font-bold @min-[96px]:text-[10px] @min-[120px]:text-[10.5px] ${wasValueClass}`}
-              title={badgeTitle}
-            >
-              {t("ops.dashboard.kpi_prev_value", { value: formatWithUnit(prevValue, unit) })}
-            </span>
-          ) : null}
         </div>
+
+        {baseline ? (
+          <span
+            className={`block min-w-0 max-w-full truncate text-[10px] font-bold leading-none @min-[96px]:text-[10.5px] @min-[120px]:text-[11px] ${wasValueClass}`}
+            title={badgeTitle}
+          >
+            {t("ops.dashboard.kpi_prev_value", { value: formatWithUnit(prevValue, unit) })}
+          </span>
+        ) : null}
       </div>
     </div>
   );
