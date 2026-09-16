@@ -3,6 +3,7 @@ import MasterStatusBadge from "../../components/MasterStatusBadge";
 
 import { Pencil, Trash2 } from "lucide-react";
 import type { Vehicle } from "../types/vehicle";
+import { formatVehicleNumber } from "../../../../utils/format";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
 
@@ -57,7 +58,7 @@ function VehicleTable({
             >
               <td className="px-4 py-3 text-sm text-slate-600">{index + 1}</td>
               <td className="px-4 py-3 text-sm font-semibold text-slate-800">
-                {vehicle.vehicleNumber}
+                {formatVehicleNumber(vehicle.vehicleNumber)}
               </td>
               <td className="px-4 py-3 text-sm text-slate-600">
                 {vehicle.vehicleType}

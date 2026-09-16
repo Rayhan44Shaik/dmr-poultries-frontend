@@ -1,5 +1,8 @@
 import { memo } from 'react';
+import { useEffect, useRef } from 'react';
 import { Trash2, Plus, ShoppingBag } from 'lucide-react';
+import { usePendingDelete } from '../../../../hooks/usePendingDelete';
+import { PendingDeleteNotification } from '../../../../components/common/PendingDeleteNotification';
 import { useI18n } from '../../../../i18n';
 import type { PartItem } from '../../types';
 
@@ -64,9 +67,30 @@ const PartsTable = ({ parts, setParts, hideSubline = false }: PartsTableProps) =
     ]);
   };
 
+  // Row delete asks first: the row greys out and an undo pop counts down
+  // 5s (Telugu supported via the shared pendingDelete strings) before the
+  // part is actually removed. Cancel restores it untouched.
+  const pendingPartRef = useRef(new Map<number, PartItem>());
+  // setParts takes the next array (not an updater) — keep a live ref so the
+  // expiry callback never drops edits made while the countdown runs.
+  const partsRef = useRef(parts);
+  useEffect(() => {
+    partsRef.current = parts;
+  }, [parts]);
+  const { requestDelete, cancel, isPending, pendingItems } = usePendingDelete<number>(
+    (id) => {
+      const part = pendingPartRef.current.get(id);
+      pendingPartRef.current.delete(id);
+      if (part) setParts(partsRef.current.filter((p) => p !== part));
+    },
+    5
+  );
+
   const removeRow = (index: number) => {
-    if (parts.length > 1) {
-      setParts(parts.filter((_, i) => i !== index));
+    if (parts.length > 1 && !isPending(index)) {
+      const part = parts[index];
+      pendingPartRef.current.set(index, part);
+      requestDelete(index, { label: part.name || t('fleet.parts.item_name') });
     }
   };
 
@@ -92,9 +116,9 @@ const PartsTable = ({ parts, setParts, hideSubline = false }: PartsTableProps) =
         <button
           type="button"
           onClick={addRow}
-          className="inline-flex items-center gap-1.5 h-8 px-3 text-[11px] font-bold uppercase tracking-wider bg-green-600 text-white border border-green-700 rounded-lg hover:bg-green-700 transition-all shadow-sm"
+          className="group relative inline-flex items-center gap-1.5 h-8 px-3 text-[11px] font-bold uppercase tracking-wider bg-green-600 text-white border border-green-700 rounded-lg hover:bg-green-700 transition-all shadow-sm active:scale-95"
         >
-          <Plus className="w-3.5 h-3.5" />
+          <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-add)]"><Plus className="w-3.5 h-3.5" /></span>
           {t('fleet.maintenance_form.add_row')}
         </button>
       </div>
@@ -180,7 +204,7 @@ const PartsTable = ({ parts, setParts, hideSubline = false }: PartsTableProps) =
                     <button
                       type="button"
                       onClick={() => removeRow(index)}
-                      disabled={parts.length === 1}
+                      disabled={parts.length <= 1 || isPending(index)}
                       className="p-1.5 rounded-lg text-red-400 hover:text-red-600 hover:bg-red-50 transition-all disabled:opacity-30 disabled:hover:bg-transparent disabled:cursor-not-allowed"
                       title={parts.length === 1 ? t('fleet.parts.cannot_delete_only_row') : t('fleet.parts.remove_item')}
                     >
@@ -206,6 +230,7 @@ const PartsTable = ({ parts, setParts, hideSubline = false }: PartsTableProps) =
           </tfoot>
         </table>
       </div>
+      <PendingDeleteNotification items={pendingItems} onCancel={cancel} />
     </div>
   );
 };

@@ -29,6 +29,7 @@ import { useI18n, type Language } from "../../../../i18n";
 import { salaryDisplayText, salaryLocale } from "../../utils/salaryDisplay";
 import type { SalaryRecord } from "../../types/staffDashboard";
 import { uiBadgeClass, uiCheckClass } from "../../../../shared/ui/uiTokens";
+import { isSalaryPaid } from "./payslipModel";
 
 /** Render "YYYY-MM-DD" (or ISO) as a readable "28 Sep 2026" string — Telugu
  *  month words when asked, but always Latin digits. */
@@ -52,6 +53,8 @@ type SalaryTableProps = {
   currentPage: number;
   setCurrentPage?: (page: number) => void;
   itemsPerPage: number;
+  /** Rows-per-page change — renders the global Rows-per-page select (Trip List style). */
+  onPageSizeChange?: (pageSize: number) => void;
   formatCurrency?: (amount: number) => string;
   saving?: boolean;
   selectedIds?: ReadonlySet<string>;
@@ -69,24 +72,21 @@ type SalaryTableProps = {
 
 function StatusBadge({ record }: { record: SalaryRecord }) {
   const { t } = useI18n();
-  const windowOpen =
-    record.status === "Paid" &&
-    record.correctionWindowDaysRemaining != null &&
-    record.correctionWindowDaysRemaining > 0;
 
-  if (record.status === "Pending" || record.status === "Submitted") {
+  if (!isSalaryPaid(record)) {
     return (
       <span className={uiBadgeClass("warning")}>
         {t("common.pending")}
       </span>
     );
   }
-  // Paid
+  // Paid — a submitted month is final. Lock icon only when the whole month
+  // is closed; no correction-window state exists on this page anymore.
   return (
-    <span className={uiBadgeClass(record.monthClosed || !windowOpen ? "neutral" : "success")}>
+    <span className={uiBadgeClass(record.monthClosed ? "neutral" : "success")}>
       <CheckCircle2 size={11} />
       {t("common.paid")}
-      {(record.monthClosed || !windowOpen) && <Lock size={10} />}
+      {record.monthClosed && <Lock size={10} />}
     </span>
   );
 }
@@ -118,6 +118,7 @@ export function SalaryTable({
   currentPage,
   setCurrentPage = () => {},
   itemsPerPage,
+  onPageSizeChange,
   formatCurrency,
   saving = false,
   selectedIds,
@@ -154,9 +155,8 @@ export function SalaryTable({
     totalGross: records.reduce((s, r) => s + (r.totalGross || 0), 0),
     totalDeductions: records.reduce((s, r) => s + (r.totalDeductions || 0), 0),
     netSalary: records.reduce((s, r) => s + (r.netSalary || 0), 0),
-    pending: records.filter((r) => r.status === "Pending").length,
-    submitted: records.filter((r) => r.status === "Submitted").length,
-    paid: records.filter((r) => r.status === "Paid").length,
+    pending: records.filter((r) => !isSalaryPaid(r)).length,
+    paid: records.filter((r) => isSalaryPaid(r)).length,
     emailsSent: records.reduce((s, r) => s + (r.emailsSent ?? 0), 0),
     whatsappsSent: records.reduce((s, r) => s + (r.whatsappsSent ?? 0), 0),
   };
@@ -207,15 +207,18 @@ export function SalaryTable({
           <colgroup>
             {selectable && <col className="w-10" />}
             <col className="w-11" />
-            <col className="w-[19%]" />
+            {/* Employee slims down (names are short); the freed space is
+                divided EQUALLY among the three money columns so amounts get
+                the room the old layout wasted. */}
+            <col className="w-[15%]" />
             <col className="w-[8%]" />
             <col className="w-[8%]" />
             <col className="w-[8%]" />
-            <col className="w-[11%]" />
-            <col className="w-[11%]" />
-            <col className="w-[11%]" />
-            <col className="w-[11%]" />
             <col className="w-[13%]" />
+            <col className="w-[13%]" />
+            <col className="w-[13%]" />
+            <col className="w-[11%]" />
+            <col className="w-[11%]" />
           </colgroup>
           <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-600">
             <tr className="whitespace-nowrap">
@@ -272,10 +275,6 @@ export function SalaryTable({
           </thead>
           <tbody className="divide-y divide-slate-100">
             {currentRecords.map((record, index) => {
-              const windowOpen =
-                record.status === "Paid" &&
-                record.correctionWindowDaysRemaining != null &&
-                record.correctionWindowDaysRemaining > 0;
               const serialNo = startIndex + index + 1;
 
               return (
@@ -313,11 +312,6 @@ export function SalaryTable({
                   <td className="px-3 py-4 text-left text-[13px] font-bold tabular-nums text-emerald-700 whitespace-nowrap">{formatVal(record.netSalary)}</td>
                   <td className="px-3 py-4 whitespace-nowrap">
                     <StatusBadge record={record} />
-                    {record.status === "Paid" && windowOpen && (
-                      <span className="ml-1 text-[10px] text-amber-600">
-                        {record.correctionWindowDaysRemaining}d
-                      </span>
-                    )}
                   </td>
                   {/* Payslip sent-counts — ONE small column AFTER Status holding
                       both the Mail and WhatsApp mini pills side by side. Each
@@ -330,7 +324,7 @@ export function SalaryTable({
                           type="button"
                           aria-label={t("staff.table.email_to", { name: salaryDisplayText(record.employeeName, language) })}
                           onClick={() => onEmail(record)}
-                          disabled={saving || record.status !== "Paid"}
+                          disabled={saving || !isSalaryPaid(record)}
                           className="group inline-flex items-center gap-1 rounded-full border border-blue-200/80 bg-blue-50/70 px-2 py-0.5 text-blue-700 transition hover:border-blue-300 hover:bg-blue-100/70 disabled:opacity-40"
                         >
                           <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-mail)]"><Mail size={12} /></span>
@@ -347,7 +341,7 @@ export function SalaryTable({
                           type="button"
                           aria-label={t("staff.table.whatsapp_to", { name: salaryDisplayText(record.employeeName, language) })}
                           onClick={() => onWhatsApp(record)}
-                          disabled={saving || record.status !== "Paid"}
+                          disabled={saving || !isSalaryPaid(record)}
                           className="group inline-flex items-center gap-1 rounded-full border border-emerald-200/80 bg-emerald-50/70 px-2 py-0.5 text-[#128C3E] transition hover:border-emerald-300 hover:bg-emerald-100/70 disabled:opacity-40"
                         >
                           <span className="inline-flex text-[#1DA851] motion-safe:group-hover:animate-[var(--animate-action-whatsapp)]"><WhatsAppBrandIcon size={12} /></span>
@@ -380,8 +374,6 @@ export function SalaryTable({
                 <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5 leading-snug">
                   <span className="whitespace-nowrap">{footer.pending} {t("common.pending")}</span>
                   <span className="text-slate-300" aria-hidden="true">·</span>
-                  <span className="whitespace-nowrap">{footer.submitted} {t("staff.table.submitted")}</span>
-                  <span className="text-slate-300" aria-hidden="true">·</span>
                   <span className="whitespace-nowrap">{footer.paid} {t("common.paid")}</span>
                 </span>
               </td>
@@ -400,12 +392,18 @@ export function SalaryTable({
         </table>
       </div>
 
-      {records.length > itemsPerPage && (
+      {/* Global pagination — the Trip List bar: "Showing 1–10 of 150",
+          Rows per page select, and the numbered page window. Always rendered
+          while the register has rows, exactly like the Trip List. */}
+      {records.length > 0 && (
         <Pagination
-          page={currentPage}
+          page={safePage}
           pageSize={itemsPerPage}
           totalItems={records.length}
           onPageChange={setCurrentPage}
+          onPageSizeChange={onPageSizeChange}
+          disabled={saving}
+          ariaLabel={t("staff.table.title")}
         />
       )}
     </div>

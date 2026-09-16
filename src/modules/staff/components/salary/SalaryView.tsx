@@ -15,7 +15,7 @@
 // notices AND the payslip sheet labels/names — the A4 PDF stays in English
 // and the app behind keeps the global language.
 
-import { Lock, Info, FileText, CheckCircle2, X, Loader2 } from "lucide-react";
+import { Lock, FileText, CheckCircle2, X, Loader2 } from "lucide-react";
 import type { SalaryRecord } from "../../types/staffDashboard";
 import { Modal } from "../../../../ui";
 import { useI18n } from "../../../../i18n";
@@ -23,7 +23,7 @@ import ScopedI18nProvider from "../../../../i18n/ScopedI18nProvider";
 import { uiButton } from "../../../../shared/ui/uiTokens";
 import { ClassicPayslipSheet } from "./ClassicPayslipSheet";
 import { ViewLanguageToggle } from "../../../../ui/ViewLanguageToggle";
-import { computePayslipTotals, toAmountValues } from "./payslipModel";
+import { computePayslipTotals, isSalaryPaid, toAmountValues } from "./payslipModel";
 import { salaryDisplayText, salaryLocale } from "../../utils/salaryDisplay";
 
 /** Render "YYYY-MM-DD" / ISO as "28 Sep 2026". */
@@ -68,11 +68,6 @@ function SalaryViewBody({
 
   const values = toAmountValues(record);
   const totals = computePayslipTotals(values);
-
-  const correctionOpen =
-    record.status === "Paid" &&
-    record.correctionWindowDaysRemaining != null &&
-    record.correctionWindowDaysRemaining > 0;
 
   const monthLabel = (() => {
     if (!record.month) return "";
@@ -141,7 +136,7 @@ function SalaryViewBody({
         </div>
 
         {/* Lifecycle notices — UI state, kept below the formal document */}
-        {record.status === "Paid" && record.paymentDate && (
+        {isSalaryPaid(record) && record.paymentDate && (
           <div className="mx-auto mt-4 flex max-w-[760px] items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
             <CheckCircle2 size={14} className="shrink-0" />
             <span>{t("staff.view.paid_on", { date: formatViewDate(record.paymentDate) })}</span>
@@ -154,22 +149,6 @@ function SalaryViewBody({
           <div className="mx-auto mt-4 flex max-w-[760px] items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 p-3 text-xs text-slate-600">
             <Lock size={14} className="shrink-0" />
             <span>{t("staff.view.month_closed")}</span>
-          </div>
-        )}
-        {record.status === "Paid" && !record.monthClosed && (
-          <div
-            className={`mx-auto mt-4 flex max-w-[760px] items-center gap-2 rounded-xl border p-3 text-xs ${
-              correctionOpen
-                ? "border-amber-200 bg-amber-50 text-amber-800"
-                : "border-slate-200 bg-slate-100 text-slate-600"
-            }`}
-          >
-            {correctionOpen ? <Info size={14} className="shrink-0" /> : <Lock size={14} className="shrink-0" />}
-            <span>
-              {correctionOpen
-                ? t("staff.view.correction_open", { days: record.correctionWindowDaysRemaining ?? 0 })
-                : t("staff.view.correction_expired")}
-            </span>
           </div>
         )}
       </div>

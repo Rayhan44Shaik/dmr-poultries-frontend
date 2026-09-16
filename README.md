@@ -59,6 +59,12 @@ prints that and exits without failing the dev command.
 - Run `npm run verify:quarter-data` to launch an isolated sample API and audit
   the Operations data hand-offs (collections, rates, shop sales, fuel, ledger
   and dashboard). It stops automatically and never touches the running preview.
+- Run `npm run verify:staff-sync` for the Staff-module twin: it replays every
+  Staff page's exact API sequence against an isolated quarter sample server —
+  Duty Planner weeks (current/previous/upcoming), Leaves (list, filters,
+  report, approve/reject), Salary Register (all quarter months, lifecycle,
+  payslip PDF, email/WhatsApp counters), Driver/Supervisor Performance and the
+  staff dashboard card — and asserts each page's view-model contract.
 - To work against the real backend instead, run it on port 4000 and start the
   frontend alone with `npm run dev:web`.
 

@@ -21,6 +21,7 @@ import { useSafeNotification } from "../../../hooks/useSafeNotification";
 import { todayBusinessDate } from "../../../utils/businessDate";
 import { loadEmployees } from "../../masters/employees/services/employeeService";
 import { downloadPayslipPdf, updateSalary, emailSalaryPayslips, whatsappSalaryPayslips, bulkUpdateSalaryStatus } from "../services/salaryService";
+import { generateCombinedPayslipPdf } from "../services/payslipPdf";
 import {
   ArrowUpDown,
   Building2,
@@ -32,8 +33,8 @@ import {
   ListFilter,
   CheckCircle,
   ClipboardCheck,
-  Plus,
   FileText,
+  Plus,
   RotateCcw,
   Search,
   Send,
@@ -54,7 +55,9 @@ import { salaryDisplayText, salaryLocale, salaryMatchesQuery } from "../utils/sa
 import { SalaryTable } from "../components/salary/salaryTable";
 import { SalaryView } from "../components/salary/SalaryView";
 import { SalaryReviewModal } from "../components/salary/SalaryReviewModal";
+import { isSalaryPaid } from "../components/salary/payslipModel";
 import { SendPayslipsModal } from "../components/salary/SendPayslipsModal";
+import { EMAIL_TEMPLATES } from "../components/salary/payslipMessages";
 import { SAMPLE_EMPLOYEE_LIST } from "../services/staffSampleData";
 import type { SalaryRecord } from "../types/staffDashboard";
 
@@ -133,6 +136,7 @@ function SalaryRegisterPage() {
   const [isMonthPickerOpen, setIsMonthPickerOpen] = useState(false);
   const [pickerYear, setPickerYear] = useState<number>(() => Number(getCurrentYearMonth().split("-")[0]));
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
   const monthPickerRef = useRef<HTMLDivElement>(null);
 
   const {
@@ -153,6 +157,11 @@ function SalaryRegisterPage() {
 
   const handleMonthChange = useCallback((value: string) => {
     setMonth(value);
+    setCurrentPage(1);
+  }, []);
+
+  const handlePageSizeChange = useCallback((next: number) => {
+    setPageSize(next);
     setCurrentPage(1);
   }, []);
 
@@ -184,8 +193,8 @@ function SalaryRegisterPage() {
       }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Escape closes the month popover (and only the month popover — the page
-      // has no other overlay open at this layer).
+      // Escape closes the month popover (the page has no other overlay open
+      // at this layer).
       if (e.key === "Escape") setIsMonthPickerOpen(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
@@ -251,16 +260,16 @@ function SalaryRegisterPage() {
     });
 
     const num = (v: number | undefined | null) => Number(v ?? 0);
-    const statusRank = (s: string) =>
-      s === "Pending" ? 0 : s === "Submitted" ? 1 : 2; // Pending < Submitted < Paid
+    // Single status model — legacy "Submitted" ranks as Paid (isSalaryPaid).
+    const statusRank = (r: Pick<SalaryRecord, "status">) => (isSalaryPaid(r) ? 2 : 0);
     const sorted = [...filtered].sort((a, b) => {
       switch (sortKey) {
         case "name-desc":
           return (b.employeeName || "").localeCompare(a.employeeName || "");
         case "status-pending-first":
-          return statusRank(a.status) - statusRank(b.status) || (a.employeeName || "").localeCompare(b.employeeName || "");
+          return statusRank(a) - statusRank(b) || (a.employeeName || "").localeCompare(b.employeeName || "");
         case "status-paid-first":
-          return statusRank(b.status) - statusRank(a.status) || (a.employeeName || "").localeCompare(b.employeeName || "");
+          return statusRank(b) - statusRank(a) || (a.employeeName || "").localeCompare(b.employeeName || "");
         case "salary-asc":
           return num(a.netSalary) - num(b.netSalary);
         case "salary-desc":
@@ -345,17 +354,43 @@ function SalaryRegisterPage() {
 
   const handleSubmitSelected = useCallback(
     async (ids: string[]) => {
-      if (ids.length === 0) return;
+      // ONE-TIME SUBMIT: only PENDING rows of the selection move to Paid.
+      // Already Submitted/Paid rows are skipped — selecting "All" can never
+      // submit (or pay) anyone twice.
+      const byId = new Map(allRecords.map((r) => [r.id, r]));
+      const pendingIds = ids.filter((id) => byId.get(id)?.status === "Pending");
+      if (pendingIds.length === 0) {
+        setSubmitMonthOpen(false);
+        showNotification(t("staff.register.submit_none_pending"), "info");
+        return;
+      }
       try {
-        const result = await bulkUpdateSalaryStatus(ids, {
+        const result = await bulkUpdateSalaryStatus(pendingIds, {
           status: "Paid",
           paymentDate: todayBusinessDate(),
           paymentMode: "Bank Transfer",
         });
         await refresh();
+        // Payslip emails go out automatically — and ONLY for the rows that
+        // were submitted now (never for the rest of the register).
+        const submittedIds = result.updated.map((r) => r.id);
+        let queued = 0;
+        try {
+          const sent = await emailSalaryPayslips(submittedIds, {
+            language,
+            subject: EMAIL_TEMPLATES[language].subject.replace("{month}", formatMonthName(month, language)),
+            body: EMAIL_TEMPLATES[language].body("{name}", formatMonthName(month, language)),
+          });
+          queued = sent.sent;
+        } catch {
+          /* payslip service unreachable — the submit itself still stands */
+        }
+        await refresh();
         setSubmitMonthOpen(false);
         showNotification(
-          t("staff.register.submitted_ok", { count: result.updated.length }),
+          queued > 0
+            ? `${t("staff.register.submitted_ok", { count: result.updated.length })} ${t("staff.register.payslips_queued", { count: queued })}`
+            : t("staff.register.submitted_ok", { count: result.updated.length }),
           "success"
         );
       } catch (error) {
@@ -365,7 +400,7 @@ function SalaryRegisterPage() {
         );
       }
     },
-    [refresh, showNotification, t]
+    [allRecords, refresh, showNotification, t, language, month]
   );
 
   const handleDownload = useCallback(
@@ -424,6 +459,29 @@ function SalaryRegisterPage() {
     }
   }, [allRecords, showNotification, t]);
 
+  /** Download payslips as ONE combined PDF — every employee on their own page. */
+  const handleDownloadCombined = useCallback(async (list: SalaryRecord[]) => {
+    if (list.length === 0) return;
+    try {
+      await generateCombinedPayslipPdf(list, "download");
+      showNotification(t("staff.register.download_single_ok", { count: list.length }), "success");
+    } catch {
+      showNotification(t("staff.register.download_failed"), "error");
+    }
+  }, [showNotification, t]);
+
+  /** Combined PDF for an id selection (Review & Submit popup). */
+  const handleDownloadSelectedCombined = useCallback(
+    async (ids: string[]) => {
+      const byId = new Map(allRecords.map((r) => [r.id, r]));
+      const list = ids
+        .map((id) => byId.get(id))
+        .filter((r): r is SalaryRecord => Boolean(r));
+      await handleDownloadCombined(list);
+    },
+    [allRecords, handleDownloadCombined]
+  );
+
   const handleSaveRecord = useCallback(
     async (record: SalaryRecord) => {
       // Optimistically update the register table so the change is visible
@@ -445,7 +503,7 @@ function SalaryRegisterPage() {
   // Individual payment dates still appear in each employee's payslip view.
   const monthPaidOnDate = useMemo(() => {
     if (allRecords.length === 0) return null;
-    const paid = allRecords.filter((r) => r.status === "Paid");
+    const paid = allRecords.filter((r) => isSalaryPaid(r));
     if (paid.length !== allRecords.length) return null;
     const dates = paid
       .map((r) => r.paymentDate ?? null)
@@ -463,7 +521,7 @@ function SalaryRegisterPage() {
     () =>
       allRecords.filter(
         (r) =>
-          (r.status === "Paid" || r.status === "Submitted") &&
+          isSalaryPaid(r) &&
           (r.emailsSent ?? 0) === 0 &&
           (r.whatsappsSent ?? 0) === 0
       ),
@@ -472,7 +530,12 @@ function SalaryRegisterPage() {
 
   // Status segmented control — same treatment as the Leave page's status tabs
   // (active = white chip + brand text, inactive = quiet slate).
-  const statusTab = (key: 'All' | 'Pending' | 'Paid', label: string, icon: React.ReactNode) => (
+  const statusTab = (
+    key: 'All' | 'Pending' | 'Paid',
+    label: string,
+    icon: React.ReactNode,
+    count?: number
+  ) => (
     <button
       type="button"
       onClick={() => handleFilterChange(key)}
@@ -485,6 +548,17 @@ function SalaryRegisterPage() {
     >
       {icon}
       {label}
+      {count != null && (
+        <span
+          className={`ml-0.5 rounded-full px-1.5 py-px text-[10px] font-bold tabular-nums leading-4 ${
+            filter === key
+              ? "bg-brand-100 text-brand-700"
+              : "bg-white/80 text-slate-500 ring-1 ring-slate-200"
+          }`}
+        >
+          {count}
+        </span>
+      )}
     </button>
   );
 
@@ -622,9 +696,9 @@ function SalaryRegisterPage() {
               aria-label={t("staff.register.filter_by_status")}
               className="inline-flex h-10 w-full items-center bg-slate-100/80 p-1 rounded-lg border border-slate-200/60"
             >
-              {statusTab("All", t("common.all"), <LayoutGrid size={12} className="text-slate-400" />)}
-              {statusTab("Pending", t("common.pending"), <Clock size={12} className="text-slate-400" />)}
-              {statusTab("Paid", t("common.paid"), <CheckCircle size={12} className="text-slate-400" />)}
+              {statusTab("All", t("common.all"), <LayoutGrid size={12} className="text-slate-400" />, totals.totalEmployees)}
+              {statusTab("Pending", t("common.pending"), <Clock size={12} className="text-slate-400" />, totals.pendingCount)}
+              {statusTab("Paid", t("common.paid"), <CheckCircle size={12} className="text-slate-400" />, totals.paidCount)}
             </div>
           </div>
         </div>
@@ -697,6 +771,10 @@ function SalaryRegisterPage() {
               <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-approve)]"><ClipboardCheck size={15} /></span>
               {t("staff.register.review_submit")}
             </button>
+            {/* Send Payslips — the bulk-send entry point. Opens the Send
+                Payslips popup (Mail / WhatsApp) for the submitted employees
+                whose payslip has not gone out yet. Downloads live inside
+                Review & Submit, not on the filter bar. */}
             <button
               type="button"
               onClick={() => openSendFor(submittedRecords, "email")}
@@ -756,7 +834,8 @@ function SalaryRegisterPage() {
           records={visibleRecords}
           currentPage={currentPage}
           setCurrentPage={setCurrentPage}
-          itemsPerPage={10}
+          itemsPerPage={pageSize}
+          onPageSizeChange={handlePageSizeChange}
           formatCurrency={formatCurrency}
           saving={saving}
           onView={setViewTarget}
@@ -781,7 +860,6 @@ function SalaryRegisterPage() {
         <SalaryReviewModal
           monthLabel={formatMonthName(month, language)}
           records={allRecords}
-          pendingCount={totals.pendingCount}
           onClose={() => setSubmitMonthOpen(false)}
           onSubmitSelected={(ids) => void handleSubmitSelected(ids)}
           onSaveRecord={(record) => handleSaveRecord(record)}
@@ -789,7 +867,7 @@ function SalaryRegisterPage() {
           onToggleSelect={toggleSelect}
           onToggleSelectAll={toggleSelectAll}
           onDownloadSelected={(ids) => void handleDownloadSelected(ids)}
-          onSendPayslips={() => openSendFor(submittedRecords, "email")}
+          onDownloadSelectedCombined={(ids) => void handleDownloadSelectedCombined(ids)}
         />
       )}
 
