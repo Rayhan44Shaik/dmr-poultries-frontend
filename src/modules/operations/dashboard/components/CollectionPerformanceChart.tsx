@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 
 import { useI18n } from "../../../../i18n";
 import { formatINR, formatINRCompact } from "../../../../utils/format";
+import MasterDropdown, { type MasterDropdownOption } from "../../../masters/components/MasterDropdown";
 import {
   collectionRecoveryPercentage,
   normalizeCollectionPerformance,
@@ -20,7 +21,7 @@ interface CollectionPerformanceChartProps {
   toDate: string;
 }
 
-const MAX_VISIBLE_SHOPS = 4;
+const MAX_VISIBLE_SHOPS = 10;
 const PENDING_COLLECTIONS_URL = "/operations?tab=pending-collections";
 
 const safeAmount = (value: number): number =>
@@ -38,6 +39,59 @@ const formatPeriod = (fromDate: string, toDate: string, language: string): strin
   return `${format(fromDate)} – ${format(toDate)}${Number.isFinite(year) ? ` ${year}` : ""}`;
 };
 
+const clampPct = (value: number): number => Math.min(100, Math.max(0, value));
+
+const recoveryColor = (value: number): string => {
+  if (value >= 85) return "#10b981";
+  if (value >= 60) return "#22c55e";
+  if (value >= 35) return "#f59e0b";
+  return "#fb923c";
+};
+
+function RecoveryRing({ value, size = 46 }: { value: number; size?: number }) {
+  const pct = clampPct(value);
+  const color = recoveryColor(pct);
+  const radius = 18.5;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset = circumference * (1 - pct / 100);
+  const roundedPct = Math.round(pct);
+
+  return (
+    <span
+      className="relative grid shrink-0 place-items-center rounded-full bg-white shadow-sm ring-1 ring-inset ring-slate-200/80"
+      style={{ width: size, height: size }}
+      aria-hidden="true"
+    >
+      <svg className="absolute inset-0" viewBox="0 0 48 48">
+        <circle
+          cx="24"
+          cy="24"
+          r={radius}
+          fill="none"
+          stroke="#e2e8f0"
+          strokeWidth="4.4"
+        />
+        <circle
+          cx="24"
+          cy="24"
+          r={radius}
+          fill="none"
+          stroke={color}
+          strokeWidth="4.4"
+          strokeLinecap={pct >= 99.5 ? "butt" : "round"}
+          strokeDasharray={circumference}
+          strokeDashoffset={dashOffset}
+          transform="rotate(-90 24 24)"
+        />
+      </svg>
+      <span className="relative flex items-baseline justify-center font-black tabular-nums tracking-[-0.07em] text-slate-800">
+        <span className="text-[10.5px]">{roundedPct}</span>
+        <span className="ml-0.5 text-[8px] tracking-normal">%</span>
+      </span>
+    </span>
+  );
+}
+
 export default function CollectionPerformanceChart({
   data,
   totalSales,
@@ -48,6 +102,46 @@ export default function CollectionPerformanceChart({
   const { t, language } = useI18n();
   const [sortBy, setSortBy] = useState<CollectionPerformanceSort>("outstanding");
 
+  const sortOptions = useMemo<MasterDropdownOption[]>(
+    () => [
+      {
+        value: "outstanding",
+        label: t("ops.dashboard.collection_performance.sort_outstanding"),
+        keywords: "gap pending outstanding high",
+      },
+      {
+        value: "recoveryLow",
+        label: t("ops.dashboard.collection_performance.sort_recovery_low"),
+        keywords: "weak recovery low",
+      },
+      {
+        value: "recoveryHigh",
+        label: t("ops.dashboard.collection_performance.sort_recovery_high"),
+        keywords: "best recovery high",
+      },
+      {
+        value: "sales",
+        label: t("ops.dashboard.collection_performance.sort_sales"),
+        keywords: "sales high",
+      },
+      {
+        value: "collections",
+        label: t("ops.dashboard.collection_performance.sort_collections"),
+        keywords: "collections collected high",
+      },
+      {
+        value: "collectionsLow",
+        label: t("ops.dashboard.collection_performance.sort_collections_low"),
+        keywords: "collections collected low",
+      },
+      {
+        value: "shop",
+        label: t("ops.dashboard.collection_performance.sort_shop"),
+        keywords: "shop name alphabet",
+      },
+    ],
+    [t],
+  );
   const rows = useMemo(() => normalizeCollectionPerformance(data), [data]);
   const visibleRows = useMemo(
     () => sortCollectionPerformance(rows, sortBy).slice(0, MAX_VISIBLE_SHOPS),
@@ -58,96 +152,81 @@ export default function CollectionPerformanceChart({
   const collections = safeAmount(totalCollections);
   const gap = Math.max(0, sales - collections);
   const recovery = sales > 0 ? (collections / sales) * 100 : 0;
-  const recoveryWidth = Math.min(100, Math.max(0, recovery));
+
+  const setSortValue = (value: string) => {
+    if (!value) {
+      setSortBy("outstanding");
+      return;
+    }
+    if (!sortOptions.some((option) => option.value === value)) return;
+    setSortBy(value as CollectionPerformanceSort);
+  };
 
   return (
     <section className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
-      <header className="flex min-w-0 flex-col items-start justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-white to-emerald-50/60 px-4 py-3.5 sm:flex-row sm:gap-4">
-        <div className="min-w-0">
-          <Link
-            to={PENDING_COLLECTIONS_URL}
-            className="group/title inline-flex min-w-0 items-center gap-1.5"
-          >
-            <h2 className="truncate text-base font-black tracking-tight text-slate-900 transition-colors group-hover/title:text-emerald-700">
-              {t("ops.dashboard.collection_performance.title")}
-            </h2>
-            <ArrowUpRight size={13} className="shrink-0 text-slate-300 group-hover/title:text-emerald-600" aria-hidden="true" />
-          </Link>
-          <span aria-hidden="true" className="mt-1 block h-0.5 w-10 rounded-full bg-emerald-500" />
-          <p className="mt-1.5 truncate text-[10.5px] font-semibold tabular-nums text-slate-400">
-            {formatPeriod(fromDate, toDate, language)}
-          </p>
-        </div>
+      <header className="border-b border-slate-100 bg-gradient-to-r from-slate-50/90 via-white to-emerald-50/30 px-4 py-3">
+        <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
+          <div className="min-w-0">
+            <Link
+              to={PENDING_COLLECTIONS_URL}
+              className="group/title inline-flex min-w-0 items-center gap-1.5"
+            >
+              <h2 className="truncate text-base font-black tracking-tight text-slate-900 transition-colors group-hover/title:text-emerald-700">
+                {t("ops.dashboard.collection_performance.title")}
+              </h2>
+              <ArrowUpRight size={13} className="shrink-0 text-slate-300 group-hover/title:text-emerald-600" aria-hidden="true" />
+            </Link>
+            <span aria-hidden="true" className="mt-1.5 block h-0.5 w-10 rounded-full bg-emerald-400" />
+            <p className="mt-1.5 truncate text-[10.5px] font-semibold tabular-nums text-slate-400">
+              {formatPeriod(fromDate, toDate, language)}
+            </p>
+          </div>
 
-        <label className="flex h-9 w-full items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 shadow-xs sm:w-auto sm:shrink-0">
-          <span className="text-[9px] font-bold text-slate-400">
-            {t("ops.dashboard.collection_performance.sort_label")}
-          </span>
-          <select
-            value={sortBy}
-            onChange={(event) => setSortBy(event.target.value as CollectionPerformanceSort)}
-            className="min-w-0 flex-1 cursor-pointer border-0 bg-transparent p-0 text-[11px] font-extrabold text-slate-700 outline-none sm:max-w-[11rem]"
-            aria-label={t("ops.dashboard.collection_performance.sort_label")}
-          >
-            <option value="outstanding">{t("ops.dashboard.collection_performance.sort_outstanding")}</option>
-            <option value="sales">{t("ops.dashboard.collection_performance.sort_sales")}</option>
-            <option value="collections">{t("ops.dashboard.collection_performance.sort_collections")}</option>
-            <option value="collectionsLow">{t("ops.dashboard.collection_performance.sort_collections_low")}</option>
-            <option value="recoveryHigh">{t("ops.dashboard.collection_performance.sort_recovery_high")}</option>
-            <option value="recoveryLow">{t("ops.dashboard.collection_performance.sort_recovery_low")}</option>
-            <option value="shop">{t("ops.dashboard.collection_performance.sort_shop")}</option>
-          </select>
-        </label>
+          <div className="flex w-full min-w-0 flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-center sm:justify-end">
+            <MasterDropdown
+              hideLabel
+              label={t("ops.dashboard.collection_performance.sort_label")}
+              value={sortBy}
+              options={sortOptions}
+              onChange={setSortValue}
+              placeholder={t("ops.dashboard.collection_performance.sort_outstanding")}
+              searchable
+              allowClear
+              className="w-full sm:w-48 lg:w-52"
+              triggerClassName="h-9 rounded-xl border-slate-200 bg-white/95 px-3 text-[11.5px] font-semibold shadow-xs"
+            />
+            <div className="flex shrink-0 items-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50/65 px-2.5 py-1.5">
+              <RecoveryRing value={recovery} size={50} />
+              <div className="leading-tight">
+                <p className="text-[9px] font-black uppercase tracking-wide text-emerald-700">
+                  {t("ops.dashboard.collection_performance.recovery")}
+                </p>
+                <p className="text-lg font-black tabular-nums text-slate-900">{recovery.toFixed(1)}%</p>
+              </div>
+            </div>
+          </div>
+        </div>
       </header>
 
-      <div className="flex flex-1 flex-col p-4">
-        <div className="rounded-xl border border-emerald-100 bg-emerald-50/55 p-3">
-          <div className="flex items-end justify-between gap-3">
-            <div>
-              <p className="text-[9px] font-bold text-emerald-700">
-                {t("ops.dashboard.collection_performance.recovery")}
-              </p>
-              <strong className="text-2xl font-black tabular-nums tracking-tight text-emerald-800">
-                {recovery.toFixed(1)}%
+      <div className="flex flex-1 flex-col p-3">
+        <div className="grid grid-cols-3 gap-1.5">
+          {[
+            [t("ops.dashboard.collection_performance.sales"), sales, "border-slate-200 bg-slate-50/80 text-slate-700"],
+            [t("ops.dashboard.collection_performance.collected"), collections, "border-emerald-200 bg-emerald-50/75 text-emerald-700"],
+            [t("ops.dashboard.collection_performance.gap"), gap, "border-orange-200 bg-orange-50/80 text-orange-700"],
+          ].map(([label, value, tone]) => (
+            <div key={String(label)} className={`min-w-0 rounded-lg border px-2 py-1.5 text-center ${tone}`}>
+              <span className="block truncate text-[8.5px] font-black uppercase tracking-wide opacity-60">
+                {label}
+              </span>
+              <strong
+                className="block truncate text-[12.5px] font-black tabular-nums"
+                title={formatINR(Number(value))}
+              >
+                {formatINRCompact(Number(value))}
               </strong>
             </div>
-            <span className="pb-1 text-right text-[9px] font-bold text-slate-500">
-              {t("ops.dashboard.collection_performance.sales_100")}
-            </span>
-          </div>
-
-          <div
-            className="mt-2 h-2.5 overflow-hidden rounded-full bg-rose-100 ring-1 ring-inset ring-rose-200/70"
-            role="img"
-            aria-label={t("ops.dashboard.collection_performance.overall_aria", {
-              value: recovery.toFixed(1),
-            })}
-          >
-            <div
-              className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-600"
-              style={{ width: `${recoveryWidth}%` }}
-            />
-          </div>
-
-          <div className="mt-3 grid grid-cols-3 divide-x divide-emerald-100 text-center">
-            {[
-              [t("ops.dashboard.collection_performance.sales"), sales, "text-slate-700"],
-              [t("ops.dashboard.collection_performance.collected"), collections, "text-emerald-700"],
-              [t("ops.dashboard.collection_performance.gap"), gap, "text-rose-700"],
-            ].map(([label, value, tone]) => (
-              <div key={String(label)} className="min-w-0 px-1">
-                <span className="block truncate text-[8px] font-bold uppercase tracking-wide text-slate-400">
-                  {label}
-                </span>
-                <strong
-                  className={`block truncate text-[10.5px] font-black tabular-nums ${tone}`}
-                  title={formatINR(Number(value))}
-                >
-                  {formatINRCompact(Number(value))}
-                </strong>
-              </div>
-            ))}
-          </div>
+          ))}
         </div>
 
         {visibleRows.length === 0 ? (
@@ -158,53 +237,48 @@ export default function CollectionPerformanceChart({
             </p>
           </div>
         ) : (
-          <div className="mt-2 divide-y divide-slate-100">
-            {visibleRows.map((row) => {
-              const rowRecovery = collectionRecoveryPercentage(row);
-              const width = Math.min(100, Math.max(0, rowRecovery));
-              return (
-                <div key={row.shopName} className="py-2.5">
-                  <div className="flex min-w-0 items-center justify-between gap-3">
-                    <span className="truncate text-sm font-extrabold leading-tight text-slate-800" title={row.shopName}>
-                      {row.shopName}
-                    </span>
-                    <span className="shrink-0 text-xs font-black tabular-nums text-emerald-700">
-                      {rowRecovery.toFixed(1)}%
-                    </span>
-                  </div>
-                  <div
-                    className="mt-1.5 h-2 overflow-hidden rounded-full bg-rose-100"
-                    role="img"
-                    aria-label={t("ops.dashboard.collection_performance.row_aria", {
-                      shop: row.shopName,
-                      value: rowRecovery.toFixed(1),
-                    })}
+          <div className="mt-2 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-xs">
+            <div className="divide-y divide-slate-100">
+              {visibleRows.map((row, index) => {
+                const rowRecovery = collectionRecoveryPercentage(row);
+                return (
+                  <article
+                    key={row.shopName}
+                    className="group min-w-0 bg-gradient-to-r from-white to-slate-50/60 px-2.5 py-1.5 transition-colors duration-150 hover:from-emerald-50/35 hover:to-white"
+                    title={`${row.shopName}\n${t("ops.dashboard.collection_performance.sales")}: ${formatINR(row.salesAmount)}\n${t("ops.dashboard.collection_performance.collected")}: ${formatINR(row.collectionAmount)}\n${t("ops.dashboard.collection_performance.gap")}: ${formatINR(row.outstandingAmount)}`}
                   >
-                    <div className="h-full rounded-full bg-emerald-500" style={{ width: `${width}%` }} />
-                  </div>
-                  <div className="mt-1.5 flex min-w-0 justify-between gap-3 text-[10px] font-bold tabular-nums text-slate-500">
-                    <span className="truncate" title={`${t("ops.dashboard.collection_performance.sales")}: ${formatINR(row.salesAmount)}`}>
-                      {t("ops.dashboard.collection_performance.sales")} {formatINRCompact(row.salesAmount)}
-                    </span>
-                    <span className="truncate text-emerald-600" title={`${t("ops.dashboard.collection_performance.collected")}: ${formatINR(row.collectionAmount)}`}>
-                      {t("ops.dashboard.collection_performance.collected")} {formatINRCompact(row.collectionAmount)}
-                    </span>
-                    <span className="truncate text-rose-600" title={`${t("ops.dashboard.collection_performance.gap")}: ${formatINR(row.outstandingAmount)}`}>
-                      {t("ops.dashboard.collection_performance.gap")} {formatINRCompact(row.outstandingAmount)}
-                    </span>
-                  </div>
-                </div>
-              );
-            })}
+                    <div className="grid min-w-0 grid-cols-[1.45rem_3rem_minmax(0,1fr)_auto] items-center gap-2">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-[10px] font-black tabular-nums text-emerald-700 ring-1 ring-inset ring-emerald-100">
+                        {index + 1}
+                      </span>
+                      <RecoveryRing value={rowRecovery} size={44} />
+                      <div className="min-w-0">
+                        <p className="truncate text-[13px] font-medium leading-tight text-slate-700 transition-colors group-hover:text-slate-900">
+                          {row.shopName}
+                        </p>
+                        <p className="mt-0.5 truncate text-[10.5px] font-semibold tabular-nums text-slate-500">
+                          {formatINRCompact(row.collectionAmount)} / {formatINRCompact(row.salesAmount)}
+                        </p>
+                      </div>
+                      <div className="shrink-0 text-right leading-tight">
+                        <span
+                          className="block rounded-full bg-orange-50 px-2 py-1 text-[11.5px] font-black tabular-nums text-orange-700 ring-1 ring-inset ring-orange-100"
+                          title={`${t("ops.dashboard.collection_performance.gap")}: ${formatINR(row.outstandingAmount)}`}
+                        >
+                          {formatINRCompact(row.outstandingAmount)}
+                        </span>
+                      </div>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
           </div>
         )}
 
-        <footer className="mt-auto flex items-center justify-between gap-2 border-t border-slate-100 pt-2.5 text-[9px] font-semibold text-slate-400">
+        <footer className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2 text-[9px] font-semibold text-slate-400">
           <span className="truncate tabular-nums">
-            {t("ops.dashboard.collection_performance.showing", {
-              shown: visibleRows.length,
-              total: rows.length,
-            })}
+            {visibleRows.length} / {rows.length} shops
           </span>
           <Link
             to={PENDING_COLLECTIONS_URL}

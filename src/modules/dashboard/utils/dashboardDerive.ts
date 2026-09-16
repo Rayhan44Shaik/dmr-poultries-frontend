@@ -125,6 +125,14 @@ function pctChange(current: number, previous: number): number | null {
   return Math.round(((current - previous) / previous) * 100);
 }
 
+function isApprovedCollection(collection: DashboardData["collections"][number]): boolean {
+  return collection.status === "Approved";
+}
+
+function isPositivePending(pending: DashboardData["pendingCollections"][number]): boolean {
+  return Number(pending.currentPending) > 0;
+}
+
 /* ------------------------------------------------------------------ */
 /*  Main derivation                                                    */
 /* ------------------------------------------------------------------ */
@@ -134,11 +142,13 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
   const tFunc = getT(t);
   const today = dashboardToday(data.sampleQuarter?.today);
   const yesterday = businessDaysBefore(today, 1);
+  const approvedCollections = data.collections.filter(isApprovedCollection);
+  const positivePendingCollections = data.pendingCollections.filter(isPositivePending);
 
   const todaySales = sum(data.shopSales.filter((s) => s.tripDate === today).map((s) => Number(s.amount) || 0));
   const yesterdaySales = sum(data.shopSales.filter((s) => s.tripDate === yesterday).map((s) => Number(s.amount) || 0));
-  const todayCollections = sum(data.collections.filter((c) => c.collectionDate === today).map((c) => Number(c.amount) || 0));
-  const yesterdayCollections = sum(data.collections.filter((c) => c.collectionDate === yesterday).map((c) => Number(c.amount) || 0));
+  const todayCollections = sum(approvedCollections.filter((c) => c.collectionDate === today).map((c) => Number(c.amount) || 0));
+  const yesterdayCollections = sum(approvedCollections.filter((c) => c.collectionDate === yesterday).map((c) => Number(c.amount) || 0));
   const todayFuel = sum(data.fuelExpenses.filter((f) => f.date === today).map((f) => Number(f.amount) || 0));
   const todayTripExpense = sum(data.trips.filter((t) => t.tripDate === today).map((t) => Number(t.expense) || 0));
   const yesterdayFuel = sum(data.fuelExpenses.filter((f) => f.date === yesterday).map((f) => Number(f.amount) || 0));
@@ -146,8 +156,8 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
   const todayProfit = todaySales - todayFuel - todayTripExpense;
   const yesterdayProfit = yesterdaySales - yesterdayFuel - yesterdayTripExpense;
 
-  const pendingAmount = sum(data.pendingCollections.map((p) => Number(p.currentPending) || 0));
-  const overdueCount = data.pendingCollections.filter((p) => Number(p.overdueDays) > 0).length;
+  const pendingAmount = sum(positivePendingCollections.map((p) => Number(p.currentPending) || 0));
+  const overdueCount = positivePendingCollections.filter((p) => Number(p.overdueDays) > 0).length;
 
   const activeShops = data.shops.filter((s) => s.status === "Active").length;
   const activeFarms = data.farms.filter((f) => f.status === "Active").length;
@@ -158,7 +168,7 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
   const series = Array.from({ length: 7 }, (_, i) => {
     const date = businessDaysBefore(today, 6 - i);
     const sales = sum(data.shopSales.filter((s) => s.tripDate === date).map((s) => Number(s.amount) || 0));
-    const collections = sum(data.collections.filter((c) => c.collectionDate === date).map((c) => Number(c.amount) || 0));
+    const collections = sum(approvedCollections.filter((c) => c.collectionDate === date).map((c) => Number(c.amount) || 0));
     const birds = sum(data.shopSales.filter((s) => s.tripDate === date).map((s) => Number(s.totalBirds) || 0));
     const weight = sum(data.shopSales.filter((s) => s.tripDate === date).map((s) => Number(s.totalWeight) || 0));
     const fuel = sum(data.fuelExpenses.filter((f) => f.date === date).map((f) => Number(f.amount) || 0));
@@ -276,7 +286,7 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
       });
     });
 
-  data.collections
+  approvedCollections
     .filter((c) => c.collectionDate === today)
     .slice(0, 3)
     .forEach((c) => {
@@ -403,7 +413,7 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
       value: formatINRCompact(pendingAmount),
       sub: overdueCount > 0
         ? tFunc("dashboard.kpi.pending_sub_overdue", { count: overdueCount })
-        : tFunc("dashboard.kpi.pending_sub_due", { count: data.pendingCollections.length }),
+        : tFunc("dashboard.kpi.pending_sub_due", { count: positivePendingCollections.length }),
       delta: null,
       trend: "flat",
       icon: CreditCard,
@@ -438,7 +448,7 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
     vehicleActivity,
     todayTrips: todayTripViews,
     latestTrips: tripViews,
-    pendingCollections: data.pendingCollections,
+    pendingCollections: positivePendingCollections,
     fleet,
     activity,
     hasAnyData,

@@ -41,20 +41,20 @@ interface OperationalTrendsChartProps {
 }
 
 const COLOR = {
-  trips: "#4338ca",
-  farmWeight: "#64748b",
-  delivered: "#2563eb",
-  mortality: "#e11d48",
+  trips: "#16a34a",
+  farmWeight: "#22c55e",
+  delivered: "#f97316",
+  mortality: "#fb7185",
   weightLoss: "#f59e0b",
 } as const;
 
-/** Bright plot colours mirror the dashboard reference without changing KPIs. */
+/** Soft green/orange plot colours: lighter bars, green trip movement line. */
 const PLOT_COLOR = {
-  trips: "#2583eb",
-  farmWeight: "#10b981",
-  delivered: "#f59e0b",
-  mortality: "#8b5cf6",
-  weightLoss: "#f43f5e",
+  trips: "#16a34a",
+  farmWeight: "#4ade80",
+  delivered: "#fb923c",
+  mortality: "#fb7185",
+  weightLoss: "#f59e0b",
 } as const;
 
 type TrendChartMode = "barLine" | "area" | "stacked";
@@ -308,8 +308,8 @@ export default function OperationalTrendsChart({
               onClick={() => setChartMode(mode.value)}
               className={`rounded-md px-2.5 py-1 text-[9.5px] font-extrabold transition-colors ${
                 chartMode === mode.value
-                  ? "bg-white text-blue-700 shadow-sm ring-1 ring-inset ring-slate-200"
-                  : "text-slate-400 hover:text-slate-700"
+                  ? "bg-white text-emerald-700 shadow-sm ring-1 ring-inset ring-emerald-100"
+                  : "text-slate-400 hover:text-emerald-700"
               }`}
             >
               {t(mode.labelKey)}
@@ -324,31 +324,31 @@ export default function OperationalTrendsChart({
           <ComposedChart data={data} margin={{ top: 12, right: 2, bottom: 0, left: -8 }} barGap={2}>
             <defs>
               <linearGradient id="ot-trips-area" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={PLOT_COLOR.trips} stopOpacity={0.16} />
+                <stop offset="0%" stopColor={PLOT_COLOR.trips} stopOpacity={0.14} />
                 <stop offset="100%" stopColor={PLOT_COLOR.trips} stopOpacity={0} />
               </linearGradient>
               <linearGradient id="ot-farm" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#34d399" />
+                <stop offset="0%" stopColor="#dcfce7" />
                 <stop offset="100%" stopColor={PLOT_COLOR.farmWeight} />
               </linearGradient>
               <linearGradient id="ot-delivered" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#fbbf24" />
+                <stop offset="0%" stopColor="#ffedd5" />
                 <stop offset="100%" stopColor={PLOT_COLOR.delivered} />
               </linearGradient>
               <linearGradient id="ot-mortality" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#a78bfa" />
+                <stop offset="0%" stopColor="#ffe4e6" />
                 <stop offset="100%" stopColor={PLOT_COLOR.mortality} />
               </linearGradient>
               <linearGradient id="ot-loss" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#fb7185" />
+                <stop offset="0%" stopColor="#fef3c7" />
                 <stop offset="100%" stopColor={PLOT_COLOR.weightLoss} />
               </linearGradient>
               <filter id="ot-line-shadow" x="-20%" y="-20%" width="140%" height="160%">
-                <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor={PLOT_COLOR.trips} floodOpacity={0.24} />
+                <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor={PLOT_COLOR.trips} floodOpacity={0.18} />
               </filter>
             </defs>
 
-            <CartesianGrid stroke="#eef2f7" strokeDasharray="3 6" vertical />
+            <CartesianGrid stroke="#f1f5f9" strokeDasharray="3 6" vertical />
             <XAxis
               dataKey="date"
               tickFormatter={(value: string) => formatBucket(value, locale)}
@@ -389,7 +389,7 @@ export default function OperationalTrendsChart({
                   />
                 );
               }}
-              cursor={{ fill: "rgba(37,131,235,0.05)", radius: 6 }}
+              cursor={{ fill: "rgba(22,163,74,0.06)", radius: 6 }}
             />
 
             {chartMode === "barLine" ? (
