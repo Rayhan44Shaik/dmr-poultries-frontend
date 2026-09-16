@@ -919,7 +919,10 @@ export default {
   'ops.mortality.pagination.rows_per_page': 'Rows per page',
 
   // Expanded detail
-  'ops.mortality.detail.trip_overview': 'Trip Overview',
+  'ops.mortality.detail.trip_overview': 'Trip Details',
+  'ops.mortality.detail.farm': 'Farm',
+  'ops.mortality.detail.delivered': 'Delivered',
+  'ops.mortality.detail.weight_summary': 'Weights',
   'ops.mortality.detail.farm_input': 'Farm Input',
   'ops.mortality.detail.delivery_output': 'Delivery Output',
   'ops.mortality.detail.total_delivery': 'Total Delivery',

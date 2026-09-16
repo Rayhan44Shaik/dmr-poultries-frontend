@@ -2326,6 +2326,10 @@ function mortalityAnalysis(params) {
     supervisorName: t.supervisorName,
     vehicleNo: t.vehicleNo,
     driverName: t.driverName,
+    // Crew travel with the trip record already — projected here so the
+    // expandable trip panel can name them without a second request.
+    loaders: Array.isArray(t.loaders) ? t.loaders : [],
+    helpers: Array.isArray(t.helpers) ? t.helpers : [],
     status: "Completed",
     farmBirds: t.totalBirds,
     farmWeight: t.dcWeight,

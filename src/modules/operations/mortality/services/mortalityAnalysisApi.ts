@@ -30,6 +30,9 @@ export interface MortalityRow {
   supervisorName: string;
   vehicleNo: string;
   driverName: string;
+  /** Crew names, straight off the trip record. */
+  loaders: string[];
+  helpers: string[];
   /** Always "Completed" — the endpoint is restricted to finished trips. */
   status: string;
   /** Birds loaded at the farm. */

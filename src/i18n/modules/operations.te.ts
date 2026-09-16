@@ -966,7 +966,10 @@ export default {
   'ops.mortality.applied_filters.search': 'శోధన',
 
   // Expanded detail
-  'ops.mortality.detail.trip_overview': 'ట్రిప్ అవలోకనం',
+  'ops.mortality.detail.trip_overview': 'ట్రిప్ వివరాలు',
+  'ops.mortality.detail.farm': 'ఫారం',
+  'ops.mortality.detail.delivered': 'డెలివరీ',
+  'ops.mortality.detail.weight_summary': 'బరువులు',
   'ops.mortality.detail.farm_input': 'ఫారం ఇన్‌పుట్',
   'ops.mortality.detail.delivery_output': 'డెలివరీ అవుట్‌పుట్',
   'ops.mortality.detail.total_delivery': 'మొత్తం డెలివరీ',

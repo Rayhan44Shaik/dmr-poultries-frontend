@@ -29,12 +29,12 @@ import {
   ChevronRight,
   Feather,
   Hash,
+  HeartCrack,
   Percent,
   Scale,
   SearchX,
   ShoppingBag,
   TrendingDown,
-  Truck,
   UserCog,
   Warehouse,
 } from "lucide-react";
@@ -301,10 +301,12 @@ export default function TripLossTable({
       {/* ── Table header bar ─────────────────────────────────────────────
           Title and count are one block: "Completed Trips  • 525 trips".
           The trip count is the first thing read after the title, so it can
-          never look like a stray pill parked at the far edge of the card. */}
-      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-slate-100 bg-gradient-to-r from-rose-50/70 via-white to-amber-50/40 px-5 py-2.5">
-        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500 to-orange-400 text-white shadow-[0_6px_14px_-6px_rgba(244,63,94,0.75)] ring-1 ring-rose-200/70">
-          <Truck size={17} strokeWidth={2.4} aria-hidden="true" />
+          never look like a stray pill parked at the far edge of the card.
+          Flat rose tile, broken heart — mortality, stated plainly: no glossy
+          gradient, no drop shadow, same quiet weight as the Trip List tile. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-slate-100 bg-gradient-to-r from-rose-50/60 via-white to-rose-50/40 px-5 py-2.5">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-rose-100 bg-rose-50/70 text-rose-500 shadow-inner">
+          <HeartCrack size={18} strokeWidth={2.2} aria-hidden="true" />
         </div>
         <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
           <h3 className="text-[15px] font-bold tracking-tight text-slate-800">
