@@ -536,6 +536,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
       <FuelViewModal
         isOpen={viewModalOpen}
         bill={viewingBill}
+        vehicleBills={viewingBill ? deduplicatedExpenses.filter((b) => b.vehicleNo === viewingBill.vehicleNo) : []}
         onClose={() => {
           setViewModalOpen(false);
           setViewingBill(null);

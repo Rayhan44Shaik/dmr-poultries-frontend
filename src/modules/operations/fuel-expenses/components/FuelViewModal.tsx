@@ -3,6 +3,7 @@ import {
   X, 
   Truck, 
   User, 
+  MapPin,
   MessageSquare,
   Fuel,
   CheckCircle2,
@@ -28,10 +29,11 @@ import { exportToPDF } from "../../../../utils/exportUtils";
 interface FuelViewModalProps {
   isOpen: boolean;
   bill: FuelExpense | null;
+  vehicleBills?: FuelExpense[];
   onClose: () => void;
 }
 
-function FuelViewModalContent({ isOpen, bill, onClose }: FuelViewModalProps) {
+function FuelViewModalContent({ isOpen, bill, vehicleBills = [], onClose }: FuelViewModalProps) {
   const { t, language, toggleLanguage } = useI18n();
   const [pdfBusy, setPdfBusy] = useState(false);
 
@@ -112,6 +114,13 @@ function FuelViewModalContent({ isOpen, bill, onClose }: FuelViewModalProps) {
     <Clock size={13} className="text-orange-500" />
   );
 
+  const hasGpsCoords =
+    bill.gpsLat != null &&
+    bill.gpsLon != null &&
+    Number.isFinite(Number(bill.gpsLat)) &&
+    Number.isFinite(Number(bill.gpsLon)) &&
+    !(Number(bill.gpsLat) === 0 && Number(bill.gpsLon) === 0);
+
   // Left column records
   const leftDetails: [string, React.ReactNode][] = [
     [t("ops.fuel.bill_no"), <span className="font-mono font-bold text-slate-800">{bill.billNo}</span>],
@@ -158,13 +167,10 @@ function FuelViewModalContent({ isOpen, bill, onClose }: FuelViewModalProps) {
     ],
     [
       t("ops.fuel.petrol_bunk_location"),
-      bill.gpsLat != null && bill.gpsLon != null ? (
-        <GpsAddressText
-          lat={bill.gpsLat}
-          lon={bill.gpsLon}
-          className="text-xs text-emerald-600 font-semibold"
-          maxLines={1}
-        />
+      hasGpsCoords ? (
+        <span className="text-xs text-emerald-600 font-semibold tabular-nums">
+          {Number(bill.gpsLat).toFixed(5)}°N, {Number(bill.gpsLon).toFixed(5)}°E
+        </span>
       ) : (
         <span className="text-slate-400">{t("ops.fuel.gps_not_captured")}</span>
       ),
@@ -312,6 +318,34 @@ function FuelViewModalContent({ isOpen, bill, onClose }: FuelViewModalProps) {
             </dl>
           </div>
 
+          {/* Full-width GPS Address Block (matching Step 2 & Step 5 Trip View) */}
+          <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
+            <span className="text-[12px] uppercase font-bold text-slate-500 flex items-center gap-1.5 mb-2">
+              <span className="h-6 w-6 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0">
+                <MapPin size={13} />
+              </span>
+              <span>{t("ops.trip.field.gps_address") || "GPS Location & Address"}</span>
+            </span>
+            {hasGpsCoords ? (
+              <div className="space-y-1">
+                <p className="text-[13px] font-semibold text-slate-800 break-words leading-relaxed">
+                  <GpsAddressText
+                    lat={bill.gpsLat}
+                    lon={bill.gpsLon}
+                    fallback={t("ops.trip.location_captured")}
+                  />
+                </p>
+                <div className="text-[11px] font-mono text-emerald-600 font-semibold pt-1">
+                  GPS: {Number(bill.gpsLat).toFixed(6)}°N, {Number(bill.gpsLon).toFixed(6)}°E
+                </div>
+              </div>
+            ) : (
+              <p className="text-xs font-semibold text-slate-400 italic">
+                {t("ops.trip.not_captured") || "Location not captured"}
+              </p>
+            )}
+          </div>
+
           {/* Total Cost Highlight Band */}
           <div className="flex items-center justify-between gap-3 rounded-xl border border-emerald-200/80 bg-gradient-to-r from-emerald-50/90 via-white to-emerald-50/60 px-5 py-3 shadow-xs">
             <span className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-emerald-800">
@@ -355,6 +389,75 @@ function FuelViewModalContent({ isOpen, bill, onClose }: FuelViewModalProps) {
               )}
             </div>
           </div>
+
+          {/* Recent Vehicle Fuel History (matching Maintenance View) */}
+          {vehicleBills.length > 1 && (
+            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs space-y-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[12px] uppercase font-bold text-slate-500 flex items-center gap-1.5">
+                  <Truck size={14} className="text-emerald-600" />
+                  <span>
+                    {language === "te"
+                      ? `ఇటీవలి ఇంధన రికార్డులు — ${vehicleDisplay}`
+                      : `Recent Fuel Entries — ${vehicleDisplay}`}
+                  </span>
+                </span>
+                <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold tabular-nums text-slate-600 border border-slate-200">
+                  {vehicleBills.length} {language === "te" ? "రికార్డులు" : "records"}
+                </span>
+              </div>
+              <div className="overflow-x-auto rounded-lg border border-slate-100">
+                <table className="min-w-full divide-y divide-slate-100 text-xs">
+                  <thead className="bg-slate-50 text-slate-500 text-[11px] uppercase font-bold">
+                    <tr>
+                      <th className="px-3 py-2 text-left">{t("common.date")}</th>
+                      <th className="px-3 py-2 text-left">{t("ops.fuel.bill_no")}</th>
+                      <th className="px-3 py-2 text-right">{t("ops.fuel.litres")}</th>
+                      <th className="px-3 py-2 text-right">{t("ops.fuel.rate_per_l")}</th>
+                      <th className="px-3 py-2 text-right">{t("ops.fuel.total_cost")}</th>
+                      <th className="px-3 py-2 text-center">{t("common.status")}</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100 bg-white">
+                    {vehicleBills.slice(0, 5).map((vb) => {
+                      const isCur = vb.id === bill.id;
+                      const isVbTrip = vb.sourceType === "TRIP" || !!vb.tripNo;
+                      const isVbDeleted = vb.deleted || vb.status === "Deleted";
+                      const st = isVbDeleted
+                        ? t("common.deleted")
+                        : isVbTrip || vb.status === "Approved"
+                        ? t("common.approved")
+                        : t("common.pending");
+                      const stColor = isVbDeleted
+                        ? "text-rose-600"
+                        : isVbTrip || vb.status === "Approved"
+                        ? "text-emerald-600"
+                        : "text-orange-500";
+                      return (
+                        <tr
+                          key={vb.id}
+                          className={isCur ? "bg-emerald-50/50 font-semibold" : "hover:bg-slate-50"}
+                        >
+                          <td className="px-3 py-2 whitespace-nowrap text-slate-600">
+                            {formatTripListDay(vb.date, language)}
+                          </td>
+                          <td className="px-3 py-2 font-mono font-bold text-slate-800">{vb.billNo}</td>
+                          <td className="px-3 py-2 text-right font-bold text-blue-600">
+                            {vb.litres.toFixed(2)} L
+                          </td>
+                          <td className="px-3 py-2 text-right text-slate-600">₹ {vb.rate.toFixed(2)}</td>
+                          <td className="px-3 py-2 text-right font-bold text-emerald-600">
+                            ₹ {vb.amount.toFixed(2)}
+                          </td>
+                          <td className={`px-3 py-2 text-center font-bold ${stColor}`}>{st}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
 
           {/* Remarks Callout (if any) */}
           {bill.remarks && (
