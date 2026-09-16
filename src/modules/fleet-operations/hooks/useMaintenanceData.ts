@@ -1,13 +1,16 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useVehicles } from '../../masters/vehicles/hooks/useVehicles';
+import type { Vehicle } from '../../masters/vehicles/types/vehicle';
 import { apiGet } from '../../../api';
 import { handleApiError } from '../../../api/errors';
-import { maintenanceApi, mapMaintenanceToEvent } from '../services/maintenanceApi';
+import { maintenanceApi, mapMaintenanceToEvent, type MaintenanceListParams } from '../services/maintenanceApi';
 import { fleetCacheInvalidate } from '../services/fleetSessionCache';
 import type { MaintenanceEvent } from '../types';
 
+type FleetVehicle = Vehicle & { currentKM?: number };
+
 interface UpcomingService {
-  vehicle: any;
+  vehicle: FleetVehicle;
   /** The maintenance type this upcoming-service row tracks (each type has its
    * own independent next-service schedule). */
   maintenanceType: string;
@@ -18,7 +21,69 @@ interface UpcomingService {
   liveCurrentKM: number;
 }
 
-const rowsOf = (payload: any): any[] => Array.isArray(payload) ? payload : (payload?.data ?? []);
+const HISTORY_PAGE_SIZE = 200;
+type MaintenanceListEnvelope = {
+  data?: unknown;
+  meta?: { totalPages?: unknown; total?: unknown; limit?: unknown; page?: unknown };
+};
+
+const rowsOf = (payload: unknown): Record<string, unknown>[] => {
+  const rows = Array.isArray(payload)
+    ? payload
+    : (payload as MaintenanceListEnvelope | null)?.data;
+  return Array.isArray(rows)
+    ? rows.filter((row): row is Record<string, unknown> => Boolean(row) && typeof row === 'object')
+    : [];
+};
+
+/** History totals must be based on every page, not an arbitrary API cap. */
+async function listEveryMaintenancePage(params: MaintenanceListParams = {}) {
+  const records: Record<string, unknown>[] = [];
+  let page = 1;
+  let totalPages: number;
+  let expectedTotal: number | null = null;
+  do {
+    const payload = await maintenanceApi.list({ ...params, page, limit: HISTORY_PAGE_SIZE });
+    const meta = !Array.isArray(payload)
+      ? (payload as MaintenanceListEnvelope | null)?.meta
+      : undefined;
+    const reportedPage = Number(meta?.page);
+    if (Number.isInteger(reportedPage) && reportedPage > 0 && reportedPage !== page) {
+      throw new Error('Maintenance API returned an unexpected page.');
+    }
+    records.push(...rowsOf(payload));
+
+    const reportedPages = Number(meta?.totalPages);
+    const reportedTotal = Number(meta?.total);
+    const reportedLimit = Number(meta?.limit) || HISTORY_PAGE_SIZE;
+    const pagesFromTotal = Number.isFinite(reportedTotal) && reportedTotal >= 0 && reportedLimit > 0
+      ? Math.max(1, Math.ceil(reportedTotal / reportedLimit))
+      : 1;
+    totalPages = Number.isInteger(reportedPages) && reportedPages > 0 ? reportedPages : pagesFromTotal;
+    if (page === 1 && Number.isFinite(reportedTotal) && reportedTotal >= 0) {
+      expectedTotal = reportedTotal;
+    }
+    page += 1;
+  } while (page <= totalPages);
+
+  // A retried page must not inflate the list, KPIs, or pagination. Conversely,
+  // an advertised total that cannot be reconciled must never masquerade as an
+  // exact result for the operator.
+  const seen = new Set<string>();
+  const uniqueRecords = records.filter((record) => {
+    const id = String(record?.id ?? '');
+    if (!id || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+  if (expectedTotal !== null && uniqueRecords.length !== expectedTotal) {
+    throw new Error('Maintenance API returned an incomplete result.');
+  }
+  return uniqueRecords;
+}
+
+/** Compare local calendar keys so an inclusive To Date never loses its final day. */
+const maintenanceDateKey = (record: MaintenanceEvent) => String(record.date || '').slice(0, 10);
 
 export function useMaintenanceData(scope: 'entry' | 'history' | 'all' = 'all') {
   const { vehicles } = useVehicles();
@@ -92,8 +157,8 @@ export function useMaintenanceData(scope: 'entry' | 'history' | 'all' = 'all') {
         // Full list of approved records (not just latestApproved per vehicle) so the
         // Approved Maintenance Timeline can show every approved maintenance event all
         // the time, not only the most recent one per vehicle.
-        const approvedData = await maintenanceApi.list({ status: 'Approved', limit: 500 });
-        if (!cancelled) setApprovedMaintenance(rowsOf(approvedData).map(mapMaintenanceToEvent));
+        const approvedData = await listEveryMaintenancePage({ status: 'Approved' });
+        if (!cancelled) setApprovedMaintenance(approvedData.map(mapMaintenanceToEvent));
       } catch {
         if (!cancelled) setApprovedMaintenance([]);
       }
@@ -123,31 +188,30 @@ export function useMaintenanceData(scope: 'entry' | 'history' | 'all' = 'all') {
     };
   }, [refreshKey, scope]);
 
-  // History uses the established query contract. Type/service filtering remains
-  // client-side because those fields are not part of the backend query contract.
+  // Type, service, and free-text search are applied locally because those
+  // fields are not part of every deployed API contract. Search therefore feels
+  // immediate and cannot be overwritten by a late request for an older phrase.
   useEffect(() => {
-    if (scope === 'entry') {
-      return;
-    }
+    if (scope === 'entry') return;
     let cancelled = false;
-    const timer = window.setTimeout(async () => {
-      if (!historyHasLoaded.current) setHistoryLoading(true);
-      setHistoryError(null);
+    // Hide the previous query's rows while this exact filter set loads.
+    // A new API query must replace, rather than coexist with, its previous result.
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- this synchronizes the active query state.
+    setHistoryLoading(true);
+    setHistoryError(null);
+    (async () => {
       try {
-        const payload = await maintenanceApi.list({
+        const records = await listEveryMaintenancePage({
           vehicleId: selectedVehicle === 'all' ? undefined : selectedVehicle,
           driverId: selectedDriver === 'all' ? undefined : selectedDriver,
           fromDate: fromDate || undefined,
           toDate: toDate || undefined,
           status: selectedStatus === 'all' || selectedStatus === 'Deleted' ? undefined : selectedStatus,
-          search: searchQuery.trim() || undefined,
-          includeDeleted: selectedStatus === 'Deleted' || selectedStatus === 'all',
-          page: 1,
-          limit: 500,
+          includeDeleted: selectedStatus === 'Deleted',
         });
         if (!cancelled) {
           historyHasLoaded.current = true;
-          setHistoryRecords(rowsOf(payload).map(mapMaintenanceToEvent));
+          setHistoryRecords(records.map(mapMaintenanceToEvent));
         }
       } catch (cause) {
         if (!cancelled) {
@@ -157,9 +221,9 @@ export function useMaintenanceData(scope: 'entry' | 'history' | 'all' = 'all') {
       } finally {
         if (!cancelled) setHistoryLoading(false);
       }
-    }, searchQuery ? 250 : 0);
-    return () => { cancelled = true; window.clearTimeout(timer); };
-  }, [fromDate, refreshKey, scope, searchQuery, selectedDriver, selectedStatus, selectedVehicle, toDate]);
+    })();
+    return () => { cancelled = true; };
+  }, [fromDate, refreshKey, scope, selectedDriver, selectedStatus, selectedVehicle, toDate]);
 
   const approvedHistory = useMemo(
     () => {
@@ -192,11 +256,18 @@ export function useMaintenanceData(scope: 'entry' | 'history' | 'all' = 'all') {
 
   const vehicleNumberById = useMemo(() => {
     const map = new Map<string, string>();
-    vehicles.forEach((vehicle: any) => map.set(String(vehicle.id), String(vehicle.vehicleNumber || '')));
+    vehicles.forEach((vehicle: FleetVehicle) => map.set(String(vehicle.id), String(vehicle.vehicleNumber || '')));
     return map;
   }, [vehicles]);
 
   const filtered = useMemo(() => historyRecords.filter((record) => {
+    // Guard the visible set as well: older API deployments may ignore a query
+    // parameter, but the table and KPIs must still reflect the chosen filters.
+    if (selectedVehicle !== 'all' && String(record.vehicleId) !== String(selectedVehicle)) return false;
+    if (selectedDriver !== 'all' && String(record.driverId) !== String(selectedDriver)) return false;
+    const date = maintenanceDateKey(record);
+    if (fromDate && (!date || date < fromDate)) return false;
+    if (toDate && (!date || date > toDate)) return false;
     if (selectedStatus === 'Deleted' && !record.deletedAt) return false;
     if (selectedStatus === 'Pending' && (record.paymentStatus !== 'pending' || record.deletedAt)) return false;
     if (selectedStatus === 'Approved' && (record.paymentStatus !== 'approved' || record.deletedAt)) return false;
@@ -216,20 +287,20 @@ export function useMaintenanceData(scope: 'entry' | 'history' | 'all' = 'all') {
       if (!values.some((value) => String(value || '').toLowerCase().includes(needle))) return false;
     }
     return true;
-  }), [historyRecords, searchQuery, selectedMaintenanceType, selectedServiceType, selectedStatus, vehicleNumberById]);
+  }), [fromDate, historyRecords, searchQuery, selectedDriver, selectedMaintenanceType, selectedServiceType, selectedStatus, selectedVehicle, toDate, vehicleNumberById]);
 
   const historyStats = useMemo(() => ({
     total: filtered.length,
     totalCost: filtered.reduce((sum, record) => sum + Number(record.totalCost || 0), 0),
-    approved: filtered.filter((record) => record.paymentStatus === 'approved').length,
-    pending: filtered.filter((record) => record.paymentStatus !== 'approved').length,
-    vehiclesServiced: new Set(filtered.map((record) => String(record.vehicleId))).size,
+    approved: filtered.filter((record) => record.paymentStatus === 'approved' && !record.deletedAt).length,
+    pending: filtered.filter((record) => record.paymentStatus === 'pending' && !record.deletedAt).length,
+    vehiclesServiced: new Set(filtered.map((record) => String(record.vehicleId)).filter(Boolean)).size,
     documents: filtered.reduce((sum, record) => sum + (record.documents?.length || 0), 0),
   }), [filtered]);
 
   const upcomingServices = useMemo((): UpcomingService[] => {
     const list: UpcomingService[] = [];
-    vehicles.forEach((vehicle: any) => {
+    vehicles.forEach((vehicle: FleetVehicle) => {
       const vehicleId = String(vehicle.id);
       // Approved records for this vehicle, newest first. Only approved records
       // drive upcoming-service schedules (pending entries are not yet effective).

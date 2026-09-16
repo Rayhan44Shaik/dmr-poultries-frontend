@@ -40,52 +40,112 @@ export interface MaintenanceListParams {
 export const isServerBillNo = (billNo?: string | null): boolean =>
   /^MNT-\d{8}-\d{3,4}$/.test(billNo ?? '');
 
+type RawMaintenanceRecord = Record<string, unknown>;
+type MaintenancePart = MaintenanceEvent['parts'][number];
+type MaintenanceDocumentRow = NonNullable<MaintenanceEvent['documents']>[number];
+
+const text = (value: unknown): string => typeof value === 'string' ? value : value == null ? '' : String(value);
+const optionalText = (value: unknown): string | undefined => {
+  const valueText = text(value).trim();
+  return valueText || undefined;
+};
+const objectValue = (value: unknown): Record<string, unknown> | null =>
+  value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null;
+
+/**
+ * Normalize a backend maintenance timestamp without changing its business-day
+ * portion. Backends commonly send a local `YYYY-MM-DDTHH:mm:ss` value; passing
+ * that through `toISOString()` would turn midnight in India into the previous
+ * UTC day and make an inclusive From/To filter lose a record. Noon UTC is a
+ * stable internal representation for this calendar business date.
+ */
+function maintenanceBusinessTimestamp(value: unknown): string {
+  const dateKey = /^(\d{4}-\d{2}-\d{2})/.exec(text(value))?.[1];
+  if (dateKey) {
+    const calendarDate = new Date(`${dateKey}T12:00:00.000Z`);
+    if (!Number.isNaN(calendarDate.getTime()) && calendarDate.toISOString().slice(0, 10) === dateKey) {
+      return calendarDate.toISOString();
+    }
+  }
+  const parsed = new Date(text(value));
+  return Number.isNaN(parsed.getTime()) ? new Date().toISOString() : parsed.toISOString();
+}
+
+function mapParts(value: unknown): MaintenancePart[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((raw): MaintenancePart[] => {
+    const part = objectValue(raw);
+    if (!part) return [];
+    return [{
+      name: text(part.name),
+      specification: text(part.specification),
+      quantity: Number(part.quantity) || 0,
+      rate: Number(part.rate) || 0,
+      amount: Number(part.amount) || 0,
+    }];
+  });
+}
+
+function mapDocuments(value: unknown): MaintenanceDocumentRow[] {
+  if (!Array.isArray(value)) return [];
+  return value.flatMap((raw): MaintenanceDocumentRow[] => {
+    const document = objectValue(raw);
+    if (!document) return [];
+    const id = Number(document.id);
+    if (!Number.isFinite(id)) return [];
+    return [{
+      id,
+      maintenanceId: Number(document.maintenanceId) || undefined,
+      fileName: text(document.fileName),
+      mimeType: text(document.mimeType),
+      fileSize: Number(document.fileSize) || undefined,
+      createdAt: optionalText(document.createdAt),
+    }];
+  });
+}
+
 /** Map a backend FleetMaintenance row into the frontend MaintenanceEvent shape. */
-export function mapMaintenanceToEvent(record: any): MaintenanceEvent {
+export function mapMaintenanceToEvent(value: unknown): MaintenanceEvent {
+  const record: RawMaintenanceRecord = objectValue(value) || {};
   const deleted = Boolean(record.deleted || record.deletedAt);
-  const normalizedStatus = String(record.paymentStatus || record.status || '').toLowerCase();
+  const normalizedStatus = text(record.paymentStatus || record.status).toLowerCase();
+  const rawNextServiceByType = objectValue(record.nextServiceByType);
+  const nextServiceByType = (() => {
+    if (!rawNextServiceByType) return undefined;
+    const map: Record<string, number> = {};
+    for (const [key, value] of Object.entries(rawNextServiceByType)) {
+      const num = Number(value);
+      if (key && Number.isFinite(num) && num > 0) map[key] = num;
+    }
+    return Object.keys(map).length > 0 ? map : undefined;
+  })();
+
   return {
-    id: String(record.id),
-    vehicleId: record.vehicleId != null ? String(record.vehicleId) : '',
-    vehicleNo: record.vehicleNo != null ? String(record.vehicleNo) : '',
-    date: record.date ? new Date(record.date).toISOString() : new Date().toISOString(),
-    billNumber: record.billNo || '',
+    id: text(record.id),
+    vehicleId: record.vehicleId != null ? text(record.vehicleId) : '',
+    vehicleNo: record.vehicleNo != null ? text(record.vehicleNo) : '',
+    date: maintenanceBusinessTimestamp(record.date),
+    billNumber: text(record.billNo || record.billNumber),
     currentKM: Number(record.currentKM) || 0,
-    maintenanceType: record.maintenanceType || '',
-    serviceType: record.serviceType || '',
-    garage: record.garage || '',
-    mechanic: record.mechanic || '',
-    driverId: record.driverId != null ? String(record.driverId) : '',
-    driverName: record.driverName || '',
-    nextServiceKM: record.nextServiceKM != null ? Number(record.nextServiceKM) : 0,
-    nextServiceByType: (() => {
-      const raw = record.nextServiceByType;
-      if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return undefined;
-      const map: Record<string, number> = {};
-      for (const [key, value] of Object.entries(raw as Record<string, unknown>)) {
-        const num = Number(value);
-        if (key && Number.isFinite(num) && num > 0) map[key] = num;
-      }
-      return Object.keys(map).length > 0 ? map : undefined;
-    })(),
+    maintenanceType: text(record.maintenanceType),
+    serviceType: text(record.serviceType),
+    garage: text(record.garage),
+    mechanic: text(record.mechanic),
+    driverId: record.driverId != null ? text(record.driverId) : '',
+    driverName: text(record.driverName),
+    nextServiceKM: Number(record.nextServiceKM) || 0,
+    nextServiceByType,
     totalCost: Number(record.totalCost) || 0,
-    parts: Array.isArray(record.parts) ? record.parts : [],
-    remarks: record.remarks || '',
-    createdAt: record.createdAt || undefined,
-    createdBy: record.createdBy || undefined,
-    updatedAt: record.updatedAt || undefined,
-    approvedBy: record.approvedBy || undefined,
-    approvedAt: record.approvedAt || undefined,
+    parts: mapParts(record.parts),
+    remarks: text(record.remarks),
+    createdAt: optionalText(record.createdAt),
+    createdBy: optionalText(record.createdBy),
+    updatedAt: optionalText(record.updatedAt),
+    approvedBy: optionalText(record.approvedBy),
+    approvedAt: optionalText(record.approvedAt),
     paymentStatus: normalizedStatus === 'approved' ? 'approved' : 'pending',
-    deletedAt: deleted ? record.deletedAt || record.updatedAt || undefined : undefined,
-    documents: (Array.isArray(record.documents) ? record.documents : []).map((d: any) => ({
-      id: d.id,
-      maintenanceId: d.maintenanceId,
-      fileName: d.fileName,
-      mimeType: d.mimeType,
-      fileSize: d.fileSize,
-      createdAt: d.createdAt,
-    })),
+    deletedAt: deleted ? optionalText(record.deletedAt || record.updatedAt) : undefined,
+    documents: mapDocuments(record.documents),
   };
 }
 
