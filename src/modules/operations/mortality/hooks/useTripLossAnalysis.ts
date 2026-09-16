@@ -43,7 +43,7 @@
 //   REFRESH:
 //     - Re-fetches data preserving current applied filters and page
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { DatePickerUtils } from "../../../../components/common/DatePicker";
 import {
   fetchMortalityAnalysis,

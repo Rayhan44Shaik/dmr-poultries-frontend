@@ -47,7 +47,6 @@ import {
 } from "../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../i18n";
 import { getQuarterSampleInfo } from "../../../../sample/quarterSample";
-import VehicleAnalyticsPage from "../../../fleet-operations/pages/VehicleAnalyticsPage";
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-IN", {
@@ -951,14 +950,5 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
     </div>
   );
 
-  return (
-    <>
-      {content}
-      <section aria-label="Vehicle analytics" className="w-full px-4 pb-8 sm:px-5 lg:px-6">
-        <div className="mx-auto w-full max-w-[1600px]">
-          <VehicleAnalyticsPage embedded />
-        </div>
-      </section>
-    </>
-  );
+  return content;
 }

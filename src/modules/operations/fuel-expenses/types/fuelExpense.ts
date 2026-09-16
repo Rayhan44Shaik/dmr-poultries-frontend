@@ -1,6 +1,21 @@
 export type FuelSourceType = "TRIP" | "MANUAL";
 export type FuelUiStatus = "Pending" | "Approved" | "Rejected";
 
+export type FuelSortKey =
+  | "billNo"
+  | "date"
+  | "sourceType"
+  | "tripNo"
+  | "vehicleNo"
+  | "driverName"
+  | "supervisorName"
+  | "meterReading"
+  | "litres"
+  | "rate"
+  | "amount"
+  | "petrolBunk"
+  | "status";
+
 export interface FuelExpense {
   id: string;
   billNo: string;
@@ -39,3 +54,4 @@ export type FuelExpenseDraft = Omit<
   FuelExpense,
   "id" | "billNo" | "createdDate" | "createdBy" | "status" | "sourceType"
 >;
+

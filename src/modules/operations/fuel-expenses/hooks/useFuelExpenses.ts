@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   fuelExpenseService,
   type FuelListMeta,
@@ -10,7 +10,7 @@ type NotificationFn = (msg: string, type?: "success" | "error" | "info") => void
 
 export function useFuelExpenses(showNotification?: NotificationFn) {
   const [expenses, setExpenses] = useState<FuelExpense[]>([]);
-  const [meta, setMeta] = useState<FuelListMeta>({ total: 0, page: 1, limit: 10, totalPages: 1 });
+  const [meta, setMeta] = useState<FuelListMeta>({ total: 0, page: 1, limit: 1000, totalPages: 1 });
   const [summary, setSummary] = useState<FuelListSummary>({
     totalLitres: 0,
     totalAmount: 0,
@@ -22,63 +22,39 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
 
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
-  const [selectedVehicles, setSelectedVehicles] = useState<string[]>([]);
-  const [sourceType, setSourceType] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [tripNo, setTripNo] = useState("");
-  const [billNo, setBillNo] = useState("");
+  const requestSeqRef = useRef(0);
 
   const refresh = useCallback(async () => {
+    const seq = requestSeqRef.current + 1;
+    requestSeqRef.current = seq;
     setLoading(true);
     setError(null);
     try {
+      // Fetch the full register for snappy client-side filtering, sorting, tab counts, and pagination
       const result = await fuelExpenseService.list({
-        page: currentPage,
-        limit: pageSize,
-        fromDate,
-        toDate,
-        vehicleNo: selectedVehicles[0] || "",
-        sourceType,
-        status: statusFilter,
-        tripNo,
-        billNo,
+        page: 1,
+        limit: 2000,
       });
+      if (requestSeqRef.current !== seq) return;
       setExpenses(result.data);
       setMeta(result.meta);
       setSummary(result.summary);
     } catch (err) {
+      if (requestSeqRef.current !== seq) return;
       const message = err instanceof Error ? err.message : "Failed to load fuel expenses.";
       setError(message);
       showNotification?.(message, "error");
     } finally {
-      setLoading(false);
+      if (requestSeqRef.current === seq) {
+        setLoading(false);
+      }
     }
-  }, [
-    currentPage,
-    pageSize,
-    fromDate,
-    toDate,
-    selectedVehicles,
-    sourceType,
-    statusFilter,
-    tripNo,
-    billNo,
-    showNotification,
-  ]);
+  }, [showNotification]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
-
-  // The API summary covers the complete filtered register. `expenses` is only
-  // the current table page, so reducing it here would make the quarter totals
-  // jump every time the user paginates.
-  const filteredSummary = summary;
 
   const saveExpense = async (expense: FuelExpenseDraft) => {
     setIsSaving(true);
@@ -155,47 +131,15 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
     }
   };
 
-  const resetFilters = () => {
-    setFromDate("");
-    setToDate("");
-    setSelectedVehicles([]);
-    setSourceType("");
-    setStatusFilter("");
-    setTripNo("");
-    setBillNo("");
-    setCurrentPage(1);
-  };
-
   return {
     expenses,
     filteredData: expenses,
-    paginatedData: expenses,
-    currentPage,
-    setCurrentPage,
-    pageSize,
-    setPageSize,
-    totalPages: meta.totalPages,
-    totalCount: meta.total,
-    fromDate,
-    setFromDate,
-    toDate,
-    setToDate,
-    selectedVehicles,
-    setSelectedVehicles,
-    sourceType,
-    setSourceType,
-    statusFilter,
-    setStatusFilter,
-    tripNo,
-    setTripNo,
-    billNo,
-    setBillNo,
-    resetFilters,
-    refresh,
+    meta,
+    summary,
     loading,
     isSaving,
     error,
-    filteredSummary,
+    refresh,
     saveExpense,
     updateExpense,
     deleteExpense,

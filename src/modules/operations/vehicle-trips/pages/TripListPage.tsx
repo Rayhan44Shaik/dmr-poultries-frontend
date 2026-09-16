@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { History, Truck } from "lucide-react";
+import { History } from "lucide-react";
 import TripFilters from "../components/TripFilters";
 import TripKPICards from "../components/TripKPICards";
 import TripMasterTable, { type TripSortKey } from "../components/TripMasterTable";

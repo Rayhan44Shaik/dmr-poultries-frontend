@@ -5,7 +5,7 @@
 // -> Mortality -> Weight Loss -> Delivery Reconciliation.
 // Shop names and per-shop delivered birds/weights live here only.
 
-import { Bird, Package, Scale, Store, Truck, UserCheck, Warehouse } from "lucide-react";
+import { Bird, Scale, Store, Truck, UserCheck, Warehouse } from "lucide-react";
 import type { TripLossAnalysis } from "../hooks/useTripLossAnalysis";
 import { useTripDeliveries } from "../hooks/useTripLossAnalysis";
 import { formatNumber, formatWeight, formatDateShort } from "../../../../utils/format";

@@ -90,13 +90,11 @@ import type {
 } from "../types";
 import {
   ORDERS_TABLE_FONT_CLASS,
-  ordersTableZebraRow,
   ordersZebraTone,
 } from "../ordersTableStyles";
 import {
   ORDERS_NO_SPINNER,
   OrdersEmptyState,
-  OrdersDropdown,
   OrdersMultiSelect,
   OrdersIconButton,
   OrdersSearchInput,
@@ -210,7 +208,7 @@ function OrdersAssignmentTab({
   onDaySelect: _onDaySelect,
   collection,
   eligibleVehicles,
-  dayVehicleViews,
+  dayVehicleViews: _dayVehicleViews,
   shopDirectory,
   supervisorDirectory,
   onChanged,
