@@ -20,19 +20,23 @@ import MasterDropdown, {
   type MasterDropdownOption,
 } from "../../../../masters/components/MasterDropdown";
 import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocalization";
+import type { PendingShopSortDir, PendingShopSortKey } from "../../types/collection";
 
 interface Props {
   fromDate: string;
   toDate: string;
   shopName: string;
-  sortBy: string;
+  /** Null means "no column order" — the register's own sequence. */
+  sortBy: PendingShopSortKey | null;
+  sortDir: PendingShopSortDir;
   shopNames: string[];
   recoveryThreshold: number;
   searchQuery: string;
   setFromDate: (value: string) => void;
   setToDate: (value: string) => void;
   setShopName: (value: string) => void;
-  setSortBy: (value: string) => void;
+  /** One setter for both halves of the order, exactly like Trip List's filter. */
+  setSort: (key: PendingShopSortKey | null, dir: PendingShopSortDir) => void;
   setRecoveryThreshold: (value: number) => void;
   setSearchQuery: (value: string) => void;
   onReset: () => void;
@@ -61,13 +65,14 @@ function PendingCollectionsFilters({
   toDate,
   shopName,
   sortBy,
+  sortDir,
   shopNames,
   recoveryThreshold,
   searchQuery,
   setFromDate,
   setToDate,
   setShopName,
-  setSortBy,
+  setSort,
   setRecoveryThreshold,
   setSearchQuery,
   onReset,
@@ -90,14 +95,41 @@ function PendingCollectionsFilters({
     searchText: shop,
   }));
 
+  /**
+   * Sort By — every column the table can order by, in `key:dir` form. This is
+   * Trip List's list, field for field: the same column-plus-direction labels,
+   * the same two options per column, so a header click and a selection here
+   * are one and the same order and the two affordances never disagree.
+   */
   const sortOptions: MasterDropdownOption[] = [
-    { value: "alphabeticalAZ", label: t("ops.collection.sort_az") },
-    { value: "alphabeticalZA", label: t("ops.collection.sort_za") },
-    { value: "highestBalance", label: t("ops.collection.sort_highest_balance") },
-    { value: "lowestBalance", label: t("ops.collection.sort_lowest_balance") },
-    { value: "latestCollection", label: t("ops.collection.sort_latest_collection") },
-    { value: "oldestCollection", label: t("ops.collection.sort_oldest_collection") },
+    { value: "shopName:asc", label: `${t("operations.shop_name")} — ${t("ops.collection.sort_az")}` },
+    { value: "shopName:desc", label: `${t("operations.shop_name")} — ${t("ops.collection.sort_za")}` },
+    { value: "balance:desc", label: `${t("common.balance")} — ${t("ops.collection.sort_high_low")}` },
+    { value: "balance:asc", label: `${t("common.balance")} — ${t("ops.collection.sort_low_high")}` },
+    { value: "weeklySales:desc", label: `${t("operations.recent_sales")} — ${t("ops.collection.sort_high_low")}` },
+    { value: "weeklySales:asc", label: `${t("operations.recent_sales")} — ${t("ops.collection.sort_low_high")}` },
+    { value: "weeklyApprovedCollections:desc", label: `${t("operations.recent_collections")} — ${t("ops.collection.sort_high_low")}` },
+    { value: "weeklyApprovedCollections:asc", label: `${t("operations.recent_collections")} — ${t("ops.collection.sort_low_high")}` },
+    { value: "recoveryPercentage:desc", label: `${t("ops.collection.recovery_pct")} — ${t("ops.collection.sort_high_low")}` },
+    { value: "recoveryPercentage:asc", label: `${t("ops.collection.recovery_pct")} — ${t("ops.collection.sort_low_high")}` },
+    { value: "lastCollectionDate:desc", label: `${t("ops.collection.last_collection")} — ${t("ops.collection.sort_latest_first")}` },
+    { value: "lastCollectionDate:asc", label: `${t("ops.collection.last_collection")} — ${t("ops.collection.sort_oldest_first")}` },
+    { value: "overdueDays:desc", label: `${t("ops.collection.overdue")} — ${t("ops.collection.sort_overdue_days")}` },
+    { value: "overdueDays:asc", label: `${t("ops.collection.overdue")} — ${t("ops.collection.sort_least_overdue")}` },
   ];
+  // `""` when no column order is active: the control reads its label, the
+  // table keeps the register sequence — Trip List behaves the same way.
+  const sortValue = sortBy ? `${sortBy}:${sortDir}` : "";
+  const setSortValue = (value: string) => {
+    if (!value) {
+      setSort(null, "asc");
+      return;
+    }
+    const match = sortOptions.find((option) => option.value === value);
+    if (!match) return;
+    const [key, direction] = value.split(":");
+    setSort(key as PendingShopSortKey, direction === "desc" ? "desc" : "asc");
+  };
 
   return (
     <div className={opsFilterCardClass}>
@@ -183,9 +215,9 @@ function PendingCollectionsFilters({
           <MasterDropdown
             hideLabel
             label={t("ops.collection.sort_by")}
-            value={sortBy}
+            value={sortValue}
             options={sortOptions}
-            onChange={(next) => setSortBy(next || "alphabeticalAZ")}
+            onChange={setSortValue}
             searchable
             className="w-full"
           />

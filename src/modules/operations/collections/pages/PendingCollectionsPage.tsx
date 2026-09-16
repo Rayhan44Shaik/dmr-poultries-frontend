@@ -4,7 +4,13 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { collectionService } from "../services/collectionService";
 import { onShopDataChanged } from "../../../../shared/events/shopDataEvents";
 import { useShops } from "../../../masters/shops/hooks/useShops";
-import type { Collection, CollectionPendingSummaryRow } from "../types/collection";
+import type {
+  Collection,
+  CollectionPendingSummaryRow,
+  PendingOverallTotals,
+  PendingShopSortDir,
+  PendingShopSortKey,
+} from "../types/collection";
 import { useToast } from "../../../../components/common/ToastProvider";
 import { ShopCollectionDetailModal } from "../components/pending/ShopCollectionDetailModal";
 import PendingCollectionsFilters from "../components/pending/PendingCollectionsFilters";
@@ -63,7 +69,13 @@ export default function PendingCollectionsPage() {
 
   // Filter state (unapplied)
   const [shopName, setShopName] = useState("");
-  const [sortBy, setSortBy] = useState("alphabeticalAZ");
+  /**
+   * Column order, held as key + direction — one vocabulary shared with the
+   * table headers and the filter bar's Sort By, exactly like Trip List.
+   * `null` means no column order: the register's own sequence.
+   */
+  const [sortBy, setSortBy] = useState<PendingShopSortKey | null>("shopName");
+  const [sortDir, setSortDir] = useState<PendingShopSortDir>("asc");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [recoveryThreshold, setRecoveryThreshold] = useState(0);
@@ -89,7 +101,8 @@ export default function PendingCollectionsPage() {
 
   // Applied filters
   const [appliedShopName, setAppliedShopName] = useState("");
-  const [appliedSortBy, setAppliedSortBy] = useState("alphabeticalAZ");
+  const [appliedSortBy, setAppliedSortBy] = useState<PendingShopSortKey | null>("shopName");
+  const [appliedSortDir, setAppliedSortDir] = useState<PendingShopSortDir>("asc");
   const [appliedFromDate, setAppliedFromDate] = useState("");
   const [appliedToDate, setAppliedToDate] = useState("");
   const [appliedRecoveryThreshold, setAppliedRecoveryThreshold] = useState(0);
@@ -188,7 +201,8 @@ export default function PendingCollectionsPage() {
 
   useEffect(() => {
     setAppliedSortBy(sortBy);
-  }, [sortBy]);
+    setAppliedSortDir(sortDir);
+  }, [sortBy, sortDir]);
 
   useEffect(() => {
     setAppliedRecoveryThreshold(recoveryThreshold);
@@ -282,27 +296,37 @@ export default function PendingCollectionsPage() {
       data = data.filter((shop) => shop.recoveryPercentage >= appliedRecoveryThreshold);
     }
 
-    switch (appliedSortBy) {
-      case "highestBalance":
-        data.sort((a, b) => b.balance - a.balance);
-        break;
-      case "lowestBalance":
-        data.sort((a, b) => a.balance - b.balance);
-        break;
-      case "alphabeticalAZ":
-        data.sort((a, b) => a.shopName.localeCompare(b.shopName));
-        break;
-      case "alphabeticalZA":
-        data.sort((a, b) => b.shopName.localeCompare(a.shopName));
-        break;
-      case "latestCollection":
-        data.sort((a, b) => (b.lastCollectionDate ?? "").localeCompare(a.lastCollectionDate ?? ""));
-        break;
-      case "oldestCollection":
-        data.sort((a, b) => (a.lastCollectionDate ?? "").localeCompare(b.lastCollectionDate ?? ""));
-        break;
-      default:
-        break;
+    if (appliedSortBy) {
+      const direction = appliedSortDir === "asc" ? 1 : -1;
+      const orderValue = (row: PendingReportRow): string | number => {
+        switch (appliedSortBy) {
+          case "balance":
+            return row.balance;
+          case "weeklySales":
+            return row.weeklySales;
+          case "weeklyApprovedCollections":
+            return row.weeklyApprovedCollections;
+          case "recoveryPercentage":
+            return row.recoveryPercentage;
+          case "overdueDays":
+            // A shop that is not overdue sits below every overdue shop, in both
+            // directions — "not overdue" is an absence, not a small number.
+            return row.overdueDays ?? -1;
+          case "lastCollectionDate":
+            return row.lastCollectionDate ?? "";
+          case "shopName":
+          default:
+            return row.shopName.toLowerCase();
+        }
+      };
+      data.sort((a, b) => {
+        const left = orderValue(a);
+        const right = orderValue(b);
+        if (typeof left === "number" && typeof right === "number") {
+          return (left - right) * direction;
+        }
+        return String(left).localeCompare(String(right)) * direction;
+      });
     }
     return data;
   }, [
@@ -312,6 +336,7 @@ export default function PendingCollectionsPage() {
     appliedFromDate,
     appliedToDate,
     appliedSortBy,
+    appliedSortDir,
     appliedRecoveryThreshold,
   ]);
 
@@ -324,7 +349,7 @@ export default function PendingCollectionsPage() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [appliedSearchQuery, appliedShopName, appliedFromDate, appliedToDate, appliedSortBy, appliedRecoveryThreshold]);
+  }, [appliedSearchQuery, appliedShopName, appliedFromDate, appliedToDate, appliedSortBy, appliedSortDir, appliedRecoveryThreshold]);
 
   // Totals for KPI
   const totalOutstanding = filteredData.reduce((sum, s) => sum + s.balance, 0);
@@ -333,6 +358,70 @@ export default function PendingCollectionsPage() {
   const avgRecovery = filteredData.length > 0
     ? filteredData.reduce((sum, s) => sum + s.recoveryPercentage, 0) / filteredData.length
     : 0;
+
+  /**
+   * The cumulative that closes the table. Summed over `filteredData` — the
+   * whole filtered set — never over the rows of the current page, so the same
+   * figures show on page 1 and on the last page.
+   */
+  const overallTotals = useMemo((): PendingOverallTotals | null => {
+    if (filteredData.length === 0) return null;
+    const collectionDates = filteredData
+      .map((row) => row.lastCollectionDate ?? "")
+      .filter((value) => Boolean(value))
+      .sort();
+    return {
+      shops: filteredData.length,
+      balance: totalOutstanding,
+      weeklySales: totalWeeklySales,
+      weeklyApprovedCollections: totalWeeklyCollections,
+      recoveryPercentage: avgRecovery,
+      lastCollectionDate: collectionDates.length > 0 ? collectionDates[collectionDates.length - 1] : null,
+      overdueShops: filteredData.filter((row) => (row.overdueDays ?? 0) > 0).length,
+    };
+  }, [filteredData, totalOutstanding, totalWeeklySales, totalWeeklyCollections, avgRecovery]);
+
+  /** Header click: ascending → descending → back to the register order. */
+  const handleSortChange = useCallback((key: PendingShopSortKey) => {
+    if (sortBy !== key) {
+      setSortBy(key);
+      setSortDir("asc");
+      return;
+    }
+    if (sortDir === "asc") {
+      setSortDir("desc");
+      return;
+    }
+    setSortBy(null);
+    setSortDir("asc");
+  }, [sortBy, sortDir]);
+
+  /** The filter bar's single setter for both halves of the order. */
+  const setSort = useCallback((key: PendingShopSortKey | null, dir: PendingShopSortDir) => {
+    setSortBy(key);
+    setSortDir(dir);
+  }, []);
+
+  /**
+   * Side arrows in the shop view walk the same order the table shows — the
+   * filtered, sorted list — and move the table's highlighted row with them.
+   */
+  const shopPosition = useMemo(
+    () => filteredData.findIndex((row) => row.shopName === selectedShop),
+    [filteredData, selectedShop],
+  );
+
+  const navigateShop = useCallback(
+    (direction: -1 | 1) => {
+      if (shopPosition < 0) return;
+      const next = shopPosition + direction;
+      if (next < 0 || next >= filteredData.length) return;
+      const nextShop = filteredData[next].shopName;
+      setSelectedShop(nextShop);
+      setSelectedShopName(nextShop);
+    },
+    [filteredData, shopPosition],
+  );
 
   const handleView = (shopName: string) => {
     setSelectedShop(shopName);
@@ -374,13 +463,15 @@ export default function PendingCollectionsPage() {
     setFromDate(mon);
     setToDate(sun);
     setShopName("");
-    setSortBy("alphabeticalAZ");
+    setSortBy("shopName");
+    setSortDir("asc");
     setRecoveryThreshold(0);
     setSearchQuery("");
     setAppliedFromDate(mon);
     setAppliedToDate(sun);
     setAppliedShopName("");
-    setAppliedSortBy("alphabeticalAZ");
+    setAppliedSortBy("shopName");
+    setAppliedSortDir("asc");
     setAppliedRecoveryThreshold(0);
     setAppliedSearchQuery("");
     setCurrentPage(1);
@@ -399,13 +490,14 @@ export default function PendingCollectionsPage() {
         toDate={toDate}
         shopName={shopName}
         sortBy={sortBy}
+        sortDir={sortDir}
         shopNames={allShops.map((s) => s.shopName).sort()}
         recoveryThreshold={recoveryThreshold}
         searchQuery={searchQuery}
         setFromDate={setFromDate}
         setToDate={setToDate}
         setShopName={setShopName}
-        setSortBy={setSortBy}
+        setSort={setSort}
         setRecoveryThreshold={setRecoveryThreshold}
         setSearchQuery={setSearchQuery}
         onReset={resetFilters}
@@ -431,6 +523,10 @@ export default function PendingCollectionsPage() {
           onView={handleView}
           totalShops={allShops.length}
           isLoading={tableLoading}
+          sortBy={sortBy}
+          sortDir={sortDir}
+          onSortChange={handleSortChange}
+          overall={overallTotals}
         />
         {shouldShowPagination(totalItems) && (
           <Pagination
@@ -456,6 +552,11 @@ export default function PendingCollectionsPage() {
           allCollections={allCollections}
           shops={allShops}
           onRefresh={refreshData}
+          onNavigateShop={navigateShop}
+          canGoPrev={shopPosition > 0}
+          canGoNext={shopPosition >= 0 && shopPosition < filteredData.length - 1}
+          shopIndex={shopPosition >= 0 ? shopPosition + 1 : undefined}
+          shopTotal={filteredData.length}
         />
       )}
     </div>
