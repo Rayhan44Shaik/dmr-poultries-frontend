@@ -158,6 +158,7 @@ export default {
   'fleet.maintenance_view.documents_count': 'Documents ({count})',
   'fleet.maintenance_view.parts_title': 'Parts / Spare Parts',
   'fleet.maintenance_view.record_title': 'Maintenance Record',
+  'fleet.maintenance_view.vehicle_details': 'Vehicle Details',
   'fleet.maintenance_view.report_title': 'Vehicle Maintenance Report',
   'fleet.maintenance_view.original': 'ORIGINAL',
   'fleet.maintenance_view.pdf_footer': 'Computer generated maintenance report — DMR Poultries Fleet System',

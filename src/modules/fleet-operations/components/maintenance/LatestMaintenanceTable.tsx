@@ -4,7 +4,7 @@ import {
   Search, Paperclip, Hash, Calendar, Wrench, Store, User, Gauge, Clock, Wallet, History, X, RotateCcw
 } from 'lucide-react';
 import { useI18n, translateStatus } from '../../../../i18n';
-import SearchableSelect from '../../../../components/common/SearchableSelect';
+import MasterDropdown from '../../../masters/components/MasterDropdown';
 import { MAINTENANCE_TYPES } from '../../utils/constants';
 // Recent-Trip-Activity chrome + global pagination standard.
 import { Pagination } from '../../../../ui';
@@ -55,9 +55,8 @@ const LatestMaintenanceTable = ({
 }: LatestMaintenanceTableProps) => {
   const { t, language } = useI18n();
   const [searchTerm, setSearchTerm] = useState('');
-  // Maintenance Type filter — MULTI: a record matches when ANY picked type
-  // is among its types. Empty selection = all types.
-  const [typeFilter, setTypeFilter] = useState<string[]>([]);
+  // Maintenance Type filter — same neat dropdown as the form's Driver field.
+  const [typeFilter, setTypeFilter] = useState<string>('');
   const tableRef = useRef<HTMLDivElement>(null);
   const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
 
@@ -79,11 +78,8 @@ const LatestMaintenanceTable = ({
 
   const filteredRecords = useMemo(() => {
     // Type filter first, then the free-text search over the surviving rows.
-    const afterType = typeFilter.length > 0
-      ? validRecords.filter((rec) => {
-          const recordTypes = (rec.maintenanceType || '').split(',').map((x) => x.trim());
-          return typeFilter.some((picked) => recordTypes.includes(picked));
-        })
+    const afterType = typeFilter
+      ? validRecords.filter((rec) => (rec.maintenanceType || '').split(',').map((x) => x.trim()).includes(typeFilter))
       : validRecords;
     const term = searchTerm.trim().toLowerCase();
     if (!term) return afterType;
@@ -155,7 +151,7 @@ const LatestMaintenanceTable = ({
   };
 
   const getEmptyText = () => {
-    if (searchTerm || typeFilter.length > 0) return t('empty.search_no_results');
+    if (searchTerm || typeFilter) return t('empty.search_no_results');
     if (viewMode === 'pending') return t('fleet.maintenance_table.no_pending');
     if (viewMode === 'approved') return t('fleet.maintenance_table.no_approved');
     return t('fleet.maintenance_table.no_deleted');
@@ -211,19 +207,20 @@ const LatestMaintenanceTable = ({
 
         {/* Type filter, search, Reset and Refresh — trip activity arrangement */}
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-          <div className="w-40 sm:w-48">
-            <SearchableSelect
+          <div className="w-40 sm:w-44">
+            <MasterDropdown
+              hideLabel
               label={t('operations.maintenance_type')}
-              value=""
+              value={typeFilter}
+              options={[
+                { value: '', label: t('common.all') },
+                ...MAINTENANCE_TYPES.map((type) => ({ value: type, label: localizeMaintenanceText(type, language) })),
+              ]}
+              onChange={(next) => { setTypeFilter(next || ''); onPageChange(1); }}
               placeholder={t('operations.maintenance_type')}
-              options={MAINTENANCE_TYPES.map((type) => ({ value: type, label: localizeMaintenanceText(type, language) }))}
-              onChange={() => {}}
-              multi
-              selectedValues={typeFilter}
-              onToggleValue={(type) => { setTypeFilter((current) => (current.includes(type) ? current.filter((x) => x !== type) : [...current, type])); onPageChange(1); }}
-              onClearValues={() => { setTypeFilter([]); onPageChange(1); }}
               searchable
-              widthClass="w-full"
+              allowClear
+              className="w-full"
             />
           </div>
 
@@ -260,7 +257,7 @@ const LatestMaintenanceTable = ({
               type="button"
               onClick={() => {
                 setSearchTerm('');
-                setTypeFilter([]);
+                setTypeFilter('');
                 onPageChange(1);
               }}
               className="group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200/70 active:scale-95"

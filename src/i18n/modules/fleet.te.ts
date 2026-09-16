@@ -158,6 +158,7 @@ export default {
   'fleet.maintenance_view.documents_count': 'పత్రాలు ({count})',
   'fleet.maintenance_view.parts_title': 'పార్ట్స్ / స్పేర్ పార్ట్స్',
   'fleet.maintenance_view.record_title': 'మెయింటెనెన్స్ రికార్డు',
+  'fleet.maintenance_view.vehicle_details': 'వాహన వివరాలు',
   'fleet.maintenance_view.report_title': 'వాహన మెయింటెనెన్స్ నివేదిక',
   'fleet.maintenance_view.original': 'ఒరిజినల్',
   'fleet.maintenance_view.pdf_footer': 'కంప్యూటర్ ద్వారా రూపొందించిన మెయింటెనెన్స్ నివేదిక — DMR పౌల్ట్రీస్ ఫ్లీట్ సిస్టమ్',
