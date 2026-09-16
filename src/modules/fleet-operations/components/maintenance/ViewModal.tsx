@@ -20,6 +20,8 @@ import { uiActionIconMotionClass } from '../../../../shared/ui/uiTokens';
 import { formatTripListDay } from '../../../operations/vehicle-trips/utils/formatTripListDay';
 import type { MaintenanceEvent } from '../../types';
 import MaintenanceDocuments from './MaintenanceDocuments';
+import MasterDropdown from '../../../masters/components/MasterDropdown';
+import { MAINTENANCE_TYPES } from '../../utils/constants';
 
 interface ViewModalProps {
   record: MaintenanceEvent;
@@ -61,6 +63,8 @@ const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose, canEdi
   const { t, language } = useI18n();
   // Documents section starts OPEN; the chevron hides/shows the gallery.
   const [docsOpen, setDocsOpen] = React.useState(true);
+  // Left panel filter — narrow the vehicle's approved list by type.
+  const [typeFilter, setTypeFilter] = React.useState('');
   // The record whose details are displayed. Clicking a row in the vehicle's
   // full history swaps it in — the view-collection interaction. When the
   // parent opens a different record, state resets during render (the React
@@ -71,6 +75,17 @@ const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose, canEdi
     setLastRecord(record);
     setActive(record);
   }
+
+  /** LEFT PANEL list — every APPROVED maintenance entry of this vehicle,
+   *  newest first, narrowable by type. Pending/deleted never appear here. */
+  const approvedHistory = React.useMemo(
+    () =>
+      vehicleHistory.filter(
+        (r) => r.paymentStatus === 'approved' && !r.deletedAt &&
+          (!typeFilter || (r.maintenanceType || '').split(',').map((x) => x.trim()).includes(typeFilter))
+      ),
+    [vehicleHistory, typeFilter]
+  );
 
   const vehicle = vehicles.find((v: any) => String(v.id) === String(active.vehicleId));
   const vehicleNumber = vehicle?.vehicleNumber || active.vehicleNo || '—';
@@ -136,7 +151,74 @@ const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose, canEdi
         </div>
 
         {/* Body — every detail of the record, sections fade in like the trip view */}
-        <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5 md:px-8">
+        <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
+          {/* LEFT — every APPROVED maintenance entry of this vehicle:
+              date + maintenance type only, filterable, click to view. */}
+          <aside className="flex w-full flex-shrink-0 flex-col border-b border-slate-100 bg-slate-50/40 lg:w-64 lg:border-b-0 lg:border-r">
+            <div className="flex items-center justify-between px-4 pt-4">
+              <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                <Truck size={13} className="flex-shrink-0 text-slate-400" />
+                {t('fleet.maintenance_view.all_records')}
+              </p>
+              <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold tabular-nums text-slate-500 ring-1 ring-slate-200">
+                {approvedHistory.length}
+              </span>
+            </div>
+            <div className="px-3 pt-2.5">
+              <MasterDropdown
+                hideLabel
+                label={t('operations.maintenance_type')}
+                value={typeFilter}
+                options={[
+                  { value: '', label: t('common.all') },
+                  ...MAINTENANCE_TYPES.map((type) => ({ value: type, label: type })),
+                ]}
+                onChange={(next) => setTypeFilter(next || '')}
+                placeholder={t('operations.maintenance_type')}
+                searchable
+                allowClear
+                className="w-full"
+              />
+            </div>
+            <div className="max-h-56 min-h-0 flex-1 overflow-y-auto p-3 lg:max-h-none">
+              {approvedHistory.length === 0 ? (
+                <p className="px-2 py-6 text-center text-xs text-slate-400">
+                  {t('fleet.maintenance_table.no_approved')}
+                </p>
+              ) : (
+                <div className="space-y-1.5">
+                  {approvedHistory.map((sub) => {
+                    const rowActive = String(sub.id) === String(active.id);
+                    const typeCount = (sub.maintenanceType || '').split(',').filter((x) => x.trim()).length;
+                    return (
+                      <button
+                        key={sub.id}
+                        type="button"
+                        onClick={() => setActive(sub)}
+                        className={`w-full rounded-xl border px-3 py-2.5 text-left transition-all ${
+                          rowActive
+                            ? 'border-blue-200 bg-white shadow-sm ring-1 ring-blue-200'
+                            : 'border-transparent hover:border-slate-200 hover:bg-white/70'
+                        }`}
+                      >
+                        <p className="text-xs font-bold text-slate-700">
+                          {formatTripListDay(sub.date || sub.createdAt, language)}
+                        </p>
+                        <p className="mt-0.5 truncate text-[11px] font-medium text-slate-500">
+                          {(sub.maintenanceType || '—').split(',')[0]}
+                          {typeCount > 1 ? ` · +${typeCount - 1}` : ''}
+                        </p>
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          </aside>
+
+          {/* RIGHT — the selected record: bill number, every detail, parts,
+              total and the documents. */}
+          <div className="min-w-0 flex-1 space-y-5 overflow-y-auto px-6 py-5 md:px-8">
           {/* Identity band */}
           <div className="flex flex-wrap items-center gap-2.5 animate-fade-in-up">
             <span className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-bold ${
@@ -285,122 +367,7 @@ const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose, canEdi
               </div>
             )}
           </section>
-
-          {/* ALL maintenance records of this vehicle — view-collection pattern:
-              summary cards + scrollable history; click a row to view it. */}
-          {vehicleHistory.length > 0 && (
-            <section className="animate-fade-in-up" style={{ animationDelay: '200ms' }}>
-              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-                <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-                  <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-700">
-                    <Truck size={14} className="text-slate-500" />
-                    {t('fleet.maintenance_view.all_records')}
-                  </h4>
-                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold tabular-nums text-slate-500">
-                    {vehicleHistory.length}
-                  </span>
-                </div>
-
-                {/* Summary cards — totals across the vehicle's whole history */}
-                <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-3">
-                  <div className="rounded-xl border border-blue-200 bg-blue-50 p-3.5">
-                    <div className="mb-1 flex items-center gap-2 text-xs font-medium text-blue-600">
-                      <Package size={14} className="shrink-0" />
-                      {t('fleet.maintenance_view.total_records')}
-                    </div>
-                    <div className="text-lg font-bold tabular-nums text-blue-700">{vehicleHistory.length}</div>
-                  </div>
-                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3.5">
-                    <div className="mb-1 flex items-center gap-2 text-xs font-medium text-emerald-600">
-                      <IndianRupee size={14} className="shrink-0" />
-                      {t('fleet.maintenance_view.total_spend')}
-                    </div>
-                    <div className="text-lg font-bold tabular-nums text-emerald-700">
-                      ₹{vehicleHistory.reduce((sum, r) => sum + Number(r.totalCost || 0), 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
-                    </div>
-                  </div>
-                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
-                    <div className="mb-1 flex items-center gap-2 text-xs font-medium text-slate-500">
-                      <Calendar size={14} className="shrink-0" />
-                      {t('fleet.maintenance_view.last_service')}
-                    </div>
-                    <div className="text-sm font-bold text-slate-700">
-                      {formatTripListDay(vehicleHistory[0]?.date || vehicleHistory[0]?.createdAt, language)}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Full history — every record till now, scrollable, click to view */}
-                <div className="max-h-[400px] overflow-y-auto border-t border-slate-100">
-                  <table className="min-w-full divide-y divide-slate-100 text-sm">
-                    <thead className="sticky top-0 z-10 bg-slate-50">
-                      <tr>
-                        <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">{t('common.date')}</th>
-                        <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">{t('fleet.maintenance_view.bill_number')}</th>
-                        <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">{t('operations.maintenance_type')}</th>
-                        <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">{t('operations.maintenance_garage')}</th>
-                        <th className="px-4 py-2.5 text-right text-xs font-bold uppercase tracking-wider text-slate-500">{t('fleet.maintenance_form.current_km')}</th>
-                        <th className="px-4 py-2.5 text-right text-xs font-bold uppercase tracking-wider text-slate-500">{t('fleet.parts.total_cost')}</th>
-                        <th className="px-4 py-2.5 text-center text-xs font-bold uppercase tracking-wider text-slate-500">{t('common.status')}</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-slate-100 bg-white">
-                      {vehicleHistory.map((sub) => {
-                        const subApproved = sub.paymentStatus === 'approved';
-                        const subDeleted = Boolean(sub.deletedAt);
-                        const rowActive = String(sub.id) === String(active.id);
-                        return (
-                          <tr
-                            key={sub.id}
-                            onClick={() => setActive(sub)}
-                            className={`cursor-pointer transition-colors ${
-                              rowActive ? 'bg-blue-50/70' : 'hover:bg-slate-50/80'
-                            }`}
-                          >
-                            <td className="whitespace-nowrap px-4 py-2.5 text-xs font-medium text-slate-600">
-                              {formatTripListDay(sub.date || sub.createdAt, language)}
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-2.5">
-                              <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-bold ${
-                                subDeleted
-                                  ? 'border-rose-100/80 bg-rose-50 text-rose-700'
-                                  : subApproved
-                                    ? 'border-emerald-100/80 bg-emerald-50 text-emerald-700'
-                                    : 'border-orange-100/80 bg-orange-50 text-orange-700'
-                              }`}>
-                                {sub.billNumber || '—'}
-                              </span>
-                            </td>
-                            <td className="max-w-[180px] truncate px-4 py-2.5 text-xs text-slate-600" title={sub.maintenanceType}>
-                              {(sub.maintenanceType || '—').split(',')[0]}
-                              {(sub.maintenanceType || '').split(',').filter((x) => x.trim()).length > 1 && (
-                                <span className="ml-1 text-slate-400">+{sub.maintenanceType.split(',').filter((x) => x.trim()).length - 1}</span>
-                              )}
-                            </td>
-                            <td className="whitespace-nowrap px-4 py-2.5 text-xs text-slate-500">{sub.garage || '—'}</td>
-                            <td className="whitespace-nowrap px-4 py-2.5 text-right text-xs font-semibold tabular-nums text-slate-700">{Number(sub.currentKM || 0).toLocaleString()}</td>
-                            <td className="whitespace-nowrap px-4 py-2.5 text-right text-xs font-bold tabular-nums text-blue-700">₹{Number(sub.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
-                            <td className="whitespace-nowrap px-4 py-2.5 text-center">
-                              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${
-                                subDeleted
-                                  ? 'border-rose-200 bg-rose-50 text-rose-700'
-                                  : subApproved
-                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                                    : 'border-blue-200 bg-blue-50 text-blue-700'
-                              }`}>
-                                {subDeleted ? <XCircle size={10} /> : subApproved ? <CheckCircle2 size={10} /> : <Clock size={10} />}
-                                {subDeleted ? translateStatus(t, 'Deleted') : subApproved ? translateStatus(t, 'Approved') : translateStatus(t, 'Pending')}
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </section>
-          )}
+          </div>
         </div>
 
         {/* Footer — gradient strip, Edit inside the view (trip close style) */}
