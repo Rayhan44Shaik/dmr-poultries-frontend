@@ -881,6 +881,8 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
               error={trendsQuery.error}
               onRetry={trendsQuery.refetch}
               animationKey={dashboardAnimationKey}
+              fromDate={trendWindow.from}
+              toDate={trendWindow.to}
             />
           </div>
         </div>
