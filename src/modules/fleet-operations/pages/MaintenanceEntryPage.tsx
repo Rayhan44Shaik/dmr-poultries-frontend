@@ -385,7 +385,6 @@ const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
           vehicles={vehicles}
           viewMode={viewMode}
           onView={handleView}
-          onEdit={handleEdit}
           onDelete={startDeletion}
           onApprove={handleApprove}
           isEditable={isEditable}
@@ -401,12 +400,14 @@ const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
           onToggleView={handleViewToggle}
         />
 
-        {/* View Modal */}
+        {/* View Modal — Edit lives inside the view, not as a separate action */}
         {viewModalOpen && viewRecord && (
           <ViewModal
             record={viewRecord}
             vehicles={vehicles}
             onClose={() => setViewModalOpen(false)}
+            canEdit={viewRecord.paymentStatus !== 'approved' && !viewRecord.deletedAt && isEditable(viewRecord.date)}
+            onEdit={(rec) => { setViewModalOpen(false); handleEdit(rec); }}
           />
         )}
 

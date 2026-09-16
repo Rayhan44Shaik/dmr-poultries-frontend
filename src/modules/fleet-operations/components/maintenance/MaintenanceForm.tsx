@@ -78,6 +78,63 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
 
   const inputClass = `${opsInputClass} pl-10`;
 
+  // Maintenance Type multi-select — same chrome as the shared MasterDropdown
+  // used by the Trip List filters: 40px control, 12px menu, 36px quiet rows
+  // with a brand-tinted selection and subtle slate chips.
+  const maintenanceSelectStyles = {
+    control: (base: Record<string, unknown>) => ({
+      ...base,
+      minHeight: '40px',
+      borderColor: '#cbd5e1',
+      boxShadow: 'none',
+      borderRadius: '0.75rem',
+      fontSize: '13px',
+      '&:hover': { borderColor: '#94a3b8' },
+    }),
+    menu: (base: Record<string, unknown>) => ({
+      ...base,
+      borderRadius: '0.75rem',
+      overflow: 'hidden',
+      zIndex: 40,
+      boxShadow: '0 12px 32px -12px rgb(15 23 42 / 0.25)',
+      border: '1px solid #e2e8f0',
+    }),
+    menuList: (base: Record<string, unknown>) => ({ ...base, padding: '4px', maxHeight: '240px' }),
+    option: (base: Record<string, unknown>, state: { isSelected: boolean; isFocused: boolean }) => ({
+      ...base,
+      fontSize: '13px',
+      fontWeight: state.isSelected ? 600 : 500,
+      padding: '8px 10px',
+      borderRadius: '0.5rem',
+      cursor: 'pointer',
+      backgroundColor: state.isSelected ? '#ecfdf5' : state.isFocused ? '#f8fafc' : 'transparent',
+      color: state.isSelected ? '#047857' : '#334155',
+      '&:active': { backgroundColor: '#ecfdf5' },
+    }),
+    multiValue: (base: Record<string, unknown>) => ({
+      ...base,
+      backgroundColor: '#f1f5f9',
+      borderRadius: '0.5rem',
+      border: '1px solid #e2e8f0',
+    }),
+    multiValueLabel: (base: Record<string, unknown>) => ({
+      ...base,
+      fontSize: '12px',
+      fontWeight: 600,
+      color: '#334155',
+      padding: '2px 6px',
+    }),
+    multiValueRemove: (base: Record<string, unknown>) => ({
+      ...base,
+      color: '#94a3b8',
+      cursor: 'pointer',
+      ':hover': { backgroundColor: '#fee2e2', color: '#b91c1c' },
+    }),
+    placeholder: (base: Record<string, unknown>) => ({ ...base, color: '#9ca3af' }),
+    clearIndicator: (base: Record<string, unknown>) => ({ ...base, color: '#94a3b8', cursor: 'pointer' }),
+    dropdownIndicator: (base: Record<string, unknown>) => ({ ...base, color: '#94a3b8', cursor: 'pointer' }),
+  };
+
   const handleCurrentKMChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
     
@@ -275,19 +332,10 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
             placeholder={t('fleet.maintenance_form.select_types')}
             isMulti
             isClearable
+            closeMenuOnSelect={false}
+            hideSelectedOptions={false}
             className="text-sm"
-            styles={{
-              control: (base) => ({
-                ...base,
-                minHeight: '40px',
-                borderColor: '#cbd5e1',
-                boxShadow: 'none',
-                borderRadius: '0.75rem',
-                fontSize: '13px',
-                '&:hover': { borderColor: '#94a3b8' }
-              }),
-              placeholder: (base) => ({ ...base, color: '#9ca3af' }),
-            }}
+            styles={maintenanceSelectStyles}
           />
 
           {/* Next Service KM — one target per selected maintenance type */}

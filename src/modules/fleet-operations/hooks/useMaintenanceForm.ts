@@ -51,6 +51,57 @@ interface UseMaintenanceFormProps {
   onSuccess: () => void;
 }
 
+/** Images above this size are re-encoded on upload so bills stay sharp but
+ *  tiny. Below it the original is kept — it is already small. */
+const IMAGE_COMPRESS_MIN_BYTES = 100 * 1024;
+/** Longest edge kept at full clarity; larger photos are scaled down. */
+const IMAGE_MAX_EDGE = 1600;
+/** JPEG quality — visually clean for documents, a fraction of the size. */
+const IMAGE_JPEG_QUALITY = 0.72;
+
+const isCompressibleImage = (file: File) =>
+  /^image\/(png|jpe?g)$/i.test(file.type) || /\.(png|jpe?g)$/i.test(file.name);
+
+/** Re-encode an image to a size-capped JPEG right away. Resolves with the
+ *  original file when compression is not possible or would not help. */
+const compressImageFile = (file: File): Promise<File> =>
+  new Promise((resolve) => {
+    const img = new Image();
+    const srcUrl = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(srcUrl);
+      try {
+        const longest = Math.max(img.naturalWidth, img.naturalHeight);
+        const scale = Math.min(1, IMAGE_MAX_EDGE / Math.max(longest, 1));
+        const w = Math.max(1, Math.round(img.naturalWidth * scale));
+        const h = Math.max(1, Math.round(img.naturalHeight * scale));
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) { resolve(file); return; }
+        // White backing sheet so transparent PNGs stay readable as JPEG.
+        ctx.fillStyle = '#ffffff';
+        ctx.fillRect(0, 0, w, h);
+        ctx.drawImage(img, 0, 0, w, h);
+        canvas.toBlob(
+          (blob) => {
+            if (!blob || blob.size >= file.size) { resolve(file); return; }
+            const base = file.name.replace(/\.[^.]+$/, '');
+            resolve(new File([blob], `${base}.jpg`, { type: 'image/jpeg' }));
+          },
+          'image/jpeg',
+          IMAGE_JPEG_QUALITY
+        );
+      } catch {
+        resolve(file);
+      }
+    };
+    img.onerror = () => { URL.revokeObjectURL(srcUrl); resolve(file); };
+    img.src = srcUrl;
+  });
+
+
 export const useMaintenanceForm = ({ onSuccess }: UseMaintenanceFormProps) => {
   const { showNotification } = useSafeNotification();
 
@@ -95,39 +146,52 @@ export const useMaintenanceForm = ({ onSuccess }: UseMaintenanceFormProps) => {
   }, [form, showNotification]);
 
   // ── Document management (multiple files, never replace previous) ──
+
   const addDocumentFiles = useCallback((files: File[]) => {
     const incoming = Array.from(files || []);
     if (incoming.length === 0) return;
-
-    setDocuments((prev) => {
-      const next = [...prev];
+    // Compress FIRST — the size the user sees (and the size that is uploaded)
+    // is already the compressed one, immediately after picking the file.
+    void (async () => {
+      const prepared: File[] = [];
       for (const file of incoming) {
-        if (next.length + 1 > MAINTENANCE_DOCUMENT_MAX_FILES) {
-          showNotification(`Maximum ${MAINTENANCE_DOCUMENT_MAX_FILES} documents are allowed.`, 'error');
-          continue;
+        if (isCompressibleImage(file) && file.size > IMAGE_COMPRESS_MIN_BYTES) {
+          prepared.push(await compressImageFile(file));
+        } else {
+          prepared.push(file);
         }
-        if (!fileIsSupported(file)) {
-          showNotification('Only PNG, JPG/JPEG, and PDF files are supported.', 'error');
-          continue;
-        }
-        if (file.size > MAINTENANCE_DOCUMENT_MAX_BYTES) {
-          showNotification(`File size cannot exceed 10 MB. ("${file.name}")`, 'error');
-          continue;
-        }
-        const key = newKey();
-        next.push({
-          key,
-          fileName: file.name,
-          mimeType: inferMimeType(file),
-          fileSize: file.size,
-          file,
-          objectUrl: file.type?.startsWith('image/') || /\.(png|jpe?g)$/i.test(file.name)
-            ? URL.createObjectURL(file)
-            : undefined,
-        });
       }
-      return next;
-    });
+      setDocuments((prev) => {
+        const next = [...prev];
+        for (const file of prepared) {
+          if (next.length + 1 > MAINTENANCE_DOCUMENT_MAX_FILES) {
+            showNotification(`Maximum ${MAINTENANCE_DOCUMENT_MAX_FILES} documents are allowed.`, 'error');
+            continue;
+          }
+          if (!fileIsSupported(file)) {
+            showNotification('Only PNG, JPG/JPEG, and PDF files are supported.', 'error');
+            continue;
+          }
+          if (file.size > MAINTENANCE_DOCUMENT_MAX_BYTES) {
+            showNotification(`File size cannot exceed 10 MB. ("${file.name}")`, 'error');
+            continue;
+          }
+          const key = newKey();
+          next.push({
+            key,
+            fileName: file.name,
+            mimeType: inferMimeType(file),
+            fileSize: file.size,
+            file,
+            objectUrl: file.type?.startsWith('image/') || /\.(png|jpe?g)$/i.test(file.name)
+              ? URL.createObjectURL(file)
+              : undefined,
+          });
+        }
+        return next;
+      });
+    })();
+
   }, [showNotification]);
 
   const removeDocument = useCallback((key: string) => {

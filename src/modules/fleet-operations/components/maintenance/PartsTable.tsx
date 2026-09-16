@@ -92,9 +92,9 @@ const PartsTable = ({ parts, setParts, hideSubline = false }: PartsTableProps) =
         <button
           type="button"
           onClick={addRow}
-          className="inline-flex items-center gap-1.5 h-8 px-3 text-[11px] font-bold uppercase tracking-wider bg-green-600 text-white border border-green-700 rounded-lg hover:bg-green-700 transition-all shadow-sm"
+          className="group relative inline-flex items-center gap-1.5 h-8 px-3 text-[11px] font-bold uppercase tracking-wider bg-green-600 text-white border border-green-700 rounded-lg hover:bg-green-700 transition-all shadow-sm active:scale-95"
         >
-          <Plus className="w-3.5 h-3.5" />
+          <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-add)]"><Plus className="w-3.5 h-3.5" /></span>
           {t('fleet.maintenance_form.add_row')}
         </button>
       </div>

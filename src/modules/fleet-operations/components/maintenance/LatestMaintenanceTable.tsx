@@ -1,6 +1,6 @@
 import { memo, useState, useMemo, useEffect, useRef } from 'react';
 import {
-  Eye, Edit, Trash2, CheckCircle2,
+  Eye, Trash2, CheckCircle2,
   Search, Paperclip, Hash, Calendar, Wrench, Store, User, Gauge, Clock, Wallet, History, X, RotateCcw
 } from 'lucide-react';
 import { useI18n, translateStatus } from '../../../../i18n';
@@ -9,6 +9,7 @@ import { Pagination } from '../../../../ui';
 import { BrandRefreshButton } from '../../../../ui';
 import { uiActionIconMotionClass } from '../../../../shared/ui/uiTokens';
 import { shouldShowPagination, PAGINATION_DEFAULT_PAGE_SIZE } from '../../../../shared/ui/paginationStyles';
+import { formatTripListDay } from '../../../operations/vehicle-trips/utils/formatTripListDay';
 import { usePendingDelete } from '../../../../hooks/usePendingDelete';
 import { PendingDeleteNotification } from '../../../../components/common/PendingDeleteNotification';
 import type { MaintenanceEvent } from '../../types';
@@ -20,7 +21,6 @@ interface LatestMaintenanceTableProps {
   vehicles: any[];
   viewMode: ViewMode;
   onView: (record: MaintenanceEvent) => void;
-  onEdit: (record: MaintenanceEvent) => void;
   onDelete: (record: MaintenanceEvent) => void;
   onApprove: (record: MaintenanceEvent) => void;
   isEditable: (createdAt?: string) => boolean;
@@ -35,22 +35,11 @@ interface LatestMaintenanceTableProps {
   onToggleView: (mode: ViewMode) => void;
 }
 
-// Helper to safely format dates
-const formatDate = (dateStr?: string) => {
-  if (!dateStr) return '-';
-  // Try to grab just the YYYY-MM-DD part if it's an ISO string
-  const rawDate = dateStr.includes('T') ? dateStr.split('T')[0] : dateStr;
-  const d = new Date(rawDate);
-  if (Number.isNaN(d.getTime())) return dateStr;
-  return d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-};
-
 const LatestMaintenanceTable = ({
   records,
   vehicles,
   viewMode,
   onView,
-  onEdit,
   onDelete,
   onApprove,
   isEditable,
@@ -62,7 +51,7 @@ const LatestMaintenanceTable = ({
   onPageSizeChange,
   onToggleView,
 }: LatestMaintenanceTableProps) => {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const tableRef = useRef<HTMLDivElement>(null);
@@ -209,50 +198,43 @@ const LatestMaintenanceTable = ({
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
           {selectedRecord && (
             <div className="flex items-center gap-1 mr-2">
+              {/* Icon-only actions — Edit lives INSIDE the View modal, not here */}
               <button
                 type="button"
                 onClick={(e) => { e.stopPropagation(); onView(selectedRecord); }}
-                className="group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm bg-blue-50/70 hover:bg-blue-50/80 text-blue-500 border border-blue-200/60 active:scale-95"
+                title={t('common.view')}
+                aria-label={t('common.view')}
+                className="group relative h-8 w-8 rounded-xl flex items-center justify-center transition-all shadow-sm bg-blue-50/70 hover:bg-blue-50/80 text-blue-500 border border-blue-200/60 active:scale-95"
               >
-                <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]"><Eye size={13} /></span>
-                <span className="hidden md:inline">{t('common.view')}</span>
+                <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]"><Eye size={14} /></span>
               </button>
               {viewMode !== 'deleted' && (
                 <>
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); onEdit(selectedRecord); }}
-                    disabled={!isEditable(selectedRecord.date)}
-                    className={`group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${
-                      isEditable(selectedRecord.date)
-                        ? 'bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-500 border border-emerald-200/60 active:scale-95'
-                        : 'bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed'
-                    }`}
-                  >
-                    <span className={`inline-flex ${isEditable(selectedRecord.date) ? uiActionIconMotionClass.edit : ''}`}><Edit size={13} /></span>
-                    <span className="hidden md:inline">{t('common.edit')}</span>
-                  </button>
+                  {/* Delete — pending AND approved (approval is final for edit,
+                      removal still allowed) with the 10s undo timer */}
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); if (selectedRecord.id) requestDelete(selectedRecord.id, { label: t('fleet.maintenance_table.deleting', { vehicle: resolveVehicleNumber(selectedRecord) }) }); setSelectedId(null); }}
                     disabled={!isEditable(selectedRecord.date) || isPending(selectedRecord.id)}
-                    className={`group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${
+                    title={t('common.delete')}
+                    aria-label={t('common.delete')}
+                    className={`group relative h-8 w-8 rounded-xl flex items-center justify-center transition-all shadow-sm ${
                       isEditable(selectedRecord.date) && !isPending(selectedRecord.id)
                         ? 'bg-rose-50/70 hover:bg-rose-50/80 text-rose-500 border border-rose-200/60 active:scale-95'
                         : 'bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed'
                     }`}
                   >
-                    <span className={`inline-flex ${isEditable(selectedRecord.date) && !isPending(selectedRecord.id) ? uiActionIconMotionClass.delete : ''}`}><Trash2 size={13} /></span>
-                    <span className="hidden md:inline">{t('common.delete')}</span>
+                    <span className={`inline-flex ${isEditable(selectedRecord.date) && !isPending(selectedRecord.id) ? uiActionIconMotionClass.delete : ''}`}><Trash2 size={14} /></span>
                   </button>
                   {canApprove && (
                     <button
                       type="button"
                       onClick={(e) => { e.stopPropagation(); onApprove(selectedRecord); setSelectedId(null); }}
-                      className="group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 active:scale-95"
+                      title={t('common.approve')}
+                      aria-label={t('common.approve')}
+                      className="group relative h-8 w-8 rounded-xl flex items-center justify-center transition-all shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 active:scale-95"
                     >
-                      <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-approve)]"><CheckCircle2 size={13} /></span>
-                      <span className="hidden md:inline">{t('common.approve')}</span>
+                      <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-approve)]"><CheckCircle2 size={14} /></span>
                     </button>
                   )}
                 </>
@@ -434,8 +416,8 @@ const LatestMaintenanceTable = ({
                       <td className="px-4 py-3 text-left whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
                           <div className="w-[13px] shrink-0" />
-                          <span className="text-xs font-medium text-slate-600">
-                            {formatDate((rec as any).date || rec.createdAt)}
+                          <span className="text-xs font-medium text-slate-600 whitespace-nowrap">
+                            {formatTripListDay((rec as any).date || rec.createdAt, language)}
                           </span>
                         </div>
                       </td>

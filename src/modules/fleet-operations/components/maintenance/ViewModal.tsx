@@ -1,5 +1,5 @@
 import React from 'react';
-import { Hash, Truck, Calendar, IndianRupee, Gauge, Milestone, Building2, UserCog, User, FileText, CheckCircle2, X } from 'lucide-react';
+import { Hash, Truck, Calendar, IndianRupee, Gauge, Milestone, Building2, UserCog, User, FileText, CheckCircle2, X, Pencil } from 'lucide-react';
 import { useI18n, translateStatus } from '../../../../i18n';
 import type { MaintenanceEvent } from '../../types';
 import MaintenanceDocuments from './MaintenanceDocuments';
@@ -8,9 +8,13 @@ interface ViewModalProps {
   record: MaintenanceEvent;
   vehicles: any[];
   onClose: () => void;
+  /** Set when the record can still be edited — shows the in-view Edit action. */
+  canEdit?: boolean;
+  /** Edit from inside the view — closes the modal and loads the form. */
+  onEdit?: (record: MaintenanceEvent) => void;
 }
 
-const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose }) => {
+const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose, canEdit = false, onEdit }) => {
   const { t } = useI18n();
   const vehicle = vehicles.find((v: any) => String(v.id) === String(record.vehicleId));
   const vehicleNumber = vehicle?.vehicleNumber || record.vehicleNo || '—';
@@ -19,8 +23,8 @@ const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose }) => {
   const statusLabel = isApproved ? translateStatus(t, 'Approved') : record.deletedAt ? translateStatus(t, 'Deleted') : translateStatus(t, 'Pending');
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4">
-      <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/40 backdrop-blur-xs p-4 animate-fade-in">
+      <div className="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-3xl w-full max-h-[90vh] overflow-y-auto animate-scale-in">
         <div className="px-6 py-4 border-b border-slate-200 flex items-center justify-between sticky top-0 bg-white z-10">
           <h3 className="text-sm uppercase tracking-wider font-bold text-slate-800">{t('fleet.maintenance_view.record_title')}</h3>
           <button onClick={onClose} className="inline-flex items-center gap-1 text-slate-400 hover:text-slate-600 text-sm font-semibold">
@@ -221,7 +225,17 @@ const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose }) => {
             </div>
           )}
 
-          <div className="flex justify-end pt-2">
+          <div className="flex items-center justify-end gap-2 pt-2">
+            {canEdit && onEdit && (
+              <button
+                type="button"
+                onClick={() => onEdit(record)}
+                className="group relative inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition shadow-sm active:scale-[0.98]"
+              >
+                <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-edit)]"><Pencil size={14} /></span>
+                {t('common.edit')}
+              </button>
+            )}
             <button
               onClick={onClose}
               className="px-4 py-2 text-sm font-semibold border border-slate-300 rounded-lg hover:bg-slate-50 text-slate-700 transition"
