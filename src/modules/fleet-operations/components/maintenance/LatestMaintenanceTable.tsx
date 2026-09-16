@@ -396,7 +396,7 @@ const LatestMaintenanceTable = ({
                       tabIndex={0}
                       aria-label={`${rec.billNumber || ''} ${resolveVehicleNumber(rec)}`}
                       onKeyDown={(event) => handleRowKeyDown(event, index)}
-                      className="group cursor-pointer outline-none transition-colors duration-150 hover:bg-slate-50/80 border-l-4 border-l-transparent focus-visible:border-l-blue-400 focus-visible:bg-blue-50/40"
+                      className="cursor-pointer outline-none transition-colors duration-150 hover:bg-slate-50/80 border-l-4 border-l-transparent focus-visible:border-l-blue-400 focus-visible:bg-blue-50/40"
                       onClick={() => onView(rec)}
                     >
                       <td className="px-4 py-3 whitespace-nowrap">
