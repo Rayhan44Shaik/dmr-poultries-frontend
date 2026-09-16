@@ -8,7 +8,6 @@
 // complete maintenance history.
 
 import jsPDF from "jspdf";
-import html2canvas from "html2canvas";
 import { formatTripListDay } from "../../operations/vehicle-trips/utils/formatTripListDay";
 import { localizeMaintenanceText, localizeMaintenanceName } from "./maintenanceLocalization";
 import type { MaintenanceEvent } from "../types";
@@ -38,7 +37,12 @@ function buildSheet(
   vehicleHistory: MaintenanceEvent[],
   vehicleNumber: string,
   language: "en" | "te",
-  t: Translate
+  t: Translate,
+  vehicleMaster?: {
+    vehicleType?: string;
+    engineNumber?: string;
+    chassisNumber?: string;
+  } | null
 ): HTMLElement {
   const sheet = document.createElement("div");
   sheet.style.cssText = `position:fixed;left:-10000px;top:0;width:794px;background:#ffffff;color:${INK};font-family:system-ui,-apple-system,'Segoe UI',Roboto,'Noto Sans Telugu',sans-serif;font-size:13px;line-height:1.45;`;
@@ -132,6 +136,20 @@ function buildSheet(
       <div style="font-size:11px;color:${MUTED};font-weight:600;">${esc(record.billNumber || "-")} · ${esc(status)}</div>
     </div>
 
+    <div style="margin:0 24px 10px;border:1px solid ${LINE};border-radius:8px;overflow:hidden;">
+      <div style="padding:6px 10px;background:#f8fafc;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:${MUTED};border-bottom:1px solid ${LINE};">${esc(t("fleet.maintenance_view.vehicle_details"))}</div>
+      <div style="display:grid;grid-template-columns:auto 1fr auto 1fr;">
+        ${[
+          [t("operations.vehicle_no"), vehicleNumber],
+          [t("fleet.vehicle_type"), vehicleMaster?.vehicleType || "—"],
+          [t("fleet.engine_no"), vehicleMaster?.engineNumber || "—"],
+          [t("fleet.chassis_no"), vehicleMaster?.chassisNumber || "—"],
+        ].map(([l, v], i) => `
+          <div style="padding:6px 10px;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:${MUTED};background:#fbfcfe;border-right:1px solid ${LINE};border-bottom:1px solid ${LINE};${i % 2 === 0 ? "" : `border-right:1px solid ${LINE};`}">${esc(l)}</div>
+          <div style="padding:6px 10px;font-size:11.5px;font-weight:700;color:${INK};border-right:1px solid ${LINE};border-bottom:1px solid ${LINE};word-break:break-word;">${esc(v)}</div>`).join("")}
+      </div>
+    </div>
+
     ${cells}
 
     ${
@@ -172,9 +190,17 @@ export async function generateMaintenancePdf(
   vehicleHistory: MaintenanceEvent[],
   vehicleNumber: string,
   language: "en" | "te" = "en",
-  t: Translate
+  t: Translate,
+  vehicleMaster?: {
+    vehicleType?: string;
+    engineNumber?: string;
+    chassisNumber?: string;
+  } | null
 ): Promise<void> {
-  const sheet = buildSheet(record, vehicleHistory, vehicleNumber, language, t);
+  // html2canvas is heavy — load it only when a PDF is actually requested so
+  // the page itself stays fast.
+  const { default: html2canvas } = await import("html2canvas");
+  const sheet = buildSheet(record, vehicleHistory, vehicleNumber, language, t, vehicleMaster);
   try {
     // Fonts/images inside the sheet need a beat to lay out before capture.
     await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));

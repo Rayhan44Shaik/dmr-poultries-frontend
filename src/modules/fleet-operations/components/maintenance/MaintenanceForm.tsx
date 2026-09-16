@@ -85,7 +85,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
   const maintenanceSelectStyles = {
     control: (base: Record<string, unknown>) => ({
       ...base,
-      minHeight: '40px',
+      minHeight: '36px',
       borderColor: '#cbd5e1',
       boxShadow: 'none',
       borderRadius: '0.75rem',

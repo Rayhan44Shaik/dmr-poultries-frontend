@@ -91,7 +91,7 @@ const ViewModalInner: React.FC<ViewModalProps> = ({ record, vehicles, onClose, c
     if (pdfBusy) return;
     setPdfBusy(true);
     try {
-      await generateMaintenancePdf(active, vehicleHistory, vehicleNumber, language, t);
+      await generateMaintenancePdf(active, vehicleHistory, vehicleNumber, language, t, vehicle);
     } finally {
       setPdfBusy(false);
     }
@@ -122,7 +122,7 @@ const ViewModalInner: React.FC<ViewModalProps> = ({ record, vehicles, onClose, c
   const showEdit = Boolean(canEdit && onEdit && !isApproved && !isDeleted);
 
   return (
-    <AppShellModal open onClose={onClose} ariaLabelledBy="maintenance-view-title" panelClassName="max-w-4xl">
+    <AppShellModal open onClose={onClose} ariaLabelledBy="maintenance-view-title" panelClassName="max-w-5xl">
       <div className="flex max-h-[calc(100vh-96px)] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl animate-scale-in">
         {/* Header — identity + status (same strip as the trip view) */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 px-6 py-4">
@@ -170,7 +170,7 @@ const ViewModalInner: React.FC<ViewModalProps> = ({ record, vehicles, onClose, c
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
           {/* LEFT — every APPROVED maintenance entry of this vehicle:
               date + maintenance type only, filterable, click to view. */}
-          <aside className="flex w-full flex-shrink-0 flex-col border-b border-slate-100 bg-slate-50/40 lg:w-64 lg:border-b-0 lg:border-r">
+          <aside className="flex w-full flex-shrink-0 flex-col border-b border-slate-100 bg-slate-50/40 lg:w-80 lg:border-b-0 lg:border-r">
             <div className="flex items-center justify-between px-4 pt-4">
               <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 <Truck size={13} className="flex-shrink-0 text-slate-400" />
@@ -245,6 +245,32 @@ const ViewModalInner: React.FC<ViewModalProps> = ({ record, vehicles, onClose, c
           {/* RIGHT — the selected record: bill number, every detail, parts,
               total and the documents. */}
           <div className="min-w-0 flex-1 space-y-5 overflow-y-auto px-6 py-5 md:px-8">
+          {/* Vehicle master details — registration identity of the vehicle */}
+          <section className="overflow-hidden rounded-xl border border-slate-200 animate-fade-in-up">
+            <p className="flex items-center gap-1.5 bg-slate-50/80 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              <Truck size={13} className="flex-shrink-0 text-blue-500" />
+              {t('fleet.maintenance_view.vehicle_details')}
+            </p>
+            <div className="grid grid-cols-1 divide-y divide-slate-100 sm:grid-cols-2 sm:divide-y-0">
+              {([
+                [t('operations.vehicle_no'), vehicleNumber],
+                [t('fleet.vehicle_type'), vehicle?.vehicleType || '—'],
+                [t('fleet.engine_no'), vehicle?.engineNumber || '—'],
+                [t('fleet.chassis_no'), vehicle?.chassisNumber || '—'],
+              ] as [string, string][]).map(([label, value], index) => (
+                <div
+                  key={label}
+                  className={`flex items-center justify-between gap-3 px-4 py-2.5 ${
+                    index % 2 === 0 ? 'sm:border-r sm:border-slate-100' : ''
+                  } ${index < 2 ? 'border-b border-slate-100 sm:border-b' : ''} bg-white`}
+                >
+                  <span className="text-[11px] font-bold uppercase tracking-wider text-slate-400">{label}</span>
+                  <span className="text-[13px] font-bold text-slate-800">{value}</span>
+                </div>
+              ))}
+            </div>
+          </section>
+
           {/* All record details — one neat table, bold labels, bright values */}
           <section className="overflow-hidden rounded-xl border border-slate-200 animate-fade-in-up" style={{ animationDelay: '40ms' }}>
             <table className="min-w-full text-sm">

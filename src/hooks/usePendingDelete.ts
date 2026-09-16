@@ -31,6 +31,8 @@ export type PendingDeleteControls<TId extends string | number> = {
  */
 export function usePendingDelete<TId extends string | number>(
   onDelete: (id: TId) => void | Promise<void>,
+  /** Undo-window length in seconds. Defaults to the shared 10s. */
+  seconds?: number,
 ): PendingDeleteControls<TId> {
   const [snapshots, setSnapshots] = useState<PendingDeleteSnapshot<TId>[]>([]);
   const onDeleteRef = useRef(onDelete);
@@ -39,10 +41,16 @@ export function usePendingDelete<TId extends string | number>(
 
   const controllerRef = useRef<ReturnType<typeof createPendingDeleteController<TId>> | null>(null);
 
+  const secondsRef = useRef(seconds);
+  useEffect(() => {
+    secondsRef.current = seconds;
+  }, [seconds]);
+
   const createController = () =>
     createPendingDeleteController<TId>({
       onExpire: (id) => onDeleteRef.current(id),
       onChange: setSnapshots,
+      seconds: secondsRef.current,
     });
 
   if (controllerRef.current == null) {
