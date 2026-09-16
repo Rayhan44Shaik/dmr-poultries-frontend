@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from "react";
+import { useMemo, useRef, useState, type CSSProperties } from "react";
 import { ArrowUpRight, BarChart3 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -163,6 +163,7 @@ export default function CollectionPerformanceChart({
   const [sortBy, setSortBy] = useState<CollectionPerformanceSort>("outstanding");
   const [sortAnimationId, setSortAnimationId] = useState(0);
   const [shopTooltip, setShopTooltip] = useState<ShopTooltipState | null>(null);
+  const chartRef = useRef<HTMLElement | null>(null);
 
   const sortOptions = useMemo<MasterDropdownOption[]>(
     () => [
@@ -229,28 +230,40 @@ export default function CollectionPerformanceChart({
     rowRecovery: number,
     target: HTMLElement,
   ) => {
-    if (typeof window === "undefined") return;
+    const chart = chartRef.current;
+    if (!chart) return;
     const rect = target.getBoundingClientRect();
+    const chartRect = chart.getBoundingClientRect();
     const tooltipWidth = 256;
-    const tooltipHeight = 150;
-    const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
-    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    const tooltipHeight = 166;
+    const inset = 10;
+    const targetTop = rect.top - chartRect.top;
+    const targetBottom = rect.bottom - chartRect.top;
+    const centeredLeft = rect.left - chartRect.left + rect.width / 2;
     const left = Math.min(
-      Math.max(rect.left + rect.width / 2, tooltipWidth / 2 + 10),
-      viewportWidth - tooltipWidth / 2 - 10,
+      Math.max(centeredLeft, tooltipWidth / 2 + inset),
+      chartRect.width - tooltipWidth / 2 - inset,
     );
-    const placement = rect.top > tooltipHeight + 18 || rect.bottom + tooltipHeight > viewportHeight
-      ? "top"
-      : "bottom";
-    const top = placement === "top" ? rect.top - 10 : rect.bottom + 10;
+
+    const bottomTop = targetBottom + 8;
+    const topTop = targetTop - tooltipHeight - 8;
+    const bottomFits = bottomTop + tooltipHeight <= chartRect.height - inset;
+    const topFits = topTop >= inset;
+    const placement: ShopTooltipState["placement"] = bottomFits || !topFits ? "bottom" : "top";
+    const preferredTop = placement === "bottom" ? bottomTop : topTop;
+    const top = Math.min(
+      Math.max(preferredTop, inset),
+      Math.max(inset, chartRect.height - tooltipHeight - inset),
+    );
+
     setShopTooltip({ row, recovery: rowRecovery, left, top, placement });
   };
 
   return (
     <>
       <style>{COLLECTION_RECOVERY_ANIMATION_STYLES}</style>
-      <section className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
-      <header className="border-b border-slate-100 bg-gradient-to-r from-slate-50/90 via-white to-emerald-50/30 px-4 py-3">
+      <section ref={chartRef} className="relative flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
+      <header className="border-b border-slate-100 bg-gradient-to-r from-slate-50/90 via-white to-emerald-50/30 px-4 py-2.5">
         <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <Link
@@ -277,6 +290,7 @@ export default function CollectionPerformanceChart({
               onChange={setSortValue}
               placeholder={t("ops.dashboard.collection_performance.sort_outstanding")}
               searchable
+              portal={false}
               className="w-full sm:w-48 lg:w-52"
               triggerClassName="h-9 rounded-xl border-slate-200 bg-white/95 px-3 text-[11.5px] font-semibold shadow-xs"
             />
@@ -293,14 +307,14 @@ export default function CollectionPerformanceChart({
         </div>
       </header>
 
-      <div className="flex flex-1 flex-col p-3">
+      <div className="flex flex-1 flex-col p-2.5">
         <div className="grid grid-cols-3 gap-1.5">
           {[
             [t("ops.dashboard.collection_performance.sales"), sales, "border-slate-200 bg-slate-50/80 text-slate-700"],
             [t("ops.dashboard.collection_performance.collected"), collections, "border-emerald-200 bg-emerald-50/75 text-emerald-700"],
             [t("ops.dashboard.collection_performance.gap"), gap, "border-orange-200 bg-orange-50/80 text-orange-700"],
           ].map(([label, value, tone]) => (
-            <div key={String(label)} className={`min-w-0 rounded-lg border px-2 py-1.5 text-center ${tone}`}>
+            <div key={String(label)} className={`min-w-0 rounded-lg border px-2 py-1 text-center ${tone}`}>
               <span className="block truncate text-[8.5px] font-black uppercase tracking-wide opacity-60">
                 {label}
               </span>
@@ -322,7 +336,7 @@ export default function CollectionPerformanceChart({
             </p>
           </div>
         ) : (
-          <div className="mt-2 grid grid-cols-2 gap-2">
+          <div className="mt-2 grid grid-cols-2 gap-1.5">
             {visibleRows.map((row, index) => {
               const rowRecovery = collectionRecoveryPercentage(row);
               return (
@@ -330,7 +344,7 @@ export default function CollectionPerformanceChart({
                   key={`${sortAnimationId}-${row.shopName}`}
                   tabIndex={0}
                   aria-label={`${row.shopName}, ${t("ops.dashboard.collection_performance.recovery")}: ${rowRecovery.toFixed(1)}%, ${t("ops.dashboard.collection_performance.gap")}: ${formatINR(row.outstandingAmount)}`}
-                  className="collection-recovery-shop-card group relative min-w-0 rounded-xl border border-slate-100 bg-gradient-to-r from-white to-slate-50/60 px-2.5 py-1.5 shadow-xs transition-colors duration-150 hover:from-emerald-50/35 hover:to-white focus:bg-emerald-50/30"
+                  className="collection-recovery-shop-card group relative min-w-0 rounded-xl border border-slate-100 bg-gradient-to-r from-white to-slate-50/60 px-2.5 py-1 shadow-xs transition-colors duration-150 hover:from-emerald-50/35 hover:to-white focus:bg-emerald-50/30"
                   style={{ animationDelay: `${index * 80}ms` }}
                   onFocus={(event) => showShopTooltip(row, rowRecovery, event.currentTarget)}
                   onBlur={() => setShopTooltip(null)}
@@ -364,7 +378,7 @@ export default function CollectionPerformanceChart({
           </div>
         )}
 
-        <footer className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2 text-[9px] font-semibold text-slate-400">
+        <footer className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-1.5 text-[9px] font-semibold text-slate-400">
           <span className="truncate tabular-nums">
             {visibleRows.length} / {rows.length} shops
           </span>
@@ -377,16 +391,15 @@ export default function CollectionPerformanceChart({
           </Link>
         </footer>
       </div>
-    </section>
 
-    {shopTooltip ? (
+      {shopTooltip ? (
       <div
         role="tooltip"
-        className="collection-recovery-tooltip pointer-events-none fixed z-[1000] w-64 rounded-2xl border border-slate-200 bg-white p-3 text-[10px] text-slate-500 shadow-xl shadow-slate-900/12"
+        className="collection-recovery-tooltip pointer-events-none absolute z-50 max-h-[10.375rem] w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 text-[10px] text-slate-500 shadow-xl shadow-slate-900/12"
         style={{
           left: shopTooltip.left,
           top: shopTooltip.top,
-          transform: shopTooltip.placement === "top" ? "translate(-50%, -100%)" : "translate(-50%, 0)",
+          transform: "translateX(-50%)",
         }}
       >
         <span
@@ -434,7 +447,8 @@ export default function CollectionPerformanceChart({
           </div>
         </div>
       </div>
-    ) : null}
+      ) : null}
+    </section>
   </>
   );
 }
