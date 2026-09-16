@@ -44,7 +44,6 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     updateExpense,
     deleteExpense,
     approveExpense,
-    rejectExpense,
   } = useFuelExpenses(showNotification);
 
   // ── Ensure unique expenses (no duplicate trip records) ──
@@ -272,10 +271,11 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     setShowForm(true);
   }, [selectedBill, canEditDelete, showNotification]);
 
+  // ── Delayed 10-Second Pending Delete with Undo ──
   const { requestDelete, cancel, pendingItems } = usePendingDelete<string>(async (id) => {
     await deleteExpense(id);
     setSelectedId((current) => (current === id ? null : current));
-  });
+  }, 10);
 
   const handleDelete = useCallback((bill?: FuelExpense) => {
     const target = bill || selectedBill;
@@ -305,19 +305,6 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     void approveExpense(target.id);
     setSelectedId(null);
   }, [selectedBill, approveExpense, showNotification]);
-
-  const handleReject = useCallback((bill?: FuelExpense) => {
-    const target = bill || selectedBill;
-    if (!target) return;
-    if (target.sourceType === "TRIP" || !!target.tripNo) {
-      showNotification("Trip diesel bills cannot be rejected from Fuel Expenses.", "info");
-      return;
-    }
-    const reason = window.prompt("Reason for rejecting fuel bill?");
-    if (!reason?.trim()) return;
-    void rejectExpense(target.id, reason.trim());
-    setSelectedId(null);
-  }, [selectedBill, rejectExpense, showNotification]);
 
   // ── Export Handlers ──
   const handleExportPDF = useCallback(async () => {
@@ -533,7 +520,6 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
           onEdit={handleEdit}
           onDelete={handleDelete}
           onApprove={handleApprove}
-          onReject={handleReject}
           canEditDelete={canEditDelete}
           startIndex={(currentPage - 1) * pageSize}
           sortBy={sortBy}

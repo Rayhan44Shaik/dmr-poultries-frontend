@@ -26,6 +26,8 @@ import type { FuelQuickTab } from "../utils/filterFuelExpenses";
 import { formatVehicleNumber } from "../../../../utils/format";
 import { formatTripListDay } from "../../vehicle-trips/utils/formatTripListDay";
 import { localizeTripViewText } from "../../vehicle-trips/utils/tripViewLocalization";
+import { BillPreviewLink } from "../../vehicle-trips/components/Step_5/BillPreviewLink";
+import { GpsAddressText } from "../../vehicle-trips/components/GpsAddressText";
 import { useI18n } from "../../../../i18n";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 
@@ -39,7 +41,6 @@ interface Props {
   onEdit?: (bill: FuelExpense) => void;
   onDelete?: (bill: FuelExpense) => void;
   onApprove?: (bill: FuelExpense) => void;
-  onReject?: (bill: FuelExpense) => void;
   canEditDelete?: (bill: FuelExpense) => boolean;
   startIndex?: number;
   sortBy?: FuelSortKey | null;
@@ -76,7 +77,6 @@ export function FuelBillTable({
   onEdit,
   onDelete,
   onApprove,
-  onReject,
   canEditDelete,
   startIndex = 0,
   sortBy = null,
@@ -119,7 +119,7 @@ export function FuelBillTable({
     [handleRowSelect, bills]
   );
 
-  const sortable = (key: FuelSortKey, content: React.ReactNode, center = false, right = false) => {
+  const sortable = (key: FuelSortKey, content: React.ReactNode, center = true) => {
     if (!onSortChange) return content;
     const active = sortBy === key;
     return (
@@ -128,7 +128,7 @@ export function FuelBillTable({
         onClick={() => onSortChange(key)}
         aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
         className={`group/sort flex items-center gap-1.5 w-full uppercase tracking-wider font-bold text-[12px] transition-colors hover:text-emerald-700 ${
-          center ? "justify-center" : right ? "justify-end" : "justify-start"
+          center ? "justify-center" : "justify-start"
         } ${active ? "text-emerald-700" : "text-slate-600"}`}
       >
         {content}
@@ -169,7 +169,7 @@ export function FuelBillTable({
             {selectedTabCount}
           </span>
 
-          {/* Segmented status toggle — labels only (no per-tab counts inside toggle) with respective colors */}
+          {/* Segmented status toggle — labels only with respective colors */}
           {onTabChange && (
             <div className="flex items-center p-0.5 ml-2 border border-slate-200/80 rounded-lg overflow-hidden bg-slate-50 shadow-sm">
               {tabs.map((tab) => {
@@ -208,7 +208,7 @@ export function FuelBillTable({
               <button
                 type="button"
                 onClick={() => onView(selectedBill)}
-                className="group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm bg-blue-50/70 hover:bg-blue-50/90 text-blue-600 border border-blue-200/60 active:scale-95"
+                className="group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm bg-emerald-50/70 hover:bg-emerald-50/90 text-emerald-600 border border-emerald-200/60 active:scale-95"
                 title="View Bill Details"
               >
                 <span className={`inline-flex ${uiActionIconMotionClass.view}`}>
@@ -225,7 +225,7 @@ export function FuelBillTable({
                 disabled={canEditDelete ? !canEditDelete(selectedBill) : false}
                 className={`group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${
                   !canEditDelete || canEditDelete(selectedBill)
-                    ? "bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-500 border border-emerald-200/60 active:scale-95"
+                    ? "bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-600 border border-emerald-200/60 active:scale-95"
                     : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"
                 }`}
                 title="Edit Fuel Bill"
@@ -269,20 +269,6 @@ export function FuelBillTable({
                 <span>Approve</span>
               </button>
             )}
-
-            {selectedBill.sourceType !== "TRIP" && selectedBill.status === "Pending" && onReject && (
-              <button
-                type="button"
-                onClick={() => onReject(selectedBill)}
-                className="group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/60 active:scale-95"
-                title="Reject Fuel Bill"
-              >
-                <span className={`inline-flex ${uiActionIconMotionClass.delete}`}>
-                  <AlertCircle size={13} />
-                </span>
-                <span>Reject</span>
-              </button>
-            )}
           </div>
         )}
       </div>
@@ -301,7 +287,7 @@ export function FuelBillTable({
                     <Hash size={14} className="text-slate-400 flex-shrink-0" />
                     <span>Bill No</span>
                   </div>
-                ))}
+                ), false)}
               </th>
 
               {/* Date */}
@@ -311,7 +297,7 @@ export function FuelBillTable({
                     <Calendar size={14} className="text-blue-500 flex-shrink-0" />
                     <span>{t("table.date")}</span>
                   </div>
-                ))}
+                ), false)}
               </th>
 
               {/* Trip No (Trip list matching styling) */}
@@ -321,7 +307,7 @@ export function FuelBillTable({
                     <Hash size={14} className="text-emerald-500 flex-shrink-0" />
                     <span>{t("operations.trip_no")}</span>
                   </div>
-                ))}
+                ), false)}
               </th>
 
               {/* Source */}
@@ -331,7 +317,7 @@ export function FuelBillTable({
                     <Layers size={14} className="text-indigo-500 flex-shrink-0" />
                     <span>Source</span>
                   </div>
-                ))}
+                ), false)}
               </th>
 
               {/* Vehicle */}
@@ -341,7 +327,7 @@ export function FuelBillTable({
                     <Truck size={14} className="text-indigo-500 flex-shrink-0" />
                     <span>{t("common.vehicle")}</span>
                   </div>
-                ))}
+                ), false)}
               </th>
 
               {/* Driver */}
@@ -351,50 +337,50 @@ export function FuelBillTable({
                     <User size={14} className="text-amber-500 flex-shrink-0" />
                     <span>{t("common.driver")}</span>
                   </div>
-                ))}
+                ), false)}
               </th>
 
-              {/* Meter Reading (KM) */}
-              <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider">
+              {/* Meter Reading (KM) — Middle / Center Aligned */}
+              <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
                 {sortable("meterReading", (
-                  <div className="flex items-center justify-end gap-1.5">
+                  <div className="flex items-center justify-center gap-1.5">
                     <Gauge size={14} className="text-teal-500 flex-shrink-0" />
                     <span>Meter (KM)</span>
                   </div>
-                ), false, true)}
+                ), true)}
               </th>
 
-              {/* Litres */}
-              <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider">
+              {/* Litres — Middle / Center Aligned */}
+              <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
                 {sortable("litres", (
-                  <div className="flex items-center justify-end gap-1.5">
+                  <div className="flex items-center justify-center gap-1.5">
                     <Droplets size={14} className="text-blue-500 flex-shrink-0" />
                     <span>Litres</span>
                   </div>
-                ), false, true)}
+                ), true)}
               </th>
 
-              {/* Rate */}
-              <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider">
+              {/* Rate — Middle / Center Aligned */}
+              <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
                 {sortable("rate", (
-                  <div className="flex items-center justify-end gap-1.5">
+                  <div className="flex items-center justify-center gap-1.5">
                     <IndianRupee size={14} className="text-slate-500 flex-shrink-0" />
                     <span>Rate (₹/L)</span>
                   </div>
-                ), false, true)}
+                ), true)}
               </th>
 
-              {/* Amount */}
-              <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider">
+              {/* Amount — Middle / Center Aligned */}
+              <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
                 {sortable("amount", (
-                  <div className="flex items-center justify-end gap-1.5">
+                  <div className="flex items-center justify-center gap-1.5">
                     <IndianRupee size={14} className="text-emerald-500 flex-shrink-0" />
                     <span>Amount (₹)</span>
                   </div>
-                ), false, true)}
+                ), true)}
               </th>
 
-              {/* Petrol Bunk */}
+              {/* Petrol Bunk & GPS with Tooltip */}
               <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
                 <div className="flex items-center gap-1.5">
                   <MapPin size={14} className="text-rose-500 flex-shrink-0" />
@@ -402,7 +388,7 @@ export function FuelBillTable({
                 </div>
               </th>
 
-              {/* Receipt */}
+              {/* Receipt / Bill Preview */}
               <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
                 <div className="flex items-center justify-center gap-1.5">
                   <FileImage size={14} className="text-indigo-500 flex-shrink-0" />
@@ -449,11 +435,6 @@ export function FuelBillTable({
                 const isApproved = isTrip || bill.status === "Approved";
                 const isPending = !isTrip && bill.status === "Pending";
                 const isRejected = !isTrip && bill.status === "Rejected";
-
-                const gpsText =
-                  bill.gpsLat != null && bill.gpsLon != null
-                    ? `GPS: ${bill.gpsLat.toFixed(4)}, ${bill.gpsLon.toFixed(4)}`
-                    : null;
 
                 return (
                   <tr
@@ -525,52 +506,50 @@ export function FuelBillTable({
                       {localizeTripViewText(bill.driverName || "—", language)}
                     </td>
 
-                    {/* Meter (KM) */}
-                    <td className="px-4 py-3 text-right text-xs font-medium text-slate-700 tabular-nums whitespace-nowrap">
+                    {/* Meter (KM) — Middle / Center Aligned */}
+                    <td className="px-4 py-3 text-center text-xs font-medium text-slate-700 tabular-nums whitespace-nowrap">
                       {bill.meterReading > 0 ? bill.meterReading.toLocaleString() : "—"}
                     </td>
 
-                    {/* Litres */}
-                    <td className="px-4 py-3 text-right text-xs font-bold text-blue-500 tabular-nums whitespace-nowrap">
+                    {/* Litres — Middle / Center Aligned */}
+                    <td className="px-4 py-3 text-center text-xs font-bold text-blue-500 tabular-nums whitespace-nowrap">
                       {bill.litres.toFixed(2)}
                     </td>
 
-                    {/* Rate */}
-                    <td className="px-4 py-3 text-right text-xs font-medium text-slate-700 tabular-nums whitespace-nowrap">
+                    {/* Rate — Middle / Center Aligned */}
+                    <td className="px-4 py-3 text-center text-xs font-medium text-slate-700 tabular-nums whitespace-nowrap">
                       {bill.rate.toFixed(2)}
                     </td>
 
-                    {/* Total Amount */}
-                    <td className="px-4 py-3 text-right text-xs font-bold text-emerald-600 tabular-nums whitespace-nowrap">
+                    {/* Total Amount — Middle / Center Aligned */}
+                    <td className="px-4 py-3 text-center text-xs font-bold text-emerald-600 tabular-nums whitespace-nowrap">
                       {bill.amount.toFixed(2)}
                     </td>
 
-                    {/* Petrol Bunk & GPS */}
-                    <td className="px-4 py-3 text-xs text-slate-600 max-w-[160px] truncate" title={bill.petrolBunk}>
-                      <div className="flex items-center gap-1">
-                        <span className="truncate">{bill.petrolBunk || "—"}</span>
-                        {gpsText && (
-                          <span className="text-[10px] text-emerald-600 font-medium" title={gpsText}>
-                            (GPS)
-                          </span>
-                        )}
+                    {/* Petrol Bunk & GPS with Tooltip */}
+                    <td className="px-4 py-3 text-xs text-slate-600 max-w-[200px]">
+                      <div className="font-medium text-slate-800 truncate" title={bill.petrolBunk}>
+                        {bill.petrolBunk || "—"}
                       </div>
+                      {bill.gpsLat != null && bill.gpsLon != null && (
+                        <div className="mt-0.5" title={`GPS: ${bill.gpsLat.toFixed(5)}, ${bill.gpsLon.toFixed(5)}`}>
+                          <GpsAddressText
+                            lat={bill.gpsLat}
+                            lon={bill.gpsLon}
+                            className="text-[11px] text-emerald-600 font-medium"
+                            maxLines={1}
+                          />
+                        </div>
+                      )}
                     </td>
 
-                    {/* Receipt Image */}
+                    {/* Receipt / Bill Preview Link with Hover Popup & Full Lightbox */}
                     <td className="px-4 py-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       {bill.image ? (
-                        <a
+                        <BillPreviewLink
                           href={bill.image}
-                          download={`${bill.billNo}.png`}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 rounded-md bg-blue-50 px-2 py-1 text-[11px] font-semibold text-blue-700 hover:bg-blue-100 transition ring-1 ring-inset ring-blue-600/20"
-                          title="View / Download Receipt"
-                        >
-                          <FileImage size={13} />
-                          <span>Receipt</span>
-                        </a>
+                          fileName={bill.imageName || `${bill.billNo}.png`}
+                        />
                       ) : (
                         <span className="text-xs text-slate-400">—</span>
                       )}
