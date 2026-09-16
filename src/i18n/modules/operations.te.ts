@@ -6,6 +6,7 @@ export default {
   'ops.collection.after_approval': 'ఆమోదం తర్వాత',
   'ops.collection.all_collectors': 'అందరు కలెక్టర్లు',
   'ops.collection.all_modes': 'అన్ని విధానాలు',
+  'ops.collection.all_transactions': 'అన్ని కలెక్షన్లు',
   'ops.collection.all_shops': 'అన్ని షాపులు',
   'ops.collection.amount_greater_zero': 'మొత్తం సున్నా కంటే ఎక్కువగా ఉండాలి.',
   'ops.collection.amount_title': 'మొత్తం',

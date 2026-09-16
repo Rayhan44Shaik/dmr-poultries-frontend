@@ -6,6 +6,7 @@ export default {
   'ops.collection.after_approval': 'After approval',
   'ops.collection.all_collectors': 'All Collectors',
   'ops.collection.all_modes': 'All Modes',
+  'ops.collection.all_transactions': 'All Collections',
   'ops.collection.all_shops': 'All Shops',
   'ops.collection.amount_greater_zero': 'Amount must be greater than zero.',
   'ops.collection.amount_title': 'Amount',

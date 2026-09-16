@@ -37,6 +37,8 @@ interface Props {
   setSearchQuery: (value: string) => void;
   onReset: () => void;
   onRefresh: () => void;
+  /** True while a refresh is reading — the brand pill dances, the page stays. */
+  refreshing?: boolean;
 }
 
 /**
@@ -70,6 +72,7 @@ function PendingCollectionsFilters({
   setSearchQuery,
   onReset,
   onRefresh,
+  refreshing = false,
 }: Props) {
   const { t, language } = useI18n();
   const thresholdId = useId();
@@ -221,7 +224,7 @@ function PendingCollectionsFilters({
             </span>
             {t("common.reset")}
           </button>
-          <BrandRefreshButton onClick={onRefresh} />
+          <BrandRefreshButton onClick={onRefresh} loading={refreshing} />
         </div>
       </div>
     </div>

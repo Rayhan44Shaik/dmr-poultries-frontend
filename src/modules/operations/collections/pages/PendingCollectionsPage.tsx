@@ -4,15 +4,13 @@ import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { collectionService } from "../services/collectionService";
 import { onShopDataChanged } from "../../../../shared/events/shopDataEvents";
 import { useShops } from "../../../masters/shops/hooks/useShops";
-import type { Collection, CollectionPendingSummaryRow, CollectionPendingSummaryTotals } from "../types/collection";
-import type { Shop } from "../../../masters/shops/types/shop";
-import { useSafeNotification } from "../../../../hooks/useSafeNotification";
+import type { Collection, CollectionPendingSummaryRow } from "../types/collection";
 import { useToast } from "../../../../components/common/ToastProvider";
 import { ShopCollectionDetailModal } from "../components/pending/ShopCollectionDetailModal";
 import PendingCollectionsFilters from "../components/pending/PendingCollectionsFilters";
 import PendingCollectionsSummary from "../components/pending/PendingCollectionsSummary";
 import PendingCollectionsTable from "../components/pending/PendingCollectionsTable";
-import ShopSalesPagination from "../components/pending/ShopSalesPagination";
+import { Pagination } from "../../../../ui";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import { useI18n } from "../../../../i18n";
 
@@ -30,20 +28,6 @@ const getCurrentWeekRange = (): { fromDate: string; toDate: string } => {
     fromDate: monday.toISOString().split("T")[0],
     toDate: sunday.toISOString().split("T")[0],
   };
-};
-
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    minimumFractionDigits: 2,
-  }).format(amount);
-
-const formatDate = (dateStr: string | null | undefined) => {
-  if (!dateStr || dateStr === "-") return "—";
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
 };
 
 const DEFAULT_PAGE_SIZE = 15;
@@ -124,13 +108,13 @@ export default function PendingCollectionsPage() {
 
   // Pending summary from backend (for shops that have collections)
   const [pendingSummaryRows, setPendingSummaryRows] = useState<CollectionPendingSummaryRow[]>([]);
-  const [pendingTotals, setPendingTotals] = useState<CollectionPendingSummaryTotals>({
-    weeklySales: 0,
-    weeklyApprovedCollections: 0,
-    weeklyPendingCollections: 0,
-    balance: 0,
-    recoveryPercentage: 0,
-  });
+  /**
+   * The table is the only thing that loads. Everything below tracks a read that
+   * changes table rows, so the page keeps its filter bar, its KPI strip and its
+   * card header on screen and never flashes a full-page loader.
+   */
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -166,7 +150,6 @@ export default function PendingCollectionsPage() {
           .fetchPendingSummary(appliedToDate)
           .then((payload) => {
             setPendingSummaryRows(payload.shops);
-            setPendingTotals(payload.totals);
           })
           .catch(() => {
             /* keep the last good summary rather than blanking the table */
@@ -218,11 +201,13 @@ export default function PendingCollectionsPage() {
   // Fetch pending summary when applied date range changes
   useEffect(() => {
     if (!appliedFromDate || !appliedToDate) return;
+    setSummaryLoading(true);
     void collectionService.fetchPendingSummary(appliedToDate).then((payload) => {
       setPendingSummaryRows(payload.shops);
-      setPendingTotals(payload.totals);
     }).catch(() => {
       setPendingSummaryRows([]);
+    }).finally(() => {
+      setSummaryLoading(false);
     });
   }, [appliedFromDate, appliedToDate]);
 
@@ -331,7 +316,6 @@ export default function PendingCollectionsPage() {
   ]);
 
   const totalItems = filteredData.length;
-  const totalPages = Math.ceil(totalItems / pageSize) || 1;
   const paginatedData = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return filteredData.slice(start, start + pageSize);
@@ -350,47 +334,9 @@ export default function PendingCollectionsPage() {
     ? filteredData.reduce((sum, s) => sum + s.recoveryPercentage, 0) / filteredData.length
     : 0;
 
-  const getLatestCollection = (shopName: string): Collection | null => {
-    const shopCollections = allCollections
-      .filter((c) => c.shopName === shopName)
-      .sort((a, b) => {
-        const dateA = a.collectionDate || a.createdDate || "";
-        const dateB = b.collectionDate || b.createdDate || "";
-        return dateB.localeCompare(dateA);
-      });
-    return shopCollections.length > 0 ? shopCollections[0] : null;
-  };
-
   const handleView = (shopName: string) => {
     setSelectedShop(shopName);
     setIsModalOpen(true);
-  };
-
-  const handleDelete = async (shopName: string) => {
-    const latest = getLatestCollection(shopName);
-    if (!latest || latest.numericId == null) {
-      toast.error(t("ops.collection.no_collection_to_delete"));
-      return;
-    }
-    const shopId = collectionService.getShopIdForName(shopName);
-    if (shopId != null) {
-      try {
-        const recent = await collectionService.fetchRecentCollectionsForShop(shopId, 1);
-        if (recent[0]?.canDelete === false) {
-          toast.error(t("ops.collection.cannot_delete_window"));
-          return;
-        }
-      } catch {
-        // Eligibility pre-check failed; let backend be authoritative
-      }
-    }
-    const result = await collectionService.deletePendingCollection(String(latest.numericId));
-    if (result.success) {
-      await refreshData();
-      toast.success(t("ops.collection.deleted_success"));
-    } else {
-      toast.error(result.message ?? t("ops.collection.delete_failed"));
-    }
   };
 
   const closeModal = () => {
@@ -399,6 +345,7 @@ export default function PendingCollectionsPage() {
   };
 
   const refreshData = async () => {
+    setRefreshing(true);
     try {
       await Promise.all([
         reloadShops(),
@@ -410,7 +357,6 @@ export default function PendingCollectionsPage() {
         try {
           const payload = await collectionService.fetchPendingSummary(appliedToDate);
           setPendingSummaryRows(payload.shops);
-          setPendingTotals(payload.totals);
         } catch {
           // Keep prior summaries if refetch fails
         }
@@ -418,6 +364,8 @@ export default function PendingCollectionsPage() {
       toast.success(t("ops.collection.refreshed"));
     } catch (error) {
       toast.error(t("ops.collection.failed_refresh"));
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -439,26 +387,9 @@ export default function PendingCollectionsPage() {
     toast.info(t("ops.collection.filters_reset"));
   };
 
-  const hasActiveFilters =
-    appliedFromDate !== "" ||
-    appliedToDate !== "" ||
-    appliedShopName.trim() !== "" ||
-    appliedRecoveryThreshold > 0 ||
-    appliedSortBy !== "alphabeticalAZ" ||
-    appliedSearchQuery.trim() !== "";
-
-  if (shopsLoading || collectionsLoading) {
-    return (
-      <div className="w-full space-y-5">
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-12 text-center">
-          <div className="inline-flex items-center gap-2 text-slate-400 text-sm font-medium">
-            <div className="w-4 h-4 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin" />
-            {t("ops.collection.loading_pending")}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // One flag for "the table is reading". The page chrome stays mounted.
+  const firstLoad = shopsLoading || collectionsLoading;
+  const tableLoading = firstLoad || summaryLoading || refreshing;
 
   return (
     <div className="w-full space-y-5 animate-in fade-in duration-500">
@@ -479,6 +410,7 @@ export default function PendingCollectionsPage() {
         setSearchQuery={setSearchQuery}
         onReset={resetFilters}
         onRefresh={refreshData}
+        refreshing={firstLoad || refreshing}
       />
 
       {/* KPI Summary Strip */}
@@ -490,6 +422,7 @@ export default function PendingCollectionsPage() {
         fromDate={appliedFromDate}
         toDate={appliedToDate}
         shopName={appliedShopName}
+        isLoading={firstLoad}
       />
 
       {/* Table Section */}
@@ -499,22 +432,20 @@ export default function PendingCollectionsPage() {
           selectedShopName={selectedShopName}
           onSelectShop={setSelectedShopName}
           onView={handleView}
-          onDelete={handleDelete}
-          grandTotalPending={totalOutstanding}
-          grandTotalWeeklySales={totalWeeklySales}
-          grandTotalWeeklyCollections={totalWeeklyCollections}
           totalShops={allShops.length}
+          isLoading={tableLoading}
         />
         {shouldShowPagination(totalItems) && (
-          <ShopSalesPagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
+          <Pagination
+            page={currentPage}
             pageSize={pageSize}
+            totalItems={totalItems}
+            onPageChange={setCurrentPage}
             onPageSizeChange={(size) => {
               setPageSize(size);
               setCurrentPage(1);
             }}
+            disabled={tableLoading}
           />
         )}
       </div>
@@ -526,7 +457,6 @@ export default function PendingCollectionsPage() {
           shopName={selectedShop}
           allCollections={allCollections}
           shops={allShops}
-          latestCollection={getLatestCollection(selectedShop)}
           onRefresh={refreshData}
         />
       )}
