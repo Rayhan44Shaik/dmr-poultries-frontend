@@ -36,6 +36,9 @@ globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} 
 globalThis.IntersectionObserver = class { observe() {} unobserve() {} disconnect() {} };
 globalThis.HTMLElement = class {};
 globalThis.SVGElement = class {};
+// file-saver touches HTMLAnchorElement at import time (it feature-detects the
+// download attribute) — layouts import it eagerly, so SSR needs the class.
+globalThis.HTMLAnchorElement = class HTMLAnchorElement {};
 globalThis.MutationObserver = class { observe() {} disconnect() {} takeRecords() { return []; } };
 try { await import("fake-indexeddb/auto"); } catch { /* optional */ }
 globalThis.Audio = class { play() { return Promise.resolve(); } };
@@ -46,6 +49,12 @@ const server = await createServer({
   server: { middlewareMode: true },
   optimizeDeps: { noDiscovery: true }, // we only evaluate our own src graph
   ssr: { external: ["react", "react-dom", "react-router-dom", "lucide-react"] },
+  // file-saver is minified UMD/CommonJS — Node's ESM interop cannot surface
+  // its named `saveAs` export under Vite's SSR transform (the browser never
+  // hits this: Vite pre-bundles it). The stub keeps the import graph loadable.
+  resolve: {
+    alias: [{ find: /^file-saver$/, replacement: new URL("./ssr-stubs/file-saver.mjs", import.meta.url).pathname }],
+  },
 });
 const React = (await import("react")).default;
 
@@ -70,9 +79,32 @@ try {
   console.error(err);
 }
 
-// Did the login form actually render?
-const hasLoginForm = /Welcome back|Sign in|Username/.test(loginHtml);
-console.log(hasLoginForm ? "LOGIN PAGE RENDERED: yes" : "LOGIN PAGE RENDERED: no (form markup missing!)");
+// Did the login form actually render? `/` now boots into a client-side
+// auth/demo gate that renders nothing during SSR (effects never run there),
+// so the guard renders the LoginPage chunk directly — same intent: the
+// sign-in screen must render its form without crashing.
+let hasLoginForm = /Welcome back|Sign in|Username/.test(loginHtml);
+try {
+  const { MemoryRouter } = await import("react-router-dom");
+  const { default: LoginPage } = await server.ssrLoadModule("/src/modules/auth/LoginPage.tsx");
+  const { I18nProvider } = await server.ssrLoadModule("/src/i18n/index.tsx");
+  const { AuthProvider } = await server.ssrLoadModule("/src/providers/AuthProvider.tsx");
+  const loginMarkup = renderToString(
+    React.createElement(
+      I18nProvider,
+      null,
+      React.createElement(AuthProvider, null,
+        React.createElement(MemoryRouter, null, React.createElement(LoginPage)))
+    )
+  );
+  hasLoginForm = /username|password/i.test(loginMarkup) && loginMarkup.length > 500;
+  console.log(`LOGIN PAGE RENDERED: ${hasLoginForm ? "yes" : "no (form markup missing!)"}  (direct render, ${loginMarkup.length} chars)`);
+  if (!hasLoginForm) failed.push({ name: "login-page", err: new Error("login form markup missing") });
+} catch (err) {
+  failed.push({ name: "login-page", err });
+  console.error("FAIL login-page");
+  console.error(err);
+}
 
 // 2) Every deferred route chunk must evaluate without a module-level crash —
 //    the same class of bug (a bad import/identifier at module scope) is what
@@ -108,18 +140,35 @@ try {
     await server.ssrLoadModule("/src/modules/staff/services/staffSampleData.ts");
   const { default: DutyPlannerGrid } = await server.ssrLoadModule("/src/modules/staff/components/duty-planner/DutyPlannerGrid.tsx");
   const { getShiftConfigsForRole } = await server.ssrLoadModule("/src/modules/staff/services/staffService.ts");
+  const { I18nProvider } = await server.ssrLoadModule("/src/i18n/index.tsx");
 
   const week = buildSampleDutyWeek("2026-09-07");
   const weekDays = week.days.map((d) => d.date);
-  const getAssignment = (employeeId, date) => week.assignments.find((a) => a.employeeId === employeeId && a.date === date);
+  // The grid consumes resolved cells (leave beats saved duty — dutyRules), not
+  // raw assignments; build the resolver exactly the way the page does.
+  const getDutyCell = (employeeId, date) => {
+    const assignment = week.assignments.find((a) => a.employeeId === employeeId && a.date === date);
+    if (!assignment) return undefined;
+    return {
+      date,
+      dutyType: assignment.dutyType ?? null,
+      assignedDutyType: assignment.dutyType ?? null,
+      isLeave: false,
+      vehicleNo: assignment.vehicleNo ?? "",
+    };
+  };
   const html = renderToString(
-    React.createElement(DutyPlannerGrid, {
-      employees: week.employees,
-      weekDays,
-      getAssignment,
-      onCellClick: () => {},
-      loading: false,
-    })
+    React.createElement(
+      I18nProvider,
+      null,
+      React.createElement(DutyPlannerGrid, {
+        employees: week.employees,
+        weekDays,
+        getDutyCell,
+        onCellClick: () => {},
+        loading: false,
+      })
+    )
   );
   const namesShown = week.employees.filter((e) => html.includes(e.employeeName)).length;
   const ok = namesShown === week.employees.length;
@@ -194,18 +243,27 @@ try {
   console.log(`     month duties: ${month.days.length} days × ${Object.keys(month.byEmployee).length} employees  (Karthik: ${karthikWork}d duty, ${karthikLeave}d leave; Ravi: ${raviOff}d off)`);
   if (!monthOk || raviOff < 1) failed.push({ name: "month-duties", err: new Error(`month duties matrix wrong (raviOff=${raviOff})`) });
 
-  // PDF report: generate a real PDF from the month data.
-  const { buildMonthDutiesPdf, todayStr } = await server.ssrLoadModule(
-    "/src/modules/staff/services/dutyReportPdf.ts"
+  // Excel report: generate a real workbook from the month data (the export
+  // button's module — mirrors the table: employee rows, date columns, counts).
+  const { buildDutyWorkbook } = await server.ssrLoadModule(
+    "/src/modules/staff/services/dutyReportExcel.ts"
   );
-  const pdfDoc = buildMonthDutiesPdf({ data: month, employees: SAMPLE_EMPLOYEE_LIST });
-  const pdfBytes = Buffer.from(pdfDoc.output("arraybuffer"));
+  const { todayStr } = await server.ssrLoadModule("/src/modules/staff/services/dutyReport.ts");
+  const workbook = buildDutyWorkbook({
+    data: {
+      ...month,
+      fromDate: month.days[0].date,
+      toDate: month.days[month.days.length - 1].date,
+    },
+    employees: SAMPLE_EMPLOYEE_LIST,
+  });
+  const excelBytes = Buffer.from(await workbook.xlsx.writeBuffer());
   const today = todayStr();
   const futureDays = month.days.filter((d) => d.date > today).length;
-  const pdfOk =
-    Boolean(pdfBytes && pdfBytes.length > 8000 && pdfBytes.subarray(0, 5).toString("latin1") === "%PDF-");
-  console.log(`     pdf report: ${pdfOk ? "valid PDF" : "FAILED"} ${pdfBytes?.length ?? 0} bytes  (${futureDays} future day(s) shown blank, not counted)`);
-  if (!pdfOk) failed.push({ name: "pdf-report", err: new Error("pdf generation failed") });
+  const excelOk =
+    Boolean(excelBytes && excelBytes.length > 4000 && excelBytes.subarray(0, 2).toString("latin1") === "PK");
+  console.log(`     excel report: ${excelOk ? "valid XLSX" : "FAILED"} ${excelBytes?.length ?? 0} bytes  (${futureDays} future day(s) shown blank, not counted)`);
+  if (!excelOk) failed.push({ name: "excel-report", err: new Error("excel generation failed") });
 
   // Grid shows friendly labels ("Duty"/"Leave") and NOT the raw types
   // ("Delivery"/"Rest"); custom "Other" types render as typed.

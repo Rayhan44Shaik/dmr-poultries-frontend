@@ -40,6 +40,7 @@
     "test:e2e": "playwright test",
     "mock:backend": "node scripts/quarter-sample-data.mjs",
     "verify:quarter-data": "node scripts/verify-quarter-sample-data.mjs",
+    "verify:staff-sync": "node scripts/verify-staff-sync.mjs",
     "mock:trips": "node scripts/dev-mock-backend.mjs",
     "smoke": "node scripts/ssr-smoke.mjs",
     "check:dashboard-sync": "node scripts/dashboard-sync-check.runner.mjs",
