@@ -272,6 +272,11 @@ function CollectionEntries({
     [entered]
   );
 
+  // The day's own average bird weight comes from the collection container, so
+  // an ordered row shows its weight before it is assigned to a vehicle (the
+  // vehicle's own average takes over once the row has an assignment).
+  const dayAvgBirdWeight = Number(collection?.trip.avgBirdWeight) || 0;
+
   // ── Row updates (editable days only) ─────────────────────────────────────
   const updateEntry = useCallback(
     (shopId: number, field: "birds" | "boxes", raw: string) => {
@@ -794,9 +799,15 @@ function CollectionEntries({
                       )}
                     </td>
                     <td className={`${opsTableTdClass} text-right`}>
-                      {assignment && assignment.avgBirdWeight > 0 && birds > 0 ? (
+                      {/* The ORDERED weight of the row: the shop's birds against
+                          the vehicle's average bird weight once it is assigned,
+                          and the day's own average before that — so a collected
+                          row never shows a dash when its birds are known. */}
+                      {birds > 0 && (assignment?.avgBirdWeight ?? dayAvgBirdWeight) > 0 ? (
                         <span className="font-medium text-slate-600">
-                          {formatKg(weightForBirds(birds, assignment.avgBirdWeight))}
+                          {formatKg(
+                            weightForBirds(birds, assignment?.avgBirdWeight ?? dayAvgBirdWeight)
+                          )}
                         </span>
                       ) : (
                         <span

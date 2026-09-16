@@ -38,11 +38,18 @@ export function formatSaleRate(rate: number | null | undefined): string {
   return Number.isFinite(r) ? `₹${r.toFixed(2)}` : "₹0.00";
 }
 
-/** Amount display — ₹5,330 / ₹5,330.50 (en-IN grouping, backend value). */
+/**
+ * Amount display — ₹5,330.00 (en-IN grouping, always two decimals, backend
+ * value). The money column sits next to RATE (₹125.00) and the totals row, so
+ * a fixed scale keeps every figure in the column aligned and comparable.
+ */
 export function formatSaleAmount(amount: number): string {
   const a = Number(amount);
-  if (!Number.isFinite(a)) return "₹0";
-  return `₹${a.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
+  if (!Number.isFinite(a)) return "₹0.00";
+  return `₹${a.toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
 }
 
 /** Remark display — "-" when empty, never undefined/null. */

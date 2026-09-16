@@ -42,10 +42,12 @@ describe("formats", () => {
     assert.equal(formatSaleRate(null), "₹0.00");
   });
 
-  it("amount uses en-IN grouping", () => {
-    assert.equal(formatSaleAmount(5330), "₹5,330");
-    assert.equal(formatSaleAmount(5330.5), "₹5,330.5");
-    assert.equal(formatSaleAmount(15351), "₹15,351");
+  it("amount uses en-IN grouping at a fixed two-decimal scale", () => {
+    assert.equal(formatSaleAmount(5330), "₹5,330.00");
+    assert.equal(formatSaleAmount(5330.5), "₹5,330.50");
+    assert.equal(formatSaleAmount(15351), "₹15,351.00");
+    assert.equal(formatSaleAmount(6787.5), "₹6,787.50");
+    assert.equal(formatSaleAmount(Number.NaN), "₹0.00");
   });
 
   it("remark falls back to a dash", () => {
