@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { AlertCircle, ArrowUpRight, WalletCards } from "lucide-react";
+import { AlertCircle, ArrowUpRight, IndianRupee } from "lucide-react";
 import { Link } from "react-router-dom";
 import {
   Bar,
@@ -54,6 +54,15 @@ const PAYMENT_REGISTER_ANIMATION_STYLES = `
   18% { opacity: 0.85; }
   100% { transform: translateX(130%); opacity: 0; }
 }
+@keyframes payment-register-stage-refresh {
+  0% { opacity: 0.76; transform: translateY(4px) scale(0.992); filter: saturate(0.92); }
+  52% { opacity: 1; transform: translateY(0) scale(1.006); filter: saturate(1.08); }
+  100% { opacity: 1; transform: translateY(0) scale(1); filter: saturate(1); }
+}
+@keyframes payment-register-rupee-glow {
+  0%, 100% { transform: scale(1); opacity: 0.32; }
+  50% { transform: scale(1.28); opacity: 0.08; }
+}
 .payment-register-value {
   animation: payment-register-value-pop 720ms cubic-bezier(0.16, 1, 0.3, 1) 160ms both;
   transform-origin: center;
@@ -61,9 +70,17 @@ const PAYMENT_REGISTER_ANIMATION_STYLES = `
 .payment-register-refresh-sheen {
   animation: payment-register-refresh-sheen 1.2s ease-in-out infinite;
 }
+.payment-register-stage-refreshing {
+  animation: payment-register-stage-refresh 1.05s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.payment-register-rupee-glow {
+  animation: payment-register-rupee-glow 1.35s ease-in-out infinite;
+}
 @media (prefers-reduced-motion: reduce) {
   .payment-register-value,
-  .payment-register-refresh-sheen {
+  .payment-register-refresh-sheen,
+  .payment-register-stage-refreshing,
+  .payment-register-rupee-glow {
     animation: none !important;
   }
 }
@@ -146,7 +163,7 @@ function TypeTooltip({
   const payees = Array.isArray(item.payees) ? item.payees : [];
 
   return (
-    <div className="max-h-[12rem] w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white p-3 text-[10px] text-slate-500 shadow-xl shadow-slate-900/12">
+    <div className="max-h-[16rem] w-72 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-3 text-[10px] text-slate-500 shadow-xl shadow-slate-900/12">
       <div className="flex min-w-0 items-start justify-between gap-2 border-b border-slate-100 pb-2">
         <p className="min-w-0 break-words text-[12px] font-bold leading-snug text-slate-800">
           {item.type}
@@ -269,7 +286,7 @@ export default function PaymentRegisterChart({ summary, loading, error }: Paymen
   return (
     <>
       <style>{PAYMENT_REGISTER_ANIMATION_STYLES}</style>
-      <section className="relative flex h-full min-h-[31rem] min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-900/5">
+      <section className="relative z-0 flex h-full min-h-[31rem] min-w-0 flex-col overflow-visible rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-900/5">
         <header className="border-b border-slate-100 bg-gradient-to-r from-slate-50/90 via-white to-sky-50/30 px-4 py-2.5">
           <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
@@ -285,9 +302,14 @@ export default function PaymentRegisterChart({ summary, loading, error }: Paymen
               </p>
             </div>
 
-            <div className="flex shrink-0 items-center gap-1 rounded-lg border border-sky-100 bg-sky-50/65 px-1.5 py-1">
-              <span className="grid h-8 w-8 shrink-0 place-items-center rounded-full bg-white text-sky-600 shadow-sm ring-1 ring-inset ring-sky-100">
-                <WalletCards className="h-4 w-4" aria-hidden="true" />
+            <div className="group flex shrink-0 items-center gap-1.5 rounded-xl border border-sky-100 bg-gradient-to-br from-sky-50 to-white px-1.5 py-1 shadow-xs">
+              <span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-sky-600 shadow-sm ring-1 ring-inset ring-sky-100">
+                <span
+                  className={`absolute inset-0 rounded-full bg-sky-300/25 ${loading ? "payment-register-rupee-glow" : "opacity-0 transition-opacity duration-300 group-hover:opacity-100"}`}
+                  aria-hidden="true"
+                />
+                <span className="absolute inset-1 rounded-full border border-sky-100/80" aria-hidden="true" />
+                <IndianRupee className="relative h-4 w-4" strokeWidth={2.8} aria-hidden="true" />
               </span>
               <p className="leading-tight">
                 <span className="block text-[8px] font-black uppercase tracking-wide text-sky-700">Payments</span>
@@ -305,7 +327,10 @@ export default function PaymentRegisterChart({ summary, loading, error }: Paymen
             <span className="payment-register-refresh-sheen pointer-events-none absolute left-3 right-3 top-2 z-10 h-px rounded-full bg-gradient-to-r from-transparent via-sky-300 to-transparent" aria-hidden="true" />
           ) : null}
 
-          <div key={dataKey} className="min-h-0 flex-1 animate-fade-in rounded-2xl border border-slate-100 bg-slate-50/60 p-2">
+          <div
+            key={`${dataKey}-${loading ? "refreshing" : "ready"}`}
+            className={`min-h-0 flex-1 animate-fade-in rounded-2xl border border-slate-100 bg-slate-50/60 p-2 ${loading ? "payment-register-stage-refreshing" : ""}`}
+          >
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
                 data={chartRows}
@@ -323,7 +348,12 @@ export default function PaymentRegisterChart({ summary, loading, error }: Paymen
                   axisLine={false}
                   tick={{ fill: "#64748b", fontSize: 10, fontWeight: 700 }}
                 />
-                <Tooltip content={<TypeTooltip />} cursor={{ fill: "rgba(226,232,240,0.35)" }} />
+                <Tooltip
+                  content={<TypeTooltip />}
+                  cursor={{ fill: "rgba(226,232,240,0.35)" }}
+                  allowEscapeViewBox={{ x: true, y: true }}
+                  wrapperStyle={{ zIndex: 60, pointerEvents: "none", outline: "none" }}
+                />
                 <Bar
                   dataKey="amount"
                   radius={[0, 12, 12, 0]}
