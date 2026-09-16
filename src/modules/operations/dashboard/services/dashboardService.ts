@@ -94,6 +94,13 @@ export interface DashboardData {
   sampleQuarter: SampleQuarter | null;
 }
 
+export interface CollectionRecoverySnapshot {
+  rows: CollectionPerformanceDatum[];
+  totalSales: number;
+  totalCollections: number;
+  totalPending: number;
+}
+
 function toNumber(value: unknown): number {
   const n = Number(value);
   return Number.isFinite(n) ? n : 0;
@@ -265,13 +272,9 @@ function deriveLegacyCollectionPerformance(
       outstandingAmount: 0,
     };
     current.outstandingAmount += toNumber(pending.pendingAmount);
-    current.salesAmount = Math.max(current.salesAmount, current.outstandingAmount);
     byShop.set(key, current);
   }
-  return [...byShop.values()].map((row) => ({
-    ...row,
-    collectionAmount: Math.max(0, row.salesAmount - row.outstandingAmount),
-  }));
+  return [...byShop.values()];
 }
 
 /** Map API fields onto the existing dashboard UI shape. */
@@ -354,6 +357,50 @@ export async function loadOperationsDashboard(
     // stores the entry flows write to, so the overview stays usable when the
     // local PostgreSQL backend is not running.
     return offlineDashboard();
+  }
+}
+
+function dashboardDateParams(fromDate?: string, toDate?: string): Record<string, string> | undefined {
+  const params: Record<string, string> = {};
+  if (fromDate) params.fromDate = fromDate;
+  if (toDate) params.toDate = toDate;
+  return Object.keys(params).length > 0 ? params : undefined;
+}
+
+function parseDashboardDate(value?: string): Date | null {
+  if (!value) return null;
+  const parsed = new Date(`${value}T00:00:00`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function toCollectionRecoverySnapshot(data: DashboardData): CollectionRecoverySnapshot {
+  return {
+    rows: data.collectionPerformanceByShop,
+    totalSales: data.totalSalesAmount,
+    totalCollections: data.totalCollections,
+    totalPending: data.pendingCollections,
+  };
+}
+
+/** Refreshes only the Collection Recovery card data. */
+export async function loadCollectionRecoveryData(
+  fromDate?: string,
+  toDate?: string,
+): Promise<CollectionRecoverySnapshot> {
+  try {
+    const { data } = await apiGet<OperationsDashboardApiResponse>(DASHBOARD_PATH, {
+      params: dashboardDateParams(fromDate, toDate),
+    });
+    return toCollectionRecoverySnapshot(
+      await enrichOperationsDashboardData(mapDashboardResponse(data)),
+    );
+  } catch {
+    if (import.meta.env.DEV) {
+      return toCollectionRecoverySnapshot(
+        demoDashboard(parseDashboardDate(fromDate), parseDashboardDate(toDate)),
+      );
+    }
+    throw new Error("Unable to refresh collection recovery data");
   }
 }
 

@@ -4,7 +4,9 @@ import { Link } from "react-router-dom";
 
 import { useI18n } from "../../../../i18n";
 import { formatINR, formatINRCompact } from "../../../../utils/format";
+import { BrandRefreshButton, Button } from "../../../../ui";
 import MasterDropdown, { type MasterDropdownOption } from "../../../masters/components/MasterDropdown";
+import { loadCollectionRecoveryData, type CollectionRecoverySnapshot } from "../services/dashboardService";
 import {
   collectionRecoveryPercentage,
   normalizeCollectionPerformance,
@@ -168,6 +170,8 @@ export default function CollectionPerformanceChart({
   const [selectedShop, setSelectedShop] = useState("");
   const [sortAnimationId, setSortAnimationId] = useState(0);
   const [shopTooltip, setShopTooltip] = useState<ShopTooltipState | null>(null);
+  const [localSnapshot, setLocalSnapshot] = useState<{ key: string; snapshot: CollectionRecoverySnapshot } | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
   const chartRef = useRef<HTMLElement | null>(null);
 
   const sortOptions = useMemo<MasterDropdownOption[]>(
@@ -210,7 +214,18 @@ export default function CollectionPerformanceChart({
     ],
     [t],
   );
-  const rows = useMemo(() => normalizeCollectionPerformance(data), [data]);
+  const propSnapshotKey = useMemo(() => {
+    const firstShop = data[0]?.shopName ?? "";
+    const lastShop = data.at(-1)?.shopName ?? "";
+    return [fromDate, toDate, totalSales, totalCollections, totalPending, data.length, firstShop, lastShop].join("|");
+  }, [data, fromDate, toDate, totalSales, totalCollections, totalPending]);
+  const activeLocalSnapshot = localSnapshot?.key === propSnapshotKey ? localSnapshot.snapshot : null;
+  const sourceRows = activeLocalSnapshot?.rows ?? data;
+  const sourceTotalSales = activeLocalSnapshot?.totalSales ?? totalSales;
+  const sourceTotalCollections = activeLocalSnapshot?.totalCollections ?? totalCollections;
+  const sourceTotalPending = activeLocalSnapshot?.totalPending ?? totalPending;
+
+  const rows = useMemo(() => normalizeCollectionPerformance(sourceRows), [sourceRows]);
   const shopOptions = useMemo<MasterDropdownOption[]>(
     () => rows
       .slice()
@@ -231,6 +246,7 @@ export default function CollectionPerformanceChart({
     () => rows.find((row) => shopKey(row.shopName) === selectedShop) ?? null,
     [rows, selectedShop],
   );
+  const effectiveSelectedShop = selectedRow ? selectedShop : "";
   const visibleRows = useMemo(() => {
     if (!selectedRow) return sortedRows.slice(0, MAX_VISIBLE_SHOPS);
     return [
@@ -241,12 +257,14 @@ export default function CollectionPerformanceChart({
     ];
   }, [selectedRow, selectedShop, sortedRows]);
 
+  const rowSalesTotal = rows.reduce((total, row) => total + safeAmount(row.salesAmount), 0);
+  const rowCollectionsTotal = rows.reduce((total, row) => total + safeAmount(row.collectionAmount), 0);
   const rowPendingTotal = rows.reduce((total, row) => total + safeAmount(row.outstandingAmount), 0);
-  const sales = selectedRow ? safeAmount(selectedRow.salesAmount) : safeAmount(totalSales);
-  const collections = selectedRow ? safeAmount(selectedRow.collectionAmount) : safeAmount(totalCollections);
+  const sales = selectedRow ? safeAmount(selectedRow.salesAmount) : safeAmount(rowSalesTotal || sourceTotalSales);
+  const collections = selectedRow ? safeAmount(selectedRow.collectionAmount) : safeAmount(rowCollectionsTotal || sourceTotalCollections);
   const pending = selectedRow
     ? safeAmount(selectedRow.outstandingAmount)
-    : safeAmount(totalPending ?? rowPendingTotal);
+    : safeAmount(sourceTotalPending ?? rowPendingTotal);
   const recovery = sales > 0 ? (collections / sales) * 100 : collections > 0 ? 100 : 0;
 
   const setSortValue = (value: string) => {
@@ -273,7 +291,23 @@ export default function CollectionPerformanceChart({
     setSortBy("outstanding");
     setSortAnimationId((current) => current + 1);
   };
-  const hasViewFilter = Boolean(selectedShop) || sortBy !== "outstanding";
+  const hasViewFilter = Boolean(effectiveSelectedShop) || sortBy !== "outstanding";
+
+  const refreshChart = async () => {
+    if (refreshing) return;
+    setShopTooltip(null);
+    setRefreshing(true);
+    try {
+      const nextSnapshot = await loadCollectionRecoveryData(fromDate, toDate);
+      setLocalSnapshot({ key: propSnapshotKey, snapshot: nextSnapshot });
+      if (selectedShop && !nextSnapshot.rows.some((row) => shopKey(row.shopName) === selectedShop)) {
+        setSelectedShop("");
+      }
+      setSortAnimationId((current) => current + 1);
+    } finally {
+      setRefreshing(false);
+    }
+  };
 
   const showShopTooltip = (
     row: CollectionPerformanceDatum,
@@ -333,24 +367,21 @@ export default function CollectionPerformanceChart({
 
           <div className="flex w-full min-w-0 flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-center sm:justify-end">
             <div className="flex shrink-0 items-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50/65 px-1.5 py-1">
-              <RecoveryRing value={recovery} size={40} />
-              <div className="leading-tight">
-                <p className="text-[7.5px] font-black uppercase tracking-wide text-emerald-700">
-                  {t("ops.dashboard.collection_performance.recovery")}
-                </p>
-                <p className="text-sm font-black tabular-nums text-slate-900">{recovery.toFixed(1)}%</p>
-              </div>
+              <RecoveryRing value={recovery} size={42} />
+              <p className="text-[8px] font-black uppercase tracking-wide text-emerald-700">
+                {t("ops.dashboard.collection_performance.recovery")}
+              </p>
             </div>
           </div>
         </div>
       </header>
 
       <div className="flex flex-col p-2.5">
-        <div className="mb-2 grid grid-cols-[minmax(0,1.05fr)_minmax(0,0.9fr)_2.25rem] gap-1.5">
+        <div className="mb-2 grid grid-cols-[minmax(0,1fr)_minmax(0,0.82fr)_2rem_2rem] gap-1.5">
           <MasterDropdown
             hideLabel
             label={t("ops.dashboard.collection_performance.shop_label")}
-            value={selectedShop}
+            value={effectiveSelectedShop}
             options={shopOptions}
             onChange={setShopValue}
             placeholder={t("ops.dashboard.collection_performance.all_shops")}
@@ -358,7 +389,7 @@ export default function CollectionPerformanceChart({
             allowClear
             portal={false}
             className="min-w-0"
-            triggerClassName="h-9 rounded-xl border-slate-200 bg-white/95 px-3 text-[11px] font-semibold shadow-xs"
+            triggerClassName="h-8 rounded-lg border-slate-200 bg-white/95 px-2.5 text-[10px] font-semibold shadow-xs"
           />
           <MasterDropdown
             hideLabel
@@ -370,18 +401,26 @@ export default function CollectionPerformanceChart({
             searchable
             portal={false}
             className="min-w-0"
-            triggerClassName="h-9 rounded-xl border-slate-200 bg-white/95 px-3 text-[11px] font-semibold shadow-xs"
+            triggerClassName="h-8 rounded-lg border-slate-200 bg-white/95 px-2.5 text-[10px] font-semibold shadow-xs"
           />
-          <button
-            type="button"
+          <Button
+            variant="outline"
+            size="sm"
+            iconOnly
             onClick={resetView}
             disabled={!hasViewFilter}
             title={t("common.reset")}
             aria-label={t("common.reset")}
-            className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-xs transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <RotateCcw size={13} aria-hidden="true" />
-          </button>
+            icon={<span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={13} aria-hidden="true" /></span>}
+            className="!h-8 !w-8 !rounded-xl border-slate-200 bg-white text-slate-500 shadow-xs hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
+          />
+          <BrandRefreshButton
+            compact
+            loading={refreshing}
+            onClick={refreshChart}
+            ariaLabel={t("common.refresh")}
+            className="!h-8 !w-8 shrink-0"
+          />
         </div>
 
         <div className="grid grid-cols-3 gap-1.5">
@@ -454,18 +493,6 @@ export default function CollectionPerformanceChart({
           </div>
         )}
 
-        <footer className="mt-2 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-1.5 text-[9px] font-semibold text-slate-400">
-          <span className="truncate tabular-nums">
-            {visibleRows.length} / {rows.length} shops
-          </span>
-          <Link
-            to={PENDING_COLLECTIONS_URL}
-            className="inline-flex shrink-0 items-center gap-1 font-black text-emerald-700 hover:underline"
-          >
-            {t("ops.dashboard.collection_performance.open_pending")}
-            <ArrowUpRight size={11} aria-hidden="true" />
-          </Link>
-        </footer>
       </div>
 
       {shopTooltip ? (
