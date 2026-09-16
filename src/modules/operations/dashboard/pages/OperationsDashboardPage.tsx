@@ -11,8 +11,7 @@ import { granularityForRange, type Granularity } from "../utils/trendSeries";
 import CollectionsPie from "../components/CollectionsPie";
 import RecentTripsTable from "../components/RecentTripsTable";
 import ActiveCounts from "../components/ActiveCounts";
-import QuarterOperationsCoverage from "../components/QuarterOperationsCoverage";
-import PendingCollectionsByShop from "../components/PendingCollectionsByShop";
+import CollectionPerformanceChart from "../components/CollectionPerformanceChart";
 import PendingApprovalsPanel from "../components/PendingApprovalsPanel";
 import {
   Calendar,
@@ -795,15 +794,6 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
         actions={headerActions}
       />
 
-      {data.sampleQuarter && data.moduleCounts && calendarFrom && calendarTo ? (
-        <QuarterOperationsCoverage
-          quarter={data.sampleQuarter}
-          counts={data.moduleCounts}
-          fromDate={calendarFrom}
-          toDate={calendarTo}
-        />
-      ) : null}
-
       <div className="relative z-10">
         <KPICards
           current={data}
@@ -883,30 +873,26 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0">
+      <CollectionPerformanceChart
+        data={data.collectionPerformanceByShop}
+        totalSales={data.totalSalesAmount}
+        totalCollections={data.totalCollections}
+        fromDate={calendarFrom}
+        toDate={calendarTo}
+      />
+
+      <div className="bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0">
+        <div className="flex justify-between items-center">
           <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.credit_allocations")}</span>
-            <h3 className="text-sm font-black text-slate-800 mt-0.5">{t("ops.dashboard.outstanding_balances")}</h3>
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.live_infrastructure")}</span>
+            <h3 className="text-sm font-black text-slate-800 mt-0.5">{t("ops.dashboard.recent_transit")}</h3>
           </div>
-          <div className="w-full overflow-hidden">
-            <PendingCollectionsByShop data={data?.pendingCollectionsByShop || []} />
+          <div className="px-2.5 py-1 rounded-full bg-slate-50 border border-slate-100 text-[10px] font-bold text-slate-500 flex items-center gap-1.5">
+            <ArrowRightLeft size={10} className="text-slate-400" /> {t("ops.dashboard.auto_updates")}
           </div>
         </div>
-        
-        <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0">
-          <div className="flex justify-between items-center">
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.live_infrastructure")}</span>
-              <h3 className="text-sm font-black text-slate-800 mt-0.5">{t("ops.dashboard.recent_transit")}</h3>
-            </div>
-            <div className="px-2.5 py-1 rounded-full bg-slate-50 border border-slate-100 text-[10px] font-bold text-slate-500 flex items-center gap-1.5">
-              <ArrowRightLeft size={10} className="text-slate-400" /> {t("ops.dashboard.auto_updates")}
-            </div>
-          </div>
-          <div className="w-full overflow-x-auto text-xs rounded-xl border border-slate-100">
-            <RecentTripsTable trips={data?.recentTrips || []} />
-          </div>
+        <div className="w-full overflow-x-auto text-xs rounded-xl border border-slate-100">
+          <RecentTripsTable trips={data.recentTrips || []} />
         </div>
       </div>
 

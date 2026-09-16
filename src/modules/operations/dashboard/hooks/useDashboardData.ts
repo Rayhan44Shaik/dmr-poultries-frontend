@@ -68,13 +68,12 @@ const initialData: DashboardData = {
   activeHelpers: 0,
   totalShops: 0,
   totalFarms: 0,
-  pendingCollectionsByShop: [],
+  collectionPerformanceByShop: [],
   usedVehicles: 0,
   usedDrivers: 0,
   usedHelpers: 0,
   usedShops: 0,
   usedFarms: 0,
-  moduleCounts: null,
   sampleQuarter: null,
 };
 

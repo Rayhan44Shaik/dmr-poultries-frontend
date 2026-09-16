@@ -113,6 +113,23 @@ async function run() {
   assert.ok(dashboard.moduleCounts.mortalityTrips > 500);
   assert.ok(dashboard.moduleCounts.orders > 0);
   assert.equal(dashboard.usedFarms, manifest.farms, "the Operations quarter must exercise every farm");
+  assert.ok(
+    Array.isArray(dashboard.collectionPerformanceByShop) && dashboard.collectionPerformanceByShop.length > 0,
+    "dashboard must expose selected-period collection performance by shop",
+  );
+  assert.equal(
+    new Set(dashboard.collectionPerformanceByShop.map((row) => row.shopName.toLowerCase())).size,
+    dashboard.collectionPerformanceByShop.length,
+    "collection performance must contain one unique row per shop",
+  );
+  assert.equal(sum(dashboard.collectionPerformanceByShop, "salesAmount"), dashboard.totalSales);
+  assert.equal(sum(dashboard.collectionPerformanceByShop, "collectionAmount"), dashboard.totalCollections);
+  assert.ok(
+    dashboard.collectionPerformanceByShop.every(
+      (row) => row.outstandingAmount === round(Math.max(0, row.salesAmount - row.collectionAmount)),
+    ),
+    "each collection performance gap must equal selected-period sales minus collections",
+  );
 
   const mortalityNewest = await request(
     "/operations/mortality-analysis?sortBy=tripDate&sortDir=desc&page=1&limit=25",
