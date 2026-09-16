@@ -143,17 +143,6 @@ export function useSalaryRegister(month: string, department: string = "") {
     [runMutation]
   );
 
-  /** Bulk Mark as Unpaid — Pending/Submitted stay; Paid reverts only inside
-   *  the 7-day correction window; the batch aborts atomically otherwise. */
-  const markUnpaidBulk = useCallback(
-    (ids: string[]) =>
-      runMutation(
-        () => bulkUpdateSalaryStatus(ids, { status: "Pending" }),
-        `Marked ${ids.length} salary record${ids.length === 1 ? "" : "s"} as unpaid — returned to Pending.`
-      ),
-    [runMutation]
-  );
-
   const generate = useCallback(
     () =>
       runMutation(
@@ -185,7 +174,6 @@ export function useSalaryRegister(month: string, department: string = "") {
     refresh,
     updateRecord,
     markPaidBulk,
-    markUnpaidBulk,
     generate,
     hasRecords: records.length > 0,
   };

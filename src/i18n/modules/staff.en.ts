@@ -372,8 +372,6 @@ export default {
   'staff.view.paid_on': 'Paid on {date}',
   'staff.view.ref': 'Ref {ref}',
   'staff.view.month_closed': 'This payroll month is closed. All records are permanently locked.',
-  'staff.view.correction_open': 'Correction window open — {days} day(s) remaining to mark unpaid.',
-  'staff.view.correction_expired': 'Correction window expired — paid salary is permanently locked.',
   // Salary Register page.
   'staff.register.month': 'Month',
   'staff.register.department': 'Department',

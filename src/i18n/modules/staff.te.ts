@@ -371,8 +371,6 @@ export default {
   'staff.view.paid_on': '{date} న చెల్లించబడింది',
   'staff.view.ref': 'రిఫరెన్స్ {ref}',
   'staff.view.month_closed': 'ఈ జీతాల నెల మూసివేయబడింది. అన్ని రికార్డులు శాశ్వతంగా లాక్ చేయబడ్డాయి.',
-  'staff.view.correction_open': 'సవరణ గడువు తెరిచి ఉంది — చెల్లించలేదని గుర్తించడానికి {days} రోజు(లు) మిగిలి ఉన్నాయి.',
-  'staff.view.correction_expired': 'సవరణ గడువు ముగిసింది — చెల్లించిన జీతం శాశ్వతంగా లాక్ చేయబడింది.',
   // Salary Register page.
   'staff.register.month': 'నెల',
   'staff.register.department': 'విభాగం',

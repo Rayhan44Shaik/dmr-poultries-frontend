@@ -142,6 +142,7 @@ function SalaryRegisterPage() {
   const {
     records,
     allRecords,
+    totals,
     filter,
     setFilter,
     loading,
@@ -529,7 +530,12 @@ function SalaryRegisterPage() {
 
   // Status segmented control — same treatment as the Leave page's status tabs
   // (active = white chip + brand text, inactive = quiet slate).
-  const statusTab = (key: 'All' | 'Pending' | 'Paid', label: string, icon: React.ReactNode) => (
+  const statusTab = (
+    key: 'All' | 'Pending' | 'Paid',
+    label: string,
+    icon: React.ReactNode,
+    count?: number
+  ) => (
     <button
       type="button"
       onClick={() => handleFilterChange(key)}
@@ -542,6 +548,17 @@ function SalaryRegisterPage() {
     >
       {icon}
       {label}
+      {count != null && (
+        <span
+          className={`ml-0.5 rounded-full px-1.5 py-px text-[10px] font-bold tabular-nums leading-4 ${
+            filter === key
+              ? "bg-brand-100 text-brand-700"
+              : "bg-white/80 text-slate-500 ring-1 ring-slate-200"
+          }`}
+        >
+          {count}
+        </span>
+      )}
     </button>
   );
 
@@ -679,9 +696,9 @@ function SalaryRegisterPage() {
               aria-label={t("staff.register.filter_by_status")}
               className="inline-flex h-10 w-full items-center bg-slate-100/80 p-1 rounded-lg border border-slate-200/60"
             >
-              {statusTab("All", t("common.all"), <LayoutGrid size={12} className="text-slate-400" />)}
-              {statusTab("Pending", t("common.pending"), <Clock size={12} className="text-slate-400" />)}
-              {statusTab("Paid", t("common.paid"), <CheckCircle size={12} className="text-slate-400" />)}
+              {statusTab("All", t("common.all"), <LayoutGrid size={12} className="text-slate-400" />, totals.totalEmployees)}
+              {statusTab("Pending", t("common.pending"), <Clock size={12} className="text-slate-400" />, totals.pendingCount)}
+              {statusTab("Paid", t("common.paid"), <CheckCircle size={12} className="text-slate-400" />, totals.paidCount)}
             </div>
           </div>
         </div>

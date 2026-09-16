@@ -72,10 +72,6 @@ type SalaryTableProps = {
 
 function StatusBadge({ record }: { record: SalaryRecord }) {
   const { t } = useI18n();
-  const windowOpen =
-    isSalaryPaid(record) &&
-    record.correctionWindowDaysRemaining != null &&
-    record.correctionWindowDaysRemaining > 0;
 
   if (!isSalaryPaid(record)) {
     return (
@@ -84,12 +80,13 @@ function StatusBadge({ record }: { record: SalaryRecord }) {
       </span>
     );
   }
-  // Paid
+  // Paid — a submitted month is final. Lock icon only when the whole month
+  // is closed; no correction-window state exists on this page anymore.
   return (
-    <span className={uiBadgeClass(record.monthClosed || !windowOpen ? "neutral" : "success")}>
+    <span className={uiBadgeClass(record.monthClosed ? "neutral" : "success")}>
       <CheckCircle2 size={11} />
       {t("common.paid")}
-      {(record.monthClosed || !windowOpen) && <Lock size={10} />}
+      {record.monthClosed && <Lock size={10} />}
     </span>
   );
 }
@@ -278,10 +275,6 @@ export function SalaryTable({
           </thead>
           <tbody className="divide-y divide-slate-100">
             {currentRecords.map((record, index) => {
-              const windowOpen =
-                isSalaryPaid(record) &&
-                record.correctionWindowDaysRemaining != null &&
-                record.correctionWindowDaysRemaining > 0;
               const serialNo = startIndex + index + 1;
 
               return (
@@ -319,11 +312,6 @@ export function SalaryTable({
                   <td className="px-3 py-4 text-left text-[13px] font-bold tabular-nums text-emerald-700 whitespace-nowrap">{formatVal(record.netSalary)}</td>
                   <td className="px-3 py-4 whitespace-nowrap">
                     <StatusBadge record={record} />
-                    {windowOpen && (
-                      <span className="ml-1 text-[10px] text-amber-600">
-                        {record.correctionWindowDaysRemaining}d
-                      </span>
-                    )}
                   </td>
                   {/* Payslip sent-counts — ONE small column AFTER Status holding
                       both the Mail and WhatsApp mini pills side by side. Each

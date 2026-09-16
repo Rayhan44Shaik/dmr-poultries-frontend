@@ -15,7 +15,7 @@
 // notices AND the payslip sheet labels/names — the A4 PDF stays in English
 // and the app behind keeps the global language.
 
-import { Lock, Info, FileText, CheckCircle2, X, Loader2 } from "lucide-react";
+import { Lock, FileText, CheckCircle2, X, Loader2 } from "lucide-react";
 import type { SalaryRecord } from "../../types/staffDashboard";
 import { Modal } from "../../../../ui";
 import { useI18n } from "../../../../i18n";
@@ -68,11 +68,6 @@ function SalaryViewBody({
 
   const values = toAmountValues(record);
   const totals = computePayslipTotals(values);
-
-  const correctionOpen =
-    isSalaryPaid(record) &&
-    record.correctionWindowDaysRemaining != null &&
-    record.correctionWindowDaysRemaining > 0;
 
   const monthLabel = (() => {
     if (!record.month) return "";
@@ -154,22 +149,6 @@ function SalaryViewBody({
           <div className="mx-auto mt-4 flex max-w-[760px] items-center gap-2 rounded-xl border border-slate-200 bg-slate-100 p-3 text-xs text-slate-600">
             <Lock size={14} className="shrink-0" />
             <span>{t("staff.view.month_closed")}</span>
-          </div>
-        )}
-        {isSalaryPaid(record) && !record.monthClosed && (
-          <div
-            className={`mx-auto mt-4 flex max-w-[760px] items-center gap-2 rounded-xl border p-3 text-xs ${
-              correctionOpen
-                ? "border-amber-200 bg-amber-50 text-amber-800"
-                : "border-slate-200 bg-slate-100 text-slate-600"
-            }`}
-          >
-            {correctionOpen ? <Info size={14} className="shrink-0" /> : <Lock size={14} className="shrink-0" />}
-            <span>
-              {correctionOpen
-                ? t("staff.view.correction_open", { days: record.correctionWindowDaysRemaining ?? 0 })
-                : t("staff.view.correction_expired")}
-            </span>
           </div>
         )}
       </div>
