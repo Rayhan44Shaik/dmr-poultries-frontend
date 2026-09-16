@@ -1,11 +1,14 @@
 // src/modules/operations/fuel-expenses/components/FuelEntryForm.tsx
 
-import { useState, useEffect, useImperativeHandle, forwardRef, useRef } from "react";
+import React, { useState, useEffect, useImperativeHandle, forwardRef, useRef } from "react";
 import Select from "react-select";
 import { MapPin, Upload, X, Loader2, Fuel } from "lucide-react";
 import type { FuelExpense, FuelExpenseDraft } from "../types/fuelExpense";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { opsReactSelectStyles } from "../../../../shared/ui/operationsStyles";
+import { useI18n } from "../../../../i18n";
+import { localizeTripViewText } from "../../vehicle-trips/utils/tripViewLocalization";
+import { formatVehicleNumber } from "../../../../utils/format";
 
 interface Props {
   onSave: (data: FuelExpenseDraft) => void;
@@ -30,6 +33,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
   drivers,
   onCancel,
 }, ref) => {
+  const { t, language } = useI18n();
   const { showNotification } = useSafeNotification();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -116,8 +120,15 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
     resetForm,
   }));
 
-  const vehicleOptions = activeVehicles.map((v) => ({ value: v.id, label: v.vehicleNumber }));
-  const driverOptions = drivers.map((d) => ({ value: d.id, label: d.employeeName }));
+  const vehicleOptions = activeVehicles.map((v) => ({
+    value: v.id,
+    label: localizeTripViewText(formatVehicleNumber(v.vehicleNumber), language),
+  }));
+
+  const driverOptions = drivers.map((d) => ({
+    value: d.id,
+    label: localizeTripViewText(d.employeeName, language),
+  }));
 
   const selectStyles = opsReactSelectStyles();
 
@@ -138,15 +149,15 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
     setFileError(null);
     if (!file) return;
     if (file.size === 0) {
-      setFileError("Bill photo is empty.");
+      setFileError(language === "te" ? "బిల్లు ఫోటో ఖాళీగా ఉంది." : "Bill photo is empty.");
       return;
     }
     if (file.size > 1_048_576) {
-      setFileError("Bill photo exceeds 1 MB.");
+      setFileError(language === "te" ? "బిల్లు ఫోటో 1 MB కంటే ఎక్కువ ఉంది." : "Bill photo exceeds 1 MB.");
       return;
     }
     if (!/^image\/(jpeg|jpg|png)$/i.test(file.type)) {
-      setFileError("Bill photo must be a JPEG or PNG image.");
+      setFileError(language === "te" ? "బిల్లు ఫోటో JPEG లేదా PNG చిత్రంగా ఉండాలి." : "Bill photo must be a JPEG or PNG image.");
       return;
     }
     const reader = new FileReader();
@@ -166,8 +177,9 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
 
   const fetchGPSLocation = () => {
     if (!navigator.geolocation) {
-      setGpsError("Geolocation is not supported.");
-      showNotification("Geolocation not supported.", "error");
+      const msg = language === "te" ? "జియోలొకేషన్ మద్దతు లేదు." : "Geolocation is not supported.";
+      setGpsError(msg);
+      showNotification(msg, "error");
       return;
     }
     setIsFetchingLocation(true);
@@ -196,10 +208,10 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
       (err) => {
         const message =
           err.code === err.PERMISSION_DENIED
-            ? "GPS permission denied."
+            ? (language === "te" ? "GPS అనుమతి నిరాకరించబడింది." : "GPS permission denied.")
             : err.code === err.TIMEOUT
-              ? "GPS timed out."
-              : "GPS location unavailable.";
+              ? (language === "te" ? "GPS సమయం ముగిసింది." : "GPS timed out.")
+              : (language === "te" ? "GPS స్థానం అందుబాటులో లేదు." : "GPS location unavailable.");
         setGpsError(message);
         showNotification(message, "error");
         setIsFetchingLocation(false);
@@ -210,7 +222,10 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
 
   const handleSubmit = () => {
     if (!date || !vehicleId || litres <= 0 || rate <= 0) {
-      showNotification("Please fill date, vehicle, litres, and rate.", "error");
+      showNotification(
+        language === "te" ? "దయచేసి తేదీ, వాహనం, లీటర్లు మరియు రేటును పూరించండి." : "Please fill date, vehicle, litres, and rate.",
+        "error"
+      );
       return;
     }
     if (fileError) {
@@ -265,13 +280,13 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
               <Fuel size={18} />
             </div>
             <h3 className="text-sm font-bold text-slate-800">
-              {editingId ? "Edit Fuel Bill" : "Add Fuel Bill (Manual Entry)"}
+              {editingId ? t("ops.fuel.edit_bill") : t("ops.fuel.add_bill_manual")}
             </h3>
           </div>
           {onCancel && (
             <button
               onClick={onCancel}
-              className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition"
+              className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition cursor-pointer"
             >
               <X size={18} />
             </button>
@@ -282,7 +297,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
           {/* Date */}
           <div>
             <label className="text-xs font-semibold text-slate-600 block mb-1">
-              Date <span className="text-red-500">*</span>
+              {t("common.date")} <span className="text-red-500">*</span>
             </label>
             <input
               type="date"
@@ -295,14 +310,14 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
           {/* Vehicle */}
           <div>
             <label className="text-xs font-semibold text-slate-600 block mb-1">
-              Vehicle <span className="text-red-500">*</span>
+              {t("common.vehicle")} <span className="text-red-500">*</span>
             </label>
             <Select
               options={vehicleOptions}
               value={vehicleOptions.find((opt) => opt.value === vehicleId) || null}
               onChange={handleVehicleChange}
               isSearchable
-              placeholder="Select Vehicle"
+              placeholder={t("ops.fuel.select_vehicle")}
               styles={selectStyles}
             />
           </div>
@@ -310,7 +325,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
           {/* Driver */}
           <div>
             <label className="text-xs font-semibold text-slate-600 block mb-1">
-              Driver <span className="text-red-500">*</span>
+              {t("common.driver")} <span className="text-red-500">*</span>
             </label>
             <Select
               options={driverOptions}
@@ -323,7 +338,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
                 }
               }}
               isSearchable
-              placeholder="Select Driver"
+              placeholder={t("ops.fuel.select_driver")}
               styles={selectStyles}
             />
           </div>
@@ -331,7 +346,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
           {/* Meter Reading */}
           <div>
             <label className="text-xs font-semibold text-slate-600 block mb-1">
-              Meter Reading (KM) <span className="text-red-500">*</span>
+              {t("ops.fuel.meter_km")} <span className="text-red-500">*</span>
             </label>
             <input
               type="number"
@@ -341,14 +356,16 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
               placeholder="0"
             />
             {minMeterReading > 0 && (
-              <div className="text-[10px] text-slate-400 mt-0.5">Minimum allowed: {minMeterReading} KM</div>
+              <div className="text-[10px] text-slate-400 mt-0.5">
+                {t("ops.fuel.min_meter_hint", { min: minMeterReading })}
+              </div>
             )}
           </div>
 
           {/* Litres */}
           <div>
             <label className="text-xs font-semibold text-slate-600 block mb-1">
-              Fuel Quantity (Litres) <span className="text-red-500">*</span>
+              {t("ops.fuel.litres")} <span className="text-red-500">*</span>
             </label>
             <input
               type="number"
@@ -363,7 +380,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
           {/* Rate */}
           <div>
             <label className="text-xs font-semibold text-slate-600 block mb-1">
-              Fuel Rate (₹/Litre) <span className="text-red-500">*</span>
+              {t("ops.fuel.rate_per_l")} <span className="text-red-500">*</span>
             </label>
             <input
               type="number"
@@ -378,7 +395,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
           {/* Amount (preview) */}
           <div>
             <label className="text-xs font-semibold text-slate-600 block mb-1">
-              Amount (₹) — litres × rate
+              {t("ops.fuel.amount_formula")}
             </label>
             <input
               type="number"
@@ -392,7 +409,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
           {/* Petrol Bunk with GPS button */}
           <div className="lg:col-span-2">
             <label className="text-xs font-semibold text-slate-600 block mb-1">
-              Petrol Bunk <span className="text-red-500">*</span>
+              {t("ops.fuel.petrol_bunk")} <span className="text-red-500">*</span>
             </label>
             <div className="flex items-center gap-2">
               <input
@@ -400,7 +417,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
                 value={petrolBunk}
                 onChange={(e) => setPetrolBunk(e.target.value)}
                 className="flex-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500"
-                placeholder="Enter bunk name"
+                placeholder={t("ops.fuel.enter_bunk")}
               />
               <button
                 type="button"
@@ -414,17 +431,21 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
             </div>
             {gpsLat != null && gpsLon != null ? (
               <div className="text-[10px] text-emerald-700 mt-1">
-                GPS captured: {gpsLat.toFixed(6)}, {gpsLon.toFixed(6)}
+                {t("ops.fuel.gps_captured", { coords: `${gpsLat.toFixed(6)}, ${gpsLon.toFixed(6)}` })}
               </div>
             ) : (
-              <div className="text-[10px] text-slate-400 mt-1">GPS not captured</div>
+              <div className="text-[10px] text-slate-400 mt-1">
+                {t("ops.fuel.gps_not_captured")}
+              </div>
             )}
             {gpsError && <div className="text-[10px] text-red-600 mt-1">{gpsError}</div>}
           </div>
 
           {/* Image Upload */}
           <div>
-            <label className="text-xs font-semibold text-slate-600 block mb-1">Bill Receipt Photo</label>
+            <label className="text-xs font-semibold text-slate-600 block mb-1">
+              {t("ops.fuel.receipt_document")}
+            </label>
             <div className="flex items-center gap-2">
               <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageChange} className="hidden" />
               <button
@@ -432,7 +453,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
                 onClick={() => fileInputRef.current?.click()}
                 className="px-3 py-2 bg-slate-100 text-slate-700 rounded-lg border border-slate-200 text-sm font-medium hover:bg-slate-200 transition cursor-pointer"
               >
-                <Upload size={16} className="inline mr-1" /> Upload
+                <Upload size={16} className="inline mr-1" /> {t("ops.fuel.upload")}
               </button>
               {image && (
                 <button type="button" onClick={removeImage} className="text-red-500 hover:text-red-700 cursor-pointer">
@@ -450,13 +471,15 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
 
           {/* Remarks */}
           <div className="lg:col-span-2">
-            <label className="text-xs font-semibold text-slate-600 block mb-1">Remarks (Optional)</label>
+            <label className="text-xs font-semibold text-slate-600 block mb-1">
+              {t("ops.fuel.remarks_operator_notes")}
+            </label>
             <input
               type="text"
               value={remarks}
               onChange={(e) => setRemarks(e.target.value)}
               className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500"
-              placeholder="Any remarks..."
+              placeholder={t("ops.fuel.enter_remarks")}
             />
           </div>
         </div>
@@ -468,7 +491,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
               onClick={onCancel}
               className="px-4 py-2 border border-slate-300 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
             >
-              Cancel
+              {t("common.cancel")}
             </button>
           )}
           <button
@@ -476,7 +499,7 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
             onClick={handleSubmit}
             className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold shadow-sm transition active:scale-95 cursor-pointer"
           >
-            {editingId ? "Update Bill" : "Save Fuel Bill"}
+            {editingId ? t("ops.fuel.update_bill") : t("ops.fuel.save_bill")}
           </button>
         </div>
       </div>

@@ -5,10 +5,12 @@ import {
   type FuelListSummary,
 } from "../services/fuelExpenseService";
 import type { FuelExpense, FuelExpenseDraft } from "../types/fuelExpense";
+import { useI18n } from "../../../../i18n";
 
 type NotificationFn = (msg: string, type?: "success" | "error" | "info") => void;
 
 export function useFuelExpenses(showNotification?: NotificationFn) {
+  const { t } = useI18n();
   const [expenses, setExpenses] = useState<FuelExpense[]>([]);
   const [deletedMap, setDeletedMap] = useState<Map<string, FuelExpense>>(new Map());
   const [meta, setMeta] = useState<FuelListMeta>({ total: 0, page: 1, limit: 1000, totalPages: 1 });
@@ -71,7 +73,7 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
     setIsSaving(true);
     try {
       await fuelExpenseService.save(expense);
-      showNotification?.("Fuel bill saved successfully!", "success");
+      showNotification?.(t("ops.fuel.refreshed"), "success");
       await refresh();
       return true;
     } catch (err) {
@@ -86,7 +88,7 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
     setIsSaving(true);
     try {
       await fuelExpenseService.update(id, updates);
-      showNotification?.("Fuel bill updated successfully!", "success");
+      showNotification?.(t("ops.fuel.refreshed"), "success");
       await refresh();
       return true;
     } catch (err) {
@@ -114,7 +116,7 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
           prev.map((e) => (e.id === id ? deletedRecord : e))
         );
       }
-      showNotification?.("Fuel bill deleted successfully!", "success");
+      showNotification?.(t("ops.fuel.deleted_success"), "success");
       return true;
     } catch (err) {
       showNotification?.(err instanceof Error ? err.message : "Failed to delete fuel bill.", "error");
@@ -128,7 +130,7 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
     setIsSaving(true);
     try {
       await fuelExpenseService.approve(id);
-      showNotification?.("Fuel bill approved successfully!", "success");
+      showNotification?.(t("ops.fuel.approved_success"), "success");
       await refresh();
       return true;
     } catch (err) {

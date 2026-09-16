@@ -23,6 +23,7 @@ import {
 } from "../utils/filterFuelExpenses";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
+import { useI18n } from "../../../../i18n";
 import { formatVehicleNumber } from "../../../../utils/format";
 import type { MasterDropdownOption } from "../../../masters/components/MasterDropdown";
 
@@ -32,6 +33,7 @@ const ALL_VEHICLES = "All Vehicles";
 const ALL_DRIVERS = "All Drivers";
 
 function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
+  const { t, language } = useI18n();
   const { showNotification } = useSafeNotification();
   const { vehicles: masterVehicles } = useVehicles();
   const { employees: masterEmployees } = useEmployees();
@@ -228,8 +230,8 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     setSortDir("asc");
     setCurrentPage(1);
     setSelectedId(null);
-    showNotification("Filters have been reset.", "info");
-  }, [showNotification]);
+    showNotification(t("ops.fuel.filters_reset"), "info");
+  }, [showNotification, t]);
 
   // ── Check if bill is editable/deletable (Pending manual bill within 10 days) ──
   const canEditDelete = useCallback((bill: FuelExpense): boolean => {
@@ -249,29 +251,29 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
       setViewingBill(target);
       setViewModalOpen(true);
     } else {
-      showNotification("No fuel bill selected.", "info");
+      showNotification(language === "te" ? "దయచేసి చూడటానికి ఒక బిల్లును ఎంచుకోండి." : "Please select a fuel bill to view.", "info");
     }
-  }, [selectedBill, showNotification]);
+  }, [selectedBill, showNotification, language]);
 
   const handleEdit = useCallback((bill?: FuelExpense) => {
     const target = bill || selectedBill;
     if (!target) return;
     if (target.sourceType === "TRIP" || !!target.tripNo) {
-      showNotification("Trip diesel bills are linked to trips and auto-approved on trip completion.", "info");
+      showNotification(t("ops.fuel.cant_delete_trip_diesel"), "info");
       return;
     }
     if (target.status === "Approved") {
-      showNotification("Approved fuel bills cannot be edited.", "info");
+      showNotification(language === "te" ? "ఆమోదించిన ఇంధన బిల్లులను సవరించలేము." : "Approved fuel bills cannot be edited.", "info");
       return;
     }
     if (!canEditDelete(target)) {
-      showNotification("Edit not allowed – bill is older than 10 days.", "error");
+      showNotification(language === "te" ? "సవరణ అనుమతించబడదు – బిల్లు 10 రోజుల కంటే పాతది." : "Edit not allowed – bill is older than 10 days.", "error");
       return;
     }
     setEditingId(target.id);
     setEditingData(target);
     setShowForm(true);
-  }, [selectedBill, canEditDelete, showNotification]);
+  }, [selectedBill, canEditDelete, showNotification, language, t]);
 
   // ── Delayed 10-Second Pending Delete with Undo ──
   const { requestDelete, cancel, pendingItems } = usePendingDelete<string>(async (id) => {
@@ -283,34 +285,36 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     const target = bill || selectedBill;
     if (!target) return;
     if (target.sourceType === "TRIP" || !!target.tripNo) {
-      showNotification("Trip diesel bills are part of completed trips and cannot be deleted here.", "info");
+      showNotification(t("ops.fuel.cant_delete_trip_diesel"), "info");
       return;
     }
     if (target.status === "Approved") {
-      showNotification("Approved fuel bills cannot be deleted.", "info");
+      showNotification(t("ops.fuel.cant_delete_approved"), "info");
       return;
     }
     if (!canEditDelete(target)) {
-      showNotification("Delete not allowed – bill is older than 10 days.", "error");
+      showNotification(t("ops.fuel.cant_delete_old"), "error");
       return;
     }
-    requestDelete(target.id, { label: `Deleting fuel bill ${target.billNo}` });
-  }, [selectedBill, canEditDelete, requestDelete, showNotification]);
+    requestDelete(target.id, {
+      label: language === "te" ? `ఇంధన బిల్లును తొలగిస్తోంది ${target.billNo}` : `Deleting fuel bill ${target.billNo}`,
+    });
+  }, [selectedBill, canEditDelete, requestDelete, showNotification, language, t]);
 
   const handleApprove = useCallback((bill?: FuelExpense) => {
     const target = bill || selectedBill;
     if (!target) return;
     if (target.sourceType === "TRIP" || !!target.tripNo) {
-      showNotification("Trip diesel bills are auto-approved upon trip completion.", "info");
+      showNotification(t("ops.fuel.trip_diesel_auto_approved"), "info");
       return;
     }
     if (target.status === "Approved") {
-      showNotification("Bill is already approved.", "info");
+      showNotification(t("ops.fuel.already_approved"), "info");
       return;
     }
     void approveExpense(target.id);
     setSelectedId(null);
-  }, [selectedBill, approveExpense, showNotification]);
+  }, [selectedBill, approveExpense, showNotification, t]);
 
   // ── Export Handlers ──
   const handleExportPDF = useCallback(async () => {
@@ -318,7 +322,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     exportBusyRef.current = "pdf";
     try {
       if (allFilteredBills.length === 0) {
-        showNotification("No fuel bills to export.", "error");
+        showNotification(t("ops.fuel.no_export_records"), "error");
         return;
       }
       const headers = [
@@ -372,20 +376,20 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
         ],
         numericColumns: [6, 7, 8, 9],
       });
-      showNotification("PDF exported successfully!", "success");
+      showNotification(t("ops.fuel.pdf_exported"), "success");
     } catch {
-      showNotification("Failed to export PDF.", "error");
+      showNotification(t("ops.fuel.pdf_failed"), "error");
     } finally {
       exportBusyRef.current = null;
     }
-  }, [allFilteredBills, fromDate, toDate, vehicle, driver, sourceType, quickTab, summaryTotals, showNotification]);
+  }, [allFilteredBills, fromDate, toDate, vehicle, driver, sourceType, quickTab, summaryTotals, showNotification, t]);
 
   const handleExportExcel = useCallback(async () => {
     if (exportBusyRef.current) return;
     exportBusyRef.current = "excel";
     try {
       if (allFilteredBills.length === 0) {
-        showNotification("No fuel bills to export.", "error");
+        showNotification(t("ops.fuel.no_export_records"), "error");
         return;
       }
       const headers = [
@@ -418,19 +422,19 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
       ]);
       const filename = `Fuel_Expenses_${new Date().toISOString().split("T")[0]}`;
       exportToExcel("Fuel Expenses Register", headers, rows, filename);
-      showNotification("Excel exported successfully!", "success");
+      showNotification(t("ops.fuel.excel_exported"), "success");
     } catch {
-      showNotification("Failed to export Excel.", "error");
+      showNotification(t("ops.fuel.excel_failed"), "error");
     } finally {
       exportBusyRef.current = null;
     }
-  }, [allFilteredBills, showNotification]);
+  }, [allFilteredBills, showNotification, t]);
 
   const handleRefreshClick = useCallback(() => {
     void refresh().then(() => {
-      showNotification("Fuel expenses refreshed.", "success");
+      showNotification(t("ops.fuel.refreshed"), "success");
     });
-  }, [refresh, showNotification]);
+  }, [refresh, showNotification, t]);
 
   return (
     <div

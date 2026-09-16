@@ -23,7 +23,8 @@ import { localizeTripViewText } from "../../vehicle-trips/utils/tripViewLocaliza
 import { TripNoBadge } from "../../vehicle-trips/components/TripNoBadge";
 import { GpsAddressText } from "../../vehicle-trips/components/GpsAddressText";
 import { BillPreviewLink } from "../../vehicle-trips/components/Step_5/BillPreviewLink";
-import { useI18n } from "../../../../i18n";
+import { ScopedI18nProvider, useI18n } from "../../../../i18n";
+import { ViewLanguageToggle } from "../../../../ui/ViewLanguageToggle";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 
 interface FuelViewModalProps {
@@ -58,14 +59,15 @@ const DetailItem = ({
   </div>
 );
 
-export function FuelViewModal({ isOpen, bill, onClose }: FuelViewModalProps) {
-  const { t, language } = useI18n();
+function FuelViewModalContent({ isOpen, bill, onClose }: FuelViewModalProps) {
+  const { t, language, toggleLanguage } = useI18n();
 
   if (!isOpen || !bill) return null;
 
+  const isDeleted = bill.deleted === true || bill.status === "Deleted";
   const isTrip = bill.sourceType === "TRIP" || !!bill.tripNo;
-  const isApproved = isTrip || bill.status === "Approved";
-  const isPending = !isTrip && bill.status === "Pending";
+  const isApproved = !isDeleted && (isTrip || bill.status === "Approved");
+  const isPending = !isDeleted && !isTrip && bill.status === "Pending";
 
   return (
     <AppShellModal open={isOpen} onClose={onClose} panelClassName="bg-white">
@@ -73,7 +75,7 @@ export function FuelViewModal({ isOpen, bill, onClose }: FuelViewModalProps) {
         
         {/* Header Section — matching Trip View Modal */}
         <div className="border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/80 rounded-t-2xl shrink-0">
-          <div className="px-6 md:px-8 py-4 flex items-center justify-between gap-4">
+          <div className="px-6 md:px-8 py-4 flex items-center justify-between gap-4 flex-wrap sm:flex-nowrap">
             <div className="flex items-center gap-4 min-w-0">
               <div className="h-12 w-12 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-lg shadow-emerald-500/20 text-white shrink-0">
                 <Fuel className="w-6 h-6" />
@@ -81,30 +83,40 @@ export function FuelViewModal({ isOpen, bill, onClose }: FuelViewModalProps) {
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap min-w-0">
                   <h2 className="text-lg md:text-xl font-bold text-slate-800 tracking-tight truncate">
-                    Fuel Bill — {bill.billNo}
+                    {t("ops.fuel.bill_details", { billNo: bill.billNo })}
                   </h2>
                   <span className="hidden sm:inline-flex items-center rounded-full bg-slate-100 border border-slate-200 px-2 py-0.5 text-[10px] font-bold text-slate-500">
-                    {isTrip ? "Trip Auto-Approved" : "Manual Bill"}
+                    {isDeleted ? t("ops.fuel.deleted_bill") : isTrip ? t("ops.fuel.trip_auto_approved") : t("ops.fuel.manual_bill")}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap mt-1">
                   <span
                     className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                      isApproved
+                      isDeleted
+                        ? "bg-rose-50 text-rose-700 border border-rose-200"
+                        : isApproved
                         ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                         : isPending
                         ? "bg-orange-50 text-orange-700 border border-orange-200"
-                        : "bg-rose-50 text-rose-700 border border-rose-200"
+                        : "bg-slate-100 text-slate-700 border border-slate-200"
                     }`}
                   >
-                    {isApproved ? (
-                      <CheckCircle2 size={12} className="text-emerald-600" />
-                    ) : isPending ? (
-                      <Clock size={12} className="text-orange-500" />
-                    ) : (
+                    {isDeleted ? (
                       <AlertCircle size={12} className="text-rose-500" />
+                    ) : isApproved ? (
+                      <CheckCircle2 size={12} className="text-emerald-600" />
+                    ) : (
+                      <Clock size={12} className="text-orange-500" />
                     )}
-                    <span>{isTrip ? "Approved (Trip Completion)" : bill.status}</span>
+                    <span>
+                      {isDeleted
+                        ? t("common.deleted")
+                        : isTrip
+                        ? t("ops.fuel.approved_trip_completion")
+                        : bill.status === "Approved"
+                        ? t("common.approved")
+                        : t("common.pending")}
+                    </span>
                   </span>
 
                   <span className="text-xs text-slate-400">·</span>
@@ -117,14 +129,24 @@ export function FuelViewModal({ isOpen, bill, onClose }: FuelViewModalProps) {
               </div>
             </div>
 
-            <button 
-              type="button"
-              onClick={onClose} 
-              className="group relative h-9 w-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition"
-              aria-label={t("common.close")}
-            >
-              <X size={18} className={uiActionIconMotionClass.close} />
-            </button>
+            <div className="flex items-center gap-2.5 ml-auto">
+              <ViewLanguageToggle
+                language={language}
+                onToggle={toggleLanguage}
+                tone="emerald"
+                labelMode="target"
+                ariaLabel={t("ops.fuel.popup_language_toggle")}
+              />
+
+              <button 
+                type="button"
+                onClick={onClose} 
+                className="group relative h-9 w-9 rounded-full hover:bg-slate-100 flex items-center justify-center text-slate-400 hover:text-slate-700 transition cursor-pointer"
+                aria-label={t("common.close")}
+              >
+                <X size={18} className={uiActionIconMotionClass.close} />
+              </button>
+            </div>
           </div>
         </div>
 
@@ -135,7 +157,7 @@ export function FuelViewModal({ isOpen, bill, onClose }: FuelViewModalProps) {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs">
               <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                Total Fuel Cost
+                {t("ops.fuel.total_fuel_cost")}
               </div>
               <div className="text-xl md:text-2xl font-extrabold text-emerald-600">
                 ₹ {bill.amount.toFixed(2)}
@@ -144,7 +166,7 @@ export function FuelViewModal({ isOpen, bill, onClose }: FuelViewModalProps) {
 
             <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs">
               <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                Litres Filled
+                {t("ops.fuel.litres_filled")}
               </div>
               <div className="text-xl md:text-2xl font-bold text-slate-800">
                 {bill.litres.toFixed(2)} <span className="text-sm font-semibold text-slate-500">L</span>
@@ -153,7 +175,7 @@ export function FuelViewModal({ isOpen, bill, onClose }: FuelViewModalProps) {
 
             <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs">
               <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                Rate / Litre
+                {t("ops.fuel.rate_litre")}
               </div>
               <div className="text-xl md:text-2xl font-bold text-slate-800">
                 ₹ {bill.rate.toFixed(2)}
@@ -162,7 +184,7 @@ export function FuelViewModal({ isOpen, bill, onClose }: FuelViewModalProps) {
 
             <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs">
               <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                Meter Reading
+                {t("ops.fuel.odometer_reading")}
               </div>
               <div className="text-xl md:text-2xl font-bold text-slate-800">
                 {bill.meterReading > 0 ? bill.meterReading.toLocaleString() : "—"} <span className="text-sm font-semibold text-slate-500">KM</span>
@@ -175,7 +197,7 @@ export function FuelViewModal({ isOpen, bill, onClose }: FuelViewModalProps) {
             {/* Left Column: Vehicle, Driver, Origin */}
             <div className="space-y-3.5">
               <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider px-1">
-                Vehicle & Trip Origin
+                {t("ops.fuel.vehicle_trip_origin")}
               </h3>
               
               <DetailItem 
@@ -192,7 +214,7 @@ export function FuelViewModal({ isOpen, bill, onClose }: FuelViewModalProps) {
 
               <div className="p-4 rounded-2xl border border-slate-200/80 bg-white shadow-xs">
                 <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-2">
-                  Source & Linked Trip
+                  {t("ops.fuel.source_linked_trip")}
                 </div>
                 <div className="flex items-center gap-2.5 flex-wrap">
                   <span
@@ -202,7 +224,7 @@ export function FuelViewModal({ isOpen, bill, onClose }: FuelViewModalProps) {
                         : "bg-slate-100 text-slate-700 border border-slate-200/80"
                     }`}
                   >
-                    {isTrip ? "Trip Diesel" : "Manual Direct Entry"}
+                    {isTrip ? t("ops.fuel.trip_diesel") : t("ops.fuel.manual_direct_entry")}
                   </span>
                   {bill.tripNo && <TripNoBadge tripNo={bill.tripNo} />}
                 </div>
@@ -211,10 +233,10 @@ export function FuelViewModal({ isOpen, bill, onClose }: FuelViewModalProps) {
               <div className="p-4 rounded-2xl border border-slate-200/80 bg-white shadow-xs">
                 <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1.5">
                   <MapPin size={14} className="text-emerald-600" />
-                  <span>Petrol Bunk & Location</span>
+                  <span>{t("ops.fuel.petrol_bunk_location")}</span>
                 </div>
                 <div className="font-bold text-slate-800 text-sm sm:text-base mt-1">
-                  {bill.petrolBunk || "—"}
+                  {localizeTripViewText(bill.petrolBunk || "—", language)}
                 </div>
                 {bill.gpsLat != null && bill.gpsLon != null && (
                   <div className="mt-2.5 pt-2.5 border-t border-slate-100">
@@ -231,25 +253,25 @@ export function FuelViewModal({ isOpen, bill, onClose }: FuelViewModalProps) {
             {/* Right Column: Financial Breakdown & Receipt Document */}
             <div className="space-y-3.5">
               <h3 className="text-xs font-bold text-slate-700 uppercase tracking-wider px-1">
-                Financial Details & Receipt
+                {t("ops.fuel.financial_details_receipt")}
               </h3>
 
               <DetailItem 
                 icon={Receipt} 
-                label="Bill Number" 
+                label={t("ops.fuel.bill_no")} 
                 value={bill.billNo} 
               />
 
               <DetailItem 
                 icon={Gauge} 
-                label="Odometer / Meter (KM)" 
-                value={bill.meterReading > 0 ? `${bill.meterReading.toLocaleString()} KM` : "Not recorded"} 
+                label={t("ops.fuel.odometer_meter")} 
+                value={bill.meterReading > 0 ? `${bill.meterReading.toLocaleString()} KM` : t("ops.fuel.not_recorded")} 
               />
 
               <DetailItem 
                 icon={Droplets} 
-                label="Diesel Quantity" 
-                value={`${bill.litres.toFixed(2)} Litres @ ₹ ${bill.rate.toFixed(2)}/L`} 
+                label={t("ops.fuel.diesel_quantity")} 
+                value={`${bill.litres.toFixed(2)} ${language === 'te' ? 'లీటర్లు' : 'Litres'} @ ₹ ${bill.rate.toFixed(2)}/L`} 
               />
 
               {/* Receipt Document Viewer Link */}
@@ -259,8 +281,8 @@ export function FuelViewModal({ isOpen, bill, onClose }: FuelViewModalProps) {
                     <FileText size={18} />
                   </div>
                   <div>
-                    <div className="text-xs font-bold text-slate-800">Receipt Document</div>
-                    <div className="text-[11px] text-slate-400">View / inspect uploaded diesel bill</div>
+                    <div className="text-xs font-bold text-slate-800">{t("ops.fuel.receipt_document")}</div>
+                    <div className="text-[11px] text-slate-400">{t("ops.fuel.receipt_document_hint")}</div>
                   </div>
                 </div>
                 {bill.image ? (
@@ -269,7 +291,7 @@ export function FuelViewModal({ isOpen, bill, onClose }: FuelViewModalProps) {
                     fileName={bill.imageName || `${bill.billNo}.png`}
                   />
                 ) : (
-                  <span className="text-xs text-slate-400 font-medium">Not Uploaded</span>
+                  <span className="text-xs text-slate-400 font-medium">{t("ops.fuel.not_uploaded")}</span>
                 )}
               </div>
             </div>
@@ -281,8 +303,12 @@ export function FuelViewModal({ isOpen, bill, onClose }: FuelViewModalProps) {
               <div className="flex items-start gap-3">
                 <MessageSquare size={18} className="text-emerald-600 mt-0.5 shrink-0" />
                 <div>
-                  <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">Remarks / Operator Notes</div>
-                  <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-medium">{bill.remarks}</p>
+                  <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                    {t("ops.fuel.remarks_operator_notes")}
+                  </div>
+                  <p className="text-xs sm:text-sm text-slate-700 leading-relaxed font-medium">
+                    {localizeTripViewText(bill.remarks, language)}
+                  </p>
                 </div>
               </div>
             </div>
@@ -306,6 +332,15 @@ export function FuelViewModal({ isOpen, bill, onClose }: FuelViewModalProps) {
 
       </div>
     </AppShellModal>
+  );
+}
+
+export function FuelViewModal(props: FuelViewModalProps) {
+  const { language } = useI18n();
+  return (
+    <ScopedI18nProvider initialLanguage={language}>
+      <FuelViewModalContent {...props} />
+    </ScopedI18nProvider>
   );
 }
 

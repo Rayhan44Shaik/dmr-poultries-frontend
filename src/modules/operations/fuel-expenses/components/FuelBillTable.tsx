@@ -148,10 +148,10 @@ export function FuelBillTable({
       : tabCounts.deleted;
 
   const tabs = [
-    { id: "ALL" as const, label: "All" },
-    { id: "PENDING" as const, label: "Pending" },
-    { id: "APPROVED" as const, label: "Approved" },
-    { id: "DELETED" as const, label: "Deleted" },
+    { id: "ALL" as const, label: t("common.all") },
+    { id: "PENDING" as const, label: t("common.pending") },
+    { id: "APPROVED" as const, label: t("common.approved") },
+    { id: "DELETED" as const, label: t("common.deleted") },
   ];
 
   const isSelectedDeleted = selectedBill?.deleted === true || selectedBill?.status === "Deleted";
@@ -173,7 +173,7 @@ export function FuelBillTable({
               <Fuel className="w-5 h-5" />
             </div>
             <h3 className="text-base font-bold text-slate-800 tracking-tight">
-              Fuel Bill Table
+              {t("ops.fuel.table_title")}
             </h3>
           </div>
 
@@ -223,8 +223,8 @@ export function FuelBillTable({
               <button
                 type="button"
                 onClick={() => onView(selectedBill)}
-                className="group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm bg-emerald-50/70 hover:bg-emerald-50/90 text-emerald-600 border border-emerald-200/60 active:scale-95"
-                title="View Bill Details"
+                className="group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm bg-emerald-50/70 hover:bg-emerald-50/90 text-emerald-600 border border-emerald-200/60 active:scale-95 cursor-pointer"
+                title={t("common.view")}
               >
                 <span className={`inline-flex ${uiActionIconMotionClass.view}`}>
                   <Eye size={13} />
@@ -237,8 +237,8 @@ export function FuelBillTable({
               <button
                 type="button"
                 onClick={() => onEdit(selectedBill)}
-                className="group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-600 border border-emerald-200/60 active:scale-95"
-                title="Edit Fuel Bill"
+                className="group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-600 border border-emerald-200/60 active:scale-95 cursor-pointer"
+                title={t("common.edit")}
               >
                 <span className={`inline-flex ${uiActionIconMotionClass.edit}`}>
                   <Pencil size={13} />
@@ -251,13 +251,13 @@ export function FuelBillTable({
               <button
                 type="button"
                 onClick={() => onApprove(selectedBill)}
-                className="group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95"
-                title="Approve Fuel Bill"
+                className="group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 cursor-pointer"
+                title={t("common.approve")}
               >
                 <span className={`inline-flex ${uiActionIconMotionClass.approve}`}>
                   <CheckCircle size={13} />
                 </span>
-                <span>Approve</span>
+                <span>{t("common.approve")}</span>
               </button>
             )}
 
@@ -265,8 +265,8 @@ export function FuelBillTable({
               <button
                 type="button"
                 onClick={() => onDelete(selectedBill)}
-                className="group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm bg-rose-50/70 hover:bg-rose-50/80 text-rose-500 border border-rose-200/60 active:scale-95"
-                title="Delete Fuel Bill (10s undo)"
+                className="group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 active:scale-95 cursor-pointer"
+                title={t("common.delete")}
               >
                 <span className={`inline-flex ${uiActionIconMotionClass.delete}`}>
                   <Trash2 size={13} />
@@ -278,19 +278,24 @@ export function FuelBillTable({
         )}
       </div>
 
-      {/* ── Table Body matching Trip Master Table styling, spacing, and typography ── */}
+      {/* ── Table Container ── */}
       <div className="overflow-x-auto">
-        <table className="min-w-full text-[13px] text-left border-collapse">
-          <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-600">
-            <tr className="whitespace-nowrap">
-              <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider w-10">#</th>
+        <table className="w-full text-left border-collapse">
+          <thead>
+            <tr className="border-b border-slate-200/80 bg-slate-50/80 text-slate-600 font-bold text-[12px] select-none">
+              {/* Index */}
+              <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider w-10">
+                <div className="flex items-center justify-center">
+                  <Hash size={14} className="text-slate-400" />
+                </div>
+              </th>
 
               {/* Bill No with Source Logo */}
               <th className="px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider">
                 {sortable("billNo", (
                   <div className="flex items-center gap-1.5">
-                    <Hash size={14} className="text-slate-400 flex-shrink-0" />
-                    <span>Bill No</span>
+                    <Fuel size={14} className="text-emerald-500 flex-shrink-0" />
+                    <span>{t("ops.fuel.bill_no")}</span>
                   </div>
                 ), false)}
               </th>
@@ -299,8 +304,8 @@ export function FuelBillTable({
               <th className="px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider">
                 {sortable("date", (
                   <div className="flex items-center gap-1.5">
-                    <Calendar size={14} className="text-emerald-600 flex-shrink-0" />
-                    <span>{t("table.date")}</span>
+                    <Calendar size={14} className="text-emerald-500 flex-shrink-0" />
+                    <span>{t("common.date")}</span>
                   </div>
                 ), false)}
               </th>
@@ -309,7 +314,7 @@ export function FuelBillTable({
               <th className="px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider">
                 {sortable("vehicleNo", (
                   <div className="flex items-center gap-1.5">
-                    <Truck size={14} className="text-indigo-500 flex-shrink-0" />
+                    <Truck size={14} className="text-emerald-500 flex-shrink-0" />
                     <span>{t("common.vehicle")}</span>
                   </div>
                 ), false)}
@@ -319,18 +324,18 @@ export function FuelBillTable({
               <th className="px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider">
                 {sortable("driverName", (
                   <div className="flex items-center gap-1.5">
-                    <User size={14} className="text-emerald-600 flex-shrink-0" />
+                    <User size={14} className="text-emerald-500 flex-shrink-0" />
                     <span>{t("common.driver")}</span>
                   </div>
                 ), false)}
               </th>
 
-              {/* Meter Reading (KM) — Middle / Center Aligned */}
+              {/* Meter (KM) — Middle / Center Aligned */}
               <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
                 {sortable("meterReading", (
                   <div className="flex items-center justify-center gap-1.5">
-                    <Gauge size={14} className="text-teal-500 flex-shrink-0" />
-                    <span>Meter (KM)</span>
+                    <Gauge size={14} className="text-amber-500 flex-shrink-0" />
+                    <span>{t("ops.fuel.meter_km")}</span>
                   </div>
                 ), true)}
               </th>
@@ -340,7 +345,7 @@ export function FuelBillTable({
                 {sortable("litres", (
                   <div className="flex items-center justify-center gap-1.5">
                     <Droplets size={14} className="text-blue-500 flex-shrink-0" />
-                    <span>Litres</span>
+                    <span>{t("ops.fuel.litres")}</span>
                   </div>
                 ), true)}
               </th>
@@ -350,7 +355,7 @@ export function FuelBillTable({
                 {sortable("rate", (
                   <div className="flex items-center justify-center gap-1.5">
                     <IndianRupee size={14} className="text-slate-500 flex-shrink-0" />
-                    <span>Rate (₹/L)</span>
+                    <span>{t("ops.fuel.rate_per_l")}</span>
                   </div>
                 ), true)}
               </th>
@@ -360,7 +365,7 @@ export function FuelBillTable({
                 {sortable("amount", (
                   <div className="flex items-center justify-center gap-1.5">
                     <IndianRupee size={14} className="text-emerald-600 flex-shrink-0" />
-                    <span>Amount (₹)</span>
+                    <span>{t("ops.fuel.amount_inr")}</span>
                   </div>
                 ), true)}
               </th>
@@ -369,7 +374,7 @@ export function FuelBillTable({
               <th className="px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider">
                 <div className="flex items-center gap-1.5">
                   <MapPin size={14} className="text-rose-500 flex-shrink-0" />
-                  <span>Petrol Bunk</span>
+                  <span>{t("ops.fuel.petrol_bunk")}</span>
                 </div>
               </th>
 
@@ -377,7 +382,7 @@ export function FuelBillTable({
               <th className="px-4 py-4 text-center text-[12px] font-bold uppercase tracking-wider">
                 <div className="flex items-center justify-center gap-1.5">
                   <FileImage size={14} className="text-indigo-500 flex-shrink-0" />
-                  <span>Receipt</span>
+                  <span>{t("ops.fuel.receipt")}</span>
                 </div>
               </th>
             </tr>
@@ -391,7 +396,7 @@ export function FuelBillTable({
                       className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600"
                       aria-hidden="true"
                     />
-                    Loading fuel expenses register...
+                    {t("ops.fuel.loading")}
                   </span>
                 </td>
               </tr>
@@ -399,7 +404,7 @@ export function FuelBillTable({
               <tr>
                 <td colSpan={11} className="py-16 text-center text-slate-400 text-sm font-medium">
                   <Fuel size={24} className="mx-auto mb-2 text-slate-300" />
-                  No fuel bills found matching the selected filters.
+                  {t("ops.fuel.no_records")}
                 </td>
               </tr>
             ) : (
@@ -445,21 +450,21 @@ export function FuelBillTable({
                         {isDeleted ? (
                           <span
                             className="inline-flex items-center justify-center h-6 w-6 rounded-lg bg-rose-50 border border-rose-200/80 text-rose-500 shadow-xs shrink-0"
-                            title="Deleted Bill"
+                            title={t("ops.fuel.deleted_bill")}
                           >
                             <AlertCircle size={13} strokeWidth={2.5} />
                           </span>
                         ) : isTrip ? (
                           <span
                             className="inline-flex items-center justify-center h-6 w-6 rounded-lg bg-indigo-50 border border-indigo-200/80 text-indigo-600 shadow-xs shrink-0"
-                            title={bill.tripNo ? `Trip Diesel (${bill.tripNo})` : "Trip Diesel"}
+                            title={bill.tripNo ? `${t("ops.fuel.trip_diesel")} (${bill.tripNo})` : t("ops.fuel.trip_diesel")}
                           >
                             <Route size={13} strokeWidth={2.5} />
                           </span>
                         ) : (
                           <span
                             className="inline-flex items-center justify-center h-6 w-6 rounded-lg bg-amber-50 border border-amber-200/80 text-amber-600 shadow-xs shrink-0"
-                            title="Manual Entry"
+                            title={t("ops.fuel.manual_entry")}
                           >
                             <Sparkles size={13} strokeWidth={2.5} />
                           </span>

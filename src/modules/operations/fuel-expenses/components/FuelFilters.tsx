@@ -25,6 +25,7 @@ import { useI18n } from "../../../../i18n";
 import { BrandRefreshButton } from "../../../../ui";
 import MasterDropdown, { type MasterDropdownOption } from "../../../masters/components/MasterDropdown";
 import type { FuelSortKey } from "../types/fuelExpense";
+import { localizeTripViewText } from "../../vehicle-trips/utils/tripViewLocalization";
 
 interface Props {
   fromDate: string;
@@ -79,40 +80,45 @@ function FuelFilters({
   onExportExcel,
   hasFilters = false,
 }: Props) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
 
   const withoutSentinel = (
     options: readonly MasterDropdownOption[],
     sentinel: string
   ) => options.filter((option) => option.value !== sentinel);
 
-  const vehicleOptions = withoutSentinel(vehicles, "All Vehicles");
-  const driverOptions = withoutSentinel(drivers, "All Drivers");
+  const localizeOptions = (options: readonly MasterDropdownOption[]) =>
+    options.map((option) => ({
+      ...option,
+      label: localizeTripViewText(option.label, language),
+      searchText: option.searchText || option.label,
+    }));
+
+  const vehicleOptions = localizeOptions(withoutSentinel(vehicles, "All Vehicles"));
+  const driverOptions = localizeOptions(withoutSentinel(drivers, "All Drivers"));
 
   const sourceOptions: MasterDropdownOption[] = [
-    { value: "TRIP", label: "Trip Diesel" },
-    { value: "MANUAL", label: "Manual Bill" },
+    { value: "TRIP", label: t("ops.fuel.trip_diesel") },
+    { value: "MANUAL", label: t("ops.fuel.manual_bill") },
   ];
 
   const sortOptions: MasterDropdownOption[] = [
-    { value: "billNo:asc", label: `Bill No — A to Z` },
-    { value: "billNo:desc", label: `Bill No — Z to A` },
-    { value: "date:desc", label: `Date — Newest First` },
-    { value: "date:asc", label: `Date — Oldest First` },
-    { value: "vehicleNo:asc", label: `${t("common.vehicle")} — A to Z` },
-    { value: "vehicleNo:desc", label: `${t("common.vehicle")} — Z to A` },
-    { value: "driverName:asc", label: `${t("common.driver")} — A to Z` },
-    { value: "driverName:desc", label: `${t("common.driver")} — Z to A` },
-    { value: "litres:desc", label: `Litres — High to Low` },
-    { value: "litres:asc", label: `Litres — Low to High` },
-    { value: "rate:desc", label: `Rate (₹/L) — High to Low` },
-    { value: "rate:asc", label: `Rate (₹/L) — Low to High` },
-    { value: "amount:desc", label: `Amount (₹) — High to Low` },
-    { value: "amount:asc", label: `Amount (₹) — Low to High` },
-    { value: "meterReading:desc", label: `Meter (KM) — High to Low` },
-    { value: "meterReading:asc", label: `Meter (KM) — Low to High` },
-    { value: "status:asc", label: `Status — A to Z` },
-    { value: "status:desc", label: `Status — Z to A` },
+    { value: "billNo:asc", label: `${t("ops.fuel.bill_no")} — ${t("ops.trip.sort_az")}` },
+    { value: "billNo:desc", label: `${t("ops.fuel.bill_no")} — ${t("ops.trip.sort_za")}` },
+    { value: "date:desc", label: `${t("common.date")} — ${t("ops.trip.sort_latest_first")}` },
+    { value: "date:asc", label: `${t("common.date")} — ${t("ops.trip.sort_oldest_first")}` },
+    { value: "vehicleNo:asc", label: `${t("common.vehicle")} — ${t("ops.trip.sort_az")}` },
+    { value: "vehicleNo:desc", label: `${t("common.vehicle")} — ${t("ops.trip.sort_za")}` },
+    { value: "driverName:asc", label: `${t("common.driver")} — ${t("ops.trip.sort_az")}` },
+    { value: "driverName:desc", label: `${t("common.driver")} — ${t("ops.trip.sort_za")}` },
+    { value: "litres:desc", label: `${t("ops.fuel.litres")} — ${t("ops.trip.sort_high_low")}` },
+    { value: "litres:asc", label: `${t("ops.fuel.litres")} — ${t("ops.trip.sort_low_high")}` },
+    { value: "rate:desc", label: `${t("ops.fuel.rate_per_l")} — ${t("ops.trip.sort_high_low")}` },
+    { value: "rate:asc", label: `${t("ops.fuel.rate_per_l")} — ${t("ops.trip.sort_low_high")}` },
+    { value: "amount:desc", label: `${t("ops.fuel.amount_inr")} — ${t("ops.trip.sort_high_low")}` },
+    { value: "amount:asc", label: `${t("ops.fuel.amount_inr")} — ${t("ops.trip.sort_low_high")}` },
+    { value: "meterReading:desc", label: `${t("ops.fuel.meter_km")} — ${t("ops.trip.sort_high_low")}` },
+    { value: "meterReading:asc", label: `${t("ops.fuel.meter_km")} — ${t("ops.trip.sort_low_high")}` },
   ];
 
   const sortValue = sortBy ? `${sortBy}:${sortDir}` : "";
@@ -168,7 +174,7 @@ function FuelFilters({
             value={vehicle === "All Vehicles" ? "" : vehicle}
             options={vehicleOptions}
             onChange={(next) => setVehicle(next || "All Vehicles")}
-            placeholder={t("ops.trip.all_vehicles") || "All Vehicles"}
+            placeholder={t("ops.fuel.all_vehicles")}
             searchable
             allowClear
             className="w-full"
@@ -186,7 +192,7 @@ function FuelFilters({
             value={driver === "All Drivers" ? "" : driver}
             options={driverOptions}
             onChange={(next) => setDriver(next || "All Drivers")}
-            placeholder="All Drivers"
+            placeholder={t("ops.fuel.all_drivers")}
             searchable
             allowClear
             className="w-full"
@@ -199,15 +205,15 @@ function FuelFilters({
         <div className="lg:col-span-3">
           <label className={opsFilterLabelClass}>
             <Layers size={17} className="text-indigo-500 flex-shrink-0" />
-            <span>Source</span>
+            <span>{t("ops.fuel.source")}</span>
           </label>
           <MasterDropdown
             hideLabel
-            label="Source"
+            label={t("ops.fuel.source")}
             value={sourceType === "All" ? "" : sourceType}
             options={sourceOptions}
             onChange={(next) => setSourceType(next || "All")}
-            placeholder="All Sources"
+            placeholder={t("ops.fuel.all_sources")}
             searchable
             allowClear
             className="w-full"
@@ -235,14 +241,14 @@ function FuelFilters({
         <div className="lg:col-span-6">
           <label className={opsFilterLabelClass}>
             <Search size={17} className="text-slate-400 flex-shrink-0" />
-            <span>Search Fuel Bills</span>
+            <span>{t("ops.fuel.search_label")}</span>
           </label>
           <div className="relative">
             <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               value={search}
               onChange={(event) => setSearch(event.target.value)}
-              placeholder="Search by Bill No, Trip No, Vehicle, Driver, Petrol Bunk..."
+              placeholder={t("ops.fuel.search_placeholder")}
               className={`${opsInputClass} pl-10`}
             />
           </div>
@@ -273,12 +279,12 @@ function FuelFilters({
             type="button"
             onClick={onAddFuelBill}
             className={`group relative ${opsPrimaryButtonClass} active:scale-95 transition-transform duration-150`}
-            aria-label="Add Fuel Bill"
+            aria-label={isFormOpen ? t("ops.fuel.hide_form") : t("ops.fuel.add_bill")}
           >
             <span className="inline-flex motion-safe:group-hover:rotate-90 transition-transform duration-200">
               <Plus size={16} />
             </span>
-            <span>{isFormOpen ? "Hide Fuel Form" : "Add Fuel Bill"}</span>
+            <span>{isFormOpen ? t("ops.fuel.hide_form") : t("ops.fuel.add_bill")}</span>
           </button>
         )}
 
@@ -290,7 +296,7 @@ function FuelFilters({
             disabled={!hasFilters}
             className={`group relative ${opsPdfButtonClass}`}
             aria-label={t("reports.export_pdf") || "PDF"}
-            title={!hasFilters ? "Apply a filter to export PDF" : "Export PDF Report"}
+            title={!hasFilters ? (language === "te" ? "PDF ఎగుమతి చేయడానికి ఫిల్టర్ వర్తించండి" : "Apply a filter to export PDF") : (language === "te" ? "PDF నివేదిక ఎగుమతి చేయండి" : "Export PDF Report")}
           >
             <span className={`inline-flex ${hasFilters ? "motion-safe:group-hover:animate-[var(--animate-action-pdf)]" : ""}`}>
               <FileText size={15} />
@@ -307,7 +313,7 @@ function FuelFilters({
             disabled={!hasFilters}
             className={`group relative ${opsExcelButtonClass}`}
             aria-label={t("reports.export_excel") || "Excel"}
-            title={!hasFilters ? "Apply a filter to export Excel" : "Export Excel Report"}
+            title={!hasFilters ? (language === "te" ? "Excel ఎగుమతి చేయడానికి ఫిల్టర్ వర్తించండి" : "Apply a filter to export Excel") : (language === "te" ? "Excel నివేదిక ఎగుమతి చేయండి" : "Export Excel Report")}
           >
             <span className={`inline-flex ${hasFilters ? "motion-safe:group-hover:animate-[var(--animate-action-excel)]" : ""}`}>
               <FileSpreadsheet size={15} />
