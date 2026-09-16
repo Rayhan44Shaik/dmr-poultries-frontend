@@ -873,26 +873,30 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
         </div>
       </div>
 
-      <CollectionPerformanceChart
-        data={data.collectionPerformanceByShop}
-        totalSales={data.totalSalesAmount}
-        totalCollections={data.totalCollections}
-        fromDate={calendarFrom}
-        toDate={calendarTo}
-      />
-
-      <div className="bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0">
-        <div className="flex justify-between items-center">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.live_infrastructure")}</span>
-            <h3 className="text-sm font-black text-slate-800 mt-0.5">{t("ops.dashboard.recent_transit")}</h3>
-          </div>
-          <div className="px-2.5 py-1 rounded-full bg-slate-50 border border-slate-100 text-[10px] font-bold text-slate-500 flex items-center gap-1.5">
-            <ArrowRightLeft size={10} className="text-slate-400" /> {t("ops.dashboard.auto_updates")}
-          </div>
+      <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-12">
+        <div className="min-w-0 lg:col-span-4">
+          <CollectionPerformanceChart
+            data={data.collectionPerformanceByShop}
+            totalSales={data.totalSalesAmount}
+            totalCollections={data.totalCollections}
+            fromDate={calendarFrom}
+            toDate={calendarTo}
+          />
         </div>
-        <div className="w-full overflow-x-auto text-xs rounded-xl border border-slate-100">
-          <RecentTripsTable trips={data.recentTrips || []} />
+
+        <div className="flex min-w-0 flex-col justify-start gap-4 rounded-2xl border border-slate-200/60 bg-white p-5 shadow-sm transition-shadow hover:shadow-md lg:col-span-8">
+          <div className="flex items-center justify-between">
+            <div>
+              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.live_infrastructure")}</span>
+              <h3 className="mt-0.5 text-sm font-black text-slate-800">{t("ops.dashboard.recent_transit")}</h3>
+            </div>
+            <div className="flex items-center gap-1.5 rounded-full border border-slate-100 bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-500">
+              <ArrowRightLeft size={10} className="text-slate-400" /> {t("ops.dashboard.auto_updates")}
+            </div>
+          </div>
+          <div className="w-full overflow-x-auto rounded-xl border border-slate-100 text-xs">
+            <RecentTripsTable trips={data.recentTrips || []} />
+          </div>
         </div>
       </div>
 
