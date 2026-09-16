@@ -58,8 +58,8 @@ interface ShopTooltipState {
 
 const COLLECTION_RECOVERY_ANIMATION_STYLES = `
 @keyframes collection-recovery-card-in {
-  0% { opacity: 0; transform: translateY(8px) scale(0.985); }
-  65% { opacity: 1; }
+  0% { opacity: 0; transform: translateY(14px) scale(0.965); }
+  55% { opacity: 1; transform: translateY(2px) scale(1.01); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 @keyframes collection-recovery-ring-draw {
@@ -76,13 +76,13 @@ const COLLECTION_RECOVERY_ANIMATION_STYLES = `
   to { opacity: 1; }
 }
 .collection-recovery-shop-card {
-  animation: collection-recovery-card-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: collection-recovery-card-in 760ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .collection-recovery-ring-progress {
-  animation: collection-recovery-ring-draw 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+  animation: collection-recovery-ring-draw 1250ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .collection-recovery-value {
-  animation: collection-recovery-digit-pop 480ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both;
+  animation: collection-recovery-digit-pop 780ms cubic-bezier(0.16, 1, 0.3, 1) 260ms both;
   transform-origin: center;
 }
 .collection-recovery-tooltip {
@@ -277,17 +277,16 @@ export default function CollectionPerformanceChart({
               onChange={setSortValue}
               placeholder={t("ops.dashboard.collection_performance.sort_outstanding")}
               searchable
-              allowClear
               className="w-full sm:w-48 lg:w-52"
               triggerClassName="h-9 rounded-xl border-slate-200 bg-white/95 px-3 text-[11.5px] font-semibold shadow-xs"
             />
-            <div className="flex shrink-0 items-center gap-1.5 rounded-xl border border-emerald-100 bg-emerald-50/65 px-2 py-1">
-              <RecoveryRing value={recovery} size={48} />
+            <div className="flex shrink-0 items-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50/65 px-1.5 py-1">
+              <RecoveryRing value={recovery} size={40} />
               <div className="leading-tight">
-                <p className="text-[8px] font-black uppercase tracking-wide text-emerald-700">
+                <p className="text-[7.5px] font-black uppercase tracking-wide text-emerald-700">
                   {t("ops.dashboard.collection_performance.recovery")}
                 </p>
-                <p className="text-base font-black tabular-nums text-slate-900">{recovery.toFixed(1)}%</p>
+                <p className="text-sm font-black tabular-nums text-slate-900">{recovery.toFixed(1)}%</p>
               </div>
             </div>
           </div>
@@ -332,7 +331,7 @@ export default function CollectionPerformanceChart({
                   tabIndex={0}
                   aria-label={`${row.shopName}, ${t("ops.dashboard.collection_performance.recovery")}: ${rowRecovery.toFixed(1)}%, ${t("ops.dashboard.collection_performance.gap")}: ${formatINR(row.outstandingAmount)}`}
                   className="collection-recovery-shop-card group relative min-w-0 rounded-xl border border-slate-100 bg-gradient-to-r from-white to-slate-50/60 px-2.5 py-1.5 shadow-xs transition-colors duration-150 hover:from-emerald-50/35 hover:to-white focus:bg-emerald-50/30"
-                  style={{ animationDelay: `${index * 32}ms` }}
+                  style={{ animationDelay: `${index * 80}ms` }}
                   onFocus={(event) => showShopTooltip(row, rowRecovery, event.currentTarget)}
                   onBlur={() => setShopTooltip(null)}
                   onMouseEnter={(event) => showShopTooltip(row, rowRecovery, event.currentTarget)}
