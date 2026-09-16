@@ -12,6 +12,7 @@ import {
   handleApiError,
 } from "../services/salaryService";
 import { buildSampleSalaryRecords } from "../services/staffSampleData";
+import { isSalaryPaid } from "../components/salary/payslipModel";
 import type { SalaryRecord } from "../types/staffDashboard";
 
 export interface SalaryRegisterTotals {
@@ -91,9 +92,9 @@ export function useSalaryRegister(month: string, department: string = "") {
   const filteredRecords = useMemo(() => {
     if (filter === 'All') return records;
     if (filter === 'Pending') {
-      return records.filter((r) => r.status === 'Pending' || r.status === 'Submitted');
+      return records.filter((r) => !isSalaryPaid(r));
     }
-    return records.filter((r) => r.status === 'Paid');
+    return records.filter((r) => isSalaryPaid(r));
   }, [records, filter]);
 
   const totals = useMemo<SalaryRegisterTotals>(() => {
@@ -102,8 +103,8 @@ export function useSalaryRegister(month: string, department: string = "") {
       totalGross: records.reduce((sum, r) => sum + r.totalGross, 0),
       totalDeductions: records.reduce((sum, r) => sum + r.totalDeductions, 0),
       netPayroll: records.reduce((sum, r) => sum + r.netSalary, 0),
-      paidCount: records.filter((r) => r.status === 'Paid').length,
-      pendingCount: records.filter((r) => r.status === 'Pending' || r.status === 'Submitted').length,
+      paidCount: records.filter((r) => isSalaryPaid(r)).length,
+      pendingCount: records.filter((r) => !isSalaryPaid(r)).length,
       submittedCount: records.filter((r) => r.status === 'Submitted').length,
     };
   }, [records]);
@@ -142,17 +143,6 @@ export function useSalaryRegister(month: string, department: string = "") {
     [runMutation]
   );
 
-  /** Bulk Mark as Unpaid — Pending/Submitted stay; Paid reverts only inside
-   *  the 7-day correction window; the batch aborts atomically otherwise. */
-  const markUnpaidBulk = useCallback(
-    (ids: string[]) =>
-      runMutation(
-        () => bulkUpdateSalaryStatus(ids, { status: "Pending" }),
-        `Marked ${ids.length} salary record${ids.length === 1 ? "" : "s"} as unpaid — returned to Pending.`
-      ),
-    [runMutation]
-  );
-
   const generate = useCallback(
     () =>
       runMutation(
@@ -184,7 +174,6 @@ export function useSalaryRegister(month: string, department: string = "") {
     refresh,
     updateRecord,
     markPaidBulk,
-    markUnpaidBulk,
     generate,
     hasRecords: records.length > 0,
   };

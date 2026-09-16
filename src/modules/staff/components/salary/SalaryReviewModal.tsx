@@ -2,11 +2,13 @@
 //
 // "Review & Submit" popup for the Salary Register.
 //
-// Left selection panel (mirrors the Shop Ledger "Select shops" pattern): search,
-// All/None, checkbox list with pagination. The payslip preview is on the right
+// Left selection panel (mirrors the Shop Ledger "Select shops" pattern): a
+// FULL scrollable list — no pagination — with search, All/None (acting on the
+// employees actually visible under the current search + status filter), and
+// All / Unpaid / Paid status chips. The payslip preview is on the right
 // (read-only by default; the footer Edit toggles inline editing). "Submit
-// Selected" submits first (Pending → Paid); the "Send Payslip" button beside
-// it then opens the submitted-only Send Payslips popup (Mail / WhatsApp).
+// Selected" submits first (Pending → Paid); "Send Payslip" beside it opens
+// the submitted-only Send Payslips popup (Mail / WhatsApp).
 //
 // The popup is rendered through <AppShellModal> — the SAME shell as the Trip
 // List view: same full-width size (max-w 96rem below the app header), same
@@ -17,11 +19,13 @@
 // scope only). Flipping it translates this popup alone — the app behind
 // keeps the global language. Nothing is persisted.
 
-import { useState, useMemo, useCallback, useEffect, useId } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef, useId } from "react";
 import {
   Search,
   X,
   Download,
+  FileText,
+  Files,
   Save,
   Pencil,
   Loader2,
@@ -30,9 +34,7 @@ import {
   ListChecks,
   CheckSquare,
   Square,
-  Send,
-  ChevronLeft,
-  ChevronRight,
+  ChevronDown,
 } from "lucide-react";
 import { AppShellModal, Button } from "../../../../ui";
 import { useI18n } from "../../../../i18n";
@@ -42,20 +44,19 @@ import { ClassicPayslipSheet } from "./ClassicPayslipSheet";
 import { ViewLanguageToggle } from "../../../../ui/ViewLanguageToggle";
 import {
   computePayslipTotals,
+  isSalaryPaid,
   toAmountValues,
   type AmountFieldKey,
   type AmountValues,
 } from "./payslipModel";
+import { loadEmployees } from "../../../masters/employees/services/employeeService";
+import { SAMPLE_EMPLOYEE_LIST } from "../../services/staffSampleData";
 import { salaryDisplayText, salaryMatchesQuery } from "../../utils/salaryDisplay";
 import type { SalaryRecord } from "../../types/staffDashboard";
-
-/** Number of employees shown per page in the left selection list. */
-const PAGE_SIZE = 10;
 
 export type SalaryReviewModalProps = {
   monthLabel: string;
   records: SalaryRecord[];
-  pendingCount: number;
   onClose: () => void;
   /** Submit the given selected employee ids (Pending → Paid). */
   onSubmitSelected: (ids: string[]) => void;
@@ -64,9 +65,10 @@ export type SalaryReviewModalProps = {
   selectedIds: Set<string>;
   onToggleSelect: (id: string) => void;
   onToggleSelectAll: (ids: string[]) => void;
+  /** Download the given ids as INDIVIDUAL payslip PDFs (one file each). */
   onDownloadSelected: (ids: string[]) => void;
-  /** Open the Send Payslips popup (submitted employees only). */
-  onSendPayslips: () => void;
+  /** Download the given ids as ONE combined PDF (one page per employee). */
+  onDownloadSelectedCombined: (ids: string[]) => void;
 };
 
 type FieldKey = AmountFieldKey;
@@ -86,7 +88,6 @@ export function SalaryReviewModal(props: SalaryReviewModalProps) {
 function SalaryReviewModalBody({
   monthLabel,
   records,
-  pendingCount,
   onClose,
   onSubmitSelected,
   onSaveRecord,
@@ -94,7 +95,7 @@ function SalaryReviewModalBody({
   onToggleSelect,
   onToggleSelectAll,
   onDownloadSelected,
-  onSendPayslips,
+  onDownloadSelectedCombined,
 }: SalaryReviewModalProps) {
   const { t, language, toggleLanguage } = useI18n();
   const titleId = useId();
@@ -107,7 +108,10 @@ function SalaryReviewModalBody({
   const [dirty, setDirty] = useState<Record<string, boolean>>({});
   const [savingId, setSavingId] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
-  const [page, setPage] = useState(1);
+  // Download menu (footer): individual PDFs vs all-in-one PDF.
+  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
+  const downloadMenuRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
 
   const selected = useMemo(() => {
     const byId = records.find((r) => r.id === selectedId);
@@ -130,7 +134,7 @@ function SalaryReviewModalBody({
       statusFilter === "all"
         ? records
         : records.filter((r) =>
-            statusFilter === "paid" ? r.status === "Paid" : r.status !== "Paid"
+            statusFilter === "paid" ? isSalaryPaid(r) : !isSalaryPaid(r)
           );
     const q = query.trim();
     if (!q) return byStatus;
@@ -144,40 +148,36 @@ function SalaryReviewModalBody({
 
   const handleStatusFilterChange = useCallback((value: "all" | "unpaid" | "paid") => {
     setStatusFilter(value);
-    setPage(1);
   }, []);
 
-  const allIds = useMemo(() => records.map((r) => r.id), [records]);
+  const filteredIds = useMemo(() => filtered.map((r) => r.id), [filtered]);
   const selectedCount = selectedIds.size;
-  // Send-once: submitted (Paid) employees can be sent — the Send Payslip
-  // button enables only while at least one submitted payslip is still
-  // unsent on BOTH channels. Sending on either channel reduces the count.
-  const submittedCount = useMemo(
-    () =>
-      records.filter(
-        (r) =>
-          (r.status === "Paid" || r.status === "Submitted") &&
-          (r.emailsSent ?? 0) === 0 &&
-          (r.whatsappsSent ?? 0) === 0
-      ).length,
+  // Per-chip counts from the FULL record set — the chips must always show
+  // what each filter WILL list, even when a side is empty (e.g. nothing
+  // submitted yet → Paid = 0).
+  const statusCounts = useMemo(
+    () => ({
+      all: records.length,
+      unpaid: records.filter((r) => !isSalaryPaid(r)).length,
+      paid: records.filter((r) => isSalaryPaid(r)).length,
+    }),
     [records]
   );
-
-  // Pagination — show PAGE_SIZE employees at a time. `activePage` is clamped
-  // so the slice/indicator never overflow even if the list shrinks.
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
-  const activePage = Math.min(page, totalPages);
-  const pageRecords = useMemo(
-    () => filtered.slice((activePage - 1) * PAGE_SIZE, activePage * PAGE_SIZE),
-    [filtered, activePage]
+  // ONE-TIME SUBMIT: only the PENDING employees inside the selection are
+  // submitted. Already Submitted/Paid rows are never submitted again — even
+  // when "All" is selected — so the button counts exactly those.
+  const pendingSelectedIds = useMemo(
+    () => records.filter((r) => selectedIds.has(r.id) && r.status === "Pending").map((r) => r.id),
+    [records, selectedIds]
   );
+  const pendingSelectedCount = pendingSelectedIds.length;
 
   const handleQueryChange = useCallback((value: string) => {
     setQuery(value);
-    setPage(1);
   }, []);
 
-  // Arrow-key navigation across the current page.
+  // Arrow-key navigation across the full list; the active row is scrolled
+  // into view so keyboard users never lose their place.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const target = e.target as HTMLElement | null;
@@ -190,19 +190,71 @@ function SalaryReviewModalBody({
       ) {
         return;
       }
-      if (pageRecords.length === 0) return;
+      if (filtered.length === 0) return;
       if (e.key === "ArrowDown" || e.key === "ArrowUp") {
         e.preventDefault();
         const dir = e.key === "ArrowDown" ? 1 : -1;
-        const idx = pageRecords.findIndex((r) => r.id === selected?.id);
+        const idx = filtered.findIndex((r) => r.id === selected?.id);
         const nextIdx =
-          idx < 0 ? 0 : (idx + dir + pageRecords.length) % pageRecords.length;
-        setSelectedId(pageRecords[nextIdx].id);
+          idx < 0 ? 0 : (idx + dir + filtered.length) % filtered.length;
+        setSelectedId(filtered[nextIdx].id);
       }
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [pageRecords, selected]);
+  }, [filtered, selected]);
+
+  useEffect(() => {
+    if (!selectedId || !listRef.current) return;
+    const row = listRef.current.querySelector(`[data-emp-id="${CSS.escape(selectedId)}"]`);
+    row?.scrollIntoView({ block: "nearest" });
+  }, [selectedId]);
+
+  // Close the footer download menu on outside click / Escape.
+  useEffect(() => {
+    if (!downloadMenuOpen) return;
+    const onDocClick = (e: MouseEvent) => {
+      if (downloadMenuRef.current && !downloadMenuRef.current.contains(e.target as Node)) {
+        setDownloadMenuOpen(false);
+      }
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setDownloadMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDocClick);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDocClick);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [downloadMenuOpen]);
+
+  // Employee-master contact lookup — roster rows show the department beside
+  // the employee's mobile number.
+  const [contacts, setContacts] = useState<Record<number, string>>({});
+  useEffect(() => {
+    let cancelled = false;
+    loadEmployees()
+      .then((list) => {
+        if (cancelled) return;
+        const map: Record<number, string> = {};
+        for (const e of list as Array<{ id: number; phoneNumber?: string }>) {
+          if (e.phoneNumber) map[e.id] = e.phoneNumber;
+        }
+        setContacts(map);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        const map: Record<number, string> = {};
+        for (const e of SAMPLE_EMPLOYEE_LIST) {
+          if (e.id != null && e.phoneNumber) map[e.id] = e.phoneNumber;
+        }
+        setContacts(map);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const ensureDraft = useCallback(
     (record: SalaryRecord): FieldValues =>
@@ -261,16 +313,15 @@ function SalaryReviewModalBody({
   }, [selected, drafts, onSaveRecord]);
 
   const handleSubmit = useCallback(() => {
-    // Submit first (Pending → Paid); payslips are sent afterwards from the
-    // Send Payslips popup. A dirty edit on the viewed employee is saved first.
-    if (selectedCount === 0) return;
+    // Submit ONLY the pending employees of the selection (Pending → Paid) —
+    // one time. Already submitted/paid rows are skipped. A dirty edit on the
+    // viewed employee is saved first; the payslip email goes out from the
+    // page handler for exactly the submitted rows.
+    if (pendingSelectedCount === 0) return;
     const afterSave =
       selected && dirty[selected.id] ? handleSave() : Promise.resolve();
-    afterSave.then(() => onSubmitSelected([...selectedIds]));
-  }, [selected, selectedCount, dirty, handleSave, onSubmitSelected, selectedIds]);
-
-  const employeeUnit = (count: number) =>
-    count === 1 ? t("staff.review.employee_one") : t("staff.review.employee_other");
+    afterSave.then(() => onSubmitSelected(pendingSelectedIds));
+  }, [selected, pendingSelectedCount, pendingSelectedIds, dirty, handleSave, onSubmitSelected]);
 
   return (
     <AppShellModal open onClose={onClose} panelClassName="bg-white" ariaLabelledBy={titleId}>
@@ -279,24 +330,17 @@ function SalaryReviewModalBody({
         lang={language === "te" ? "te" : undefined}
       >
         {/* Header — the Trip List view treatment: gradient band, icon tile,
-            counts, and the round red-hover dismiss. */}
+            and the round red-hover dismiss. No count chips here — the table
+            footer and the status chips already carry the numbers. */}
         <div className="rounded-t-2xl border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/80">
           <div className="flex flex-col gap-4 px-6 py-4 sm:flex-row sm:items-center sm:justify-between md:px-8">
             <div className="flex min-w-0 flex-1 items-center gap-4 sm:flex-none">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-teal-400 text-white shadow-lg shadow-emerald-400/20">
                 <ClipboardCheck className="h-6 w-6" />
               </div>
-              <div className="min-w-0">
-                <h2 id={titleId} className="truncate text-lg font-bold tracking-tight text-slate-800 md:text-xl">
-                  {t("staff.review.title")} — {monthLabel}
-                </h2>
-                <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-100 bg-amber-50/80 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-500">
-                    {records.length} {employeeUnit(records.length)} · {pendingCount} {t("common.pending")} ·{" "}
-                    {submittedCount} {t("common.paid")}
-                  </span>
-                </div>
-              </div>
+              <h2 id={titleId} className="min-w-0 truncate text-lg font-bold tracking-tight text-slate-800 md:text-xl">
+                {t("staff.review.title")} — {monthLabel}
+              </h2>
             </div>
             <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-2 sm:w-auto">
               {/* Popup-scoped EN/తెలుగు pill, no tooltip — the app behind is untouched. */}
@@ -324,18 +368,14 @@ function SalaryReviewModalBody({
         {/* Body — employee selection + payslip preview (panels scroll inside). */}
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
           <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-            {/* LEFT: employee selection */}
-            <aside className="flex w-full shrink-0 flex-col overflow-hidden border-b border-slate-200 bg-slate-50/60 lg:w-80 lg:border-b-0 lg:border-r">
+            {/* LEFT: employee selection — full scrollable list, no pagination */}
+            <aside className="flex w-full shrink-0 flex-col overflow-hidden border-b border-slate-200 bg-slate-50/60 lg:w-[28rem] lg:border-b-0 lg:border-r">
               {/* Header */}
               <div className="border-b border-slate-200 bg-white px-4 py-3">
-                <h3 className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
-                  <ListChecks size={15} className="text-emerald-600" />
+                <h3 className="flex items-center gap-1.5 text-[15px] font-bold text-slate-800">
+                  <ListChecks size={16} className="text-emerald-600" />
                   {t("staff.review.review_employees")}
                 </h3>
-                <p className="mt-0.5 text-[11px] text-slate-500">
-                  {records.length} {employeeUnit(records.length)} ·{" "}
-                  {pendingCount} {t("common.pending")}
-                </p>
               </div>
 
               {/* Toolbar: search + bulk actions */}
@@ -349,7 +389,7 @@ function SalaryReviewModalBody({
                     onChange={(e) => handleQueryChange(e.target.value)}
                     placeholder={t("staff.review.search_placeholder")}
                     aria-label={t("staff.review.search_label")}
-                    className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50/70 pl-7 pr-8 text-xs text-slate-700 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50/70 pl-7 pr-8 text-[13px] text-slate-700 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                   />
                   {query && (
                     <button
@@ -363,7 +403,7 @@ function SalaryReviewModalBody({
                   )}
                 </div>
 
-                <div className="flex items-center justify-between text-[11px]">
+                <div className="flex items-center justify-between text-xs">
                   <span className="font-medium text-slate-500">
                     <span className="font-bold text-emerald-700 tabular-nums">{selectedCount}</span> {t("staff.review.selected")}
                   </span>
@@ -371,31 +411,45 @@ function SalaryReviewModalBody({
                     <span className="inline-flex items-center gap-0.5 rounded-lg bg-slate-100/80 p-0.5" role="group" aria-label={t("staff.register.filter_by_status")}>
                       {(
                         [
-                          { value: "all", label: t("common.all") },
-                          { value: "unpaid", label: t("staff.review.unpaid") },
-                          { value: "paid", label: t("common.paid") },
+                          { value: "all", label: t("common.all"), count: statusCounts.all },
+                          { value: "unpaid", label: t("common.pending"), count: statusCounts.unpaid },
+                          { value: "paid", label: t("common.paid"), count: statusCounts.paid },
                         ] as const
-                      ).map((opt) => (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => handleStatusFilterChange(opt.value)}
-                          aria-pressed={statusFilter === opt.value}
-                          className={`rounded-md px-2 py-1 text-[11px] font-semibold transition ${
-                            statusFilter === opt.value
-                              ? "bg-white text-emerald-700 shadow-sm"
-                              : "text-slate-500 hover:text-slate-800"
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
+                      ).map((opt) => {
+                        const active = statusFilter === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => handleStatusFilterChange(opt.value)}
+                            aria-pressed={active}
+                            title={`${opt.label} — ${opt.count}`}
+                            className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-bold transition-all duration-200 ${
+                              active
+                                ? "bg-emerald-600 text-white shadow-sm"
+                                : "text-slate-500 hover:bg-white hover:text-slate-800"
+                            }`}
+                          >
+                            {opt.label}
+                            <span
+                              className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums transition-colors duration-200 ${
+                                active ? "bg-white/25 text-white" : "bg-white text-slate-500 ring-1 ring-slate-200"
+                              }`}
+                            >
+                              {opt.count}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </span>
                     <span className="text-slate-300">|</span>
+                    {/* All/None act on the employees VISIBLE under the current
+                        search + status filter — never on the whole register. */}
                     <button
                       type="button"
-                      onClick={() => onToggleSelectAll(allIds)}
-                      className="rounded-md px-2 py-1 font-semibold text-emerald-600 transition hover:bg-emerald-50"
+                      onClick={() => onToggleSelectAll(filteredIds)}
+                      disabled={filteredIds.length === 0}
+                      className="rounded-md px-2 py-1 font-semibold text-emerald-600 transition hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-40"
                     >
                       <span className="inline-flex items-center gap-1"><CheckSquare size={12} /> {t("common.all")}</span>
                     </button>
@@ -412,117 +466,98 @@ function SalaryReviewModalBody({
                 </div>
               </div>
 
-              {/* Employee list — 10 at a time */}
-              <div className="flex min-h-0 flex-1 flex-col">
-                <div className="min-h-0 flex-1 overflow-y-auto px-1.5 py-1.5 overscroll-contain max-h-64 lg:max-h-none">
-                  {pageRecords.length > 0 ? (
-                    <ul className="space-y-0.5">
-                      {pageRecords.map((r) => {
-                        const isActive = r.id === selected?.id;
-                        const isSelected = selectedIds.has(r.id);
-                        const isBusy = savingId === r.id;
-                        const displayName = salaryDisplayText(r.employeeName, language);
-                        return (
-                          <li key={r.id}>
-                            <div
-                              onClick={() => setSelectedId(r.id)}
-                              className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 transition ${
-                                isActive
-                                  ? "bg-emerald-50 ring-1 ring-emerald-200"
-                                  : isSelected
-                                  ? "bg-emerald-50/40"
-                                  : "hover:bg-white"
-                              }`}
+              {/* Employee list — the full filtered roster, simply scrollable. */}
+              <div className="min-h-0 flex-1 overflow-y-auto px-1.5 py-1.5 overscroll-contain">
+                {filtered.length > 0 ? (
+                  <ul ref={listRef} className="space-y-0.5">
+                    {filtered.map((r) => {
+                      const isActive = r.id === selected?.id;
+                      const isSelected = selectedIds.has(r.id);
+                      const isBusy = savingId === r.id;
+                      const displayName = salaryDisplayText(r.employeeName, language);
+                      const mobile = contacts[r.employeeId] ?? "";
+                      return (
+                        <li key={r.id} data-emp-id={r.id}>
+                          <div
+                            onClick={() => setSelectedId(r.id)}
+                            className={`flex cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2 transition ${
+                              isActive
+                                ? "bg-emerald-50 ring-1 ring-emerald-200"
+                                : isSelected
+                                ? "bg-emerald-50/40"
+                                : "hover:bg-white"
+                            }`}
+                          >
+                            <span
+                              className="flex h-4 w-4 shrink-0 items-center justify-center"
+                              onClick={(e) => e.stopPropagation()}
                             >
-                              <span
-                                className="flex h-4 w-4 shrink-0 items-center justify-center"
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                {isBusy ? (
-                                  <Loader2 size={13} className="animate-spin text-emerald-500" />
-                                ) : (
-                                  <input
-                                    type="checkbox"
-                                    checked={isSelected}
-                                    onChange={() => onToggleSelect(r.id)}
-                                    aria-label={t("staff.review.select_employee", { name: r.employeeName })}
-                                    className="h-4 w-4 cursor-pointer accent-emerald-600"
-                                  />
-                                )}
-                              </span>
+                              {isBusy ? (
+                                <Loader2 size={13} className="animate-spin text-emerald-500" />
+                              ) : (
+                                <input
+                                  type="checkbox"
+                                  checked={isSelected}
+                                  onChange={() => onToggleSelect(r.id)}
+                                  aria-label={t("staff.review.select_employee", { name: r.employeeName })}
+                                  className="h-[18px] w-[18px] cursor-pointer accent-emerald-600"
+                                />
+                              )}
+                            </span>
 
-                              <span className="min-w-0 flex-1">
-                                <span
-                                  className={`block truncate text-[13px] leading-tight ${
-                                    isActive
-                                      ? "font-bold text-emerald-700"
-                                      : "font-medium text-slate-700"
-                                  }`}
-                                >
-                                  {displayName}
-                                </span>
-                                <span className="block truncate text-[10.5px] text-slate-400">
-                                  {salaryDisplayText(r.department, language)}
-                                </span>
-                              </span>
-
+                            <span className="min-w-0 flex-1">
                               <span
-                                className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
-                                  r.status === "Paid" || r.status === "Submitted"
-                                    ? "bg-emerald-50 text-emerald-700"
-                                    : "bg-amber-50 text-amber-600"
+                                className={`block truncate text-sm leading-tight ${
+                                  isActive
+                                    ? "font-bold text-emerald-700"
+                                    : "font-medium text-slate-700"
                                 }`}
                               >
-                                {r.status === "Paid" || r.status === "Submitted"
-                                  ? t("common.paid")
-                                  : t("common.pending")}
+                                {displayName}
                               </span>
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  ) : (
-                    <p className="px-2 py-8 text-center text-xs text-slate-400">
-                      {t("staff.review.no_match")}
-                    </p>
-                  )}
-                </div>
+                              <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-slate-400">
+                                <span className="truncate">{salaryDisplayText(r.department, language)}</span>
+                                {mobile && (
+                                  <>
+                                    <span className="text-slate-300">·</span>
+                                    <span className="truncate tabular-nums">{mobile}</span>
+                                  </>
+                                )}
+                              </span>
+                            </span>
 
-                {/* Pagination */}
-                {filtered.length > 0 && (
-                  <div className="flex shrink-0 items-center justify-between border-t border-slate-200 bg-white px-3 py-1.5">
-                    <span className="text-[11px] text-slate-400 tabular-nums">
-                      {`${(activePage - 1) * PAGE_SIZE + 1}–${Math.min(
-                        activePage * PAGE_SIZE,
-                        filtered.length
-                      )}`}
-                      <span className="text-slate-300"> {t("staff.review.of")} </span>
-                      {filtered.length}
-                    </span>
-                    <div className="flex items-center gap-1">
-                      <button
-                        type="button"
-                        onClick={() => setPage((p) => Math.max(1, p - 1))}
-                        disabled={activePage <= 1}
-                        aria-label={t("staff.review.prev_page")}
-                        className="flex h-6 w-6 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"
-                      >
-                        <ChevronLeft size={15} />
-                      </button>
-                      <span className="px-1 text-[11px] font-semibold text-slate-600 tabular-nums">
-                        {activePage}/{totalPages}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                        disabled={activePage >= totalPages}
-                        aria-label={t("staff.review.next_page")}
-                        className="flex h-6 w-6 items-center justify-center rounded-md text-slate-500 transition hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-30"
-                      >
-                        <ChevronRight size={15} />
-                      </button>
-                    </div>
+                            <span
+                              className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold ${
+                                isSalaryPaid(r)
+                                  ? "bg-emerald-50 text-emerald-700"
+                                  : "bg-amber-50 text-amber-600"
+                              }`}
+                            >
+                              {isSalaryPaid(r)
+                                ? t("common.paid")
+                                : t("common.pending")}
+                            </span>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                ) : query.trim() ? (
+                  <p className="px-2 py-8 text-center text-xs text-slate-400">
+                    {t("staff.review.no_match")}
+                  </p>
+                ) : (
+                  <div className="px-3 py-8 text-center">
+                    <p className="text-xs font-semibold text-slate-500">
+                      {statusFilter === "paid"
+                        ? t("staff.review.empty_paid")
+                        : t("staff.review.empty_pending")}
+                    </p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
+                      {statusFilter === "paid"
+                        ? t("staff.review.empty_paid_hint")
+                        : t("staff.review.empty_pending_hint")}
+                    </p>
                   </div>
                 )}
               </div>
@@ -600,41 +635,101 @@ function SalaryReviewModalBody({
             )}
           </div>
           <div className="flex flex-wrap items-center gap-2">
-            <Button
-              variant="secondary"
-              onClick={() => onDownloadSelected([...selectedIds])}
-              disabled={selectedCount === 0}
-              icon={
-                <span className={`inline-flex ${uiActionIconMotionClass.pdf}`}>
-                  <Download size={13} />
-                </span>
-              }
-            >
-              {t("common.download")} ({selectedCount})
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={onSendPayslips}
-              disabled={submittedCount === 0}
-              icon={
-                <span className={`inline-flex ${uiActionIconMotionClass.mail}`}>
-                  <Send size={13} />
-                </span>
-              }
-            >
-              {t("staff.review.send_payslips")} ({submittedCount})
-            </Button>
+            {/* Download menu — Individual PDFs (one file per employee) or ALL
+                selected payslips combined into ONE PDF. */}
+            <div className="relative" ref={downloadMenuRef}>
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  // One employee selected → download their single payslip
+                  // straight away; several → offer Individual PDFs or the
+                  // All in One PDF.
+                  if (selectedCount === 1) {
+                    onDownloadSelected([...selectedIds]);
+                  } else {
+                    setDownloadMenuOpen((o) => !o);
+                  }
+                }}
+                disabled={selectedCount === 0}
+                aria-haspopup={selectedCount > 1 ? "menu" : undefined}
+                aria-expanded={selectedCount > 1 ? downloadMenuOpen : undefined}
+                icon={
+                  <span className={`inline-flex ${uiActionIconMotionClass.pdf}`}>
+                    <Download size={13} />
+                  </span>
+                }
+              >
+                {t("common.download")} ({selectedCount})
+                <ChevronDown size={12} className={`transition-transform ${downloadMenuOpen ? "rotate-180" : ""}`} />
+              </Button>
+              {downloadMenuOpen && (
+                <div
+                  role="menu"
+                  aria-label={t("staff.review.download_menu_label")}
+                  className="absolute bottom-full right-0 z-50 mb-2 w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl animate-scale-in"
+                >
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setDownloadMenuOpen(false);
+                      onDownloadSelected([...selectedIds]);
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-[13px] font-semibold text-slate-700 transition hover:bg-emerald-50"
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
+                      <Files size={15} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block">
+                        {t(
+                          selectedCount === 1
+                            ? "staff.review.download_individual_one"
+                            : "staff.review.download_individual_other",
+                          { count: selectedCount }
+                        )}
+                      </span>
+                      <span className="block text-[11px] font-medium text-slate-400">{t("staff.register.download_individual_hint")}</span>
+                    </span>
+                  </button>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    onClick={() => {
+                      setDownloadMenuOpen(false);
+                      onDownloadSelectedCombined([...selectedIds]);
+                    }}
+                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-[13px] font-semibold text-slate-700 transition hover:bg-emerald-50"
+                  >
+                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-500">
+                      <FileText size={15} />
+                    </span>
+                    <span className="min-w-0 flex-1">
+                      <span className="block">
+                        {t(
+                          selectedCount === 1
+                            ? "staff.review.download_single_one"
+                            : "staff.review.download_single_other",
+                          { count: selectedCount }
+                        )}
+                      </span>
+                      <span className="block text-[11px] font-medium text-slate-400">{t("staff.register.download_single_hint")}</span>
+                    </span>
+                  </button>
+                </div>
+              )}
+            </div>
             <Button
               variant="success"
               onClick={handleSubmit}
-              disabled={selectedCount === 0}
+              disabled={pendingSelectedCount === 0}
               icon={
                 <span className={`inline-flex ${uiActionIconMotionClass.approve}`}>
                   <ClipboardCheck size={15} />
                 </span>
               }
             >
-              {t("staff.review.submit_selected")} ({selectedCount})
+              {t("staff.review.submit_selected")} ({pendingSelectedCount})
             </Button>
           </div>
         </div>

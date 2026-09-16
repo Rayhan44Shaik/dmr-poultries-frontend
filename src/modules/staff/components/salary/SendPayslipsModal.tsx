@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { AppShellModal, Button } from "../../../../ui";
 import { ScopedI18nProvider, useI18n, type Language } from "../../../../i18n";
+import { isSalaryPaid } from "./payslipModel";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import { usePopupGuard } from "./usePopupGuard";
 import { ViewLanguageToggle } from "../../../../ui/ViewLanguageToggle";
@@ -48,33 +49,10 @@ import { loadEmployees } from "../../../masters/employees/services/employeeServi
 import { generatePayslipPdf } from "../../services/payslipPdf";
 import { SAMPLE_EMPLOYEE_LIST } from "../../services/staffSampleData";
 import { salaryDisplayText, salaryMatchesQuery } from "../../utils/salaryDisplay";
+import { EMAIL_TEMPLATES, WA_TEMPLATES } from "./payslipMessages";
 import type { SalaryRecord } from "../../types/staffDashboard";
 
 export type SendChannel = "email" | "whatsapp";
-
-const EMAIL_TEMPLATES: Record<Language, { subject: string; body: (name: string, month: string) => string }> = {
-  en: {
-    subject: "Your Salary Payslip — {month}",
-    body: (name, month) =>
-      `Dear ${name},\n\nPlease find attached your salary payslip for ${month}.\n\nRegards,\nDMR POULTRIES`,
-  },
-  te: {
-    subject: "మీ జీతం పేస్లిప్ — {month}",
-    body: (name, month) =>
-      `ప్రియమైన ${name},\n\n${month} నెలకు సంబంధించిన మీ జీతం పేస్లిప్ జతచేయబడింది. దయచేసి అటాచ్మెంట్ను చూడండి.\n\nధన్యవాదాలు,\nDMR POULTRIES`,
-  },
-};
-
-const WA_TEMPLATES: Record<Language, { body: (name: string, month: string) => string }> = {
-  en: {
-    body: (name, month) =>
-      `Dear ${name},\n\nYour salary payslip for ${month} is attached with this message.\n\nRegards,\nDMR POULTRIES`,
-  },
-  te: {
-    body: (name, month) =>
-      `ప్రియమైన ${name},\n\n${month} నెలకు సంబంధించిన మీ జీతం పేస్లిప్ ఈ మెసేజ్తో జతచేయబడింది.\n\nధన్యవాదాలు,\nDMR POULTRIES`,
-  },
-};
 
 export type SendPayslipsModalProps = {
   monthLabel: string;
@@ -138,7 +116,7 @@ function SendPayslipsDialog({
 
   // Submitted-only recipient list (defensive: the page already filters).
   const submitted = useMemo(
-    () => records.filter((r) => r.status === "Paid" || r.status === "Submitted"),
+    () => records.filter((r) => isSalaryPaid(r)),
     [records]
   );
   // Everything starts selected; the user may narrow it down.
@@ -207,9 +185,6 @@ function SendPayslipsDialog({
     setEmailBody(EMAIL_TEMPLATES[language].body("{name}", monthLabel));
     setWaBody(WA_TEMPLATES[language].body("{name}", monthLabel));
   }
-
-  const contactOf = (employeeId: number, ch: SendChannel): string =>
-    ch === "email" ? emails[employeeId] ?? "" : phones[employeeId] ?? "";
 
   const recipients = useMemo(
     () =>
@@ -391,33 +366,64 @@ function SendPayslipsDialog({
         lang={language === "te" ? "te" : undefined}
       >
         {/* Header — the Trip List view treatment: gradient band, icon tile,
-            counts, and the round red-hover dismiss. */}
+            and the round red-hover dismiss. The Mail / WhatsApp toggle sits
+            centred at the top: its thumb slides between the two channels
+            (300 ms ease-out) and the colours cross-fade with it. */}
         <div className="rounded-t-2xl border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/80">
-          <div className="flex flex-col gap-4 px-6 py-4 sm:flex-row sm:items-center sm:justify-between md:px-8">
-            <div className="flex min-w-0 flex-1 items-center gap-4 sm:flex-none">
+          <div className="grid grid-cols-1 gap-3 px-6 py-4 md:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] md:items-center md:gap-4 md:px-8">
+            <div className="flex min-w-0 items-center gap-4">
               <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-teal-400 text-white shadow-lg shadow-emerald-400/20">
                 <Send className="h-6 w-6" />
               </div>
-              <div className="min-w-0">
-                <h2 id={titleId} className="truncate text-lg font-bold tracking-tight text-slate-800 md:text-xl">
-                  {t("staff.send.title")} — {monthLabel}
-                </h2>
-                <div className="mt-1.5 flex flex-wrap items-center gap-2">
-                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-emerald-100 bg-emerald-50 px-2.5 py-0.5 text-[10px] font-bold text-emerald-700">
-                    <CheckCircle2 size={11} />
-                    {t("staff.send.submitted_chip", { count: submitted.length })}
-                  </span>
-                  <span className="text-[11px] font-medium text-slate-500 tabular-nums">
-                    {t("staff.send.selected_line", {
-                      selected: targetRecords.length,
-                      total: submitted.length,
-                      month: monthLabel,
-                    })}
-                  </span>
-                </div>
+              <h2 id={titleId} className="min-w-0 truncate text-lg font-bold tracking-tight text-slate-800 md:text-xl">
+                {t("staff.send.title")} — {monthLabel}
+              </h2>
+            </div>
+            <div className="flex justify-start md:justify-center">
+              <div
+                role="tablist"
+                aria-label={t("staff.send.title")}
+                className="relative inline-flex h-10 w-72 shrink-0 items-center rounded-full border border-slate-200 bg-slate-100/90 p-1 shadow-sm"
+              >
+                <span
+                  aria-hidden="true"
+                  className={`absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-full shadow-md transition-[transform,background-color] duration-300 ease-[cubic-bezier(0.65,0,0.35,1)] ${
+                    channel === "email" ? "translate-x-0 bg-emerald-600" : "translate-x-full bg-[#25D366]"
+                  }`}
+                />
+                {(["email", "whatsapp"] as SendChannel[]).map((ch) => {
+                  const active = channel === ch;
+                  const count = withContact(ch);
+                  return (
+                    <button
+                      key={ch}
+                      role="tab"
+                      type="button"
+                      aria-selected={active}
+                      onClick={() => setChannel(ch)}
+                      className={`relative z-10 flex h-8 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2 text-[12.5px] font-bold transition-colors duration-300 ${
+                        active ? "text-white" : "text-slate-500 hover:text-slate-800"
+                      }`}
+                    >
+                      {ch === "email" ? (
+                        <Mail size={14} className={`shrink-0 transition-colors duration-300 ${active ? "text-white" : "text-slate-400"}`} />
+                      ) : (
+                        <WhatsAppBrandIcon size={14} className={`shrink-0 transition-colors duration-300 ${active ? "text-white" : "text-[#1DA851]"}`} />
+                      )}
+                      <span className="truncate">{t(ch === "email" ? "staff.send.channel_email" : "staff.send.channel_whatsapp")}</span>
+                      <span
+                        className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums transition-colors duration-300 ${
+                          active ? "bg-white/25 text-white" : "bg-white text-slate-500 ring-1 ring-slate-200"
+                        }`}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
               </div>
             </div>
-            <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-2 sm:w-auto">
+            <div className="flex items-center justify-start gap-2 md:justify-end">
               {/* Popup-scoped EN/తెలుగు pill, no tooltip — the app behind is untouched. */}
               <ViewLanguageToggle
                 language={language}
@@ -451,61 +457,20 @@ function SendPayslipsDialog({
           </div>
         ) : (
           <>
-            {/* Channel tabs — Mail / WhatsApp switch. */}
-            <div
-              role="tablist"
-              aria-label={t("staff.send.title")}
-              className="grid shrink-0 grid-cols-2 gap-2 border-b border-slate-100 bg-slate-50/60 px-6 py-2.5 md:px-8"
-            >
-              {(["email", "whatsapp"] as SendChannel[]).map((ch) => {
-                const active = channel === ch;
-                const count = withContact(ch);
-                return (
-                  <button
-                    key={ch}
-                    role="tab"
-                    type="button"
-                    aria-selected={active}
-                    onClick={() => setChannel(ch)}
-                    className={`flex h-10 items-center justify-center gap-2 rounded-xl border text-[13px] font-bold transition-all active:scale-[0.98] ${
-                      active
-                        ? ch === "email"
-                          ? "border-emerald-300 bg-emerald-50 text-emerald-700 shadow-sm"
-                          : "border-[#25D366]/40 bg-[#25D366]/10 text-[#128C3E] shadow-sm"
-                        : "border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-700"
-                    }`}
-                  >
-                    {ch === "email" ? <Mail size={15} /> : <WhatsAppBrandIcon size={15} />}
-                    {t(ch === "email" ? "staff.send.channel_email" : "staff.send.channel_whatsapp")}
-                    <span
-                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold tabular-nums ${
-                        active
-                          ? ch === "email"
-                            ? "bg-emerald-600 text-white"
-                            : "bg-[#25D366] text-white"
-                          : "bg-slate-100 text-slate-500"
-                      }`}
-                    >
-                      {count}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-
             {/* Body — recipient selection + message (panels scroll inside). */}
             <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
               <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
-                {/* LEFT: recipient selection */}
-                <aside className="flex w-full shrink-0 flex-col overflow-hidden border-b border-slate-200 bg-slate-50/60 lg:w-80 lg:border-b-0 lg:border-r">
+                {/* LEFT: recipient selection — the SAME panel structure as
+                    Review & Submit: white title block, search + "N selected"
+                    with All/None, then the full scrollable list. Rows carry
+                    the details that matter here: the contact for the active
+                    channel, plus a Ready / missing-contact badge. */}
+                <aside className="flex w-full shrink-0 flex-col overflow-hidden border-b border-slate-200 bg-slate-50/60 lg:w-[28rem] lg:border-b-0 lg:border-r">
                   <div className="border-b border-slate-200 bg-white px-4 py-3">
-                    <h3 className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
-                      <ListChecks size={15} className="text-emerald-600" />
+                    <h3 className="flex items-center gap-1.5 text-[15px] font-bold text-slate-800">
+                      <ListChecks size={16} className="text-emerald-600" />
                       {t("staff.send.select_recipients")}
                     </h3>
-                    <p className="mt-0.5 text-[11px] text-slate-500 tabular-nums">
-                      {targetRecords.length} / {submitted.length}
-                    </p>
                   </div>
 
                   <div className="space-y-2 border-b border-slate-200 bg-white px-3 py-2.5">
@@ -517,7 +482,7 @@ function SendPayslipsDialog({
                         onChange={(e) => handleQueryChange(e.target.value)}
                         placeholder={t("staff.send.search_placeholder")}
                         aria-label={t("staff.send.search_label")}
-                        className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50/70 pl-7 pr-8 text-xs text-slate-700 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                        className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50/70 pl-7 pr-8 text-[13px] text-slate-700 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                       />
                       {query && (
                         <button
@@ -531,7 +496,7 @@ function SendPayslipsDialog({
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between text-[11px]">
+                    <div className="flex items-center justify-between text-xs">
                       <span className="font-medium text-slate-500">
                         <span className="font-bold text-emerald-700 tabular-nums">{targetRecords.length}</span>{" "}
                         {t("staff.review.selected")}
@@ -539,7 +504,7 @@ function SendPayslipsDialog({
                       <div className="flex items-center gap-1">
                         <button
                           type="button"
-                          onClick={() => setSelectedIds(new Set(submitted.map((r) => r.id)))}
+                          onClick={() => setSelectedIds(new Set(filtered.map((r) => r.id)))}
                           className="rounded-md px-2 py-1 font-semibold text-emerald-600 transition hover:bg-emerald-50"
                         >
                           <span className="inline-flex items-center gap-1"><CheckSquare size={12} /> {t("common.all")}</span>
@@ -557,19 +522,21 @@ function SendPayslipsDialog({
                     </div>
                   </div>
 
-                  <div className="flex min-h-0 flex-1 flex-col">
-                    <div className="min-h-0 max-h-64 flex-1 overflow-y-auto overscroll-contain px-1.5 py-1.5 lg:max-h-none">
+                  <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-1.5 py-1.5">
                       {filtered.length > 0 ? (
                         <ul className="space-y-0.5">
                           {filtered.map((r) => {
                             const isActive = r.id === preview?.id;
                             const isSelected = selectedIds.has(r.id);
                             const contact = channel === "email" ? r.email : r.phone;
+                            // Secondary line: department beside the MOBILE
+                            // number (falls back to the channel contact).
+                            const detail = r.phone || contact;
                             return (
                               <li key={r.id}>
                                 <div
                                   onClick={() => selectPreview(r.id)}
-                                  className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 transition ${
+                                  className={`flex cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2 transition ${
                                     isActive
                                       ? channel === "email"
                                         ? "bg-emerald-50 ring-1 ring-emerald-200"
@@ -590,12 +557,12 @@ function SendPayslipsDialog({
                                       checked={isSelected}
                                       onChange={() => toggleSelect(r.id)}
                                       aria-label={t(channel === "email" ? "staff.send.aria_send_email" : "staff.send.aria_send_wa", { name: r.name })}
-                                      className={`h-4 w-4 cursor-pointer ${channel === "email" ? "accent-emerald-600" : "accent-[#25D366]"}`}
+                                      className={`h-[18px] w-[18px] cursor-pointer ${channel === "email" ? "accent-emerald-600" : "accent-[#25D366]"}`}
                                     />
                                   </span>
                                   <span className="min-w-0 flex-1">
                                     <span
-                                      className={`block truncate text-[13px] leading-tight ${
+                                      className={`block truncate text-sm leading-tight ${
                                         isActive
                                           ? channel === "email"
                                             ? "font-bold text-emerald-700"
@@ -605,13 +572,29 @@ function SendPayslipsDialog({
                                     >
                                       {r.name}
                                     </span>
-                                    <span
-                                      className={`block truncate text-[10.5px] tabular-nums ${
-                                        contact ? "text-slate-400" : "font-medium text-amber-600"
-                                      }`}
-                                    >
-                                      {contact || channelContactLabel(false)}
+                                    <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-slate-400">
+                                      <span className="truncate">{r.department}</span>
+                                      <span className="text-slate-300">·</span>
+                                      {detail ? (
+                                        <span className="truncate tabular-nums">{detail}</span>
+                                      ) : (
+                                        <span className="truncate font-medium text-amber-600">{channelContactLabel(false)}</span>
+                                      )}
                                     </span>
+                                  </span>
+
+                                  <span
+                                    className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold ${
+                                      contact
+                                        ? "bg-emerald-50 text-emerald-700"
+                                        : "bg-amber-50 text-amber-600"
+                                    }`}
+                                  >
+                                    {contact
+                                      ? channel === "email"
+                                        ? <><Mail size={10} /> {t("staff.send.ready")}</>
+                                        : <><WhatsAppBrandIcon size={10} /> {t("staff.send.ready")}</>
+                                      : <><AlertCircle size={10} /> {channelContactLabel(false)}</>}
                                   </span>
                                 </div>
                               </li>
@@ -623,13 +606,15 @@ function SendPayslipsDialog({
                           {t("staff.send.no_match", { query })}
                         </p>
                       )}
-                    </div>
-
                   </div>
                 </aside>
 
-                {/* RIGHT: recipient details + message */}
-                <div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-slate-100/60 px-4 py-4 sm:px-5">
+                {/* RIGHT: recipient details + message — keyed on the channel
+                    so a toggle cross-fades the panel in smoothly. */}
+                <div
+                  key={channel}
+                  className="min-h-0 flex-1 animate-fade-in space-y-3 overflow-y-auto bg-slate-100/60 px-4 py-4 sm:px-5"
+                >
                   {preview && previewRecord ? (
                     <>
                       <div className="rounded-xl border border-slate-100 bg-white px-3.5 py-3 text-xs shadow-xs">
@@ -853,19 +838,6 @@ function SendPayslipsDialog({
           </div>
           {submitted.length > 0 && (
             <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="secondary"
-                onClick={() => void handleDownloadAll()}
-                disabled={downloading || targetRecords.length === 0}
-                loading={downloading}
-                icon={
-                  <span className={`inline-flex ${uiActionIconMotionClass.pdf}`}>
-                    <Download size={13} />
-                  </span>
-                }
-              >
-                {downloading ? t("staff.send.preparing") : t("staff.send.download_pdfs")}
-              </Button>
               {channel === "email" ? (
                 <Button
                   variant="primary"

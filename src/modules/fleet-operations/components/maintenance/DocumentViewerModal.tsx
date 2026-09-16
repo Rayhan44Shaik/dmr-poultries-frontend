@@ -20,11 +20,11 @@ const DocumentViewerModal = ({ open, maintenanceId, doc, onClose }: DocumentView
 
   return (
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4"
+      className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 animate-fade-in"
       onClick={onClose}
     >
       <div
-        className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh]"
+        className="bg-white rounded-2xl border border-slate-200 shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] animate-scale-in"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="px-5 py-3.5 border-b border-slate-200 flex items-center justify-between gap-3">

@@ -71,3 +71,14 @@ export function computePayslipTotals(values: AmountValues): {
     values.otherDeductions;
   return { gross, deductions, net: gross - deductions };
 }
+
+// ---------------------------------------------------------------------------
+// Status model — ONE definition of "paid" shared by the register table, the
+// Review & Submit popup, the Send popup and every count/filter derived from
+// them. The one-time submit moves Pending → Paid, so a legacy "Submitted"
+// record (a month submitted before that change) must be displayed, counted
+// and filtered exactly like a Paid one — otherwise the table, the chips and
+// the register disagree about the same row.
+export function isSalaryPaid(record: Pick<SalaryRecord, "status">): boolean {
+  return record.status === "Paid" || record.status === "Submitted";
+}

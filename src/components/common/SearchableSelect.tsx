@@ -24,6 +24,14 @@ interface SearchableSelectProps {
   allowClear?: boolean;
   widthClass?: string;
   searchPlaceholder?: string;
+  /** Multi-select mode: rows toggle their check, the menu stays open. */
+  multi?: boolean;
+  /** Checked values in multi mode. */
+  selectedValues?: string[];
+  /** Toggle one value in multi mode. */
+  onToggleValue?: (value: string) => void;
+  /** Clear every selection in multi mode. */
+  onClearValues?: () => void;
 }
 
 /** Five 36px-at-default rows; rem keeps the visible window in scale. */
@@ -39,6 +47,10 @@ const SearchableSelect = ({
   allowClear = true,
   widthClass = 'w-56',
   searchPlaceholder = 'Search...',
+  multi = false,
+  selectedValues = [],
+  onToggleValue,
+  onClearValues,
 }: SearchableSelectProps) => {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -74,12 +86,27 @@ const SearchableSelect = ({
   }, [items, query]);
 
   const selectedLabel = items.find((opt) => opt.value === value)?.label;
-  const display = selectedLabel || placeholder;
+  // Multi trigger: the first pick's label, then a numeric "+N" (digits read
+  // the same in Telugu and English).
+  const multiCount = selectedValues.length;
+  const multiFirst = multiCount > 0 ? items.find((opt) => selectedValues.includes(opt.value))?.label : undefined;
+  const display = multi
+    ? (multiCount === 0 ? placeholder : multiCount === 1 ? multiFirst ?? placeholder : `${multiFirst ?? ''} +${multiCount - 1}`)
+    : selectedLabel || placeholder;
 
   const pick = (next: string) => {
     onChange(next);
     setOpen(false);
     setQuery('');
+  };
+
+  const pickRow = (next: string) => {
+    if (multi && onToggleValue) {
+      onToggleValue(next);
+      setQuery('');
+      return;
+    }
+    pick(next);
   };
 
   return (
@@ -95,7 +122,7 @@ const SearchableSelect = ({
         }}
         className={`h-9 px-3 ${widthClass} rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none bg-white text-slate-700 flex items-center justify-between gap-2 hover:border-slate-300 transition font-medium ${open ? 'ring-2 ring-blue-500/20 border-blue-500' : ''}`}
       >
-        <span className={`truncate ${value ? 'text-slate-700' : 'text-slate-400'}`}>
+        <span className={`truncate ${(multi ? multiCount > 0 : value) ? 'text-slate-700' : 'text-slate-400'}`}>
           {display}
         </span>
         <ChevronDown
@@ -127,13 +154,20 @@ const SearchableSelect = ({
           {allowClear && (
             <button
               type="button"
-              onClick={() => pick('')}
+              onClick={() => {
+                if (multi && onClearValues) {
+                  onClearValues();
+                  setQuery('');
+                  return;
+                }
+                pick('');
+              }}
               className={`w-full flex items-center gap-2 px-3 h-9 text-xs font-medium text-left border-b border-slate-100 hover:bg-slate-50 transition ${
-                !value ? 'text-blue-600 bg-blue-50/70' : 'text-slate-600'
+                (multi ? multiCount === 0 : !value) ? 'text-blue-600 bg-blue-50/70' : 'text-slate-600'
               }`}
             >
               <span className="w-3.5 shrink-0">
-                {!value && <Check size={13} className="text-blue-600" />}
+                {(multi ? multiCount === 0 : !value) && <Check size={13} className="text-blue-600" />}
               </span>
               <span className="truncate">{placeholder}</span>
             </button>
@@ -144,12 +178,12 @@ const SearchableSelect = ({
             style={{ maxHeight: LIST_MAX_HEIGHT }}
           >
             {filtered.map((opt) => {
-              const isSelected = value === opt.value;
+              const isSelected = multi ? selectedValues.includes(opt.value) : value === opt.value;
               return (
                 <li key={opt.value}>
                   <button
                     type="button"
-                    onClick={() => pick(opt.value)}
+                    onClick={() => pickRow(opt.value)}
                     className={`w-full flex items-center gap-2 px-3 h-9 text-xs font-medium text-left truncate hover:bg-slate-50 transition ${
                       isSelected ? 'text-blue-600 bg-blue-50/70' : 'text-slate-700'
                     }`}

@@ -21,6 +21,8 @@ import SearchableSelect from '../../../components/common/SearchableSelect';
 import MaintenanceTimeline, { type VehicleMeterEvent } from '../components/maintenance/MaintenanceTimeline';
 import UpcomingServices from '../components/maintenance/UpcomingServices';
 import { useMaintenanceData } from '../hooks/useMaintenanceData';
+import { formatVehicleNumber } from '../../../utils/format';
+import { localizeMaintenanceText } from '../utils/maintenanceLocalization';
 import { safeDate } from '../utils/maintenanceHelpers';
 import { useEmployees } from '../../masters/employees/hooks/useEmployees';
 
@@ -29,7 +31,7 @@ interface MaintenanceHistoryPageProps { embedded?: boolean }
 const STATUS_OPTIONS = ['Approved', 'Pending', 'Deleted'] as const;
 
 const MaintenanceHistoryPage = ({ embedded = false }: MaintenanceHistoryPageProps) => {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const data = useMaintenanceData('history');
   const { employees } = useEmployees();
   const [meterEvents, setMeterEvents] = useState<VehicleMeterEvent[]>([]);
@@ -53,6 +55,7 @@ const MaintenanceHistoryPage = ({ embedded = false }: MaintenanceHistoryPageProp
     toDate: '',
     search: '',
   });
+  const [pendingTypes, setPendingTypes] = useState<string[]>([]);
   const setPendingField = <K extends keyof typeof pending>(key: K, value: typeof pending[K]) =>
     setPending((prev) => ({ ...prev, [key]: value }));
 
@@ -60,6 +63,7 @@ const MaintenanceHistoryPage = ({ embedded = false }: MaintenanceHistoryPageProp
   // to the data hook at once, so both tables re-run with the new filters.
   const applyFilters = () => {
     data.setSelectedVehicle(pending.vehicle);
+    data.setSelectedMaintenanceType(pendingTypes.length ? pendingTypes.join('|') : 'all');
     data.setSelectedDriver(pending.driver);
     data.setSelectedMaintenanceType(pending.maintenanceType);
     data.setSelectedServiceType(pending.serviceType);
@@ -73,6 +77,7 @@ const MaintenanceHistoryPage = ({ embedded = false }: MaintenanceHistoryPageProp
   // full unfiltered view (all approved maintenance + all upcoming services).
   const clearFilters = () => {
     setPending({ vehicle: 'all', driver: 'all', maintenanceType: 'all', serviceType: 'all', status: 'all', fromDate: '', toDate: '', search: '' });
+    setPendingTypes([]);
     data.resetFilters();
   };
 
@@ -179,7 +184,7 @@ const MaintenanceHistoryPage = ({ embedded = false }: MaintenanceHistoryPageProp
               label={t('common.vehicle')}
               value={pending.vehicle === 'all' ? '' : pending.vehicle}
               placeholder={t('fleet.maintenance_history.all_vehicles')}
-              options={data.vehicles.map((vehicle: any) => ({ value: String(vehicle.id), label: vehicle.vehicleNumber }))}
+              options={data.vehicles.map((vehicle: any) => ({ value: String(vehicle.id), label: formatVehicleNumber(String(vehicle.vehicleNumber || '')) }))}
               onChange={(v) => setPendingField('vehicle', v || 'all')}
               searchable
               widthClass="w-48"
@@ -195,10 +200,14 @@ const MaintenanceHistoryPage = ({ embedded = false }: MaintenanceHistoryPageProp
             />
             <SearchableSelect
               label={t('operations.maintenance_type')}
-              value={pending.maintenanceType === 'all' ? '' : pending.maintenanceType}
+              value=""
               placeholder={t('fleet.maintenance_history.all_maintenance_types')}
-              options={data.maintenanceTypes}
-              onChange={(v) => setPendingField('maintenanceType', v || 'all')}
+              options={(data.maintenanceTypes as string[]).map((type) => ({ value: type, label: localizeMaintenanceText(type, language) }))}
+              onChange={() => {}}
+              multi
+              selectedValues={pendingTypes}
+              onToggleValue={(type) => setPendingTypes((current) => (current.includes(type) ? current.filter((x) => x !== type) : [...current, type]))}
+              onClearValues={() => setPendingTypes([])}
               searchable
               widthClass="w-56"
             />
