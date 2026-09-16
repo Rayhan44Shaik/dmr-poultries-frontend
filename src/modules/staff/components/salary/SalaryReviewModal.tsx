@@ -49,6 +49,8 @@ import {
   type AmountFieldKey,
   type AmountValues,
 } from "./payslipModel";
+import { loadEmployees } from "../../../masters/employees/services/employeeService";
+import { SAMPLE_EMPLOYEE_LIST } from "../../services/staffSampleData";
 import { salaryDisplayText, salaryMatchesQuery } from "../../utils/salaryDisplay";
 import type { SalaryRecord } from "../../types/staffDashboard";
 
@@ -224,6 +226,33 @@ function SalaryReviewModalBody({
     };
   }, [downloadMenuOpen]);
 
+  // Employee-master contact lookup — roster rows show the department beside
+  // the employee's mobile number.
+  const [contacts, setContacts] = useState<Record<number, string>>({});
+  useEffect(() => {
+    let cancelled = false;
+    loadEmployees()
+      .then((list) => {
+        if (cancelled) return;
+        const map: Record<number, string> = {};
+        for (const e of list as Array<{ id: number; phoneNumber?: string }>) {
+          if (e.phoneNumber) map[e.id] = e.phoneNumber;
+        }
+        setContacts(map);
+      })
+      .catch(() => {
+        if (cancelled) return;
+        const map: Record<number, string> = {};
+        for (const e of SAMPLE_EMPLOYEE_LIST) {
+          if (e.id != null && e.phoneNumber) map[e.id] = e.phoneNumber;
+        }
+        setContacts(map);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   const ensureDraft = useCallback(
     (record: SalaryRecord): FieldValues =>
       drafts[record.id] ?? toAmountValues(record),
@@ -335,11 +364,11 @@ function SalaryReviewModalBody({
         <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-contain">
           <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
             {/* LEFT: employee selection — full scrollable list, no pagination */}
-            <aside className="flex w-full shrink-0 flex-col overflow-hidden border-b border-slate-200 bg-slate-50/60 lg:w-96 lg:border-b-0 lg:border-r">
+            <aside className="flex w-full shrink-0 flex-col overflow-hidden border-b border-slate-200 bg-slate-50/60 lg:w-[28rem] lg:border-b-0 lg:border-r">
               {/* Header */}
               <div className="border-b border-slate-200 bg-white px-4 py-3">
-                <h3 className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
-                  <ListChecks size={15} className="text-emerald-600" />
+                <h3 className="flex items-center gap-1.5 text-[15px] font-bold text-slate-800">
+                  <ListChecks size={16} className="text-emerald-600" />
                   {t("staff.review.review_employees")}
                 </h3>
               </div>
@@ -355,7 +384,7 @@ function SalaryReviewModalBody({
                     onChange={(e) => handleQueryChange(e.target.value)}
                     placeholder={t("staff.review.search_placeholder")}
                     aria-label={t("staff.review.search_label")}
-                    className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50/70 pl-7 pr-8 text-xs text-slate-700 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                    className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50/70 pl-7 pr-8 text-[13px] text-slate-700 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                   />
                   {query && (
                     <button
@@ -369,7 +398,7 @@ function SalaryReviewModalBody({
                   )}
                 </div>
 
-                <div className="flex items-center justify-between text-[11px]">
+                <div className="flex items-center justify-between text-xs">
                   <span className="font-medium text-slate-500">
                     <span className="font-bold text-emerald-700 tabular-nums">{selectedCount}</span> {t("staff.review.selected")}
                   </span>
@@ -387,7 +416,7 @@ function SalaryReviewModalBody({
                           type="button"
                           onClick={() => handleStatusFilterChange(opt.value)}
                           aria-pressed={statusFilter === opt.value}
-                          className={`rounded-md px-2 py-1 text-[11px] font-semibold transition ${
+                          className={`rounded-md px-2 py-1 text-xs font-semibold transition ${
                             statusFilter === opt.value
                               ? "bg-white text-emerald-700 shadow-sm"
                               : "text-slate-500 hover:text-slate-800"
@@ -430,11 +459,12 @@ function SalaryReviewModalBody({
                       const isSelected = selectedIds.has(r.id);
                       const isBusy = savingId === r.id;
                       const displayName = salaryDisplayText(r.employeeName, language);
+                      const mobile = contacts[r.employeeId] ?? "";
                       return (
                         <li key={r.id} data-emp-id={r.id}>
                           <div
                             onClick={() => setSelectedId(r.id)}
-                            className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 transition ${
+                            className={`flex cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2 transition ${
                               isActive
                                 ? "bg-emerald-50 ring-1 ring-emerald-200"
                                 : isSelected
@@ -454,14 +484,14 @@ function SalaryReviewModalBody({
                                   checked={isSelected}
                                   onChange={() => onToggleSelect(r.id)}
                                   aria-label={t("staff.review.select_employee", { name: r.employeeName })}
-                                  className="h-4 w-4 cursor-pointer accent-emerald-600"
+                                  className="h-[18px] w-[18px] cursor-pointer accent-emerald-600"
                                 />
                               )}
                             </span>
 
                             <span className="min-w-0 flex-1">
                               <span
-                                className={`block truncate text-[13px] leading-tight ${
+                                className={`block truncate text-sm leading-tight ${
                                   isActive
                                     ? "font-bold text-emerald-700"
                                     : "font-medium text-slate-700"
@@ -469,13 +499,19 @@ function SalaryReviewModalBody({
                               >
                                 {displayName}
                               </span>
-                              <span className="block truncate text-[10.5px] text-slate-400">
-                                {salaryDisplayText(r.department, language)}
+                              <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-slate-400">
+                                <span className="truncate">{salaryDisplayText(r.department, language)}</span>
+                                {mobile && (
+                                  <>
+                                    <span className="text-slate-300">·</span>
+                                    <span className="truncate tabular-nums">{mobile}</span>
+                                  </>
+                                )}
                               </span>
                             </span>
 
                             <span
-                              className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                              className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold ${
                                 r.status === "Paid" || r.status === "Submitted"
                                   ? "bg-emerald-50 text-emerald-700"
                                   : "bg-amber-50 text-amber-600"

@@ -409,11 +409,11 @@ function SendPayslipsDialog({
               <div
                 role="tablist"
                 aria-label={t("staff.send.title")}
-                className="relative inline-flex h-9 w-60 shrink-0 items-center rounded-full border border-slate-200 bg-slate-100/90 p-1 shadow-sm"
+                className="relative inline-flex h-10 w-72 shrink-0 items-center rounded-full border border-slate-200 bg-slate-100/90 p-1 shadow-sm"
               >
                 <span
                   aria-hidden="true"
-                  className={`absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-full shadow transition-all duration-300 ease-out ${
+                  className={`absolute inset-y-1 left-1 w-[calc(50%-0.25rem)] rounded-full shadow-md transition-[transform,background-color] duration-300 ease-[cubic-bezier(0.65,0,0.35,1)] ${
                     channel === "email" ? "translate-x-0 bg-emerald-600" : "translate-x-full bg-[#25D366]"
                   }`}
                 />
@@ -427,15 +427,19 @@ function SendPayslipsDialog({
                       type="button"
                       aria-selected={active}
                       onClick={() => setChannel(ch)}
-                      className={`relative z-10 flex h-7 flex-1 items-center justify-center gap-1.5 rounded-full text-[12px] font-bold transition-colors duration-300 ${
+                      className={`relative z-10 flex h-8 min-w-0 flex-1 items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-2 text-[12.5px] font-bold transition-colors duration-300 ${
                         active ? "text-white" : "text-slate-500 hover:text-slate-800"
                       }`}
                     >
-                      {ch === "email" ? <Mail size={13} /> : <WhatsAppBrandIcon size={13} />}
-                      {t(ch === "email" ? "staff.send.channel_email" : "staff.send.channel_whatsapp")}
+                      {ch === "email" ? (
+                        <Mail size={14} className={`shrink-0 transition-colors duration-300 ${active ? "text-white" : "text-slate-400"}`} />
+                      ) : (
+                        <WhatsAppBrandIcon size={14} className={`shrink-0 transition-colors duration-300 ${active ? "text-white" : "text-[#1DA851]"}`} />
+                      )}
+                      <span className="truncate">{t(ch === "email" ? "staff.send.channel_email" : "staff.send.channel_whatsapp")}</span>
                       <span
-                        className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums transition-colors duration-300 ${
-                          active ? "bg-white/25 text-white" : "bg-slate-200/80 text-slate-600"
+                        className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums transition-colors duration-300 ${
+                          active ? "bg-white/25 text-white" : "bg-white text-slate-500 ring-1 ring-slate-200"
                         }`}
                       >
                         {count}
@@ -487,10 +491,10 @@ function SendPayslipsDialog({
                     with All/None, then the full scrollable list. Rows carry
                     the details that matter here: the contact for the active
                     channel, plus a Ready / missing-contact badge. */}
-                <aside className="flex w-full shrink-0 flex-col overflow-hidden border-b border-slate-200 bg-slate-50/60 lg:w-96 lg:border-b-0 lg:border-r">
+                <aside className="flex w-full shrink-0 flex-col overflow-hidden border-b border-slate-200 bg-slate-50/60 lg:w-[28rem] lg:border-b-0 lg:border-r">
                   <div className="border-b border-slate-200 bg-white px-4 py-3">
-                    <h3 className="flex items-center gap-1.5 text-sm font-bold text-slate-800">
-                      <ListChecks size={15} className="text-emerald-600" />
+                    <h3 className="flex items-center gap-1.5 text-[15px] font-bold text-slate-800">
+                      <ListChecks size={16} className="text-emerald-600" />
                       {t("staff.send.select_recipients")}
                     </h3>
                   </div>
@@ -504,7 +508,7 @@ function SendPayslipsDialog({
                         onChange={(e) => handleQueryChange(e.target.value)}
                         placeholder={t("staff.send.search_placeholder")}
                         aria-label={t("staff.send.search_label")}
-                        className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50/70 pl-7 pr-8 text-xs text-slate-700 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
+                        className="h-9 w-full rounded-lg border border-slate-200 bg-slate-50/70 pl-7 pr-8 text-[13px] text-slate-700 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20"
                       />
                       {query && (
                         <button
@@ -518,7 +522,7 @@ function SendPayslipsDialog({
                       )}
                     </div>
 
-                    <div className="flex items-center justify-between text-[11px]">
+                    <div className="flex items-center justify-between text-xs">
                       <span className="font-medium text-slate-500">
                         <span className="font-bold text-emerald-700 tabular-nums">{targetRecords.length}</span>{" "}
                         {t("staff.review.selected")}
@@ -551,11 +555,14 @@ function SendPayslipsDialog({
                             const isActive = r.id === preview?.id;
                             const isSelected = selectedIds.has(r.id);
                             const contact = channel === "email" ? r.email : r.phone;
+                            // Secondary line: department beside the MOBILE
+                            // number (falls back to the channel contact).
+                            const detail = r.phone || contact;
                             return (
                               <li key={r.id}>
                                 <div
                                   onClick={() => selectPreview(r.id)}
-                                  className={`flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 transition ${
+                                  className={`flex cursor-pointer items-center gap-2.5 rounded-xl px-2.5 py-2 transition ${
                                     isActive
                                       ? channel === "email"
                                         ? "bg-emerald-50 ring-1 ring-emerald-200"
@@ -576,12 +583,12 @@ function SendPayslipsDialog({
                                       checked={isSelected}
                                       onChange={() => toggleSelect(r.id)}
                                       aria-label={t(channel === "email" ? "staff.send.aria_send_email" : "staff.send.aria_send_wa", { name: r.name })}
-                                      className={`h-4 w-4 cursor-pointer ${channel === "email" ? "accent-emerald-600" : "accent-[#25D366]"}`}
+                                      className={`h-[18px] w-[18px] cursor-pointer ${channel === "email" ? "accent-emerald-600" : "accent-[#25D366]"}`}
                                     />
                                   </span>
                                   <span className="min-w-0 flex-1">
                                     <span
-                                      className={`block truncate text-[13px] leading-tight ${
+                                      className={`block truncate text-sm leading-tight ${
                                         isActive
                                           ? channel === "email"
                                             ? "font-bold text-emerald-700"
@@ -591,17 +598,19 @@ function SendPayslipsDialog({
                                     >
                                       {r.name}
                                     </span>
-                                    <span
-                                      className={`block truncate text-[10.5px] tabular-nums ${
-                                        contact ? "text-slate-400" : "font-medium text-amber-600"
-                                      }`}
-                                    >
-                                      {contact || channelContactLabel(false)}
+                                    <span className="flex min-w-0 items-center gap-1.5 text-[12px] text-slate-400">
+                                      <span className="truncate">{r.department}</span>
+                                      <span className="text-slate-300">·</span>
+                                      {detail ? (
+                                        <span className="truncate tabular-nums">{detail}</span>
+                                      ) : (
+                                        <span className="truncate font-medium text-amber-600">{channelContactLabel(false)}</span>
+                                      )}
                                     </span>
                                   </span>
 
                                   <span
-                                    className={`inline-flex shrink-0 items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                                    className={`inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-1 text-[11px] font-bold ${
                                       contact
                                         ? "bg-emerald-50 text-emerald-700"
                                         : "bg-amber-50 text-amber-600"
