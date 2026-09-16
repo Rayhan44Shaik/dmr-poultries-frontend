@@ -9,6 +9,7 @@ export type CollectionPerformanceSort =
   | "outstanding"
   | "sales"
   | "collections"
+  | "collectionsLow"
   | "recoveryHigh"
   | "recoveryLow"
   | "shop";
@@ -93,6 +94,9 @@ export function sortCollectionPerformance(
         break;
       case "collections":
         difference = b.collectionAmount - a.collectionAmount;
+        break;
+      case "collectionsLow":
+        difference = a.collectionAmount - b.collectionAmount;
         break;
       case "recoveryHigh":
         difference = collectionRecoveryPercentage(b) - collectionRecoveryPercentage(a);

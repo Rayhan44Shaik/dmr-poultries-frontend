@@ -54,6 +54,7 @@ test("collection performance supports deterministic amount and recovery sorting"
 
   assert.equal(sortCollectionPerformance(normalized, "outstanding")[0].shopName, "Balaji Traders");
   assert.equal(sortCollectionPerformance(normalized, "collections")[0].shopName, "Balaji Traders");
+  assert.equal(sortCollectionPerformance(normalized, "collectionsLow")[0].shopName, "Cash-only adjustment");
   assert.equal(sortCollectionPerformance(normalized, "recoveryHigh")[0].shopName, "Cash-only adjustment");
   assert.equal(sortCollectionPerformance(normalized, "recoveryLow")[0].shopName, "Balaji Traders");
   assert.deepEqual(

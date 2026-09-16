@@ -62,13 +62,42 @@ export default function CollectionPerformanceChart({
 
   return (
     <section className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
-      <header className="flex min-w-0 items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-white to-emerald-50/60 px-4 py-3.5">
-        <h2 className="truncate text-sm font-black tracking-tight text-slate-900">
-          {t("ops.dashboard.collection_performance.title")}
-        </h2>
-        <span className="shrink-0 text-[8.5px] font-bold tabular-nums text-slate-400">
-          {formatPeriod(fromDate, toDate, language)}
-        </span>
+      <header className="flex min-w-0 flex-col items-start justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-white to-emerald-50/60 px-4 py-3.5 sm:flex-row sm:gap-4">
+        <div className="min-w-0">
+          <Link
+            to={PENDING_COLLECTIONS_URL}
+            className="group/title inline-flex min-w-0 items-center gap-1.5"
+          >
+            <h2 className="truncate text-base font-black tracking-tight text-slate-900 transition-colors group-hover/title:text-emerald-700">
+              {t("ops.dashboard.collection_performance.title")}
+            </h2>
+            <ArrowUpRight size={13} className="shrink-0 text-slate-300 group-hover/title:text-emerald-600" aria-hidden="true" />
+          </Link>
+          <span aria-hidden="true" className="mt-1 block h-0.5 w-10 rounded-full bg-emerald-500" />
+          <p className="mt-1.5 truncate text-[10.5px] font-semibold tabular-nums text-slate-400">
+            {formatPeriod(fromDate, toDate, language)}
+          </p>
+        </div>
+
+        <label className="flex h-9 w-full items-center gap-2 rounded-lg border border-slate-200 bg-white px-2.5 shadow-xs sm:w-auto sm:shrink-0">
+          <span className="text-[9px] font-bold text-slate-400">
+            {t("ops.dashboard.collection_performance.sort_label")}
+          </span>
+          <select
+            value={sortBy}
+            onChange={(event) => setSortBy(event.target.value as CollectionPerformanceSort)}
+            className="min-w-0 flex-1 cursor-pointer border-0 bg-transparent p-0 text-[11px] font-extrabold text-slate-700 outline-none sm:max-w-[11rem]"
+            aria-label={t("ops.dashboard.collection_performance.sort_label")}
+          >
+            <option value="outstanding">{t("ops.dashboard.collection_performance.sort_outstanding")}</option>
+            <option value="sales">{t("ops.dashboard.collection_performance.sort_sales")}</option>
+            <option value="collections">{t("ops.dashboard.collection_performance.sort_collections")}</option>
+            <option value="collectionsLow">{t("ops.dashboard.collection_performance.sort_collections_low")}</option>
+            <option value="recoveryHigh">{t("ops.dashboard.collection_performance.sort_recovery_high")}</option>
+            <option value="recoveryLow">{t("ops.dashboard.collection_performance.sort_recovery_low")}</option>
+            <option value="shop">{t("ops.dashboard.collection_performance.sort_shop")}</option>
+          </select>
+        </label>
       </header>
 
       <div className="flex flex-1 flex-col p-4">
@@ -121,25 +150,6 @@ export default function CollectionPerformanceChart({
           </div>
         </div>
 
-        <label className="mt-3 flex h-8 items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50/70 px-2.5">
-          <span className="text-[9px] font-bold text-slate-400">
-            {t("ops.dashboard.collection_performance.sort_label")}
-          </span>
-          <select
-            value={sortBy}
-            onChange={(event) => setSortBy(event.target.value as CollectionPerformanceSort)}
-            className="min-w-0 flex-1 cursor-pointer border-0 bg-transparent p-0 text-right text-[9.5px] font-bold text-slate-700 outline-none"
-            aria-label={t("ops.dashboard.collection_performance.sort_label")}
-          >
-            <option value="outstanding">{t("ops.dashboard.collection_performance.sort_outstanding")}</option>
-            <option value="sales">{t("ops.dashboard.collection_performance.sort_sales")}</option>
-            <option value="collections">{t("ops.dashboard.collection_performance.sort_collections")}</option>
-            <option value="recoveryHigh">{t("ops.dashboard.collection_performance.sort_recovery_high")}</option>
-            <option value="recoveryLow">{t("ops.dashboard.collection_performance.sort_recovery_low")}</option>
-            <option value="shop">{t("ops.dashboard.collection_performance.sort_shop")}</option>
-          </select>
-        </label>
-
         {visibleRows.length === 0 ? (
           <div className="flex min-h-32 flex-1 flex-col items-center justify-center gap-2 text-center text-slate-400">
             <BarChart3 size={19} aria-hidden="true" />
@@ -153,17 +163,17 @@ export default function CollectionPerformanceChart({
               const rowRecovery = collectionRecoveryPercentage(row);
               const width = Math.min(100, Math.max(0, rowRecovery));
               return (
-                <div key={row.shopName} className="py-2">
-                  <div className="flex min-w-0 items-center justify-between gap-2">
-                    <span className="truncate text-[10px] font-bold text-slate-700" title={row.shopName}>
+                <div key={row.shopName} className="py-2.5">
+                  <div className="flex min-w-0 items-center justify-between gap-3">
+                    <span className="truncate text-sm font-extrabold leading-tight text-slate-800" title={row.shopName}>
                       {row.shopName}
                     </span>
-                    <span className="shrink-0 text-[9.5px] font-black tabular-nums text-emerald-700">
+                    <span className="shrink-0 text-xs font-black tabular-nums text-emerald-700">
                       {rowRecovery.toFixed(1)}%
                     </span>
                   </div>
                   <div
-                    className="mt-1 h-1.5 overflow-hidden rounded-full bg-rose-100"
+                    className="mt-1.5 h-2 overflow-hidden rounded-full bg-rose-100"
                     role="img"
                     aria-label={t("ops.dashboard.collection_performance.row_aria", {
                       shop: row.shopName,
@@ -172,7 +182,7 @@ export default function CollectionPerformanceChart({
                   >
                     <div className="h-full rounded-full bg-emerald-500" style={{ width: `${width}%` }} />
                   </div>
-                  <div className="mt-1 flex min-w-0 justify-between gap-2 text-[8px] font-bold tabular-nums text-slate-400">
+                  <div className="mt-1.5 flex min-w-0 justify-between gap-3 text-[10px] font-bold tabular-nums text-slate-500">
                     <span className="truncate" title={`${t("ops.dashboard.collection_performance.sales")}: ${formatINR(row.salesAmount)}`}>
                       {t("ops.dashboard.collection_performance.sales")} {formatINRCompact(row.salesAmount)}
                     </span>

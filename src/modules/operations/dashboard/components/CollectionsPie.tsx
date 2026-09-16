@@ -29,7 +29,6 @@ function lighten(hex: string, amt = 0.22): string {
 
 interface CollectionsPieProps {
   data: { name: string; value: number }[];
-  order?: "mode" | "amount";
 }
 
 interface EnrichedMode {
@@ -132,7 +131,7 @@ function CollectionTooltip({
  * Payment-mode donut with stable bank/cash colours, direct amount/share
  * callouts, a selected-period total, and the existing KPI summary beneath it.
  */
-export default function CollectionsPie({ data, order = "mode" }: CollectionsPieProps) {
+export default function CollectionsPie({ data }: CollectionsPieProps) {
   const { t } = useI18n();
   const chartData = useMemo(() => data ?? [], [data]);
 
@@ -146,15 +145,6 @@ export default function CollectionsPie({ data, order = "mode" }: CollectionsPieP
       gid: slug(d.name),
     }));
   }, [chartData]);
-
-  const orderedData = useMemo(
-    () => [...enrichedData].sort((a, b) =>
-      order === "amount"
-        ? b.value - a.value || a.name.localeCompare(b.name, "en-IN")
-        : a.name.localeCompare(b.name, "en-IN"),
-    ),
-    [enrichedData, order],
-  );
 
   const total = useMemo(
     () => enrichedData.reduce((sum, d) => sum + d.value, 0),
@@ -170,7 +160,6 @@ export default function CollectionsPie({ data, order = "mode" }: CollectionsPieP
     () => chartData.map((d) => `${d.name}:${Math.round(Number(d.value) || 0)}`).join("|"),
     [chartData]
   );
-  const sceneSignature = `${order}|${dataSignature}`;
 
   // recharts v3: the per-sector shape gets `isActive` for the hovered slice —
   // just lift it (bigger outer radius). The other slices stay fully solid.
@@ -271,7 +260,7 @@ export default function CollectionsPie({ data, order = "mode" }: CollectionsPieP
       <div className="relative min-h-[21.25rem] w-full flex-1" style={{ minHeight: "21.25rem" }}>
         <div className="absolute inset-0 flex items-center justify-center">
           <div
-            key={sceneSignature}
+            key={dataSignature}
             className="relative aspect-square w-full max-w-[20rem] animate-fade-in"
             style={{ aspectRatio: "1 / 1" }}
           >
@@ -290,7 +279,7 @@ export default function CollectionsPie({ data, order = "mode" }: CollectionsPieP
               <ResponsiveContainer width="100%" height="100%">
                 <PieChart>
                   <defs>
-                    {orderedData.map((d) => (
+                    {enrichedData.map((d) => (
                       <linearGradient key={d.gid} id={`cs-grad-${d.gid}`} x1="0%" y1="0%" x2="0%" y2="100%">
                         <stop offset="0%" stopColor={lighten(d.color)} />
                         <stop offset="100%" stopColor={d.color} />
@@ -298,7 +287,7 @@ export default function CollectionsPie({ data, order = "mode" }: CollectionsPieP
                     ))}
                   </defs>
                   <Pie
-                    data={orderedData}
+                    data={enrichedData}
                     dataKey="value"
                     nameKey="name"
                     cx="50%"
@@ -314,7 +303,7 @@ export default function CollectionsPie({ data, order = "mode" }: CollectionsPieP
                     animationDuration={760}
                     animationEasing="ease-out"
                   >
-                    {orderedData.map((d) => (
+                    {enrichedData.map((d) => (
                       <Cell key={d.gid} fill={`url(#cs-grad-${d.gid})`} />
                     ))}
                   </Pie>
@@ -334,7 +323,7 @@ export default function CollectionsPie({ data, order = "mode" }: CollectionsPieP
           </div>
         </div>
 
-        {orderedData.slice(0, 3).map((mode, index) => {
+        {enrichedData.slice(0, 3).map((mode, index) => {
           const onLeft = index === 1;
           const position = index === 0
             ? "right-0 top-[16%]"
