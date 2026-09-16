@@ -959,6 +959,9 @@ export default {
   // A background re-read: the rows stay on screen while this is up.
   'ops.mortality.updating': 'Updating…',
   'ops.mortality.aria.expand': 'Expand trip',
+  // The ↑↓ pair that sits on the highlighted trip row.
+  'ops.mortality.aria.previous_trip': 'Previous trip',
+  'ops.mortality.aria.next_trip': 'Next trip',
   'ops.mortality.aria.collapse': 'Collapse trip',
 
   // Applied filters indicator

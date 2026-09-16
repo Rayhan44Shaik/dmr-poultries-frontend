@@ -247,7 +247,7 @@ ok("table: header glyphs are coloured lucide icons", (tableHtml.match(/text-(ind
   // ── MOUSE: the row is the click target, and a click arms the keyboard ────
   ok("mouse: the trip row shows a pointer", tableHtml.includes("cursor-pointer"), "row does not look clickable");
   ok("mouse: grid text is not drag-selected into a toggle", tableHtml.includes("select-none"), "row would toggle on a text drag");
-  ok("mouse: clicking a row opens its detail", source.includes("onClick={(event) => {") && source.includes("event.currentTarget.focus();\n                        toggle(r.tripId);"), "row has no click handler");
+  ok("mouse: clicking a row selects and opens its detail", source.includes("event.currentTarget.focus();\n                        setSelectedTripId(r.tripId);\n                        toggle(r.tripId);"), "row has no click handler");
   ok("mouse: the chevron does not toggle twice", source.includes("event.stopPropagation();\n                              toggle(r.tripId);"), "chevron click would fight the row click");
 
   // ── THE PANEL IS SELECTABLE, AND KEEPS THE KEYBOARD ALIVE ───────────────
@@ -262,6 +262,27 @@ ok("table: header glyphs are coloured lucide icons", (tableHtml.match(/text-(ind
 }
 
 ok("table: expand affordance kept", tableHtml.includes("Expand trip") && tableHtml.includes("aria-expanded"), "expand control missing");
+
+/* ── 3a-bis. The trip the grid is on: highlighted, with its own ↑↓ ─────── */
+{
+  const rowStart = tableHtml.indexOf("<tbody");
+  const firstRow = tableHtml.slice(rowStart, tableHtml.indexOf("</tr>", rowStart));
+  ok("select: the grid rests on a trip as soon as it renders", firstRow.includes("border-emerald-500"), "no highlighted trip");
+  ok("select: the highlight is a tinted band plus an edge bar", firstRow.includes("bg-emerald-50/40") && firstRow.includes("border-l-2"), "highlight is not the emerald band + edge");
+  ok("select: the serial reads as the selected one", firstRow.includes("text-emerald-700"), "serial is not marked");
+  ok("select: ↑↓ sit on the highlighted trip", firstRow.includes("Previous trip") && firstRow.includes("Next trip") && (tableHtml.match(/aria-label="Previous trip"/g) || []).length === 1, `pairs=${(tableHtml.match(/aria-label="Previous trip"/g) || []).length}`);
+  ok("select: the pair is not repeated down the grid", (tableHtml.match(/Next trip/g) || []).length === 2, `mentions=${(tableHtml.match(/Next trip/g) || []).length}`);
+  ok("select: the first trip cannot step up", firstRow.includes("disabled"), "the ↑ control is live on the first row");
+  const lastRow = tableHtml.slice(tableHtml.lastIndexOf("<tr", tableHtml.indexOf("</tbody>")), tableHtml.indexOf("</tbody>"));
+  ok("select: only one pair is live at a time", (tableHtml.match(/aria-label="Next trip"/g) || []).length === 1, "more than one stepper rendered");
+  void lastRow;
+
+  const { readFileSync: readTable } = await import("node:fs");
+  const rowSource = readTable("src/modules/operations/mortality/components/TripLossTable.tsx", "utf8");
+  ok("select: the pair steps one trip, not a page", rowSource.includes("moveTo(records[index - 1], isOpen)") && rowSource.includes("moveTo(records[index + 1], isOpen)"), "in-table stepper does not move a single trip");
+  ok("select: the pair never toggles the row it sits on", (rowSource.match(/event.stopPropagation\(\);/g) || []).length >= 3, "stepper click would bubble into the row");
+  ok("select: the highlight follows the keyboard too", rowSource.includes("onFocus={() => setSelectedTripId(r.tripId)}") && rowSource.includes("setSelectedTripId(next.tripId);"), "keyboard moves do not move the highlight");
+}
 // The expanded cell belongs to a table that can be wider than its scroller, so
 // the panel must be pinned to the scroller's edge — otherwise its right half
 // (and the last table columns) render outside the visible card. The panel only
@@ -548,6 +569,7 @@ try {
     noEnglish("the table", teTableHtml);
     noEnglish("the trip panel", tePanelHtml);
     noEnglish("the cumulative summary", teSummaryHtml);
+    ok("telugu: the ↑↓ pair is labelled in Telugu", teTableHtml.includes("మునుపటి ట్రిప్") && teTableHtml.includes("తదుపరి ట్రిప్"), "stepper labels still English");
     ok("telugu: the keyboard hint names the click in Telugu", teTableHtml.includes("Enter లేదా క్లిక్") && !teTableHtml.includes("Enter or a click"), "hint still English");
     ok("telugu: section titles translated", tePanelHtml.includes("ట్రిప్ వివరాలు") && tePanelHtml.includes("బరువులు") && tePanelHtml.includes("రేట్లు"), "panel titles still English");
     ok("telugu: column names translated", teSummaryHtml.includes("పేరు") && teTableHtml.includes("ట్రిప్ నం.") && teTableHtml.includes("రోజు") && teTableHtml.includes("ఫారం"), "column names still English");
