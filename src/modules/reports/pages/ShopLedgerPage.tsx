@@ -1,23 +1,27 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { uiSearchInputWithClearClass } from '../../../shared/ui/uiTokens';
 import { format, subDays } from "date-fns";
 import {
+  ArrowDown,
   ArrowDownLeft,
+  ArrowUp,
+  ArrowUpDown,
   ArrowUpRight,
   Bird,
+  Calendar,
   CalendarDays,
   CheckCircle2,
   CheckSquare,
   Download,
   Eye,
   EyeOff,
+  FileSpreadsheet,
   FileStack,
   FileText,
+  Filter,
   IndianRupee,
   Layers,
   ListChecks,
   Loader2,
-  RefreshCw,
   RotateCcw,
   Scale,
   Search,
@@ -26,7 +30,6 @@ import {
   Weight,
   X,
 } from "lucide-react";
-import Select, { type StylesConfig } from "react-select";
 import { useShops } from "../../masters/shops/hooks/useShops";
 import type { Shop } from "../../masters/shops/types/shop";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
@@ -34,6 +37,19 @@ import { onShopDataChanged } from "../../../shared/events/shopDataEvents";
 import { useI18n } from "../../../i18n";
 import { DatePicker } from "../../../components/common/DatePicker";
 import { apiPost } from "../../../api";
+import { BrandRefreshButton, Pagination } from "../../../ui";
+import MasterDropdown, { type MasterDropdownOption } from "../../masters/components/MasterDropdown";
+import {
+  opsFilterCardClass,
+  opsFilterLabelClass,
+  opsInputClass,
+  opsPrimaryButtonClass,
+  opsSecondaryButtonClass,
+  opsPdfButtonClass,
+  opsExcelButtonClass,
+} from "../../../shared/ui/operationsStyles";
+import { shouldShowPagination, PAGINATION_DEFAULT_PAGE_SIZE } from "../../../shared/ui/paginationStyles";
+import { exportToExcel } from "../../../utils/exportUtils";
 import {
   fetchShopLedger,
   type ShopLedgerRow,
@@ -50,11 +66,6 @@ interface ShopLedgerProps {
 type ReportTypeFilter = "all" | "sales" | "collection";
 type WaReportType = "All" | "Sales" | "Collection";
 type WaScope = "selected" | "all";
-
-interface SelectOption {
-  value: string;
-  label: string;
-}
 
 interface WhatsAppSendPayload {
   reportType: WaReportType;
@@ -87,8 +98,41 @@ const REFRESH_TOAST_DURATION = 3500;
 const WA_SEND_COUNT_STORAGE_KEY = "dmr-shop-ledger-whatsapp-weekly-send-counts";
 const WA_LAST_SENT_STORAGE_KEY = "dmr-shop-ledger-whatsapp-weekly-last-sent";
 
-const PAGE_SIZES = [10, 15, 20, 25, 30] as const;
-const DEFAULT_PAGE_SIZE = 10;
+// Global pagination — one page-size system for the whole app (Trip List,
+// Collections, Shop Ledger all share it).
+const DEFAULT_PAGE_SIZE = PAGINATION_DEFAULT_PAGE_SIZE;
+
+/** Columns the ledger may be sorted by. Balance is deliberately excluded —
+ *  it is a running total whose order is defined by Date, never by size. */
+type LedgerSortKey =
+  | "date"
+  | "particulars"
+  | "birds"
+  | "weight"
+  | "rate"
+  | "debit"
+  | "credit";
+
+/** Stable, direction-aware comparator for ledger rows (opening row excluded
+ *  by the caller — it is pinned first and never sorted). */
+function compareLedgerTx(a: LedgerTransaction, b: LedgerTransaction, key: LedgerSortKey): number {
+  if (key === "date") return a.date.localeCompare(b.date);
+  if (key === "particulars") return a.particulars.localeCompare(b.particulars, undefined, { numeric: true });
+  return (a[key] ?? 0) - (b[key] ?? 0);
+}
+
+/** The Trip List's two-tone sort arrows, reused verbatim on ledger headers. */
+function LedgerSortArrows({ active, dir }: { active: boolean; dir?: "asc" | "desc" }) {
+  const base = "h-3.5 w-3.5 shrink-0 transition-colors";
+  const on = "text-emerald-600";
+  const off = "text-slate-400 group-hover/sort:text-slate-600";
+  return (
+    <span className="inline-flex items-center gap-0.5 shrink-0" aria-hidden="true">
+      <ArrowUp size={13} strokeWidth={2.7} className={`${base} ${active && dir === "asc" ? on : off}`} />
+      <ArrowDown size={13} strokeWidth={2.7} className={`${base} ${active && dir === "desc" ? on : off}`} />
+    </span>
+  );
+}
 
 function ShopLedgerWhatsAppIcon({ size = 16 }: { size?: number }) {
   return (
@@ -308,20 +352,16 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [currentPage, setCurrentPage] = useState(1);
+  /** Trip-List style explicit sort — null means natural ledger order.
+   *  Default view is LATEST FIRST (newest transactions on top). */
+  const [sortBy, setSortBy] = useState<LedgerSortKey | null>("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const [ledgerData, setLedgerData] = useState<LedgerTransaction[]>([]);
   const [ledgerLoading, setLedgerLoading] = useState(true);
   const [ledgerRefreshing, setLedgerRefreshing] = useState(false);
   const [ledgerError, setLedgerError] = useState<string | null>(null);
   const [refreshToast, setRefreshToast] = useState(false);
-
-  const shopOptions = useMemo(() => {
-    const all = [{ value: "All Shops", label: "All Shops" }];
-    const source = shops.map((shop: Shop) => shop.shopName);
-    const unique = Array.from(new Set(source));
-    const shopList = unique.map((name) => ({ value: name, label: name }));
-    return [...all, ...shopList];
-  }, [shops]);
 
   const selectedShopId = useMemo(() => {
     return appliedSelectedShop === "All Shops"
@@ -414,17 +454,25 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     return [...opening, ...scoped];
   }, [ledgerData, appliedReportType, appliedSearchTerm]);
 
-  const totalRows = useMemo(() => Math.max(0, filteredLedger.length - 1), [filteredLedger]);
+  /** Body rows (opening row excluded) with the applied search/type filters
+   *  AND the explicit Sort By selection — the single source the table, the
+   *  paginator and the Excel export all read, so they can never disagree. */
+  const sortedBody = useMemo(() => {
+    const body = filteredLedger.slice(1);
+    if (!sortBy) return body;
+    const dir = sortDir === "desc" ? -1 : 1;
+    return [...body].sort((a, b) => compareLedgerTx(a, b, sortBy) * dir);
+  }, [filteredLedger, sortBy, sortDir]);
+
+  const totalRows = useMemo(() => sortedBody.length, [sortedBody]);
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
   const safePage = Math.min(currentPage, totalPages);
-  const rangeStart = totalRows === 0 ? 0 : (safePage - 1) * pageSize + 1;
-  const rangeEnd = Math.min(totalRows, safePage * pageSize);
 
   const visibleRows = useMemo(() => {
     const opening = filteredLedger.slice(0, 1);
     const start = (safePage - 1) * pageSize;
-    return [...opening, ...filteredLedger.slice(1 + start, 1 + start + pageSize)];
-  }, [filteredLedger, safePage, pageSize]);
+    return [...opening, ...sortedBody.slice(start, start + pageSize)];
+  }, [filteredLedger, sortedBody, safePage, pageSize]);
 
   const summary = useMemo(() => {
     const tx = filteredLedger.slice(1);
@@ -845,6 +893,64 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     setAppliedReportType("all");
     setAppliedSearchTerm("");
 
+    // Reset returns to the page's standard state: latest-first date order.
+    setSortBy("date");
+    setSortDir("desc");
+    setCurrentPage(1);
+  }, []);
+
+  /** First click sorts ascending; second flips to descending; a third click
+   *  on the active column clears the sort (Trip List contract, same here). */
+  const handleSortChange = useCallback(
+    (key: LedgerSortKey) => {
+      if (sortBy !== key) {
+        setSortBy(key);
+        setSortDir("asc");
+      } else if (sortDir === "asc") {
+        setSortDir("desc");
+      } else {
+        setSortBy(null);
+        setSortDir("asc");
+      }
+      setCurrentPage(1);
+    },
+    [sortBy, sortDir],
+  );
+
+  /** The Sort By dropdown commits a `key:dir` pair (or "" to clear). */
+  const handleSortValueChange = useCallback((value: string) => {
+    if (!value) {
+      setSortBy(null);
+      setSortDir("asc");
+      setCurrentPage(1);
+      return;
+    }
+    const [key, direction] = value.split(":");
+    setSortBy(key as LedgerSortKey);
+    setSortDir(direction === "desc" ? "desc" : "asc");
+    setCurrentPage(1);
+  }, []);
+
+  /** Remove ONE applied filter from the indicator pills — resets that draft
+   *  and its applied value, so the ledger refetches immediately. */
+  const clearAppliedFilter = useCallback((which: "dates" | "shop" | "type" | "search") => {
+    if (which === "dates") {
+      const defaultFrom = toWeekAgoDefault();
+      const defaultTo = toDateDefault();
+      setDateFrom(defaultFrom);
+      setDateTo(defaultTo);
+      setAppliedDateFrom(defaultFrom);
+      setAppliedDateTo(defaultTo);
+    } else if (which === "shop") {
+      setSelectedShop("All Shops");
+      setAppliedSelectedShop("All Shops");
+    } else if (which === "type") {
+      setReportType("all");
+      setAppliedReportType("all");
+    } else {
+      setSearchValue("");
+      setAppliedSearchTerm("");
+    }
     setCurrentPage(1);
   }, []);
 
@@ -868,6 +974,45 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     setRefreshToast(true);
     setRefreshNonce((n) => n + 1);
   }, []);
+
+  /** Excel export — the exact rows on screen (applied filters + sort), in the
+   *  same shape as the ledger table. Trip List uses the same shared util. */
+  const handleExportExcel = useCallback(() => {
+    const rows = sortedBody;
+    if (rows.length === 0) {
+      showNotification("No ledger rows to export for the current filters.", "error");
+      return;
+    }
+    const headers = [
+      "Date",
+      "Particulars",
+      "Type",
+      "Payment Mode",
+      "Birds",
+      "Weight (KG)",
+      "Rate",
+      "Debit",
+      "Credit",
+      "Balance",
+    ];
+    const data = rows.map((tx) => [
+      tx.date,
+      tx.particulars,
+      tx.type === "sale" ? "Sale" : tx.type === "collection" ? "Collection" : "Correction",
+      normalizePaymentMode(tx.paymentMode) || "-",
+      tx.type === "sale" ? tx.birds : 0,
+      tx.type === "sale" ? Number(tx.weight.toFixed(2)) : 0,
+      tx.type === "sale" ? Number(tx.rate.toFixed(2)) : 0,
+      Number(tx.debit.toFixed(2)),
+      Number(tx.credit.toFixed(2)),
+      Number(tx.balance.toFixed(2)),
+    ]);
+    const shopLabel = appliedSelectedShop === "All Shops" ? "All Shops" : appliedSelectedShop;
+    const title = `Shop Ledger — ${shopLabel} (${formatDisplayDate(appliedDateFrom)} to ${formatDisplayDate(appliedDateTo)})`;
+    const filename = `Shop_Ledger_${appliedSelectedShop === "All Shops" ? "All_Shops" : appliedSelectedShop.replace(/\s+/g, "_")}_${appliedDateFrom}_to_${appliedDateTo}`;
+    exportToExcel(title, headers, data, filename);
+    showNotification("Shop Ledger exported to Excel.", "success");
+  }, [sortedBody, appliedSelectedShop, appliedDateFrom, appliedDateTo, showNotification]);
 
   // ─── WhatsApp modal state ──────────────────────────────────
   const [whatsappOpen, setWhatsappOpen] = useState(false);
@@ -1305,161 +1450,241 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     showNotification,
   ]);
 
-  // ─── React-Select styles (original) ───
-  const selectStyles = useMemo<StylesConfig<SelectOption, false>>(() => ({
-    control: (base) => ({
-      ...base,
-      borderRadius: "0.5rem",
-      borderColor: "#cbd5e1",
-      boxShadow: "none",
-      minHeight: "2.375rem",
-      fontSize: "0.875rem",
-      "&:hover": { borderColor: "#94a3b8" },
-      "&:focus-within": {
-        borderColor: "#3b82f6",
-        boxShadow: "0 0 0 3px rgba(59, 130, 246, 0.15)",
-      },
-    }),
-    option: (base, { isFocused, isSelected }) => ({
-      ...base,
-      backgroundColor: isSelected ? "#2563eb" : isFocused ? "#eff6ff" : "white",
-      color: isSelected ? "white" : "#1e293b",
-      fontSize: "0.8125rem",
-      padding: "0.375rem 0.75rem",
-    }),
-    menu: (base) => ({
-      ...base,
-      zIndex: 9999,
-      borderRadius: 8,
-      overflow: "hidden",
-      boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)",
-      border: "1px solid #f1f5f9",
-    }),
-    menuList: (base) => ({
-      ...base,
-      maxHeight: "200px",
-    }),
-    placeholder: (base) => ({
-      ...base,
-      color: "#94a3b8",
-    }),
-  }), []);
+  // ─── Filter dropdown models — identical chrome to the Trip List toolbar ───
+  // Shop options feed the shared MasterDropdown (searchable, clearable). The
+  // "All Shops" sentinel is an EMPTY value, so the dropdown shows its
+  // placeholder and the clear affordance behaves exactly like Trip Filters.
+  const shopDropdownOptions = useMemo<MasterDropdownOption[]>(() => {
+    const seen = new Set<string>();
+    return shops.flatMap((shop: Shop) => {
+      const name = String(shop.shopName || "").trim();
+      if (!name || seen.has(name)) return [];
+      seen.add(name);
+      return [{ value: name, label: name, searchText: name }];
+    });
+  }, [shops]);
 
-  const reportTypeOptions: { value: ReportTypeFilter; label: string }[] = [
-    { value: "all", label: "All" },
+  const reportTypeOptions: MasterDropdownOption[] = [
     { value: "sales", label: "Sales" },
     { value: "collection", label: "Collection" },
   ];
 
-  const actionButtonClass =
-    "inline-flex h-9 items-center gap-1.5 rounded-lg border px-3.5 text-[13px] font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-500/30";
+  /** Field name + direction — the exact Sort By model the Trip List uses. */
+  const sortOptions: MasterDropdownOption[] = [
+    { value: "date:asc", label: "Date — Oldest first" },
+    { value: "date:desc", label: "Date — Latest first" },
+    { value: "particulars:asc", label: "Particulars — A to Z" },
+    { value: "particulars:desc", label: "Particulars — Z to A" },
+    { value: "birds:asc", label: "Birds — Low to High" },
+    { value: "birds:desc", label: "Birds — High to Low" },
+    { value: "weight:asc", label: "Weight (KG) — Low to High" },
+    { value: "weight:desc", label: "Weight (KG) — High to Low" },
+    { value: "rate:asc", label: "Rate — Low to High" },
+    { value: "rate:desc", label: "Rate — High to Low" },
+    { value: "debit:asc", label: "Debit — Low to High" },
+    { value: "debit:desc", label: "Debit — High to Low" },
+    { value: "credit:asc", label: "Credit — Low to High" },
+    { value: "credit:desc", label: "Credit — High to Low" },
+  ];
+  const sortValue = sortBy ? `${sortBy}:${sortDir}` : "";
 
-  const iconOnlyButtonClass =
-    "inline-flex h-9 w-9 items-center justify-center rounded-lg border shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-500/30";
+  // ─── Applied-filter pills (Mortality-style indicator) ───
+  // One pill per committed filter, each individually removable.
+  const appliedFilterPills = useMemo(() => {
+    const pills: { key: "dates" | "shop" | "type" | "search"; label: string; value: string }[] = [];
+    const defaultFrom = toWeekAgoDefault();
+    const defaultTo = toDateDefault();
+    if (appliedDateFrom !== defaultFrom || appliedDateTo !== defaultTo) {
+      pills.push({ key: "dates", label: "Date", value: `${formatDisplayDate(appliedDateFrom)} → ${formatDisplayDate(appliedDateTo)}` });
+    }
+    if (appliedSelectedShop !== "All Shops") {
+      pills.push({ key: "shop", label: t("common.shop"), value: appliedSelectedShop });
+    }
+    if (appliedReportType !== "all") {
+      pills.push({ key: "type", label: "Type", value: appliedReportType === "sales" ? "Sales" : "Collection" });
+    }
+    if (appliedSearchTerm.trim()) {
+      pills.push({ key: "search", label: t("common.search"), value: appliedSearchTerm.trim() });
+    }
+    return pills;
+  }, [appliedDateFrom, appliedDateTo, appliedSelectedShop, appliedReportType, appliedSearchTerm, t]);
 
-  const iconOnlyTone =
-    "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900";
+  /** Clickable column header — Trip List's three-state sort contract:
+   *  first click asc, second desc, third clears back to ledger order. */
+  const sortableHeader = (key: LedgerSortKey, icon: React.ReactNode, label: string, center = false) => {
+    const active = sortBy === key;
+    return (
+      <button
+        type="button"
+        onClick={() => handleSortChange(key)}
+        aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+        className={`group/sort flex items-center gap-2 w-full uppercase tracking-wider font-bold text-[12px] transition-colors hover:text-emerald-700 ${
+          center ? "justify-center" : ""
+        } ${active ? "text-emerald-700" : ""}`}
+      >
+        {icon}
+        <span>{label}</span>
+        <LedgerSortArrows active={active} dir={sortDir} />
+      </button>
+    );
+  };
 
-  const searchButtonClass =
-    "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800";
-
-  const resetButtonClass =
-    "border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 focus-visible:outline-none";
-
-  const pdfButtonClass =
-    "border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 focus-visible:outline-none";
-
-  const labelClass = "block text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1";
-
-  // ─── UI (Original Colors) ──────────────────────────────────
+  // ─── UI — Trip-List style toolbar, pills, table and global pagination ───
   return (
-    <div className={`w-full space-y-4 animate-in fade-in duration-500 text-slate-800 ${
+    <div className={`w-full space-y-5 animate-in fade-in duration-200 text-slate-800 ${
       embedded ? '' : 'px-3 md:px-6 py-4 bg-slate-50/50 min-h-screen'
     }`}>
-      <div className="bg-white rounded-2xl p-4 md:p-6 border border-slate-200/85 shadow-sm space-y-4">
-
-        {/* ── FILTER ROW ───────────────────────────────────── */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="min-w-0">
-            <label className={labelClass}>Date From</label>
-            <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="From date" className="w-full" />
-          </div>
-          <div className="min-w-0">
-            <label className={labelClass}>Date To</label>
-            <DatePicker value={dateTo} onChange={setDateTo} placeholder="To date" className="w-full" />
-          </div>
-          <div className="min-w-0">
-            <label className={labelClass}>Shop</label>
-            <Select
-              options={shopOptions}
-              value={shopOptions.find((opt) => opt.value === selectedShop)}
-              onChange={(selected) => {
-                setSelectedShop(selected?.value || "All Shops");
-              }}
-              isSearchable
-              placeholder="Search or select shop..."
-              styles={selectStyles}
-              maxMenuHeight={200}
+      {/* ── FILTER CARD — identical chrome & colours to the Trip List ─────── */}
+      <div className={opsFilterCardClass}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+          <div>
+            <label className={opsFilterLabelClass}>
+              <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
+              <span>{t("common.from")}</span>
+            </label>
+            <DatePicker
+              value={dateFrom}
+              onChange={setDateFrom}
+              placeholder={t("placeholder.enter_date")}
+              className="w-full text-xs font-medium"
             />
           </div>
-          <div className="min-w-0">
-            <label className={labelClass}>Report Type</label>
-            <Select
+
+          <div>
+            <label className={opsFilterLabelClass}>
+              <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
+              <span>{t("common.to")}</span>
+            </label>
+            <DatePicker
+              value={dateTo}
+              onChange={setDateTo}
+              placeholder={t("placeholder.enter_date")}
+              className="w-full text-xs font-medium"
+            />
+          </div>
+
+          <div>
+            <label className={opsFilterLabelClass}>
+              <Store size={17} className="text-emerald-500 flex-shrink-0" />
+              <span>{t("common.shop")}</span>
+            </label>
+            <MasterDropdown
+              hideLabel
+              label={t("common.shop")}
+              value={selectedShop === "All Shops" ? "" : selectedShop}
+              options={shopDropdownOptions}
+              onChange={(next) => setSelectedShop(next || "All Shops")}
+              placeholder="All Shops"
+              searchable
+              allowClear
+              className="w-full"
+            />
+          </div>
+
+          <div>
+            <label className={opsFilterLabelClass}>
+              <Layers size={17} className="text-amber-500 flex-shrink-0" />
+              <span>Report Type</span>
+            </label>
+            <MasterDropdown
+              hideLabel
+              label="Report Type"
+              value={reportType === "all" ? "" : reportType}
               options={reportTypeOptions}
-              value={reportTypeOptions.find((opt) => opt.value === reportType)}
-              onChange={(selected) => {
-                setReportType((selected?.value as ReportTypeFilter) || "all");
-              }}
-              placeholder="All"
-              styles={selectStyles}
-              maxMenuHeight={200}
+              onChange={(next) => setReportType((next as ReportTypeFilter) || "all")}
+              placeholder={t("common.all")}
+              searchable
+              allowClear
+              className="w-full"
+            />
+          </div>
+
+          <div>
+            <label className={opsFilterLabelClass}>
+              <ArrowUpDown size={17} className="text-violet-500 flex-shrink-0" />
+              <span>{t("common.sort_by")}</span>
+            </label>
+            <MasterDropdown
+              hideLabel
+              label={t("common.sort_by")}
+              value={sortValue}
+              options={sortOptions}
+              onChange={handleSortValueChange}
+              placeholder="No sorting"
+              searchable
+              allowClear
+              className="w-full"
             />
           </div>
         </div>
 
-        {/* ── ACTION ROW ───────────────────────────────────── */}
-        <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 md:flex-row md:items-center">
-          {/* Search box fills the available empty space; actions stay right. */}
-          <div className="relative min-w-0 flex-1">
-            <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={searchValue}
-              onChange={(e) => setSearchValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleSearch();
-              }}
-              placeholder="Search all details — date, particulars, birds, weight, rate, debit, credit, payment mode…"
-              aria-label="Search all Shop Ledger details"
-              className={uiSearchInputWithClearClass}
-            />
-            {searchValue && (
-              <button
-                type="button"
-                onClick={() => setSearchValue("")}
-                aria-label="Clear search"
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:text-slate-600"
-              >
-                <X size={13} />
-              </button>
-            )}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-end pt-1">
+          <div className="lg:col-span-7">
+            <label className={opsFilterLabelClass}>
+              <Search size={17} className="text-slate-400 flex-shrink-0" />
+              <span>{t("common.search")}</span>
+            </label>
+            <div className="relative">
+              <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSearch();
+                }}
+                placeholder="Search all details — date, particulars, birds, weight, rate, debit, credit, payment mode…"
+                aria-label="Search all Shop Ledger details"
+                className={`${opsInputClass} pl-10 ${searchValue ? "pr-9" : ""}`}
+              />
+              {searchValue && (
+                <button
+                  type="button"
+                  onClick={() => setSearchValue("")}
+                  aria-label="Clear search"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:text-slate-600"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <button type="button" onClick={handleSearch} className={`${actionButtonClass} ${searchButtonClass}`}>
-              <Search size={14} /> Search
+
+          <div className="lg:col-span-5 flex items-center gap-2 justify-end flex-wrap">
+            <button type="button" onClick={handleSearch} className={`group relative ${opsPrimaryButtonClass}`} aria-label={t("common.search")}>
+              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-search)]"><Search size={15} /></span>
+              {t("common.search")}
             </button>
-            <button type="button" onClick={handleReset} className={`${actionButtonClass} ${resetButtonClass}`}>
-              <RotateCcw size={14} /> Reset
+            <button type="button" onClick={handleReset} className={`group relative ${opsSecondaryButtonClass}`} aria-label={t("common.reset")}>
+              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>
+              {t("common.reset")}
             </button>
+            <BrandRefreshButton onClick={handleRefresh} loading={ledgerRefreshing} />
             <button
               type="button"
               onClick={() => void handleExportPDF()}
               disabled={pdfGenerating}
               title={appliedSelectedShop === "All Shops" ? "Generate PDFs for all shops" : `Generate PDF for ${appliedSelectedShop}`}
-              className={`${actionButtonClass} ${pdfButtonClass} disabled:opacity-60`}
+              className={`group relative ${opsPdfButtonClass} disabled:opacity-60`}
+              aria-label="PDF"
             >
-              {pdfGenerating ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
-              {pdfProgress ?? (appliedSelectedShop === "All Shops" ? "PDF" : "PDF")}
+              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-pdf)]">
+                {pdfGenerating ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />}
+              </span>
+              {pdfProgress ?? "PDF"}
+            </button>
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              disabled={sortedBody.length === 0}
+              title="Export the filtered ledger to Excel"
+              className={`group relative ${opsExcelButtonClass} disabled:opacity-60`}
+              aria-label="Excel"
+            >
+              <span className={`inline-flex ${sortedBody.length > 0 ? "motion-safe:group-hover:animate-[var(--animate-action-excel)]" : ""}`}>
+                <FileSpreadsheet size={15} />
+              </span>
+              Excel
             </button>
             <button
               type="button"
@@ -1467,28 +1692,58 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               title="WhatsApp"
               aria-label="WhatsApp"
               disabled={waSending}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#25D366]/50 bg-[#25D366] text-white shadow-sm transition hover:bg-[#1DA851] focus:outline-none focus:ring-2 focus:ring-[#25D366]/35 disabled:cursor-not-allowed disabled:opacity-60"
+              className="group inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#25D366]/50 bg-[#25D366] text-white shadow-sm transition hover:bg-[#1DA851] focus:outline-none focus:ring-2 focus:ring-[#25D366]/35 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <ShopLedgerWhatsAppIcon size={17} />
-            </button>
-            <button
-              type="button"
-              onClick={handleRefresh}
-              title="Refresh"
-              aria-label="Refresh"
-              disabled={ledgerRefreshing}
-              className={`${iconOnlyButtonClass} ${iconOnlyTone} disabled:opacity-60`}
-            >
-              <RefreshCw size={16} className={ledgerRefreshing ? "animate-spin" : ""} />
+              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-whatsapp)]">
+                <ShopLedgerWhatsAppIcon size={17} />
+              </span>
             </button>
           </div>
         </div>
+      </div>
 
-        {ledgerError && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-2.5 text-xs text-amber-800">
-            {ledgerError}
-          </div>
-        )}
+      {/* ── APPLIED FILTERS — one removable pill per committed filter,
+             exactly like the Mortality / Trip Loss page ─────────────────── */}
+      {appliedFilterPills.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2">
+          <Filter size={14} className="flex-shrink-0 text-amber-600" />
+          <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700">Applied Filters</span>
+          <span className="flex flex-wrap items-center gap-1.5">
+            {appliedFilterPills.map((pill) => (
+              <span
+                key={pill.key}
+                className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-white/80 px-2.5 py-0.5 text-[11px] leading-5 text-amber-800"
+              >
+                <span className="font-medium text-amber-600">{pill.label}</span>
+                <span className="font-semibold tabular-nums">{pill.value}</span>
+                <button
+                  type="button"
+                  onClick={() => clearAppliedFilter(pill.key)}
+                  aria-label={`Clear ${pill.label} filter`}
+                  className="group ml-0.5 rounded-full p-0.5 text-amber-400 transition-colors hover:bg-amber-100 hover:text-amber-700"
+                >
+                  <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-close)]">
+                    <X size={11} strokeWidth={2.75} />
+                  </span>
+                </button>
+              </span>
+            ))}
+          </span>
+          <button
+            type="button"
+            onClick={handleReset}
+            className="ml-auto flex-shrink-0 rounded-md px-2 py-1 text-[11px] font-semibold text-amber-600 transition-colors hover:bg-amber-100 hover:text-amber-800"
+          >
+            {t("common.clear")}
+          </button>
+        </div>
+      )}
+
+      {ledgerError && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-2.5 text-xs text-amber-800">
+          {ledgerError}
+        </div>
+      )}
 
         {/* ── KPI CARDS (only for an applied date/shop filter) ── */}
         {hasKpiFilter ? (
@@ -1522,73 +1777,51 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           </div>
         )}
 
-        {/* ── TABLE ────────────────────────────────────────── */}
-        <div className="rounded-2xl border border-slate-200/70 overflow-hidden bg-white shadow-sm">
-          <div className="overflow-x-auto max-h-[70vh]">
+      {/* ── TABLE — same card & header treatment as the Trip List ────────── */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden text-xs md:text-sm">
+        <div className="flex items-center justify-between gap-3 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-blue-50/60 via-white to-blue-50/40">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-blue-50/70 border border-blue-100 flex items-center justify-center text-blue-500 shadow-inner">
+              <Store className="w-5 h-5" />
+            </div>
+            <h3 className="text-base font-bold text-slate-800 tracking-tight">Shop Ledger</h3>
+          </div>
+          <span className="rounded-full border border-blue-100 bg-blue-50/80 px-2.5 py-1 text-[11px] font-bold text-blue-700 tabular-nums whitespace-nowrap">
+            {totalRows === 0 ? "No rows" : `${totalRows} row${totalRows === 1 ? "" : "s"}`}
+            {appliedSelectedShop !== "All Shops" ? ` · ${appliedSelectedShop}` : ""}
+          </span>
+        </div>
+        <div className="overflow-x-auto max-h-[70vh]">
             <table className="min-w-full text-sm">
               <thead className="sticky top-0 bg-slate-100/95 backdrop-blur-sm border-b border-slate-200 text-slate-700 shadow-sm">
                 <tr>
+                  {/* Flat 2D icons — no solid tiles, just the coloured glyph */}
                   <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-500 text-white">
-                        <CalendarDays size={13} />
-                      </span>
-                      Date
-                    </span>
+                    {sortableHeader("date", <CalendarDays size={16} className="text-indigo-500 shrink-0" />, "Date")}
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-500 text-white">
-                        <Store size={13} />
-                      </span>
-                      Particulars
-                    </span>
+                    {sortableHeader("particulars", <Store size={16} className="text-emerald-500 shrink-0" />, "Particulars")}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-500 text-white">
-                        <Bird size={13} />
-                      </span>
-                      Birds
-                    </span>
+                    {sortableHeader("birds", <Bird size={16} className="text-amber-500 shrink-0" />, "Birds", true)}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-cyan-500 text-white">
-                        <Weight size={13} />
-                      </span>
-                      Weight (KG)
-                    </span>
+                    {sortableHeader("weight", <Weight size={16} className="text-cyan-500 shrink-0" />, "Weight (KG)", true)}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-violet-500 text-white">
-                        <IndianRupee size={13} />
-                      </span>
-                      Rate
-                    </span>
+                    {sortableHeader("rate", <IndianRupee size={16} className="text-violet-500 shrink-0" />, "Rate", true)}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-green-500 text-white">
-                        <ArrowUpRight size={13} />
-                      </span>
-                      Debit
-                    </span>
+                    {sortableHeader("debit", <ArrowUpRight size={16} className="text-green-500 shrink-0" />, "Debit", true)}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-sky-500 text-white">
-                        <ArrowDownLeft size={13} />
-                      </span>
-                      Credit
-                    </span>
+                    {sortableHeader("credit", <ArrowDownLeft size={16} className="text-sky-500 shrink-0" />, "Credit", true)}
                   </th>
+                  {/* Balance is a running total — its order is defined by Date,
+                      so it is the one column that never sorts. */}
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-500 text-white">
-                        <Scale size={13} />
-                      </span>
+                    <span className="inline-flex items-center gap-1.5 justify-center">
+                      <Scale size={16} className="text-slate-500 shrink-0" />
                       Balance
                     </span>
                   </th>
@@ -1659,48 +1892,22 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             </table>
           </div>
 
-          {/* ── PAGINATION ─────────────────────────────────── */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-2.5">
-            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-500">
-              <span>{totalRows === 0 ? "0–0 of 0" : `${rangeStart}–${rangeEnd} of ${totalRows}`}</span>
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                aria-label={t("common.rows_per_page")}
-                className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/25"
-              >
-                {PAGE_SIZES.map((size) => (
-                  <option key={size} value={size}>{size} / page</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                disabled={safePage <= 1}
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
-                aria-label={t("common.previous_page")}
-              >
-                {t("common.previous")}
-              </button>
-              <span className="px-2 text-xs font-medium text-slate-600">{safePage} / {totalPages}</span>
-              <button
-                type="button"
-                disabled={safePage >= totalPages}
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
-                aria-label={t("common.next_page")}
-              >
-                {t("common.next")}
-              </button>
-            </div>
-          </div>
+          {/* ── GLOBAL PAGINATION — the shared app-wide pager (Trip List,
+                 Collections and Shop Ledger all render this one) ───────── */}
+          {shouldShowPagination(totalRows) && (
+            <Pagination
+              page={safePage}
+              pageSize={pageSize}
+              totalItems={totalRows}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+              }}
+              disabled={ledgerLoading || ledgerRefreshing}
+            />
+          )}
         </div>
-      </div>
 
       {/* ── REFRESHED TOAST (top-right) ─────────────────────── */}
       {refreshToast && (
@@ -2009,30 +2216,30 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               </button>
             </div>
 
-            {/* Top bar */}
+            {/* Top bar — same dropdown chrome as the page toolbar */}
             <div className="grid grid-cols-1 gap-3 border-b border-slate-100 px-5 py-3 sm:grid-cols-2 lg:grid-cols-4">
               <div>
-                <label className={labelClass}>Report Type</label>
-                <Select
+                <label className={opsFilterLabelClass}>Report Type</label>
+                <MasterDropdown
+                  hideLabel
+                  label="Report Type"
+                  value={waReportType === "All" ? "" : waReportType}
                   options={[
-                    { value: "All", label: "All (Sales + Collection)" },
                     { value: "Sales", label: "Sales" },
                     { value: "Collection", label: "Collection" },
                   ]}
-                  value={{
-                    value: waReportType,
-                    label: waReportType === "All" ? "All (Sales + Collection)" : waReportType,
-                  }}
-                  onChange={(selected) => {
-                    setWaReportType((selected?.value as WaReportType) || "All");
+                  onChange={(next) => {
+                    setWaReportType((next as WaReportType) || "All");
                     resetWaSucceeded();
                   }}
-                  styles={selectStyles}
-                  maxMenuHeight={200}
+                  placeholder="All (Sales + Collection)"
+                  searchable
+                  allowClear
+                  className="w-full"
                 />
               </div>
               <div>
-                <label className={labelClass}>Date From</label>
+                <label className={opsFilterLabelClass}>Date From</label>
                 <DatePicker
                   value={waDateFrom}
                   onChange={(value) => {
@@ -2045,7 +2252,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                 />
               </div>
               <div>
-                <label className={labelClass}>Date To</label>
+                <label className={opsFilterLabelClass}>Date To</label>
                 <DatePicker
                   value={waDateTo}
                   onChange={(value) => {
@@ -2058,7 +2265,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                 />
               </div>
               <div>
-                <label className={labelClass}>Recipient</label>
+                <label className={opsFilterLabelClass}>Recipient</label>
                 <div className="grid grid-cols-2 gap-2">
                   {[
                     { value: "selected" as const, label: "Selected" },
@@ -2250,7 +2457,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                       </div>
 
                       <div>
-                        <label className={labelClass}>Message preview</label>
+                        <label className={opsFilterLabelClass}>Message preview</label>
                         <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded-xl border border-emerald-100 bg-emerald-50/50 px-3.5 py-3 font-sans text-[11px] leading-relaxed text-slate-700">
                           {waPreviewMessage}
                         </pre>
