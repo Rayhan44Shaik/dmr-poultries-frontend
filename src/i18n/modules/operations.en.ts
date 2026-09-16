@@ -896,6 +896,10 @@ export default {
   'ops.mortality.kpi.weight_loss': 'Weight Loss',
   'ops.mortality.kpi.weight_loss_pct': 'Weight Loss %',
   'ops.mortality.kpi.filtered_summary': 'Summary for the applied filter',
+  // Cumulative summary — below the table, totals for EVERY page
+  'ops.mortality.cumulative.title': 'Cumulative Summary',
+  'ops.mortality.cumulative.scope': '{trips} trips · {shops} shops',
+  'ops.mortality.cumulative.hint': 'Totals cover every page of the filtered set, not just the {rows} rows on screen.',
 
   // Table columns
   'ops.mortality.col.source_farm': 'Farm',

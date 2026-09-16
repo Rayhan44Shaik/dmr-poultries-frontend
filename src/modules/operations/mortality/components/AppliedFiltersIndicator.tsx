@@ -5,6 +5,7 @@
 import { Filter, X } from "lucide-react";
 import type { LossFilters } from "../hooks/useTripLossAnalysis";
 import { useI18n } from "../../../../i18n";
+import { localizeTripViewText } from "../../vehicle-trips/utils/tripViewLocalization";
 
 interface AppliedFiltersIndicatorProps {
   appliedFilters: LossFilters;
@@ -15,7 +16,7 @@ export default function AppliedFiltersIndicator({
   appliedFilters,
   onClear,
 }: AppliedFiltersIndicatorProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
 
   const parts: { label: string; value: string }[] = [];
 
@@ -26,10 +27,12 @@ export default function AppliedFiltersIndicator({
     parts.push({ label: t("ops.mortality.applied_filters.to"), value: appliedFilters.toDate });
   }
   if (appliedFilters.sourceFarm.trim()) {
-    parts.push({ label: t("ops.mortality.applied_filters.farm"), value: appliedFilters.sourceFarm });
+    // Farm and supervisor names read in Telugu script, exactly as they do in the
+    // table below — a pill that stayed in Latin would be the last English on the page.
+    parts.push({ label: t("ops.mortality.applied_filters.farm"), value: localizeTripViewText(appliedFilters.sourceFarm, language) });
   }
   if (appliedFilters.supervisor.trim()) {
-    parts.push({ label: t("ops.mortality.applied_filters.supervisor"), value: appliedFilters.supervisor });
+    parts.push({ label: t("ops.mortality.applied_filters.supervisor"), value: localizeTripViewText(appliedFilters.supervisor, language) });
   }
   if (appliedFilters.search.trim()) {
     parts.push({ label: t("ops.mortality.applied_filters.search"), value: appliedFilters.search });

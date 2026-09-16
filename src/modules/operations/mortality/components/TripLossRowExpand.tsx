@@ -31,10 +31,13 @@ import { HeartPulse, Scale, Truck } from "lucide-react";
 import type { TripLossAnalysis } from "../hooks/useTripLossAnalysis";
 import { formatNumber, formatWeight } from "../../../../utils/format";
 import { formatTripListDay } from "../../vehicle-trips/utils/formatTripListDay";
+import { localizeTripViewText } from "../../vehicle-trips/utils/tripViewLocalization";
 import { useI18n } from "../../../../i18n";
 
 interface TripLossRowExpandProps {
   record: TripLossAnalysis;
+  /** Localised weight unit, e.g. "kg" / "కేజీ". */
+  weightUnit?: string;
 }
 
 /**
@@ -112,23 +115,27 @@ function Pair({ label, value, tone, rule = true }: {
   );
 }
 
-export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
+export default function TripLossRowExpand({ record, weightUnit = "kg" }: TripLossRowExpandProps) {
   const { t, language } = useI18n();
-  const crew = (names?: string[]) => (names && names.length > 0 ? names.join(", ") : "—");
+  // Trip data is localised the way the Trip List rows are: names read in Telugu
+  // script and the figures stay numeric.
+  const view = (value?: string | null) => localizeTripViewText(value, language);
+  const crew = (names?: string[]) =>
+    names && names.length > 0 ? names.map((name) => view(name)).join(", ") : "—";
 
   /** Trip facts, two pairs per row — trip no + day, vehicle + supervisor, … */
   const detailRows: Array<Array<{ label: string; value: React.ReactNode; tone?: string }>> = [
     [
-      { label: t("ops.mortality.field.trip_no"), value: record.tripNo, tone: "text-indigo-600" },
+      { label: t("ops.mortality.field.trip_no"), value: view(record.tripNo), tone: "text-indigo-600" },
       { label: t("ops.trip.day"), value: formatTripListDay(record.tripDate, language) },
     ],
     [
-      { label: t("common.vehicle"), value: record.vehicleNo || "—" },
-      { label: t("common.supervisor"), value: record.supervisorName || "—" },
+      { label: t("common.vehicle"), value: view(record.vehicleNo) || "—" },
+      { label: t("common.supervisor"), value: view(record.supervisorName) || "—" },
     ],
     [
-      { label: t("common.driver"), value: record.driverName || "—" },
-      { label: t("ops.mortality.field.source_farm"), value: record.sourceFarm || "—" },
+      { label: t("common.driver"), value: view(record.driverName) || "—" },
+      { label: t("ops.mortality.field.source_farm"), value: view(record.sourceFarm) || "—" },
     ],
     [
       { label: t("ops.trip.field.loaders"), value: crew(record.loaders) },
@@ -141,21 +148,21 @@ export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
     {
       label: t("ops.mortality.detail.farm"),
       birds: formatNumber(record.farmBirds),
-      weight: formatWeight(record.farmWeight),
+      weight: formatWeight(record.farmWeight, weightUnit),
       pct: "100.00%",
       tone: "text-amber-700",
     },
     {
       label: t("ops.mortality.detail.delivered"),
       birds: formatNumber(record.deliveredBirds),
-      weight: formatWeight(record.deliveredWeight),
+      weight: formatWeight(record.deliveredWeight, weightUnit),
       pct: `${((record.deliveredWeight / Math.max(record.farmWeight, 1)) * 100).toFixed(2)}%`,
       tone: "text-sky-700",
     },
     {
       label: t("ops.mortality.detail.mortality"),
       birds: formatNumber(record.mortalityCount),
-      weight: formatWeight(record.mortalityWeight),
+      weight: formatWeight(record.mortalityWeight, weightUnit),
       pct: `${record.mortalityPercentage.toFixed(2)}%`,
       tone: "text-orange-600",
     },
@@ -163,7 +170,7 @@ export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
       label: t("ops.mortality.detail.weight_loss"),
       // Loss is a weight figure; it has no bird count of its own.
       birds: <span className="text-slate-300">—</span>,
-      weight: formatWeight(record.weightLoss),
+      weight: formatWeight(record.weightLoss, weightUnit),
       pct: `${record.weightLossPercentage.toFixed(2)}%`,
       tone: "text-rose-600",
     },
@@ -187,7 +194,7 @@ export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
             {t("ops.mortality.detail.trip_overview")}
           </h4>
           <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-[1px] text-[10px] font-bold uppercase tracking-wide text-emerald-700">
-            {record.status}
+            {view(record.status)}
           </span>
         </div>
 

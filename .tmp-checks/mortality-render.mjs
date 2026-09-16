@@ -57,12 +57,43 @@ const { renderToStaticMarkup } = await import("react-dom/server");
 const { I18nProvider } = await server.ssrLoadModule("/src/i18n/index.tsx");
 const pageModule = await server.ssrLoadModule("/src/modules/operations/mortality/pages/MortalityEntryPage.tsx");
 const tableModule = await server.ssrLoadModule("/src/modules/operations/mortality/components/TripLossTable.tsx");
-const kpiModule = await server.ssrLoadModule("/src/modules/operations/mortality/components/LossKpiCards.tsx");
+const summaryModule = await server.ssrLoadModule("/src/modules/operations/mortality/components/CumulativeSummary.tsx");
+// The KPI strip is gone from this page: the component must not exist at all.
+{
+  const { existsSync } = await import("node:fs");
+  ok("no-KPI: LossKpiCards.tsx is deleted", !existsSync("src/modules/operations/mortality/components/LossKpiCards.tsx"), "component still on disk");
+}
+const pageSource = (await import("node:fs")).readFileSync("src/modules/operations/mortality/pages/MortalityEntryPage.tsx", "utf8");
+ok("no-KPI: the page never references the KPI cards", !pageSource.includes("LossKpiCards"), "KPI import/render still present");
+ok("no-KPI: the page has no KPI section", !pageSource.includes("ops.mortality.kpi.filtered_summary"), "KPI section still rendered");
+{
+  const tableAt = pageSource.indexOf("<TripLossTable");
+  const tableSectionEnd = pageSource.indexOf("</section>", tableAt);
+  const summaryAt = pageSource.indexOf("<CumulativeSummary");
+  ok("cumulative: rendered below the table", tableAt > 0 && summaryAt > tableSectionEnd, `table@${tableAt} sectionEnd@${tableSectionEnd} summary@${summaryAt}`);
+  ok("cumulative: only after a Search", pageSource.includes("analysis.summaryVisible &&"), "gate missing");
+  ok("cumulative: fed the whole filtered set", pageSource.includes("totalRecords={analysis.totalRecords}"), "whole-set props missing");
+}
 const filtersModule = await server.ssrLoadModule("/src/modules/operations/mortality/components/LossFilters.tsx");
 const indicatorModule = await server.ssrLoadModule("/src/modules/operations/mortality/components/AppliedFiltersIndicator.tsx");
 
+const formatNumberEn = (value) => Number(value).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
 const shell = (node) => React.createElement(I18nProvider, null, node);
 const render = (node) => renderToStaticMarkup(shell(node));
+/// Render once in Telugu: the provider reads the stored language at mount.
+const renderTe = (node) => {
+  const saved = store.get("dmr-language");
+  store.set("dmr-language", "te");
+  const html = renderToStaticMarkup(shell(node));
+  if (saved === undefined) store.delete("dmr-language");
+  else store.set("dmr-language", saved);
+  return html;
+};
+/// Text cells of a rendered block, tags stripped.
+const cellsOf = (html) => html.replace(/<[^>]+>/g, "|").split("|").map((part) => part.trim()).filter(Boolean);
+/// A Telugu page carries Telugu words and figures — never English words.
+const SYMBOLS = new Set(["—", "#", "%", "…", "•", "·"]);
+const englishLeft = (html) => cellsOf(html).filter((cell) => !/[\u0C00-\u0C7F]/.test(cell) && !/^[0-9][0-9,.\s%·’'\/\-]*$/.test(cell) && !SYMBOLS.has(cell));
 
 /* ── 1. The page shell (no data yet: first paint) ──────────────────────── */
 const pageHtml = render(React.createElement(pageModule.default));
@@ -237,18 +268,23 @@ ok("table: expand affordance kept", tableHtml.includes("Expand trip") && tableHt
   ok("panel: every i18n key resolved (no raw key leaked)", panelHtml.includes("ops.mortality") === false);
 }
 
-/* ── 4. KPI strip through the global grid ─────────────────────────────── */
-const kpiHtml = render(
-  React.createElement(kpiModule.default, {
-    kpis: { totalTrips: 525, farmBirds: 202769, farmWeight: 473557.27, deliveryShops: 6852, deliveredBirds: 196900, deliveredWeight: 454133.18, mortalityCount: 5869, mortalityWeight: 11667.65, mortalityPercentage: 2.89, weightLoss: 7769.05, weightLossPercentage: 1.64 },
-    loading: false,
-  }),
+/* ── 4. Cumulative summary through the global grid ────────────────────── */
+const quarterKpis = { totalTrips: 525, farmBirds: 202769, farmWeight: 473557.27, deliveryShops: 6852, deliveredBirds: 196900, deliveredWeight: 454133.18, mortalityCount: 5869, mortalityWeight: 11667.65, mortalityPercentage: 2.89, weightLoss: 7769.05, weightLossPercentage: 1.64 };
+const summaryHtml = render(
+  React.createElement(summaryModule.default, { kpis: quarterKpis, totalRecords: 525, pageSize: 10 }),
 );
-ok("kpi: eleven cards", (kpiHtml.match(/tooltip|title="/g) || []).length >= 11, "unexpected card count");
-ok("kpi: lakh compaction (2.03 L farm birds)", kpiHtml.includes("2.03") && kpiHtml.includes("L"), "compaction missing");
-ok("kpi: exact tooltip retained", kpiHtml.includes("2,02,769"), "exact value tooltip missing");
-ok("kpi: both grids present", (kpiHtml.match(/<section/g) || []).length === 2, `sections=${(kpiHtml.match(/<section/g) || []).length}`);
-ok("kpi: percent cards", kpiHtml.includes("2.89%") && kpiHtml.includes("1.64%"), "percent values missing");
+ok("cumulative: ONE card", (summaryHtml.match(/rounded-2xl/g) || []).length === 1, `cards=${(summaryHtml.match(/rounded-2xl/g) || []).length}`);
+ok("cumulative: ONE table", (summaryHtml.match(/<table/g) || []).length === 1, `tables=${(summaryHtml.match(/<table/g) || []).length}`);
+ok("cumulative: full-width fixed table", summaryHtml.includes("w-full table-fixed"), "table class missing");
+ok("cumulative: four equal columns", (summaryHtml.match(/w-1\/4/g) || []).length >= 16, `w-1/4=${(summaryHtml.match(/w-1\/4/g) || []).length}`);
+ok("cumulative: every cell starts from the left", (summaryHtml.match(/text-left/g) || []).length >= 16 && !summaryHtml.includes("text-right"), "alignment wrong");
+ok("cumulative: no KPI cards", !summaryHtml.includes("tooltip") && (summaryHtml.match(/<section/g) || []).length === 1 && !summaryHtml.includes("grid-cols"), "card grid leaked in");
+ok("cumulative: says every page, not this page", summaryHtml.includes("not just the 10 rows on screen"), "scope wording missing");
+ok("cumulative: scope repeats trips and shops", summaryHtml.includes("525 trips") && summaryHtml.includes("6,852 shops"), "scope chip missing");
+ok("cumulative: whole-set totals printed", summaryHtml.includes("4,73,557.27 kg") && summaryHtml.includes("4,54,133.18 kg") && summaryHtml.includes("11,667.65 kg"), "totals missing");
+ok("cumulative: weight-loss row has no bird count", summaryHtml.includes("7,769.05 kg") && summaryHtml.includes("—"), "loss row wrong");
+ok("cumulative: survival closes the summary", summaryHtml.includes("97.11%"), "survival row missing");
+ok("cumulative: weights read like the panel", summaryHtml.includes("100.00%") && summaryHtml.includes("95.90%") && summaryHtml.includes("2.89%") && summaryHtml.includes("1.64%"), "percent row missing");
 
 /* ── 5. Applied-filters indicator ─────────────────────────────────────── */
 const indicatorHtml = render(
@@ -295,10 +331,33 @@ try {
   ok("live: every row of the page rendered", payload.data.every((row) => liveTableHtml.includes(row.tripNo)), "a row is missing");
   ok("live: pagination reflects the full filtered set", liveTableHtml.includes(`of ${payload.meta.total}`), `total=${payload.meta.total}`);
 
-  const liveKpiHtml = render(React.createElement(kpiModule.default, { kpis: payload.kpis, loading: false }));
-  const exactBirds = payload.kpis.farmBirds.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
-  ok("live: KPI strip uses the server aggregates", liveKpiHtml.includes(exactBirds) || liveKpiHtml.includes("L"), `farmBirds=${payload.kpis.farmBirds}`);
-  ok("live: mortality % card rendered", liveKpiHtml.includes(`${payload.kpis.mortalityPercentage.toFixed(2)}%`), String(payload.kpis.mortalityPercentage));
+  const expandModule = await server.ssrLoadModule("/src/modules/operations/mortality/components/TripLossRowExpand.tsx");
+
+  // CUMULATIVE, NOT PAGE BY PAGE: the totals describe the whole filtered set, so
+  // they are identical on every page while the rows change.
+  const { formatWeight } = await server.ssrLoadModule("/src/utils/format.ts");
+  const pageOne = await (await fetch(`${API}/operations/mortality-analysis?limit=10&page=1&sortBy=tripDate&sortDir=desc`)).json();
+  const pageTwo = await (await fetch(`${API}/operations/mortality-analysis?limit=10&page=2&sortBy=tripDate&sortDir=desc`)).json();
+  const whole = await (await fetch(`${API}/operations/mortality-analysis?limit=500&page=1&sortBy=tripDate&sortDir=desc`)).json();
+  const allRows = await (await fetch(`${API}/operations/mortality-analysis?limit=1000&page=1&sortBy=tripDate&sortDir=desc`)).json();
+  ok("live: paging really changes the rows", pageOne.data[0].tripNo !== pageTwo.data[0].tripNo, "same first row on both pages");
+  ok("live: totals identical on page 1 and page 2", pageOne.kpis.farmWeight === pageTwo.kpis.farmWeight && pageOne.kpis.mortalityCount === pageTwo.kpis.mortalityCount, "page-scoped totals");
+  ok("live: totals identical however wide the page", pageOne.kpis.farmWeight === whole.kpis.farmWeight && pageOne.kpis.totalTrips === whole.kpis.totalTrips, `10-row=${pageOne.kpis.farmWeight} 500-row=${whole.kpis.farmWeight}`);
+  const summed = allRows.data.reduce((total, row) => total + row.farmWeight, 0);
+  ok("live: the reported total is the sum over the whole set", Math.abs(summed - allRows.kpis.farmWeight) < 0.5, `sum=${summed.toFixed(2)} reported=${allRows.kpis.farmWeight}`);
+  // A 500-row page is short of the 525-trip set, yet the totals still cover the
+  // whole set — which is exactly what "cumulative, not page by page" must mean.
+  const shortPageSum = whole.data.reduce((total, row) => total + row.farmWeight, 0);
+  ok("live: a short page does not shrink the totals", whole.data.length < whole.meta.total && whole.kpis.farmWeight === allRows.kpis.farmWeight, `${whole.data.length} of ${whole.meta.total}`);
+  ok("live: totals are not the visible rows' subtotal", Math.abs(shortPageSum - whole.kpis.farmWeight) > 0.5, `visible sum=${shortPageSum.toFixed(2)} total=${whole.kpis.farmWeight}`);
+  const pageSubtotal = pageOne.data.reduce((total, row) => total + row.farmWeight, 0);
+  const liveSummaryHtml = render(
+    React.createElement(summaryModule.default, { kpis: pageOne.kpis, totalRecords: pageOne.meta.total, pageSize: 10 }),
+  );
+  ok("live: summary prints the whole-set total", liveSummaryHtml.includes(formatWeight(allRows.kpis.farmWeight)), formatWeight(allRows.kpis.farmWeight));
+  ok("live: summary is NOT the visible page's subtotal", !liveSummaryHtml.includes(formatWeight(pageSubtotal)), `page subtotal ${formatWeight(pageSubtotal)} leaked`);
+  ok("live: summary counts every matching trip", liveSummaryHtml.includes(`${formatNumberEn(pageOne.meta.total)} trips`), `${pageOne.meta.total} trips`);
+  ok("live: summary survival closes with the server's figure", liveSummaryHtml.includes(`${(100 - pageOne.kpis.mortalityPercentage).toFixed(2)}%`), String(pageOne.kpis.mortalityPercentage));
 
   // Dropdown options come from the same unfiltered peek the table does.
   const options = payload.filterOptions;
@@ -355,6 +414,75 @@ try {
   ok("live: farm + supervisor pair narrows the set", byPair.meta.total > 0 && byPair.meta.total <= byFarm.meta.total, `${byPair.meta.total} of ${byFarm.meta.total}`);
   const searched = await (await fetch(`${API}/operations/mortality-analysis?limit=1&search=${encodeURIComponent(first.tripNo)}`)).json();
   ok("live: search by trip number finds it", searched.meta.total >= 1 && searched.data[0].tripNo === first.tripNo, `${searched.meta.total} rows`);
+
+  // ── TELUGU: the whole page reads in Telugu — every label, hint and data value —
+  //    while every figure stays numeric.
+  {
+    const viewModule = await server.ssrLoadModule("/src/modules/operations/vehicle-trips/utils/tripViewLocalization.ts");
+    const row = pageOne.data[0];
+    const englishAttributes = (html) =>
+      (html.match(/(?:aria-label|placeholder)="[^"]*[A-Za-z][^"]*"/g) || []).filter((attr) => !dividerClass(attr));
+    /// Class strings are not user-visible text; only the labels themselves matter.
+    const dividerClass = (attr) => attr.includes("aria-label") === false && attr.includes("placeholder") === false;
+    const noEnglish = (label, html) => {
+      ok(`telugu: ${label} has no English left`, englishLeft(html).length === 0, englishLeft(html).join(" · "));
+      const attrs = englishAttributes(html);
+      ok(`telugu: ${label} has no English labels`, attrs.length === 0, attrs.join(" · "));
+    };
+    const teRender = (label, node, assert) => {
+      try {
+        assert(renderTe(node));
+      } catch (error) {
+        failures.push(`FAIL telugu: ${label} — ${error.message}`);
+      }
+    };
+
+    const teTableHtml = renderTe(
+      React.createElement(tableModule.default, {
+        records: pageOne.data, sort: { key: "tripDate", dir: "desc" }, setSort: noop, page: 1,
+        totalPages: pageOne.meta.totalPages, totalRecords: pageOne.meta.total, pageSize: 10,
+        onPageChange: noop, onPageSizeChange: noop, loading: false, emptyAll: false, filtersApplied: true,
+        weightUnit: "కేజీ",
+      }),
+    );
+    const tePanelHtml = renderTe(
+      React.createElement(expandModule.default, { record: row, weightUnit: "కేజీ" }),
+    );
+    const teSummaryHtml = renderTe(
+      React.createElement(summaryModule.default, { kpis: pageOne.kpis, totalRecords: pageOne.meta.total, pageSize: 10, weightUnit: "కేజీ" }),
+    );
+    noEnglish("the table", teTableHtml);
+    noEnglish("the trip panel", tePanelHtml);
+    noEnglish("the cumulative summary", teSummaryHtml);
+    ok("telugu: section titles translated", tePanelHtml.includes("ట్రిప్ వివరాలు") && tePanelHtml.includes("బరువులు") && tePanelHtml.includes("రేట్లు"), "panel titles still English");
+    ok("telugu: column names translated", teSummaryHtml.includes("పేరు") && teTableHtml.includes("ట్రిప్ నం.") && teTableHtml.includes("రోజు") && teTableHtml.includes("ఫారం"), "column names still English");
+    ok("telugu: status chip translated", tePanelHtml.includes("పూర్తయింది"), "status chip still English");
+    ok("telugu: trip number reads in Telugu", tePanelHtml.includes(viewModule.localizeTripViewText(row.tripNo, "te")) && viewModule.localizeTripViewText(row.tripNo, "te") !== row.tripNo, row.tripNo);
+    ok("telugu: farm and crew read in Telugu", tePanelHtml.includes(viewModule.localizeTripViewText(row.sourceFarm, "te")) && tePanelHtml.includes(viewModule.localizeTripViewText(row.supervisorName, "te")), "names not localised");
+    ok("telugu: figures stay numeric", tePanelHtml.includes(formatNumberEn(row.farmBirds)) && tePanelHtml.includes(row.farmWeight.toFixed(2)) && teTableHtml.includes(formatNumberEn(row.farmBirds)), "figures changed");
+    ok("telugu: weights use the Telugu unit", tePanelHtml.includes("కేజీ") && teSummaryHtml.includes("కేజీ") && !tePanelHtml.includes(" kg"), "unit not localised");
+    ok("telugu: cumulative labels translated", teSummaryHtml.includes("మొత్తం సారాంశం") && teSummaryHtml.includes("పేరు") && teSummaryHtml.includes("పక్షులు"), "summary labels still English");
+
+    teRender("the page shell", React.createElement(pageModule.default), (html) => noEnglish("the page shell", html));
+    teRender(
+      "the filter bar",
+      React.createElement(filtersModule.default, {
+        filters: { fromDate: "", toDate: "", sourceFarm: "", supervisor: "", search: "" },
+        setFilters: noop, appliedFilters: {}, farmOptions: [], supervisorOptions: [],
+        sort: { key: "tripDate", dir: "desc" }, setSort: noop,
+        onApply: noop, onReset: noop, onRefresh: noop, refreshing: false,
+      }),
+      (html) => noEnglish("the filter bar", html),
+    );
+    teRender(
+      "the applied-filters indicator",
+      React.createElement(indicatorModule.default, {
+        appliedFilters: { fromDate: "2026-09-01", toDate: "2026-09-16", sourceFarm: "Anand Agro Farms", supervisor: "Ravi Rao", search: "" },
+        onClear: noop,
+      }),
+      (html) => noEnglish("the applied-filters indicator", html),
+    );
+  }
 } catch (error) {
   failures.push(`FAIL live data sync: ${error.message} (is the sample API on :4000 running?)`);
 }

@@ -935,6 +935,9 @@ export default {
   'ops.mortality.kpi.weight_loss': 'బరువు నష్టం',
   'ops.mortality.kpi.weight_loss_pct': 'బరువు నష్టం %',
   'ops.mortality.kpi.filtered_summary': 'వర్తింపజేసిన ఫిల్టర్ కోసం సారాంశం',
+  'ops.mortality.cumulative.title': 'మొత్తం సారాంశం',
+  'ops.mortality.cumulative.scope': '{trips} ట్రిప్పులు · {shops} షాపులు',
+  'ops.mortality.cumulative.hint': 'ఈ మొత్తాలు ఫిల్టర్ చేసిన అన్ని పేజీలకూ వర్తిస్తాయి — తెరపై ఉన్న {rows} వరుసలకు మాత్రమే కాదు.',
 
   // Table columns
   'ops.mortality.col.source_farm': 'ఫారం',

@@ -13,9 +13,12 @@
 // These controls modify DRAFT filters only. Changing them does NOT affect the table.
 // Clicking SEARCH copies draft → applied filters, which then:
 //   - Filters the completed-trips table
-//   - Shows KPI cards (if a real filter was set)
-//   - Shows Applied Filters indicator
-// Reset clears draft + applied filters, hides KPI/indicator, restores table to ALL trips.
+//   - Shows the cumulative summary BELOW the table (if a real filter was set)
+//   - Shows the Applied Filters indicator above the table
+// Reset clears draft + applied filters, hides the indicator and the summary, and
+// restores the table to ALL trips.
+//
+// Both calendars follow the page language, so a Telugu page gets a Telugu calendar.
 // Sort BY applies immediately (it is a view control, not a data filter).
 
 import { ArrowUpDown, Calendar, RotateCcw, Search, UserCog, Warehouse, X } from "lucide-react";
@@ -38,7 +41,7 @@ import { useI18n } from "../../../../i18n";
 interface LossFiltersProps {
   filters: Filters;
   setFilters: (updater: (prev: Filters) => Filters) => void;
-  /** The filter the table + KPIs are currently running with. Comparing it with
+  /** The filter the table + cumulative summary are running with. Comparing it with
    *  the draft controls is what tells the operator that Search is still to be
    *  pressed — otherwise an edited dropdown looks like a broken filter. */
   appliedFilters: Filters;
@@ -89,7 +92,7 @@ export default function LossFilters({
   onRefresh,
   refreshing = false,
 }: LossFiltersProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const patch = (partial: Partial<Filters>) => setFilters((prev) => ({ ...prev, ...partial }));
 
   // Draft vs applied: any difference means the operator still has to press
@@ -152,6 +155,7 @@ export default function LossFilters({
             placeholder={t("placeholder.enter_date")}
             className="w-full text-xs font-medium"
             name="mortality-from-date"
+            language={language}
           />
         </div>
 
@@ -167,6 +171,7 @@ export default function LossFilters({
             placeholder={t("placeholder.enter_date")}
             className="w-full text-xs font-medium"
             name="mortality-to-date"
+            language={language}
           />
         </div>
 

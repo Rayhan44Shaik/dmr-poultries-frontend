@@ -51,6 +51,10 @@ const PHRASE_TE: Record<string, string> = {
   "Non-Association": "నాన్-అసోసియేషన్",
   Direct: "డైరెక్ట్",
   Contract: "కాంట్రాక్ట్",
+  // Trip status — printed as a chip on the mortality trip panel.
+  Completed: "పూర్తయింది",
+  "In Progress": "కొనసాగుతోంది",
+  Pending: "పెండింగ్",
 };
 
 const WORD_TE: Record<string, string> = {

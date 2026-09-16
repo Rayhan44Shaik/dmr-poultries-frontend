@@ -42,6 +42,7 @@ import type { LossSort, TripLossAnalysis } from "../hooks/useTripLossAnalysis";
 import type { SortBy } from "../services/mortalityAnalysisApi";
 import { formatNumber, formatWeight } from "../../../../utils/format";
 import { formatTripListDay } from "../../vehicle-trips/utils/formatTripListDay";
+import { localizeTripViewText } from "../../vehicle-trips/utils/tripViewLocalization";
 import { Pagination } from "../../../../ui";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import TripLossRowExpand from "./TripLossRowExpand";
@@ -63,6 +64,8 @@ interface TripLossTableProps {
   /** A real filter has been applied via Search (shows "no results for filter" state). */
   filtersApplied?: boolean;
   onReset?: () => void;
+  /** Localised weight unit, e.g. "kg" / "కేజీ". */
+  weightUnit?: string;
 }
 
 type Align = "left" | "right" | "center";
@@ -231,7 +234,8 @@ export default function TripLossTable({
   onPageSizeChange,
   loading = false,
   emptyAll = false,
-  filtersApplied = false,
+  filtersApplied,
+  weightUnit = "kg",
   onReset,
 }: TripLossTableProps) {
   const { t, language } = useI18n();
@@ -506,7 +510,9 @@ export default function TripLossTable({
                         </span>
                       </td>
 
-                      <td className="whitespace-nowrap px-3 py-3.5 font-bold text-indigo-600">{r.tripNo}</td>
+                      <td className="whitespace-nowrap px-3 py-3.5 font-bold text-indigo-600">
+                        {localizeTripViewText(r.tripNo, language)}
+                      </td>
 
                       <td className="whitespace-nowrap px-3 py-3.5 font-medium text-slate-600">
                         {formatTripListDay(r.tripDate, language)}
@@ -516,14 +522,14 @@ export default function TripLossTable({
                         className="max-w-[170px] truncate px-3 py-3.5 font-medium text-slate-700"
                         title={r.sourceFarm || undefined}
                       >
-                        {r.sourceFarm || "—"}
+                        {localizeTripViewText(r.sourceFarm, language) || "—"}
                       </td>
 
                       <td
                         className="max-w-[130px] truncate px-3 py-3.5 text-slate-600"
                         title={r.supervisorName || undefined}
                       >
-                        {r.supervisorName || "—"}
+                        {localizeTripViewText(r.supervisorName, language) || "—"}
                       </td>
 
                       <td className="whitespace-nowrap px-3 py-3.5 text-center font-semibold tabular-nums text-amber-700">
@@ -531,7 +537,7 @@ export default function TripLossTable({
                       </td>
 
                       <td className="whitespace-nowrap px-3 py-3.5 text-center tabular-nums text-amber-700">
-                        {formatWeight(r.farmWeight)}
+                        {formatWeight(r.farmWeight, weightUnit)}
                       </td>
 
                       {/* Plain number — the ShoppingBag glyph already names this
@@ -546,7 +552,7 @@ export default function TripLossTable({
                       </td>
 
                       <td className="whitespace-nowrap px-3 py-3.5 text-center tabular-nums text-sky-700">
-                        {formatWeight(r.deliveredWeight)}
+                        {formatWeight(r.deliveredWeight, weightUnit)}
                       </td>
 
                       <td className="whitespace-nowrap px-3 py-3.5 text-center font-semibold tabular-nums text-orange-600">
@@ -554,11 +560,11 @@ export default function TripLossTable({
                       </td>
 
                       <td className="whitespace-nowrap px-3 py-3.5 text-center tabular-nums text-orange-600">
-                        {formatWeight(r.mortalityWeight)}
+                        {formatWeight(r.mortalityWeight, weightUnit)}
                       </td>
 
                       <td className="whitespace-nowrap px-3 py-3.5 text-center font-semibold tabular-nums text-rose-600">
-                        {formatWeight(r.weightLoss)}
+                        {formatWeight(r.weightLoss, weightUnit)}
                       </td>
 
                       <td className="whitespace-nowrap px-3 py-3.5 text-center tabular-nums text-rose-600">
@@ -573,7 +579,7 @@ export default function TripLossTable({
                             className="sticky left-0"
                             style={panelWidth > 0 ? { width: `${panelWidth}px` } : undefined}
                           >
-                            <TripLossRowExpand record={r} />
+                            <TripLossRowExpand record={r} weightUnit={weightUnit} />
                           </div>
                         </td>
                       </tr>
