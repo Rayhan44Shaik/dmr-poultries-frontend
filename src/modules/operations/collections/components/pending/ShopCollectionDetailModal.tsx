@@ -51,6 +51,27 @@ import { collectionStatusKey, collectionStatusLabel } from "../../utils/collecti
 const SHOP_HISTORY_LIMIT = 500;
 const DEFAULT_PAGE_SIZE = 10;
 
+/**
+ * Table geometry.
+ *
+ * S.No is the ONE column with a width of its own — a narrow rail sized for a
+ * record number, so it never takes a data column's share. The other seven
+ * columns are then computed from what is left, which keeps them EXACTLY equal
+ * at every width instead of hand-rounded percentages that drift a pixel apart:
+ *
+ *   data column = (100% − S.No rail) ÷ 7
+ *
+ * `table-layout: fixed` makes the browser honour these outright, so the grid
+ * reads evenly however long a collection number or a collector's name gets.
+ */
+const DATA_COLUMN_COUNT = 7;
+const SNO_COLUMN_WIDTH = "4.5rem";
+const DATA_COLUMN_WIDTH = "calc((100% - " + SNO_COLUMN_WIDTH + ") / " + DATA_COLUMN_COUNT + ")";
+
+/** One gutter for every cell — header and body alike — so text starts and ends
+ *  on the same vertical lines all the way down the table. */
+const CELL_PADDING_X = "px-3";
+
 /** Columns the header can sort, mirroring the Trip List table's vocabulary. */
 type ViewSortKey =
   | "collectionNo"
@@ -365,7 +386,7 @@ function ShopCollectionDetailView({
         type="button"
         onClick={() => handleSortChange(key)}
         aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
-        className={`group/sort flex w-full items-center gap-1.5 text-xs font-bold uppercase tracking-wider transition-colors hover:text-emerald-700 ${
+        className={`group/sort flex w-full items-center gap-1 text-[11px] font-bold uppercase tracking-wide transition-colors hover:text-emerald-700 ${
           align === "right" ? "justify-end" : ""
         } ${active ? "text-emerald-700" : "text-slate-500"}`}
       >
@@ -541,85 +562,78 @@ function ShopCollectionDetailView({
             ) : (
               <>
                 <div className="overflow-x-auto">
-                  {/* S.No is a narrow rail; the seven data columns then share the
-                    * remaining width EQUALLY, so every column is spaced the same. */}
-                  <table className="min-w-[82.5rem] w-full table-fixed divide-y divide-slate-100">
+                  {/* S.No keeps its narrow rail; the other seven columns are each
+                    * exactly the same width (see DATA_COLUMN_WIDTH). */}
+                  <table className="min-w-[86rem] w-full table-fixed divide-y divide-slate-100">
                     <colgroup>
-                      <col className="w-[6%]" />
-                      <col className="w-[13.4286%]" />
-                      <col className="w-[13.4286%]" />
-                      <col className="w-[13.4286%]" />
-                      <col className="w-[13.4286%]" />
-                      <col className="w-[13.4286%]" />
-                      <col className="w-[13.4286%]" />
-                      <col className="w-[13.4286%]" />
+                      <col style={{ width: SNO_COLUMN_WIDTH }} />
+                      {Array.from({ length: DATA_COLUMN_COUNT }, (_, index) => (
+                        <col key={index} style={{ width: DATA_COLUMN_WIDTH }} />
+                      ))}
                     </colgroup>
                     <thead className="border-b border-slate-200 bg-slate-50/75">
-                      <tr>
-                        <th className="px-3.5 py-3 text-left text-xs font-bold uppercase tracking-wider text-slate-500">
-                          <span className="inline-flex items-center gap-1.5">
-                            <Hash size={14} className="shrink-0 text-slate-400" />
-                            {t("table.s_no")}
-                          </span>
+                      <tr className="whitespace-nowrap">
+                        <th className={`${CELL_PADDING_X} py-3 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500`}>
+                          {t("table.s_no")}
                         </th>
-                        <th className="px-3.5 py-3 text-left">
+                        <th className={`${CELL_PADDING_X} py-3 text-left`}>
                           {sortableHeader(
                             "collectionNo",
                             <span className="inline-flex items-center gap-1.5">
-                              <FileText size={14} className="shrink-0 text-emerald-500" />
+                              <FileText size={13} className="shrink-0 text-emerald-500" />
                               {t("ops.collection.collection_id")}
                             </span>,
                           )}
                         </th>
-                        <th className="px-3.5 py-3 text-left">
+                        <th className={`${CELL_PADDING_X} py-3 text-left`}>
                           {sortableHeader(
                             "collectionDate",
                             <span className="inline-flex items-center gap-1.5">
-                              <Calendar size={14} className="shrink-0 text-blue-500" />
+                              <Calendar size={13} className="shrink-0 text-blue-500" />
                               {t("ops.collection.collection_date")}
                             </span>,
                           )}
                         </th>
-                        <th className="px-3.5 py-3 text-right">
+                        <th className={`${CELL_PADDING_X} py-3 text-right`}>
                           {sortableHeader(
                             "amount",
                             <span className="inline-flex items-center gap-1.5">
-                              <IndianRupee size={14} className="shrink-0 text-emerald-600" />
+                              <IndianRupee size={13} className="shrink-0 text-emerald-600" />
                               {t("table.amount")}
                             </span>,
                             "right",
                           )}
                         </th>
-                        <th className="px-3.5 py-3 text-left">
+                        <th className={`${CELL_PADDING_X} py-3 text-left`}>
                           {sortableHeader(
                             "paymentMode",
                             <span className="inline-flex items-center gap-1.5">
-                              <CreditCard size={14} className="shrink-0 text-sky-500" />
+                              <CreditCard size={13} className="shrink-0 text-sky-500" />
                               {t("operations.payment_mode")}
                             </span>,
                           )}
                         </th>
-                        <th className="px-3.5 py-3 text-left">
+                        <th className={`${CELL_PADDING_X} py-3 text-left`}>
                           {sortableHeader(
                             "collector",
                             <span className="inline-flex items-center gap-1.5">
-                              <User size={14} className="shrink-0 text-violet-500" />
+                              <User size={13} className="shrink-0 text-violet-500" />
                               {t("ops.collection.collected_by")}
                             </span>,
                           )}
                         </th>
-                        <th className="px-3.5 py-3 text-left">
+                        <th className={`${CELL_PADDING_X} py-3 text-left`}>
                           {sortableHeader(
                             "status",
                             <span className="inline-flex items-center gap-1.5">
-                              <Activity size={14} className="shrink-0 text-orange-500" />
+                              <Activity size={13} className="shrink-0 text-orange-500" />
                               {t("table.status")}
                             </span>,
                           )}
                         </th>
-                        <th className="px-3.5 py-3 text-center text-xs font-bold uppercase tracking-wider text-slate-500">
+                        <th className={`${CELL_PADDING_X} py-3 text-center text-[11px] font-bold uppercase tracking-wide text-slate-500`}>
                           <span className="inline-flex w-full items-center justify-center gap-1.5">
-                            <Settings2 size={14} className="shrink-0 text-slate-400" />
+                            <Settings2 size={13} className="shrink-0 text-slate-400" />
                             {t("table.actions")}
                           </span>
                         </th>
@@ -644,36 +658,36 @@ function ShopCollectionDetailView({
                               isCounting || isCommitting ? "bg-rose-50/40" : "hover:bg-slate-50/50"
                             }`}
                           >
-                            <td className="px-3.5 py-3 text-xs font-semibold tabular-nums text-slate-500">
+                            <td className={`${CELL_PADDING_X} py-3 text-center text-xs font-semibold tabular-nums text-slate-500`}>
                               {startIndex + index + 1}
                             </td>
-                            <td className="px-3.5 py-3 text-xs font-medium tabular-nums text-slate-700">
+                            <td className={`${CELL_PADDING_X} py-3 text-xs font-medium tabular-nums text-slate-700`}>
                               <span className="block truncate" title={col.collectionNo || "-"}>
                                 {col.collectionNo || "-"}
                               </span>
                             </td>
-                            <td className="px-3.5 py-3 text-xs text-slate-600 tabular-nums whitespace-nowrap">
+                            <td className={`${CELL_PADDING_X} py-3 text-xs text-slate-600 tabular-nums whitespace-nowrap`}>
                               {formatDate(col.collectionDate)}
                             </td>
-                            <td className="px-3.5 py-3 text-right text-sm font-bold tabular-nums text-slate-900 whitespace-nowrap">
+                            <td className={`${CELL_PADDING_X} py-3 text-right text-sm font-bold tabular-nums text-slate-900 whitespace-nowrap`}>
                               {formatCurrency(Number(col.amount) || 0)}
                             </td>
-                            <td className="px-3.5 py-3 text-xs text-slate-600">
+                            <td className={`${CELL_PADDING_X} py-3 text-xs text-slate-600`}>
                               <span className="inline-flex max-w-full items-center gap-1 truncate rounded-full bg-slate-100 px-2 py-0.5 font-medium text-slate-700">
                                 {localizeTripViewText(col.paymentMode || "Cash", language)}
                               </span>
                             </td>
-                            <td className="px-3.5 py-3 text-xs font-medium text-slate-600">
+                            <td className={`${CELL_PADDING_X} py-3 text-xs font-medium text-slate-600`}>
                               <span className="block truncate" title={col.collector || "-"}>
                                 {localizeTripViewText(col.collector || "-", language)}
                               </span>
                             </td>
-                            <td className="px-3.5 py-3 text-xs">
+                            <td className={`${CELL_PADDING_X} py-3 text-xs`}>
                               <span className={`inline-flex items-center rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${statusBadgeClass(col.status)}`}>
                                 {statusLabel}
                               </span>
                             </td>
-                            <td className="px-3.5 py-3 text-center">
+                            <td className={`${CELL_PADDING_X} py-3 text-center`}>
                               {col.deleted ? (
                                 // A deleted record keeps its permanent number and
                                 // status, and offers nothing left to act on — the
