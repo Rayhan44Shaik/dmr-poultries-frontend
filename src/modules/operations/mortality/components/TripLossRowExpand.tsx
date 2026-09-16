@@ -42,7 +42,7 @@ function Card({
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
       <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-4 py-1.5">
-        <h4 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+        <h4 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-600">
           <Icon size={13} className={tone} aria-hidden="true" />
           {title}
         </h4>
@@ -62,17 +62,20 @@ type DetailField = {
   title?: string;
 };
 
-/** One label/value cell: LABEL left, value right-aligned — the one-line
- *  "VEHICLE NO. … TS 08 UB 1037" idiom. Values are never left dangling after
- *  the label, which is what left a wide empty band in the earlier layout. */
+/**
+ * One label/value cell. The label owns a fixed width and the value follows it
+ * immediately, so the two always read together — a value pushed to the far edge
+ * of a half-width cell is what left the wide empty band between an entry and
+ * the next one.
+ */
 function Cell({ field }: { field: DetailField }) {
   return (
-    <div className="flex items-center justify-between gap-3 px-4 py-1.5">
-      <span className="shrink-0 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
+    <div className="flex items-baseline gap-2.5 px-3.5 py-1.5">
+      <span className="w-[104px] shrink-0 text-[11px] font-bold uppercase tracking-wide text-slate-500">
         {field.label}
       </span>
       <span
-        className={`min-w-0 text-right text-[13px] font-semibold tabular-nums ${
+        className={`min-w-0 flex-1 text-[13px] font-semibold tabular-nums ${
           field.tone ?? "text-slate-700"
         } ${field.wrap ? "" : "truncate"}`}
         title={field.title}
@@ -88,13 +91,15 @@ export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
   const crew = (names?: string[]) => (names && names.length > 0 ? names.join(", ") : "—");
   const farmWeight = Math.max(record.farmWeight, 1);
 
-  // Four facts per row on anything wide: with two per row each cell spanned
-  // half the card, so the label sat at one end and its value at the other with a
-  // band of nothing between them. Four keeps every label next to its value.
-  const detailRows: DetailField[][] = [
+  // TWO label/value pairs per row — trip no + day, vehicle + supervisor, then
+  // driver + farm and the crew. Two columns keep each line short enough that the
+  // label and its value read as one entry.
+  const detailRows: Array<[DetailField, DetailField]> = [
     [
       { label: t("ops.mortality.field.trip_no"), value: record.tripNo, tone: "text-indigo-600" },
       { label: t("ops.trip.day"), value: formatTripListDay(record.tripDate, language) },
+    ],
+    [
       { label: t("common.vehicle"), value: record.vehicleNo || "—", title: record.vehicleNo || undefined },
       { label: t("common.supervisor"), value: record.supervisorName || "—" },
     ],
@@ -105,6 +110,8 @@ export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
         value: record.sourceFarm || "—",
         title: record.sourceFarm || undefined,
       },
+    ],
+    [
       { label: t("ops.trip.field.loaders"), value: crew(record.loaders), wrap: true },
       { label: t("ops.trip.field.helpers"), value: crew(record.helpers), wrap: true },
     ],
@@ -168,7 +175,7 @@ export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
             {detailRows.map((row, rowIndex) => (
               <div
                 key={rowIndex}
-                className="grid grid-cols-1 divide-y divide-slate-100 sm:grid-cols-2 sm:divide-x sm:divide-y-0 lg:grid-cols-4"
+                className="grid grid-cols-1 divide-y divide-slate-100 sm:grid-cols-2 sm:divide-x sm:divide-y-0"
               >
                 {row.map((field, cellIndex) => (
                   <Cell key={cellIndex} field={field} />
@@ -180,32 +187,38 @@ export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
 
         {/* ── 2. WEIGHTS ──────────────────────────────────────────────── */}
         <Card icon={Scale} tone="text-rose-500" title={t("ops.mortality.detail.weight_summary")}>
+          {/* Columns are sized to their content and packed together; the last
+              cell is an invisible filler that absorbs the remaining width, so
+              the numbers never drift away from their headings. table-fixed
+              guarantees the widths hold whatever the values are. */}
           <table className="w-full table-fixed border-collapse text-[13px]">
             <thead>
-              <tr className="border-b border-slate-100 text-[11px] uppercase tracking-wider text-slate-400">
-                <th className="w-[34%] px-4 py-1.5 text-left font-semibold">{t("common.name")}</th>
-                <th className="w-[20%] px-4 py-1.5 text-right font-semibold">{t("common.birds")}</th>
-                <th className="w-[26%] px-4 py-1.5 text-right font-semibold">{t("common.weight")}</th>
-                <th className="w-[20%] px-4 py-1.5 text-right font-semibold">%</th>
+              <tr className="border-b border-slate-100 text-[11px] uppercase tracking-wider text-slate-600">
+                <th className="w-[22%] px-3 py-1.5 text-left font-bold">{t("common.name")}</th>
+                <th className="w-[11%] px-3 py-1.5 text-right font-bold">{t("common.birds")}</th>
+                <th className="w-[14%] px-3 py-1.5 text-right font-bold">{t("common.weight")}</th>
+                <th className="w-[11%] px-3 py-1.5 text-right font-bold">%</th>
+                <th className="w-[42%]" aria-hidden="true" />
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {weightRows.map((row) => (
                 <tr key={row.label}>
-                  <td className="px-4 py-1.5 font-medium text-slate-700">{row.label}</td>
-                  <td className={`px-4 py-1.5 text-right font-semibold tabular-nums ${row.tone}`}>
+                  <td className="px-3 py-1.5 font-medium text-slate-700">{row.label}</td>
+                  <td className={`px-3 py-1.5 text-right font-semibold tabular-nums ${row.tone}`}>
                     {row.birds}
                   </td>
-                  <td className={`px-4 py-1.5 text-right font-semibold tabular-nums ${row.tone}`}>
+                  <td className={`px-3 py-1.5 text-right font-semibold tabular-nums ${row.tone}`}>
                     {row.weight}
                   </td>
                   <td
-                    className={`px-4 py-1.5 text-right font-semibold tabular-nums ${
+                    className={`px-3 py-1.5 text-right font-semibold tabular-nums ${
                       row.pctTone ?? row.tone
                     }`}
                   >
                     {row.pct}
                   </td>
+                  <td aria-hidden="true" />
                 </tr>
               ))}
             </tbody>

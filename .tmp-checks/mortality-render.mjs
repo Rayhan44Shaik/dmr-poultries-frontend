@@ -181,9 +181,10 @@ ok("table: expand affordance kept", tableHtml.includes("Expand trip") && tableHt
   ok("panel: weights table is a plain table — no bars", !expandHtml.includes('style="width') && !expandHtml.includes("animate-pulse"));
   ok("panel: trip facts use the shared labels", expandHtml.includes("Vehicle") && expandHtml.includes("Supervisor") && expandHtml.includes("Source Farm") && expandHtml.includes("Driver") && expandHtml.includes("Loaders") && expandHtml.includes("Helpers"));
   // The reference idiom: label left, value RIGHT — nothing is left dangling.
-  ok("panel: label/value cells are justify-between (value right-aligned)", (expandHtml.match(/justify-between/g) || []).length >= 8, `cells=${(expandHtml.match(/justify-between/g) || []).length}`);
-  ok("panel: facts sit four-up on wide screens (labels stay next to values)", (expandHtml.match(/lg:grid-cols-4/g) || []).length === 2 && expandHtml.includes("sm:divide-x"));
-  ok("panel: weights columns are fixed so one cannot swallow the width", expandHtml.includes("table-fixed") && (expandHtml.match(/w-\[(34|20|26)%\]/g) || []).length === 4);
+  ok("panel: value follows its label (nothing stretched to the cell edge)", (expandHtml.match(/w-\[104px\]/g) || []).length === 8, `cells=${(expandHtml.match(/w-\[104px\]/g) || []).length}`);
+  ok("panel: trip details are TWO columns, not four", (expandHtml.match(/sm:grid-cols-2/g) || []).length === 4 && !expandHtml.includes("lg:grid-cols-4"));
+  ok("panel: headings are brightened", expandHtml.includes("text-slate-500") && expandHtml.includes("text-slate-600"), "heading tints missing");
+  ok("panel: weights columns are compact + fixed, filler absorbs the rest", expandHtml.includes("table-fixed") && (expandHtml.match(/w-\[(22|11|14|42)%\]/g) || []).length === 5, `cols=${(expandHtml.match(/w-\[[0-9]+%\]/g) || []).length}`);
   ok("panel: rows are one line tall", expandHtml.includes("py-1.5") && !expandHtml.includes("py-2 text-\[13px\]"));
   ok("panel: survival rate closes the weights card as a tinted strip", expandHtml.includes("bg-emerald-50/70") && expandHtml.includes("Survival Rate"));
 }
