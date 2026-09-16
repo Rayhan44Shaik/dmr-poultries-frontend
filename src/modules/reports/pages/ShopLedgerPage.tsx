@@ -210,14 +210,18 @@ const formatDisplayDate = (value: string): string => {
 };
 
 const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+/** Telugu short weekdays — same order as WEEKDAY_SHORT (Sunday first). The
+ *  active language decides which set renders; underlying dates never change. */
+const WEEKDAY_SHORT_TE = ["ఆది", "సోమ", "మంగళ", "బుధ", "గురు", "శుక్ర", "శని"] as const;
 
-/** yyyy-MM-dd → short weekday ("Mon"). Parsed LOCALLY — a UTC parse would
- *  roll the day back one in IST and label Tuesday rows as Monday. */
-const weekdayOf = (value: string): string => {
+/** yyyy-MM-dd → short weekday ("Mon" / "సోమ"). Parsed LOCALLY — a UTC parse
+ *  would roll the day back one in IST and label Tuesday rows as Monday. */
+const weekdayOf = (value: string, language: "en" | "te" = "en"): string => {
   const parts = value.split("-").map(Number);
   if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return "";
   const [year, month, day] = parts;
-  return WEEKDAY_SHORT[new Date(year, month - 1, day).getDay()];
+  const dow = new Date(year, month - 1, day).getDay();
+  return (language === "te" ? WEEKDAY_SHORT_TE : WEEKDAY_SHORT)[dow];
 };
 
 /** Shift a yyyy-MM-dd date by N days on the local calendar. */
@@ -387,7 +391,7 @@ function buildWhatsAppMessage(
 }
 
 const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const { showNotification } = useSafeNotification();
   const { shops } = useShops();
 
@@ -424,6 +428,9 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   const [ledgerData, setLedgerData] = useState<LedgerTransaction[]>([]);
   const [ledgerLoading, setLedgerLoading] = useState(true);
   const [ledgerRefreshing, setLedgerRefreshing] = useState(false);
+  /** Holds an i18n KEY (not display text) so the fetch effect never needs
+   *  `t` in its deps — switching language re-renders the translated banner
+   *  without refetching data (no spinner flicker on language change). */
   const [ledgerError, setLedgerError] = useState<string | null>(null);
   const [refreshToast, setRefreshToast] = useState(false);
 
@@ -520,7 +527,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         if (!cancelled) {
           setLedgerLoading(false);
           setLedgerRefreshing(false);
-          setLedgerError("Unable to load ledger data. Please make sure the backend is running.");
+          setLedgerError("shop_ledger.load_error");
         }
       });
     return () => {
@@ -724,7 +731,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       }
 
       if (shopNames.length === 0) {
-        showNotification("No shops found in the selected date range.", "error");
+        showNotification(t("shop_ledger.no_shops_in_range"), "error");
         return;
       }
 
@@ -749,7 +756,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       }
 
       if (allLedgers.length === 0) {
-        showNotification("No transaction data to export.", "error");
+        showNotification(t("shop_ledger.no_export_data"), "error");
         return;
       }
 
@@ -813,18 +820,18 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       setPdfPreview(nextState);
       setPdfShopSearch("");
       showNotification(
-        "PDF ready. Preview it below — download each shop separately or the combined file.",
+        t("shop_ledger.pdf_ready_hint"),
         "success",
       );
     } catch {
       createdUrls.forEach((url) => URL.revokeObjectURL(url));
-      showNotification("Failed to load ledger data. Please try again.", "error");
+      showNotification(t("shop_ledger.load_failed"), "error");
     } finally {
       pdfGeneratingRef.current = false;
       setPdfGenerating(false);
       setPdfProgress(null);
     }
-  }, [appliedSelectedShop, appliedDateFrom, appliedDateTo, showNotification, shopMasterMap, getCachedLedger]);
+  }, [appliedSelectedShop, appliedDateFrom, appliedDateTo, showNotification, shopMasterMap, getCachedLedger, t]);
 
   const closePdfPreview = useCallback(() => {
     // Invalidate any in-flight export so it cannot re-open this modal.
@@ -954,7 +961,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     if (!current) return;
     const chosen = current.files.filter((file) => current.selectedShops.includes(file.shop));
     if (chosen.length === 0) {
-      showNotification("Select at least one shop to download.", "info");
+      showNotification(t("shop_ledger.pdf_select_shops"), "info");
       return;
     }
     pdfDownloadBusyRef.current = true;
@@ -997,7 +1004,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       })
       .filter((entry) => entry.data.length > 0);
     if (ledgers.length === 0) {
-      showNotification("Select at least one shop to download.", "info");
+      showNotification(t("shop_ledger.pdf_select_shops"), "info");
       return;
     }
     const label = ledgers.length === 1 ? ledgers[0].shop : "All Shops";
@@ -1125,7 +1132,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   const handleExportExcel = useCallback(() => {
     const rows = sortedBody;
     if (rows.length === 0) {
-      showNotification("No ledger rows to export for the current filters.", "error");
+      showNotification(t("shop_ledger.no_export_rows"), "error");
       return;
     }
     const headers = [
@@ -1158,8 +1165,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     const title = `Shop Ledger — ${shopLabel} (${formatDisplayDate(appliedDateFrom)} to ${formatDisplayDate(appliedDateTo)})`;
     const filename = `Shop_Ledger_${appliedSelectedShop === "All Shops" ? "All_Shops" : appliedSelectedShop.replace(/\s+/g, "_")}_${appliedDateFrom}_to_${appliedDateTo}`;
     exportToExcel(title, headers, data, filename);
-    showNotification("Shop Ledger exported to Excel.", "success");
-  }, [sortedBody, appliedSelectedShop, appliedDateFrom, appliedDateTo, showNotification]);
+    showNotification(t("shop_ledger.excel_exported"), "success");
+  }, [sortedBody, appliedSelectedShop, appliedDateFrom, appliedDateTo, showNotification, t]);
 
   // ─── WhatsApp modal state ──────────────────────────────────
   const [whatsappOpen, setWhatsappOpen] = useState(false);
@@ -1364,7 +1371,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     ).then((url) => {
       if (url) {
         downloadFile(url, waPreviewFileName);
-        showNotification("Attachment PDF downloaded.", "success");
+        showNotification(t("shop_ledger.wa.attachment_downloaded"), "success");
       }
     });
   };
@@ -1460,25 +1467,25 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
     const targets = waTargetShops;
     if (targets.length === 0) {
-      setWaError("Please select at least one shop before sending.");
+      setWaError(t("shop_ledger.wa.select_error"));
       return;
     }
     if (!waDateFrom || !waDateTo) {
-      setWaError("Please choose a valid date range.");
+      setWaError(t("shop_ledger.wa.invalid_range"));
       return;
     }
     if (!WHATSAPP_BACKEND_ENABLED) {
       // Never fake success. The endpoint/service must be explicitly enabled
       // and the backend must confirm delivery before we report success.
-      setWaError("WhatsApp report service is not configured.");
-      showNotification("WhatsApp report service is not configured.", "info");
+      setWaError(t("shop_ledger.wa.not_configured"));
+      showNotification(t("shop_ledger.wa.not_configured"), "info");
       return;
     }
 
     // Retry safety: skip shops that already received this exact report.
     const pendingTargets = targets.filter((shop) => !waSucceededRef.current.includes(shop));
     if (pendingTargets.length === 0) {
-      setWaError("Every selected shop already received this report for these settings.");
+      setWaError(t("shop_ledger.wa.already_sent"));
       return;
     }
 
@@ -1580,8 +1587,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       setWaError(message);
       showNotification(message, "error");
     } else {
-      setWaError("Unable to send WhatsApp report. Please try again.");
-      showNotification("Unable to send WhatsApp report. Please try again.", "error");
+      setWaError(t("shop_ledger.wa.send_failed"));
+      showNotification(t("shop_ledger.wa.send_failed"), "error");
     }
   }, [
     waScope,
@@ -1595,6 +1602,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     buildLedger,
     waReportType,
     showNotification,
+    t,
   ]);
 
   // ─── Filter dropdown models — identical chrome to the Trip List toolbar ───
@@ -1612,26 +1620,26 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   }, [shops]);
 
   const reportTypeOptions: MasterDropdownOption[] = [
-    { value: "sales", label: "Sales" },
-    { value: "collection", label: "Collection" },
+    { value: "sales", label: t("shop_ledger.type.sales") },
+    { value: "collection", label: t("shop_ledger.type.collection") },
   ];
 
   /** Field name + direction — the exact Sort By model the Trip List uses. */
   const sortOptions: MasterDropdownOption[] = [
-    { value: "date:asc", label: "Date — Oldest first" },
-    { value: "date:desc", label: "Date — Latest first" },
-    { value: "particulars:asc", label: "Particulars — A to Z" },
-    { value: "particulars:desc", label: "Particulars — Z to A" },
-    { value: "birds:asc", label: "Birds — Low to High" },
-    { value: "birds:desc", label: "Birds — High to Low" },
-    { value: "weight:asc", label: "Weight (KG) — Low to High" },
-    { value: "weight:desc", label: "Weight (KG) — High to Low" },
-    { value: "rate:asc", label: "Rate — Low to High" },
-    { value: "rate:desc", label: "Rate — High to Low" },
-    { value: "debit:asc", label: "Debit — Low to High" },
-    { value: "debit:desc", label: "Debit — High to Low" },
-    { value: "credit:asc", label: "Credit — Low to High" },
-    { value: "credit:desc", label: "Credit — High to Low" },
+    { value: "date:asc", label: t("shop_ledger.sort.date_asc") },
+    { value: "date:desc", label: t("shop_ledger.sort.date_desc") },
+    { value: "particulars:asc", label: t("shop_ledger.sort.particulars_asc") },
+    { value: "particulars:desc", label: t("shop_ledger.sort.particulars_desc") },
+    { value: "birds:asc", label: t("shop_ledger.sort.birds_asc") },
+    { value: "birds:desc", label: t("shop_ledger.sort.birds_desc") },
+    { value: "weight:asc", label: t("shop_ledger.sort.weight_asc") },
+    { value: "weight:desc", label: t("shop_ledger.sort.weight_desc") },
+    { value: "rate:asc", label: t("shop_ledger.sort.rate_asc") },
+    { value: "rate:desc", label: t("shop_ledger.sort.rate_desc") },
+    { value: "debit:asc", label: t("shop_ledger.sort.debit_asc") },
+    { value: "debit:desc", label: t("shop_ledger.sort.debit_desc") },
+    { value: "credit:asc", label: t("shop_ledger.sort.credit_asc") },
+    { value: "credit:desc", label: t("shop_ledger.sort.credit_desc") },
   ];
   const sortValue = sortBy ? `${sortBy}:${sortDir}` : "";
 
@@ -1642,13 +1650,13 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     const defaultFrom = toWeekAgoDefault();
     const defaultTo = toDateDefault();
     if (appliedDateFrom !== defaultFrom || appliedDateTo !== defaultTo) {
-      pills.push({ key: "dates", label: "Date", value: `${formatDisplayDate(appliedDateFrom)} → ${formatDisplayDate(appliedDateTo)}` });
+      pills.push({ key: "dates", label: t("common.date"), value: `${formatDisplayDate(appliedDateFrom)} → ${formatDisplayDate(appliedDateTo)}` });
     }
     if (appliedSelectedShop !== "All Shops") {
       pills.push({ key: "shop", label: t("common.shop"), value: appliedSelectedShop });
     }
     if (appliedReportType !== "all") {
-      pills.push({ key: "type", label: "Type", value: appliedReportType === "sales" ? "Sales" : "Collection" });
+      pills.push({ key: "type", label: t("common.type"), value: appliedReportType === "sales" ? t("shop_ledger.type.sales") : t("shop_ledger.type.collection") });
     }
     if (appliedSearchTerm.trim()) {
       pills.push({ key: "search", label: t("common.search"), value: appliedSearchTerm.trim() });
@@ -1721,7 +1729,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               value={selectedShop === "All Shops" ? "" : selectedShop}
               options={shopDropdownOptions}
               onChange={(next) => setSelectedShop(next || "All Shops")}
-              placeholder="All Shops"
+              placeholder={t("shop_ledger.all_shops")}
               searchable
               allowClear
               className="w-full"
@@ -1731,11 +1739,11 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           <div>
             <label className={opsFilterLabelClass}>
               <Layers size={17} className="text-amber-500 flex-shrink-0" />
-              <span>Report Type</span>
+              <span>{t("shop_ledger.report_type")}</span>
             </label>
             <MasterDropdown
               hideLabel
-              label="Report Type"
+              label={t("shop_ledger.report_type")}
               value={reportType === "all" ? "" : reportType}
               options={reportTypeOptions}
               onChange={(next) => setReportType((next as ReportTypeFilter) || "all")}
@@ -1757,7 +1765,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               value={sortValue}
               options={sortOptions}
               onChange={handleSortValueChange}
-              placeholder="No sorting"
+              placeholder={t("shop_ledger.no_sorting")}
               searchable
               allowClear
               className="w-full"
@@ -1780,15 +1788,15 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                 onKeyDown={(e) => {
                   if (e.key === "Enter") handleSearch();
                 }}
-                placeholder="Search all details — date, particulars, birds, weight, rate, debit, credit, payment mode…"
-                aria-label="Search all Shop Ledger details"
+                placeholder={t("shop_ledger.search_placeholder")}
+                aria-label={t("shop_ledger.search_aria")}
                 className={`${opsInputClass} pl-10 ${searchValue ? "pr-9" : ""}`}
               />
               {searchValue && (
                 <button
                   type="button"
                   onClick={() => setSearchValue("")}
-                  aria-label="Clear search"
+                  aria-label={t("shop_ledger.clear_search")}
                   className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:text-slate-600"
                 >
                   <X size={14} />
@@ -1811,7 +1819,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               type="button"
               onClick={() => void handleExportPDF()}
               disabled={pdfGenerating}
-              title={appliedSelectedShop === "All Shops" ? "Generate PDFs for all shops" : `Generate PDF for ${appliedSelectedShop}`}
+              title={appliedSelectedShop === "All Shops" ? t("shop_ledger.pdf_hint_all") : t("shop_ledger.pdf_hint_shop", { shop: appliedSelectedShop })}
               className={`group relative ${opsPdfButtonClass} disabled:opacity-60`}
               aria-label="PDF"
             >
@@ -1824,7 +1832,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               type="button"
               onClick={handleExportExcel}
               disabled={sortedBody.length === 0}
-              title="Export the filtered ledger to Excel"
+              title={t("shop_ledger.excel_hint")}
               className={`group relative ${opsExcelButtonClass} disabled:opacity-60`}
               aria-label="Excel"
             >
@@ -1854,7 +1862,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       {appliedFilterPills.length > 0 && (
         <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2">
           <Filter size={14} className="flex-shrink-0 text-amber-600" />
-          <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700">Applied Filters</span>
+          <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700">{t("shop_ledger.applied_filters")}</span>
           <span className="flex flex-wrap items-center gap-1.5">
             {appliedFilterPills.map((pill) => (
               <span
@@ -1866,7 +1874,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                 <button
                   type="button"
                   onClick={() => clearAppliedFilter(pill.key)}
-                  aria-label={`Clear ${pill.label} filter`}
+                  aria-label={t("shop_ledger.clear_filter", { label: pill.label })}
                   className="group ml-0.5 rounded-full p-0.5 text-amber-400 transition-colors hover:bg-amber-100 hover:text-amber-700"
                 >
                   <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-close)]">
@@ -1888,7 +1896,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
       {ledgerError && (
         <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-2.5 text-xs text-amber-800">
-          {ledgerError}
+          {t(ledgerError)}
         </div>
       )}
 
@@ -1900,51 +1908,51 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         <div className="flex items-end justify-between gap-3 mb-2.5">
           <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-500">
             <BarChart3 size={14} className="text-emerald-500" />
-            Statement Overview
+            {t("shop_ledger.statement_overview")}
             {appliedSelectedShop !== "All Shops" && (
               <span className="normal-case tracking-normal font-semibold text-slate-400">— {appliedSelectedShop}</span>
             )}
           </p>
           <p className="text-[11px] font-semibold text-slate-400 tabular-nums">
             {totalRows === scopeRows
-              ? `${scopeRows.toLocaleString()} transactions`
-              : `Showing ${totalRows.toLocaleString()} of ${scopeRows.toLocaleString()} transactions`}
+              ? t("shop_ledger.tx_count", { count: scopeRows.toLocaleString() })
+              : t("shop_ledger.tx_showing", { shown: totalRows.toLocaleString(), total: scopeRows.toLocaleString() })}
           </p>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
           <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
             <p className="flex items-center gap-1.5 text-xs text-slate-500">
-              <Scale size={13} className="text-indigo-500" /> Opening Balance
+              <Scale size={13} className="text-indigo-500" /> {t("shop_ledger.opening_balance")}
             </p>
             <p className="text-xl font-bold text-indigo-600 tabular-nums">{formatAmount(scopeSummary.openingBalance)}</p>
           </div>
           <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
             <p className="flex items-center gap-1.5 text-xs text-slate-500">
-              <ArrowUpRight size={13} className="text-emerald-500" /> Total Sales (Debit)
+              <ArrowUpRight size={13} className="text-emerald-500" /> {t("shop_ledger.total_sales_debit")}
             </p>
             <p className="text-xl font-bold text-emerald-600 tabular-nums">{formatAmount(scopeSummary.totalDebit)}</p>
           </div>
           <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
             <p className="flex items-center gap-1.5 text-xs text-slate-500">
-              <ArrowDownLeft size={13} className="text-blue-500" /> Total Collections (Credit)
+              <ArrowDownLeft size={13} className="text-blue-500" /> {t("shop_ledger.total_collections_credit")}
             </p>
             <p className="text-xl font-bold text-blue-600 tabular-nums">{formatAmount(scopeSummary.totalCredit)}</p>
           </div>
           <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
             <p className="flex items-center gap-1.5 text-xs text-slate-500">
-              <Bird size={13} className="text-amber-500" /> Total Birds
+              <Bird size={13} className="text-amber-500" /> {t("shop_ledger.total_birds")}
             </p>
             <p className="text-xl font-bold text-slate-800 tabular-nums">{scopeSummary.totalBirds.toLocaleString()}</p>
           </div>
           <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
             <p className="flex items-center gap-1.5 text-xs text-slate-500">
-              <Weight size={13} className="text-cyan-500" /> Total Weight (KG)
+              <Weight size={13} className="text-cyan-500" /> {t("shop_ledger.total_weight_kg")}
             </p>
             <p className="text-xl font-bold text-slate-800 tabular-nums">{scopeSummary.totalWeight.toFixed(2)}</p>
           </div>
           <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
             <p className="flex items-center gap-1.5 text-xs text-slate-500">
-              <IndianRupee size={13} className="text-violet-500" /> Closing Balance
+              <IndianRupee size={13} className="text-violet-500" /> {t("shop_ledger.closing_balance")}
             </p>
             <p className={`text-xl font-bold tabular-nums ${scopeSummary.closingBalance >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
               {formatAmount(scopeSummary.closingBalance)}
@@ -1960,14 +1968,14 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             <div className="h-9 w-9 rounded-xl bg-blue-50/70 border border-blue-100 flex items-center justify-center text-blue-500 shadow-inner">
               <Store className="w-5 h-5" />
             </div>
-            <h3 className="text-base font-bold text-slate-800 tracking-tight">Shop Ledger</h3>
+            <h3 className="text-base font-bold text-slate-800 tracking-tight">{t("shop_ledger.title")}</h3>
           </div>
           <div className="flex items-center gap-2 min-w-0">
             <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600 tabular-nums whitespace-nowrap">
               {formatDisplayDate(appliedDateFrom)} → {formatDisplayDate(appliedDateTo)}
             </span>
             <span className="rounded-full border border-blue-100 bg-blue-50/80 px-2.5 py-1 text-[11px] font-bold text-blue-700 tabular-nums whitespace-nowrap">
-              {totalRows === 0 ? "No rows" : `${totalRows} row${totalRows === 1 ? "" : "s"}`}
+              {totalRows === 0 ? t("shop_ledger.no_rows") : t("shop_ledger.row_count", { count: totalRows })}
               {appliedSelectedShop !== "All Shops" ? ` · ${appliedSelectedShop}` : ""}
             </span>
           </div>
@@ -1978,39 +1986,39 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                 <tr>
                   {/* Flat 2D icons — no solid tiles, just the coloured glyph */}
                   <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
-                    {sortableHeader("date", <CalendarDays size={16} className="text-indigo-500 shrink-0" />, "Date")}
+                    {sortableHeader("date", <CalendarDays size={16} className="text-indigo-500 shrink-0" />, t("common.date"))}
                   </th>
                   {/* Day of week — a quick glance column beside the date */}
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
                     <span className="inline-flex items-center gap-1.5 justify-center">
                       <CalendarRange size={16} className="text-blue-500 shrink-0" />
-                      Day
+                      {t("common.day")}
                     </span>
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
-                    {sortableHeader("particulars", <Store size={16} className="text-emerald-500 shrink-0" />, "Particulars")}
+                    {sortableHeader("particulars", <Store size={16} className="text-emerald-500 shrink-0" />, t("shop_ledger.col.particulars"))}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
-                    {sortableHeader("birds", <Bird size={16} className="text-amber-500 shrink-0" />, "Birds", true)}
+                    {sortableHeader("birds", <Bird size={16} className="text-amber-500 shrink-0" />, t("common.birds"), true)}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
-                    {sortableHeader("weight", <Weight size={16} className="text-cyan-500 shrink-0" />, "Weight (KG)", true)}
+                    {sortableHeader("weight", <Weight size={16} className="text-cyan-500 shrink-0" />, t("shop_ledger.col.weight_kg"), true)}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
-                    {sortableHeader("rate", <IndianRupee size={16} className="text-violet-500 shrink-0" />, "Rate", true)}
+                    {sortableHeader("rate", <IndianRupee size={16} className="text-violet-500 shrink-0" />, t("common.rate"), true)}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
-                    {sortableHeader("debit", <ArrowUpRight size={16} className="text-green-500 shrink-0" />, "Debit", true)}
+                    {sortableHeader("debit", <ArrowUpRight size={16} className="text-green-500 shrink-0" />, t("common.debit"), true)}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
-                    {sortableHeader("credit", <ArrowDownLeft size={16} className="text-sky-500 shrink-0" />, "Credit", true)}
+                    {sortableHeader("credit", <ArrowDownLeft size={16} className="text-sky-500 shrink-0" />, t("common.credit"), true)}
                   </th>
                   {/* Balance is a running total — its order is defined by Date,
                       so it is the one column that never sorts. */}
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
                     <span className="inline-flex items-center gap-1.5 justify-center">
                       <Scale size={16} className="text-slate-500 shrink-0" />
-                      Balance
+                      {t("common.balance")}
                     </span>
                   </th>
                 </tr>
@@ -2021,14 +2029,14 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     <td colSpan={9} className="py-16 text-center text-sm font-medium text-slate-400">
                       <span className="inline-flex items-center gap-2">
                         <LoaderCircle size={16} className="animate-spin text-emerald-600" aria-hidden="true" />
-                        Loading shop ledger records…
+                        {t("shop_ledger.loading_records")}
                       </span>
                     </td>
                   </tr>
                 ) : visibleRows.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="py-12 text-center text-slate-400">
-                      No transactions found for the selected filters.
+                      {t("shop_ledger.no_transactions")}
                     </td>
                   </tr>
                 ) : (
@@ -2039,19 +2047,21 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                       const paymentMode = normalizePaymentMode(tx.paymentMode);
                       const typeLabel =
                         tx.type === "sale"
-                          ? { text: "Sale", color: "text-emerald-600" }
+                          ? { text: t("shop_ledger.tx_type.sale"), color: "text-emerald-600" }
                           : tx.type === "collection"
-                            ? { text: paymentMode ? `Collection - ${paymentMode}` : "Collection", color: "text-blue-600" }
-                            : { text: "Correction", color: "text-rose-600" };
+                            ? { text: paymentMode ? t("shop_ledger.tx_type.collection_mode", { mode: paymentMode }) : t("shop_ledger.tx_type.collection"), color: "text-blue-600" }
+                            : { text: t("shop_ledger.tx_type.correction"), color: "text-rose-600" };
                       return (
                         <tr
                           key={`${isOpening ? "opening" : tx.collectionNo || tx.particulars}-${idx}`}
                           className={`transition-colors ${isOpening ? "bg-amber-50/50 font-semibold" : "hover:bg-slate-50/80"}`}
                         >
                           <td className="px-4 py-3 text-xs font-medium text-slate-600 tabular-nums">{formatDisplayDate(tx.date)}</td>
-                          <td className="px-4 py-3 text-center text-xs font-semibold text-slate-500">{weekdayOf(tx.date)}</td>
+                          <td className="px-4 py-3 text-center text-xs font-semibold text-slate-500">{weekdayOf(tx.date, language)}</td>
                           <td className="px-4 py-3 text-xs font-medium text-slate-700">
-                            {tx.particulars}
+                            {/* Opening row label follows the UI language; raw
+                                particulars stay untouched (searchable data). */}
+                            {isOpening ? t("shop_ledger.opening_balance") : tx.particulars}
                             {!isOpening && (
                               <span className={`ml-2 text-[10px] font-semibold ${typeLabel.color}`}>
                                 {typeLabel.text}
@@ -2076,7 +2086,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     })}
                     {visibleRows.length > 1 && (
                       <tr className="bg-slate-100/80 font-bold border-t-2 border-slate-300">
-                        <td className="px-4 py-3 text-xs text-slate-700" colSpan={3}>TOTAL</td>
+                        <td className="px-4 py-3 text-xs text-slate-700" colSpan={3}>{t("shop_ledger.total_row")}</td>
                         <td className="px-4 py-3 text-center text-xs text-slate-800">{summary.totalBirds}</td>
                         <td className="px-4 py-3 text-center text-xs text-slate-800">{summary.totalWeight.toFixed(2)}</td>
                         <td className="px-4 py-3 text-center text-xs text-slate-800">-</td>
@@ -2114,7 +2124,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
             <CheckCircle2 size={16} />
           </span>
-          <span className="text-sm font-semibold text-emerald-800">Shop Ledger Refreshed</span>
+          <span className="text-sm font-semibold text-emerald-800">{t("shop_ledger.refreshed_toast")}</span>
         </div>
       )}
 
@@ -2133,17 +2143,17 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     className="truncate text-sm font-bold uppercase tracking-wide text-slate-800"
                     title={activePdfFile.filename}
                   >
-                    Weekly Statement
+                    {t("shop_ledger.pdf_weekly_statement")}
                   </h3>
                   <p className="text-[11px] text-slate-400">
-                    {formatDisplayDate(appliedDateFrom)} to {formatDisplayDate(appliedDateTo)}
+                    {t("shop_ledger.pdf_date_range", { from: formatDisplayDate(appliedDateFrom), to: formatDisplayDate(appliedDateTo) })}
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={closePdfPreview}
-                aria-label="Close PDF preview"
+                aria-label={t("shop_ledger.pdf_close")}
                 className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
               >
                 <X size={16} />
@@ -2161,7 +2171,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                         <span className="flex h-5 w-5 items-center justify-center rounded-md bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-sm">
                           <ListChecks size={12} />
                         </span>
-                        Select shops
+                        {t("shop_ledger.select_shops")}
                       </span>
                       <span
                         className={`rounded-full px-2 py-0.5 text-[10px] font-bold transition ${
@@ -2221,15 +2231,15 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                         type="text"
                         value={pdfShopSearch}
                         onChange={(e) => setPdfShopSearch(e.target.value)}
-                        placeholder="Search shops..."
-                        aria-label="Search shops in PDF preview"
+                        placeholder={t("shop_ledger.pdf_search_placeholder")}
+                        aria-label={t("shop_ledger.pdf_search_aria")}
                         className="h-8 w-full rounded-lg border border-slate-200 bg-white pl-7 pr-7 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-300"
                       />
                       {pdfShopSearch && (
                         <button
                           type="button"
                           onClick={() => setPdfShopSearch("")}
-                          aria-label="Clear shop search"
+                          aria-label={t("shop_ledger.pdf_clear_search")}
                           className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 transition hover:text-slate-600"
                         >
                           <X size={12} />
@@ -2294,7 +2304,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                               type="checkbox"
                               checked={isSelected}
                               onChange={() => togglePdfShop(file.shop)}
-                              aria-label={`Include ${file.shop} in downloads`}
+                              aria-label={t("shop_ledger.pdf_include_shop", { shop: file.shop })}
                               className="h-4 w-4 shrink-0 cursor-pointer accent-red-600"
                             />
                             <button
@@ -2321,7 +2331,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                             {isBusy ? (
                               <Loader2 size={13} className="shrink-0 animate-spin text-red-500" />
                             ) : file.url ? (
-                              <CheckCircle2 size={13} className="shrink-0 text-emerald-500" aria-label="PDF ready" />
+                              <CheckCircle2 size={13} className="shrink-0 text-emerald-500" aria-label={t("shop_ledger.pdf_ready")} />
                             ) : null}
                           </div>
                         );
@@ -2402,13 +2412,13 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   <ShopLedgerWhatsAppIcon size={16} />
                 </span>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-800">WhatsApp Report</h3>
+                  <h3 className="text-sm font-bold text-slate-800">{t("shop_ledger.wa.title")}</h3>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={closeWhatsApp}
-                aria-label="Close WhatsApp report"
+                aria-label={t("shop_ledger.wa.close")}
                 className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
               >
                 <X size={16} />
@@ -2418,27 +2428,27 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             {/* Top bar — same dropdown chrome as the page toolbar */}
             <div className="grid grid-cols-1 gap-3 border-b border-slate-100 px-5 py-3 sm:grid-cols-2 lg:grid-cols-4">
               <div>
-                <label className={opsFilterLabelClass}>Report Type</label>
+                <label className={opsFilterLabelClass}>{t("shop_ledger.report_type")}</label>
                 <MasterDropdown
                   hideLabel
-                  label="Report Type"
+                  label={t("shop_ledger.report_type")}
                   value={waReportType === "All" ? "" : waReportType}
                   options={[
-                    { value: "Sales", label: "Sales" },
-                    { value: "Collection", label: "Collection" },
+                    { value: "Sales", label: t("shop_ledger.type.sales") },
+                    { value: "Collection", label: t("shop_ledger.type.collection") },
                   ]}
                   onChange={(next) => {
                     setWaReportType((next as WaReportType) || "All");
                     resetWaSucceeded();
                   }}
-                  placeholder="All (Sales + Collection)"
+                  placeholder={t("shop_ledger.wa.type_all")}
                   searchable
                   allowClear
                   className="w-full"
                 />
               </div>
               <div>
-                <label className={opsFilterLabelClass}>Date From</label>
+                <label className={opsFilterLabelClass}>{t("shop_ledger.wa.date_from")}</label>
                 <DatePicker
                   value={waDateFrom}
                   onChange={(value) => {
@@ -2446,12 +2456,12 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     resetWaSucceeded();
                     resetWaAttachment();
                   }}
-                  placeholder="From date"
+                  placeholder={t("shop_ledger.wa.from_placeholder")}
                   className="w-full"
                 />
               </div>
               <div>
-                <label className={opsFilterLabelClass}>Date To</label>
+                <label className={opsFilterLabelClass}>{t("shop_ledger.wa.date_to")}</label>
                 <DatePicker
                   value={waDateTo}
                   onChange={(value) => {
@@ -2459,16 +2469,16 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     resetWaSucceeded();
                     resetWaAttachment();
                   }}
-                  placeholder="To date"
+                  placeholder={t("shop_ledger.wa.to_placeholder")}
                   className="w-full"
                 />
               </div>
               <div>
-                <label className={opsFilterLabelClass}>Recipient</label>
+                <label className={opsFilterLabelClass}>{t("shop_ledger.wa.recipient")}</label>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { value: "selected" as const, label: "Selected" },
-                    { value: "all" as const, label: "All" },
+                    { value: "selected" as const, label: t("shop_ledger.wa.recipient_selected") },
+                    { value: "all" as const, label: t("shop_ledger.wa.recipient_all") },
                   ].map((opt) => (
                     <button
                       key={opt.value}
@@ -2498,7 +2508,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                 <div className="space-y-2 border-b border-slate-100 px-3.5 py-3">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                      {waScope === "all" ? "All shops" : "Select shops"}
+                      {waScope === "all" ? t("shop_ledger.wa.all_shops_scope") : t("shop_ledger.select_shops")}
                     </span>
                     {waScope === "selected" && (
                       <span className="rounded-full bg-[#25D366]/10 px-2 py-0.5 text-[10px] font-bold text-[#1DA851]">
@@ -2530,8 +2540,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                       type="text"
                       value={waShopSearch}
                       onChange={(e) => setWaShopSearch(e.target.value)}
-                      placeholder="Search shops..."
-                      aria-label="Search shops in WhatsApp report"
+                      placeholder={t("shop_ledger.wa.search_shops")}
+                      aria-label={t("shop_ledger.wa.search_shops_aria")}
                       className="h-8 w-full rounded-lg border border-slate-200 bg-white pl-7 pr-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#25D366]/25 focus:border-[#25D366]/50"
                     />
                   </div>
@@ -2559,7 +2569,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                             type="checkbox"
                             checked={waSelectedShops.includes(shop)}
                             onChange={() => toggleWaShop(shop)}
-                            aria-label={`Send report to ${shop}`}
+                            aria-label={t("shop_ledger.wa.send_to", { shop })}
                             className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer accent-[#25D366]"
                           />
                         )}
@@ -2574,7 +2584,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                         >
                           <span className="block truncate text-xs font-semibold text-slate-700">{shop}</span>
                           <span className="block truncate text-[10px] text-slate-400">
-                            {recipient.ownerName || "Shop Owner"} · {recipient.whatsappNumber || "No number"}
+                            {recipient.ownerName || t("shop_ledger.wa.shop_owner")} · {recipient.whatsappNumber || t("shop_ledger.wa.no_number")}
                           </span>
                         </button>
                         {isSending ? (
@@ -2603,16 +2613,16 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   >
                     {waSending ? <Loader2 size={14} className="animate-spin" /> : <ShopLedgerWhatsAppIcon size={14} />}
                     {waSending
-                      ? `Sending${waSendingShop ? `: ${waSendingShop}` : "…"}`
+                      ? `${t("shop_ledger.wa.sending")}${waSendingShop ? `: ${waSendingShop}` : "…"}`
                       : waScope === "all"
                         ? waConfirmAll
-                          ? "Confirm & Send All"
-                          : "Send All Shops"
-                        : `Send Selected (${waSelectedShops.length})`}
+                          ? t("shop_ledger.wa.confirm_send_all")
+                          : t("shop_ledger.wa.send_all")
+                        : t("shop_ledger.wa.send_selected", { count: waSelectedShops.length })}
                   </button>
                   {waScope === "all" && waConfirmAll && !waSending && (
                     <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] font-medium text-amber-800">
-                      Press again to send to all {waAllShopNames.length} shop(s).
+                      {t("shop_ledger.wa.confirm_all", { count: waAllShopNames.length })}
                     </p>
                   )}
                 </div>
@@ -2626,28 +2636,28 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                       <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-3.5 py-3 text-xs">
                         <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
                           <div className="min-w-0">
-                            <span className="font-semibold text-slate-500">Shop:</span>{" "}
+                            <span className="font-semibold text-slate-500">{t("shop_ledger.wa.shop_label")}</span>{" "}
                             <span className="text-slate-700">{waPreviewShop}</span>
                           </div>
                           <div className="min-w-0">
-                            <span className="font-semibold text-slate-500">Owner:</span>{" "}
-                            <span className="text-slate-700">{waPreviewRecipient.ownerName || "Shop Owner"}</span>
+                            <span className="font-semibold text-slate-500">{t("shop_ledger.wa.owner_label")}</span>{" "}
+                            <span className="text-slate-700">{waPreviewRecipient.ownerName || t("shop_ledger.wa.shop_owner")}</span>
                           </div>
                           <div className="min-w-0">
-                            <span className="font-semibold text-slate-500">WhatsApp:</span>{" "}
-                            <span className="text-slate-700">{waPreviewRecipient.whatsappNumber || "Not available"}</span>
+                            <span className="font-semibold text-slate-500">{t("shop_ledger.wa.whatsapp_label")}</span>{" "}
+                            <span className="text-slate-700">{waPreviewRecipient.whatsappNumber || t("shop_ledger.wa.not_available")}</span>
                           </div>
                           <div className="min-w-0">
-                            <span className="font-semibold text-slate-500">Sent this week:</span>{" "}
+                            <span className="font-semibold text-slate-500">{t("shop_ledger.wa.sent_this_week")}</span>{" "}
                             <span className="text-slate-700">
-                              {weeklySendCount(waSendCounts, currentWeekKey, waPreviewShop)} time(s)
+                              {t("shop_ledger.wa.times_count", { count: weeklySendCount(waSendCounts, currentWeekKey, waPreviewShop) })}
                             </span>
                           </div>
                         </div>
                         {weeklySendCount(waSendCounts, currentWeekKey, waPreviewShop) > 0 &&
                           waLastSent[weeklySendKey(currentWeekKey, waPreviewShop)] && (
                             <div className="mt-1 min-w-0">
-                              <span className="font-semibold text-slate-500">Last sent:</span>{" "}
+                              <span className="font-semibold text-slate-500">{t("shop_ledger.wa.last_sent")}</span>{" "}
                               <span className="text-slate-600">
                                 {waLastSent[weeklySendKey(currentWeekKey, waPreviewShop)]}
                               </span>
@@ -2656,7 +2666,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                       </div>
 
                       <div>
-                        <label className={opsFilterLabelClass}>Message preview</label>
+                        <label className={opsFilterLabelClass}>{t("shop_ledger.wa.message_preview")}</label>
                         <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded-xl border border-emerald-100 bg-emerald-50/50 px-3.5 py-3 font-sans text-[11px] leading-relaxed text-slate-700">
                           {waPreviewMessage}
                         </pre>
@@ -2672,7 +2682,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                               {waPreviewFileName}
                             </p>
                             <p className="text-[10px] font-medium text-slate-400">
-                              PDF attachment · {formatDisplayDate(waDateFrom)} to {formatDisplayDate(waDateTo)}
+                              {t("shop_ledger.wa.pdf_attachment", { from: formatDisplayDate(waDateFrom), to: formatDisplayDate(waDateTo) })}
                             </p>
                           </div>
                           <button
@@ -2688,7 +2698,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                             ) : (
                               <Eye size={12} />
                             )}
-                            {waAttachmentOpen ? "Hide" : "Check PDF"}
+                            {waAttachmentOpen ? t("shop_ledger.pdf_hide") : t("shop_ledger.pdf_check")}
                           </button>
                           <button
                             type="button"
