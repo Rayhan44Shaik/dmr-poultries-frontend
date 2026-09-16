@@ -28,6 +28,8 @@ import {
 import { DatePicker } from "../../../../components/common/DatePicker";
 import { useI18n } from "../../../../i18n";
 import { getQuarterSampleInfo, type SampleQuarter } from "../../../../sample/quarterSample";
+import { greetingForHour } from "../../../../utils/format";
+import { getCurrentUser } from "../../../settings/services";
 import { kickApprovalSnapshot } from "../../../approvals/services/approvalSnapshot";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import {
@@ -224,7 +226,7 @@ function RangeDatePicker({
       <button
         type="button"
         onClick={toggleCalendar}
-        aria-label="Select date range"
+        aria-label={t("ops.dashboard.select_date_range")}
         aria-expanded={isOpen}
         className={`group flex h-11 items-center gap-2.5 rounded-xl border bg-white py-1.5 pl-1.5 pr-2.5 shadow-sm transition-all duration-150 active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-emerald-500/10 ${
           isOpen
@@ -280,7 +282,7 @@ function RangeDatePicker({
               </span>
               <div
                 role="tablist"
-                aria-label="Quick date range"
+                aria-label={t("ops.dashboard.quick_date_range")}
                 className="relative grid grid-cols-4 gap-1 rounded-xl bg-slate-100 p-1 transition-colors duration-200"
                 style={themed ? { backgroundColor: activeTheme.soft } : undefined}
               >
@@ -534,6 +536,27 @@ function TrendViewSwitcher({
 function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   const { t, language: uiLanguage } = useI18n();
   const trendLocale = uiLanguage === "te" ? "te-IN" : "en-IN";
+
+  // Time-of-day greeting + signed-in user name, in the UI language — one
+  // render-time value, no timers, so the header can never blink or lag.
+  const greetingName = getCurrentUser().name;
+  const greetingDateLabel = new Date().toLocaleDateString(trendLocale, {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  const greetingHeader = (
+    <div className="min-w-0">
+      <h1 className="truncate text-lg font-black tracking-tight text-slate-900 sm:text-xl">
+        {greetingForHour()}, {greetingName} 👋
+      </h1>
+      <span aria-hidden="true" className="mt-1 block h-0.5 w-10 rounded-full bg-emerald-400" />
+      <p className="mt-1.5 text-[11px] font-semibold tabular-nums text-slate-400">
+        {greetingDateLabel} · {t("ops.dashboard.daily_snapshot")}
+      </p>
+    </div>
+  );
   const { showNotification } = useSafeNotification();
   const [browserAnchor] = useState<Date>(() => todayMidnight());
   const initialRange = getRollingQuarterRange(browserAnchor);
@@ -755,8 +778,8 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
         type="button"
         onClick={handleRefreshAll}
         disabled={refreshing}
-        title="Refresh all data"
-        aria-label="Refresh all data"
+        title={t("ops.dashboard.refresh_all")}
+        aria-label={t("ops.dashboard.refresh_all")}
         className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200/80 bg-slate-50/70 text-slate-600 transition-all hover:border-emerald-500/50 hover:bg-slate-100/80 hover:text-emerald-600 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 active:scale-[0.96] disabled:opacity-60"
       >
         <RefreshCw size={18} className={refreshing ? "animate-spin" : ""} />
@@ -768,6 +791,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   if (!isRangeSelected) {
     return (
       <div className={`min-w-0 space-y-4 ${embedded ? "" : "p-4 sm:p-5 lg:p-6"}`}>
+        {greetingHeader}
         <PendingApprovalsPanel
           actions={headerActions}
         />
@@ -789,6 +813,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   if (isLoading) {
     return (
       <div className={`min-w-0 space-y-5 ${embedded ? "" : "p-4 sm:p-5 lg:p-6"}`}>
+        {greetingHeader}
         <PendingApprovalsPanel
           actions={headerActions}
         />
@@ -808,6 +833,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   if (error) {
     return (
       <div className={`min-w-0 space-y-4 ${embedded ? "" : "p-4 sm:p-5 lg:p-6"}`}>
+        {greetingHeader}
         <PendingApprovalsPanel
           actions={headerActions}
         />
@@ -828,6 +854,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   return (
     <div className={`min-w-0 space-y-5 ${embedded ? "" : "p-4 sm:p-5 lg:p-6"}`}>
       {/* Pending-approval KPIs and date-range filter on one slim row. */}
+      {greetingHeader}
       <PendingApprovalsPanel
         actions={headerActions}
       />

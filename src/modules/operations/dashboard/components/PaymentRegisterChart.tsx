@@ -12,6 +12,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { useI18n } from "../../../../i18n";
 import { formatINR, formatINRCompact } from "../../../../utils/format";
 import type {
   PaymentRegisterSummary,
@@ -98,13 +99,13 @@ function shortenType(type: string): string {
     .replace("Other Expense", "Other");
 }
 
-function formatPeriod(fromDate: string, toDate: string): string {
+function formatPeriod(fromDate: string, toDate: string, locale: string): string {
   const format = (value: string) => {
     if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return value || "—";
     const date = new Date(`${value}T00:00:00`);
     return Number.isNaN(date.getTime())
       ? value
-      : date.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
+      : date.toLocaleDateString(locale, { day: "numeric", month: "short" });
   };
   const year = new Date(`${toDate}T00:00:00`).getFullYear();
   return `${format(fromDate)} – ${format(toDate)}${Number.isFinite(year) ? ` ${year}` : ""}`;
@@ -154,13 +155,13 @@ function PaymentModeStat({ mode, amount, percent }: { mode: string; amount: numb
   );
 }
 
-function TypeTooltip({
-  active,
+function TypeTooltip({  active,
   payload,
 }: {
   active?: boolean;
   payload?: Array<{ payload?: unknown }>;
 }) {
+  const { t } = useI18n();
   if (!active) return null;
   const item = payload?.[0]?.payload as Partial<PaymentTypeChartRow> | undefined;
   if (!item || typeof item.type !== "string") return null;
@@ -183,16 +184,16 @@ function TypeTooltip({
       </div>
       <dl className="mt-2 grid grid-cols-2 gap-1.5">
         <div className="rounded-lg bg-slate-50 px-2 py-1.5">
-          <dt className="font-black uppercase tracking-wide text-slate-400">Amount</dt>
+          <dt className="font-black uppercase tracking-wide text-slate-400">{t("ops.dashboard.payment.amount")}</dt>
           <dd className="mt-0.5 font-bold tabular-nums text-slate-800">{formatINR(amount)}</dd>
         </div>
         <div className="rounded-lg bg-sky-50 px-2 py-1.5">
-          <dt className="font-black uppercase tracking-wide text-sky-500">Entries</dt>
+          <dt className="font-black uppercase tracking-wide text-sky-500">{t("ops.dashboard.payment.entries")}</dt>
           <dd className="mt-0.5 font-bold tabular-nums text-sky-700">{count}</dd>
         </div>
       </dl>
       <div className="mt-1.5 rounded-lg bg-slate-50 px-2 py-1.5 ring-1 ring-inset ring-slate-100">
-        <p className="font-black uppercase tracking-wide text-slate-400">Paid to</p>
+        <p className="font-black uppercase tracking-wide text-slate-400">{t("ops.dashboard.payment.paid_to")}</p>
         <div className="mt-1 space-y-1">
           {payees.slice(0, 4).map((payee) => (
             <div key={payee.paidTo} className="flex min-w-0 items-center justify-between gap-2">
@@ -237,6 +238,7 @@ function PaymentSkeleton() {
 }
 
 function EmptyState({ error }: { error?: string | null }) {
+  const { t } = useI18n();
   return (
     <>
       <style>{PAYMENT_REGISTER_ANIMATION_STYLES}</style>
@@ -245,7 +247,7 @@ function EmptyState({ error }: { error?: string | null }) {
           <div className="min-w-0">
             <Link to="/accounts?tab=paid-payments" className="group/title inline-flex min-w-0 items-center gap-1.5">
               <h2 className="truncate text-base font-black tracking-tight text-slate-900 transition-colors group-hover/title:text-sky-700">
-                Payments
+                {t("ops.dashboard.payment.title")}
               </h2>
               <ArrowUpRight size={13} className="shrink-0 text-slate-300 group-hover/title:text-sky-600" aria-hidden="true" />
             </Link>
@@ -255,10 +257,10 @@ function EmptyState({ error }: { error?: string | null }) {
         <div className="flex flex-1 flex-col items-center justify-center p-4 text-center text-slate-400">
           <AlertCircle className="h-8 w-8 text-slate-300" aria-hidden="true" />
           <p className="mt-3 text-sm font-black text-slate-700">
-            {error ? "Payment register is unavailable" : "No payment data in this period"}
+            {error ? t("ops.dashboard.payment.unavailable") : t("ops.dashboard.payment.no_data")}
           </p>
           <p className="mx-auto mt-1 max-w-sm text-xs font-semibold text-slate-500">
-            {error ?? "Change the dashboard date range or refresh the dashboard to sync payment totals."}
+            {error ?? t("ops.dashboard.payment.no_data_hint")}
           </p>
         </div>
       </div>
@@ -267,6 +269,8 @@ function EmptyState({ error }: { error?: string | null }) {
 }
 
 export default function PaymentRegisterChart({ summary, loading, error, animationKey = 0 }: PaymentRegisterChartProps) {
+  const { t, language } = useI18n();
+  const periodLocale = language === "te" ? "te-IN" : "en-IN";
   const chartRows = useMemo<PaymentTypeChartRow[]>(() => {
     return (summary?.typeRows ?? []).map((row, index) => ({
       ...row,
@@ -307,7 +311,7 @@ export default function PaymentRegisterChart({ summary, loading, error, animatio
               </Link>
               <span aria-hidden="true" className="mt-1.5 block h-0.5 w-10 rounded-full bg-sky-400" />
               <p className="mt-1.5 truncate text-[10.5px] font-semibold tabular-nums text-slate-400">
-                {formatPeriod(summary.fromDate, summary.toDate)}
+                {formatPeriod(summary.fromDate, summary.toDate, periodLocale)}
               </p>
             </div>
 
@@ -326,11 +330,11 @@ export default function PaymentRegisterChart({ summary, loading, error, animatio
                 <IndianRupee className="relative h-4 w-4" strokeWidth={2.8} aria-hidden="true" />
               </span>
               <p className="leading-tight">
-                <span className="block text-[8px] font-black uppercase tracking-wide text-sky-700">Payments</span>
+                <span className="block text-[8px] font-black uppercase tracking-wide text-sky-700">{t("ops.dashboard.payment.title")}</span>
                 <strong className="payment-register-value block text-[12.5px] font-black tabular-nums text-slate-800">
                   {formatINRCompact(totalAmount)}
                 </strong>
-                <span className="block text-[8.5px] font-bold tabular-nums text-slate-400">{totalCount} entries</span>
+                <span className="block text-[8.5px] font-bold tabular-nums text-slate-400">{t("ops.dashboard.payment.entries_count", { count: totalCount })}</span>
               </p>
             </div>
           </div>

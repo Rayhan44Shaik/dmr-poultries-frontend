@@ -581,14 +581,22 @@ function enrichCollectionPerformanceRows(
   return [...byShop.values()].sort((a, b) => a.shopName.localeCompare(b.shopName, "en-IN"));
 }
 
-async function enrichOperationsDashboardData(data: DashboardData, fromDate?: string, toDate?: string): Promise<DashboardData> {
+async function enrichOperationsDashboardData(
+  data: DashboardData,
+  fromDate?: string,
+  toDate?: string,
+  withSpanFleet = true,
+): Promise<DashboardData> {
   const [shops, pendingRows, vehicles, employees, spanTrips, allTrips] = await Promise.all([
     fetchDashboardShops(),
     fetchDashboardPendingCollections(),
     fetchDashboardVehicles(),
     fetchDashboardEmployees(),
-    fetchSpanTrips(fromDate, toDate),
-    fetchAllTrips(),
+    // Span rosters only where they are rendered — a collection-card refresh
+    // or the previous-window comparison load never shows them, so those
+    // paths skip the two trip-list pulls entirely (no background duplication).
+    withSpanFleet ? fetchSpanTrips(fromDate, toDate) : Promise.resolve(null),
+    withSpanFleet ? fetchAllTrips() : Promise.resolve(null),
   ]);
 
   if (shops.length === 0 && pendingRows.length === 0 && vehicles.length === 0 && employees.length === 0 && spanTrips === null) return data;
@@ -701,7 +709,8 @@ export function mapDashboardResponse(
  *  start/end window selected, so every KPI/chart/panel matches the range. */
 export async function loadOperationsDashboard(
   from?: Date | null,
-  to?: Date | null
+  to?: Date | null,
+  options?: { withSpanFleet?: boolean }
 ): Promise<DashboardData> {
   // Business dates (local calendar days, never toISOString) so the backend
   // aggregates exactly the window the user picked.
@@ -715,7 +724,12 @@ export async function loadOperationsDashboard(
     const { data } = await apiGet<OperationsDashboardApiResponse>(DASHBOARD_PATH, {
       params: Object.keys(params).length > 0 ? params : undefined,
     });
-    return enrichOperationsDashboardData(mapDashboardResponse(data), fromDate || undefined, toDate || undefined);
+    return enrichOperationsDashboardData(
+      mapDashboardResponse(data),
+      fromDate || undefined,
+      toDate || undefined,
+      options?.withSpanFleet ?? true,
+    );
   } catch {
     // The development preview has no production dashboard API. Use a complete
     // in-memory showcase so every Operations Dashboard panel can be reviewed;
@@ -760,7 +774,9 @@ export async function loadCollectionRecoveryData(
       params: dashboardDateParams(fromDate, toDate),
     });
     return toCollectionRecoverySnapshot(
-      await enrichOperationsDashboardData(mapDashboardResponse(data), fromDate, toDate),
+      // The recovery card refreshes only its own rows — skip the two span
+      // trip fetches it would otherwise duplicate in the background.
+      await enrichOperationsDashboardData(mapDashboardResponse(data), fromDate, toDate, false),
     );
   } catch {
     if (import.meta.env.DEV) {

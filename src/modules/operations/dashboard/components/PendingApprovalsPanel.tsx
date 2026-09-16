@@ -20,6 +20,7 @@ import {
   Wallet,
   Wrench,
 } from "lucide-react";
+import { useI18n } from "../../../../i18n";
 import { usePendingApprovals } from "../../../approvals/hooks/usePendingApprovals";
 import { PENDING_LEAVES_PATH } from "../../../staff/utils/leaveDeepLink";
 
@@ -61,12 +62,13 @@ const preloaders: Record<string, () => void> = {
 
 interface Stat {
   key: string;
-  label: string;
+  /** i18n key for the tile label (`ops.dashboard.approvals.<key>`). */
+  labelKey: string;
+  /** i18n key for the hover tooltip line. */
+  tipKey: string;
   href: string;
   icon: LucideIcon;
   count: number;
-  /** Readable hover tooltip line. */
-  tip: string;
   /** Tooltip bubble anchoring (responsive — tiles are 2-up on mobile, 4-up on sm+). */
   tipClass: string;
   /** Matching arrow position. */
@@ -77,6 +79,7 @@ interface Stat {
 }
 
 export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode }) {
+  const { t } = useI18n();
   const q = usePendingApprovals();
   const loading = !q.loaded;
   const allClear = q.loaded && q.total === 0 && q.documents.count === 0;
@@ -93,11 +96,11 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
   const stats: Stat[] = [
     {
       key: "trips",
-      label: "Trips",
+      labelKey: "ops.dashboard.approvals.trips",
       href: "/operations?tab=trip-entry&status=Pending",
       icon: Truck,
       count: q.trips.count,
-      tip: "Trips completed and waiting for your approval",
+      tipKey: "ops.dashboard.approvals.tip.trips",
       tipClass: "left-0",
       arrowClass: "left-4",
       chip: "bg-sky-100 text-sky-600",
@@ -106,11 +109,11 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
     },
     {
       key: "rates",
-      label: "Rate entries",
+      labelKey: "ops.dashboard.approvals.rate_entries",
       href: "/operations?tab=rate-entry",
       icon: ReceiptText,
       count: q.rateEntries.count,
-      tip: "Completed trips that still need shop sale rates",
+      tipKey: "ops.dashboard.approvals.tip.rate_entries",
       tipClass: "right-0 sm:right-auto sm:left-1/2 sm:-translate-x-1/2",
       arrowClass: "right-4 sm:right-auto sm:left-1/2 sm:-translate-x-1/2",
       chip: "bg-indigo-100 text-indigo-600",
@@ -119,11 +122,11 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
     },
     {
       key: "collections",
-      label: "Collections",
+      labelKey: "ops.dashboard.approvals.collections",
       href: "/operations?tab=collection",
       icon: Wallet,
       count: q.collections.count,
-      tip: "Collections entered by staff and waiting for your approval",
+      tipKey: "ops.dashboard.approvals.tip.collections",
       tipClass: "left-0 sm:left-1/2 sm:-translate-x-1/2",
       arrowClass: "left-4 sm:left-1/2 sm:-translate-x-1/2",
       chip: "bg-amber-100 text-amber-600",
@@ -132,11 +135,11 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
     },
     {
       key: "maintenance",
-      label: "Maintenance",
+      labelKey: "ops.dashboard.approvals.maintenance",
       href: "/fleet?tab=entry&view=pending",
       icon: Wrench,
       count: q.maintenance.count,
-      tip: "Maintenance bills waiting to be verified",
+      tipKey: "ops.dashboard.approvals.tip.maintenance",
       tipClass: "left-0 sm:left-1/2 sm:-translate-x-1/2",
       arrowClass: "left-4 sm:left-1/2 sm:-translate-x-1/2",
       chip: "bg-violet-100 text-violet-600",
@@ -145,11 +148,11 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
     },
     {
       key: "payments",
-      label: "Payments",
+      labelKey: "ops.dashboard.approvals.payments",
       href: "/accounts?tab=paid-payments",
       icon: Banknote,
       count: q.payments.count,
-      tip: "Draft payment requests waiting for approval",
+      tipKey: "ops.dashboard.approvals.tip.payments",
       tipClass: "right-0 sm:right-auto sm:left-1/2 sm:-translate-x-1/2",
       arrowClass: "right-4 sm:right-auto sm:left-1/2 sm:-translate-x-1/2",
       chip: "bg-emerald-100 text-emerald-600",
@@ -158,11 +161,11 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
     },
     {
       key: "leaves",
-      label: "Leaves",
+      labelKey: "ops.dashboard.approvals.leaves",
       href: PENDING_LEAVES_PATH,
       icon: CalendarDays,
       count: q.leaves.count,
-      tip: "Leave requests waiting for your approval",
+      tipKey: "ops.dashboard.approvals.tip.leaves",
       /* Tiles are 2-up on mobile, where this one lands in the right column, so
          the bubble hugs the right edge there and centres from `sm` up. */
       tipClass: "right-0 sm:right-auto sm:left-1/2 sm:-translate-x-1/2",
@@ -173,11 +176,11 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
     },
     {
       key: "documents",
-      label: "Documents",
+      labelKey: "ops.dashboard.approvals.documents",
       href: "/fleet?tab=permits",
       icon: FileWarning,
       count: q.documents.count,
-      tip: "Expired vehicle documents — RC, insurance, fitness, permit, PUC",
+      tipKey: "ops.dashboard.approvals.tip.documents",
       tipClass: "left-0 sm:left-auto sm:right-0",
       arrowClass: "left-4 sm:left-auto sm:right-4",
       chip: "bg-rose-100 text-rose-600",
@@ -189,13 +192,13 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
   const tipLine = (stat: Stat): string =>
     stat.count === 0
       ? stat.key === "documents"
-        ? "No vehicle documents expired"
-        : `No ${stat.label.toLowerCase()} pending right now`
-      : stat.tip;
+        ? t("ops.dashboard.approvals.empty_tip_documents")
+        : t("ops.dashboard.approvals.empty_tip", { label: t(stat.labelKey).toLowerCase() })
+      : t(stat.tipKey);
 
   return (
     <section
-      aria-label="Pending approvals"
+      aria-label={t("ops.dashboard.approvals.title")}
       className="relative z-30 flex flex-wrap items-center gap-x-1 gap-y-1.5 rounded-xl border border-slate-200/70 bg-white px-3 py-2.5 shadow-sm"
     >
       {loading ? (
@@ -207,7 +210,7 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
       ) : allClear ? (
         <p className="flex items-center gap-1.5 px-1 text-[12px] font-semibold text-emerald-600">
           <CheckCircle2 size={14} strokeWidth={2.4} className="shrink-0" />
-          Nothing pending — all approvals clear and documents valid
+          {t("ops.dashboard.approvals.all_clear")}
         </p>
       ) : (
         <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
@@ -221,7 +224,7 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
                 onMouseEnter={() => preloaders[stat.key]()}
                 onFocus={() => preloaders[stat.key]()}
                 onTouchStart={() => preloaders[stat.key]()}
-                aria-label={`${stat.count} ${stat.label} pending — open ${stat.label}`}
+                aria-label={t("ops.dashboard.approvals.tile_aria", { count: stat.count, label: t(stat.labelKey) })}
                 className={`group/tile relative flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-all duration-150 active:scale-[0.96] sm:px-3 motion-reduce:transition-none motion-reduce:active:scale-100 ${stat.hover} ${
                   empty ? "opacity-40 hover:bg-transparent" : ""
                 }`}
@@ -236,7 +239,7 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
                     {stat.count}
                   </span>
                   <span className="text-[12px] font-semibold text-slate-500">
-                    {stat.label}
+                    {t(stat.labelKey)}
                   </span>
                 </span>
 
@@ -250,7 +253,7 @@ export default function PendingApprovalsPanel({ actions }: { actions?: ReactNode
                     <span className={`mt-[5px] h-1.5 w-1.5 shrink-0 rounded-full ${stat.dot}`} />
                     <span>
                       <span className="block text-[12px] font-bold text-white">
-                        {stat.count} {stat.label}
+                        {stat.count} {t(stat.labelKey)}
                       </span>
                       <span className="block text-slate-300">{tipLine(stat)}</span>
                     </span>

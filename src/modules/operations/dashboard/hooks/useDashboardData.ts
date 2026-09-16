@@ -163,7 +163,9 @@ export function useDashboardData(
     }
     try {
       const [baseline, baselineBirds] = await Promise.all([
-        loadOperationsDashboard(previousWindow.from, previousWindow.to),
+        // The comparison window feeds only KPI deltas — it never renders the
+        // span rosters, so skip the trip-list pulls (no background duplication).
+        loadOperationsDashboard(previousWindow.from, previousWindow.to, { withSpanFleet: false }),
         withBirds(previousWindow),
       ]);
       if (requestId !== requestRef.current) return;
