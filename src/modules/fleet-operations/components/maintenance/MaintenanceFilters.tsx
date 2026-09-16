@@ -33,14 +33,13 @@ type Props = {
   driver: string;
   maintenanceType: string;
   serviceType: string;
-  sortBy: MaintenanceSortKey | null;
+  sortBy: MaintenanceSortKey;
   sortDir: "asc" | "desc";
   search: string;
   vehicles: readonly MasterDropdownOption[];
   drivers: readonly MasterDropdownOption[];
   maintenanceTypes: readonly string[];
   serviceTypes: readonly string[];
-  resultCount: number;
   loading: boolean;
   setFromDate: (value: string) => void;
   setToDate: (value: string) => void;
@@ -48,7 +47,7 @@ type Props = {
   setDriver: (value: string) => void;
   setMaintenanceType: (value: string) => void;
   setServiceType: (value: string) => void;
-  setSort: (key: MaintenanceSortKey | null, direction: "asc" | "desc") => void;
+  setSort: (key: MaintenanceSortKey, direction: "asc" | "desc") => void;
   setSearch: (value: string) => void;
   onReset: () => void;
   onRefresh: () => void;
@@ -74,7 +73,6 @@ function MaintenanceFilters({
   drivers,
   maintenanceTypes,
   serviceTypes,
-  resultCount,
   loading,
   setFromDate,
   setToDate,
@@ -98,7 +96,7 @@ function MaintenanceFilters({
       label: `${t("common.date")} — ${t("ops.trip.sort_oldest_first")}`,
     },
   ];
-  const sortValue = sortBy ? `${sortBy}:${sortDir}` : "";
+  const sortValue = `${sortBy}:${sortDir}`;
   const localizedMaintenanceTypes = maintenanceTypes.map((type) => ({
     value: type,
     label: localizeMaintenanceText(type, language),
@@ -111,13 +109,9 @@ function MaintenanceFilters({
   }));
 
   const selectSort = (value: string) => {
-    if (!value) {
-      setSort(null, "asc");
-      return;
-    }
-    const [key, direction] = value.split(":");
     if (!sortOptions.some((option) => option.value === value)) return;
-    setSort(key as MaintenanceSortKey, direction === "desc" ? "desc" : "asc");
+    const [, direction] = value.split(":");
+    setSort("date", direction === "asc" ? "asc" : "desc");
   };
 
   return (
@@ -235,7 +229,6 @@ function MaintenanceFilters({
             onChange={selectSort}
             placeholder={t("ops.trip.no_sorting")}
             searchable
-            allowClear
             className="w-full"
           />
         </div>
@@ -270,14 +263,6 @@ function MaintenanceFilters({
               </button>
             ) : null}
           </div>
-          <p
-            className="mt-1 min-h-4 text-[11px] font-medium text-slate-400"
-            aria-live="polite"
-          >
-            {loading
-              ? t("common.loading")
-              : `${resultCount.toLocaleString("en-IN")} ${t("common.results")}`}
-          </p>
         </div>
         <div className="flex flex-wrap items-center justify-start gap-2 lg:col-span-3 lg:justify-end">
           <button

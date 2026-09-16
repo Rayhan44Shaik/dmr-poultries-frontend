@@ -24,13 +24,11 @@ interface MaintenanceHistoryPageProps {
 
 function sortMaintenanceRecords(
   records: readonly MaintenanceEvent[],
-  sortBy: MaintenanceSortKey | null,
   sortDir: "asc" | "desc",
 ): MaintenanceEvent[] {
   // Timeline sorting is intentionally calendar-only: a timeline must preserve
   // a truthful chronological sequence when maintenance and meter events meet.
-  const direction = sortBy ? sortDir : "desc";
-  const multiplier = direction === "asc" ? 1 : -1;
+  const multiplier = sortDir === "asc" ? 1 : -1;
   return [...records].sort(
     (left, right) =>
       String(left.date || left.createdAt || "")
@@ -75,8 +73,7 @@ const MaintenanceHistoryPage = ({
   const { showNotification } = useSafeNotification();
   const data = useMaintenanceData('history');
   const [meterEvents, setMeterEvents] = useState<VehicleMeterEvent[]>([]);
-  const [sortBy, setSortBy] = useState<MaintenanceSortKey | null>(null);
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
   const refreshRequested = useRef(false);
 
   // Drivers remain available from the master even when a narrow date/type
@@ -209,12 +206,11 @@ const MaintenanceHistoryPage = ({
       : data.approvedHistory.length
         ? data.approvedHistory
         : filteredApproved;
-    return sortMaintenanceRecords(source, sortBy, sortDir);
+    return sortMaintenanceRecords(source, sortDir);
   }, [
     data.approvedHistory,
     data.filtered,
     data.hasActiveFilters,
-    sortBy,
     sortDir,
   ]);
 
@@ -270,16 +266,15 @@ const MaintenanceHistoryPage = ({
   const updateFilter = (update: () => void) => update();
 
   const updateSort = (
-    nextSortBy: MaintenanceSortKey | null,
+    _nextSortBy: MaintenanceSortKey,
     nextSortDir: "asc" | "desc",
   ) => {
-    setSortBy(nextSortBy);
-    setSortDir(nextSortBy ? nextSortDir : "asc");
+    setSortDir(nextSortDir);
   };
 
   const resetFilters = () => {
     data.resetFilters();
-    updateSort(null, "asc");
+    updateSort("date", "desc");
     showNotification(t("fleet.maintenance_history.filters_reset"), "info");
   };
 
@@ -311,14 +306,13 @@ const MaintenanceHistoryPage = ({
           serviceType={
             data.selectedServiceType === "all" ? "" : data.selectedServiceType
           }
-          sortBy={sortBy}
+          sortBy="date"
           sortDir={sortDir}
           search={data.searchQuery}
           vehicles={vehicleOptions}
           drivers={driverOptions}
           maintenanceTypes={maintenanceTypes}
           serviceTypes={data.serviceTypes}
-          resultCount={timelineEvents.length}
           loading={data.historyLoading}
           setFromDate={(value) => updateFilter(() => data.setFromDate(value))}
           setToDate={(value) => updateFilter(() => data.setToDate(value))}
@@ -376,7 +370,7 @@ const MaintenanceHistoryPage = ({
                   meterEvents={filteredMeterEvents}
                   vehicles={data.vehicles}
                   hasActiveFilters={data.hasActiveFilters}
-                  sortDirection={sortBy ? sortDir : "desc"}
+                  sortDirection={sortDir}
                   onClearFilters={resetFilters}
                 />
               </div>
