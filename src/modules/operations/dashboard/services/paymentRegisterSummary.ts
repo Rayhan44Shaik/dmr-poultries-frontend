@@ -15,6 +15,11 @@ interface PaymentRegisterApiRow {
   status?: string;
 }
 
+export interface PaymentRegisterPayeeSummary {
+  paidTo: string;
+  amount: number;
+}
+
 export interface PaymentRegisterTypeSummary {
   type: string;
   amount: number;
@@ -22,6 +27,7 @@ export interface PaymentRegisterTypeSummary {
   percent: number;
   topPayee: string;
   topPayeeAmount: number;
+  payees: PaymentRegisterPayeeSummary[];
 }
 
 export interface PaymentRegisterModeSummary {
@@ -67,6 +73,21 @@ function normalisePaymentType(value: unknown): string {
   return raw;
 }
 
+function normalisePaymentMode(value: unknown): "Cash" | "Union Bank" | "HDFC Bank" {
+  const raw = text(value, "Cash");
+  const key = raw.toLocaleLowerCase("en-IN");
+  if (key.includes("cash")) return "Cash";
+  if (key.includes("union")) return "Union Bank";
+  if (key.includes("hdfc")) return "HDFC Bank";
+  // Payment Register can store instrument names such as UPI/NEFT/RTGS/Cheque.
+  // The dashboard mode chips must match Collection Stream, so bank instruments
+  // are rolled into the two bank buckets instead of showing cheque/UPI labels.
+  if (key.includes("upi") || key.includes("neft") || key.includes("imps") || key.includes("bank")) {
+    return "Union Bank";
+  }
+  return "HDFC Bank";
+}
+
 interface NormalisedPaymentRow {
   paymentType: string;
   paymentMode: string;
@@ -78,7 +99,7 @@ interface NormalisedPaymentRow {
 function normalisePayment(row: PaymentRegisterApiRow): NormalisedPaymentRow {
   return {
     paymentType: normalisePaymentType(row.paymentType ?? row.category),
-    paymentMode: text(row.paymentMode, "Other"),
+    paymentMode: normalisePaymentMode(row.paymentMode),
     paidTo: text(row.paidTo, "Unknown payee"),
     amount: toAmount(row.amount),
     status: text(row.status, "").toLocaleLowerCase("en-IN"),
@@ -118,19 +139,22 @@ function buildSummary(
 
   const typeRows: PaymentRegisterTypeSummary[] = [...byType.entries()]
     .map(([type, summary]) => {
-      const [topPayee = "—", topPayeeAmount = 0] = [...summary.payees.entries()]
-        .sort((a, b) => b[1] - a[1])[0] ?? [];
+      const payees = [...summary.payees.entries()]
+        .map(([paidTo, amount]) => ({ paidTo, amount }))
+        .sort((a, b) => b.amount - a.amount || a.paidTo.localeCompare(b.paidTo, "en-IN"));
       return {
         type,
         amount: summary.amount,
         count: summary.count,
         percent: totalAmount > 0 ? (summary.amount / totalAmount) * 100 : 0,
-        topPayee,
-        topPayeeAmount,
+        topPayee: payees[0]?.paidTo ?? "—",
+        topPayeeAmount: payees[0]?.amount ?? 0,
+        payees,
       };
     })
     .sort((a, b) => b.amount - a.amount || a.type.localeCompare(b.type, "en-IN"));
 
+  const modeOrder = ["Cash", "Union Bank", "HDFC Bank"];
   const modeRows: PaymentRegisterModeSummary[] = [...byMode.entries()]
     .map(([mode, summary]) => ({
       mode,
@@ -138,7 +162,7 @@ function buildSummary(
       count: summary.count,
       percent: totalAmount > 0 ? (summary.amount / totalAmount) * 100 : 0,
     }))
-    .sort((a, b) => b.amount - a.amount || a.mode.localeCompare(b.mode, "en-IN"));
+    .sort((a, b) => modeOrder.indexOf(a.mode) - modeOrder.indexOf(b.mode));
 
   return {
     fromDate,
