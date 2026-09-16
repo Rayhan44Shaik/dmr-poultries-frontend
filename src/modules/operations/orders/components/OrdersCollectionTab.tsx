@@ -27,18 +27,18 @@
 // Refreshing the page always reproduces the saved collection.
 
 import React, { useCallback, useMemo, useRef, useState } from "react";
-import { Loader2, Lock, RefreshCw, Save, Send, Trash2, X } from "lucide-react";
+import { Loader2, Lock, Save, Send, Trash2, X, Calendar, ArrowUpDown, Search, MapPin, RotateCcw, ClipboardList } from "lucide-react";
 import type { Shop } from "../../../masters/shops/types/shop";
 import type { Trip } from "../../../../shared/trip";
 import {
+  opsFilterCardClass,
+  opsFilterLabelClass,
   opsPrimaryButtonClass,
   opsSecondaryButtonClass,
   opsTableDivideClass,
   opsTableHeadRowClass,
-  opsTableTdClass,
-  opsTableThClass,
 } from "../../../../shared/ui/operationsStyles";
-import TripPagination from "../../vehicle-trips/components/TripPagination";
+import { BrandRefreshButton, Pagination } from "../../../../ui";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
@@ -60,9 +60,12 @@ import {
   type ShopDirectory,
 } from "../ordersService";
 import { useOrdersI18n } from "../i18n/ordersI18n";
+import { compareAssignmentRows, type AssignmentSort } from "../assignmentSort";
 import type { OrderShopRow, OrdersDayCollection } from "../types";
 import {
   ORDERS_TABLE_FONT_CLASS,
+  ORDERS_TABLE_TD_CLASS as opsTableTdClass,
+  ORDERS_TABLE_TH_CLASS as opsTableThClass,
   ordersTableZebraRow,
 } from "../ordersTableStyles";
 import {
@@ -70,7 +73,7 @@ import {
   OrdersDateControl,
   OrdersEmptyState,
   OrdersDropdown,
-  OrdersIconButton,
+  OrdersMultiSelect,
   OrdersSearchInput,
   OrdersStatusBadge,
   OrdersTableSkeleton,
@@ -78,7 +81,7 @@ import {
 } from "./OrdersCommon";
 
 /** Fixed page size — 10 rows per page (global pagination component). */
-const PAGE_SIZE = 10;
+
 const ORDER_REMARKS = "[ORDER]";
 
 let clientKeySeq = 0;
@@ -191,9 +194,26 @@ type Props = {
   refreshing: boolean;
 };
 
+type CollectionSort = "collected" | "status" | Exclude<AssignmentSort, "pending" | "sequence">;
+
+type CollectionFilters = {
+  cityFilters: string[];
+  setCityFilters: (values: string[]) => void;
+  query: string;
+  setQuery: (value: string) => void;
+  sortMode: CollectionSort;
+  setSortMode: (value: CollectionSort) => void;
+  pageSize: number;
+  setPageSize: (value: number) => void;
+};
+
 function OrdersCollectionTab(props: Props) {
   const { to } = useOrdersI18n();
   const { shops, shopsLoading } = props;
+  const [query, setQuery] = useState("");
+  const [cityFilters, setCityFilters] = useState<string[]>([]);
+  const [sortMode, setSortMode] = useState<CollectionSort>("collected");
+  const [pageSize, setPageSize] = useState(10);
 
   // Shops load asynchronously. The stateful editor mounts only once they are
   // ready (and re-mounts per day via key={day} from the page), so it can seed
@@ -208,7 +228,7 @@ function OrdersCollectionTab(props: Props) {
       </div>
     );
   }
-  return <CollectionEntries {...props} />;
+  return <CollectionEntries key={props.day} {...props} query={query} setQuery={setQuery} cityFilters={cityFilters} setCityFilters={setCityFilters} sortMode={sortMode} setSortMode={setSortMode} pageSize={pageSize} setPageSize={setPageSize} />;
 }
 
 function CollectionEntries({
@@ -223,7 +243,8 @@ function CollectionEntries({
   onFinished,
   onRefresh,
   refreshing,
-}: Omit<Props, "shopsLoading">) {
+  cityFilters, setCityFilters, query, setQuery, sortMode, setSortMode, pageSize, setPageSize,
+}: Omit<Props, "shopsLoading"> & CollectionFilters) {
   const { to } = useOrdersI18n();
   const { showNotification } = useSafeNotification();
 
@@ -238,10 +259,7 @@ function CollectionEntries({
   // ── Entries (local editing state, seeded from the day's collection) ──
   const initial = useMemo(
     () => buildInitial(shops, collection),
-    // Once per mount — the component re-mounts per day/tab visit; later data
-    // refreshes keep the user's in-progress edits.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    []
+    [shops, collection]
   );
   const [entries, setEntries] = useState<Map<number, EntryRow>>(initial.map);
   const [savedSnapshot, setSavedSnapshot] = useState<string>(initial.snapshot);
@@ -250,6 +268,15 @@ function CollectionEntries({
     () => !isLocked && entrySnapshot(Array.from(entries.values())) !== savedSnapshot,
     [entries, savedSnapshot, isLocked]
   );
+
+  const [lastServerSnapshot, setLastServerSnapshot] = useState(initial.snapshot);
+  if (lastServerSnapshot !== initial.snapshot) {
+    setLastServerSnapshot(initial.snapshot);
+    if (!isDirty) {
+      setEntries(initial.map);
+      setSavedSnapshot(initial.snapshot);
+    }
+  }
 
   // ── Container identity (one container per day — reuse or create today) ──
   const containerRef = useRef<{ id: number | null; tripNo: string | null }>({
@@ -261,7 +288,7 @@ function CollectionEntries({
   const [saving, setSaving] = useState(false);
   const [finishing, setFinishing] = useState(false);
   const persistLockRef = useRef(false);
-  const busy = saving || finishing;
+  const busy = saving || finishing || refreshing;
 
   const entered = useMemo(
     () => Array.from(entries.values()).filter((r) => r.birds > 0 || r.boxes > 0),
@@ -480,7 +507,6 @@ function CollectionEntries({
 
   // ── Table-level search (full dataset, not just the visible page) ────────
   // Matches: shop name, village, trip number, vehicle number, status.
-  const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
 
   const statusLabelOf = useCallback(
@@ -501,12 +527,12 @@ function CollectionEntries({
   // ── Compact table-level sort (works with search + pagination + date) ────
   // "Collected" = the shop has an order entry for the selected day
   // (persisted, or in-progress on an editable day).
-  const [sortMode, setSortMode] = useState<"collected" | "az" | "za">("collected");
   const sortOptions = useMemo(
     () => [
       { value: "collected", label: to("orders.sort_collected_first") },
       { value: "az", label: to("orders.sort_name_az") },
       { value: "za", label: to("orders.sort_name_za") },
+      ...["city_az", "city_za", "birds_asc", "birds_desc", "boxes_asc", "boxes_desc", "weight_asc", "weight_desc", "vehicle_trip", "status"].map(value => ({ value, label: to(`orders.sort_${value}`) })),
     ],
     [to]
   );
@@ -524,8 +550,13 @@ function CollectionEntries({
     [readOnlyEntries, entries, isEditable]
   );
 
+  const cityOptions = useMemo(() => [...new Set(shops.map(shop => villageOf(shop.id, shop.shopName, shopDirectory).trim()).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b)).map(city => ({ value: city, label: city })), [shops, shopDirectory]);
+  const citySet = useMemo(() => new Set(cityFilters), [cityFilters]);
+
   const filteredShopList = useMemo(() => {
     const list = shops.filter((shop) => {
+      if (citySet.size && !citySet.has(villageOf(shop.id, shop.shopName, shopDirectory).trim())) return false;
       if (!q) return true;
       const assignment = collection?.shops.get(shop.id) ?? null;
       const ro = readOnlyEntries.get(shop.id);
@@ -536,6 +567,8 @@ function CollectionEntries({
         (isEditable && ((live?.birds ?? 0) > 0 || (live?.boxes ?? 0) > 0));
       const haystack = [
         shop.shopName,
+        shop.shopNumber,
+        shop.phoneNumber,
         villageOf(shop.id, shop.shopName, shopDirectory),
         assignment?.tripNo ?? "",
         assignment?.vehicleNo ?? "",
@@ -546,22 +579,27 @@ function CollectionEntries({
         .toLowerCase();
       return haystack.includes(q);
     });
+    const sortRow = (shop: Shop) => {
+      const entry = isEditable ? entries.get(shop.id) : readOnlyEntries.get(shop.id);
+      const birds = entry?.birds ?? 0;
+      const assignment = collection?.shops.get(shop.id);
+      return { name: shop.shopName, city: villageOf(shop.id, shop.shopName, shopDirectory), birds,
+        boxes: entry?.boxes ?? 0, weight: weightForBirds(birds, assignment?.avgBirdWeight ?? dayAvgBirdWeight),
+        sequence: shop.id, vehicle: assignment?.vehicleNo ?? '', trip: assignment?.tripNo ?? '', assigned: collectedOf(shop.id) };
+    };
     list.sort((a, b) => {
-      if (sortMode === "az") return a.shopName.localeCompare(b.shopName);
-      if (sortMode === "za") return b.shopName.localeCompare(a.shopName);
-      // Collected first, then alphabetically by shop name.
-      const ca = collectedOf(a.id) ? 0 : 1;
-      const cb = collectedOf(b.id) ? 0 : 1;
-      return ca - cb || a.shopName.localeCompare(b.shopName);
+      if (sortMode === 'collected') return Number(collectedOf(b.id)) - Number(collectedOf(a.id)) || a.shopName.localeCompare(b.shopName);
+      if (sortMode === 'status') return statusLabelOf(a.id, collectedOf(a.id)).localeCompare(statusLabelOf(b.id, collectedOf(b.id))) || a.shopName.localeCompare(b.shopName);
+      return compareAssignmentRows(sortRow(a), sortRow(b), sortMode);
     });
     return list;
-  }, [shops, q, collection, readOnlyEntries, entries, isEditable, shopDirectory, statusLabelOf, sortMode, collectedOf]);
+  }, [shops, q, collection, readOnlyEntries, entries, isEditable, shopDirectory, statusLabelOf, sortMode, collectedOf, citySet, dayAvgBirdWeight]);
 
   // ── Pagination (existing global component; reset to page 1 when the
   //     filtered result or the day changes) ─────────────────────────────────
-  const totalPages = Math.max(1, Math.ceil(filteredShopList.length / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(filteredShopList.length / pageSize));
   const [page, setPage] = useState(1);
-  const listKey = `${day}|${filteredShopList.length}|${q}|${sortMode}`;
+  const listKey = `${day}|${q}|${sortMode}|${pageSize}|${cityFilters.join(",")}`;
   const [lastKey, setLastKey] = useState(listKey);
   if (lastKey !== listKey) {
     setLastKey(listKey);
@@ -569,59 +607,65 @@ function CollectionEntries({
   }
   const safePage = Math.min(page, totalPages);
   const pageShops = filteredShopList.slice(
-    (safePage - 1) * PAGE_SIZE,
-    safePage * PAGE_SIZE
+    (safePage - 1) * pageSize,
+    safePage * pageSize
   );
-  const startIndex = filteredShopList.length === 0 ? 0 : (safePage - 1) * PAGE_SIZE;
+  const startIndex = filteredShopList.length === 0 ? 0 : (safePage - 1) * pageSize;
+
+  const filterCard = (
+    <section className={opsFilterCardClass} aria-label={to('orders.collection_filters')}>
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+        <div><div className={opsFilterLabelClass}><Calendar size={17} className="text-emerald-500" />{to('orders.col_date')}</div>
+          <OrdersDateControl day={day} today={today} onDaySelect={onDaySelect} t={to} hideDayChip />
+        </div>
+        <div><div className={opsFilterLabelClass}><ArrowUpDown size={17} className="text-emerald-500" />{to('orders.sort')}</div>
+          <OrdersDropdown value={sortMode} onChange={value => setSortMode(value as CollectionSort)} options={sortOptions} ariaLabel={to('orders.sort')} widthClass="w-full" />
+        </div>
+        <div><div className={opsFilterLabelClass}><Search size={17} className="text-emerald-500" />{to('orders.search_label')}</div>
+          <OrdersSearchInput value={query} onChange={setQuery} placeholder={to('orders.search_collection')} className="w-full" />
+        </div>
+        <div><div className={opsFilterLabelClass}><MapPin size={17} className="text-emerald-500" />{to('orders.city')}</div>
+          <OrdersMultiSelect values={cityFilters} onChange={setCityFilters} options={cityOptions} ariaLabel={to('orders.filter_city')} placeholder={to('orders.filter_city_all')} widthClass="w-full" />
+        </div>
+        <div className="flex items-end justify-end gap-2 sm:col-span-2 xl:col-span-4">
+          <button type="button" className={`group ${opsSecondaryButtonClass}`} onClick={() => {
+            setQuery(''); setSortMode('collected'); setCityFilters([]); setPage(1);
+            if (day !== today) onDaySelect(today);
+          }} aria-label={to('common.reset')}>
+            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>{to('common.reset')}
+          </button>
+          <BrandRefreshButton onClick={onRefresh} loading={refreshing} />
+        </div>
+      </div>
+    </section>
+  );
+  const tableTitle = <div className="flex items-center gap-3">
+    <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-sky-100 bg-sky-50 text-sky-600 shadow-inner"><ClipboardList size={20} aria-hidden /></span>
+    <h2 className="text-base font-bold tracking-tight text-slate-800">{to('orders.tab_collection')}</h2>
+  </div>;
 
   // ── Render ────────────────────────────────────────────────────────────────
   // Closed day with nothing collected: clean empty state (read-only by nature).
   if (isAutoClosed && !collection) {
     return (
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        {/* Controls only — the active tab already identifies the section. */}
-        <div className="px-5 py-2.5 border-b border-slate-200 bg-slate-50/60 flex items-center gap-3 flex-wrap">
-          <OrdersDateControl day={day} today={today} onDaySelect={onDaySelect} t={to} />
-          <OrdersIconButton
-            label={`${to("orders.refresh")} — ${to("orders.refresh_collection")}`}
-            onClick={onRefresh}
-            busy={refreshing}
-          >
-            <RefreshCw size={14} />
-          </OrdersIconButton>
-        </div>
+      <div className="space-y-5">
+        {filterCard}
+        <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+          <div className="border-b border-slate-100 bg-sky-50/40 px-6 py-3">{tableTitle}</div>
         <OrdersEmptyState
           title={to("orders.no_orders_for_day", { date: formatDayFull(day) })}
         />
+      </div>
       </div>
     );
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-5">
+      {filterCard}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        {/* Table-level controls: [Search][Date][Sort] … [↻ Refresh] —
-            Refresh is ALWAYS the last control, far right. No section
-            heading — the active tab says it. No Previous/Next day
-            buttons, no scroller. */}
-        <div className="px-5 py-2.5 border-b border-slate-200 bg-slate-50/60 flex items-center gap-3 flex-wrap">
-          <OrdersSearchInput
-            value={query}
-            onChange={setQuery}
-            placeholder={to("orders.search_collection")}
-            className="w-full sm:w-64"
-          />
-          <OrdersDateControl day={day} today={today} onDaySelect={onDaySelect} t={to} hideDayChip />
-          <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
-            {to("orders.sort")}
-          </span>
-          <OrdersDropdown
-            value={sortMode}
-            onChange={(v) => setSortMode(v as "collected" | "az" | "za")}
-            options={sortOptions}
-            ariaLabel={to("orders.sort")}
-            widthClass="w-44"
-          />
+        <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 bg-gradient-to-r from-sky-50/60 via-white to-sky-50/40 px-6 py-3">
+          {tableTitle}
           {isLocked && !isAutoClosed && (
             <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 border border-slate-300 px-2 py-0.5 text-[11px] font-bold text-slate-600">
               <Lock size={11} />
@@ -654,16 +698,10 @@ function CollectionEntries({
               })}
             </span>
           </div>
-          <OrdersIconButton
-            label={`${to("orders.refresh")} — ${to("orders.refresh_collection")}`}
-            onClick={onRefresh}
-            busy={refreshing}
-          >
-            <RefreshCw size={14} />
-          </OrdersIconButton>
+
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-x-auto" aria-busy={refreshing}>
           <table className={`w-full min-w-[1060px] ${ORDERS_TABLE_FONT_CLASS}`}>
             <thead>
               <tr className={opsTableHeadRowClass}>
@@ -679,8 +717,8 @@ function CollectionEntries({
                 <th className={`${opsTableThClass} w-20`}>{to("orders.col_action")}</th>
               </tr>
             </thead>
-            <tbody className={opsTableDivideClass}>
-              {pageShops.map((shop, index) => {
+            <tbody key={`${safePage}|${q}|${sortMode}|${pageSize}`} className={`${opsTableDivideClass} motion-safe:animate-page-pop`}>
+              {refreshing ? <tr><td colSpan={10}><OrdersTableSkeleton rows={Math.min(pageSize, 6)} /></td></tr> : pageShops.map((shop, index) => {
                 const live = entries.get(shop.id);
                 const ro = readOnlyEntries.get(shop.id);
                 const birds = isEditable ? live?.birds ?? 0 : ro?.birds ?? 0;
@@ -853,7 +891,7 @@ function CollectionEntries({
                   </tr>
                 );
               })}
-              {pageShops.length === 0 && (
+              {!refreshing && pageShops.length === 0 && (
                 <tr>
                   <td colSpan={10} className="px-4 py-12">
                     <OrdersEmptyState
@@ -873,15 +911,14 @@ function CollectionEntries({
         </div>
 
         {/* Global pagination (existing component) */}
-        {filteredShopList.length > PAGE_SIZE && (
-          <div className="px-4 py-3 border-t border-slate-100">
-            <TripPagination
-              currentPage={safePage}
-              totalPages={totalPages}
-              onPageChange={setPage}
-            />
-          </div>
-        )}
+        <Pagination
+          page={safePage}
+          pageSize={pageSize}
+          totalItems={filteredShopList.length}
+          onPageChange={setPage}
+          onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+          disabled={refreshing}
+        />
 
         {/* Footer actions (editable days only) */}
         {isEditable ? (

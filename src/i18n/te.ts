@@ -1153,6 +1153,9 @@ export default {
   'masters.shops.location.extract_coordinates': 'అక్షాంశం-రేఖాంశం తీసుకోండి',
 
   // Accounts Summary
+  'accounts.summary.scope_note': 'పూర్తయిన / ఆమోదించిన ట్రిప్‌లు:',
+  'accounts.summary.loading_data': 'విశ్లేషణ డేటా లోడ్ అవుతోంది…',
+  'accounts.summary.trip_navigation': 'ట్రిప్‌లు',
   'accounts.summary.title': 'అకౌంట్స్ సారాంశం',
   'accounts.summary.period.this_week': 'ఈ వారం',
   'accounts.summary.period.week': 'వారం',
@@ -1212,8 +1215,8 @@ export default {
   'accounts.summary.expense_rows.maintenance': 'వాహన మరమ్మతు (₹)',
   'accounts.summary.expense_rows.office': 'ఆఫీస్ ఖర్చులు (₹)',
   'accounts.summary.expense_rows.total': 'మొత్తం ఖర్చులు (₹)',
-  'accounts.summary.expense_rows.net_profit': 'నికర లాభం (₹)',
-  'accounts.summary.disclaimer': 'ఎంచుకున్న తేదీల ప్రకారం అన్ని లెక్కలు.',
+  'accounts.summary.expense_rows.net_profit': 'నికర నగదు లాభం (₹)',
+  'accounts.summary.disclaimer': 'ఖర్చులు: పేమెంట్ రిజిస్టర్\u200cలో ఆమోదించిన రికార్డులు మాత్రమే. పెండింగ్ కలెక్షన్ = ఎంచుకున్న తేదీల అమ్మకాలు − కలెక్షన్లు (కనీసం 0). ఇది మొత్తం షాప్ బకాయి కాదు.',
 
   // Reports Dashboard
   'reports.dashboard.title': 'నివేదికల డ్యాష్‌బోర్డ్',

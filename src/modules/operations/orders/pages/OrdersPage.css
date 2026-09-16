@@ -1,0 +1,114 @@
+/* Compact button selector for Orders, visually separate from the page. The rail is the first child of the app's scroll
+   area, so top: 0 docks it directly under the persistent global header. */
+.orders-workspace {
+  --orders-page-surface: #ffffff;
+  --orders-rail-surface: #f8fafc;
+  min-width: 0;
+  min-height: 100%;
+  background: #f8fafc;
+}
+
+.orders-tab-rail {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  background: var(--orders-rail-surface);
+  box-shadow: none;
+}
+
+.orders-browser-tabs {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  width: fit-content;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding: 4px;
+  border: 1px solid #e2e8f0;
+  border-radius: 14px;
+  background: #ffffff;
+  box-shadow: 0 1px 3px rgb(15 23 42 / 4%);
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+
+.orders-browser-tab {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-width: max-content;
+  min-height: 44px;
+  margin: 0;
+  padding: 10px 22px;
+  border: 0;
+  border-radius: 10px;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 160ms ease, color 160ms ease, box-shadow 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.orders-browser-tab:hover:not([aria-selected="true"]) {
+  background: #f1f5f9;
+  color: #334155;
+}
+
+.orders-browser-tab[aria-selected="true"] {
+  background: #ecfdf5;
+  color: #047857;
+  box-shadow: inset 0 0 0 1px #b7e4cf, 0 1px 2px rgb(15 23 42 / 4%);
+}
+
+.orders-browser-tab[aria-selected="true"] .orders-browser-tab-icon {
+  color: #059669;
+}
+
+.orders-browser-tab:active {
+  box-shadow: inset 0 1px 3px rgb(15 23 42 / 12%);
+}
+
+.orders-browser-tab:focus-visible {
+  outline: 2px solid #0f172a;
+  outline-offset: -3px;
+}
+
+.orders-browser-tab-icon {
+  display: inline-flex;
+  flex-shrink: 0;
+}
+.orders-browser-tab-icon svg {
+  width: 17px;
+  height: 17px;
+}
+
+.orders-page-content {
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 20px 24px 32px;
+}
+.orders-page-content > * + * {
+  margin-top: 16px;
+}
+
+@media (max-width: 639px) {
+  .orders-browser-tabs { padding: 4px; gap: 4px; }
+  .orders-browser-tab { min-height: 44px; padding: 10px 14px; font-size: 12px; gap: 7px; }
+  .orders-page-content { padding: 16px 16px 24px; }
+}
+
+/* Keep this Orders surface white in both themes, as requested. The app's
+   global header/theme and the existing table layout are not changed. */
+@media (prefers-reduced-motion: reduce) {
+  .orders-browser-tab { transition: none; }
+}

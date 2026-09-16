@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { weekRange } from '../../../utils/businessDate';
-import { filterPayments, paymentCurrency, paymentNoDisplay, paymentStatusLabel } from './paymentRegister';
+import { filterPayments, paymentCurrency, paymentNoDisplay, paymentStatusLabel, paymentExpenseSector } from './paymentRegister';
 import type { Payment } from '../types/payment.types';
 
 const base: Payment = {
@@ -80,4 +80,14 @@ test('Pending is a display label only; existing API statuses remain unchanged', 
   const pending: Payment = { ...base, status: 'Draft' };
   assert.equal(paymentStatusLabel(pending.status), 'Pending');
   assert.equal(pending.status, 'Draft');
+});
+
+
+test('analysis maps actual payment type aliases to their respective expense categories', () => {
+  for (const type of ['Diesel', 'Fuel Payment', 'Petrol']) assert.equal(paymentExpenseSector(type, 'Operations'), 'fuel');
+  for (const type of ['Toll', 'FASTag', 'Trip Payment']) assert.equal(paymentExpenseSector(type, 'Operations'), 'trip');
+  assert.equal(paymentExpenseSector('Farmer Payment', 'Procurement'), 'farm');
+  assert.equal(paymentExpenseSector('Maintenance', 'Operations'), 'maintenance');
+  assert.equal(paymentExpenseSector('Salary', 'Operations'), 'salary');
+  assert.equal(paymentExpenseSector('Office Expense', 'Operations'), 'office');
 });

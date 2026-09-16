@@ -292,16 +292,7 @@ export const exportPDF = async (
   });
   totalExpRow.push(formatCurrencyPlain(Object.values(totalExpenses).reduce((a, b) => a + b, 0)));
 
-  const netProfitRow: any[] = ['Net Profit (Rs.)'];
-  weeklyMetrics.forEach((m, idx) => {
-    const totalExp = Object.values(weeklyExpenses[idx] || {}).reduce((a, b) => a + b, 0);
-    const profit = m.sales - totalExp;
-    netProfitRow.push(formatCurrencyPlain(profit));
-  });
-  netProfitRow.push(formatCurrencyPlain(totalMetrics.sales - Object.values(totalExpenses).reduce((a, b) => a + b, 0)));
-
   expenseRows.push(totalExpRow);
-  expenseRows.push(netProfitRow);
 
   autoTable(doc, {
     head: [expenseHeaders],
@@ -341,19 +332,9 @@ export const exportPDF = async (
         data.cell.styles.fontStyle = 'bold';
         data.cell.styles.textColor = [22, 101, 52] as any;
       }
-    },
-    didDrawCell: (data) => {
-      if (data.section === 'body') {
-        const rowIndex = data.row.index;
-        if (rowIndex === expenseRows.length - 1) {
-          // Net Profit – stronger green
-          data.cell.styles.fillColor = [220, 252, 231] as any;
-          data.cell.styles.textColor = [22, 101, 52] as any;
-          data.cell.styles.fontStyle = 'bold';
-        } else if (rowIndex === expenseRows.length - 2) {
-          data.cell.styles.fillColor = [240, 253, 244] as any;
-          data.cell.styles.fontStyle = 'bold';
-        }
+      if (data.section === 'body' && data.row.index === expenseRows.length - 1) {
+        data.cell.styles.fillColor = [240, 253, 244];
+        data.cell.styles.fontStyle = 'bold';
       }
     },
   });
@@ -461,16 +442,6 @@ export const exportExcel = (
   });
   totalExpRow.push(Number(Object.values(totalExpenses).reduce((a, b) => a + b, 0).toFixed(2)));
   expenseRows.push(totalExpRow);
-
-  // Net Profit row
-  const netProfitRow: any[] = ['Net Profit (₹)'];
-  weeklyMetrics.forEach((m, idx) => {
-    const totalExp = Object.values(weeklyExpenses[idx] || {}).reduce((a, b) => a + b, 0);
-    const profit = m.sales - totalExp;
-    netProfitRow.push(Number(profit.toFixed(2)));
-  });
-  netProfitRow.push(Number((totalMetrics.sales - Object.values(totalExpenses).reduce((a, b) => a + b, 0)).toFixed(2)));
-  expenseRows.push(netProfitRow);
 
   expenseRows.forEach(row => wsData.push(row));
 

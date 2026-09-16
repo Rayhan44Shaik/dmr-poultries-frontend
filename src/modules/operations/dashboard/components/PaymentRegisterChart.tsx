@@ -328,7 +328,7 @@ export default function PaymentRegisterChart({ summary, loading, error, animatio
               <p className="leading-tight">
                 <span className="block text-[8px] font-black uppercase tracking-wide text-sky-700">Payments</span>
                 <strong className="payment-register-value block text-[12.5px] font-black tabular-nums text-slate-800">
-                  {formatINRCompact(totalAmount)}
+                  {formatINR(totalAmount)}
                 </strong>
                 <span className="block text-[8.5px] font-bold tabular-nums text-slate-400">{totalCount} entries</span>
               </p>

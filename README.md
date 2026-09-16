@@ -59,6 +59,13 @@ prints that and exits without failing the dev command.
 - Run `npm run verify:quarter-data` to launch an isolated sample API and audit
   the Operations data hand-offs (collections, rates, shop sales, fuel, ledger
   and dashboard). It stops automatically and never touches the running preview.
+- Run `npm run verify:fleet-sync` while the dev server is running for a read-only
+  audit of Fleet maintenance, meter history, permits/scans, EMI schedules, fuel
+  readings and analytics through the actual frontend mappers. Set `API` to audit
+  a sample API at a different URL. The audit never adds or changes records.
+  Fleet Analytics defaults to the advertised sample quarter (Reset restores it)
+  and reloads when revisiting its tab. Real-backend deployments retain the
+  current-week default. FASTAG remains the existing construction placeholder.
 - Run `npm run verify:staff-sync` for the Staff-module twin: it replays every
   Staff page's exact API sequence against an isolated quarter sample server —
   Duty Planner weeks (current/previous/upcoming), Leaves (list, filters,

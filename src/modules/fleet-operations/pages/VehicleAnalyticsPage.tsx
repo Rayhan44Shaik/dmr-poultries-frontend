@@ -27,6 +27,7 @@ import { formatCurrencyCompact, formatNumberCompact } from '../utils/formatters'
 
 interface VehicleAnalyticsPageProps {
   embedded?: boolean;
+  active?: boolean;
 }
 
 const containsFilter = (option: { label: string }, inputValue: string) => {
@@ -113,10 +114,11 @@ const SkeletonCharts = () => (
   </div>
 );
 
-const VehicleAnalyticsPage = ({ embedded = false }: VehicleAnalyticsPageProps) => {
+const VehicleAnalyticsPage = ({ embedded = false, active = true }: VehicleAnalyticsPageProps) => {
   const { t } = useI18n();
   const {
     stats,
+    sampleRange,
     weeklyData,
     expenseBreakdown,
     vehicleStats,
@@ -135,7 +137,7 @@ const VehicleAnalyticsPage = ({ embedded = false }: VehicleAnalyticsPageProps) =
     error,
     refresh,
     lastRefreshed,
-  } = useAnalyticsData();
+  } = useAnalyticsData(active);
 
   const selectedOption = useMemo(
     () => vehicleOptions.find((option) => option.value === selectedVehicleId) ?? null,
@@ -207,6 +209,13 @@ const VehicleAnalyticsPage = ({ embedded = false }: VehicleAnalyticsPageProps) =
             )}
             {toast.message}
           </div>
+        )}
+
+        {sampleRange && (
+          <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+            Sample quarter: {sampleRange.fromDate} – {sampleRange.toDate}. Figures use the existing
+            Fleet records and the selected date / vehicle filters. Reset restores the full quarter.
+          </p>
         )}
 
         {/* Filter/Control Bar */}

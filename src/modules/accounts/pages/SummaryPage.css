@@ -1,0 +1,71 @@
+/* Account Analysis uses the same density as Trip List, not the old compact
+   spreadsheet cells. Scoped to its two report tables, never global tables. */
+.account-analysis .analysis-table {
+  min-width: 900px;
+  table-layout: auto;
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.account-analysis .analysis-table th {
+  padding: 16px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+.account-analysis .analysis-table td {
+  padding: 20px 16px;
+  font-size: 13px;
+  vertical-align: middle;
+}
+.account-analysis .analysis-table tbody tr {
+  border-bottom: 1px solid #f1f5f9;
+}
+.account-analysis .analysis-table tbody tr:nth-child(even) {
+  background-color: #f8fafc;
+}
+.account-analysis .analysis-table tbody tr:hover {
+  background-color: #f0fdf4;
+}
+.account-analysis .analysis-table th span {
+  white-space: nowrap;
+}
+.account-analysis .analysis-filters {
+  font-size: 13px;
+}
+.account-analysis .analysis-filters button {
+  min-height: 36px;
+}
+.account-analysis .analysis-filters input {
+  min-height: 40px;
+  font-size: 13px;
+}
+.dark .account-analysis .analysis-table tbody tr { border-color: #334155; }
+.dark .account-analysis .analysis-table tbody tr:nth-child(even) { background-color: #1e293b; }
+.dark .account-analysis .analysis-table tbody tr:hover { background-color: #064e3b; }
+
+/* A fixed label column avoids the large proportional Particulars/week gap.
+   Period columns share remaining width, with centred, high-contrast figures. */
+.account-analysis .analysis-table th:first-child,
+.account-analysis .analysis-table td:first-child {
+  width: 260px;
+  min-width: 260px;
+  white-space: nowrap;
+  padding-right: 12px;
+}
+.account-analysis .analysis-table th:not(:first-child),
+.account-analysis .analysis-table td:not(:first-child) {
+  width: auto;
+  text-align: center;
+  padding-left: 12px;
+  padding-right: 12px;
+  font-variant-numeric: tabular-nums;
+}
+.account-analysis .analysis-table td:not(:first-child) { font-weight: 650; }
+
+/* Keep headings readable on one line; the table wrapper handles overflow. */
+.account-analysis .analysis-table th { white-space: nowrap; }
+.account-analysis .analysis-table th > span.block { display: inline; margin-left: 6px; }
+.account-analysis h2, .account-analysis h3 { white-space: nowrap; }

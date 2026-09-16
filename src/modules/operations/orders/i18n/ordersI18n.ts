@@ -7,7 +7,22 @@ import { useCallback } from "react";
 import { useI18n, type Language } from "../../../../i18n";
 
 const EN: Record<string, string> = {
+  "orders.collection_filters": "Order Collection filters",
+  "orders.sort_status": "Status",
+  "orders.assignment_filters": "Order Assignment filters",
+  "orders.search_label": "Search",
+  "orders.sort_sequence": "Original order / S.No",
+  "orders.sort_city_az": "City A → Z",
+  "orders.sort_city_za": "City Z → A",
+  "orders.sort_birds_asc": "Birds: Low → High",
+  "orders.sort_birds_desc": "Birds: High → Low",
+  "orders.sort_boxes_asc": "Boxes: Low → High",
+  "orders.sort_boxes_desc": "Boxes: High → Low",
+  "orders.sort_weight_asc": "Weight: Low → High",
+  "orders.sort_weight_desc": "Weight: High → Low",
+
   // Tabs
+  "orders.tabs_label": "Orders pages",
   "orders.tab_collection": "Order Collection",
   "orders.tab_assignment": "Order Assignment",
   "orders.tab_tracking": "Delivery Tracking",
@@ -345,6 +360,8 @@ const EN: Record<string, string> = {
 
   // Collection table sort
   "orders.sort": "Sort",
+  "orders.sort_newest": "Date: Newest first",
+  "orders.sort_oldest": "Date: Oldest first",
   "orders.sort_collected_first": "Collected First",
   "orders.sort_name_az": "Shop Name A → Z",
   "orders.sort_name_za": "Shop Name Z → A",
@@ -410,6 +427,21 @@ const EN: Record<string, string> = {
 };
 
 const TE: Record<string, string> = {
+  "orders.collection_filters": "ఆర్డర్ సేకరణ ఫిల్టర్లు",
+  "orders.sort_status": "స్థితి",
+  "orders.assignment_filters": "ఆర్డర్ కేటాయింపు ఫిల్టర్లు",
+  "orders.search_label": "వెతకండి",
+  "orders.sort_sequence": "అసలు క్రమం / క్రమ సంఖ్య",
+  "orders.sort_city_az": "నగరం A → Z",
+  "orders.sort_city_za": "నగరం Z → A",
+  "orders.sort_birds_asc": "పక్షులు: తక్కువ → ఎక్కువ",
+  "orders.sort_birds_desc": "పక్షులు: ఎక్కువ → తక్కువ",
+  "orders.sort_boxes_asc": "బాక్సులు: తక్కువ → ఎక్కువ",
+  "orders.sort_boxes_desc": "బాక్సులు: ఎక్కువ → తక్కువ",
+  "orders.sort_weight_asc": "బరువు: తక్కువ → ఎక్కువ",
+  "orders.sort_weight_desc": "బరువు: ఎక్కువ → తక్కువ",
+
+  "orders.tabs_label": "ఆర్డర్ పేజీలు",
   // Tabs
   "orders.tab_collection": "ఆర్డర్ సేకరణ",
   "orders.tab_assignment": "ఆర్డర్ అసైన్‌మెంట్",
@@ -745,6 +777,8 @@ const TE: Record<string, string> = {
 
   // Collection table sort
   "orders.sort": "వరుస",
+  "orders.sort_newest": "తేదీ: కొత్తవి ముందు",
+  "orders.sort_oldest": "తేదీ: పాతవి ముందు",
   "orders.sort_collected_first": "సేకరించినవి ముందు",
   "orders.sort_name_az": "షాప్ పేరు A → Z",
   "orders.sort_name_za": "షాప్ పేరు Z → A",

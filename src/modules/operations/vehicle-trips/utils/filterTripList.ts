@@ -62,6 +62,8 @@ export function filterTripListTrips(
   const to = dateOnly(toDate);
 
   return trips.filter((trip) => {
+    // Older servers may ignore the completed-only endpoint contract.
+    if (trip.deleted || !['Completed', 'Approved'].includes(String(trip.status))) return false;
     const tripDate = dateOnly(trip.tripDate);
     if ((from && (!tripDate || tripDate < from)) || (to && (!tripDate || tripDate > to))) return false;
     if (vehicleId != null && Number(trip.vehicleId) !== vehicleId) return false;
