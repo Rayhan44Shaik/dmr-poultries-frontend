@@ -19,9 +19,10 @@
 //   └───────────────────────────────────────────────────────────┘
 //
 // Four equal columns carry every section: the first column of each half is the
-// field name, the next is its data, right-aligned so each half ends cleanly at
-// its edge. Section rows span all four columns, so the card reads as one table
-// rather than three boxes with gaps between them.
+// field name, the next is its data — every cell reads from its own LEFT edge,
+// so a value starts right where its name ends instead of being pushed to the
+// far side of the cell. Section rows span all four columns, so the card reads
+// as one table rather than three boxes with gaps between them.
 //
 // No shop-wise delivery list here: the shop COUNT already sits on the trip row,
 // and shop-level detail lives in the Delivery module where it is actionable.
@@ -101,7 +102,7 @@ function Pair({ label, value, tone, rule = true }: {
         {label}
       </th>
       <td
-        className={`w-1/4 border-l border-slate-200 px-3 py-2.5 text-right align-middle text-[12.5px] font-semibold tabular-nums ${
+        className={`w-1/4 border-l border-slate-200 px-3 py-2.5 text-left align-middle text-[12.5px] font-semibold tabular-nums ${
           tone ?? "text-slate-700"
         }`}
       >
@@ -168,7 +169,8 @@ export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
     },
   ];
 
-  const numericHead = "w-1/4 border-l border-slate-200 px-3 py-2 text-right text-[10.5px] font-bold uppercase tracking-wide text-slate-900";
+  const numericHead =
+    "w-1/4 border-l border-slate-200 px-3 py-2 text-left text-[10.5px] font-bold uppercase tracking-wide text-slate-900";
 
   return (
     <div className="border-t border-slate-200/80 bg-slate-100/60 px-2 py-2.5">
@@ -235,13 +237,13 @@ export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
                 >
                   {row.label}
                 </th>
-                <td className={`w-1/4 border-l border-slate-100 px-3 py-2.5 text-right align-middle font-semibold tabular-nums ${row.tone}`}>
+                <td className={`w-1/4 border-l border-slate-100 px-3 py-2.5 text-left align-middle font-semibold tabular-nums ${row.tone}`}>
                   {row.birds}
                 </td>
-                <td className={`w-1/4 border-l border-slate-100 px-3 py-2.5 text-right align-middle font-semibold tabular-nums ${row.tone}`}>
+                <td className={`w-1/4 border-l border-slate-100 px-3 py-2.5 text-left align-middle font-semibold tabular-nums ${row.tone}`}>
                   {row.weight}
                 </td>
-                <td className={`w-1/4 border-l border-slate-100 px-3 py-2.5 text-right align-middle font-semibold tabular-nums ${row.tone}`}>
+                <td className={`w-1/4 border-l border-slate-100 px-3 py-2.5 text-left align-middle font-semibold tabular-nums ${row.tone}`}>
                   {row.pct}
                 </td>
               </tr>
@@ -263,7 +265,7 @@ export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
               </th>
               <td
                 colSpan={3}
-                className="bg-emerald-50/70 px-3 py-2.5 text-right align-middle text-[15px] font-extrabold tabular-nums text-emerald-700"
+                className="bg-emerald-50/70 px-3 py-2.5 text-left align-middle text-[15px] font-extrabold tabular-nums text-emerald-700"
               >
                 {(record.survivalRate * 100).toFixed(2)}%
               </td>

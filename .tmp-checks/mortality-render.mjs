@@ -192,7 +192,8 @@ ok("table: expand affordance kept", tableHtml.includes("Expand trip") && tableHt
   ok("panel: four equal columns carry every row", (expandHtml.match(/w-1\/4/g) || []).length >= 20, `quarter cells=${(expandHtml.match(/w-1\/4/g) || []).length}`);
   ok("panel: trip + weights + rates titles present", ["Trip Details", "Weights", "Rates"].every((title) => expandHtml.includes(title)));
   ok("panel: card title carries the trip mark", expandHtml.includes("border-indigo-100 bg-indigo-50/70") && expandHtml.includes("border-rose-100 bg-rose-50/70") && expandHtml.includes("border-emerald-100 bg-emerald-50/70"));
-  ok("panel: values are right-aligned so each half closes cleanly", (expandHtml.match(/text-right align-middle/g) || []).length >= 12, `right-aligned=${(expandHtml.match(/text-right align-middle/g) || []).length}`);
+  ok("panel: every value starts from the left", (expandHtml.match(/text-left align-middle/g) || []).length >= 12 && !expandHtml.includes("text-right align-middle"), `left=${(expandHtml.match(/text-left align-middle/g) || []).length} right=${(expandHtml.match(/text-right align-middle/g) || []).length}`);
+  ok("panel: no cell in the panel is right-aligned at all", !expandHtml.includes("text-right"), "a cell is still right-aligned");
   ok("panel: name │ data hairline inside every pair", (expandHtml.match(/border-l border-slate-200 px-3/g) || []).length >= 10, `rules=${(expandHtml.match(/border-l border-slate-200 px-3/g) || []).length}`);
 
   const detailRow = expandHtml.slice(expandHtml.indexOf("Trip No"), expandHtml.indexOf("Weights"));
