@@ -41,20 +41,20 @@ interface OperationalTrendsChartProps {
 }
 
 const COLOR = {
-  trips: "#16a34a",
-  farmWeight: "#22c55e",
-  delivered: "#f97316",
-  mortality: "#fb7185",
-  weightLoss: "#f59e0b",
+  trips: "#0284c7",
+  farmWeight: "#0d9488",
+  delivered: "#7c3aed",
+  mortality: "#e11d48",
+  weightLoss: "#d97706",
 } as const;
 
-/** Soft green/orange plot colours: lighter bars, green trip movement line. */
+/** Calm sky/teal/lavender plot colours: softer on the eyes than the older bright palette. */
 const PLOT_COLOR = {
-  trips: "#16a34a",
-  farmWeight: "#4ade80",
-  delivered: "#fb923c",
-  mortality: "#fb7185",
-  weightLoss: "#f59e0b",
+  trips: "#0ea5e9",
+  farmWeight: "#2dd4bf",
+  delivered: "#a78bfa",
+  mortality: "#fda4af",
+  weightLoss: "#fbbf24",
 } as const;
 
 type TrendChartMode = "barLine" | "area" | "stacked";
@@ -308,8 +308,8 @@ export default function OperationalTrendsChart({
               onClick={() => setChartMode(mode.value)}
               className={`rounded-md px-2.5 py-1 text-[9.5px] font-extrabold transition-colors ${
                 chartMode === mode.value
-                  ? "bg-white text-emerald-700 shadow-sm ring-1 ring-inset ring-emerald-100"
-                  : "text-slate-400 hover:text-emerald-700"
+                  ? "bg-white text-sky-700 shadow-sm ring-1 ring-inset ring-sky-100"
+                  : "text-slate-400 hover:text-sky-700"
               }`}
             >
               {t(mode.labelKey)}
@@ -328,19 +328,19 @@ export default function OperationalTrendsChart({
                 <stop offset="100%" stopColor={PLOT_COLOR.trips} stopOpacity={0} />
               </linearGradient>
               <linearGradient id="ot-farm" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#dcfce7" />
+                <stop offset="0%" stopColor="#ccfbf1" />
                 <stop offset="100%" stopColor={PLOT_COLOR.farmWeight} />
               </linearGradient>
               <linearGradient id="ot-delivered" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#ffedd5" />
+                <stop offset="0%" stopColor="#ede9fe" />
                 <stop offset="100%" stopColor={PLOT_COLOR.delivered} />
               </linearGradient>
               <linearGradient id="ot-mortality" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#ffe4e6" />
+                <stop offset="0%" stopColor="#fff1f2" />
                 <stop offset="100%" stopColor={PLOT_COLOR.mortality} />
               </linearGradient>
               <linearGradient id="ot-loss" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#fef3c7" />
+                <stop offset="0%" stopColor="#fef9c3" />
                 <stop offset="100%" stopColor={PLOT_COLOR.weightLoss} />
               </linearGradient>
               <filter id="ot-line-shadow" x="-20%" y="-20%" width="140%" height="160%">
@@ -389,7 +389,7 @@ export default function OperationalTrendsChart({
                   />
                 );
               }}
-              cursor={{ fill: "rgba(22,163,74,0.06)", radius: 6 }}
+              cursor={{ fill: "rgba(14,165,233,0.07)", radius: 6 }}
             />
 
             {chartMode === "barLine" ? (
