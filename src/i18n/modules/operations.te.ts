@@ -214,6 +214,8 @@ export default {
   'ops.dashboard.in_period': 'ఈ కాలావధిలో {count}',
   'ops.dashboard.on_trips_count': '{count} ట్రిప్‌లు',
   'ops.dashboard.no_trips_range': 'ఈ కాలావధిలో ట్రిప్‌లు లేవు',
+  'ops.dashboard.everyone_ran': 'ఈ కాలావధిలో అందరూ ట్రిప్‌లు చేశారు',
+  'ops.dashboard.idle_list': 'ఈ కాలావధిలో ట్రిప్‌లు చేయనివారు',
   'ops.dashboard.more_items': '+ ఇంకా {count}',
   'ops.dashboard.detail_trips': '{trips} ట్రిప్‌లు',
   'ops.dashboard.detail_trips_shops': '{trips} ట్రిప్‌లు · {shops} షాప్‌లు',

@@ -978,11 +978,11 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
         <ActiveCounts
           rosters={
             data?.spanFleet ?? {
-              vehicles: { worked: data?.usedVehicles ?? 0, activeTotal: data?.activeVehicles ?? 0, items: [], overflow: 0 },
-              drivers: { worked: data?.usedDrivers ?? 0, activeTotal: data?.activeDrivers ?? 0, items: [], overflow: 0 },
-              supervisors: { worked: 0, activeTotal: 0, items: [], overflow: 0 },
-              helpers: { worked: data?.usedHelpers ?? 0, activeTotal: data?.activeHelpers ?? 0, items: [], overflow: 0 },
-              loaders: { worked: 0, activeTotal: 0, items: [], overflow: 0 },
+              vehicles: { worked: data?.usedVehicles ?? 0, activeTotal: data?.activeVehicles ?? 0, items: [], overflow: 0, idle: [], idleOverflow: 0 },
+              drivers: { worked: data?.usedDrivers ?? 0, activeTotal: data?.activeDrivers ?? 0, items: [], overflow: 0, idle: [], idleOverflow: 0 },
+              supervisors: { worked: 0, activeTotal: 0, items: [], overflow: 0, idle: [], idleOverflow: 0 },
+              helpers: { worked: data?.usedHelpers ?? 0, activeTotal: data?.activeHelpers ?? 0, items: [], overflow: 0, idle: [], idleOverflow: 0 },
+              loaders: { worked: 0, activeTotal: 0, items: [], overflow: 0, idle: [], idleOverflow: 0 },
               tripCount: 0,
             }
           }

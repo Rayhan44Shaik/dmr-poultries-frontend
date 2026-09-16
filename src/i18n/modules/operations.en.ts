@@ -214,6 +214,8 @@ export default {
   'ops.dashboard.in_period': '{count} in period',
   'ops.dashboard.on_trips_count': '{count} on trips',
   'ops.dashboard.no_trips_range': 'No trips in this range',
+  'ops.dashboard.everyone_ran': 'Everyone ran trips in this range',
+  'ops.dashboard.idle_list': 'Did not run in this range',
   'ops.dashboard.more_items': '+ {count} more',
   'ops.dashboard.detail_trips': '{trips} trips',
   'ops.dashboard.detail_trips_shops': '{trips} trips · {shops} shops',

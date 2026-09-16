@@ -151,19 +151,37 @@ export interface SpanFleetParticipant {
 }
 
 /**
+ * One register member that ran NO trip in the selected span — shown when a
+ * tile is selected ("select the tile again and it goes"). Register-Inactive
+ * (out of service) members are included, flagged so the UI can badge them
+ * differently from actives that were merely idle in the window.
+ */
+export interface SpanIdleItem {
+  name: string;
+  detail?: string;
+  /** Master register says Inactive (out of service), not just idle this span. */
+  registerInactive: boolean;
+}
+
+/**
  * One register's span roster: the people/vehicles that ran trips in the
- * selected window. The active register size rides along as a small "of N
- * active" denominator for context — it is never what the headline counts.
+ * selected window plus the register members that did NOT. The active register
+ * size rides along as a small "of N active" denominator — it is never what
+ * the headline counts.
  */
 export interface SpanFleetRoster {
   /** Distinct participants who ran ≥1 trip in the span. */
   worked: number;
   /** Active register size (window-independent context). */
   activeTotal: number;
-  /** The participants themselves, busiest first (tooltip list, capped). */
+  /** The participants themselves, busiest first (overlay list, capped). */
   items: SpanFleetParticipant[];
-  /** Participants beyond the cap (tooltip "+N more"). */
+  /** Participants beyond the cap (overlay "+N more"). */
   overflow: number;
+  /** Register members (any status) that ran no trip in the span, a–z. */
+  idle: SpanIdleItem[];
+  /** Idle members beyond the cap. */
+  idleOverflow: number;
 }
 
 /**
@@ -242,24 +260,47 @@ function bumpParticipant(map: Map<string, ParticipantBucket>, name: string): Par
   return existing;
 }
 
-/** Busiest first, then alphabetical, so the tooltip reads like a leaderboard. */
-function buildRoster(items: SpanFleetParticipant[], activeTotal: number): SpanFleetRoster {
+/** Busiest first, then alphabetical, so the overlay reads like a leaderboard; the idle half sorts a–z. */
+function buildRoster(
+  items: SpanFleetParticipant[],
+  activeTotal: number,
+  idleAll: SpanIdleItem[],
+): SpanFleetRoster {
   const sorted = [...items].sort((a, b) => b.trips - a.trips || a.name.localeCompare(b.name, "en-IN"));
+  const idleSorted = [...idleAll].sort((a, b) => a.name.localeCompare(b.name, "en-IN"));
   return {
     worked: sorted.length,
     activeTotal,
     items: sorted.slice(0, TOOLTIP_ITEM_LIMIT),
     overflow: Math.max(0, sorted.length - TOOLTIP_ITEM_LIMIT),
+    idle: idleSorted.slice(0, TOOLTIP_ITEM_LIMIT),
+    idleOverflow: Math.max(0, idleSorted.length - TOOLTIP_ITEM_LIMIT),
   };
 }
 
-/** Active register size for one crew department ("Driver"/"Drivers" either way). */
-function activeCrewCount(employees: readonly Record<string, unknown>[], department: string): number {
+/** Crew rows of one department from the employee master ("Driver"/"Drivers" either way). */
+function crewDeptRows(
+  employees: readonly Record<string, unknown>[],
+  department: string,
+): Record<string, unknown>[] {
   const want = department.toLowerCase();
   return employees.filter((row) => {
     const dept = String(row.department ?? row.role ?? "").trim().toLowerCase();
-    return (dept === want || `${dept}s` === want || dept === `${want}s`) && row.status === "Active";
-  }).length;
+    return dept === want || `${dept}s` === want || dept === `${want}s`;
+  });
+}
+
+/** Active register size for one crew department. */
+function activeCrewCount(employees: readonly Record<string, unknown>[], department: string): number {
+  return crewDeptRows(employees, department).filter((row) => row.status === "Active").length;
+}
+
+/** "Joined …" line for a crew member, matching the register's record. */
+function crewJoinedDetail(row: Record<string, unknown>, department: string): string | undefined {
+  const joined = String(row.joiningDate ?? "").trim();
+  if (joined) return `Joined ${joined}`;
+  const dept = String(row.department ?? department).trim();
+  return dept || undefined;
 }
 
 /** Aggregate the span's trip rows into the five on-trip rosters. */
@@ -289,6 +330,22 @@ function buildSpanFleet(
     for (const name of trip.loaders) bumpParticipant(loadersByName, name);
   }
 
+  // Register members that ran NO trip in the span — the "inactive in this
+  // range" line shown when a tile is selected. Register-Inactive members are
+  // included but flagged, so the UI can badge them differently.
+  const vehiclesIdle: SpanIdleItem[] = vehicles.flatMap((row) => {
+    const name = String(row.vehicleNumber ?? row.number ?? "").trim();
+    if (!name || vehiclesByName.has(name)) return [];
+    const detail = String(row.vehicleType ?? "").trim();
+    return [{ name, detail: detail || undefined, registerInactive: row.status !== "Active" }];
+  });
+  const crewIdle = (department: string, participants: Map<string, ParticipantBucket>): SpanIdleItem[] =>
+    crewDeptRows(employees, department).flatMap((row) => {
+      const name = String(row.employeeName ?? "").trim();
+      if (!name || participants.has(name)) return [];
+      return [{ name, detail: crewJoinedDetail(row, department), registerInactive: row.status !== "Active" }];
+    });
+
   return {
     vehicles: buildRoster(
       [...vehiclesByName.values()].map((p) => ({
@@ -298,22 +355,27 @@ function buildSpanFleet(
         weightKg: Math.round(p.weightKg),
       })),
       vehicles.filter((v) => v.status === "Active").length,
+      vehiclesIdle,
     ),
     drivers: buildRoster(
       [...driversByName.values()].map((p) => ({ name: p.name, trips: p.trips, shops: p.shops.size })),
       activeCrewCount(employees, "Driver"),
+      crewIdle("Driver", driversByName),
     ),
     supervisors: buildRoster(
       [...supervisorsByName.values()].map((p) => ({ name: p.name, trips: p.trips, farms: p.farms.size })),
       activeCrewCount(employees, "Supervisor"),
+      crewIdle("Supervisor", supervisorsByName),
     ),
     helpers: buildRoster(
       [...helpersByName.values()].map((p) => ({ name: p.name, trips: p.trips })),
       activeCrewCount(employees, "Helper"),
+      crewIdle("Helper", helpersByName),
     ),
     loaders: buildRoster(
       [...loadersByName.values()].map((p) => ({ name: p.name, trips: p.trips })),
       activeCrewCount(employees, "Loader"),
+      crewIdle("Loader", loadersByName),
     ),
     tripCount: trips.length,
   };
