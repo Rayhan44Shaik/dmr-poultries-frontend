@@ -237,42 +237,40 @@ export default function CollectionPerformanceChart({
             </p>
           </div>
         ) : (
-          <div className="mt-2 overflow-hidden rounded-xl border border-slate-100 bg-white shadow-xs">
-            <div className="divide-y divide-slate-100">
-              {visibleRows.map((row, index) => {
-                const rowRecovery = collectionRecoveryPercentage(row);
-                return (
-                  <article
-                    key={row.shopName}
-                    className="group min-w-0 bg-gradient-to-r from-white to-slate-50/60 px-2.5 py-1.5 transition-colors duration-150 hover:from-emerald-50/35 hover:to-white"
-                    title={`${row.shopName}\n${t("ops.dashboard.collection_performance.sales")}: ${formatINR(row.salesAmount)}\n${t("ops.dashboard.collection_performance.collected")}: ${formatINR(row.collectionAmount)}\n${t("ops.dashboard.collection_performance.gap")}: ${formatINR(row.outstandingAmount)}`}
-                  >
-                    <div className="grid min-w-0 grid-cols-[1.45rem_3rem_minmax(0,1fr)_auto] items-center gap-2">
-                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-emerald-50 text-[10px] font-black tabular-nums text-emerald-700 ring-1 ring-inset ring-emerald-100">
-                        {index + 1}
-                      </span>
-                      <RecoveryRing value={rowRecovery} size={44} />
-                      <div className="min-w-0">
-                        <p className="truncate text-[13px] font-medium leading-tight text-slate-700 transition-colors group-hover:text-slate-900">
-                          {row.shopName}
-                        </p>
-                        <p className="mt-0.5 truncate text-[10.5px] font-semibold tabular-nums text-slate-500">
-                          {formatINRCompact(row.collectionAmount)} / {formatINRCompact(row.salesAmount)}
-                        </p>
-                      </div>
-                      <div className="shrink-0 text-right leading-tight">
-                        <span
-                          className="block rounded-full bg-orange-50 px-2 py-1 text-[11.5px] font-black tabular-nums text-orange-700 ring-1 ring-inset ring-orange-100"
-                          title={`${t("ops.dashboard.collection_performance.gap")}: ${formatINR(row.outstandingAmount)}`}
-                        >
-                          {formatINRCompact(row.outstandingAmount)}
-                        </span>
-                      </div>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            {visibleRows.map((row, index) => {
+              const rowRecovery = collectionRecoveryPercentage(row);
+              return (
+                <article
+                  key={row.shopName}
+                  className="group min-w-0 rounded-xl border border-slate-100 bg-gradient-to-r from-white to-slate-50/60 px-2.5 py-1.5 shadow-xs transition-colors duration-150 hover:from-emerald-50/35 hover:to-white"
+                  title={`${row.shopName}\n${t("ops.dashboard.collection_performance.sales")}: ${formatINR(row.salesAmount)}\n${t("ops.dashboard.collection_performance.collected")}: ${formatINR(row.collectionAmount)}\n${t("ops.dashboard.collection_performance.gap")}: ${formatINR(row.outstandingAmount)}`}
+                >
+                  <div className="grid min-w-0 grid-cols-[1.35rem_2.9rem_minmax(0,1fr)_auto] items-center gap-1.5">
+                    <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-emerald-50 text-[9.5px] font-black tabular-nums text-emerald-700 ring-1 ring-inset ring-emerald-100">
+                      {index + 1}
+                    </span>
+                    <RecoveryRing value={rowRecovery} size={44} />
+                    <div className="min-w-0">
+                      <p className="truncate text-[12.5px] font-medium leading-tight text-slate-700 transition-colors group-hover:text-slate-900">
+                        {row.shopName}
+                      </p>
+                      <p className="mt-0.5 truncate text-[10px] font-semibold tabular-nums text-slate-500">
+                        {formatINRCompact(row.collectionAmount)} / {formatINRCompact(row.salesAmount)}
+                      </p>
                     </div>
-                  </article>
-                );
-              })}
-            </div>
+                    <div className="shrink-0 text-right leading-tight">
+                      <span
+                        className="block rounded-full bg-orange-50 px-1.5 py-1 text-[10.5px] font-black tabular-nums text-orange-700 ring-1 ring-inset ring-orange-100"
+                        title={`${t("ops.dashboard.collection_performance.gap")}: ${formatINR(row.outstandingAmount)}`}
+                      >
+                        {formatINRCompact(row.outstandingAmount)}
+                      </span>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
           </div>
         )}
 
