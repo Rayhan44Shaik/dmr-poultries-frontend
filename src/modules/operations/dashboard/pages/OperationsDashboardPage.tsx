@@ -52,16 +52,13 @@ const todayMidnight = (): Date => {
   return d;
 };
 
-// Fallback window for a production/offline backend. When the quarter sample
-// API is present, the page replaces it with the manifest's exact `fromDate`
-// and `toDate` before its first data request.
-const getBusinessWeekRange = (anchor = todayMidnight()) => {
-  /* A normal backend opens on the current Monday–Sunday week. The sample
-     dashboard intentionally opens on the full advertised quarter instead. */
-  const daysSinceMonday = (anchor.getDay() + 6) % 7;
-  const monday = addDays(anchor, -daysSinceMonday);
-  return { startDate: monday, endDate: addDays(monday, 6) };
-};
+// The overview always opens on one complete, inclusive seven-day window.
+// The end is the business "today" date (from the sample manifest when present)
+// so the default never includes future days or depends on a browser timezone.
+const getDefaultWeekRange = (anchor = todayMidnight()) => ({
+  startDate: addDays(anchor, -6),
+  endDate: anchor,
+});
 
 // -------- Helper: Format Date to YYYY-MM-DD safely --------
 const toInputDateString = (date: Date | undefined): string => {
@@ -74,10 +71,14 @@ const toInputDateString = (date: Date | undefined): string => {
 
 // -------- Helper: Parse YYYY-MM-DD string to Date object safely --------
 const parseInputDateString = (dateStr: string): Date | undefined => {
-  if (!dateStr) return undefined;
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return undefined;
   const [year, month, day] = dateStr.split("-").map(Number);
-  if (!year || !month || !day) return undefined;
-  return new Date(year, month - 1, day);
+  const parsed = new Date(year, month - 1, day);
+  // JavaScript silently normalises dates such as 2026-02-31 into March. Reject
+  // them instead: a custom range must describe exactly the dates the user sees.
+  return parsed.getFullYear() === year && parsed.getMonth() === month - 1 && parsed.getDate() === day
+    ? parsed
+    : undefined;
 };
 
 // -------- RangeDatePicker Component --------
@@ -608,20 +609,18 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   );
   const { showNotification } = useSafeNotification();
   const [browserAnchor] = useState<Date>(() => todayMidnight());
-  const initialRange = getBusinessWeekRange(browserAnchor);
+  const initialRange = getDefaultWeekRange(browserAnchor);
   const [sampleQuarter, setSampleQuarter] = useState<SampleQuarter | null>(null);
   const [startDate, setStartDate] = useState<Date | undefined>(initialRange.startDate);
   const [endDate, setEndDate] = useState<Date | undefined>(initialRange.endDate);
   const rangeTouchedRef = useRef(false);
   const [comparisonPeriod] = useState<"7d" | "15d" | "30d">("7d");
 
-  // The sample server owns the business date. Resolve it once so a pinned
-  // SAMPLE_TODAY and the dashboard date picker/chips use exactly the same
-  // quarter window instead of silently falling back to the browser clock.
-  // Hold the FIRST dashboard load until the sample window answer lands, so the
-  // overview loads exactly once with its final dates — the rolling browser
-  // window is a fallback, not a load-then-throw-away warmup (no duplicate
-  // first paint, no numbers flickering into different values).
+  // The sample server owns its business date. Resolve it before the first
+  // request so a pinned fixture still opens on exactly one completed week.
+  // The manifest keeps its exact endpoints for the QTR shortcut; it no longer
+  // overrides the dashboard's production default range. Holding the first
+  // request prevents a browser-clock warmup and a second repaint.
   const [sampleResolved, setSampleResolved] = useState(false);
   useEffect(() => {
     let active = true;
@@ -635,15 +634,14 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
       if (info) {
         setSampleQuarter(info.quarter);
         if (!rangeTouchedRef.current) {
-          // The manifest is the only source of truth for the sample window.
-          // Its explicit endpoints (rather than `today - 91`) keep the first
-          // paint, QTR shortcut, KPI range, charts and every linked register
-          // tied to the exact same rows — including a pinned/custom fixture.
-          const sampleStart = parseInputDateString(info.quarter.fromDate);
-          const sampleEnd = parseInputDateString(info.quarter.toDate);
-          if (sampleStart && sampleEnd) {
-            setStartDate(sampleStart);
-            setEndDate(sampleEnd);
+          // Default to the last seven inclusive calendar days ending on the
+          // sample business date. QTR remains a separate, exact-manifest
+          // shortcut in the picker below.
+          const sampleToday = parseInputDateString(info.quarter.today);
+          if (sampleToday) {
+            const week = getDefaultWeekRange(sampleToday);
+            setStartDate(week.startDate);
+            setEndDate(week.endDate);
           }
         }
       }
@@ -683,7 +681,8 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   const counterMonthFrom = toInputDateString(startOfMonth(dashboardAnchor));
   const countersQuery = useOperationalTrends(
     (counterWeekFrom < counterMonthFrom ? counterWeekFrom : counterMonthFrom) || undefined,
-    counterToday || undefined
+    counterToday || undefined,
+    sampleResolved
   );
 
   const trendCounts = useMemo(() => {
@@ -772,7 +771,11 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
     ? windowForView(trendView, dashboardAnchor)
     : { from: calendarFrom, to: calendarTo };
 
-  const trendsQuery = useOperationalTrends(trendWindow.from || undefined, trendWindow.to || undefined);
+  const trendsQuery = useOperationalTrends(
+    trendWindow.from || undefined,
+    trendWindow.to || undefined,
+    sampleResolved
+  );
   const defaultGranularity = granularityForRange(rangeDays);
   const trendGranularity: Granularity = trendView
     ? GRANULARITY_BY_VIEW[trendView]

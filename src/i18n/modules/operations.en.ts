@@ -339,7 +339,6 @@ export default {
   'ops.dashboard.trend.mortality_weight': 'Mortality weight',
   'ops.dashboard.trend.title': 'Trips & weight movement',
   'ops.dashboard.trend.today': 'Today',
-  'ops.dashboard.trend.truncated': 'Charts cover the {count} most recent trips in this range',
   'ops.dashboard.trend.view_mortality': 'Open the weight loss analysis',
   'ops.dashboard.trend.week': 'Week',
   'ops.dashboard.trend.weight_loss': 'Weight loss',

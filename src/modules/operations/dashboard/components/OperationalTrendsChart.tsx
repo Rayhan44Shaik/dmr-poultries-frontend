@@ -259,9 +259,12 @@ export default function OperationalTrendsChart({
 
   const rows = trends?.rows;
 
+  // Keep the client aggregation on the exact inclusive range as a second
+  // guard after the server filter. This prevents an over-broad cached response
+  // from leaking a trip into a custom-range total or tooltip.
   const buckets = useMemo(
-    () => aggregateOperational(rows ?? [], granularity),
-    [rows, granularity]
+    () => aggregateOperational(rows ?? [], granularity, { fromDate, toDate }),
+    [rows, granularity, fromDate, toDate]
   );
   const previous = useMemo(() => previousBySortKey(buckets), [buckets]);
   const totals = useMemo(() => summariseOperational(buckets), [buckets]);
@@ -308,7 +311,23 @@ export default function OperationalTrendsChart({
   }
 
   return (
-    <div className="flex w-full flex-1 flex-col">
+    <div className="relative flex w-full flex-1 flex-col">
+      {/* Keep the previous chart's geometry in place while the next custom
+          window is verified, but make it unambiguous that final totals are
+          still loading. This avoids both a blank flash and stale figures being
+          read as the selected range's result. */}
+      {loading ? (
+        <div
+          role="status"
+          aria-live="polite"
+          className="absolute inset-0 z-10 flex items-center justify-center rounded-xl bg-white/70 backdrop-blur-[1px]"
+        >
+          <span className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-[11px] font-bold text-slate-600 shadow-sm">
+            <span aria-hidden="true" className="h-3 w-3 animate-spin rounded-full border-2 border-slate-200 border-t-emerald-500" />
+            {t("common.loading")}
+          </span>
+        </div>
+      ) : null}
       <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
         <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[9.5px] font-bold text-slate-500">
           {[
@@ -519,11 +538,6 @@ export default function OperationalTrendsChart({
         />
       </div>
 
-      {trends?.truncated ? (
-        <p className="mt-2 text-[10.5px] font-medium text-slate-400">
-          {t("ops.dashboard.trend.truncated", { count: trends.countedTrips })}
-        </p>
-      ) : null}
     </div>
   );
 }
