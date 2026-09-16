@@ -256,6 +256,7 @@ ok("table: header glyphs are coloured lucide icons", (tableHtml.match(/text-(ind
   }
   ok("highlight: the row is still the click target", tableHtml.includes("cursor-pointer") && tableHtml.includes("select-none"), "row affordances missing");
   ok("highlight: nothing else rides on the row", !tableHtml.includes("Previous trip") && !tableHtml.includes("Next trip") && !tableHtml.includes("border-l-2"), "extra per-row chrome came back");
+  ok("highlight: a click leaves no box on the chevron", tableHtml.includes("focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"), "the chevron parks a focus box");
 
   // ── MOUSE: the row is the click target, and a click arms the keyboard ────
   ok("mouse: the trip row shows a pointer", tableHtml.includes("cursor-pointer"), "row does not look clickable");

@@ -566,7 +566,9 @@ export default function TripLossTable({
                               event.stopPropagation();
                               toggle(r.tripId);
                             }}
-                            className="rounded-md p-0.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                            // The keyboard still gets a ring; a mouse click does not
+                            // leave a box parked on the chevron.
+                            className="rounded-md p-0.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"
                             aria-label={isOpen ? t("ops.mortality.aria.collapse") : t("ops.mortality.aria.expand")}
                             aria-expanded={isOpen}
                           >
