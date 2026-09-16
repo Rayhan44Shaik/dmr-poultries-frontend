@@ -159,6 +159,10 @@ export default {
   'fleet.maintenance_view.parts_title': 'పార్ట్స్ / స్పేర్ పార్ట్స్',
   'fleet.maintenance_view.record_title': 'మెయింటెనెన్స్ రికార్డు',
   'fleet.maintenance_view.service_details': 'సర్వీస్ వివరాలు',
+  'fleet.maintenance_view.all_records': 'అన్ని మెయింటెనెన్స్ రికార్డులు',
+  'fleet.maintenance_view.total_records': 'మొత్తం రికార్డులు',
+  'fleet.maintenance_view.total_spend': 'మొత్తం ఖర్చు',
+  'fleet.maintenance_view.last_service': 'చివరి సర్వీస్',
 
   'fleet.timeline.clear_filters': 'ఫిల్టర్లను క్లియర్ చేయండి',
   'fleet.timeline.driver': 'డ్రైవర్: {driver}',

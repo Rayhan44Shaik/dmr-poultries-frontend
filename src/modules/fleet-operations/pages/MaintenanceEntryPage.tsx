@@ -405,6 +405,9 @@ const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
           <ViewModal
             record={viewRecord}
             vehicles={vehicles}
+            vehicleHistory={[...maintenance]
+              .filter((r) => String(r.vehicleId) === String(viewRecord.vehicleId))
+              .sort((a, b) => safeDate(b.date).getTime() - safeDate(a.date).getTime())}
             onClose={() => setViewModalOpen(false)}
             canEdit={viewRecord.paymentStatus !== 'approved' && !viewRecord.deletedAt}
             onEdit={(rec) => { setViewModalOpen(false); handleEdit(rec); }}

@@ -1,10 +1,12 @@
 import { memo, useState, useMemo, useEffect, useRef } from 'react';
 import {
-  Eye, Trash2, CheckCircle2, ChevronDown, Truck,
+  Eye, Trash2, CheckCircle2, Truck,
   Search, Paperclip, Hash, Calendar, Wrench, Store, User, Gauge, Clock, Wallet, History, X, RotateCcw
 } from 'lucide-react';
 import { useI18n, translateStatus } from '../../../../i18n';
 import { safeDate } from '../../utils/maintenanceHelpers';
+import MasterDropdown from '../../../masters/components/MasterDropdown';
+import { MAINTENANCE_TYPES } from '../../utils/constants';
 // Recent-Trip-Activity chrome + global pagination standard.
 import { Pagination } from '../../../../ui';
 import { BrandRefreshButton } from '../../../../ui';
@@ -59,6 +61,8 @@ const LatestMaintenanceTable = ({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   // Approved tab expansion — which vehicle's full record list is open.
   const [expandedVehicle, setExpandedVehicle] = useState<string | null>(null);
+  // Maintenance Type filter — same neat dropdown as the form's Driver field.
+  const [typeFilter, setTypeFilter] = useState<string>('');
   const tableRef = useRef<HTMLDivElement>(null);
 
   const { requestDelete, cancel, isPending, pendingItems } = usePendingDelete<string>(async (id) => {
@@ -97,8 +101,11 @@ const LatestMaintenanceTable = ({
   }, [allRecords]);
 
   const filteredRecords = useMemo(() => {
+    const afterType = typeFilter
+      ? validRecords.filter((rec) => (rec.maintenanceType || '').split(',').map((x) => x.trim()).includes(typeFilter))
+      : validRecords;
     const term = searchTerm.trim().toLowerCase();
-    if (!term) return validRecords;
+    if (!term) return afterType;
     return validRecords.filter(rec => {
       const vehicleNumber = resolveVehicleNumber(rec);
       const searchable = [
@@ -117,7 +124,7 @@ const LatestMaintenanceTable = ({
       return searchable.includes(term);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [validRecords, searchTerm, vehicles]);
+  }, [validRecords, typeFilter, searchTerm, vehicles]);
 
   const totalRecords = filteredRecords.length;
   const startIndex = (currentPage - 1) * pageSize + 1;
@@ -265,6 +272,23 @@ const LatestMaintenanceTable = ({
               )}
             </div>
           )}
+
+          <div className="w-40 sm:w-44">
+            <MasterDropdown
+              hideLabel
+              label={t('operations.maintenance_type')}
+              value={typeFilter}
+              options={[
+                { value: '', label: t('common.all') },
+                ...MAINTENANCE_TYPES.map((type) => ({ value: type, label: type })),
+              ]}
+              onChange={(next) => { setTypeFilter(next || ''); setSelectedId(null); setExpandedVehicle(null); onPageChange(1); }}
+              placeholder={t('operations.maintenance_type')}
+              searchable
+              allowClear
+              className="w-full"
+            />
+          </div>
 
           <div className="relative flex-1 sm:flex-none">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
@@ -427,15 +451,7 @@ const LatestMaintenanceTable = ({
                     >
                       <td className="px-4 py-3 whitespace-nowrap">
                         <div className="flex items-start gap-1.5">
-                          {viewMode === 'approved' ? (
-                            <span className={`mt-1 inline-flex shrink-0 text-slate-400 transition-transform duration-200 ${
-                              expandedVehicle === String(rec.vehicleId) ? 'rotate-180 text-blue-500' : ''
-                            }`}>
-                              <ChevronDown size={13} />
-                            </span>
-                          ) : (
-                            <div className="w-[13px] shrink-0 mt-0.5" />
-                          )}
+                          <div className="w-[13px] shrink-0 mt-0.5" />
                           <div className="flex flex-col items-start gap-1">
                             <span className={`inline-flex items-center gap-1.5 text-xs font-bold rounded-md px-2 py-0.5 border ${
                               isDeleted

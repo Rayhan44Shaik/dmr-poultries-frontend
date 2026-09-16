@@ -25,6 +25,9 @@ interface ViewModalProps {
   record: MaintenanceEvent;
   vehicles: any[];
   onClose: () => void;
+  /** EVERY maintenance record of this vehicle till now (newest first) —
+   *  shown below the details like the collection shop view. */
+  vehicleHistory?: MaintenanceEvent[];
   /** Set when the record can still be edited — shows the in-view Edit action. */
   canEdit?: boolean;
   /** Edit from inside the view — closes the modal and loads the form. */
@@ -54,15 +57,25 @@ function DetailCell({
   );
 }
 
-const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose, canEdit = false, onEdit }) => {
+const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose, canEdit = false, onEdit, vehicleHistory = [] }) => {
   const { t, language } = useI18n();
   // Documents section starts OPEN; the chevron hides/shows the gallery.
   const [docsOpen, setDocsOpen] = React.useState(true);
+  // The record whose details are displayed. Clicking a row in the vehicle's
+  // full history swaps it in — the view-collection interaction. When the
+  // parent opens a different record, state resets during render (the React
+  // recommended "adjust state on prop change" pattern — no effect needed).
+  const [active, setActive] = React.useState(record);
+  const [lastRecord, setLastRecord] = React.useState(record);
+  if (record !== lastRecord) {
+    setLastRecord(record);
+    setActive(record);
+  }
 
-  const vehicle = vehicles.find((v: any) => String(v.id) === String(record.vehicleId));
-  const vehicleNumber = vehicle?.vehicleNumber || record.vehicleNo || '—';
-  const isApproved = record.paymentStatus === 'approved';
-  const isDeleted = Boolean(record.deletedAt);
+  const vehicle = vehicles.find((v: any) => String(v.id) === String(active.vehicleId));
+  const vehicleNumber = vehicle?.vehicleNumber || active.vehicleNo || '—';
+  const isApproved = active.paymentStatus === 'approved';
+  const isDeleted = Boolean(active.deletedAt);
 
   const statusLabel = isApproved
     ? translateStatus(t, 'Approved')
@@ -76,14 +89,14 @@ const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose, canEdi
       ? { cls: 'text-rose-700 bg-rose-50 border-rose-200', icon: <XCircle size={13} /> }
       : { cls: 'text-blue-700 bg-blue-50 border-blue-200', icon: <Clock size={13} /> };
 
-  const maintTypes = (record.maintenanceType || '')
+  const maintTypes = (active.maintenanceType || '')
     .split(',')
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const nextByType = record.nextServiceByType || {};
-  const parts = Array.isArray(record.parts) ? record.parts : [];
-  const documents = Array.isArray(record.documents) ? record.documents : [];
+  const nextByType = active.nextServiceByType || {};
+  const parts = Array.isArray(active.parts) ? active.parts : [];
+  const documents = Array.isArray(active.documents) ? active.documents : [];
   const showEdit = Boolean(canEdit && onEdit && !isApproved && !isDeleted);
 
   return (
@@ -134,15 +147,15 @@ const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose, canEdi
                   : 'border-orange-100/80 bg-orange-50 text-orange-700'
             }`}>
               <Hash size={14} />
-              {record.billNumber || '—'}
+              {active.billNumber || '—'}
             </span>
             <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 shadow-xs">
               <Calendar size={14} className="flex-shrink-0 text-blue-500" />
-              {formatTripListDay(record.date || record.createdAt, language)}
+              {formatTripListDay(active.date || active.createdAt, language)}
             </span>
             <span className="inline-flex items-center gap-1.5 rounded-lg border border-orange-100 bg-orange-50/60 px-3 py-1.5 text-sm font-bold text-slate-700 shadow-xs">
               <Gauge size={14} className="flex-shrink-0 text-orange-500" />
-              {Number(record.currentKM || 0).toLocaleString()} KM
+              {Number(active.currentKM || 0).toLocaleString()} KM
             </span>
           </div>
 
@@ -154,16 +167,16 @@ const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose, canEdi
             </p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <DetailCell icon={<User size={13} className="text-indigo-500" />} label={t('common.driver')}>
-                {record.driverName || '—'}
+                {active.driverName || '—'}
               </DetailCell>
               <DetailCell icon={<Wrench size={13} className="text-purple-500" />} label={t('fleet.maintenance_form.service_type')}>
-                {record.serviceType || '—'}
+                {active.serviceType || '—'}
               </DetailCell>
               <DetailCell icon={<Building2 size={13} className="text-amber-500" />} label={t('operations.maintenance_garage')}>
-                {record.garage || '—'}
+                {active.garage || '—'}
               </DetailCell>
               <DetailCell icon={<UserCog size={13} className="text-cyan-500" />} label={t('fleet.maintenance_form.mechanic')}>
-                {record.mechanic || '—'}
+                {active.mechanic || '—'}
               </DetailCell>
               <DetailCell icon={<Cog size={13} className="text-slate-500" />} label={t('operations.maintenance_type')}>
                 {maintTypes.length > 0 ? (
@@ -185,18 +198,18 @@ const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose, canEdi
                       </span>
                     ))}
                   </span>
-                ) : record.nextServiceKM
-                  ? `${Number(record.nextServiceKM).toLocaleString()} KM`
+                ) : active.nextServiceKM
+                  ? `${Number(active.nextServiceKM).toLocaleString()} KM`
                   : '—'}
               </DetailCell>
             </div>
-            {record.remarks ? (
+            {active.remarks ? (
               <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50/50 px-3.5 py-3">
                 <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
                   <FileText size={13} className="flex-shrink-0 text-emerald-500" />
                   {t('common.remarks')}
                 </p>
-                <p className="mt-1 whitespace-pre-wrap break-words text-[13px] font-medium text-slate-700">{record.remarks}</p>
+                <p className="mt-1 whitespace-pre-wrap break-words text-[13px] font-medium text-slate-700">{active.remarks}</p>
               </div>
             ) : null}
           </section>
@@ -243,7 +256,7 @@ const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose, canEdi
                 {t('fleet.parts.total_cost')}
               </span>
               <span className="text-lg font-bold tabular-nums text-emerald-700">
-                ₹{Number(record.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                ₹{Number(active.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </span>
             </div>
           </section>
@@ -266,12 +279,128 @@ const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose, canEdi
                 <ChevronDown size={16} />
               </span>
             </button>
-            {docsOpen && documents.length > 0 && record.id && (
+            {docsOpen && documents.length > 0 && active.id && (
               <div className="mt-3 animate-fade-in-up">
-                <MaintenanceDocuments maintenanceId={record.id} documents={documents} allowRemove={false} />
+                <MaintenanceDocuments maintenanceId={active.id} documents={documents} allowRemove={false} />
               </div>
             )}
           </section>
+
+          {/* ALL maintenance records of this vehicle — view-collection pattern:
+              summary cards + scrollable history; click a row to view it. */}
+          {vehicleHistory.length > 0 && (
+            <section className="animate-fade-in-up" style={{ animationDelay: '200ms' }}>
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
+                  <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+                    <Truck size={14} className="text-slate-500" />
+                    {t('fleet.maintenance_view.all_records')}
+                  </h4>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-xs font-bold tabular-nums text-slate-500">
+                    {vehicleHistory.length}
+                  </span>
+                </div>
+
+                {/* Summary cards — totals across the vehicle's whole history */}
+                <div className="grid grid-cols-1 gap-3 p-4 sm:grid-cols-3">
+                  <div className="rounded-xl border border-blue-200 bg-blue-50 p-3.5">
+                    <div className="mb-1 flex items-center gap-2 text-xs font-medium text-blue-600">
+                      <Package size={14} className="shrink-0" />
+                      {t('fleet.maintenance_view.total_records')}
+                    </div>
+                    <div className="text-lg font-bold tabular-nums text-blue-700">{vehicleHistory.length}</div>
+                  </div>
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3.5">
+                    <div className="mb-1 flex items-center gap-2 text-xs font-medium text-emerald-600">
+                      <IndianRupee size={14} className="shrink-0" />
+                      {t('fleet.maintenance_view.total_spend')}
+                    </div>
+                    <div className="text-lg font-bold tabular-nums text-emerald-700">
+                      ₹{vehicleHistory.reduce((sum, r) => sum + Number(r.totalCost || 0), 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-slate-200 bg-slate-50 p-3.5">
+                    <div className="mb-1 flex items-center gap-2 text-xs font-medium text-slate-500">
+                      <Calendar size={14} className="shrink-0" />
+                      {t('fleet.maintenance_view.last_service')}
+                    </div>
+                    <div className="text-sm font-bold text-slate-700">
+                      {formatTripListDay(vehicleHistory[0]?.date || vehicleHistory[0]?.createdAt, language)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Full history — every record till now, scrollable, click to view */}
+                <div className="max-h-[400px] overflow-y-auto border-t border-slate-100">
+                  <table className="min-w-full divide-y divide-slate-100 text-sm">
+                    <thead className="sticky top-0 z-10 bg-slate-50">
+                      <tr>
+                        <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">{t('common.date')}</th>
+                        <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">{t('fleet.maintenance_view.bill_number')}</th>
+                        <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">{t('operations.maintenance_type')}</th>
+                        <th className="px-4 py-2.5 text-left text-xs font-bold uppercase tracking-wider text-slate-500">{t('operations.maintenance_garage')}</th>
+                        <th className="px-4 py-2.5 text-right text-xs font-bold uppercase tracking-wider text-slate-500">{t('fleet.maintenance_form.current_km')}</th>
+                        <th className="px-4 py-2.5 text-right text-xs font-bold uppercase tracking-wider text-slate-500">{t('fleet.parts.total_cost')}</th>
+                        <th className="px-4 py-2.5 text-center text-xs font-bold uppercase tracking-wider text-slate-500">{t('common.status')}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 bg-white">
+                      {vehicleHistory.map((sub) => {
+                        const subApproved = sub.paymentStatus === 'approved';
+                        const subDeleted = Boolean(sub.deletedAt);
+                        const rowActive = String(sub.id) === String(active.id);
+                        return (
+                          <tr
+                            key={sub.id}
+                            onClick={() => setActive(sub)}
+                            className={`cursor-pointer transition-colors ${
+                              rowActive ? 'bg-blue-50/70' : 'hover:bg-slate-50/80'
+                            }`}
+                          >
+                            <td className="whitespace-nowrap px-4 py-2.5 text-xs font-medium text-slate-600">
+                              {formatTripListDay(sub.date || sub.createdAt, language)}
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-2.5">
+                              <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-bold ${
+                                subDeleted
+                                  ? 'border-rose-100/80 bg-rose-50 text-rose-700'
+                                  : subApproved
+                                    ? 'border-emerald-100/80 bg-emerald-50 text-emerald-700'
+                                    : 'border-orange-100/80 bg-orange-50 text-orange-700'
+                              }`}>
+                                {sub.billNumber || '—'}
+                              </span>
+                            </td>
+                            <td className="max-w-[180px] truncate px-4 py-2.5 text-xs text-slate-600" title={sub.maintenanceType}>
+                              {(sub.maintenanceType || '—').split(',')[0]}
+                              {(sub.maintenanceType || '').split(',').filter((x) => x.trim()).length > 1 && (
+                                <span className="ml-1 text-slate-400">+{sub.maintenanceType.split(',').filter((x) => x.trim()).length - 1}</span>
+                              )}
+                            </td>
+                            <td className="whitespace-nowrap px-4 py-2.5 text-xs text-slate-500">{sub.garage || '—'}</td>
+                            <td className="whitespace-nowrap px-4 py-2.5 text-right text-xs font-semibold tabular-nums text-slate-700">{Number(sub.currentKM || 0).toLocaleString()}</td>
+                            <td className="whitespace-nowrap px-4 py-2.5 text-right text-xs font-bold tabular-nums text-blue-700">₹{Number(sub.totalCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
+                            <td className="whitespace-nowrap px-4 py-2.5 text-center">
+                              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold ${
+                                subDeleted
+                                  ? 'border-rose-200 bg-rose-50 text-rose-700'
+                                  : subApproved
+                                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                    : 'border-blue-200 bg-blue-50 text-blue-700'
+                              }`}>
+                                {subDeleted ? <XCircle size={10} /> : subApproved ? <CheckCircle2 size={10} /> : <Clock size={10} />}
+                                {subDeleted ? translateStatus(t, 'Deleted') : subApproved ? translateStatus(t, 'Approved') : translateStatus(t, 'Pending')}
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </section>
+          )}
         </div>
 
         {/* Footer — gradient strip, Edit inside the view (trip close style) */}

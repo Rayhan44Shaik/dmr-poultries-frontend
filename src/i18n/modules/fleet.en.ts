@@ -159,6 +159,10 @@ export default {
   'fleet.maintenance_view.parts_title': 'Parts / Spare Parts',
   'fleet.maintenance_view.record_title': 'Maintenance Record',
   'fleet.maintenance_view.service_details': 'Service Details',
+  'fleet.maintenance_view.all_records': 'All Maintenance Records',
+  'fleet.maintenance_view.total_records': 'Total Records',
+  'fleet.maintenance_view.total_spend': 'Total Spend',
+  'fleet.maintenance_view.last_service': 'Last Service',
 
   'fleet.timeline.clear_filters': 'Clear Filters',
   'fleet.timeline.driver': 'Driver: {driver}',
