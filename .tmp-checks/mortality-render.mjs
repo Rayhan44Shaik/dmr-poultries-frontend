@@ -215,7 +215,7 @@ ok("table: card header bar title", tableHtml.includes("Completed Trips"));
 ok("table: count pill uses the trip total", tableHtml.includes("525"), "count pill missing");
 ok("table: count sits in the title block right after the title", /Completed Trips<\/h3>\s*<span[^>]*>[\s\S]{0,220}525 trips/.test(tableHtml), "count pill is not beside the title");
 ok("table: broken-heart mortality mark in a flat rose tile", tableHtml.includes("heart-crack") && tableHtml.includes("border-rose-100 bg-rose-50/70") && !tableHtml.includes("from-rose-500 to-orange-400"), "mortality mark missing or still glossy");
-ok("table: header shows the keyboard hint", tableHtml.includes("move rows") && tableHtml.includes("Enter opens the trip panel"), "keyboard hint missing");
+ok("table: header shows the keyboard hint", tableHtml.includes("move rows") && tableHtml.includes("Enter or a click opens the trip panel"), "keyboard hint missing");
 // Every metric glyph must live in the HEADER only — never repeated per row.
 {
   const headerEnd = tableHtml.indexOf("</thead>");
@@ -243,6 +243,22 @@ ok("table: header glyphs are coloured lucide icons", (tableHtml.match(/text-(ind
   ok("keys: arrow up/down move between rows", source.includes('event.key !== "ArrowDown" && event.key !== "ArrowUp"') && source.includes("rowRefs.current.get(next.tripId)?.focus()"), "arrow navigation missing");
   ok("keys: Enter/Space opens and Escape closes the panel", source.includes('event.key === "Enter" || event.key === " "') && source.includes('event.key === "Escape"') && source.includes("toggle(row.tripId)"), "open/close keys missing");
   ok("keys: focused row is visible (focus ring)", tableHtml.includes("focus-visible:ring-inset focus-visible:ring-emerald-400"), "no focus ring");
+
+  // ── MOUSE: the row is the click target, and a click arms the keyboard ────
+  ok("mouse: the trip row shows a pointer", tableHtml.includes("cursor-pointer"), "row does not look clickable");
+  ok("mouse: grid text is not drag-selected into a toggle", tableHtml.includes("select-none"), "row would toggle on a text drag");
+  ok("mouse: clicking a row opens its detail", source.includes("onClick={(event) => {") && source.includes("event.currentTarget.focus();\n                        toggle(r.tripId);"), "row has no click handler");
+  ok("mouse: the chevron does not toggle twice", source.includes("event.stopPropagation();\n                              toggle(r.tripId);"), "chevron click would fight the row click");
+
+  // ── THE PANEL IS SELECTABLE, AND KEEPS THE KEYBOARD ALIVE ───────────────
+  ok("panel: its text takes the selection cursor", source.includes("cursor-text select-text"), "panel is not selectable");
+  ok("panel: a click on its text hand the keyboard over", source.includes("selection.isCollapsed") && source.includes("event.currentTarget.focus();") && source.includes("tabIndex={-1}"), "panel cannot keep the keyboard");
+  ok("panel: ↑/↓ inside it walks the trips", source.includes("handlePanelKeyDown") && source.includes("moveTo(records[rowIndex + (event.key === \"ArrowDown\" ? 1 : -1)], true)"), "no arrow handling inside the panel");
+
+  // ── ONE TRIP AT A TIME ─────────────────────────────────────────────────
+  ok("browse: one panel at a time", source.includes("useState<number | null>(null)") && !source.includes("useState<Set<number>>(new Set())"), "several panels can pile up");
+  ok("browse: the panel follows the arrows", source.includes("moveTo(next, openTripId !== null)"), "arrows leave the panel behind");
+  ok("browse: arrows work from inside the row too", source.includes('if (event.key === "Enter" || event.key === " " || event.key === "Escape") {') && source.includes("// ↑/↓ always step one trip, wherever the focus sits inside the row."), "arrows are still gated to the row element");
 }
 
 ok("table: expand affordance kept", tableHtml.includes("Expand trip") && tableHtml.includes("aria-expanded"), "expand control missing");
@@ -253,7 +269,7 @@ ok("table: expand affordance kept", tableHtml.includes("Expand trip") && tableHt
 {
   const { readFileSync } = await import("node:fs");
   const source = readFileSync("src/modules/operations/mortality/components/TripLossTable.tsx", "utf8");
-  ok("table: expanded row is pinned to the visible area", source.includes('className="sticky left-0"') && source.includes("width: `${panelWidth}px`"), "panel is not pinned; it will overflow the card");
+  ok("table: expanded row is pinned to the visible area", source.includes('className="sticky left-0 cursor-text select-text"') && source.includes("width: `${panelWidth}px`"), "panel is not pinned; it will overflow the card");
   ok("table: the scroller is measured for the panel width", source.includes("new ResizeObserver") && source.includes("clientWidth") && tableHtml.includes("overflow-x-auto"), "scroll container is not measured");
 }
 
@@ -532,6 +548,7 @@ try {
     noEnglish("the table", teTableHtml);
     noEnglish("the trip panel", tePanelHtml);
     noEnglish("the cumulative summary", teSummaryHtml);
+    ok("telugu: the keyboard hint names the click in Telugu", teTableHtml.includes("Enter లేదా క్లిక్") && !teTableHtml.includes("Enter or a click"), "hint still English");
     ok("telugu: section titles translated", tePanelHtml.includes("ట్రిప్ వివరాలు") && tePanelHtml.includes("బరువులు") && tePanelHtml.includes("రేట్లు"), "panel titles still English");
     ok("telugu: column names translated", teSummaryHtml.includes("పేరు") && teTableHtml.includes("ట్రిప్ నం.") && teTableHtml.includes("రోజు") && teTableHtml.includes("ఫారం"), "column names still English");
     ok("telugu: status chip translated", tePanelHtml.includes("పూర్తయింది"), "status chip still English");

@@ -243,7 +243,11 @@ export default function TripLossTable({
   onReset,
 }: TripLossTableProps) {
   const { t, language } = useI18n();
-  const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  /**
+   * The trip whose detail panel is open — ONE at a time, so walking the grid with
+   * ↑/↓ reads as a single trip after another rather than a pile of open panels.
+   */
+  const [openTripId, setOpenTripId] = useState<number | null>(null);
   /** Row elements by trip id, so ↑/↓ can move focus down the grid. */
   const rowRefs = useRef(new Map<number, HTMLTableRowElement>());
   /**
@@ -270,26 +274,34 @@ export default function TripLossTable({
   }, []);
 
   const toggle = useCallback(
-    (id: number) =>
-      setExpanded((prev) => {
-        const next = new Set(prev);
-        if (next.has(id)) next.delete(id);
-        else next.add(id);
-        return next;
-      }),
+    (id: number) => setOpenTripId((prev) => (prev === id ? null : id)),
     []
   );
 
   /**
+   * Move the grid's attention to another trip: the row takes focus (so the next
+   * ↑/↓ starts from here) and, when a panel is open, the panel follows — one trip
+   * after another.
+   */
+  const moveTo = useCallback((next: TripLossAnalysis | undefined, follow: boolean) => {
+    if (!next) return;
+    if (follow) setOpenTripId(next.tripId);
+    requestAnimationFrame(() => rowRefs.current.get(next.tripId)?.focus());
+  }, []);
+
+  /**
    * Keyboard contract for the grid — the same one the Trip List table uses:
    *
-   *   ↑ / ↓   move to the row above / below
+   *   ↑ / ↓   move to the row above / below, one trip at a time. When a detail
+   *           panel is open the panel travels with the focus, so the operator can
+   *           read every trip in turn without touching the mouse
    *   Enter   open or close that trip's detail panel (Space does the same)
    *   Escape  close the open panel without moving
    *
    * Focus stays on the row itself, so the browser's own scroll-into-view keeps
-   * the target visible; inner controls (the chevron button) keep their normal
-   * key behaviour because events from them are ignored here.
+   * the target visible. ↑/↓ are also honoured while the focus is inside the row
+   * (the chevron) or inside the open panel; Enter / Space / Escape belong to
+   * whatever control actually has focus, so a button keeps its own key behaviour.
    */
   const handleRowKeyDown = useCallback(
     (event: React.KeyboardEvent<HTMLTableRowElement>, rowIndex: number) => {
@@ -297,25 +309,49 @@ export default function TripLossTable({
       const row = records[rowIndex];
       if (!row) return;
 
-      if (event.key === "Enter" || event.key === " ") {
-        event.preventDefault();
-        toggle(row.tripId);
-        return;
-      }
-      if (event.key === "Escape") {
-        if (!expanded.has(row.tripId)) return;
+      if (event.key === "Enter" || event.key === " " || event.key === "Escape") {
+        // Only the row itself owns these; a focused chevron keeps its own keys.
+        if (event.target !== event.currentTarget) return;
+        if (event.key === "Escape") {
+          if (openTripId !== row.tripId) return;
+          event.preventDefault();
+          setOpenTripId(null);
+          return;
+        }
         event.preventDefault();
         toggle(row.tripId);
         return;
       }
       if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
 
+      // ↑/↓ always step one trip, wherever the focus sits inside the row.
       event.preventDefault();
       const next = records[rowIndex + (event.key === "ArrowDown" ? 1 : -1)];
-      if (!next) return;
-      requestAnimationFrame(() => rowRefs.current.get(next.tripId)?.focus());
+      moveTo(next, openTripId !== null);
     },
-    [records, expanded, toggle]
+    [records, openTripId, toggle, moveTo]
+  );
+
+  /**
+   * ↑/↓/Escape from inside the open panel. The panel is focusable so a click on
+   * its text keeps the keyboard alive — a reader can select a value with the
+   * mouse and still walk to the next trip with the arrow keys.
+   */
+  const handlePanelKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLDivElement>, rowIndex: number) => {
+      const row = records[rowIndex];
+      if (!row) return;
+      if (event.key === "Escape") {
+        event.preventDefault();
+        setOpenTripId(null);
+        rowRefs.current.get(row.tripId)?.focus();
+        return;
+      }
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+      event.preventDefault();
+      moveTo(records[rowIndex + (event.key === "ArrowDown" ? 1 : -1)], true);
+    },
+    [records, moveTo]
   );
 
   const onSort = (col: Column) => {
@@ -494,7 +530,7 @@ export default function TripLossTable({
               </tr>
             ) : (
               records.map((r, index) => {
-                const isOpen = expanded.has(r.tripId);
+                const isOpen = openTripId === r.tripId;
                 const serialNo = (page - 1) * pageSize + index + 1;
                 return (
                   <Fragment key={r.tripId}>
@@ -506,7 +542,14 @@ export default function TripLossTable({
                       tabIndex={0}
                       onKeyDown={(event) => handleRowKeyDown(event, index)}
                       aria-expanded={isOpen}
-                      className={`outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 hover:bg-slate-50/60 ${
+                      onClick={(event) => {
+                        // A click anywhere on the trip row opens its detail — the
+                        // row takes focus first, so the keyboard walks on from the
+                        // trip the operator just picked.
+                        event.currentTarget.focus();
+                        toggle(r.tripId);
+                      }}
+                      className={`cursor-pointer select-none outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 hover:bg-slate-50/60 ${
                         isOpen ? "bg-slate-50/60" : index % 2 === 0 ? "bg-white" : "bg-slate-50/20"
                       }`}
                     >
@@ -514,7 +557,10 @@ export default function TripLossTable({
                         <span className="flex items-center justify-center gap-1.5">
                           <button
                             type="button"
-                            onClick={() => toggle(r.tripId)}
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              toggle(r.tripId);
+                            }}
                             className="rounded-md p-0.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
                             aria-label={isOpen ? t("ops.mortality.aria.collapse") : t("ops.mortality.aria.expand")}
                             aria-expanded={isOpen}
@@ -593,8 +639,17 @@ export default function TripLossTable({
                       <tr>
                         <td colSpan={COLUMNS.length} className="p-0">
                           <div
-                            className="sticky left-0"
+                            className="sticky left-0 cursor-text select-text"
                             style={panelWidth > 0 ? { width: `${panelWidth}px` } : undefined}
+                            tabIndex={-1}
+                            onKeyDown={(event) => handlePanelKeyDown(event, index)}
+                            onMouseUp={(event) => {
+                              // A plain click hands the keyboard to the panel so
+                              // ↑/↓ keep working; a drag that selected text is left
+                              // alone, because reading a value comes first.
+                              const selection = window.getSelection?.();
+                              if (!selection || selection.isCollapsed) event.currentTarget.focus();
+                            }}
                           >
                             <TripLossRowExpand record={r} weightUnit={weightUnit} />
                           </div>
