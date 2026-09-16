@@ -113,14 +113,13 @@ export function greetingForHour(hour = new Date().getHours()): string {
 
 /**
  * Normalise an Indian vehicle registration to a spaced, readable form:
- * `TS07UB1222` → `TS 07 UB 1222`. Passes through values that don't match the
- * standard `ST NN XX NNNN` shape unchanged (e.g. already-spaced numbers or
- * older custom plates).
+ * `TS07UB1222` → `TS 07 UB 1222`. Three- and four-digit serials are both
+ * accepted; non-standard values pass through unchanged.
  */
 export function formatVehicleNumber(value: string | null | undefined): string {
   if (!value) return "—";
   const raw = String(value).trim();
-  const m = /^([A-Z]{2})\s*(\d{2})\s*([A-Z]{1,3})\s*(\d{4})$/i.exec(raw);
+  const m = /^([A-Z]{2})\s*(\d{2})\s*([A-Z]{1,3})\s*(\d{3,4})$/i.exec(raw);
   return m ? `${m[1].toUpperCase()} ${m[2]} ${m[3].toUpperCase()} ${m[4]}` : raw;
 }
 

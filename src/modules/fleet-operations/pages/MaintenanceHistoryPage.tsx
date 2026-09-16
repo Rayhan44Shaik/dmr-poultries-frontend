@@ -385,6 +385,11 @@ const MaintenanceHistoryPage = ({
                   events={timelineEvents}
                   meterEvents={filteredMeterEvents}
                   vehicles={data.vehicles}
+                  vehicleHistory={
+                    data.approvedHistory.length
+                      ? data.approvedHistory
+                      : timelineEvents
+                  }
                   hasActiveFilters={data.hasActiveFilters}
                   sortDirection={sortDir}
                   onClearFilters={resetFilters}

@@ -1,10 +1,15 @@
 import { memo } from 'react';
 import { AlertTriangle, CheckCircle2, Clock, ShieldCheck, Wrench } from 'lucide-react';
+import { formatVehicleNumber } from '../../../../utils/format';
+import type { Vehicle } from '../../../masters/vehicles/types/vehicle';
+import type { MaintenanceEvent } from '../../types';
+
+type UpcomingVehicle = Vehicle & { currentKM?: number };
 
 interface UpcomingService {
-  vehicle: any;
+  vehicle: UpcomingVehicle;
   maintenanceType: string;
-  lastMaint: any;
+  lastMaint: MaintenanceEvent | null;
   nextKM: number;
   dueKM: number;
   isDue: boolean;
@@ -53,7 +58,9 @@ const UpcomingServices = ({ services }: UpcomingServicesProps) => {
               {/* Top Row Header Metadata */}
               <div className="flex justify-between items-center gap-3">
                 <span className="font-bold text-slate-800 tracking-wide text-sm bg-slate-100/80 px-2.5 py-1 rounded-lg border border-slate-200/40">
-                  {item.vehicle.vehicleNumber}
+                  {formatVehicleNumber(
+                    String(item.vehicle.vehicleNumber || item.vehicle.vehicleNo || ''),
+                  )}
                 </span>
                 
                 {hasPassed ? (
