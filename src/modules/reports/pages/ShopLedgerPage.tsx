@@ -23,6 +23,7 @@ import {
   Layers,
   ListChecks,
   Loader2,
+  LoaderCircle,
   RotateCcw,
   Scale,
   Search,
@@ -535,7 +536,11 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
    * user has applied — the loader keeps the current table visible meanwhile.
    */
   useEffect(
-    () => onShopDataChanged(() => setRefreshNonce((nonce) => nonce + 1)),
+    () =>
+      onShopDataChanged(() => {
+        setLedgerLoading(true);
+        setRefreshNonce((nonce) => nonce + 1);
+      }),
     [],
   );
 
@@ -979,6 +984,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   const handleSearch = useCallback(() => {
     // Commit the draft filter controls. Until Search is clicked the table,
     // KPIs and exports keep using the previously applied filters.
+    setLedgerLoading(true); // Rate-Entry style spinner while records reload
     setAppliedDateFrom(dateFrom);
     setAppliedDateTo(dateTo);
     setAppliedSelectedShop(selectedShop);
@@ -991,6 +997,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     const defaultFrom = toWeekAgoDefault();
     const defaultTo = toDateDefault();
 
+    setLedgerLoading(true); // Rate-Entry style spinner while records reload
     setDateFrom(defaultFrom);
     setDateTo(defaultTo);
     setSelectedShop("All Shops");
@@ -1044,6 +1051,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   /** Remove ONE applied filter from the indicator pills — resets that draft
    *  and its applied value, so the ledger refetches immediately. */
   const clearAppliedFilter = useCallback((which: "dates" | "shop" | "type" | "search") => {
+    setLedgerLoading(true); // Rate-Entry style spinner while records reload
     if (which === "dates") {
       const defaultFrom = toWeekAgoDefault();
       const defaultTo = toDateDefault();
@@ -1080,6 +1088,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
   const handleRefresh = useCallback(() => {
     // Targeted content refresh only — never reload the whole page/browser tab.
+    setLedgerLoading(true); // Rate-Entry style spinner while records reload
     setLedgerRefreshing(true);
     setRefreshToast(true);
     setRefreshNonce((n) => n + 1);
@@ -1963,10 +1972,19 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {visibleRows.length === 0 ? (
+                {ledgerLoading ? (
+                  <tr>
+                    <td colSpan={9} className="py-16 text-center text-sm font-medium text-slate-400">
+                      <span className="inline-flex items-center gap-2">
+                        <LoaderCircle size={16} className="animate-spin text-emerald-600" aria-hidden="true" />
+                        Loading shop ledger records…
+                      </span>
+                    </td>
+                  </tr>
+                ) : visibleRows.length === 0 ? (
                   <tr>
                     <td colSpan={9} className="py-12 text-center text-slate-400">
-                      {ledgerLoading ? "Loading ledger..." : "No transactions found for the selected filters."}
+                      No transactions found for the selected filters.
                     </td>
                   </tr>
                 ) : (
@@ -1999,13 +2017,14 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                           <td className="px-4 py-3 text-center text-xs">{isSale ? tx.birds : "-"}</td>
                           <td className="px-4 py-3 text-center text-xs">{isSale ? tx.weight.toFixed(2) : "-"}</td>
                           <td className="px-4 py-3 text-center text-xs">{isSale ? tx.rate.toFixed(2) : "-"}</td>
-                          <td className="px-4 py-3 text-center text-xs font-bold text-emerald-600">
+                          <td className="px-4 py-3 text-center text-xs font-bold text-emerald-600 whitespace-nowrap tabular-nums">
                             {tx.debit > 0 ? formatAmount(tx.debit) : "-"}
                           </td>
-                          <td className="px-4 py-3 text-center text-xs font-bold text-blue-600">
+                          <td className="px-4 py-3 text-center text-xs font-bold text-blue-600 whitespace-nowrap tabular-nums">
                             {tx.credit > 0 ? formatAmount(tx.credit) : "-"}
                           </td>
-                          <td className={`px-4 py-3 text-center text-xs font-bold ${tx.balance >= 0 ? "text-slate-800" : "text-rose-600"}`}>
+                          {/* Balance always renders on ONE line, never wraps */}
+                          <td className={`px-4 py-3 text-center text-xs font-bold whitespace-nowrap tabular-nums ${tx.balance >= 0 ? "text-slate-800" : "text-rose-600"}`}>
                             {formatAmount(tx.balance)}
                           </td>
                         </tr>
@@ -2017,9 +2036,9 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                         <td className="px-4 py-3 text-center text-xs text-slate-800">{summary.totalBirds}</td>
                         <td className="px-4 py-3 text-center text-xs text-slate-800">{summary.totalWeight.toFixed(2)}</td>
                         <td className="px-4 py-3 text-center text-xs text-slate-800">-</td>
-                        <td className="px-4 py-3 text-center text-xs font-bold text-emerald-700">{formatAmount(summary.totalDebit)}</td>
-                        <td className="px-4 py-3 text-center text-xs font-bold text-blue-700">{formatAmount(summary.totalCredit)}</td>
-                        <td className="px-4 py-3 text-center text-xs font-bold text-slate-800">{formatAmount(summary.closingBalance)}</td>
+                        <td className="px-4 py-3 text-center text-xs font-bold text-emerald-700 whitespace-nowrap tabular-nums">{formatAmount(summary.totalDebit)}</td>
+                        <td className="px-4 py-3 text-center text-xs font-bold text-blue-700 whitespace-nowrap tabular-nums">{formatAmount(summary.totalCredit)}</td>
+                        <td className="px-4 py-3 text-center text-xs font-bold text-slate-800 whitespace-nowrap tabular-nums">{formatAmount(summary.closingBalance)}</td>
                       </tr>
                     )}
                   </>
