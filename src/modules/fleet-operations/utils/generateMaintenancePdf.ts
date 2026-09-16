@@ -10,6 +10,7 @@
 import jsPDF from "jspdf";
 import html2canvas from "html2canvas";
 import { formatTripListDay } from "../../operations/vehicle-trips/utils/formatTripListDay";
+import { localizeMaintenanceText, localizeMaintenanceName } from "./maintenanceLocalization";
 import type { MaintenanceEvent } from "../types";
 
 type Translate = (key: string, params?: Record<string, string | number>) => string;
@@ -54,31 +55,39 @@ function buildSheet(
     [t("common.date"), day(record)],
     [t("common.vehicle"), vehicleNumber],
     [t("fleet.maintenance_form.current_km"), `${Number(record.currentKM || 0).toLocaleString("en-IN")} KM`],
-    [t("common.driver"), record.driverName || "—"],
-    [t("fleet.maintenance_form.service_type"), record.serviceType || "—"],
-    [t("operations.maintenance_garage"), record.garage || "—"],
-    [t("fleet.maintenance_form.mechanic"), record.mechanic || "—"],
-    [t("operations.maintenance_type"), types.length ? types.join(", ") : "—"],
+    [t("common.driver"), localizeMaintenanceName(record.driverName, language) || "—"],
+    [t("fleet.maintenance_form.service_type"), localizeMaintenanceText(record.serviceType, language) || "—"],
+    [t("operations.maintenance_garage"), localizeMaintenanceName(record.garage, language) || "—"],
+    [t("fleet.maintenance_form.mechanic"), localizeMaintenanceName(record.mechanic, language) || "—"],
+    [t("operations.maintenance_type"), types.length ? types.map((tp) => localizeMaintenanceText(tp, language)).join(", ") : "—"],
     [t("fleet.maintenance_form.next_service_km"),
       types.length
-        ? types.map((tp) => `${tp}: ${nextByType[tp] != null ? `${Number(nextByType[tp]).toLocaleString("en-IN")} KM` : "—"}`).join(" · ")
+        ? types.map((tp) => `${localizeMaintenanceText(tp, language)}: ${nextByType[tp] != null ? `${Number(nextByType[tp]).toLocaleString("en-IN")} KM` : "—"}`).join(" · ")
         : record.nextServiceKM ? `${Number(record.nextServiceKM).toLocaleString("en-IN")} KM` : "—"],
     [t("common.status"), status],
     [t("common.remarks"), record.remarks || "—"],
   ];
-  const cells = detailPairs
-    .map(
-      ([label, value]) => `
-        <div style="border-right:1px solid ${LINE};border-bottom:1px solid ${LINE};padding:7px 10px;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:${MUTED};background:#f8fafc;">${esc(label)}</div>
-        <div style="border-right:1px solid ${LINE};border-bottom:1px solid ${LINE};padding:7px 10px;font-size:12px;font-weight:700;color:${INK};word-break:break-word;">${esc(value)}</div>`
-    )
-    .join("");
+  // Two EQUAL side-by-side columns, each column its own label/value pairs
+  // (left column gets the first half of the fields, right the second).
+  const half = Math.ceil(detailPairs.length / 2);
+  const column = (pairs: [string, string][], last: boolean) =>
+    pairs
+      .map(
+        ([label, value]) => `
+        <div style="padding:7px 10px;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:${MUTED};background:#f8fafc;border-bottom:1px solid ${LINE};${last ? '' : `border-right:1px solid ${LINE};`}">${esc(label)}</div>
+        <div style="padding:7px 10px;font-size:12px;font-weight:700;color:${INK};word-break:break-word;border-bottom:1px solid ${LINE};${last ? '' : `border-right:1px solid ${LINE};`}">${esc(value)}</div>`
+      )
+      .join("");
+  const cells = `<div style="display:grid;grid-template-columns:1fr 1fr;grid-column-gap:14px;">
+        <div style="display:grid;grid-template-columns:auto 1fr;border:1px solid ${LINE};border-radius:8px;overflow:hidden;">${column(detailPairs.slice(0, half), false)}</div>
+        <div style="display:grid;grid-template-columns:auto 1fr;border:1px solid ${LINE};border-radius:8px;overflow:hidden;">${column(detailPairs.slice(half), true)}</div>
+      </div>`;
 
   const partsRows = parts
     .map(
       (p, i) => `
       <tr style="background:${i % 2 ? "#fbfdfc" : "#ffffff"};">
-        <td style="padding:6px 10px;border-bottom:1px solid ${LINE};font-weight:600;">${esc(p.name || "-")}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid ${LINE};font-weight:600;">${esc(localizeMaintenanceText(p.name, language) || "-")}</td>
         <td style="padding:6px 10px;border-bottom:1px solid ${LINE};color:${MUTED};">${esc(p.specification || "-")}</td>
         <td style="padding:6px 10px;border-bottom:1px solid ${LINE};text-align:center;font-weight:700;">${p.quantity ?? 0}</td>
         <td style="padding:6px 10px;border-bottom:1px solid ${LINE};text-align:right;">${inr(Number(p.rate || 0))}</td>
@@ -96,9 +105,9 @@ function buildSheet(
       <tr style="background:${i % 2 ? "#fbfdfc" : "#ffffff"};">
         <td style="padding:6px 10px;border-bottom:1px solid ${LINE};white-space:nowrap;font-weight:600;">${esc(day(row))}</td>
         <td style="padding:6px 10px;border-bottom:1px solid ${LINE};font-weight:700;color:${BRAND_GREEN};">${esc(row.billNumber || "-")}</td>
-        <td style="padding:6px 10px;border-bottom:1px solid ${LINE};">${esc(typeList[0] || "-")}${typeList.length > 1 ? ` +${typeList.length - 1}` : ""}</td>
-        <td style="padding:6px 10px;border-bottom:1px solid ${LINE};color:${MUTED};">${esc(row.garage || "-")}</td>
-        <td style="padding:6px 10px;border-bottom:1px solid ${LINE};color:${MUTED};">${esc(row.mechanic || "-")}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid ${LINE};">${esc(localizeMaintenanceText(typeList[0], language) || "-")}${typeList.length > 1 ? ` +${typeList.length - 1}` : ""}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid ${LINE};color:${MUTED};">${esc(localizeMaintenanceName(row.garage, language) || "-")}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid ${LINE};color:${MUTED};">${esc(localizeMaintenanceName(row.mechanic, language) || "-")}</td>
         <td style="padding:6px 10px;border-bottom:1px solid ${LINE};text-align:right;font-weight:600;">${Number(row.currentKM || 0).toLocaleString("en-IN")}</td>
         <td style="padding:6px 10px;border-bottom:1px solid ${LINE};text-align:right;font-weight:700;">${inr(Number(row.totalCost || 0))}</td>
         <td style="padding:6px 10px;border-bottom:1px solid ${LINE};text-align:center;color:${tone};font-weight:700;">${esc(st)}</td>
@@ -123,9 +132,7 @@ function buildSheet(
       <div style="font-size:11px;color:${MUTED};font-weight:600;">${esc(record.billNumber || "-")} · ${esc(status)}</div>
     </div>
 
-    <div style="margin:0 24px;display:grid;grid-template-columns:110px 1fr 110px 1fr;border:1px solid ${LINE};border-radius:8px;overflow:hidden;">
-      ${cells}
-    </div>
+    ${cells}
 
     ${
       parts.length

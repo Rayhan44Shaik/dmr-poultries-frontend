@@ -8,6 +8,7 @@ import type { PartItem } from '../../types';
 import { maintenanceApi } from '../../services/maintenanceApi';
 // Trip-List field chrome — identical labels, inputs and dropdowns.
 import { opsFilterLabelClass, opsInputClass } from '../../../../shared/ui/operationsStyles';
+import { localizeMaintenanceText } from '../../utils/maintenanceLocalization';
 import MasterDropdown from '../../../masters/components/MasterDropdown';
 
 export interface FormDocumentItem {
@@ -73,7 +74,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
   onMarkDocumentRemoval,
   validateKM,
 }) => {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [kmError, setKmError] = useState<string | null>(null);
 
   const inputClass = `${opsInputClass} pl-10`;
@@ -326,8 +327,9 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
           </label>
           <Select
             key={`maintenance-${selectKey}`}
-            options={maintenanceOptions}
-            value={maintenanceOptions.filter(opt => form.maintenanceType.includes(opt.value))}
+            options={maintenanceOptions.map((opt) => ({ ...opt, label: localizeMaintenanceText(opt.label, language) }))}
+            getOptionValue={(opt) => opt.value}
+            value={maintenanceOptions.filter(opt => form.maintenanceType.includes(opt.value)).map((opt) => ({ ...opt, label: localizeMaintenanceText(opt.label, language) }))}
             onChange={onMaintenanceChange}
             placeholder={t('fleet.maintenance_form.select_types')}
             isMulti
@@ -369,7 +371,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
               {form.maintenanceType.map((type) => (
                 <div key={type} className="flex items-center gap-2">
                   <span className="min-w-0 flex-1 truncate rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-[11px] font-semibold text-slate-600">
-                    {type}
+                    {localizeMaintenanceText(type, language)}
                   </span>
                   <div className="relative w-36 shrink-0">
                     <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">

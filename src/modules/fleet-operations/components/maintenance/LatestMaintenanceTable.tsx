@@ -12,6 +12,7 @@ import { BrandRefreshButton } from '../../../../ui';
 import { uiActionIconMotionClass } from '../../../../shared/ui/uiTokens';
 import { shouldShowPagination, PAGINATION_DEFAULT_PAGE_SIZE } from '../../../../shared/ui/paginationStyles';
 import { formatTripListDay } from '../../../operations/vehicle-trips/utils/formatTripListDay';
+import { localizeMaintenanceText, localizeMaintenanceName } from '../../utils/maintenanceLocalization';
 import { usePendingDelete } from '../../../../hooks/usePendingDelete';
 import { PendingDeleteNotification } from '../../../../components/common/PendingDeleteNotification';
 import type { MaintenanceEvent } from '../../types';
@@ -217,7 +218,7 @@ const LatestMaintenanceTable = ({
               value={typeFilter}
               options={[
                 { value: '', label: t('common.all') },
-                ...MAINTENANCE_TYPES.map((type) => ({ value: type, label: type })),
+                ...MAINTENANCE_TYPES.map((type) => ({ value: type, label: localizeMaintenanceText(type, language) })),
               ]}
               onChange={(next) => { setTypeFilter(next || ''); onPageChange(1); }}
               placeholder={t('operations.maintenance_type')}
@@ -418,7 +419,7 @@ const LatestMaintenanceTable = ({
 
                       <td className="px-4 py-3 text-left whitespace-nowrap">
                         <span title={allTypes} className="text-xs text-slate-600 cursor-help">
-                          {firstType}
+                          {localizeMaintenanceText(firstType, language)}
                           {typeCount > 1 && (
                             <span className="text-xs text-slate-400 ml-1">
                               {t('fleet.maintenance_table.more', { count: typeCount - 1 })}
@@ -428,11 +429,11 @@ const LatestMaintenanceTable = ({
                       </td>
 
                       <td className="px-4 py-3 text-left whitespace-nowrap">
-                        <span className="text-xs text-slate-600">{rec.garage || '-'}</span>
+                        <span className="text-xs text-slate-600">{localizeMaintenanceName(rec.garage || '-', language) || '-'}</span>
                       </td>
 
                       <td className="px-4 py-3 text-left whitespace-nowrap">
-                        <span className="text-xs text-slate-600">{rec.mechanic || '-'}</span>
+                        <span className="text-xs text-slate-600">{localizeMaintenanceName(rec.mechanic || '-', language) || '-'}</span>
                       </td>
 
                       <td className="px-4 py-3 text-right text-xs font-semibold text-slate-700 whitespace-nowrap tabular-nums">
@@ -458,11 +459,11 @@ const LatestMaintenanceTable = ({
                       <td className="px-4 py-3 text-center whitespace-nowrap">
                         {Array.isArray(rec.documents) && rec.documents.length > 0 ? (
                           <button
-                            onClick={(e) => { e.stopPropagation(); onView(rec); }}
-                            className="inline-flex items-center justify-center gap-1 px-2.5 py-1 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 rounded-lg hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition-all shadow-sm"
+                            onClick={(e) => { e.stopPropagation(); e.preventDefault(); onView(rec); }}
+                            className="group relative inline-flex items-center justify-center gap-1 px-2.5 py-1 text-xs font-semibold text-violet-600 bg-violet-50 border border-violet-200 rounded-lg hover:bg-violet-500 hover:text-white transition-all shadow-sm active:scale-95"
                             title={t('fleet.maintenance_table.documents_attached', { count: rec.documents.length })}
                           >
-                            <Paperclip size={12} />
+                            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]"><Paperclip size={12} /></span>
                             {rec.documents.length}
                           </button>
                         ) : (
@@ -474,11 +475,11 @@ const LatestMaintenanceTable = ({
                           Approved rows: no actions at all — clicking the row
                           opens the full view. */}
                       {viewMode === 'pending' && (
-                        <td className="px-4 py-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                        <td className="px-4 py-3 text-center whitespace-nowrap" onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
                           <span className="inline-flex items-center justify-center gap-1">
                             <button
                               type="button"
-                              onClick={() => onApprove(rec)}
+                              onClick={(e) => { e.stopPropagation(); e.preventDefault(); onApprove(rec); }}
                               title={t('common.approve')}
                               aria-label={t('common.approve')}
                               className="group relative h-8 w-8 rounded-xl flex items-center justify-center transition-all shadow-sm bg-emerald-50/70 hover:bg-emerald-500 text-emerald-600 hover:text-white border border-emerald-200/60 active:scale-95"
@@ -487,7 +488,7 @@ const LatestMaintenanceTable = ({
                             </button>
                             <button
                               type="button"
-                              onClick={() => { if (rec.id) requestDelete(rec.id, { label: t('fleet.maintenance_table.deleting', { vehicle: resolveVehicleNumber(rec) }) }); }}
+                              onClick={(e) => { e.stopPropagation(); e.preventDefault(); if (rec.id) requestDelete(rec.id, { label: t('fleet.maintenance_table.deleting', { vehicle: resolveVehicleNumber(rec) }) }); }}
                               disabled={!rec.id || isPending(rec.id)}
                               title={t('common.delete')}
                               aria-label={t('common.delete')}

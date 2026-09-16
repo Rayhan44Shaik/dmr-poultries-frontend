@@ -22,6 +22,7 @@ import { uiPdfButtonClass } from '../../../../shared/ui/uiTokens';
 import { useI18n, translateStatus } from '../../../../i18n';
 import { uiActionIconMotionClass } from '../../../../shared/ui/uiTokens';
 import { formatTripListDay } from '../../../operations/vehicle-trips/utils/formatTripListDay';
+import { localizeMaintenanceText, localizeMaintenanceName } from '../../utils/maintenanceLocalization';
 import type { MaintenanceEvent } from '../../types';
 import MaintenanceDocuments from './MaintenanceDocuments';
 import MasterDropdown from '../../../masters/components/MasterDropdown';
@@ -253,14 +254,14 @@ const ViewModalInner: React.FC<ViewModalProps> = ({ record, vehicles, onClose, c
                   [t('common.date'), formatTripListDay(active.date || active.createdAt, language)],
                   [t('common.vehicle'), vehicleNumber],
                   [t('fleet.maintenance_form.current_km'), `${Number(active.currentKM || 0).toLocaleString()} KM`],
-                  [t('common.driver'), active.driverName || '—'],
-                  [t('fleet.maintenance_form.service_type'), active.serviceType || '—'],
-                  [t('operations.maintenance_garage'), active.garage || '—'],
-                  [t('fleet.maintenance_form.mechanic'), active.mechanic || '—'],
-                  [t('operations.maintenance_type'), maintTypes.length ? maintTypes.join(', ') : '—'],
+                  [t('common.driver'), localizeMaintenanceName(active.driverName, language) || '—'],
+                  [t('fleet.maintenance_form.service_type'), localizeMaintenanceText(active.serviceType, language) || '—'],
+                  [t('operations.maintenance_garage'), localizeMaintenanceName(active.garage, language) || '—'],
+                  [t('fleet.maintenance_form.mechanic'), localizeMaintenanceName(active.mechanic, language) || '—'],
+                  [t('operations.maintenance_type'), maintTypes.length ? maintTypes.map((type) => localizeMaintenanceText(type, language)).join(', ') : '—'],
                   [t('fleet.maintenance_form.next_service_km'),
                     maintTypes.length
-                      ? maintTypes.map((type) => `${type}: ${nextByType[type] != null ? `${Number(nextByType[type]).toLocaleString()} KM` : '—'}`).join(' · ')
+                      ? maintTypes.map((type) => `${localizeMaintenanceText(type, language)}: ${nextByType[type] != null ? `${Number(nextByType[type]).toLocaleString()} KM` : '—'}`).join(' · ')
                       : active.nextServiceKM ? `${Number(active.nextServiceKM).toLocaleString()} KM` : '—'],
                   [t('common.status'), statusLabel],
                   [t('common.remarks'), active.remarks || '—'],
