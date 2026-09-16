@@ -351,7 +351,7 @@ const KPICard = memo(function KPICard({
     >
       <div className="absolute inset-0 bg-gradient-to-br from-white via-white to-slate-50 opacity-80" />
       <div className={`absolute -right-6 top-1/2 h-20 w-20 -translate-y-1/2 rounded-full ${config.bg} opacity-[0.08] blur-sm transition-opacity duration-300 group-hover:opacity-[0.14]`} />
-      <div className="absolute right-1.5 top-1/2 z-10 flex h-6 w-12 -translate-y-1/2 items-center justify-center text-center @min-[96px]:right-2 @min-[96px]:h-[1.875rem] @min-[96px]:w-[3.25rem] @min-[120px]:h-9 @min-[120px]:w-14">
+      <div className="absolute right-1.5 top-1/2 z-10 flex h-8 w-12 -translate-y-1/2 items-center justify-center text-center @min-[96px]:right-2 @min-[96px]:h-9 @min-[96px]:w-[3.25rem] @min-[120px]:h-10 @min-[120px]:w-14">
         <span
           className="absolute bottom-full left-1/2 mb-1 inline-flex w-full max-w-full -translate-x-1/2 items-center justify-center whitespace-nowrap rounded-full bg-slate-50 px-1 py-0.5 text-center text-[7px] font-black uppercase tracking-[0.04em] text-slate-400 ring-1 ring-inset ring-slate-100 @min-[96px]:px-1.5 @min-[96px]:text-[7.5px] @min-[120px]:text-[8px]"
           title={periodChip}
@@ -359,11 +359,11 @@ const KPICard = memo(function KPICard({
           {periodChip}
         </span>
         <div
-          className={`${config.bg} mx-auto flex h-6 w-6 items-center justify-center rounded-lg shadow-md transition-transform duration-300 group-hover:scale-110 @min-[96px]:h-[1.875rem] @min-[96px]:w-[1.875rem] @min-[120px]:h-9 @min-[120px]:w-9`}
+          className={`${config.bg} mx-auto flex h-8 w-8 items-center justify-center rounded-xl shadow-md transition-transform duration-300 group-hover:scale-110 @min-[96px]:h-9 @min-[96px]:w-9 @min-[120px]:h-10 @min-[120px]:w-10`}
         >
           <Icon
-            className="h-3.5 w-3.5 text-white @min-[96px]:h-4 @min-[96px]:w-4 @min-[120px]:h-[18px] @min-[120px]:w-[18px]"
-            size={14}
+            className="h-[18px] w-[18px] text-white @min-[96px]:h-5 @min-[96px]:w-5 @min-[120px]:h-[22px] @min-[120px]:w-[22px]"
+            size={18}
           />
         </div>
       </div>
