@@ -164,6 +164,14 @@ export async function fetchMortalityAnalysis(
  * Shop-level detail for a single expanded row. Fetched lazily on expand — the
  * table itself only needs the shop COUNT, which already ships with each row.
  */
+/**
+ * Shop-level delivery lines for ONE trip.
+ *
+ * Kept in the service layer next to the list call it belongs to. The mortality
+ * page itself shows the shop COUNT from the row (and the trip panel shows trip
+ * + weight detail only), so the shop-wise breakdown is read by the Delivery
+ * screens; this stays the single typed accessor for that endpoint.
+ */
 export async function fetchTripDeliveries(
   tripId: number,
   signal?: AbortSignal

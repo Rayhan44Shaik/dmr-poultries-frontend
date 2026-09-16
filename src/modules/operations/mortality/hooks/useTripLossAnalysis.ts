@@ -47,8 +47,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { DatePickerUtils } from "../../../../components/common/DatePicker";
 import {
   fetchMortalityAnalysis,
-  fetchTripDeliveries,
-  type MortalityDelivery,
   type MortalityFilterOptions,
   type MortalityKpis,
   type MortalityRow,
@@ -59,7 +57,6 @@ const { startOfWeekMonday, endOfWeekSunday, toLocalISODate } = DatePickerUtils;
 
 /** Row shape is the backend contract — re-exported so views stay decoupled. */
 export type TripLossAnalysis = MortalityRow;
-export type { MortalityDelivery as TripDelivery };
 
 export interface LossFilters {
   fromDate: string;
@@ -379,48 +376,4 @@ export function useTripLossAnalysis() {
     /** Completed trips exist at all (used to choose the right empty state). */
     hasTrips,
   };
-}
-
-/**
- * Shop-level deliveries for ONE expanded row.
- *
- * Fetched lazily, only while a row is expanded: the table itself needs just the
- * shop COUNT, which already ships with every row. This is what keeps the page
- * to a single small request on load.
- */
-export function useTripDeliveries(tripId: number | null) {
-  const [deliveries, setDeliveries] = useState<MortalityDelivery[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (tripId == null) {
-      setDeliveries([]);
-      setLoading(false);
-      setError(null);
-      return;
-    }
-
-    const controller = new AbortController();
-    setLoading(true);
-    setError(null);
-
-    fetchTripDeliveries(tripId, controller.signal)
-      .then((rows) => {
-        if (controller.signal.aborted) return;
-        setDeliveries(rows);
-      })
-      .catch((err: unknown) => {
-        if (controller.signal.aborted) return;
-        setDeliveries([]);
-        setError(messageOf(err));
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setLoading(false);
-      });
-
-    return () => controller.abort();
-  }, [tripId]);
-
-  return { deliveries, loading, error };
 }

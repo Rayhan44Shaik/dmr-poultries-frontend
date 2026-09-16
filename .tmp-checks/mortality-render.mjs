@@ -166,54 +166,43 @@ ok("table: expand affordance kept", tableHtml.includes("Expand trip") && tableHt
   const expandModule = await server.ssrLoadModule("/src/modules/operations/mortality/components/TripLossRowExpand.tsx");
   const expandHtml = render(React.createElement(expandModule.default, { record: rows[0] }));
   ok("panel: trip + vehicle facts", expandHtml.includes(rows[0].tripNo) && expandHtml.includes(rows[0].vehicleNo) && expandHtml.includes(rows[0].driverName));
-  ok("panel: stacked tables, nothing squeezed side by side", expandHtml.includes("space-y-3") && !expandHtml.includes("lg:grid-cols"));
-  ok("panel: three tables (trip · shops · weights)", (expandHtml.match(/<h4/g) || []).length === 3, `h4=${(expandHtml.match(/<h4/g) || []).length}`);
+  ok("panel: two cards, stacked", (expandHtml.match(/<h4/g) || []).length === 2, `h4=${(expandHtml.match(/<h4/g) || []).length}`);
+  ok("panel: no shop-wise delivery card", !expandHtml.includes("Delivery Output") && !expandHtml.includes("Total Delivery") && !expandHtml.includes(">Shop<"), "the shop table is still mounted");
   ok("panel: weights table is a plain table — no bars", !expandHtml.includes('style="width') && !expandHtml.includes("animate-pulse"));
-  ok("panel: trip facts use the shared labels", expandHtml.includes("Vehicle") && expandHtml.includes("Supervisor") && expandHtml.includes("Source Farm") && expandHtml.includes("Driver"));
+  ok("panel: trip facts use the shared labels", expandHtml.includes("Vehicle") && expandHtml.includes("Supervisor") && expandHtml.includes("Source Farm") && expandHtml.includes("Driver") && expandHtml.includes("Loaders") && expandHtml.includes("Helpers"));
+  // The reference idiom: label left, value RIGHT — nothing is left dangling.
+  ok("panel: label/value cells are justify-between (value right-aligned)", (expandHtml.match(/justify-between/g) || []).length >= 8, `cells=${(expandHtml.match(/justify-between/g) || []).length}`);
+  ok("panel: two label/value pairs per row, split by a divider", (expandHtml.match(/sm:grid-cols-2/g) || []).length === 4 && expandHtml.includes("sm:divide-x"));
+  ok("panel: rows are one line tall", expandHtml.includes("py-1.5") && !expandHtml.includes("py-2 text-\[13px\]"));
+  ok("panel: survival rate closes the weights card as a tinted strip", expandHtml.includes("bg-emerald-50/70") && expandHtml.includes("Survival Rate"));
 }
 
-/* ── 3c. Delivery output table, rendered with REAL shop rows ──────────── */
+/* ── 3c. Delivery data — the shop endpoint still backs the numbers ─────── */
 {
-  const deliveryModule = await server.ssrLoadModule("/src/modules/operations/mortality/components/TripDeliveryOutput.tsx");
   const API = process.env.API ?? "http://127.0.0.1:4000/api";
   const firstTrip = await (await fetch(`${API}/operations/mortality-analysis?limit=1`)).json();
-  const tripId = firstTrip.data[0].tripId;
+  const record = firstTrip.data[0];
+  const tripId = record.tripId;
   const shopsRaw = await (await fetch(`${API}/operations/mortality-analysis/${tripId}/deliveries`)).json();
   const shops = Array.isArray(shopsRaw) ? shopsRaw : shopsRaw.data;
-  ok("shops: the trip really has delivery rows", Array.isArray(shops) && shops.length > 0, `rows=${shops?.length}`);
+  ok("data: the trip really has delivery rows", Array.isArray(shops) && shops.length > 0, `rows=${shops?.length}`);
 
-  const shopsHtml = render(React.createElement(deliveryModule.default, { deliveries: shops }));
-  ok("shops: one table, headers written once", (shopsHtml.match(/<table/g) || []).length === 1 && (shopsHtml.match(/>Shop</g) || []).length === 1 && (shopsHtml.match(/>Birds</g) || []).length === 1 && (shopsHtml.match(/>Weight</g) || []).length === 1);
-  ok("shops: every shop of the trip is a row", shops.every((shop) => shopsHtml.includes(shop.shopName)), "a shop is missing");
-  ok("shops: birds and weight per row match the API", shops.every((shop) => shopsHtml.includes(shop.birds.toLocaleString("en-IN")) && shopsHtml.includes(shop.weight.toFixed(2))), "a value is off");
-  ok("shops: no glyph repeated per shop row", !/lucide-(bird|store|shopping-bag|scale)/.test(shopsHtml.slice(shopsHtml.indexOf("<tbody"), shopsHtml.indexOf("</tbody>"))), "a glyph is repeated per shop row");
-  ok("shops: pinned total row sums the shops", shopsHtml.includes("Total Delivery") && shopsHtml.includes(shops.reduce((n, s2) => n + s2.birds, 0).toLocaleString("en-IN")), "total mismatch");
+  // SYNC: the shop-wise lines must add up to the counters the page prints —
+  // same trip, same numbers, whether read from the row or from the shops.
+  const birdsTotal = shops.reduce((n, row) => n + row.birds, 0);
+  const weightTotal = Number(shops.reduce((n, row) => n + row.weight, 0).toFixed(2));
+  ok("sync: shop count on the row equals the shop rows fetched", record.deliveryShops === shops.length, `row=${record.deliveryShops} fetched=${shops.length}`);
+  ok("sync: shop birds add up to the row's delivered birds", birdsTotal === record.deliveredBirds, `${birdsTotal} vs ${record.deliveredBirds}`);
+  ok("sync: shop weights add up to the row's delivered weight", Math.abs(weightTotal - record.deliveredWeight) < 0.05, `${weightTotal} vs ${record.deliveredWeight}`);
 
-  // SYNC: the shop-wise rows must add up to the counters printed on the row —
-  // same trip, same numbers, whichever way the operator reads them.
-  {
-    const record = firstTrip.data[0];
-    const birdsTotal = shops.reduce((n, row) => n + row.birds, 0);
-    const weightTotal = Number(shops.reduce((n, row) => n + row.weight, 0).toFixed(2));
-    ok("sync: shop count on the row equals the shop rows fetched", record.deliveryShops === shops.length, `row=${record.deliveryShops} fetched=${shops.length}`);
-    ok("sync: shop birds add up to the row's delivered birds", birdsTotal === record.deliveredBirds, `${birdsTotal} vs ${record.deliveredBirds}`);
-    ok("sync: shop weights add up to the row's delivered weight", Math.abs(weightTotal - record.deliveredWeight) < 0.05, `${weightTotal} vs ${record.deliveredWeight}`);
-    ok("sync: the panel's TOTAL row prints those same numbers", shopsHtml.includes(birdsTotal.toLocaleString("en-IN")) && shopsHtml.includes(weightTotal.toFixed(2)));
-  }
-
-  // The trip panel itself: facts + waterfall, with the shop table slotted in.
-  const expandModule2 = await server.ssrLoadModule("/src/modules/operations/mortality/components/TripLossRowExpand.tsx");
-  const panelHtml = render(React.createElement(expandModule2.default, { record: firstTrip.data[0] }));
-  {
-    const record = firstTrip.data[0];
-    ok("panel: trip + vehicle facts from the API", panelHtml.includes(record.tripNo) && panelHtml.includes(record.vehicleNo) && panelHtml.includes(record.driverName));
-    ok("panel: loaders named on the trip table", (record.loaders || []).length > 0 && (record.loaders || []).every((name) => panelHtml.includes(name)), `loaders=${(record.loaders || []).join("/")}`);
-    ok("panel: helpers named on the trip table", (record.helpers || []).length > 0 && (record.helpers || []).every((name) => panelHtml.includes(name)), `helpers=${(record.helpers || []).join("/")}`);
-    ok("panel: delivery table slotted in with its own title bar", panelHtml.includes("Delivery Output"));
-    ok("panel: weights table carries every figure", ["Farm", "Delivered", "Mortality", "Weight Loss", "Survival Rate"].every((label) => panelHtml.includes(label)) && panelHtml.includes(record.farmWeight.toFixed(2)) && panelHtml.includes(record.deliveredWeight.toFixed(2)) && panelHtml.includes(record.mortalityWeight.toFixed(2)) && panelHtml.includes(record.weightLoss.toFixed(2)));
-    ok("panel: survival rate printed", panelHtml.includes(`${(record.survivalRate * 100).toFixed(2)}%`));
-    ok("panel: every i18n key resolved (no raw key leaked)", panelHtml.includes("ops.mortality") === false);
-  }
+  // The trip panel itself: facts, crew and the weights table.
+  const expandModule = await server.ssrLoadModule("/src/modules/operations/mortality/components/TripLossRowExpand.tsx");
+  const panelHtml = render(React.createElement(expandModule.default, { record }));
+  ok("panel: trip + vehicle facts from the API", panelHtml.includes(record.tripNo) && panelHtml.includes(record.vehicleNo) && panelHtml.includes(record.driverName));
+  ok("panel: loaders named on the trip table", (record.loaders || []).length > 0 && (record.loaders || []).every((name) => panelHtml.includes(name)), `loaders=${(record.loaders || []).join("/")}`);
+  ok("panel: helpers named on the trip table", (record.helpers || []).length > 0 && (record.helpers || []).every((name) => panelHtml.includes(name)), `helpers=${(record.helpers || []).join("/")}`);
+  ok("panel: survival rate printed", panelHtml.includes(`${(record.survivalRate * 100).toFixed(2)}%`));
+  ok("panel: every i18n key resolved (no raw key leaked)", panelHtml.includes("ops.mortality") === false);
 }
 
 /* ── 4. KPI strip through the global grid ─────────────────────────────── */
