@@ -10,7 +10,6 @@ import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocal
 import { formatTripListDay } from "../../../vehicle-trips/utils/formatTripListDay";
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 import { opsSecondaryButtonClass } from "../../../../../shared/ui/operationsStyles";
-import { BrandRefreshButton } from "../../../../../ui";
 import { collectionStatusKey, collectionStatusLabel } from "../../utils/collectionStatusLabel";
 import {
   collectionShopKey,
@@ -28,8 +27,6 @@ interface Props {
   onReject: (id: string) => void;
   onEdit: (collection: RecentCollection) => void;
   onViewShop: (shopName: string) => void;
-  /** Reloads the recent feed from the backend without changing the active view. */
-  onRefresh: () => void | Promise<void>;
   /** Fires whenever the highlighted row changes, so the page can mirror it. */
   onSelectionChange?: (collection: RecentCollection | null) => void;
 }
@@ -62,7 +59,6 @@ export default function RecentCollectionsTable({
   onApprove,
   onEdit,
   onViewShop,
-  onRefresh,
   onSelectionChange,
 }: Props) {
   const { t, language } = useI18n();
@@ -258,12 +254,6 @@ export default function RecentCollectionsTable({
   const clearSearch = () => updateSearch("");
   const resetTable = () => updateSearch("");
 
-  const refreshTable = () => {
-    setCurrentPage(1);
-    selectRow(null);
-    void onRefresh();
-  };
-
   /** Approved actions always select first, then open that exact entry. */
   const viewApprovedCollection = (collection: RecentCollection) => {
     selectRow(collection);
@@ -370,15 +360,6 @@ export default function RecentCollectionsTable({
             </span>
             {t("common.reset")}
           </button>
-
-          <BrandRefreshButton
-            onClick={refreshTable}
-            loading={isLoading}
-            ariaLabel={t("common.refresh")}
-          >
-            {t("common.refresh")}
-          </BrandRefreshButton>
-
         </div>
       </div>
 

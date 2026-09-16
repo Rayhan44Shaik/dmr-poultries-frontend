@@ -9,7 +9,7 @@ import {
   opsSecondaryButtonClass,
 } from "../../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../../i18n";
-import { BrandRefreshButton } from "../../../../../ui";
+import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocalization";
 import MasterDropdown, { type MasterDropdownOption } from "../../../../masters/components/MasterDropdown";
 
 interface Props {
@@ -25,11 +25,7 @@ interface Props {
   onReferenceChange: (value: string) => void;
   onViewLedger: () => void;
   onReset: () => void;
-  /** Reload masters + collections from the API (Trip List's refresh action). */
-  onRefresh?: () => void;
   ledgerLoading?: boolean;
-  /** Drives the refresh button's dancing-hen loading state. */
-  refreshing?: boolean;
 }
 
 /**
@@ -51,11 +47,14 @@ function CollectionInformation({
   onReferenceChange,
   onViewLedger,
   onReset,
-  onRefresh,
   ledgerLoading = false,
-  refreshing = false,
 }: Props) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+
+  // Payment modes are master-data values, so they localise through the same
+  // helper the Trip View uses: Telugu script in Telugu, the stored value (and
+  // every numeric figure) untouched.
+  const modeLabel = (mode: string) => localizeTripViewText(mode, language) || mode;
 
   // Same option contract the Trip List filters use, so every dropdown on this
   // page gets the shared search / clear / keyboard behaviour.
@@ -63,7 +62,7 @@ function CollectionInformation({
   const collectorOptions: MasterDropdownOption[] = collectors.map((name) => ({ value: name, label: name }));
   const paymentModeOptions: MasterDropdownOption[] = paymentModes.map((mode) => ({
     value: mode.name,
-    label: mode.name,
+    label: modeLabel(mode.name),
   }));
 
   const isLedgerEnabled =
@@ -230,7 +229,6 @@ function CollectionInformation({
           </span>
           {t("common.reset")}
         </button>
-          {onRefresh && <BrandRefreshButton loading={refreshing} onClick={onRefresh} />}
         </div>
       </div>
     </div>

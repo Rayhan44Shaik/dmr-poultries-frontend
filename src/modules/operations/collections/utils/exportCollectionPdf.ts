@@ -2,8 +2,13 @@
  * Collection view → A4 portrait PDF.
  *
  * Uses the same global letterhead every other export in the app uses
- * (`drawPreparedDmrPoultryHeader`), so the masthead, margins and footer match
- * the Masters and Fleet exports exactly.
+ * (`drawPreparedDmrPoultryHeader` — DMR masthead with the hen logo), so the
+ * masthead, margins and footer match the Trip List view exactly.
+ *
+ * The sheet carries the SHOP NAME and the recent-credits table the view modal
+ * shows — and nothing else. The old "Collection Details" panel (the selected
+ * entry, repeated field by field) was removed: the modal already shows it, and
+ * the receipt is about the shop's credit history.
  *
  * LANGUAGE NOTE: jsPDF's built-in Helvetica has no Telugu glyphs, and no
  * Telugu font is embedded in this app. Rendering Telugu through it produces
@@ -34,7 +39,9 @@ const COLOR = {
   white: [255, 255, 255] as RGB,
   rowAlt: [247, 249, 252] as RGB,
   panelBg: [248, 250, 252] as RGB,
-  value: [15, 23, 42] as RGB,
+  /** Pure black for table data — figures must read as printed, not grey. */
+  value: [0, 0, 0] as RGB,
+  black: [0, 0, 0] as RGB,
 };
 
 const PAGE_MARGIN = 14;
@@ -77,84 +84,38 @@ function safeFilename(name: string): string {
   return cleaned.toLowerCase().endsWith(".pdf") ? cleaned : `${cleaned}.pdf`;
 }
 
-export interface CollectionPdfDetail {
-  collectionNo: string;
-  collectionDate: string;
-  collectorName: string;
-  paymentModeName: string;
-  referenceNo: string;
-  amount: number;
-  remarks: string;
-  status?: string;
-}
-
 export interface ExportCollectionPdfOptions {
   shopName: string;
-  detail: CollectionPdfDetail;
-  /** Recent credits for the same shop, newest first. */
+  /** Recent credits for the same shop, newest first — exactly what the view shows. */
   recent?: CollectionApiEntry[];
   filename?: string;
 }
 
-/** Draws the "Collection Details" panel and returns the y it ends at. */
-function drawDetailPanel(doc: jsPDF, startY: number, detail: CollectionPdfDetail): number {
-  const rows: Array<[string, string]> = [
-    ["Collection No", detail.collectionNo || "-"],
-    ["Collection Date", formatDay(detail.collectionDate)],
-    ["Collector", detail.collectorName || "-"],
-    ["Payment Mode", detail.paymentModeName || "-"],
-    ["Reference No", detail.referenceNo || "-"],
-    ["Amount Received", `Rs. ${formatMoney(detail.amount)}`],
-  ];
-
-  const titleH = 8;
-  const rowH = 7.4;
-  const cols = 2;
-  const lineCount = Math.ceil(rows.length / cols);
-  const remarks = (detail.remarks || "").trim();
-  const remarksH = remarks && remarks !== "-" ? 8 : 0;
-  const panelH = titleH + lineCount * rowH + remarksH + 4;
+/**
+ * The shop block: one label, one name, generous margins. Everything else the
+ * old panel carried (collection no, collector, mode, reference, remarks) is
+ * deliberately gone — the view modal is where an individual entry is read.
+ */
+function drawShopBlock(doc: jsPDF, startY: number, shopName: string): number {
+  const blockH = 18;
 
   setFill(doc, COLOR.panelBg);
   setDraw(doc, COLOR.border);
   doc.setLineWidth(0.3);
-  doc.roundedRect(PAGE_MARGIN, startY, CONTENT_WIDTH, panelH, 2, 2, "FD");
+  doc.roundedRect(PAGE_MARGIN, startY, CONTENT_WIDTH, blockH, 2, 2, "FD");
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(9);
-  setText(doc, COLOR.navy);
-  doc.text("COLLECTION DETAILS", PAGE_MARGIN + 4, startY + 5.6);
+  doc.setFontSize(7.4);
+  setText(doc, COLOR.muted);
+  doc.text("SHOP", PAGE_MARGIN + 5, startY + 6.4);
 
-  const colWidth = (CONTENT_WIDTH - 8) / cols;
-  rows.forEach((row, index) => {
-    const col = index % cols;
-    const line = Math.floor(index / cols);
-    const x = PAGE_MARGIN + 4 + col * colWidth;
-    const y = startY + titleH + line * rowH + 4;
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(13);
+  setText(doc, COLOR.black);
+  const nameLines = doc.splitTextToSize(shopName || "-", CONTENT_WIDTH - 10);
+  doc.text(nameLines[0] ?? "-", PAGE_MARGIN + 5, startY + 13.2);
 
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.4);
-    setText(doc, COLOR.muted);
-    doc.text(row[0].toUpperCase(), x, y);
-
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(9);
-    setText(doc, COLOR.value);
-    doc.text(doc.splitTextToSize(row[1], colWidth - 6)[0] ?? "-", x, y + 4.4);
-  });
-
-  if (remarksH) {
-    const y = startY + titleH + lineCount * rowH + 4;
-    doc.setFont("helvetica", "normal");
-    doc.setFontSize(7.4);
-    setText(doc, COLOR.muted);
-    doc.text("REMARKS", PAGE_MARGIN + 4, y);
-    doc.setFontSize(8.6);
-    setText(doc, COLOR.slate);
-    doc.text(doc.splitTextToSize(remarks, CONTENT_WIDTH - 10)[0] ?? "", PAGE_MARGIN + 34, y);
-  }
-
-  return startY + panelH;
+  return startY + blockH;
 }
 
 function drawFooters(doc: jsPDF, generatedAt: string): void {
@@ -181,7 +142,7 @@ function drawFooters(doc: jsPDF, generatedAt: string): void {
 
 /** Build and download the A4 portrait collection PDF. */
 export async function exportCollectionPdf(options: ExportCollectionPdfOptions): Promise<void> {
-  const { shopName, detail, recent = [] } = options;
+  const { shopName, recent = [] } = options;
 
   const doc = createDmrPoultryPdf("portrait");
   const assets = await prepareDmrPoultryHeaderAssets({ henUrl: henImage });
@@ -192,7 +153,7 @@ export async function exportCollectionPdf(options: ExportCollectionPdfOptions): 
     assets,
   );
 
-  // Title strip: what this document is, and for which shop.
+  // Title strip: what this document is (the shop itself gets its own block).
   let y = headerBottom + 3;
   setFill(doc, COLOR.header);
   doc.roundedRect(PAGE_MARGIN, y, CONTENT_WIDTH, 9, 1.6, 1.6, "F");
@@ -200,15 +161,9 @@ export async function exportCollectionPdf(options: ExportCollectionPdfOptions): 
   doc.setFontSize(9.6);
   setText(doc, COLOR.white);
   doc.text("COLLECTION RECEIPT", PAGE_MARGIN + 4, y + 6);
-  doc.setFontSize(8.4);
-  doc.text(
-    doc.splitTextToSize(shopName || "-", 110)[0] ?? "-",
-    PAGE_MARGIN + CONTENT_WIDTH - 4,
-    y + 6,
-    { align: "right" },
-  );
 
-  y = drawDetailPanel(doc, y + 12, detail);
+  // The shop name, and nothing else — no per-entry field dump.
+  y = drawShopBlock(doc, y + 12, shopName);
 
   const rows = recent.slice(0, 10).map((row, index) => [
     String(index + 1),
@@ -224,10 +179,10 @@ export async function exportCollectionPdf(options: ExportCollectionPdfOptions): 
     doc.setFont("helvetica", "bold");
     doc.setFontSize(9);
     setText(doc, COLOR.navy);
-    doc.text("RECENT 10 CREDITS", PAGE_MARGIN, y + 8);
+    doc.text("RECENT 10 CREDITS", PAGE_MARGIN, y + 9);
 
     autoTable(doc, {
-      startY: y + 11,
+      startY: y + 12,
       margin: { right: PAGE_MARGIN, bottom: 17, left: PAGE_MARGIN },
       tableWidth: CONTENT_WIDTH,
       head: [["#", "DATE", "COLLECTION NO", "AMOUNT", "COLLECTOR", "MODE", "STATUS"]],
@@ -235,11 +190,12 @@ export async function exportCollectionPdf(options: ExportCollectionPdfOptions): 
       theme: "grid",
       styles: {
         font: "helvetica",
-        fontSize: 8,
-        cellPadding: 2,
+        fontSize: 8.4,
+        cellPadding: 2.2,
         lineColor: COLOR.border,
         lineWidth: 0.2,
-        textColor: COLOR.slate,
+        // Printed-black body so every figure is legible on paper.
+        textColor: COLOR.black,
       },
       headStyles: {
         fillColor: COLOR.header,
@@ -253,7 +209,7 @@ export async function exportCollectionPdf(options: ExportCollectionPdfOptions): 
         0: { cellWidth: 10, halign: "center" },
         1: { cellWidth: 26 },
         2: { cellWidth: 38 },
-        3: { cellWidth: 28, halign: "right", fontStyle: "bold", textColor: COLOR.value },
+        3: { cellWidth: 28, halign: "right", fontStyle: "bold", textColor: COLOR.black },
         4: { cellWidth: 32 },
         5: { cellWidth: 24 },
         6: { cellWidth: 24 },
@@ -270,6 +226,6 @@ export async function exportCollectionPdf(options: ExportCollectionPdfOptions): 
   })}`;
   drawFooters(doc, generatedAt);
 
-  const stamp = (detail.collectionDate || "").slice(0, 10) || "collection";
-  doc.save(safeFilename(options.filename ?? `collection-${detail.collectionNo || stamp}.pdf`));
+  const stamp = (recent[0]?.collectionDate || new Date().toISOString()).slice(0, 10);
+  doc.save(safeFilename(options.filename ?? `collection-${shopName}-${stamp}.pdf`));
 }

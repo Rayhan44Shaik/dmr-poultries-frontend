@@ -18,6 +18,11 @@ const PHRASE_TE: Record<string, string> = {
   "Spent layer hen": "లేయర్ కోడి",
   "Dual purpose backyard bird": "రెండు ఉపయోగాల ఇంటి పక్షి",
   "Premium black-meat bird": "ప్రీమియం నల్ల మాంసం పక్షి",
+  // Payment modes — data values, so they localise here rather than as i18n
+  // keys. Telugu reads them in Telugu script; the stored value never changes.
+  "Cash": "నగదు",
+  "Union Bank": "యూనియన్ బ్యాంక్",
+  "HDFC Bank": "హెచ్‌డీఎఫ్‌సీ బ్యాంక్",
 };
 
 const WORD_TE: Record<string, string> = {
