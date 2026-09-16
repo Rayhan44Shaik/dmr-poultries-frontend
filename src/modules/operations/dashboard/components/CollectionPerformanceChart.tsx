@@ -1,9 +1,10 @@
 import { useMemo, useRef, useState, type CSSProperties } from "react";
-import { ArrowUpRight, BarChart3, RefreshCw, RotateCcw } from "lucide-react";
+import { ArrowUpRight, BarChart3, RotateCcw } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { useI18n } from "../../../../i18n";
 import { formatINR, formatINRCompact } from "../../../../utils/format";
+import { BrandRefreshButton } from "../../../../ui";
 import MasterDropdown, { type MasterDropdownOption } from "../../../masters/components/MasterDropdown";
 import { loadCollectionRecoveryData, type CollectionRecoverySnapshot } from "../services/dashboardService";
 import {
@@ -448,26 +449,27 @@ export default function CollectionPerformanceChart({
             onBlur={() => setActionTooltip(null)}
             onMouseEnter={(event) => showActionTooltip(t("common.reset"), event.currentTarget)}
             onMouseLeave={() => setActionTooltip(null)}
-            className="group flex h-8 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-[9.5px] font-black text-slate-500 shadow-xs transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
+            className="group flex h-8 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-[9.5px] font-black text-slate-500 shadow-xs transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:border-slate-200 disabled:hover:bg-white disabled:hover:text-slate-500"
           >
-            <RotateCcw size={12} className="shrink-0 motion-safe:group-hover:animate-[var(--animate-action-reset)]" aria-hidden="true" />
+            <RotateCcw
+              size={12}
+              className={`shrink-0 ${hasViewFilter ? "motion-safe:group-hover:animate-[var(--animate-action-reset)]" : ""}`}
+              aria-hidden="true"
+            />
             <span>{t("common.reset")}</span>
           </button>
-          <button
-            type="button"
+          <BrandRefreshButton
+            loading={refreshing}
             onClick={refreshChart}
-            disabled={refreshing}
-            aria-label={t("common.refresh")}
-            aria-busy={refreshing || undefined}
+            ariaLabel={t("common.refresh")}
             onFocus={(event) => showActionTooltip(t("common.refresh"), event.currentTarget)}
             onBlur={() => setActionTooltip(null)}
             onMouseEnter={(event) => showActionTooltip(t("common.refresh"), event.currentTarget)}
             onMouseLeave={() => setActionTooltip(null)}
-            className="group flex h-8 items-center justify-center gap-1 rounded-lg border border-orange-200 bg-orange-50 px-2 text-[9.5px] font-black text-orange-700 shadow-xs transition hover:border-orange-300 hover:bg-orange-100 disabled:cursor-wait disabled:opacity-70"
+            className="!h-8 shrink-0 !gap-1 !pl-2 !pr-2 text-[9.5px] font-black"
           >
-            <RefreshCw size={12} className={`shrink-0 ${refreshing ? "animate-spin" : "motion-safe:group-hover:animate-[var(--animate-action-reset)]"}`} aria-hidden="true" />
-            <span>{t("common.refresh")}</span>
-          </button>
+            {t("common.refresh")}
+          </BrandRefreshButton>
         </div>
 
         <div className="grid grid-cols-3 gap-1.5">
