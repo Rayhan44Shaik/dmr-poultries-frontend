@@ -158,14 +158,23 @@ export function FuelViewModal({ isOpen, bill, onClose }: FuelViewModalProps) {
                 value={localizeTripViewText(bill.driverName || "—", language)} 
               />
 
-              {bill.tripNo && (
-                <div className="p-3 rounded-xl border border-slate-100 bg-white">
-                  <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
-                    {t("operations.trip_no")}
-                  </div>
-                  <TripNoBadge tripNo={bill.tripNo} />
+              <div className="p-3 rounded-xl border border-slate-100 bg-white">
+                <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                  Source & Origin
                 </div>
-              )}
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-bold ${
+                      isTrip
+                        ? "bg-indigo-50 text-indigo-700 border border-indigo-200/80"
+                        : "bg-slate-100 text-slate-700 border border-slate-200/80"
+                    }`}
+                  >
+                    {isTrip ? "Trip Diesel" : "Manual Direct Entry"}
+                  </span>
+                  {bill.tripNo && <TripNoBadge tripNo={bill.tripNo} />}
+                </div>
+              </div>
 
               <div className="p-3 rounded-xl border border-slate-100 bg-white">
                 <div className="text-[11px] font-bold text-slate-400 uppercase tracking-wider mb-1 flex items-center gap-1">

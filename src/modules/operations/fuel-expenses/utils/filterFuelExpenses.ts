@@ -102,6 +102,11 @@ export function filterFuelExpenses(
 function compareBillsNewestFirst(left: FuelExpense, right: FuelExpense): number {
   const byDate = String(right.date ?? "").localeCompare(String(left.date ?? ""));
   if (byDate !== 0) return byDate;
+  const leftNum = Number(left.id);
+  const rightNum = Number(right.id);
+  if (Number.isFinite(leftNum) && Number.isFinite(rightNum) && leftNum !== rightNum) {
+    return rightNum - leftNum;
+  }
   return String(right.billNo ?? "").localeCompare(String(left.billNo ?? ""), undefined, {
     numeric: true,
     sensitivity: "base",

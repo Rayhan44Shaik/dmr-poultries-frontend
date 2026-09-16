@@ -234,9 +234,10 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     showNotification("Filters have been reset.", "info");
   }, [showNotification]);
 
-  // ── Check if bill is editable (within 10 days) ──
+  // ── Check if bill is editable/deletable (Pending manual bill within 10 days) ──
   const canEditDelete = useCallback((bill: FuelExpense): boolean => {
     if (bill.sourceType === "TRIP" || !!bill.tripNo) return false;
+    if (bill.status !== "Pending") return false;
     if (!bill.createdDate && !bill.date) return true;
     const created = new Date(bill.createdDate || bill.date);
     const now = new Date();
@@ -262,6 +263,10 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
       showNotification("Trip diesel bills are linked to trips and auto-approved on trip completion.", "info");
       return;
     }
+    if (target.status === "Approved") {
+      showNotification("Approved fuel bills cannot be edited.", "info");
+      return;
+    }
     if (!canEditDelete(target)) {
       showNotification("Edit not allowed – bill is older than 10 days.", "error");
       return;
@@ -282,6 +287,10 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     if (!target) return;
     if (target.sourceType === "TRIP" || !!target.tripNo) {
       showNotification("Trip diesel bills are part of completed trips and cannot be deleted here.", "info");
+      return;
+    }
+    if (target.status === "Approved") {
+      showNotification("Approved fuel bills cannot be deleted.", "info");
       return;
     }
     if (!canEditDelete(target)) {
