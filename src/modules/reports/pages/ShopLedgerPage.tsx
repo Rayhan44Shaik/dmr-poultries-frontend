@@ -1,23 +1,30 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from "react";
-import { uiSearchInputWithClearClass } from '../../../shared/ui/uiTokens';
-import { format, subDays } from "date-fns";
+import { format } from "date-fns";
 import {
+  ArrowDown,
   ArrowDownLeft,
+  ArrowUp,
+  ArrowUpDown,
   ArrowUpRight,
+  BarChart3,
   Bird,
+  Calendar,
   CalendarDays,
+  CalendarRange,
   CheckCircle2,
   CheckSquare,
   Download,
   Eye,
   EyeOff,
+  FileSpreadsheet,
   FileStack,
   FileText,
+  Filter,
   IndianRupee,
   Layers,
   ListChecks,
   Loader2,
-  RefreshCw,
+  LoaderCircle,
   RotateCcw,
   Scale,
   Search,
@@ -26,7 +33,6 @@ import {
   Weight,
   X,
 } from "lucide-react";
-import Select, { type StylesConfig } from "react-select";
 import { useShops } from "../../masters/shops/hooks/useShops";
 import type { Shop } from "../../masters/shops/types/shop";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
@@ -34,8 +40,22 @@ import { onShopDataChanged } from "../../../shared/events/shopDataEvents";
 import { useI18n } from "../../../i18n";
 import { DatePicker } from "../../../components/common/DatePicker";
 import { apiPost } from "../../../api";
+import { BrandRefreshButton, Pagination } from "../../../ui";
+import MasterDropdown, { type MasterDropdownOption } from "../../masters/components/MasterDropdown";
+import {
+  opsFilterCardClass,
+  opsFilterLabelClass,
+  opsInputClass,
+  opsPrimaryButtonClass,
+  opsSecondaryButtonClass,
+  opsPdfButtonClass,
+  opsExcelButtonClass,
+} from "../../../shared/ui/operationsStyles";
+import { shouldShowPagination, PAGINATION_DEFAULT_PAGE_SIZE } from "../../../shared/ui/paginationStyles";
+import { exportToExcel } from "../../../utils/exportUtils";
 import {
   fetchShopLedger,
+  type ShopLedgerResponse,
   type ShopLedgerRow,
 } from "../services/shopLedgerService";
 import { generateShopLedgerPDF, prepareShopLedgerPdfAssets } from "../components/ShopLedgerPDF";
@@ -50,11 +70,6 @@ interface ShopLedgerProps {
 type ReportTypeFilter = "all" | "sales" | "collection";
 type WaReportType = "All" | "Sales" | "Collection";
 type WaScope = "selected" | "all";
-
-interface SelectOption {
-  value: string;
-  label: string;
-}
 
 interface WhatsAppSendPayload {
   reportType: WaReportType;
@@ -87,8 +102,41 @@ const REFRESH_TOAST_DURATION = 3500;
 const WA_SEND_COUNT_STORAGE_KEY = "dmr-shop-ledger-whatsapp-weekly-send-counts";
 const WA_LAST_SENT_STORAGE_KEY = "dmr-shop-ledger-whatsapp-weekly-last-sent";
 
-const PAGE_SIZES = [10, 15, 20, 25, 30] as const;
-const DEFAULT_PAGE_SIZE = 10;
+// Global pagination — one page-size system for the whole app (Trip List,
+// Collections, Shop Ledger all share it).
+const DEFAULT_PAGE_SIZE = PAGINATION_DEFAULT_PAGE_SIZE;
+
+/** Columns the ledger may be sorted by. Balance is deliberately excluded —
+ *  it is a running total whose order is defined by Date, never by size. */
+type LedgerSortKey =
+  | "date"
+  | "particulars"
+  | "birds"
+  | "weight"
+  | "rate"
+  | "debit"
+  | "credit";
+
+/** Stable, direction-aware comparator for ledger rows (opening row excluded
+ *  by the caller — it is pinned first and never sorted). */
+function compareLedgerTx(a: LedgerTransaction, b: LedgerTransaction, key: LedgerSortKey): number {
+  if (key === "date") return a.date.localeCompare(b.date);
+  if (key === "particulars") return a.particulars.localeCompare(b.particulars, undefined, { numeric: true });
+  return (a[key] ?? 0) - (b[key] ?? 0);
+}
+
+/** The Trip List's two-tone sort arrows, reused verbatim on ledger headers. */
+function LedgerSortArrows({ active, dir }: { active: boolean; dir?: "asc" | "desc" }) {
+  const base = "h-3.5 w-3.5 shrink-0 transition-colors";
+  const on = "text-emerald-600";
+  const off = "text-slate-400 group-hover/sort:text-slate-600";
+  return (
+    <span className="inline-flex items-center gap-0.5 shrink-0" aria-hidden="true">
+      <ArrowUp size={13} strokeWidth={2.7} className={`${base} ${active && dir === "asc" ? on : off}`} />
+      <ArrowDown size={13} strokeWidth={2.7} className={`${base} ${active && dir === "desc" ? on : off}`} />
+    </span>
+  );
+}
 
 function ShopLedgerWhatsAppIcon({ size = 16 }: { size?: number }) {
   return (
@@ -132,14 +180,78 @@ const mapRowToTx = (row: ShopLedgerRow): LedgerTransaction => {
   };
 };
 
-const toDateDefault = () => format(new Date(), "yyyy-MM-dd");
-const toWeekAgoDefault = () => format(subDays(new Date(), 7), "yyyy-MM-dd");
+/** ISO week start — the Monday (local time) of the week containing `date`. */
+function mondayOf(date: Date): Date {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = d.getDay(); // 0 = Sun … 6 = Sat
+  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+  return d;
+}
 
-/** yyyy-MM-dd → dd-MM-yyyy for display (WhatsApp text, weekly labels). */
+/**
+ * Default ledger window — the CURRENT week, Monday → TODAY.
+ *
+ * From = this week's Monday; To = today. When today IS Sunday the range is
+ * the complete Monday → Sunday week; on any other day it runs from Monday up
+ * to the present moment, so the statement always starts on a week boundary.
+ */
+function defaultWeekRange(): { from: string; to: string } {
+  const now = new Date();
+  return { from: format(mondayOf(now), "yyyy-MM-dd"), to: format(now, "yyyy-MM-dd") };
+}
+
+const toDateDefault = () => defaultWeekRange().to;
+const toWeekAgoDefault = () => defaultWeekRange().from;
+
+/** yyyy-MM-dd → dd-MM-yyyy (day-month-year) for table cells and exports. */
 const formatDisplayDate = (value: string): string => {
   const parts = value.split("-");
   return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : value;
 };
+
+const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+/** Telugu short weekdays — same order as WEEKDAY_SHORT (Sunday first). The
+ *  active language decides which set renders; underlying dates never change. */
+const WEEKDAY_SHORT_TE = ["ఆది", "సోమ", "మంగళ", "బుధ", "గురు", "శుక్ర", "శని"] as const;
+
+/** yyyy-MM-dd → short weekday ("Mon" / "సోమ"). Parsed LOCALLY — a UTC parse
+ *  would roll the day back one in IST and label Tuesday rows as Monday. */
+const weekdayOf = (value: string, language: "en" | "te" = "en"): string => {
+  const parts = value.split("-").map(Number);
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return "";
+  const [year, month, day] = parts;
+  const dow = new Date(year, month - 1, day).getDay();
+  return (language === "te" ? WEEKDAY_SHORT_TE : WEEKDAY_SHORT)[dow];
+};
+
+/** Shift a yyyy-MM-dd date by N days on the local calendar. */
+const shiftDateIso = (value: string, days: number): string => {
+  const parts = value.split("-").map(Number);
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return value;
+  const [year, month, day] = parts;
+  return format(new Date(year, month - 1, day + days), "yyyy-MM-dd");
+};
+
+const round2 = (value: number): number => Math.round(value * 100) / 100;
+
+/** Fetch the COMPLETE ledger, walking server pagination until every row has
+ *  arrived — without this, All-Shops ranges with more than one page of
+ *  transactions would silently truncate at the server's page size. */
+async function fetchAllLedgerPages(filters: {
+  shopId?: number;
+  fromDate: string;
+  toDate: string;
+}): Promise<ShopLedgerResponse> {
+  const first = await fetchShopLedger({ ...filters, page: 1, limit: 500 });
+  const totalPages = Math.max(1, first.meta?.totalPages ?? 1);
+  if (totalPages <= 1) return first;
+  const rest = await Promise.all(
+    Array.from({ length: totalPages - 1 }, (_, index) =>
+      fetchShopLedger({ ...filters, page: index + 2, limit: 500 }),
+    ),
+  );
+  return { ...first, data: [...first.data, ...rest.flatMap((page) => page.data)] };
+}
 
 const normalizePaymentMode = (value?: string): string => {
   const raw = String(value ?? "").trim();
@@ -279,7 +391,7 @@ function buildWhatsAppMessage(
 }
 
 const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const { showNotification } = useSafeNotification();
   const { shops } = useShops();
 
@@ -308,20 +420,19 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [currentPage, setCurrentPage] = useState(1);
+  /** Trip-List style explicit sort — null means natural ledger order.
+   *  Default view is LATEST FIRST (newest transactions on top). */
+  const [sortBy, setSortBy] = useState<LedgerSortKey | null>("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
 
   const [ledgerData, setLedgerData] = useState<LedgerTransaction[]>([]);
   const [ledgerLoading, setLedgerLoading] = useState(true);
   const [ledgerRefreshing, setLedgerRefreshing] = useState(false);
+  /** Holds an i18n KEY (not display text) so the fetch effect never needs
+   *  `t` in its deps — switching language re-renders the translated banner
+   *  without refetching data (no spinner flicker on language change). */
   const [ledgerError, setLedgerError] = useState<string | null>(null);
   const [refreshToast, setRefreshToast] = useState(false);
-
-  const shopOptions = useMemo(() => {
-    const all = [{ value: "All Shops", label: "All Shops" }];
-    const source = shops.map((shop: Shop) => shop.shopName);
-    const unique = Array.from(new Set(source));
-    const shopList = unique.map((name) => ({ value: name, label: name }));
-    return [...all, ...shopList];
-  }, [shops]);
 
   const selectedShopId = useMemo(() => {
     return appliedSelectedShop === "All Shops"
@@ -331,7 +442,59 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
   const buildLedger = useCallback(
     async (from: string, to: string, shopId?: number): Promise<LedgerTransaction[]> => {
-      const res = await fetchShopLedger({ fromDate: from, toDate: to, shopId });
+      const res = await fetchAllLedgerPages({ fromDate: from, toDate: to, shopId });
+
+      let openingTotal: number;
+      let body: LedgerTransaction[];
+
+      if (shopId != null) {
+        // Single shop — the backend returns the authoritative opening balance
+        // and true per-row running balances. By construction the previous
+        // week's closing is exactly this week's opening.
+        openingTotal = Number(res.openingBalance) || 0;
+        body = res.data.map(mapRowToTx);
+      } else {
+        // ALL SHOPS — the backend's combined ledger mixes balances across
+        // shops, so rebuild the TRUE per-shop running balances client-side.
+        // Each shop's opening at `from` = its master opening + its own net
+        // activity before `from`, so for every shop the previous period's
+        // closing carries forward as this period's opening.
+        const history = await fetchAllLedgerPages({
+          fromDate: shiftDateIso(from, -365),
+          toDate: shiftDateIso(from, -1),
+        });
+        const preNetByShop = new Map<number, number>();
+        for (const row of history.data) {
+          const sid = Number(row.shopId ?? 0);
+          preNetByShop.set(sid, (preNetByShop.get(sid) ?? 0) + row.debit - row.credit);
+        }
+        const openingByShop = new Map<number, number>();
+        let aggregateOpening = 0;
+        for (const shop of shops) {
+          const opening = (Number(shop.openingBalance) || 0) + (preNetByShop.get(shop.id) ?? 0);
+          openingByShop.set(shop.id, opening);
+          aggregateOpening += opening;
+        }
+        // Defensive: shops with pre-range activity missing from the master.
+        for (const [sid, net] of preNetByShop) {
+          if (!openingByShop.has(sid)) {
+            openingByShop.set(sid, net);
+            aggregateOpening += net;
+          }
+        }
+        // Rows arrive chronologically — thread each shop's own balance.
+        const running = new Map<number, number>(openingByShop);
+        body = res.data.map((row) => {
+          const sid = Number(row.shopId ?? 0);
+          const next = round2((running.get(sid) ?? 0) + row.debit - row.credit);
+          running.set(sid, next);
+          const tx = mapRowToTx(row);
+          tx.balance = next;
+          return tx;
+        });
+        openingTotal = round2(aggregateOpening);
+      }
+
       const openingRow: LedgerTransaction = {
         date: from,
         particulars: "Opening Balance",
@@ -340,12 +503,12 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         rate: 0,
         debit: 0,
         credit: 0,
-        balance: Number(res.openingBalance) || 0,
+        balance: openingTotal,
         type: "sale",
       };
-      return [openingRow, ...res.data.map(mapRowToTx)];
+      return [openingRow, ...body];
     },
-    []
+    [shops]
   );
 
   useEffect(() => {
@@ -364,7 +527,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         if (!cancelled) {
           setLedgerLoading(false);
           setLedgerRefreshing(false);
-          setLedgerError("Unable to load ledger data. Please make sure the backend is running.");
+          setLedgerError("shop_ledger.load_error");
         }
       });
     return () => {
@@ -381,7 +544,11 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
    * user has applied — the loader keeps the current table visible meanwhile.
    */
   useEffect(
-    () => onShopDataChanged(() => setRefreshNonce((nonce) => nonce + 1)),
+    () =>
+      onShopDataChanged(() => {
+        setLedgerLoading(true);
+        setRefreshNonce((nonce) => nonce + 1);
+      }),
     [],
   );
 
@@ -414,17 +581,25 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     return [...opening, ...scoped];
   }, [ledgerData, appliedReportType, appliedSearchTerm]);
 
-  const totalRows = useMemo(() => Math.max(0, filteredLedger.length - 1), [filteredLedger]);
+  /** Body rows (opening row excluded) with the applied search/type filters
+   *  AND the explicit Sort By selection — the single source the table, the
+   *  paginator and the Excel export all read, so they can never disagree. */
+  const sortedBody = useMemo(() => {
+    const body = filteredLedger.slice(1);
+    if (!sortBy) return body;
+    const dir = sortDir === "desc" ? -1 : 1;
+    return [...body].sort((a, b) => compareLedgerTx(a, b, sortBy) * dir);
+  }, [filteredLedger, sortBy, sortDir]);
+
+  const totalRows = useMemo(() => sortedBody.length, [sortedBody]);
   const totalPages = Math.max(1, Math.ceil(totalRows / pageSize));
   const safePage = Math.min(currentPage, totalPages);
-  const rangeStart = totalRows === 0 ? 0 : (safePage - 1) * pageSize + 1;
-  const rangeEnd = Math.min(totalRows, safePage * pageSize);
 
   const visibleRows = useMemo(() => {
     const opening = filteredLedger.slice(0, 1);
     const start = (safePage - 1) * pageSize;
-    return [...opening, ...filteredLedger.slice(1 + start, 1 + start + pageSize)];
-  }, [filteredLedger, safePage, pageSize]);
+    return [...opening, ...sortedBody.slice(start, start + pageSize)];
+  }, [filteredLedger, sortedBody, safePage, pageSize]);
 
   const summary = useMemo(() => {
     const tx = filteredLedger.slice(1);
@@ -436,19 +611,40 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     const totalWeight = tx
       .filter((t) => t.type === "sale")
       .reduce((sum, t) => sum + t.weight, 0);
-    const closingBalance =
-      filteredLedger.length > 0
-        ? filteredLedger[filteredLedger.length - 1].balance
-        : 0;
-    return { totalDebit, totalCredit, totalBirds, totalWeight, closingBalance };
+    // Opening row is always pinned first — single shop: backend-authoritative;
+    // all shops: aggregate of every shop's carried-forward opening.
+    const openingBalance = filteredLedger.length > 0 ? filteredLedger[0].balance : 0;
+    // The accounting identity: Closing = Opening + Sales − Collections. For a
+    // single shop this equals the last running balance; for All Shops it is
+    // the combined closing outstanding across every shop.
+    const closingBalance = round2(openingBalance + totalDebit - totalCredit);
+    return { openingBalance, totalDebit, totalCredit, totalBirds, totalWeight, closingBalance };
   }, [filteredLedger]);
 
-  // KPIs are calculated only when the user applies a meaningful filter:
-  // a custom date range or a specific shop. These are committed on Search.
-  const hasKpiFilter =
-    appliedDateFrom !== toWeekAgoDefault() ||
-    appliedDateTo !== toDateDefault() ||
-    appliedSelectedShop !== "All Shops";
+  /** STATEMENT OVERVIEW — always the FULL ledger for the applied dates + shop
+   *  scope, independent of Report Type / Search. Those filters narrow the
+   *  TABLE (and its TOTAL row) but must never silently zero the headline
+   *  Opening → Sales → Collections → Closing statement, which is what made the
+   *  overview look frozen when a filter was applied. Date / shop changes
+   *  re-fetch `ledgerData`, so Opening and Closing visibly move with them. */
+  const scopeSummary = useMemo(() => {
+    const tx = ledgerData.slice(1);
+    const totalDebit = tx.reduce((sum, t) => sum + t.debit, 0);
+    const totalCredit = tx.reduce((sum, t) => sum + t.credit, 0);
+    const totalBirds = tx
+      .filter((t) => t.type === "sale")
+      .reduce((sum, t) => sum + t.birds, 0);
+    const totalWeight = tx
+      .filter((t) => t.type === "sale")
+      .reduce((sum, t) => sum + t.weight, 0);
+    const openingBalance = ledgerData.length > 0 ? ledgerData[0].balance : 0;
+    const closingBalance = round2(openingBalance + totalDebit - totalCredit);
+    return { openingBalance, totalDebit, totalCredit, totalBirds, totalWeight, closingBalance };
+  }, [ledgerData]);
+
+  /** Rows in the full scope (excluding the pinned Opening row) — used to
+   *  show "X of Y transactions" so every filter visibly does something. */
+  const scopeRows = Math.max(0, ledgerData.length - 1);
 
   const resetPage = useCallback(() => setCurrentPage(1), []);
 
@@ -535,7 +731,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       }
 
       if (shopNames.length === 0) {
-        showNotification("No shops found in the selected date range.", "error");
+        showNotification(t("shop_ledger.no_shops_in_range"), "error");
         return;
       }
 
@@ -560,7 +756,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       }
 
       if (allLedgers.length === 0) {
-        showNotification("No transaction data to export.", "error");
+        showNotification(t("shop_ledger.no_export_data"), "error");
         return;
       }
 
@@ -624,18 +820,18 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       setPdfPreview(nextState);
       setPdfShopSearch("");
       showNotification(
-        "PDF ready. Preview it below — download each shop separately or the combined file.",
+        t("shop_ledger.pdf_ready_hint"),
         "success",
       );
     } catch {
       createdUrls.forEach((url) => URL.revokeObjectURL(url));
-      showNotification("Failed to load ledger data. Please try again.", "error");
+      showNotification(t("shop_ledger.load_failed"), "error");
     } finally {
       pdfGeneratingRef.current = false;
       setPdfGenerating(false);
       setPdfProgress(null);
     }
-  }, [appliedSelectedShop, appliedDateFrom, appliedDateTo, showNotification, shopMasterMap, getCachedLedger]);
+  }, [appliedSelectedShop, appliedDateFrom, appliedDateTo, showNotification, shopMasterMap, getCachedLedger, t]);
 
   const closePdfPreview = useCallback(() => {
     // Invalidate any in-flight export so it cannot re-open this modal.
@@ -765,7 +961,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     if (!current) return;
     const chosen = current.files.filter((file) => current.selectedShops.includes(file.shop));
     if (chosen.length === 0) {
-      showNotification("Select at least one shop to download.", "info");
+      showNotification(t("shop_ledger.pdf_select_shops"), "info");
       return;
     }
     pdfDownloadBusyRef.current = true;
@@ -808,7 +1004,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       })
       .filter((entry) => entry.data.length > 0);
     if (ledgers.length === 0) {
-      showNotification("Select at least one shop to download.", "info");
+      showNotification(t("shop_ledger.pdf_select_shops"), "info");
       return;
     }
     const label = ledgers.length === 1 ? ledgers[0].shop : "All Shops";
@@ -821,6 +1017,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   const handleSearch = useCallback(() => {
     // Commit the draft filter controls. Until Search is clicked the table,
     // KPIs and exports keep using the previously applied filters.
+    setLedgerLoading(true); // Rate-Entry style spinner while records reload
     setAppliedDateFrom(dateFrom);
     setAppliedDateTo(dateTo);
     setAppliedSelectedShop(selectedShop);
@@ -833,6 +1030,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     const defaultFrom = toWeekAgoDefault();
     const defaultTo = toDateDefault();
 
+    setLedgerLoading(true); // Rate-Entry style spinner while records reload
     setDateFrom(defaultFrom);
     setDateTo(defaultTo);
     setSelectedShop("All Shops");
@@ -845,6 +1043,65 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     setAppliedReportType("all");
     setAppliedSearchTerm("");
 
+    // Reset returns to the page's standard state: latest-first date order.
+    setSortBy("date");
+    setSortDir("desc");
+    setCurrentPage(1);
+  }, []);
+
+  /** First click sorts ascending; second flips to descending; a third click
+   *  on the active column clears the sort (Trip List contract, same here). */
+  const handleSortChange = useCallback(
+    (key: LedgerSortKey) => {
+      if (sortBy !== key) {
+        setSortBy(key);
+        setSortDir("asc");
+      } else if (sortDir === "asc") {
+        setSortDir("desc");
+      } else {
+        setSortBy(null);
+        setSortDir("asc");
+      }
+      setCurrentPage(1);
+    },
+    [sortBy, sortDir],
+  );
+
+  /** The Sort By dropdown commits a `key:dir` pair (or "" to clear). */
+  const handleSortValueChange = useCallback((value: string) => {
+    if (!value) {
+      setSortBy(null);
+      setSortDir("asc");
+      setCurrentPage(1);
+      return;
+    }
+    const [key, direction] = value.split(":");
+    setSortBy(key as LedgerSortKey);
+    setSortDir(direction === "desc" ? "desc" : "asc");
+    setCurrentPage(1);
+  }, []);
+
+  /** Remove ONE applied filter from the indicator pills — resets that draft
+   *  and its applied value, so the ledger refetches immediately. */
+  const clearAppliedFilter = useCallback((which: "dates" | "shop" | "type" | "search") => {
+    setLedgerLoading(true); // Rate-Entry style spinner while records reload
+    if (which === "dates") {
+      const defaultFrom = toWeekAgoDefault();
+      const defaultTo = toDateDefault();
+      setDateFrom(defaultFrom);
+      setDateTo(defaultTo);
+      setAppliedDateFrom(defaultFrom);
+      setAppliedDateTo(defaultTo);
+    } else if (which === "shop") {
+      setSelectedShop("All Shops");
+      setAppliedSelectedShop("All Shops");
+    } else if (which === "type") {
+      setReportType("all");
+      setAppliedReportType("all");
+    } else {
+      setSearchValue("");
+      setAppliedSearchTerm("");
+    }
     setCurrentPage(1);
   }, []);
 
@@ -864,10 +1121,52 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
   const handleRefresh = useCallback(() => {
     // Targeted content refresh only — never reload the whole page/browser tab.
+    setLedgerLoading(true); // Rate-Entry style spinner while records reload
     setLedgerRefreshing(true);
     setRefreshToast(true);
     setRefreshNonce((n) => n + 1);
   }, []);
+
+  /** Excel export — the exact rows on screen (applied filters + sort), in the
+   *  same shape as the ledger table. Trip List uses the same shared util. */
+  const handleExportExcel = useCallback(() => {
+    const rows = sortedBody;
+    if (rows.length === 0) {
+      showNotification(t("shop_ledger.no_export_rows"), "error");
+      return;
+    }
+    const headers = [
+      "Date",
+      "Day",
+      "Particulars",
+      "Type",
+      "Payment Mode",
+      "Birds",
+      "Weight (KG)",
+      "Rate",
+      "Debit",
+      "Credit",
+      "Balance",
+    ];
+    const data = rows.map((tx) => [
+      formatDisplayDate(tx.date),
+      weekdayOf(tx.date),
+      tx.particulars,
+      tx.type === "sale" ? "Sale" : tx.type === "collection" ? "Collection" : "Correction",
+      normalizePaymentMode(tx.paymentMode) || "-",
+      tx.type === "sale" ? tx.birds : 0,
+      tx.type === "sale" ? Number(tx.weight.toFixed(2)) : 0,
+      tx.type === "sale" ? Number(tx.rate.toFixed(2)) : 0,
+      Number(tx.debit.toFixed(2)),
+      Number(tx.credit.toFixed(2)),
+      Number(tx.balance.toFixed(2)),
+    ]);
+    const shopLabel = appliedSelectedShop === "All Shops" ? "All Shops" : appliedSelectedShop;
+    const title = `Shop Ledger — ${shopLabel} (${formatDisplayDate(appliedDateFrom)} to ${formatDisplayDate(appliedDateTo)})`;
+    const filename = `Shop_Ledger_${appliedSelectedShop === "All Shops" ? "All_Shops" : appliedSelectedShop.replace(/\s+/g, "_")}_${appliedDateFrom}_to_${appliedDateTo}`;
+    exportToExcel(title, headers, data, filename);
+    showNotification(t("shop_ledger.excel_exported"), "success");
+  }, [sortedBody, appliedSelectedShop, appliedDateFrom, appliedDateTo, showNotification, t]);
 
   // ─── WhatsApp modal state ──────────────────────────────────
   const [whatsappOpen, setWhatsappOpen] = useState(false);
@@ -1072,7 +1371,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     ).then((url) => {
       if (url) {
         downloadFile(url, waPreviewFileName);
-        showNotification("Attachment PDF downloaded.", "success");
+        showNotification(t("shop_ledger.wa.attachment_downloaded"), "success");
       }
     });
   };
@@ -1168,25 +1467,25 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
     const targets = waTargetShops;
     if (targets.length === 0) {
-      setWaError("Please select at least one shop before sending.");
+      setWaError(t("shop_ledger.wa.select_error"));
       return;
     }
     if (!waDateFrom || !waDateTo) {
-      setWaError("Please choose a valid date range.");
+      setWaError(t("shop_ledger.wa.invalid_range"));
       return;
     }
     if (!WHATSAPP_BACKEND_ENABLED) {
       // Never fake success. The endpoint/service must be explicitly enabled
       // and the backend must confirm delivery before we report success.
-      setWaError("WhatsApp report service is not configured.");
-      showNotification("WhatsApp report service is not configured.", "info");
+      setWaError(t("shop_ledger.wa.not_configured"));
+      showNotification(t("shop_ledger.wa.not_configured"), "info");
       return;
     }
 
     // Retry safety: skip shops that already received this exact report.
     const pendingTargets = targets.filter((shop) => !waSucceededRef.current.includes(shop));
     if (pendingTargets.length === 0) {
-      setWaError("Every selected shop already received this report for these settings.");
+      setWaError(t("shop_ledger.wa.already_sent"));
       return;
     }
 
@@ -1288,8 +1587,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       setWaError(message);
       showNotification(message, "error");
     } else {
-      setWaError("Unable to send WhatsApp report. Please try again.");
-      showNotification("Unable to send WhatsApp report. Please try again.", "error");
+      setWaError(t("shop_ledger.wa.send_failed"));
+      showNotification(t("shop_ledger.wa.send_failed"), "error");
     }
   }, [
     waScope,
@@ -1303,163 +1602,244 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     buildLedger,
     waReportType,
     showNotification,
+    t,
   ]);
 
-  // ─── React-Select styles (original) ───
-  const selectStyles = useMemo<StylesConfig<SelectOption, false>>(() => ({
-    control: (base) => ({
-      ...base,
-      borderRadius: "0.5rem",
-      borderColor: "#cbd5e1",
-      boxShadow: "none",
-      minHeight: "2.375rem",
-      fontSize: "0.875rem",
-      "&:hover": { borderColor: "#94a3b8" },
-      "&:focus-within": {
-        borderColor: "#3b82f6",
-        boxShadow: "0 0 0 3px rgba(59, 130, 246, 0.15)",
-      },
-    }),
-    option: (base, { isFocused, isSelected }) => ({
-      ...base,
-      backgroundColor: isSelected ? "#2563eb" : isFocused ? "#eff6ff" : "white",
-      color: isSelected ? "white" : "#1e293b",
-      fontSize: "0.8125rem",
-      padding: "0.375rem 0.75rem",
-    }),
-    menu: (base) => ({
-      ...base,
-      zIndex: 9999,
-      borderRadius: 8,
-      overflow: "hidden",
-      boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)",
-      border: "1px solid #f1f5f9",
-    }),
-    menuList: (base) => ({
-      ...base,
-      maxHeight: "200px",
-    }),
-    placeholder: (base) => ({
-      ...base,
-      color: "#94a3b8",
-    }),
-  }), []);
+  // ─── Filter dropdown models — identical chrome to the Trip List toolbar ───
+  // Shop options feed the shared MasterDropdown (searchable, clearable). The
+  // "All Shops" sentinel is an EMPTY value, so the dropdown shows its
+  // placeholder and the clear affordance behaves exactly like Trip Filters.
+  const shopDropdownOptions = useMemo<MasterDropdownOption[]>(() => {
+    const seen = new Set<string>();
+    return shops.flatMap((shop: Shop) => {
+      const name = String(shop.shopName || "").trim();
+      if (!name || seen.has(name)) return [];
+      seen.add(name);
+      return [{ value: name, label: name, searchText: name }];
+    });
+  }, [shops]);
 
-  const reportTypeOptions: { value: ReportTypeFilter; label: string }[] = [
-    { value: "all", label: "All" },
-    { value: "sales", label: "Sales" },
-    { value: "collection", label: "Collection" },
+  const reportTypeOptions: MasterDropdownOption[] = [
+    { value: "sales", label: t("shop_ledger.type.sales") },
+    { value: "collection", label: t("shop_ledger.type.collection") },
   ];
 
-  const actionButtonClass =
-    "inline-flex h-9 items-center gap-1.5 rounded-lg border px-3.5 text-[13px] font-medium shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-500/30";
+  /** Field name + direction — the exact Sort By model the Trip List uses. */
+  const sortOptions: MasterDropdownOption[] = [
+    { value: "date:asc", label: t("shop_ledger.sort.date_asc") },
+    { value: "date:desc", label: t("shop_ledger.sort.date_desc") },
+    { value: "particulars:asc", label: t("shop_ledger.sort.particulars_asc") },
+    { value: "particulars:desc", label: t("shop_ledger.sort.particulars_desc") },
+    { value: "birds:asc", label: t("shop_ledger.sort.birds_asc") },
+    { value: "birds:desc", label: t("shop_ledger.sort.birds_desc") },
+    { value: "weight:asc", label: t("shop_ledger.sort.weight_asc") },
+    { value: "weight:desc", label: t("shop_ledger.sort.weight_desc") },
+    { value: "rate:asc", label: t("shop_ledger.sort.rate_asc") },
+    { value: "rate:desc", label: t("shop_ledger.sort.rate_desc") },
+    { value: "debit:asc", label: t("shop_ledger.sort.debit_asc") },
+    { value: "debit:desc", label: t("shop_ledger.sort.debit_desc") },
+    { value: "credit:asc", label: t("shop_ledger.sort.credit_asc") },
+    { value: "credit:desc", label: t("shop_ledger.sort.credit_desc") },
+  ];
+  const sortValue = sortBy ? `${sortBy}:${sortDir}` : "";
 
-  const iconOnlyButtonClass =
-    "inline-flex h-9 w-9 items-center justify-center rounded-lg border shadow-sm transition focus:outline-none focus:ring-2 focus:ring-blue-500/30";
+  // ─── Applied-filter pills (Mortality-style indicator) ───
+  // One pill per committed filter, each individually removable.
+  const appliedFilterPills = useMemo(() => {
+    const pills: { key: "dates" | "shop" | "type" | "search"; label: string; value: string }[] = [];
+    const defaultFrom = toWeekAgoDefault();
+    const defaultTo = toDateDefault();
+    if (appliedDateFrom !== defaultFrom || appliedDateTo !== defaultTo) {
+      pills.push({ key: "dates", label: t("common.date"), value: `${formatDisplayDate(appliedDateFrom)} → ${formatDisplayDate(appliedDateTo)}` });
+    }
+    if (appliedSelectedShop !== "All Shops") {
+      pills.push({ key: "shop", label: t("common.shop"), value: appliedSelectedShop });
+    }
+    if (appliedReportType !== "all") {
+      pills.push({ key: "type", label: t("common.type"), value: appliedReportType === "sales" ? t("shop_ledger.type.sales") : t("shop_ledger.type.collection") });
+    }
+    if (appliedSearchTerm.trim()) {
+      pills.push({ key: "search", label: t("common.search"), value: appliedSearchTerm.trim() });
+    }
+    return pills;
+  }, [appliedDateFrom, appliedDateTo, appliedSelectedShop, appliedReportType, appliedSearchTerm, t]);
 
-  const iconOnlyTone =
-    "border-slate-300 bg-white text-slate-700 hover:bg-slate-50 hover:text-slate-900";
+  /** Clickable column header — Trip List's three-state sort contract:
+   *  first click asc, second desc, third clears back to ledger order. */
+  const sortableHeader = (key: LedgerSortKey, icon: React.ReactNode, label: string, center = false) => {
+    const active = sortBy === key;
+    return (
+      <button
+        type="button"
+        onClick={() => handleSortChange(key)}
+        aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
+        className={`group/sort flex items-center gap-2 w-full uppercase tracking-wider font-bold text-[12px] transition-colors hover:text-emerald-700 ${
+          center ? "justify-center" : ""
+        } ${active ? "text-emerald-700" : ""}`}
+      >
+        {icon}
+        <span>{label}</span>
+        <LedgerSortArrows active={active} dir={sortDir} />
+      </button>
+    );
+  };
 
-  const searchButtonClass =
-    "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 hover:text-emerald-800";
-
-  const resetButtonClass =
-    "border-rose-200 bg-rose-50 text-rose-600 hover:bg-rose-100 hover:text-rose-700 focus-visible:outline-none";
-
-  const pdfButtonClass =
-    "border-red-200 bg-red-50 text-red-600 hover:bg-red-100 hover:text-red-700 focus-visible:outline-none";
-
-  const labelClass = "block text-[11px] font-semibold uppercase tracking-wide text-slate-500 mb-1";
-
-  // ─── UI (Original Colors) ──────────────────────────────────
+  // ─── UI — Trip-List style toolbar, pills, table and global pagination ───
   return (
-    <div className={`w-full space-y-4 animate-in fade-in duration-500 text-slate-800 ${
+    <div className={`w-full space-y-5 animate-in fade-in duration-200 text-slate-800 ${
       embedded ? '' : 'px-3 md:px-6 py-4 bg-slate-50/50 min-h-screen'
     }`}>
-      <div className="bg-white rounded-2xl p-4 md:p-6 border border-slate-200/85 shadow-sm space-y-4">
-
-        {/* ── FILTER ROW ───────────────────────────────────── */}
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="min-w-0">
-            <label className={labelClass}>Date From</label>
-            <DatePicker value={dateFrom} onChange={setDateFrom} placeholder="From date" className="w-full" />
-          </div>
-          <div className="min-w-0">
-            <label className={labelClass}>Date To</label>
-            <DatePicker value={dateTo} onChange={setDateTo} placeholder="To date" className="w-full" />
-          </div>
-          <div className="min-w-0">
-            <label className={labelClass}>Shop</label>
-            <Select
-              options={shopOptions}
-              value={shopOptions.find((opt) => opt.value === selectedShop)}
-              onChange={(selected) => {
-                setSelectedShop(selected?.value || "All Shops");
-              }}
-              isSearchable
-              placeholder="Search or select shop..."
-              styles={selectStyles}
-              maxMenuHeight={200}
+      {/* ── FILTER CARD — identical chrome & colours to the Trip List ─────── */}
+      <div className={opsFilterCardClass}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+          <div>
+            <label className={opsFilterLabelClass}>
+              <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
+              <span>{t("common.from")}</span>
+            </label>
+            <DatePicker
+              value={dateFrom}
+              onChange={setDateFrom}
+              placeholder={t("placeholder.enter_date")}
+              className="w-full text-xs font-medium"
             />
           </div>
-          <div className="min-w-0">
-            <label className={labelClass}>Report Type</label>
-            <Select
+
+          <div>
+            <label className={opsFilterLabelClass}>
+              <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
+              <span>{t("common.to")}</span>
+            </label>
+            <DatePicker
+              value={dateTo}
+              onChange={setDateTo}
+              placeholder={t("placeholder.enter_date")}
+              className="w-full text-xs font-medium"
+            />
+          </div>
+
+          <div>
+            <label className={opsFilterLabelClass}>
+              <Store size={17} className="text-emerald-500 flex-shrink-0" />
+              <span>{t("common.shop")}</span>
+            </label>
+            <MasterDropdown
+              hideLabel
+              label={t("common.shop")}
+              value={selectedShop === "All Shops" ? "" : selectedShop}
+              options={shopDropdownOptions}
+              onChange={(next) => setSelectedShop(next || "All Shops")}
+              placeholder={t("shop_ledger.all_shops")}
+              searchable
+              allowClear
+              className="w-full"
+            />
+          </div>
+
+          <div>
+            <label className={opsFilterLabelClass}>
+              <Layers size={17} className="text-amber-500 flex-shrink-0" />
+              <span>{t("shop_ledger.report_type")}</span>
+            </label>
+            <MasterDropdown
+              hideLabel
+              label={t("shop_ledger.report_type")}
+              value={reportType === "all" ? "" : reportType}
               options={reportTypeOptions}
-              value={reportTypeOptions.find((opt) => opt.value === reportType)}
-              onChange={(selected) => {
-                setReportType((selected?.value as ReportTypeFilter) || "all");
-              }}
-              placeholder="All"
-              styles={selectStyles}
-              maxMenuHeight={200}
+              onChange={(next) => setReportType((next as ReportTypeFilter) || "all")}
+              placeholder={t("common.all")}
+              searchable
+              allowClear
+              className="w-full"
+            />
+          </div>
+
+          <div>
+            <label className={opsFilterLabelClass}>
+              <ArrowUpDown size={17} className="text-violet-500 flex-shrink-0" />
+              <span>{t("common.sort_by")}</span>
+            </label>
+            <MasterDropdown
+              hideLabel
+              label={t("common.sort_by")}
+              value={sortValue}
+              options={sortOptions}
+              onChange={handleSortValueChange}
+              placeholder={t("shop_ledger.no_sorting")}
+              searchable
+              allowClear
+              className="w-full"
             />
           </div>
         </div>
 
-        {/* ── ACTION ROW ───────────────────────────────────── */}
-        <div className="flex flex-col gap-2 border-t border-slate-100 pt-3 md:flex-row md:items-center">
-          {/* Search box fills the available empty space; actions stay right. */}
-          <div className="relative min-w-0 flex-1">
-            <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
-            <input
-              type="text"
-              value={searchValue}
-              onChange={(e) => setSearchValue(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") handleSearch();
-              }}
-              placeholder="Search all details — date, particulars, birds, weight, rate, debit, credit, payment mode…"
-              aria-label="Search all Shop Ledger details"
-              className={uiSearchInputWithClearClass}
-            />
-            {searchValue && (
-              <button
-                type="button"
-                onClick={() => setSearchValue("")}
-                aria-label="Clear search"
-                className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:text-slate-600"
-              >
-                <X size={13} />
-              </button>
-            )}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-end pt-1">
+          <div className="lg:col-span-7">
+            <label className={opsFilterLabelClass}>
+              <Search size={17} className="text-slate-400 flex-shrink-0" />
+              <span>{t("common.search")}</span>
+            </label>
+            <div className="relative">
+              <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                type="text"
+                value={searchValue}
+                onChange={(e) => setSearchValue(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSearch();
+                }}
+                placeholder={t("shop_ledger.search_placeholder")}
+                aria-label={t("shop_ledger.search_aria")}
+                className={`${opsInputClass} pl-10 ${searchValue ? "pr-9" : ""}`}
+              />
+              {searchValue && (
+                <button
+                  type="button"
+                  onClick={() => setSearchValue("")}
+                  aria-label={t("shop_ledger.clear_search")}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 hover:text-slate-600"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
           </div>
-          <div className="flex shrink-0 flex-wrap items-center gap-2">
-            <button type="button" onClick={handleSearch} className={`${actionButtonClass} ${searchButtonClass}`}>
-              <Search size={14} /> Search
+
+          <div className="lg:col-span-5 flex items-center gap-2 justify-end flex-wrap">
+            <button type="button" onClick={handleSearch} className={`group relative ${opsPrimaryButtonClass}`} aria-label={t("common.search")}>
+              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-search)]"><Search size={15} /></span>
+              {t("common.search")}
             </button>
-            <button type="button" onClick={handleReset} className={`${actionButtonClass} ${resetButtonClass}`}>
-              <RotateCcw size={14} /> Reset
+            <button type="button" onClick={handleReset} className={`group relative ${opsSecondaryButtonClass}`} aria-label={t("common.reset")}>
+              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>
+              {t("common.reset")}
             </button>
+            <BrandRefreshButton onClick={handleRefresh} loading={ledgerRefreshing} />
             <button
               type="button"
               onClick={() => void handleExportPDF()}
               disabled={pdfGenerating}
-              title={appliedSelectedShop === "All Shops" ? "Generate PDFs for all shops" : `Generate PDF for ${appliedSelectedShop}`}
-              className={`${actionButtonClass} ${pdfButtonClass} disabled:opacity-60`}
+              title={appliedSelectedShop === "All Shops" ? t("shop_ledger.pdf_hint_all") : t("shop_ledger.pdf_hint_shop", { shop: appliedSelectedShop })}
+              className={`group relative ${opsPdfButtonClass} disabled:opacity-60`}
+              aria-label="PDF"
             >
-              {pdfGenerating ? <Loader2 size={14} className="animate-spin" /> : <FileText size={14} />}
-              {pdfProgress ?? (appliedSelectedShop === "All Shops" ? "PDF" : "PDF")}
+              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-pdf)]">
+                {pdfGenerating ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />}
+              </span>
+              {pdfProgress ?? "PDF"}
+            </button>
+            <button
+              type="button"
+              onClick={handleExportExcel}
+              disabled={sortedBody.length === 0}
+              title={t("shop_ledger.excel_hint")}
+              className={`group relative ${opsExcelButtonClass} disabled:opacity-60`}
+              aria-label="Excel"
+            >
+              <span className={`inline-flex ${sortedBody.length > 0 ? "motion-safe:group-hover:animate-[var(--animate-action-excel)]" : ""}`}>
+                <FileSpreadsheet size={15} />
+              </span>
+              Excel
             </button>
             <button
               type="button"
@@ -1467,138 +1847,196 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               title="WhatsApp"
               aria-label="WhatsApp"
               disabled={waSending}
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#25D366]/50 bg-[#25D366] text-white shadow-sm transition hover:bg-[#1DA851] focus:outline-none focus:ring-2 focus:ring-[#25D366]/35 disabled:cursor-not-allowed disabled:opacity-60"
+              className="group inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#25D366]/50 bg-[#25D366] text-white shadow-sm transition hover:bg-[#1DA851] focus:outline-none focus:ring-2 focus:ring-[#25D366]/35 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              <ShopLedgerWhatsAppIcon size={17} />
-            </button>
-            <button
-              type="button"
-              onClick={handleRefresh}
-              title="Refresh"
-              aria-label="Refresh"
-              disabled={ledgerRefreshing}
-              className={`${iconOnlyButtonClass} ${iconOnlyTone} disabled:opacity-60`}
-            >
-              <RefreshCw size={16} className={ledgerRefreshing ? "animate-spin" : ""} />
+              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-whatsapp)]">
+                <ShopLedgerWhatsAppIcon size={17} />
+              </span>
             </button>
           </div>
         </div>
+      </div>
 
-        {ledgerError && (
-          <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-2.5 text-xs text-amber-800">
-            {ledgerError}
-          </div>
-        )}
+      {/* ── APPLIED FILTERS — one removable pill per committed filter,
+             exactly like the Mortality / Trip Loss page ─────────────────── */}
+      {appliedFilterPills.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-amber-200 bg-amber-50/60 px-3 py-2">
+          <Filter size={14} className="flex-shrink-0 text-amber-600" />
+          <span className="text-[11px] font-bold uppercase tracking-wider text-amber-700">{t("shop_ledger.applied_filters")}</span>
+          <span className="flex flex-wrap items-center gap-1.5">
+            {appliedFilterPills.map((pill) => (
+              <span
+                key={pill.key}
+                className="inline-flex items-center gap-1.5 rounded-full border border-amber-200 bg-white/80 px-2.5 py-0.5 text-[11px] leading-5 text-amber-800"
+              >
+                <span className="font-medium text-amber-600">{pill.label}</span>
+                <span className="font-semibold tabular-nums">{pill.value}</span>
+                <button
+                  type="button"
+                  onClick={() => clearAppliedFilter(pill.key)}
+                  aria-label={t("shop_ledger.clear_filter", { label: pill.label })}
+                  className="group ml-0.5 rounded-full p-0.5 text-amber-400 transition-colors hover:bg-amber-100 hover:text-amber-700"
+                >
+                  <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-close)]">
+                    <X size={11} strokeWidth={2.75} />
+                  </span>
+                </button>
+              </span>
+            ))}
+          </span>
+          <button
+            type="button"
+            onClick={handleReset}
+            className="ml-auto flex-shrink-0 rounded-md px-2 py-1 text-[11px] font-semibold text-amber-600 transition-colors hover:bg-amber-100 hover:text-amber-800"
+          >
+            {t("common.clear")}
+          </button>
+        </div>
+      )}
 
-        {/* ── KPI CARDS (only for an applied date/shop filter) ── */}
-        {hasKpiFilter ? (
-          <div className="grid grid-cols-2 sm:grid-cols-5 gap-4">
-            <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-              <p className="text-xs text-slate-500">Total Debit (Sales)</p>
-              <p className="text-xl font-bold text-emerald-600">{formatAmount(summary.totalDebit)}</p>
-            </div>
-            <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-              <p className="text-xs text-slate-500">Total Credit (Collections)</p>
-              <p className="text-xl font-bold text-blue-600">{formatAmount(summary.totalCredit)}</p>
-            </div>
-            <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-              <p className="text-xs text-slate-500">Total Birds</p>
-              <p className="text-xl font-bold text-slate-800">{summary.totalBirds}</p>
-            </div>
-            <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-              <p className="text-xs text-slate-500">Total Weight (KG)</p>
-              <p className="text-xl font-bold text-slate-800">{summary.totalWeight.toFixed(2)}</p>
-            </div>
-            <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-              <p className="text-xs text-slate-500">Closing Balance</p>
-              <p className={`text-xl font-bold ${summary.closingBalance >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-                {formatAmount(summary.closingBalance)}
-              </p>
-            </div>
-          </div>
-        ) : (
-          <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-2.5 text-xs font-medium text-slate-500">
-            KPI totals appear after you filter by a date range or select a shop.
-          </div>
-        )}
+      {ledgerError && (
+        <div className="rounded-xl border border-amber-200 bg-amber-50/70 px-4 py-2.5 text-xs text-amber-800">
+          {t(ledgerError)}
+        </div>
+      )}
 
-        {/* ── TABLE ────────────────────────────────────────── */}
-        <div className="rounded-2xl border border-slate-200/70 overflow-hidden bg-white shadow-sm">
-          <div className="overflow-x-auto max-h-[70vh]">
+      {/* ── STATEMENT OVERVIEW — the FULL Opening → Sales → Collections →
+             Closing statement for the selected dates + shop. Report Type and
+             Search narrow the table below; they never blank these cards, and
+             date/shop changes visibly move Opening and Closing. ─────────── */}
+      <div>
+        <div className="flex items-end justify-between gap-3 mb-2.5">
+          <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-500">
+            <BarChart3 size={14} className="text-emerald-500" />
+            {t("shop_ledger.statement_overview")}
+            {appliedSelectedShop !== "All Shops" && (
+              <span className="normal-case tracking-normal font-semibold text-slate-400">— {appliedSelectedShop}</span>
+            )}
+          </p>
+          <p className="text-[11px] font-semibold text-slate-400 tabular-nums">
+            {totalRows === scopeRows
+              ? t("shop_ledger.tx_count", { count: scopeRows.toLocaleString() })
+              : t("shop_ledger.tx_showing", { shown: totalRows.toLocaleString(), total: scopeRows.toLocaleString() })}
+          </p>
+        </div>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+            <p className="flex items-center gap-1.5 text-xs text-slate-500">
+              <Scale size={13} className="text-indigo-500" /> {t("shop_ledger.opening_balance")}
+            </p>
+            <p className="text-xl font-bold text-indigo-600 tabular-nums">{formatAmount(scopeSummary.openingBalance)}</p>
+          </div>
+          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+            <p className="flex items-center gap-1.5 text-xs text-slate-500">
+              <ArrowUpRight size={13} className="text-emerald-500" /> {t("shop_ledger.total_sales_debit")}
+            </p>
+            <p className="text-xl font-bold text-emerald-600 tabular-nums">{formatAmount(scopeSummary.totalDebit)}</p>
+          </div>
+          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+            <p className="flex items-center gap-1.5 text-xs text-slate-500">
+              <ArrowDownLeft size={13} className="text-blue-500" /> {t("shop_ledger.total_collections_credit")}
+            </p>
+            <p className="text-xl font-bold text-blue-600 tabular-nums">{formatAmount(scopeSummary.totalCredit)}</p>
+          </div>
+          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+            <p className="flex items-center gap-1.5 text-xs text-slate-500">
+              <Bird size={13} className="text-amber-500" /> {t("shop_ledger.total_birds")}
+            </p>
+            <p className="text-xl font-bold text-slate-800 tabular-nums">{scopeSummary.totalBirds.toLocaleString()}</p>
+          </div>
+          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+            <p className="flex items-center gap-1.5 text-xs text-slate-500">
+              <Weight size={13} className="text-cyan-500" /> {t("shop_ledger.total_weight_kg")}
+            </p>
+            <p className="text-xl font-bold text-slate-800 tabular-nums">{scopeSummary.totalWeight.toFixed(2)}</p>
+          </div>
+          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+            <p className="flex items-center gap-1.5 text-xs text-slate-500">
+              <IndianRupee size={13} className="text-violet-500" /> {t("shop_ledger.closing_balance")}
+            </p>
+            <p className={`text-xl font-bold tabular-nums ${scopeSummary.closingBalance >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+              {formatAmount(scopeSummary.closingBalance)}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* ── TABLE — same card & header treatment as the Trip List ────────── */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden text-xs md:text-sm">
+        <div className="flex items-center justify-between gap-3 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-blue-50/60 via-white to-blue-50/40">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-blue-50/70 border border-blue-100 flex items-center justify-center text-blue-500 shadow-inner">
+              <Store className="w-5 h-5" />
+            </div>
+            <h3 className="text-base font-bold text-slate-800 tracking-tight">{t("shop_ledger.title")}</h3>
+          </div>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600 tabular-nums whitespace-nowrap">
+              {formatDisplayDate(appliedDateFrom)} → {formatDisplayDate(appliedDateTo)}
+            </span>
+            <span className="rounded-full border border-blue-100 bg-blue-50/80 px-2.5 py-1 text-[11px] font-bold text-blue-700 tabular-nums whitespace-nowrap">
+              {totalRows === 0 ? t("shop_ledger.no_rows") : t("shop_ledger.row_count", { count: totalRows })}
+              {appliedSelectedShop !== "All Shops" ? ` · ${appliedSelectedShop}` : ""}
+            </span>
+          </div>
+        </div>
+        <div className="overflow-x-auto max-h-[70vh]">
             <table className="min-w-full text-sm">
               <thead className="sticky top-0 bg-slate-100/95 backdrop-blur-sm border-b border-slate-200 text-slate-700 shadow-sm">
                 <tr>
+                  {/* Flat 2D icons — no solid tiles, just the coloured glyph */}
                   <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-indigo-500 text-white">
-                        <CalendarDays size={13} />
-                      </span>
-                      Date
+                    {sortableHeader("date", <CalendarDays size={16} className="text-indigo-500 shrink-0" />, t("common.date"))}
+                  </th>
+                  {/* Day of week — a quick glance column beside the date */}
+                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
+                    <span className="inline-flex items-center gap-1.5 justify-center">
+                      <CalendarRange size={16} className="text-blue-500 shrink-0" />
+                      {t("common.day")}
                     </span>
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-emerald-500 text-white">
-                        <Store size={13} />
-                      </span>
-                      Particulars
-                    </span>
+                    {sortableHeader("particulars", <Store size={16} className="text-emerald-500 shrink-0" />, t("shop_ledger.col.particulars"))}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-amber-500 text-white">
-                        <Bird size={13} />
-                      </span>
-                      Birds
-                    </span>
+                    {sortableHeader("birds", <Bird size={16} className="text-amber-500 shrink-0" />, t("common.birds"), true)}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-cyan-500 text-white">
-                        <Weight size={13} />
-                      </span>
-                      Weight (KG)
-                    </span>
+                    {sortableHeader("weight", <Weight size={16} className="text-cyan-500 shrink-0" />, t("shop_ledger.col.weight_kg"), true)}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-violet-500 text-white">
-                        <IndianRupee size={13} />
-                      </span>
-                      Rate
-                    </span>
+                    {sortableHeader("rate", <IndianRupee size={16} className="text-violet-500 shrink-0" />, t("common.rate"), true)}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-green-500 text-white">
-                        <ArrowUpRight size={13} />
-                      </span>
-                      Debit
-                    </span>
+                    {sortableHeader("debit", <ArrowUpRight size={16} className="text-green-500 shrink-0" />, t("common.debit"), true)}
                   </th>
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-sky-500 text-white">
-                        <ArrowDownLeft size={13} />
-                      </span>
-                      Credit
-                    </span>
+                    {sortableHeader("credit", <ArrowDownLeft size={16} className="text-sky-500 shrink-0" />, t("common.credit"), true)}
                   </th>
+                  {/* Balance is a running total — its order is defined by Date,
+                      so it is the one column that never sorts. */}
                   <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
-                    <span className="inline-flex items-center gap-1.5">
-                      <span className="flex h-6 w-6 items-center justify-center rounded-lg bg-slate-500 text-white">
-                        <Scale size={13} />
-                      </span>
-                      Balance
+                    <span className="inline-flex items-center gap-1.5 justify-center">
+                      <Scale size={16} className="text-slate-500 shrink-0" />
+                      {t("common.balance")}
                     </span>
                   </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {visibleRows.length === 0 ? (
+                {ledgerLoading ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-400">
-                      {ledgerLoading ? "Loading ledger..." : "No transactions found for the selected filters."}
+                    <td colSpan={9} className="py-16 text-center text-sm font-medium text-slate-400">
+                      <span className="inline-flex items-center gap-2">
+                        <LoaderCircle size={16} className="animate-spin text-emerald-600" aria-hidden="true" />
+                        {t("shop_ledger.loading_records")}
+                      </span>
+                    </td>
+                  </tr>
+                ) : visibleRows.length === 0 ? (
+                  <tr>
+                    <td colSpan={9} className="py-12 text-center text-slate-400">
+                      {t("shop_ledger.no_transactions")}
                     </td>
                   </tr>
                 ) : (
@@ -1609,18 +2047,21 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                       const paymentMode = normalizePaymentMode(tx.paymentMode);
                       const typeLabel =
                         tx.type === "sale"
-                          ? { text: "Sale", color: "text-emerald-600" }
+                          ? { text: t("shop_ledger.tx_type.sale"), color: "text-emerald-600" }
                           : tx.type === "collection"
-                            ? { text: paymentMode ? `Collection - ${paymentMode}` : "Collection", color: "text-blue-600" }
-                            : { text: "Correction", color: "text-rose-600" };
+                            ? { text: paymentMode ? t("shop_ledger.tx_type.collection_mode", { mode: paymentMode }) : t("shop_ledger.tx_type.collection"), color: "text-blue-600" }
+                            : { text: t("shop_ledger.tx_type.correction"), color: "text-rose-600" };
                       return (
                         <tr
                           key={`${isOpening ? "opening" : tx.collectionNo || tx.particulars}-${idx}`}
                           className={`transition-colors ${isOpening ? "bg-amber-50/50 font-semibold" : "hover:bg-slate-50/80"}`}
                         >
-                          <td className="px-4 py-3 text-xs font-medium text-slate-600">{tx.date}</td>
+                          <td className="px-4 py-3 text-xs font-medium text-slate-600 tabular-nums">{formatDisplayDate(tx.date)}</td>
+                          <td className="px-4 py-3 text-center text-xs font-semibold text-slate-500">{weekdayOf(tx.date, language)}</td>
                           <td className="px-4 py-3 text-xs font-medium text-slate-700">
-                            {tx.particulars}
+                            {/* Opening row label follows the UI language; raw
+                                particulars stay untouched (searchable data). */}
+                            {isOpening ? t("shop_ledger.opening_balance") : tx.particulars}
                             {!isOpening && (
                               <span className={`ml-2 text-[10px] font-semibold ${typeLabel.color}`}>
                                 {typeLabel.text}
@@ -1630,13 +2071,14 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                           <td className="px-4 py-3 text-center text-xs">{isSale ? tx.birds : "-"}</td>
                           <td className="px-4 py-3 text-center text-xs">{isSale ? tx.weight.toFixed(2) : "-"}</td>
                           <td className="px-4 py-3 text-center text-xs">{isSale ? tx.rate.toFixed(2) : "-"}</td>
-                          <td className="px-4 py-3 text-center text-xs font-bold text-emerald-600">
+                          <td className="px-4 py-3 text-center text-xs font-bold text-emerald-600 whitespace-nowrap tabular-nums">
                             {tx.debit > 0 ? formatAmount(tx.debit) : "-"}
                           </td>
-                          <td className="px-4 py-3 text-center text-xs font-bold text-blue-600">
+                          <td className="px-4 py-3 text-center text-xs font-bold text-blue-600 whitespace-nowrap tabular-nums">
                             {tx.credit > 0 ? formatAmount(tx.credit) : "-"}
                           </td>
-                          <td className={`px-4 py-3 text-center text-xs font-bold ${tx.balance >= 0 ? "text-slate-800" : "text-rose-600"}`}>
+                          {/* Balance always renders on ONE line, never wraps */}
+                          <td className={`px-4 py-3 text-center text-xs font-bold whitespace-nowrap tabular-nums ${tx.balance >= 0 ? "text-slate-800" : "text-rose-600"}`}>
                             {formatAmount(tx.balance)}
                           </td>
                         </tr>
@@ -1644,13 +2086,13 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     })}
                     {visibleRows.length > 1 && (
                       <tr className="bg-slate-100/80 font-bold border-t-2 border-slate-300">
-                        <td className="px-4 py-3 text-xs text-slate-700" colSpan={2}>TOTAL</td>
+                        <td className="px-4 py-3 text-xs text-slate-700" colSpan={3}>{t("shop_ledger.total_row")}</td>
                         <td className="px-4 py-3 text-center text-xs text-slate-800">{summary.totalBirds}</td>
                         <td className="px-4 py-3 text-center text-xs text-slate-800">{summary.totalWeight.toFixed(2)}</td>
                         <td className="px-4 py-3 text-center text-xs text-slate-800">-</td>
-                        <td className="px-4 py-3 text-center text-xs font-bold text-emerald-700">{formatAmount(summary.totalDebit)}</td>
-                        <td className="px-4 py-3 text-center text-xs font-bold text-blue-700">{formatAmount(summary.totalCredit)}</td>
-                        <td className="px-4 py-3 text-center text-xs font-bold text-slate-800">{formatAmount(summary.closingBalance)}</td>
+                        <td className="px-4 py-3 text-center text-xs font-bold text-emerald-700 whitespace-nowrap tabular-nums">{formatAmount(summary.totalDebit)}</td>
+                        <td className="px-4 py-3 text-center text-xs font-bold text-blue-700 whitespace-nowrap tabular-nums">{formatAmount(summary.totalCredit)}</td>
+                        <td className="px-4 py-3 text-center text-xs font-bold text-slate-800 whitespace-nowrap tabular-nums">{formatAmount(summary.closingBalance)}</td>
                       </tr>
                     )}
                   </>
@@ -1659,48 +2101,22 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             </table>
           </div>
 
-          {/* ── PAGINATION ─────────────────────────────────── */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-2.5">
-            <div className="flex flex-wrap items-center gap-2 text-[11px] font-semibold text-slate-500">
-              <span>{totalRows === 0 ? "0–0 of 0" : `${rangeStart}–${rangeEnd} of ${totalRows}`}</span>
-              <select
-                value={pageSize}
-                onChange={(e) => {
-                  setPageSize(Number(e.target.value));
-                  setCurrentPage(1);
-                }}
-                aria-label={t("common.rows_per_page")}
-                className="h-8 rounded-lg border border-slate-200 bg-white px-2 text-xs font-medium text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500/25"
-              >
-                {PAGE_SIZES.map((size) => (
-                  <option key={size} value={size}>{size} / page</option>
-                ))}
-              </select>
-            </div>
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                disabled={safePage <= 1}
-                onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
-                className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
-                aria-label={t("common.previous_page")}
-              >
-                {t("common.previous")}
-              </button>
-              <span className="px-2 text-xs font-medium text-slate-600">{safePage} / {totalPages}</span>
-              <button
-                type="button"
-                disabled={safePage >= totalPages}
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
-                className="h-8 rounded-lg border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-40"
-                aria-label={t("common.next_page")}
-              >
-                {t("common.next")}
-              </button>
-            </div>
-          </div>
+          {/* ── GLOBAL PAGINATION — the shared app-wide pager (Trip List,
+                 Collections and Shop Ledger all render this one) ───────── */}
+          {shouldShowPagination(totalRows) && (
+            <Pagination
+              page={safePage}
+              pageSize={pageSize}
+              totalItems={totalRows}
+              onPageChange={setCurrentPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setCurrentPage(1);
+              }}
+              disabled={ledgerLoading || ledgerRefreshing}
+            />
+          )}
         </div>
-      </div>
 
       {/* ── REFRESHED TOAST (top-right) ─────────────────────── */}
       {refreshToast && (
@@ -1708,7 +2124,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-emerald-500 text-white">
             <CheckCircle2 size={16} />
           </span>
-          <span className="text-sm font-semibold text-emerald-800">Shop Ledger Refreshed</span>
+          <span className="text-sm font-semibold text-emerald-800">{t("shop_ledger.refreshed_toast")}</span>
         </div>
       )}
 
@@ -1727,17 +2143,17 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     className="truncate text-sm font-bold uppercase tracking-wide text-slate-800"
                     title={activePdfFile.filename}
                   >
-                    Weekly Statement
+                    {t("shop_ledger.pdf_weekly_statement")}
                   </h3>
                   <p className="text-[11px] text-slate-400">
-                    {formatDisplayDate(appliedDateFrom)} to {formatDisplayDate(appliedDateTo)}
+                    {t("shop_ledger.pdf_date_range", { from: formatDisplayDate(appliedDateFrom), to: formatDisplayDate(appliedDateTo) })}
                   </p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={closePdfPreview}
-                aria-label="Close PDF preview"
+                aria-label={t("shop_ledger.pdf_close")}
                 className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
               >
                 <X size={16} />
@@ -1755,7 +2171,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                         <span className="flex h-5 w-5 items-center justify-center rounded-md bg-gradient-to-br from-red-500 to-rose-600 text-white shadow-sm">
                           <ListChecks size={12} />
                         </span>
-                        Select shops
+                        {t("shop_ledger.select_shops")}
                       </span>
                       <span
                         className={`rounded-full px-2 py-0.5 text-[10px] font-bold transition ${
@@ -1815,15 +2231,15 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                         type="text"
                         value={pdfShopSearch}
                         onChange={(e) => setPdfShopSearch(e.target.value)}
-                        placeholder="Search shops..."
-                        aria-label="Search shops in PDF preview"
+                        placeholder={t("shop_ledger.pdf_search_placeholder")}
+                        aria-label={t("shop_ledger.pdf_search_aria")}
                         className="h-8 w-full rounded-lg border border-slate-200 bg-white pl-7 pr-7 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-red-500/20 focus:border-red-300"
                       />
                       {pdfShopSearch && (
                         <button
                           type="button"
                           onClick={() => setPdfShopSearch("")}
-                          aria-label="Clear shop search"
+                          aria-label={t("shop_ledger.pdf_clear_search")}
                           className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 transition hover:text-slate-600"
                         >
                           <X size={12} />
@@ -1888,7 +2304,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                               type="checkbox"
                               checked={isSelected}
                               onChange={() => togglePdfShop(file.shop)}
-                              aria-label={`Include ${file.shop} in downloads`}
+                              aria-label={t("shop_ledger.pdf_include_shop", { shop: file.shop })}
                               className="h-4 w-4 shrink-0 cursor-pointer accent-red-600"
                             />
                             <button
@@ -1915,7 +2331,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                             {isBusy ? (
                               <Loader2 size={13} className="shrink-0 animate-spin text-red-500" />
                             ) : file.url ? (
-                              <CheckCircle2 size={13} className="shrink-0 text-emerald-500" aria-label="PDF ready" />
+                              <CheckCircle2 size={13} className="shrink-0 text-emerald-500" aria-label={t("shop_ledger.pdf_ready")} />
                             ) : null}
                           </div>
                         );
@@ -1996,43 +2412,43 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   <ShopLedgerWhatsAppIcon size={16} />
                 </span>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-800">WhatsApp Report</h3>
+                  <h3 className="text-sm font-bold text-slate-800">{t("shop_ledger.wa.title")}</h3>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={closeWhatsApp}
-                aria-label="Close WhatsApp report"
+                aria-label={t("shop_ledger.wa.close")}
                 className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
               >
                 <X size={16} />
               </button>
             </div>
 
-            {/* Top bar */}
+            {/* Top bar — same dropdown chrome as the page toolbar */}
             <div className="grid grid-cols-1 gap-3 border-b border-slate-100 px-5 py-3 sm:grid-cols-2 lg:grid-cols-4">
               <div>
-                <label className={labelClass}>Report Type</label>
-                <Select
+                <label className={opsFilterLabelClass}>{t("shop_ledger.report_type")}</label>
+                <MasterDropdown
+                  hideLabel
+                  label={t("shop_ledger.report_type")}
+                  value={waReportType === "All" ? "" : waReportType}
                   options={[
-                    { value: "All", label: "All (Sales + Collection)" },
-                    { value: "Sales", label: "Sales" },
-                    { value: "Collection", label: "Collection" },
+                    { value: "Sales", label: t("shop_ledger.type.sales") },
+                    { value: "Collection", label: t("shop_ledger.type.collection") },
                   ]}
-                  value={{
-                    value: waReportType,
-                    label: waReportType === "All" ? "All (Sales + Collection)" : waReportType,
-                  }}
-                  onChange={(selected) => {
-                    setWaReportType((selected?.value as WaReportType) || "All");
+                  onChange={(next) => {
+                    setWaReportType((next as WaReportType) || "All");
                     resetWaSucceeded();
                   }}
-                  styles={selectStyles}
-                  maxMenuHeight={200}
+                  placeholder={t("shop_ledger.wa.type_all")}
+                  searchable
+                  allowClear
+                  className="w-full"
                 />
               </div>
               <div>
-                <label className={labelClass}>Date From</label>
+                <label className={opsFilterLabelClass}>{t("shop_ledger.wa.date_from")}</label>
                 <DatePicker
                   value={waDateFrom}
                   onChange={(value) => {
@@ -2040,12 +2456,12 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     resetWaSucceeded();
                     resetWaAttachment();
                   }}
-                  placeholder="From date"
+                  placeholder={t("shop_ledger.wa.from_placeholder")}
                   className="w-full"
                 />
               </div>
               <div>
-                <label className={labelClass}>Date To</label>
+                <label className={opsFilterLabelClass}>{t("shop_ledger.wa.date_to")}</label>
                 <DatePicker
                   value={waDateTo}
                   onChange={(value) => {
@@ -2053,16 +2469,16 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     resetWaSucceeded();
                     resetWaAttachment();
                   }}
-                  placeholder="To date"
+                  placeholder={t("shop_ledger.wa.to_placeholder")}
                   className="w-full"
                 />
               </div>
               <div>
-                <label className={labelClass}>Recipient</label>
+                <label className={opsFilterLabelClass}>{t("shop_ledger.wa.recipient")}</label>
                 <div className="grid grid-cols-2 gap-2">
                   {[
-                    { value: "selected" as const, label: "Selected" },
-                    { value: "all" as const, label: "All" },
+                    { value: "selected" as const, label: t("shop_ledger.wa.recipient_selected") },
+                    { value: "all" as const, label: t("shop_ledger.wa.recipient_all") },
                   ].map((opt) => (
                     <button
                       key={opt.value}
@@ -2092,7 +2508,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                 <div className="space-y-2 border-b border-slate-100 px-3.5 py-3">
                   <div className="flex items-center justify-between">
                     <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
-                      {waScope === "all" ? "All shops" : "Select shops"}
+                      {waScope === "all" ? t("shop_ledger.wa.all_shops_scope") : t("shop_ledger.select_shops")}
                     </span>
                     {waScope === "selected" && (
                       <span className="rounded-full bg-[#25D366]/10 px-2 py-0.5 text-[10px] font-bold text-[#1DA851]">
@@ -2124,8 +2540,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                       type="text"
                       value={waShopSearch}
                       onChange={(e) => setWaShopSearch(e.target.value)}
-                      placeholder="Search shops..."
-                      aria-label="Search shops in WhatsApp report"
+                      placeholder={t("shop_ledger.wa.search_shops")}
+                      aria-label={t("shop_ledger.wa.search_shops_aria")}
                       className="h-8 w-full rounded-lg border border-slate-200 bg-white pl-7 pr-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#25D366]/25 focus:border-[#25D366]/50"
                     />
                   </div>
@@ -2153,7 +2569,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                             type="checkbox"
                             checked={waSelectedShops.includes(shop)}
                             onChange={() => toggleWaShop(shop)}
-                            aria-label={`Send report to ${shop}`}
+                            aria-label={t("shop_ledger.wa.send_to", { shop })}
                             className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer accent-[#25D366]"
                           />
                         )}
@@ -2168,7 +2584,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                         >
                           <span className="block truncate text-xs font-semibold text-slate-700">{shop}</span>
                           <span className="block truncate text-[10px] text-slate-400">
-                            {recipient.ownerName || "Shop Owner"} · {recipient.whatsappNumber || "No number"}
+                            {recipient.ownerName || t("shop_ledger.wa.shop_owner")} · {recipient.whatsappNumber || t("shop_ledger.wa.no_number")}
                           </span>
                         </button>
                         {isSending ? (
@@ -2197,16 +2613,16 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   >
                     {waSending ? <Loader2 size={14} className="animate-spin" /> : <ShopLedgerWhatsAppIcon size={14} />}
                     {waSending
-                      ? `Sending${waSendingShop ? `: ${waSendingShop}` : "…"}`
+                      ? `${t("shop_ledger.wa.sending")}${waSendingShop ? `: ${waSendingShop}` : "…"}`
                       : waScope === "all"
                         ? waConfirmAll
-                          ? "Confirm & Send All"
-                          : "Send All Shops"
-                        : `Send Selected (${waSelectedShops.length})`}
+                          ? t("shop_ledger.wa.confirm_send_all")
+                          : t("shop_ledger.wa.send_all")
+                        : t("shop_ledger.wa.send_selected", { count: waSelectedShops.length })}
                   </button>
                   {waScope === "all" && waConfirmAll && !waSending && (
                     <p className="mt-2 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1.5 text-[11px] font-medium text-amber-800">
-                      Press again to send to all {waAllShopNames.length} shop(s).
+                      {t("shop_ledger.wa.confirm_all", { count: waAllShopNames.length })}
                     </p>
                   )}
                 </div>
@@ -2220,28 +2636,28 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                       <div className="rounded-xl border border-slate-100 bg-slate-50/70 px-3.5 py-3 text-xs">
                         <div className="grid grid-cols-1 gap-1 sm:grid-cols-2">
                           <div className="min-w-0">
-                            <span className="font-semibold text-slate-500">Shop:</span>{" "}
+                            <span className="font-semibold text-slate-500">{t("shop_ledger.wa.shop_label")}</span>{" "}
                             <span className="text-slate-700">{waPreviewShop}</span>
                           </div>
                           <div className="min-w-0">
-                            <span className="font-semibold text-slate-500">Owner:</span>{" "}
-                            <span className="text-slate-700">{waPreviewRecipient.ownerName || "Shop Owner"}</span>
+                            <span className="font-semibold text-slate-500">{t("shop_ledger.wa.owner_label")}</span>{" "}
+                            <span className="text-slate-700">{waPreviewRecipient.ownerName || t("shop_ledger.wa.shop_owner")}</span>
                           </div>
                           <div className="min-w-0">
-                            <span className="font-semibold text-slate-500">WhatsApp:</span>{" "}
-                            <span className="text-slate-700">{waPreviewRecipient.whatsappNumber || "Not available"}</span>
+                            <span className="font-semibold text-slate-500">{t("shop_ledger.wa.whatsapp_label")}</span>{" "}
+                            <span className="text-slate-700">{waPreviewRecipient.whatsappNumber || t("shop_ledger.wa.not_available")}</span>
                           </div>
                           <div className="min-w-0">
-                            <span className="font-semibold text-slate-500">Sent this week:</span>{" "}
+                            <span className="font-semibold text-slate-500">{t("shop_ledger.wa.sent_this_week")}</span>{" "}
                             <span className="text-slate-700">
-                              {weeklySendCount(waSendCounts, currentWeekKey, waPreviewShop)} time(s)
+                              {t("shop_ledger.wa.times_count", { count: weeklySendCount(waSendCounts, currentWeekKey, waPreviewShop) })}
                             </span>
                           </div>
                         </div>
                         {weeklySendCount(waSendCounts, currentWeekKey, waPreviewShop) > 0 &&
                           waLastSent[weeklySendKey(currentWeekKey, waPreviewShop)] && (
                             <div className="mt-1 min-w-0">
-                              <span className="font-semibold text-slate-500">Last sent:</span>{" "}
+                              <span className="font-semibold text-slate-500">{t("shop_ledger.wa.last_sent")}</span>{" "}
                               <span className="text-slate-600">
                                 {waLastSent[weeklySendKey(currentWeekKey, waPreviewShop)]}
                               </span>
@@ -2250,7 +2666,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                       </div>
 
                       <div>
-                        <label className={labelClass}>Message preview</label>
+                        <label className={opsFilterLabelClass}>{t("shop_ledger.wa.message_preview")}</label>
                         <pre className="max-h-56 overflow-auto whitespace-pre-wrap rounded-xl border border-emerald-100 bg-emerald-50/50 px-3.5 py-3 font-sans text-[11px] leading-relaxed text-slate-700">
                           {waPreviewMessage}
                         </pre>
@@ -2266,7 +2682,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                               {waPreviewFileName}
                             </p>
                             <p className="text-[10px] font-medium text-slate-400">
-                              PDF attachment · {formatDisplayDate(waDateFrom)} to {formatDisplayDate(waDateTo)}
+                              {t("shop_ledger.wa.pdf_attachment", { from: formatDisplayDate(waDateFrom), to: formatDisplayDate(waDateTo) })}
                             </p>
                           </div>
                           <button
@@ -2282,7 +2698,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                             ) : (
                               <Eye size={12} />
                             )}
-                            {waAttachmentOpen ? "Hide" : "Check PDF"}
+                            {waAttachmentOpen ? t("shop_ledger.pdf_hide") : t("shop_ledger.pdf_check")}
                           </button>
                           <button
                             type="button"

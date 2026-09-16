@@ -5403,10 +5403,22 @@ const server = http.createServer(async (req, res) => {
       const to = q.get("toDate") || QUARTER.toDate;
       const all = buildLedger(shopId);
       const rows = all.filter((r) => inRange(r.date, from, to));
-      const opening = shopId
-        ? (all.find((r) => r.date >= from)?.balance ?? 0) -
-          (rows[0] ? rows[0].debit - rows[0].credit : 0)
-        : 0;
+      let opening = 0;
+      if (shopId) {
+        const idx = all.findIndex((r) => r.date >= from);
+        if (idx >= 0) {
+          // Balance just BEFORE the first transaction on/after `from`.
+          opening = all[idx].balance - (all[idx].debit - all[idx].credit);
+        } else if (all.length > 0) {
+          // No activity on/after `from` — the carried-forward closing of the
+          // last earlier transaction IS this period's opening, so the previous
+          // week's closing always equals this week's opening.
+          opening = all[all.length - 1].balance;
+        } else {
+          // No ledger rows at all yet — the master opening stands.
+          opening = SHOP_BY_ID.get(shopId)?.openingBalance ?? 0;
+        }
+      }
       const { data, meta } = paginate(rows, q, 500);
       return send(200, {
         shopId: shopId ?? null,
