@@ -217,6 +217,16 @@ export default {
   'ops.dashboard.select_date_range': 'తేదీ పరిధిని ఎంచుకోండి',
   'ops.dashboard.quick_date_range': 'త్వరిత తేదీ పరిధి',
   'ops.dashboard.refresh_all': 'అన్ని డేటాను రిఫ్రెష్ చేయండి',
+
+  /* తేదీ పరిధి ఎంపిక — ఎంచుకున్న విలువలు "పూర్తయింది" నొక్కినప్పుడే వర్తిస్తాయి. */
+  'ops.dashboard.done': 'పూర్తయింది',
+  'ops.dashboard.done_title': 'ఎంచుకున్న పరిధిని వర్తించండి',
+  'ops.dashboard.custom_range': 'అనుకూల పరిధి',
+  'ops.dashboard.or_custom_dates': 'లేదా మీకు కావలసిన తేదీలు ఎంచుకోండి',
+  'ops.dashboard.preset_7d': 'గత 7 రోజులు',
+  'ops.dashboard.preset_15d': 'గత 15 రోజులు',
+  'ops.dashboard.preset_1m': 'గత 1 నెల',
+  'ops.dashboard.preset_qtr': 'త్రైమాసిక నమూనా విండో',
   'ops.dashboard.payment.title': 'చెల్లింపులు',
   'ops.dashboard.payment.amount': 'మొత్తం',
   'ops.dashboard.payment.entries': 'ఎంట్రీలు',

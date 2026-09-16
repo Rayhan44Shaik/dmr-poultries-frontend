@@ -12,10 +12,8 @@ import {
   TrendingUp,
   TrendingDown,
 } from "lucide-react";
-import { Link } from "react-router-dom";
 
 import { useI18n } from "../../../../i18n";
-import { buildAnalysisPath } from "../../../../shared/kpi/analysisLink";
 
 // ---------- Type Definitions ----------
 export interface DashboardMetrics {
@@ -36,9 +34,6 @@ export interface KPICardsProps {
   /** The equal-length window before the one on screen; `null` until it loads. */
   previous?: DashboardMetrics | null;
   rangeDays?: number;
-  /** The window on screen, so each KPI can deep-link its analysis page to the
-   *  very same dates (and the window before them). */
-  range?: { from: string; to: string } | null;
 }
 
 // ---------- Helpers ----------
@@ -170,9 +165,6 @@ interface KPICardProps {
   unit?: "KG" | "₹";
   rangeDays?: number;
   breakdown?: { fuel: number; trip: number };
-  /** Accounts → Analysis, opened on the dashboard's window with compare on. */
-  to?: string | null;
-  range?: { from: string; to: string } | null;
 }
 
 const kpiCardLabel = (label: CardLabel): string => {
@@ -217,17 +209,6 @@ const kpiCardShortLabel = (label: CardLabel): string => {
   }
 };
 
-/** "2026-09-07" → "07 Sep 2026" — used in the deep-link tooltip. */
-const formatRangeDate = (dateKey: string, language: string): string => {
-  const date = new Date(`${dateKey}T00:00:00`);
-  if (isNaN(date.getTime())) return dateKey;
-  return date.toLocaleDateString(language === "te" ? "te-IN" : "en-IN", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric",
-  });
-};
-
 const KPICard = memo(function KPICard({
   label,
   value,
@@ -235,10 +216,8 @@ const KPICard = memo(function KPICard({
   unit,
   rangeDays,
   breakdown,
-  to,
-  range,
 }: KPICardProps) {
-  const { t, language } = useI18n();
+  const { t } = useI18n();
   const config = cardConfig[label];
   const Icon = config.icon;
 
@@ -364,9 +343,9 @@ const KPICard = memo(function KPICard({
   const cardContent = (
     <div
       className={`@container group relative flex h-full min-h-[7.35rem] min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${
-        /* Every tile is a link now, so the pointer leads; only a non-clickable
-           Expenses tile would keep the "hover me for the breakdown" cursor. */
-        showBreakdown ? (to ? "cursor-pointer" : "cursor-help") : ""
+        /* No navigation from the KPI row on purpose — only Expenses keeps the
+           "hover me for the breakdown" cue. */
+        showBreakdown ? "cursor-help" : ""
       }`}
     >
       <div className="absolute inset-0 bg-gradient-to-br from-white via-white to-slate-50 opacity-80" />
@@ -491,39 +470,16 @@ const KPICard = memo(function KPICard({
       </div>
     ) : null;
 
-  /* The whole tile is the link: click anywhere on it and the Analysis page
-     opens on exactly the window this dashboard is showing. */
-  const linkTitle =
-    to && range
-      ? t("ops.analysis.open_kpi", {
-          kpi: t(kpiCardLabel(label)),
-          range: `${formatRangeDate(range.from, language)} → ${formatRangeDate(range.to, language)}`,
-        })
-      : undefined;
-
-  const tile = to ? (
-    <Link
-      to={to}
-      className="block h-full min-w-0 rounded-2xl focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/60 focus-visible:ring-offset-2"
-      title={linkTitle}
-      aria-label={linkTitle}
-    >
-      {cardContent}
-    </Link>
-  ) : (
-    cardContent
-  );
-
   if (showBreakdown && breakdown) {
     return (
       <div className="group/exp relative h-full">
-        {tile}
+        {cardContent}
         {breakdownPopup}
       </div>
     );
   }
 
-  return tile;
+  return cardContent;
 });
 
 // ---------- Main Component ----------
@@ -531,7 +487,6 @@ export default function KPICards({
   current,
   previous,
   rangeDays,
-  range,
 }: KPICardsProps) {
   const cards = useMemo(() => {
     const prev = previous || {};
@@ -583,15 +538,9 @@ export default function KPICards({
     ];
   }, [current, previous]);
 
-  /* Every tile goes to the same place — Accounts → Analysis, the trip analysis
-     behind all seven figures — carrying the exact window on screen and asking
-     for its "Compare previous" to be on. 7 days here is 7 days there; a custom
-     range arrives as that same range. */
-  const analysisPath = useMemo(() => (range ? buildAnalysisPath(range) : null), [range]);
-
   const finalCards = useMemo(
-    () => cards.map((card) => ({ ...card, rangeDays, range: range ?? null, to: analysisPath })),
-    [cards, rangeDays, range, analysisPath]
+    () => cards.map((card) => ({ ...card, rangeDays })),
+    [cards, rangeDays]
   );
 
   return (
@@ -603,10 +552,16 @@ export default function KPICards({
        figure, then the change and the previous window's figure side by side) so
        nothing has to be squeezed or clipped to fit.
        `min-w-0` on the cells is what lets them shrink with the page rather than
-       forcing overflow; the card handles the narrow end with its own densities. */
+       forcing overflow; the card handles the narrow end with its own densities.
+       The staggered entrance is pure CSS (opacity + transform, GPU-only), so
+       the row animates without a single rAF loop — nothing can ever "stick". */
     <div className="grid min-w-0 grid-cols-7 gap-1.5 sm:gap-2">
-      {finalCards.map((card) => (
-        <div key={card.label} className="min-w-0">
+      {finalCards.map((card, index) => (
+        <div
+          key={card.label}
+          className="min-w-0 animate-kpi-tile motion-reduce:animate-none"
+          style={{ animationDelay: `${index * 45}ms` }}
+        >
           <KPICard {...card} />
         </div>
       ))}

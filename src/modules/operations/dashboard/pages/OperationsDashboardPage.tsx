@@ -97,28 +97,54 @@ function RangeDatePicker({
   placement = "bottom",
   className = "",
 }: RangeDatePickerProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
   const rangeAnchor = anchorDate ?? todayMidnight();
 
+  /* DRAFT-ONLY SELECTION: every pick inside the popover — a quick-range chip
+     or a custom date — lands in local draft state and the committed range
+     changes ONLY when Done is pressed, so typing/picking never churns the
+     dashboard behind the popover. Clicking outside discards the draft. */
+  const [draftStart, setDraftStart] = useState<Date | undefined>(startDate);
+  const [draftEnd, setDraftEnd] = useState<Date | undefined>(endDate);
+
+  /* The draft only lives while the popover is open — opening always restages
+     it from the committed range, so an outside-click close simply forgets it. */
+  const stageDraft = () => {
+    setDraftStart(startDate);
+    setDraftEnd(endDate);
+  };
+
+  const commitRange = () => {
+    if (!draftStart || !draftEnd) return;
+    // Swapped endpoints (picked in the other order) are sorted once, here.
+    const [first, second] =
+      draftStart.getTime() <= draftEnd.getTime() ? [draftStart, draftEnd] : [draftEnd, draftStart];
+    onRangeChange(first, second);
+    setIsOpen(false);
+  };
+  const draftValid = draftStart !== undefined && draftEnd !== undefined;
+
   const formatDate = (date: Date | undefined) => {
     if (!date) return "";
-    return date.toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" });
+    return date.toLocaleDateString(language === "te" ? "te-IN" : "en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
   };
 
   const handleStartChange = (dateStr: string) => {
-    const newStart = parseInputDateString(dateStr);
-    onRangeChange(newStart, endDate);
+    setDraftStart(parseInputDateString(dateStr));
   };
 
   const handleEndChange = (dateStr: string) => {
-    const newEnd = parseInputDateString(dateStr);
-    onRangeChange(startDate, newEnd);
+    setDraftEnd(parseInputDateString(dateStr));
   };
 
-  const startDateStr = toInputDateString(startDate);
-  const endDateStr = toInputDateString(endDate);
+  const startDateStr = toInputDateString(draftStart);
+  const endDateStr = toInputDateString(draftEnd);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -130,7 +156,10 @@ function RangeDatePicker({
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
-  const toggleCalendar = () => setIsOpen(!isOpen);
+  const toggleCalendar = () => {
+    if (!isOpen) stageDraft();
+    setIsOpen(!isOpen);
+  };
 
   const dropdownPositionClass =
     placement === "top"
@@ -157,18 +186,19 @@ function RangeDatePicker({
   const RANGE_PRESETS: ReadonlyArray<{
     key: string;
     label: string;
-    word: string;
+    /** i18n key — the full-sentence name shown under the chips. */
+    wordKey: string;
     Icon: typeof CalendarDays;
     start: () => Date;
     theme: PresetTheme;
   }> = [
     {
-      key: "7d", label: "7D", word: "Last 7 days", Icon: CalendarDays,
+      key: "7d", label: "7D", wordKey: "ops.dashboard.preset_7d", Icon: CalendarDays,
       start: () => addDays(rangeAnchor, -6),
       theme: FALLBACK_THEME,
     },
     {
-      key: "15d", label: "15D", word: "Last 15 days", Icon: CalendarClock,
+      key: "15d", label: "15D", wordKey: "ops.dashboard.preset_15d", Icon: CalendarClock,
       start: () => addDays(rangeAnchor, -14),
       theme: {
         from: "#0ea5e9", to: "#0284c7", soft: "#f0f9ff", text: "#0369a1", ring: "#bae6fd",
@@ -176,7 +206,7 @@ function RangeDatePicker({
       },
     },
     {
-      key: "1m", label: "1M", word: "Last 1 month", Icon: CalendarRange,
+      key: "1m", label: "1M", wordKey: "ops.dashboard.preset_1m", Icon: CalendarRange,
       start: () => addDays(subMonths(rangeAnchor, 1), 1),
       theme: {
         from: "#8b5cf6", to: "#7c3aed", soft: "#f5f3ff", text: "#6d28d9", ring: "#ddd6fe",
@@ -184,7 +214,7 @@ function RangeDatePicker({
       },
     },
     {
-      key: "qtr", label: "QTR", word: "Quarter sample window", Icon: Layers,
+      key: "qtr", label: "QTR", wordKey: "ops.dashboard.preset_qtr", Icon: Layers,
       start: () => addDays(rangeAnchor, -91),
       theme: {
         from: "#f59e0b", to: "#d97706", soft: "#fffbeb", text: "#b45309", ring: "#fde68a",
@@ -193,24 +223,37 @@ function RangeDatePicker({
     },
   ];
 
-  const activePreset = RANGE_PRESETS.find((preset) => {
-    if (!startDate || !endDate) return false;
-    const expected = preset.start();
-    return (
-      toInputDateString(startDate) === toInputDateString(expected) &&
-      toInputDateString(endDate) === toInputDateString(rangeAnchor)
+  /* A preset counts as "matching" only when BOTH draft dates land exactly on
+     it — the trigger chip reflects the committed range, the popover the
+     pending draft, and both are computed with one helper. */
+  const presetMatching = (from: Date | undefined, to: Date | undefined) => {
+    if (!from || !to) return undefined;
+    const toKey = toInputDateString(to);
+    return RANGE_PRESETS.find(
+      (preset) =>
+        toInputDateString(preset.start()) === toInputDateString(from) &&
+        toInputDateString(rangeAnchor) === toKey
     );
-  });
+  };
 
+  const activePreset = presetMatching(startDate, endDate);
+  const draftPreset = presetMatching(draftStart, draftEnd);
+
+  /* Quick-range chips stage into the draft — the dashboard only changes when
+     the reader presses Done. */
   const applyPreset = (preset: (typeof RANGE_PRESETS)[number]) => {
-    onRangeChange(preset.start(), rangeAnchor);
-    setIsOpen(false);
+    setDraftStart(preset.start());
+    setDraftEnd(rangeAnchor);
   };
 
   const activePresetIndex = RANGE_PRESETS.findIndex((p) => p.key === activePreset?.key);
   const themed = activePresetIndex >= 0;
   const activeTheme = themed ? activePreset!.theme : FALLBACK_THEME;
-  const activeWord = themed ? activePreset!.word : "Custom range";
+
+  const draftPresetIndex = RANGE_PRESETS.findIndex((p) => p.key === draftPreset?.key);
+  const draftThemed = draftPresetIndex >= 0;
+  const draftTheme = draftThemed ? draftPreset!.theme : FALLBACK_THEME;
+  const draftWord = draftThemed ? t(draftPreset!.wordKey) : t("ops.dashboard.custom_range");
 
   const slateCalendarIcon = <Calendar size={15} className="text-emerald-600" />;
 
@@ -220,6 +263,8 @@ function RangeDatePicker({
     startDate && endDate
       ? Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1
       : null;
+  const draftLabel =
+    draftStart && draftEnd ? `${formatDate(draftStart)} – ${formatDate(draftEnd)}` : null;
 
   return (
     <div className={`relative ${className}`} ref={containerRef}>
@@ -278,13 +323,13 @@ function RangeDatePicker({
             {/* Quick-range segmented toggle with a sliding indicator */}
             <div>
               <span className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
-                Quick range
+                {t("ops.dashboard.quick_date_range")}
               </span>
               <div
                 role="tablist"
                 aria-label={t("ops.dashboard.quick_date_range")}
                 className="relative grid grid-cols-4 gap-1 rounded-xl bg-slate-100 p-1 transition-colors duration-200"
-                style={themed ? { backgroundColor: activeTheme.soft } : undefined}
+                style={draftThemed ? { backgroundColor: draftTheme.soft } : undefined}
               >
                 {/* Sliding colour thumb (cell width + gap accounted for); its
                     gradient swaps to the active preset's colour as it slides. */}
@@ -292,22 +337,22 @@ function RangeDatePicker({
                   aria-hidden
                   className="pointer-events-none absolute inset-y-1 left-1 w-[calc((100%-1.25rem)/4)] rounded-lg ring-1 ring-inset ring-white/25 transition-[transform,opacity] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
                   style={{
-                    ["--i" as string]: String(Math.max(activePresetIndex, 0)),
+                    ["--i" as string]: String(Math.max(draftPresetIndex, 0)),
                     transform: "translateX(calc(var(--i) * (100% + 0.25rem)))",
-                    backgroundImage: `linear-gradient(to bottom right, ${activeTheme.from}, ${activeTheme.to})`,
-                    boxShadow: `0 2px 8px -2px ${activeTheme.from}99`,
-                    opacity: themed ? 1 : 0,
+                    backgroundImage: `linear-gradient(to bottom right, ${draftTheme.from}, ${draftTheme.to})`,
+                    boxShadow: `0 2px 8px -2px ${draftTheme.from}99`,
+                    opacity: draftThemed ? 1 : 0,
                   } as CSSProperties}
                 />
                 {RANGE_PRESETS.map((preset) => {
-                  const active = activePreset?.key === preset.key;
+                  const active = draftPreset?.key === preset.key;
                   const PresetIcon = preset.Icon;
                   return (
                     <button
                       key={preset.key}
                       type="button"
                       role="tab"
-                      title={preset.word}
+                      title={t(preset.wordKey)}
                       onClick={() => applyPreset(preset)}
                       aria-pressed={active}
                       aria-selected={active}
@@ -331,19 +376,19 @@ function RangeDatePicker({
                   );
                 })}
               </div>
-              {/* Live description of the current selection */}
+              {/* Live description of the PENDING draft — commit needs Done. */}
               <p className="mt-2 flex items-center justify-center gap-1.5 text-[11.5px] font-semibold text-slate-500">
                 <span
                   className="h-1.5 w-1.5 rounded-full transition-colors duration-200"
-                  style={{ backgroundColor: themed ? activeTheme.from : "#cbd5e1" }}
+                  style={{ backgroundColor: draftThemed ? draftTheme.from : "#cbd5e1" }}
                 />
                 <span
                   className="font-bold transition-colors duration-200"
-                  style={{ color: themed ? activeTheme.text : "#475569" }}
+                  style={{ color: draftThemed ? draftTheme.text : "#475569" }}
                 >
-                  {activeWord}
+                  {draftWord}
                 </span>
-                {rangeLabel && <span className="tabular-nums text-slate-400">· {rangeLabel}</span>}
+                {draftLabel && <span className="tabular-nums text-slate-400">· {draftLabel}</span>}
               </p>
             </div>
 
@@ -351,7 +396,7 @@ function RangeDatePicker({
             <div className="flex items-center gap-2">
               <span className="h-px flex-1 bg-slate-100" />
               <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
-                or pick custom dates
+                {t("ops.dashboard.or_custom_dates")}
               </span>
               <span className="h-px flex-1 bg-slate-100" />
             </div>
@@ -389,14 +434,17 @@ function RangeDatePicker({
             <div className="flex justify-end border-t border-slate-100 pt-3.5">
               <button
                 type="button"
-                onClick={() => setIsOpen(false)}
-                className="rounded-lg px-5 py-2 text-[13px] font-bold text-white shadow-sm transition-all duration-200 hover:brightness-110 active:scale-[0.98]"
+                onClick={commitRange}
+                disabled={!draftValid}
+                title={t("ops.dashboard.done_title")}
+                aria-label={t("ops.dashboard.done")}
+                className="rounded-lg px-5 py-2 text-[13px] font-bold text-white shadow-sm transition-all duration-200 hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                 style={{
-                  backgroundImage: `linear-gradient(to bottom right, ${activeTheme.from}, ${activeTheme.to})`,
-                  boxShadow: `0 2px 8px -2px ${activeTheme.from}80`,
+                  backgroundImage: `linear-gradient(to bottom right, ${draftTheme.from}, ${draftTheme.to})`,
+                  boxShadow: `0 2px 8px -2px ${draftTheme.from}80`,
                 }}
               >
-                Done
+                {t("ops.dashboard.done")}
               </button>
             </div>
           </div>
@@ -569,28 +617,44 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   // The sample server owns the business date. Resolve it once so a pinned
   // SAMPLE_TODAY and the dashboard date picker/chips use exactly the same
   // quarter window instead of silently falling back to the browser clock.
+  // Hold the FIRST dashboard load until the sample window answer lands, so the
+  // overview loads exactly once with its final dates — the rolling browser
+  // window is a fallback, not a load-then-throw-away warmup (no duplicate
+  // first paint, no numbers flickering into different values).
+  const [sampleResolved, setSampleResolved] = useState(false);
   useEffect(() => {
     let active = true;
-    void getQuarterSampleInfo().then((info) => {
-      if (!active || !info) return;
-      setSampleQuarter(info.quarter);
-      if (rangeTouchedRef.current) return;
-      const sampleStart = parseInputDateString(info.quarter.fromDate);
-      const sampleEnd = parseInputDateString(info.quarter.toDate);
-      if (sampleStart && sampleEnd) {
-        setStartDate(sampleStart);
-        setEndDate(sampleEnd);
+    // Never let a dead sample API block the overview: after 1.5 s the rolling
+    // browser window proceeds on its own.
+    const failsafe = window.setTimeout(() => {
+      if (active) setSampleResolved(true);
+    }, 1500);
+    void getQuarterSampleInfo().catch(() => null).then((info) => {
+      if (!active) return;
+      if (info) {
+        setSampleQuarter(info.quarter);
+        if (!rangeTouchedRef.current) {
+          const sampleStart = parseInputDateString(info.quarter.fromDate);
+          const sampleEnd = parseInputDateString(info.quarter.toDate);
+          if (sampleStart && sampleEnd) {
+            setStartDate(sampleStart);
+            setEndDate(sampleEnd);
+          }
+        }
       }
+      setSampleResolved(true);
     });
     return () => {
       active = false;
+      window.clearTimeout(failsafe);
     };
   }, []);
 
   const { data, previousData, isLoading, error, refetch } = useDashboardData(
     startDate ?? null,
     endDate ?? null,
-    comparisonPeriod
+    comparisonPeriod,
+    sampleResolved
   );
 
   const dashboardQuarter = data?.sampleQuarter ?? sampleQuarter;
@@ -680,20 +744,17 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   }, [calendarFrom, calendarTo]);
 
   useEffect(() => {
+    // Same once-only guarantee as the KPI data: wait for the sample window so
+    // the register fetch never runs for the browser-clock warmup range.
+    if (!sampleResolved) return;
     const timer = window.setTimeout(() => {
       void loadPaymentRegister();
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [loadPaymentRegister]);
+  }, [loadPaymentRegister, sampleResolved]);
 
-  /* The window on screen, handed to the KPI tiles: each tile deep-links to its
-     analysis page filtered to these exact dates, and the link also carries the
-     equal-length window before them, so the analysis page can compare the same
-     way the tiles do. */
-  const kpiRange = useMemo(
-    () => (calendarFrom && calendarTo ? { from: calendarFrom, to: calendarTo } : null),
-    [calendarFrom, calendarTo]
-  );
+  /* The KPI row never navigates — tiles show the window's totals and the equal
+     window before them, and that is all they do. */
 
   const calendarKey = `${calendarFrom}:${calendarTo}`;
   const [lastCalendarKey, setLastCalendarKey] = useState(calendarKey);
@@ -860,11 +921,13 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
       />
 
       <div className="relative z-10">
+        {/* The stagger replays when a window commits or refresh is pressed —
+            one pure-CSS entrance, then the tiles sit perfectly still. */}
         <KPICards
+          key={`kpi-${dashboardAnimationKey}-${calendarKey}`}
           current={data}
           previous={previousData}
           rangeDays={rangeDays}
-          range={kpiRange}
         />
       </div>
 

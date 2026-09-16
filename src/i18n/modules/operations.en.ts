@@ -217,6 +217,16 @@ export default {
   'ops.dashboard.select_date_range': 'Select date range',
   'ops.dashboard.quick_date_range': 'Quick date range',
   'ops.dashboard.refresh_all': 'Refresh all data',
+
+  /* Date-range picker — selections stay in draft until Done commits them. */
+  'ops.dashboard.done': 'Done',
+  'ops.dashboard.done_title': 'Apply the selected range',
+  'ops.dashboard.custom_range': 'Custom range',
+  'ops.dashboard.or_custom_dates': 'or pick custom dates',
+  'ops.dashboard.preset_7d': 'Last 7 days',
+  'ops.dashboard.preset_15d': 'Last 15 days',
+  'ops.dashboard.preset_1m': 'Last 1 month',
+  'ops.dashboard.preset_qtr': 'Quarter sample window',
   'ops.dashboard.payment.title': 'Payments',
   'ops.dashboard.payment.amount': 'Amount',
   'ops.dashboard.payment.entries': 'Entries',
