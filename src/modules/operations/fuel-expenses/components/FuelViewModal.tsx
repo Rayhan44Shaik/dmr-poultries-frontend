@@ -7,8 +7,9 @@
 //   (newest first), filterable by source (Trip / Manual), with roving keyboard navigation,
 //   GPS indicators with address tooltip, and receipt thumbnail previews.
 // - RIGHT: Full detail breakdown — identity, vehicle, driver, odometer, quantity, rate,
-//   total cost, bunk, full-width GPS address block, receipt lightbox and operator remarks.
-// - FOOTER: PDF export (bill + vehicle history), in-view Edit (if pending) and Close.
+//   total cost, bunk, full-width GPS address block with direct Google Maps Location URL,
+//   receipt lightbox and operator remarks.
+// - FOOTER: Professional DMR branded PDF export (bill + vehicle history), in-view Edit (if pending) and Close.
 
 import React, { useState, useRef, useMemo, useCallback } from "react";
 import { 
@@ -26,7 +27,9 @@ import {
   IndianRupee,
   Pencil,
   Image as ImageIcon,
-  Building2,
+  ExternalLink,
+  Copy,
+  Check,
 } from "lucide-react";
 import AppShellModal from "../../../../ui/AppShellModal";
 import type { FuelExpense } from "../types/fuelExpense";
@@ -39,7 +42,7 @@ import { BillPreviewLink } from "../../vehicle-trips/components/Step_5/BillPrevi
 import { ScopedI18nProvider, useI18n, translateStatus } from "../../../../i18n";
 import { ViewLanguageToggle } from "../../../../ui/ViewLanguageToggle";
 import { uiActionIconMotionClass, uiPdfButtonClass } from "../../../../shared/ui/uiTokens";
-import { exportToPDF } from "../../../../utils/exportUtils";
+import { generateFuelPdf } from "../utils/generateFuelPdf";
 import MasterDropdown from "../../../masters/components/MasterDropdown";
 
 export interface FuelViewModalProps {
@@ -67,6 +70,7 @@ function FuelViewModalContent({
   const { t, language, toggleLanguage } = useI18n();
   const [sourceFilter, setSourceFilter] = useState("");
   const [pdfBusy, setPdfBusy] = useState(false);
+  const [copiedUrl, setCopiedUrl] = useState(false);
 
   // The record whose details are displayed. Clicking a row in the vehicle's
   // history swaps it in — identical to Maintenance ViewModal.
@@ -128,46 +132,17 @@ function FuelViewModalContent({
     if (!currentRecord || pdfBusy) return;
     setPdfBusy(true);
     try {
-      const isTrip = currentRecord.sourceType === "TRIP" || !!currentRecord.tripNo || !!currentRecord.tripId;
-      const isDeleted = currentRecord.deleted === true || currentRecord.status === "Deleted";
-      const statusStr = isDeleted ? "Deleted" : isTrip ? "Approved (Trip)" : currentRecord.status;
-
-      const headers = ["Field", "Value"];
-      const rows = [
-        ["Bill Number", currentRecord.billNo],
-        ["Date", formatTripListDay(currentRecord.date, language)],
-        ["Vehicle", vehicleNumber],
-        ["Driver", currentRecord.driverName || "—"],
-        ["Source", isTrip ? "Trip Diesel" : "Manual Entry"],
-        ["Linked Trip", currentRecord.tripNo || "—"],
-        ["Meter Reading", currentRecord.meterReading > 0 ? `${currentRecord.meterReading.toLocaleString("en-IN")} KM` : "—"],
-        ["Diesel Quantity", `${currentRecord.litres.toFixed(2)} Litres`],
-        ["Rate / Litre", `₹ ${currentRecord.rate.toFixed(2)}`],
-        ["Total Amount", `₹ ${currentRecord.amount.toFixed(2)}`],
-        ["Petrol Bunk", currentRecord.petrolBunk || "—"],
-        ["Status", statusStr],
-        ["Remarks", currentRecord.remarks || "—"],
-      ];
-
-      exportToPDF(
-        `Fuel Bill — ${currentRecord.billNo}`,
-        headers,
-        rows,
-        `Fuel_Bill_${currentRecord.billNo}_${currentRecord.date || "record"}`,
-        {
-          subtitle: `Vehicle: ${vehicleNumber}  |  Status: ${statusStr}`,
-          summary: [
-            { label: "Quantity", value: `${currentRecord.litres.toFixed(2)} L` },
-            { label: "Rate", value: `₹ ${currentRecord.rate.toFixed(2)}/L` },
-            { label: "Total Cost", value: `₹ ${currentRecord.amount.toFixed(2)}` },
-            { label: "Meter", value: currentRecord.meterReading > 0 ? `${currentRecord.meterReading.toLocaleString("en-IN")} KM` : "—" },
-          ],
-        }
+      await generateFuelPdf(
+        currentRecord,
+        approvedHistory,
+        vehicleNumber,
+        language,
+        t
       );
     } finally {
       setPdfBusy(false);
     }
-  }, [currentRecord, pdfBusy, language, vehicleNumber]);
+  }, [currentRecord, approvedHistory, vehicleNumber, language, t, pdfBusy]);
 
   if (!isOpen || !currentRecord) return null;
 
@@ -207,6 +182,17 @@ function FuelViewModalContent({
     Number.isFinite(Number(currentRecord.gpsLat)) &&
     Number.isFinite(Number(currentRecord.gpsLon)) &&
     !(Number(currentRecord.gpsLat) === 0 && Number(currentRecord.gpsLon) === 0);
+
+  const mapsLocationUrl = hasGpsCoords
+    ? `https://www.google.com/maps?q=${Number(currentRecord.gpsLat).toFixed(6)},${Number(currentRecord.gpsLon).toFixed(6)}`
+    : "";
+
+  const handleCopyMapsUrl = () => {
+    if (!mapsLocationUrl) return;
+    navigator.clipboard.writeText(mapsLocationUrl);
+    setCopiedUrl(true);
+    setTimeout(() => setCopiedUrl(false), 2000);
+  };
 
   const showEdit = Boolean(canEdit && onEdit && !isApproved && !isDeleted);
 
@@ -477,17 +463,43 @@ function FuelViewModalContent({
               </div>
             </section>
 
-            {/* GPS Location & Address Card matching Step 2 & Step 5 */}
+            {/* GPS Location & Address Card with Interactive Google Maps Location URL */}
             <section className="animate-fade-in-up" style={{ animationDelay: "40ms" }}>
-              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
-                <span className="text-[12px] uppercase font-bold text-slate-500 flex items-center gap-1.5 mb-2">
-                  <span className="h-6 w-6 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0">
-                    <MapPin size={13} />
+              <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[12px] uppercase font-bold text-slate-500 flex items-center gap-1.5">
+                    <span className="h-6 w-6 rounded-lg bg-emerald-50 text-emerald-600 border border-emerald-100 flex items-center justify-center shrink-0">
+                      <MapPin size={13} />
+                    </span>
+                    <span>{t("ops.trip.field.gps_address") || "GPS Location & Address"}</span>
                   </span>
-                  <span>{t("ops.trip.field.gps_address") || "GPS Location & Address"}</span>
-                </span>
+
+                  {hasGpsCoords && (
+                    <div className="flex items-center gap-2">
+                      <a
+                        href={mapsLocationUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-2.5 py-1 rounded-lg border border-emerald-200 transition-colors shadow-xs"
+                      >
+                        <ExternalLink size={12} />
+                        <span>Google Maps</span>
+                      </a>
+                      <button
+                        type="button"
+                        onClick={handleCopyMapsUrl}
+                        className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 bg-slate-50 hover:bg-slate-100 px-2 py-1 rounded-lg border border-slate-200 transition-colors"
+                        title="Copy Location URL"
+                      >
+                        {copiedUrl ? <Check size={12} className="text-emerald-600" /> : <Copy size={12} />}
+                        <span>{copiedUrl ? "Copied" : "Copy URL"}</span>
+                      </button>
+                    </div>
+                  )}
+                </div>
+
                 {hasGpsCoords ? (
-                  <div className="space-y-1">
+                  <div className="space-y-1.5 pt-1">
                     <p className="text-[13px] font-semibold text-slate-800 break-words leading-relaxed">
                       <GpsAddressText
                         lat={currentRecord.gpsLat}
@@ -495,8 +507,19 @@ function FuelViewModalContent({
                         fallback={t("ops.trip.location_captured")}
                       />
                     </p>
-                    <div className="text-[11px] font-mono text-emerald-600 font-semibold pt-1">
-                      GPS: {Number(currentRecord.gpsLat).toFixed(6)}°N, {Number(currentRecord.gpsLon).toFixed(6)}°E
+                    <div className="flex flex-wrap items-center gap-3 text-[11px] pt-1 border-t border-slate-100">
+                      <div className="font-mono text-emerald-700 font-semibold">
+                        GPS: {Number(currentRecord.gpsLat).toFixed(6)}°N, {Number(currentRecord.gpsLon).toFixed(6)}°E
+                      </div>
+                      <span className="text-slate-300">·</span>
+                      <a
+                        href={mapsLocationUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-emerald-600 hover:text-emerald-700 hover:underline truncate max-w-xs font-medium"
+                      >
+                        {mapsLocationUrl}
+                      </a>
                     </div>
                   </div>
                 ) : (
@@ -577,7 +600,7 @@ function FuelViewModalContent({
           </div>
         </div>
 
-        {/* ── Footer — PDF Export, Edit inside the view, Close ── */}
+        {/* ── Footer — Professional PDF Export, Edit inside the view, Close ── */}
         <div className="flex items-center justify-end gap-3 rounded-b-2xl border-t border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 px-6 py-4 shrink-0">
           <button
             type="button"
