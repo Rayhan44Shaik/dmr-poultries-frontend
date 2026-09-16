@@ -1,10 +1,9 @@
 import { useMemo, useRef, useState, type CSSProperties } from "react";
-import { ArrowUpRight, BarChart3, RotateCcw } from "lucide-react";
+import { ArrowUpRight, BarChart3, RefreshCw, RotateCcw } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { useI18n } from "../../../../i18n";
 import { formatINR, formatINRCompact } from "../../../../utils/format";
-import { BrandRefreshButton, Button } from "../../../../ui";
 import MasterDropdown, { type MasterDropdownOption } from "../../../masters/components/MasterDropdown";
 import { loadCollectionRecoveryData, type CollectionRecoverySnapshot } from "../services/dashboardService";
 import {
@@ -56,6 +55,13 @@ const recoveryColor = (value: number): string => {
 interface ShopTooltipState {
   row: CollectionPerformanceDatum;
   recovery: number;
+  left: number;
+  top: number;
+  placement: "top" | "bottom";
+}
+
+interface ActionTooltipState {
+  label: string;
   left: number;
   top: number;
   placement: "top" | "bottom";
@@ -170,6 +176,7 @@ export default function CollectionPerformanceChart({
   const [selectedShop, setSelectedShop] = useState("");
   const [sortAnimationId, setSortAnimationId] = useState(0);
   const [shopTooltip, setShopTooltip] = useState<ShopTooltipState | null>(null);
+  const [actionTooltip, setActionTooltip] = useState<ActionTooltipState | null>(null);
   const [localSnapshot, setLocalSnapshot] = useState<{ key: string; snapshot: CollectionRecoverySnapshot } | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const chartRef = useRef<HTMLElement | null>(null);
@@ -272,6 +279,7 @@ export default function CollectionPerformanceChart({
     if (!sortOptions.some((option) => option.value === nextSort)) return;
     if (nextSort === sortBy) return;
     setShopTooltip(null);
+    setActionTooltip(null);
     setSortBy(nextSort);
     setSortAnimationId((current) => current + 1);
   };
@@ -280,6 +288,7 @@ export default function CollectionPerformanceChart({
     if (value && !shopOptions.some((option) => option.value === value)) return;
     if (value === selectedShop) return;
     setShopTooltip(null);
+    setActionTooltip(null);
     setSelectedShop(value);
     setSortAnimationId((current) => current + 1);
   };
@@ -287,6 +296,7 @@ export default function CollectionPerformanceChart({
   const resetView = () => {
     if (!selectedShop && sortBy === "outstanding") return;
     setShopTooltip(null);
+    setActionTooltip(null);
     setSelectedShop("");
     setSortBy("outstanding");
     setSortAnimationId((current) => current + 1);
@@ -296,6 +306,7 @@ export default function CollectionPerformanceChart({
   const refreshChart = async () => {
     if (refreshing) return;
     setShopTooltip(null);
+    setActionTooltip(null);
     setRefreshing(true);
     try {
       const nextSnapshot = await loadCollectionRecoveryData(fromDate, toDate);
@@ -307,6 +318,31 @@ export default function CollectionPerformanceChart({
     } finally {
       setRefreshing(false);
     }
+  };
+
+  const showActionTooltip = (label: string, target: HTMLElement) => {
+    const chart = chartRef.current;
+    if (!chart) return;
+    const rect = target.getBoundingClientRect();
+    const chartRect = chart.getBoundingClientRect();
+    const tooltipWidth = 118;
+    const tooltipHeight = 34;
+    const inset = 8;
+    const centeredLeft = rect.left - chartRect.left + rect.width / 2;
+    const left = Math.min(
+      Math.max(centeredLeft, tooltipWidth / 2 + inset),
+      chartRect.width - tooltipWidth / 2 - inset,
+    );
+    const bottomTop = rect.bottom - chartRect.top + 6;
+    const topTop = rect.top - chartRect.top - tooltipHeight - 6;
+    const bottomFits = bottomTop + tooltipHeight <= chartRect.height - inset;
+    const topFits = topTop >= inset;
+    const placement: ActionTooltipState["placement"] = bottomFits || !topFits ? "bottom" : "top";
+    const top = Math.min(
+      Math.max(placement === "bottom" ? bottomTop : topTop, inset),
+      Math.max(inset, chartRect.height - tooltipHeight - inset),
+    );
+    setActionTooltip({ label, left, top, placement });
   };
 
   const showShopTooltip = (
@@ -377,7 +413,7 @@ export default function CollectionPerformanceChart({
       </header>
 
       <div className="flex flex-col p-2.5">
-        <div className="mb-2 grid grid-cols-[minmax(0,1fr)_minmax(0,0.82fr)_2rem_2rem] gap-1.5">
+        <div className="mb-2 grid grid-cols-[minmax(0,1fr)_minmax(0,0.78fr)_auto_auto] gap-1.5">
           <MasterDropdown
             hideLabel
             label={t("ops.dashboard.collection_performance.shop_label")}
@@ -389,7 +425,7 @@ export default function CollectionPerformanceChart({
             allowClear
             portal={false}
             className="min-w-0"
-            triggerClassName="h-8 rounded-lg border-slate-200 bg-white/95 px-2.5 text-[10px] font-semibold shadow-xs"
+            triggerClassName="h-8 rounded-lg border-slate-200 bg-white/95 px-2 text-[9.5px] font-semibold shadow-xs"
           />
           <MasterDropdown
             hideLabel
@@ -401,26 +437,37 @@ export default function CollectionPerformanceChart({
             searchable
             portal={false}
             className="min-w-0"
-            triggerClassName="h-8 rounded-lg border-slate-200 bg-white/95 px-2.5 text-[10px] font-semibold shadow-xs"
+            triggerClassName="h-8 rounded-lg border-slate-200 bg-white/95 px-2 text-[9.5px] font-semibold shadow-xs"
           />
-          <Button
-            variant="outline"
-            size="sm"
-            iconOnly
+          <button
+            type="button"
             onClick={resetView}
             disabled={!hasViewFilter}
-            title={t("common.reset")}
             aria-label={t("common.reset")}
-            icon={<span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={13} aria-hidden="true" /></span>}
-            className="!h-8 !w-8 !rounded-xl border-slate-200 bg-white text-slate-500 shadow-xs hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700"
-          />
-          <BrandRefreshButton
-            compact
-            loading={refreshing}
+            onFocus={(event) => showActionTooltip(t("common.reset"), event.currentTarget)}
+            onBlur={() => setActionTooltip(null)}
+            onMouseEnter={(event) => showActionTooltip(t("common.reset"), event.currentTarget)}
+            onMouseLeave={() => setActionTooltip(null)}
+            className="group flex h-8 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white px-2 text-[9.5px] font-black text-slate-500 shadow-xs transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <RotateCcw size={12} className="shrink-0 motion-safe:group-hover:animate-[var(--animate-action-reset)]" aria-hidden="true" />
+            <span>{t("common.reset")}</span>
+          </button>
+          <button
+            type="button"
             onClick={refreshChart}
-            ariaLabel={t("common.refresh")}
-            className="!h-8 !w-8 shrink-0"
-          />
+            disabled={refreshing}
+            aria-label={t("common.refresh")}
+            aria-busy={refreshing || undefined}
+            onFocus={(event) => showActionTooltip(t("common.refresh"), event.currentTarget)}
+            onBlur={() => setActionTooltip(null)}
+            onMouseEnter={(event) => showActionTooltip(t("common.refresh"), event.currentTarget)}
+            onMouseLeave={() => setActionTooltip(null)}
+            className="group flex h-8 items-center justify-center gap-1 rounded-lg border border-orange-200 bg-orange-50 px-2 text-[9.5px] font-black text-orange-700 shadow-xs transition hover:border-orange-300 hover:bg-orange-100 disabled:cursor-wait disabled:opacity-70"
+          >
+            <RefreshCw size={12} className={`shrink-0 ${refreshing ? "animate-spin" : "motion-safe:group-hover:animate-[var(--animate-action-reset)]"}`} aria-hidden="true" />
+            <span>{t("common.refresh")}</span>
+          </button>
         </div>
 
         <div className="grid grid-cols-3 gap-1.5">
@@ -494,6 +541,28 @@ export default function CollectionPerformanceChart({
         )}
 
       </div>
+
+      {actionTooltip ? (
+        <div
+          role="tooltip"
+          className="collection-recovery-tooltip pointer-events-none absolute z-50 w-[7.375rem] rounded-xl border border-slate-200 bg-slate-900/95 px-2.5 py-1.5 text-center text-[10px] font-bold text-white shadow-lg"
+          style={{
+            left: actionTooltip.left,
+            top: actionTooltip.top,
+            transform: "translateX(-50%)",
+          }}
+        >
+          <span
+            className={`absolute left-1/2 h-2 w-2 -translate-x-1/2 rotate-45 border-slate-900/95 bg-slate-900/95 ${
+              actionTooltip.placement === "top"
+                ? "-bottom-1"
+                : "-top-1"
+            }`}
+            aria-hidden="true"
+          />
+          <span className="relative">{actionTooltip.label}</span>
+        </div>
+      ) : null}
 
       {shopTooltip ? (
       <div
