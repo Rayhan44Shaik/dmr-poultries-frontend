@@ -42,17 +42,19 @@ function matchesGlobalSearch(bill: FuelExpense, search: string): boolean {
 }
 
 /**
- * Ensures unique fuel expense records (no duplicates on trip diesel records).
+ * Ensures unique fuel expense records (deduplicated by record id and bill number).
+ * Allows multiple distinct fuel bills per trip (e.g. multi-fill trips).
  */
 export function uniqueFuelExpenses(expenses: readonly FuelExpense[]): FuelExpense[] {
   const seenIds = new Set<string>();
-  const seenTripNos = new Set<string>();
+  const seenBillNos = new Set<string>();
   return expenses.filter((item) => {
     if (!item || !item.id || seenIds.has(String(item.id))) return false;
     seenIds.add(String(item.id));
-    if (item.tripNo && item.sourceType === "TRIP") {
-      if (seenTripNos.has(item.tripNo)) return false;
-      seenTripNos.add(item.tripNo);
+    if (item.billNo) {
+      const key = String(item.billNo).trim().toUpperCase();
+      if (seenBillNos.has(key)) return false;
+      seenBillNos.add(key);
     }
     return true;
   });

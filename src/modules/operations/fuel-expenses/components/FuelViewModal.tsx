@@ -3,10 +3,11 @@
 // Fuel record view — the same global-view shell as the Trip List and Maintenance view
 // (AppShellModal: overlay below the header, ESC to close, fade + scale panel).
 // Two-panel split layout:
-// - LEFT: Every approved fuel entry of this vehicle (newest first), filterable by source,
-//   with roving keyboard navigation. Clicking a record swaps it into the active detail view.
+// - LEFT: Generous expanded sidebar (w-96) listing every approved fuel entry of this vehicle
+//   (newest first), filterable by source (Trip / Manual), with roving keyboard navigation,
+//   GPS indicators with address tooltip, and receipt thumbnail previews.
 // - RIGHT: Full detail breakdown — identity, vehicle, driver, odometer, quantity, rate,
-//   total cost, bunk, full-width GPS address block, receipt lightbox and remarks.
+//   total cost, bunk, full-width GPS address block, receipt lightbox and operator remarks.
 // - FOOTER: PDF export (bill + vehicle history), in-view Edit (if pending) and Close.
 
 import React, { useState, useRef, useMemo, useCallback } from "react";
@@ -24,6 +25,8 @@ import {
   FileDown,
   IndianRupee,
   Pencil,
+  Image as ImageIcon,
+  Building2,
 } from "lucide-react";
 import AppShellModal from "../../../../ui/AppShellModal";
 import type { FuelExpense } from "../types/fuelExpense";
@@ -208,13 +211,13 @@ function FuelViewModalContent({
   const showEdit = Boolean(canEdit && onEdit && !isApproved && !isDeleted);
 
   return (
-    <AppShellModal open={isOpen} onClose={onClose} panelClassName="max-w-5xl" ariaLabelledBy="fuel-view-title">
+    <AppShellModal open={isOpen} onClose={onClose} panelClassName="max-w-6xl" ariaLabelledBy="fuel-view-title">
       <div className="flex max-h-[calc(100vh-96px)] flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-2xl animate-scale-in">
         
         {/* ── Header — Identity + Vehicle + Status Pill + Language Toggle + Close ── */}
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 px-6 py-4">
           <div className="flex min-w-0 flex-wrap items-center gap-3">
-            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-blue-100 bg-blue-50/70 text-blue-500 shadow-inner">
+            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50/80 text-emerald-600 shadow-inner">
               <Fuel className="h-5 w-5" />
             </div>
             <div className="min-w-0">
@@ -231,7 +234,7 @@ function FuelViewModalContent({
             </div>
           </div>
 
-          <div className="flex flex-shrink-0 items-center gap-2">
+          <div className="flex flex-shrink-0 items-center gap-2.5">
             {/* Status Pill */}
             <span className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-bold shadow-sm ${statusPillClass}`}>
               {statusIcon}
@@ -259,17 +262,17 @@ function FuelViewModalContent({
           </div>
         </div>
 
-        {/* ── Body — Split Layout: Left (All vehicle records) + Right (Active record details) ── */}
+        {/* ── Body — Split Layout: Left Expanded Sidebar (w-96) + Right (Active record details) ── */}
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
           
-          {/* ── LEFT PANEL — Every approved fuel entry of this vehicle ── */}
-          <aside className="flex w-full flex-shrink-0 flex-col border-b border-slate-100 bg-slate-50/40 lg:w-80 lg:border-b-0 lg:border-r">
+          {/* ── LEFT PANEL — Generous sidebar with every approved fuel entry of this vehicle ── */}
+          <aside className="flex w-full flex-shrink-0 flex-col border-b border-slate-100 bg-slate-50/40 lg:w-[380px] lg:border-b-0 lg:border-r">
             <div className="flex items-center justify-between px-4 pt-4">
               <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 <Truck size={13} className="flex-shrink-0 text-slate-400" />
-                {t("fleet.maintenance_view.all_records") || "All Records"}
+                <span>{t("fleet.maintenance_view.all_records") || "All Records"}</span>
               </p>
-              <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold tabular-nums text-slate-500 ring-1 ring-slate-200">
+              <span className="rounded-full bg-white px-2.5 py-0.5 text-[11px] font-bold tabular-nums text-slate-600 ring-1 ring-slate-200 shadow-xs">
                 {approvedHistory.length}
               </span>
             </div>
@@ -293,7 +296,7 @@ function FuelViewModalContent({
             </div>
 
             {/* Scrollable list of vehicle fuel entries */}
-            <div className="max-h-56 min-h-0 flex-1 overflow-y-auto p-3 lg:max-h-none space-y-1.5">
+            <div className="max-h-64 min-h-0 flex-1 overflow-y-auto p-3 lg:max-h-none space-y-2">
               {approvedHistory.length === 0 ? (
                 <p className="py-8 text-center text-xs font-medium text-slate-400">
                   {t("ops.fuel.no_records") || "No records found"}
@@ -302,6 +305,9 @@ function FuelViewModalContent({
                 approvedHistory.map((rec) => {
                   const isSelected = String(rec.id) === String(currentRecord.id);
                   const isRecTrip = rec.sourceType === "TRIP" || !!rec.tripNo;
+                  const hasGps = rec.gpsLat != null && rec.gpsLon != null && !(Number(rec.gpsLat) === 0 && Number(rec.gpsLon) === 0);
+                  const hasImg = Boolean(rec.image);
+
                   return (
                     <button
                       key={rec.id}
@@ -322,8 +328,8 @@ function FuelViewModalContent({
                       }}
                       className={`group flex w-full flex-col rounded-xl border p-3 text-left transition-all ${
                         isSelected
-                          ? "border-blue-300 bg-blue-50/70 shadow-sm ring-1 ring-blue-300"
-                          : "border-slate-200/70 bg-white hover:border-slate-300 hover:bg-slate-50/80"
+                          ? "border-emerald-500 bg-emerald-50/80 shadow-sm ring-1 ring-emerald-400 border-l-4 border-l-emerald-600"
+                          : "border-slate-200/80 bg-white hover:border-slate-300 hover:bg-slate-50/80"
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
@@ -340,13 +346,47 @@ function FuelViewModalContent({
                           {isRecTrip ? rec.tripNo || t("ops.fuel.trip_diesel") : t("ops.fuel.manual_entry")}
                         </span>
                       </div>
-                      <div className="mt-1 flex items-center justify-between text-xs">
-                        <span className="font-mono text-[11px] text-slate-500 truncate max-w-[110px]">
+
+                      {/* Bill No & Bunk Name */}
+                      <div className="mt-1 flex items-center justify-between gap-1 text-xs">
+                        <span className="font-mono text-[11px] font-bold text-slate-700 truncate max-w-[130px]">
                           {rec.billNo}
                         </span>
-                        <span className="font-bold tabular-nums text-slate-700">
-                          {rec.litres.toFixed(2)} L · ₹{rec.amount.toFixed(2)}
+                        <span className="text-[11px] text-slate-500 truncate max-w-[160px] text-right">
+                          {rec.petrolBunk || "—"}
                         </span>
+                      </div>
+
+                      {/* Quantity, Cost & Feature Badges (GPS, Photo) */}
+                      <div className="mt-1.5 flex items-center justify-between text-xs pt-1 border-t border-slate-100">
+                        <div className="flex items-center gap-1.5">
+                          <span className="font-bold tabular-nums text-blue-600">
+                            {rec.litres.toFixed(2)} L
+                          </span>
+                          <span className="text-slate-300">·</span>
+                          <span className="font-bold tabular-nums text-emerald-700">
+                            ₹{rec.amount.toFixed(2)}
+                          </span>
+                        </div>
+
+                        <div className="flex items-center gap-1">
+                          {hasGps && (
+                            <span 
+                              className="inline-flex items-center text-emerald-600 bg-emerald-50 rounded p-0.5 border border-emerald-100" 
+                              title={`GPS: ${Number(rec.gpsLat).toFixed(4)}°N, ${Number(rec.gpsLon).toFixed(4)}°E`}
+                            >
+                              <MapPin size={11} />
+                            </span>
+                          )}
+                          {hasImg && (
+                            <span 
+                              className="inline-flex items-center text-blue-600 bg-blue-50 rounded p-0.5 border border-blue-100" 
+                              title={t("ops.fuel.receipt_document")}
+                            >
+                              <ImageIcon size={11} />
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </button>
                   );
@@ -355,7 +395,7 @@ function FuelViewModalContent({
             </div>
           </aside>
 
-          {/* ── RIGHT PANEL — Details of the active record ── */}
+          {/* ── RIGHT PANEL — Full Details of the active record ── */}
           <div className="min-w-0 flex-1 overflow-y-auto p-6 space-y-4">
             
             {/* Identity & 2-Column Key Metrics / Attribute Pairs */}
@@ -437,7 +477,7 @@ function FuelViewModalContent({
               </div>
             </section>
 
-            {/* GPS Location & Address Card */}
+            {/* GPS Location & Address Card matching Step 2 & Step 5 */}
             <section className="animate-fade-in-up" style={{ animationDelay: "40ms" }}>
               <div className="bg-white border border-slate-200 rounded-xl p-4 shadow-xs">
                 <span className="text-[12px] uppercase font-bold text-slate-500 flex items-center gap-1.5 mb-2">
@@ -480,7 +520,7 @@ function FuelViewModalContent({
               </div>
             </section>
 
-            {/* Receipt Document Card */}
+            {/* Receipt Document Card with Preview Lightbox */}
             <section className="animate-fade-in-up" style={{ animationDelay: "120ms" }}>
               <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
