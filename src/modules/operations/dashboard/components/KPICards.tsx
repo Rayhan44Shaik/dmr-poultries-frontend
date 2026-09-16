@@ -308,7 +308,7 @@ const KPICard = memo(function KPICard({
     changeText = "—";
     badgeTitle = t("ops.dashboard.kpi_no_baseline", { days });
   }
-  /* The visible period under the logo stays compact ("~ 7 d" / "~ 92 d");
+  /* The visible period above the logo stays compact ("~ 7 d" / "~ 92 d");
      the comparison tooltip keeps the longer previous-window wording. */
 
   /* The tile prints the compact figure ("₹2.89 Cr", "40,183"); the tooltip
@@ -328,7 +328,7 @@ const KPICard = memo(function KPICard({
      widest real content ("Pending Collections", "₹2.89 Cr", "▲ 494.3% 30 d",
      "No change 30 d", "was ₹40.31 L"):
 
-       line 1  KPI name, with the logo/"~ 7 d" stack centred on the right edge
+       line 1  KPI name, with "~ 7 d" above the logo at the right edge
        line 2  the figure
        line 3  ▲ 5.7% 7 d ……… was 48   (change left, previous figure right)
 
@@ -351,7 +351,13 @@ const KPICard = memo(function KPICard({
     >
       <div className="absolute inset-0 bg-gradient-to-br from-white via-white to-slate-50 opacity-80" />
       <div className={`absolute -right-6 top-1/2 h-20 w-20 -translate-y-1/2 rounded-full ${config.bg} opacity-[0.08] blur-sm transition-opacity duration-300 group-hover:opacity-[0.14]`} />
-      <div className="absolute right-1.5 top-1/2 z-10 flex w-12 -translate-y-1/2 flex-col items-center justify-center gap-1 text-center @min-[96px]:right-2 @min-[96px]:w-[3.25rem] @min-[120px]:w-14">
+      <div className="absolute right-1.5 top-1/2 z-10 flex h-6 w-12 -translate-y-1/2 items-center justify-center text-center @min-[96px]:right-2 @min-[96px]:h-[1.875rem] @min-[96px]:w-[3.25rem] @min-[120px]:h-9 @min-[120px]:w-14">
+        <span
+          className="absolute bottom-full left-1/2 mb-1 inline-flex w-full max-w-full -translate-x-1/2 items-center justify-center whitespace-nowrap rounded-full bg-slate-50 px-1 py-0.5 text-center text-[7px] font-black uppercase tracking-[0.04em] text-slate-400 ring-1 ring-inset ring-slate-100 @min-[96px]:px-1.5 @min-[96px]:text-[7.5px] @min-[120px]:text-[8px]"
+          title={periodChip}
+        >
+          {periodChip}
+        </span>
         <div
           className={`${config.bg} mx-auto flex h-6 w-6 items-center justify-center rounded-lg shadow-md transition-transform duration-300 group-hover:scale-110 @min-[96px]:h-[1.875rem] @min-[96px]:w-[1.875rem] @min-[120px]:h-9 @min-[120px]:w-9`}
         >
@@ -360,12 +366,6 @@ const KPICard = memo(function KPICard({
             size={14}
           />
         </div>
-        <span
-          className="inline-flex w-full max-w-full items-center justify-center whitespace-nowrap rounded-full bg-slate-50 px-1 py-0.5 text-center text-[7px] font-black uppercase tracking-[0.04em] text-slate-400 ring-1 ring-inset ring-slate-100 @min-[96px]:px-1.5 @min-[96px]:text-[7.5px] @min-[120px]:text-[8px]"
-          title={periodChip}
-        >
-          {periodChip}
-        </span>
       </div>
 
       <div className="relative flex h-full min-w-0 flex-col justify-between gap-1.5 pr-12 @min-[96px]:pr-14 @min-[120px]:pr-16">
