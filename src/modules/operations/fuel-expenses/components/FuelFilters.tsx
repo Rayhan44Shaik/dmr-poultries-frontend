@@ -3,7 +3,6 @@ import {
   FileText,
   FileSpreadsheet,
   Search,
-  Eye,
   Calendar,
   Truck,
   User,
@@ -21,7 +20,6 @@ import {
   opsPrimaryButtonClass,
   opsPdfButtonClass,
   opsExcelButtonClass,
-  opsViewButtonClass,
 } from "../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../i18n";
 import { BrandRefreshButton } from "../../../../ui";
@@ -52,10 +50,7 @@ interface Props {
   onExportPDF?: () => void;
   onRefresh?: () => void;
   onExportExcel?: () => void;
-  onViewSelected?: () => void;
-  showViewButton?: boolean;
   hasFilters?: boolean;
-  viewButtonRef?: React.Ref<HTMLButtonElement>;
 }
 
 function FuelFilters({
@@ -82,10 +77,7 @@ function FuelFilters({
   onExportPDF,
   onRefresh,
   onExportExcel,
-  onViewSelected,
-  showViewButton = false,
   hasFilters = false,
-  viewButtonRef,
 }: Props) {
   const { t } = useI18n();
 
@@ -258,90 +250,71 @@ function FuelFilters({
       </div>
 
       {/* ── Action Toolbar: Order = Reset, Refresh, Add Fuel Bill, PDF, Excel ── */}
-      <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100 flex-wrap">
-        <div className="flex items-center gap-2">
-          {showViewButton && onViewSelected && (
-            <button
-              ref={viewButtonRef}
-              type="button"
-              onClick={onViewSelected}
-              className={`group relative ${opsViewButtonClass}`}
-              aria-label={t("ops.trip.view_selected")}
-            >
-              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]">
-                <Eye size={15} />
-              </span>
-              <span>{t("ops.trip.view_selected")}</span>
-            </button>
-          )}
-        </div>
+      <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100 flex-wrap">
+        {/* 1. Reset Filters */}
+        <button
+          type="button"
+          onClick={onReset}
+          className={`group relative ${opsSecondaryButtonClass}`}
+          aria-label={t("common.reset")}
+        >
+          <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]">
+            <RotateCcw size={14} />
+          </span>
+          <span>{t("common.reset")}</span>
+        </button>
 
-        <div className="flex items-center gap-2.5 justify-end flex-wrap">
-          {/* 1. Reset Filters */}
+        {/* 2. Refresh */}
+        {onRefresh && <BrandRefreshButton onClick={onRefresh} />}
+
+        {/* 3. Add Fuel Bill */}
+        {onAddFuelBill && (
           <button
             type="button"
-            onClick={onReset}
-            className={`group relative ${opsSecondaryButtonClass}`}
-            aria-label={t("common.reset")}
+            onClick={onAddFuelBill}
+            className={`group relative ${opsPrimaryButtonClass} active:scale-95 transition-transform duration-150`}
+            aria-label="Add Fuel Bill"
           >
-            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]">
-              <RotateCcw size={14} />
+            <span className="inline-flex motion-safe:group-hover:rotate-90 transition-transform duration-200">
+              <Plus size={16} />
             </span>
-            <span>{t("common.reset")}</span>
+            <span>{isFormOpen ? "Hide Fuel Form" : "Add Fuel Bill"}</span>
           </button>
+        )}
 
-          {/* 2. Refresh */}
-          {onRefresh && <BrandRefreshButton onClick={onRefresh} />}
+        {/* 4. PDF (Enabled only when filter applied) */}
+        {onExportPDF && (
+          <button
+            type="button"
+            onClick={onExportPDF}
+            disabled={!hasFilters}
+            className={`group relative ${opsPdfButtonClass}`}
+            aria-label={t("reports.export_pdf") || "PDF"}
+            title={!hasFilters ? "Apply a filter to export PDF" : "Export PDF Report"}
+          >
+            <span className={`inline-flex ${hasFilters ? "motion-safe:group-hover:animate-[var(--animate-action-pdf)]" : ""}`}>
+              <FileText size={15} />
+            </span>
+            <span>PDF</span>
+          </button>
+        )}
 
-          {/* 3. Add Fuel Bill */}
-          {onAddFuelBill && (
-            <button
-              type="button"
-              onClick={onAddFuelBill}
-              className={`group relative ${opsPrimaryButtonClass} active:scale-95 transition-transform duration-150`}
-              aria-label="Add Fuel Bill"
-            >
-              <span className="inline-flex motion-safe:group-hover:rotate-90 transition-transform duration-200">
-                <Plus size={16} />
-              </span>
-              <span>{isFormOpen ? "Hide Fuel Form" : "Add Fuel Bill"}</span>
-            </button>
-          )}
-
-          {/* 4. PDF (Enabled only when filter applied) */}
-          {onExportPDF && (
-            <button
-              type="button"
-              onClick={onExportPDF}
-              disabled={!hasFilters}
-              className={`group relative ${opsPdfButtonClass}`}
-              aria-label={t("reports.export_pdf") || "PDF"}
-              title={!hasFilters ? "Apply a filter to export PDF" : "Export PDF Report"}
-            >
-              <span className={`inline-flex ${hasFilters ? "motion-safe:group-hover:animate-[var(--animate-action-pdf)]" : ""}`}>
-                <FileText size={15} />
-              </span>
-              <span>PDF</span>
-            </button>
-          )}
-
-          {/* 5. Excel (Enabled only when filter applied) */}
-          {onExportExcel && (
-            <button
-              type="button"
-              onClick={onExportExcel}
-              disabled={!hasFilters}
-              className={`group relative ${opsExcelButtonClass}`}
-              aria-label={t("reports.export_excel") || "Excel"}
-              title={!hasFilters ? "Apply a filter to export Excel" : "Export Excel Report"}
-            >
-              <span className={`inline-flex ${hasFilters ? "motion-safe:group-hover:animate-[var(--animate-action-excel)]" : ""}`}>
-                <FileSpreadsheet size={15} />
-              </span>
-              <span>Excel</span>
-            </button>
-          )}
-        </div>
+        {/* 5. Excel (Enabled only when filter applied) */}
+        {onExportExcel && (
+          <button
+            type="button"
+            onClick={onExportExcel}
+            disabled={!hasFilters}
+            className={`group relative ${opsExcelButtonClass}`}
+            aria-label={t("reports.export_excel") || "Excel"}
+            title={!hasFilters ? "Apply a filter to export Excel" : "Export Excel Report"}
+          >
+            <span className={`inline-flex ${hasFilters ? "motion-safe:group-hover:animate-[var(--animate-action-excel)]" : ""}`}>
+              <FileSpreadsheet size={15} />
+            </span>
+            <span>Excel</span>
+          </button>
+        )}
       </div>
     </div>
   );

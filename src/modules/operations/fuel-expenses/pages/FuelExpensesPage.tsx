@@ -75,7 +75,6 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
   const [viewingBill, setViewingBill] = useState<FuelExpense | null>(null);
 
   const tableContainerRef = useRef<HTMLDivElement>(null);
-  const viewButtonRef = useRef<HTMLButtonElement>(null);
   const exportBusyRef = useRef<"pdf" | "excel" | null>(null);
 
   // ── Build Dropdown Options from Masters ──
@@ -112,10 +111,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as Node;
-      if (
-        tableContainerRef.current?.contains(target) ||
-        viewButtonRef.current?.contains(target)
-      ) {
+      if (tableContainerRef.current?.contains(target)) {
         return;
       }
       setSelectedId(null);
@@ -466,10 +462,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
         onExportPDF={() => void handleExportPDF()}
         onExportExcel={() => void handleExportExcel()}
         onRefresh={handleRefreshClick}
-        onViewSelected={() => handleView()}
-        showViewButton={selectedId !== null}
         hasFilters={hasFilters}
-        viewButtonRef={viewButtonRef}
       />
 
       {/* ── KPI Summary Cards (Appear smoothly ONLY when filter is active) ── */}
