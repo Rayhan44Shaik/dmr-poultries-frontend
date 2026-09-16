@@ -262,7 +262,7 @@ const KPICard = memo(function KPICard({
   const comparison = compare(value, prevValue, config.upIsGood);
   const baseline = prevValue > 0;
   const days = rangeDays && rangeDays > 0 ? rangeDays : 7;
-  const periodLabel = `${days} d`;
+  const periodLabel = `${days} D`;
   const periodChip = `~ ${periodLabel}`;
   const rangeLabel = t("ops.dashboard.vs_prev", { days });
 
@@ -272,9 +272,14 @@ const KPICard = memo(function KPICard({
      change and its period are never clipped and never push anything out. */
   let badgeClasses =
     "inline-flex max-w-full shrink-0 items-center gap-0.5 rounded-full px-1 py-0.5 text-[7.5px] font-semibold whitespace-nowrap @min-[96px]:px-1.5 @min-[96px]:text-[9px] @min-[120px]:text-[9.5px] ";
+  let periodChipClasses =
+    "absolute bottom-full left-1/2 mb-1 inline-flex w-full max-w-full -translate-x-1/2 items-center justify-center gap-0.5 whitespace-nowrap rounded-full px-1 py-0.5 text-center text-[7px] font-black uppercase tracking-[0.04em] ring-1 ring-inset @min-[96px]:px-1.5 @min-[96px]:text-[7.5px] @min-[120px]:text-[8px] ";
   const trendIconClass =
     "h-2 w-2 shrink-0 @min-[96px]:h-2.5 @min-[96px]:w-2.5 @min-[120px]:h-[11px] @min-[120px]:w-[11px]";
+  const periodTrendIconClass =
+    "h-2 w-2 shrink-0 @min-[96px]:h-2.5 @min-[96px]:w-2.5 @min-[120px]:h-3 @min-[120px]:w-3";
   let iconElement: React.ReactNode = null;
+  let periodTrendIcon: React.ReactNode = null;
   let changeText: string;
   let badgeTitle: string;
 
@@ -282,11 +287,20 @@ const KPICard = memo(function KPICard({
     badgeClasses += comparison.good
       ? "bg-emerald-50 text-emerald-700"
       : "bg-rose-50 text-rose-600";
+    periodChipClasses += comparison.good
+      ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
+      : "bg-rose-50 text-rose-600 ring-rose-100";
     iconElement =
       comparison.pct > 0 ? (
         <TrendingUp size={10} className={trendIconClass} />
       ) : (
         <TrendingDown size={10} className={trendIconClass} />
+      );
+    periodTrendIcon =
+      comparison.pct > 0 ? (
+        <TrendingUp size={10} className={periodTrendIconClass} />
+      ) : (
+        <TrendingDown size={10} className={periodTrendIconClass} />
       );
     changeText = formatPct(comparison.pct);
     badgeTitle = t("ops.dashboard.kpi_compare_title", {
@@ -296,6 +310,7 @@ const KPICard = memo(function KPICard({
     });
   } else if (comparison.kind === "flat") {
     badgeClasses += "bg-slate-100 text-slate-500";
+    periodChipClasses += "bg-slate-50 text-slate-400 ring-slate-100";
     changeText = t("ops.dashboard.kpi_no_change");
     badgeTitle = t("ops.dashboard.kpi_compare_title", {
       current: formatWithUnit(value, unit),
@@ -305,11 +320,12 @@ const KPICard = memo(function KPICard({
   } else {
     // No prior window to measure against — say so instead of printing 0.0%.
     badgeClasses += "bg-slate-100 text-slate-400";
+    periodChipClasses += "bg-slate-50 text-slate-400 ring-slate-100";
     changeText = "—";
     badgeTitle = t("ops.dashboard.kpi_no_baseline", { days });
   }
-  /* The visible period above the logo stays compact ("~ 7 d" / "~ 92 d");
-     the comparison tooltip keeps the longer previous-window wording. */
+  /* The compact period stays above the right-edge logo and carries the same
+     up/down trend arrow as the comparison badge. */
 
   /* The tile prints the compact figure ("₹2.89 Cr", "40,183"); the tooltip
      keeps the exact one ("₹28,870,424", "40,183 Kg") so the full number is
@@ -325,12 +341,12 @@ const KPICard = memo(function KPICard({
      always exactly 1/7 of the page: no sideways dragging, nothing wrapping
      underneath. Because that share can be narrow, the tile measures ITSELF
      (`@container`) and grows through three densities, each sized against the
-     widest real content ("Pending Collections", "₹2.89 Cr", "▲ 494.3% 30 d",
-     "No change 30 d", "was ₹40.31 L"):
+     widest real content ("Pending Collections", "₹2.89 Cr", "▲ 494.3% 30 D",
+     "No change 30 D", "was ₹40.31 L"):
 
-       line 1  KPI name, with "~ 7 d" above the logo at the right edge
-       line 2  the figure
-       line 3  ▲ 5.7% 7 d ……… was 48   (change left, previous figure right)
+       line 1  KPI name, with "▲ ~ 7 D" above the logo at the right edge
+       line 2  the figure, with the previous "was" value directly underneath
+       line 3  ▲ 5.7% 7 D   (comparison badge)
 
        · tiny (default)     20px logo, 8px name,   14px figure, 7.5px badge, 8px was
        · ≥96px of content   26px logo, 10px name,  19px figure, 9px badge,   8.5px was
@@ -338,8 +354,8 @@ const KPICard = memo(function KPICard({
      Card padding is deliberately NOT tiered: container queries read the tile's
      content-box width, so tiering the padding would move the measurement the
      tiers depend on. The badge keeps its slim px-1.5 at every size for the same
-     reason — every pixel it saves goes to keeping "▲ 5.7% 7 d" and "was 48" on
-     one shared line. Nothing is ellipsized except as a last resort, and the
+     reason — every pixel it saves goes to keeping "▲ 5.7% 7 D" and "was 48"
+     readable. Nothing is ellipsized except as a last resort, and the
      full figure plus the full comparison always sit in the tooltips. */
   const cardContent = (
     <div
@@ -352,10 +368,8 @@ const KPICard = memo(function KPICard({
       <div className="absolute inset-0 bg-gradient-to-br from-white via-white to-slate-50 opacity-80" />
       <div className={`absolute -right-6 top-1/2 h-20 w-20 -translate-y-1/2 rounded-full ${config.bg} opacity-[0.08] blur-sm transition-opacity duration-300 group-hover:opacity-[0.14]`} />
       <div className="absolute right-1.5 top-1/2 z-10 flex h-8 w-12 -translate-y-1/2 items-center justify-center text-center @min-[96px]:right-2 @min-[96px]:h-9 @min-[96px]:w-[3.25rem] @min-[120px]:h-10 @min-[120px]:w-14">
-        <span
-          className="absolute bottom-full left-1/2 mb-1 inline-flex w-full max-w-full -translate-x-1/2 items-center justify-center whitespace-nowrap rounded-full bg-slate-50 px-1 py-0.5 text-center text-[7px] font-black uppercase tracking-[0.04em] text-slate-400 ring-1 ring-inset ring-slate-100 @min-[96px]:px-1.5 @min-[96px]:text-[7.5px] @min-[120px]:text-[8px]"
-          title={periodChip}
-        >
+        <span className={periodChipClasses} title={periodChip}>
+          {periodTrendIcon}
           {periodChip}
         </span>
         <div
@@ -379,39 +393,37 @@ const KPICard = memo(function KPICard({
           </span>
         </div>
 
-        {/* line 2 — the figure, big and unclipped */}
-        <div
-          className={`min-w-0 truncate text-[14px] font-bold leading-none tracking-tight @min-[96px]:text-[19px] @min-[120px]:text-[23px] ${config.text}`}
-          title={`${t(kpiCardLabel(label))} · ${exactValue} · ${periodChip}`}
-        >
-          {displayMain}
-          {displaySuffix && (
-            <span className="ml-0.5 text-[8.5px] font-medium text-slate-400 @min-[96px]:text-[11px] @min-[120px]:text-[13px]">
-              {displaySuffix}
-            </span>
-          )}
-        </div>
-
-        {/* line 3 — the bottom line: the change with its window on the left
-            ("▲ 5.7% 7d") and the previous window's own figure on the right
-            ("was 48"), side by side, so the percentage can be read against a
-            real number at a glance. `flex-wrap` is the safety valve: on a tile
-            too narrow for both (a long "No change 7d" beside "was ₹2.89 Cr"),
-            the "was" figure drops underneath instead of being squeezed or cut. */}
-        <div className="flex min-w-0 flex-wrap items-center justify-between gap-x-0 gap-y-1">
-          <span className={badgeClasses} title={`${badgeTitle} · ${rangeLabel}`}>
-            {iconElement}
-            {changeText}
-            <span className="font-medium text-slate-400">{periodLabel}</span>
-          </span>
+        {/* line 2 — the figure, big and unclipped; previous value sits just under it */}
+        <div className="min-w-0">
+          <div
+            className={`min-w-0 truncate text-[14px] font-bold leading-none tracking-tight @min-[96px]:text-[19px] @min-[120px]:text-[23px] ${config.text}`}
+            title={`${t(kpiCardLabel(label))} · ${exactValue} · ${periodChip}`}
+          >
+            {displayMain}
+            {displaySuffix && (
+              <span className="ml-0.5 text-[8.5px] font-medium text-slate-400 @min-[96px]:text-[11px] @min-[120px]:text-[13px]">
+                {displaySuffix}
+              </span>
+            )}
+          </div>
           {baseline ? (
             <span
-              className="min-w-0 max-w-full truncate text-[8px] font-medium text-slate-400 @min-[96px]:text-[8.5px]"
+              className="mt-1 block min-w-0 max-w-full truncate text-[8px] font-medium text-slate-400 @min-[96px]:text-[8.5px]"
               title={badgeTitle}
             >
               {t("ops.dashboard.kpi_prev_value", { value: formatWithUnit(prevValue, unit) })}
             </span>
           ) : null}
+        </div>
+
+        {/* line 3 — the bottom comparison badge. The "was" value now sits
+            directly under the main number for the previous-style read. */}
+        <div className="flex min-w-0 items-center">
+          <span className={badgeClasses} title={`${badgeTitle} · ${rangeLabel}`}>
+            {iconElement}
+            {changeText}
+            <span className="font-medium text-slate-400">{periodLabel}</span>
+          </span>
         </div>
       </div>
     </div>
