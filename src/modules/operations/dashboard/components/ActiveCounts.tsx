@@ -16,17 +16,18 @@ import type {
  * "of N active" denominator for context. Tiles: Vehicles, Drivers,
  * Supervisors, Helpers, Loaders — shops are deliberately not part of it.
  *
- * Directly below the tiles the ACTIVE (worked) lists of the whole fleet are
- * always on screen — one column per register, busiest first, each row with
- * its per-span detail (trips / shops delivered / farms covered / kg hauled).
- * No hover or focus is needed to read them.
+ * Directly below the tiles the fleet's lists are always on screen — one
+ * column per register, no hover needed:
+ *  - Drivers / Supervisors / Helpers / Loaders → ACTIVE (worked-in-span)
+ *    lists, busiest first, with trips / shops / farms detail.
+ *  - Vehicles → per review, the ACTIVE vehicle list is not needed in any
+ *    scenario: its column shows ONLY the vehicles that did NOT run in the
+ *    span (register-Inactive ones carry an "Inactive" badge).
  *
- * CLICK a tile (e.g. Active Loaders) → the register's "did not run in this
- * range" members appear below the active lists as a one-by-one HORIZONTAL
- * scroll line; selecting the tile again closes it, selecting another
- * register switches it. Register-Inactive (out of service) members carry an
- * "Inactive" badge, so they are never confused with actives that were
- * merely idle in the window.
+ * CLICK a crew tile → that register's "did not run in this range" members
+ * appear as a one-by-one HORIZONTAL scroll line below the lists; selecting
+ * the tile again closes it, selecting another register switches it. The
+ * Vehicles tile is not selectable — its idle side is already its column.
  */
 interface ActiveCountsProps {
   rosters: DashboardSpanFleet;
@@ -86,19 +87,8 @@ export default function ActiveCounts({ rosters }: ActiveCountsProps) {
           const registerLabel = t(`ops.dashboard.active_${tile.key}`);
           const isSelected = selected === tile.key;
 
-          return (
-            <button
-              key={tile.key}
-              type="button"
-              onClick={() => setSelected(isSelected ? null : tile.key)}
-              aria-pressed={isSelected}
-              aria-label={`${registerLabel}: ${stat.activeTotal > 0 ? `${stat.worked} / ${stat.activeTotal}` : stat.worked}`}
-              className={`flex flex-col items-center p-3 rounded-xl border transition-shadow outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 ${
-                isSelected
-                  ? "border-emerald-300 bg-emerald-50/40 shadow-md"
-                  : "border-slate-100 hover:shadow-md"
-              }`}
-            >
+          const tileBody = (
+            <>
               <div className={`p-2 rounded-full ${tile.bg} mb-2`}>
                 <Icon size={18} className={tile.color} />
               </div>
@@ -123,18 +113,105 @@ export default function ActiveCounts({ rosters }: ActiveCountsProps) {
                   style={{ width: `${Math.min(percent, 100)}%` }}
                 />
               </div>
+            </>
+          );
+
+          // Vehicles is display-only — its "did not run" side is already its
+          // column below, so there is nothing more to select for it.
+          if (tile.key === "vehicles") {
+            return (
+              <div
+                key={tile.key}
+                aria-label={`${registerLabel}: ${stat.activeTotal > 0 ? `${stat.worked} / ${stat.activeTotal}` : stat.worked}`}
+                className="flex flex-col items-center p-3 rounded-xl border border-slate-100"
+              >
+                {tileBody}
+              </div>
+            );
+          }
+
+          return (
+            <button
+              key={tile.key}
+              type="button"
+              onClick={() => setSelected(isSelected ? null : tile.key)}
+              aria-pressed={isSelected}
+              aria-label={`${registerLabel}: ${stat.activeTotal > 0 ? `${stat.worked} / ${stat.activeTotal}` : stat.worked}`}
+              className={`flex flex-col items-center p-3 rounded-xl border transition-shadow outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/60 ${
+                isSelected
+                  ? "border-emerald-300 bg-emerald-50/40 shadow-md"
+                  : "border-slate-100 hover:shadow-md"
+              }`}
+            >
+              {tileBody}
             </button>
           );
         })}
       </div>
 
-      {/* ── The ACTIVE (worked-in-span) lists of the whole fleet, always
-            on screen below the tiles — one column per register, busiest
-            first. No tooltip: the lists ARE the details. ───────────────────── */}
+      {/* ── The fleet lists, always on screen below the tiles — one column
+            per register. Crew columns show the ACTIVE (worked-in-span) rows,
+            busiest first; the Vehicles column per review shows ONLY its
+            inactive side (which vehicles did not run in the span). No
+            tooltips: the lists ARE the details. ─────────────────────────────── */}
       <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 border-t border-slate-100 pt-3">
         {TILES.map((tile) => {
           const stat: SpanFleetRoster = rosters[tile.key] ?? EMPTY;
           const registerLabel = t(`ops.dashboard.active_${tile.key}`);
+
+          // Vehicles: the active/worked list is not needed in any scenario —
+          // only the vehicles that did NOT run in the span are shown.
+          if (tile.key === "vehicles") {
+            const idleCount = stat.idle.length + stat.idleOverflow;
+            return (
+              <div key={`list-${tile.key}`} className="min-w-0">
+                <div className="flex items-center justify-between gap-1.5 border-b border-slate-100 pb-1">
+                  <span className="truncate text-[11px] font-bold text-slate-800">{registerLabel}</span>
+                  <span
+                    className={`shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-black tabular-nums ring-1 ring-inset ${
+                      idleCount > 0
+                        ? "bg-rose-50 text-rose-600 ring-rose-100"
+                        : "bg-slate-50 text-slate-500 ring-slate-100"
+                    }`}
+                  >
+                    {t("ops.dashboard.inactive_count", { count: idleCount })}
+                  </span>
+                </div>
+                {stat.idle.length > 0 ? (
+                  <ul className="mt-1.5 max-h-48 space-y-1 overflow-y-auto pr-0.5 text-[10px] text-slate-500">
+                    {stat.idle.map((item) => (
+                      <li key={`${tile.key}-${item.name}`} className="flex items-start gap-1.5">
+                        <span aria-hidden="true" className="mt-[4.5px] h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" />
+                        <span className="min-w-0">
+                          <span className="flex items-center gap-1.5">
+                            <span className="truncate font-semibold text-slate-700">{item.name}</span>
+                            {item.registerInactive && (
+                              <span className="shrink-0 rounded-full bg-rose-50 px-1.5 py-px text-[9px] font-black text-rose-600 ring-1 ring-inset ring-rose-100">
+                                {t("common.inactive")}
+                              </span>
+                            )}
+                          </span>
+                          {item.detail ? (
+                            <span className="block truncate tabular-nums text-slate-400">{item.detail}</span>
+                          ) : null}
+                        </span>
+                      </li>
+                    ))}
+                    {stat.idleOverflow > 0 && (
+                      <li className="pt-0.5 text-center font-bold text-slate-400">
+                        {t("ops.dashboard.more_items", { count: stat.idleOverflow })}
+                      </li>
+                    )}
+                  </ul>
+                ) : (
+                  <p className="mt-1.5 text-[10px] text-slate-400">
+                    {t("ops.dashboard.everyone_ran")}
+                  </p>
+                )}
+              </div>
+            );
+          }
+
           return (
             <div key={`list-${tile.key}`} className="min-w-0">
               <div className="flex items-center justify-between gap-1.5 border-b border-slate-100 pb-1">
