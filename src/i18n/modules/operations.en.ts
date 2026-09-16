@@ -59,6 +59,7 @@ export default {
   'ops.collection.latest_collection_details': 'Latest Collection Details',
   'ops.collection.loading_pending': 'Loading pending collections…',
   'ops.collection.loading_recent': 'Loading Recent Collection records…',
+  'ops.collection.loading_view_records': 'Loading View collection records…',
   'ops.collection.loading_summary': 'Loading summary…',
   'ops.collection.mobile': 'Mobile',
   'ops.collection.mobile_label': 'Mobile No.',

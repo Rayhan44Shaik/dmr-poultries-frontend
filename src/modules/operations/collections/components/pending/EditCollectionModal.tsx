@@ -95,13 +95,26 @@ export function EditCollectionModal({
   }, []);
 
   const [recentList, setRecentList] = useState<CollectionApiEntry[]>([]);
+  /**
+   * The shop `recentList` belongs to, plus whether its fetch has come back.
+   * Together they stop the popup from ever showing another shop's credits, or
+   * flashing "no collections" for the split second before the first response —
+   * the records area states what it is loading instead.
+   */
+  const [recentListShop, setRecentListShop] = useState<string | null>(null);
+  const [recentReady, setRecentReady] = useState(false);
+  const [recentLoading, setRecentLoading] = useState(false);
+  /** The rows that describe THIS shop — never a leftover from the last one. */
+  const creditsForShop = recentListShop === shopName ? recentList : [];
+  /** True until this shop's credits have actually arrived once. */
+  const creditsPending = !recentReady || recentLoading;
+  const creditsLoading = creditsForShop.length === 0 && creditsPending;
   /** Free-text filter over this shop's credits. */
   const [creditSearch, setCreditSearch] = useState("");
   /** One focusable handle per rendered row, so the arrow keys can walk them. */
   const creditRowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
   /** Row the pointer last touched, so Up/Down resumes from there. */
   const [creditFocusIndex, setCreditFocusIndex] = useState(0);
-  const [recentLoading, setRecentLoading] = useState(false);
 
   const shopCollections = allCollections
     .filter((c) => c.shopName === shopName)
@@ -124,7 +137,7 @@ export function EditCollectionModal({
   const pickedCached =
     pickedId == null ? null : shopCollections.find((c) => String(c.id) === pickedId) ?? null;
   const pickedApi =
-    pickedId == null ? null : recentList.find((c) => String(c.id) === pickedId) ?? null;
+    pickedId == null ? null : creditsForShop.find((c) => String(c.id) === pickedId) ?? null;
   // Deleted records are deliberately absent from allCollections, so map a
   // picked recent API row into the shared detail shape. Memoizing keeps the
   // selected object stable and prevents the form-sync effect from re-running
@@ -186,8 +199,22 @@ export function EditCollectionModal({
   useEffect(() => {
     let cancelled = false;
     const shopId = collectionService.getShopIdForName(shopName);
-    if (!isOpen || !shopId) {
-      if (!isOpen) setRecentList([]);
+    if (!isOpen) {
+      setRecentList([]);
+      setRecentListShop(null);
+      setRecentReady(false);
+      return;
+    }
+    // A different shop means the previous rows are no longer this shop's
+    // history: drop them so the loader shows for the right shop.
+    if (recentListShop !== shopName) {
+      setRecentList([]);
+      setRecentListShop(shopName);
+      setRecentReady(false);
+    }
+    if (!shopId) {
+      // Nothing to fetch for this shop; say so rather than loading forever.
+      setRecentReady(true);
       return;
     }
     setRecentLoading(true);
@@ -201,12 +228,14 @@ export function EditCollectionModal({
         if (!cancelled) setRecentList([]);
       })
       .finally(() => {
-        if (!cancelled) setRecentLoading(false);
+        if (cancelled) return;
+        setRecentLoading(false);
+        setRecentReady(true);
       });
     return () => {
       cancelled = true;
     };
-  }, [isOpen, shopName, creditsSignature, mergeCredits]);
+  }, [isOpen, shopName, recentListShop, creditsSignature, mergeCredits]);
 
   useEffect(() => {
     if (selected) {
@@ -236,7 +265,7 @@ export function EditCollectionModal({
    * Credits filtered by the search box. Matches the raw English value AND its
    * Telugu rendering, so a user reading in either language finds the row.
    */
-  const filteredCredits = useMemo(() => recentList.filter((col) => {
+  const filteredCredits = useMemo(() => creditsForShop.filter((col) => {
     const q = creditSearch.trim().toLowerCase();
     if (!q) return true;
     const squashed = q.replace(/\s+/g, "");
@@ -259,7 +288,7 @@ export function EditCollectionModal({
       const text = String(value ?? "").toLowerCase();
       return text.includes(q) || text.replace(/\s+/g, "").includes(squashed);
     });
-  }), [recentList, creditSearch, t, dateLocale, language, tr]);
+  }), [creditsForShop, creditSearch, t, dateLocale, language, tr]);
 
   /**
    * Keyboard model for the credits table — the same one the Trip List uses:
@@ -718,7 +747,10 @@ export function EditCollectionModal({
                     </span>
                   </h4>
                   <div className="flex items-center gap-2">
-                    {recentLoading && (
+                    {/* Only while rows are already on screen (a refetch behind
+                      * the table). On a cold open the records area carries the
+                      * loading state, so there is one indicator, not two. */}
+                    {recentLoading && creditsForShop.length > 0 && (
                       <span className="inline-flex items-center gap-1 text-xs text-slate-400">
                         <Loader2 size={12} className="animate-spin" />
                         {t("common.loading")}
@@ -755,9 +787,17 @@ export function EditCollectionModal({
                     </div>
                   </div>
                 </div>
-                {recentLoading && recentList.length === 0 ? (
-                  <p className="px-4 py-6 text-sm text-slate-500">{t("ops.collection.loading_recent")}</p>
-                ) : recentList.length === 0 ? (
+                {creditsLoading ? (
+                  /* Same loading treatment the Rate Entry table uses: the card
+                   * keeps its header, and the records area states plainly what
+                   * is being fetched. */
+                  <div className="py-16 text-center text-sm font-medium text-slate-400">
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 size={16} className="animate-spin text-emerald-600" aria-hidden="true" />
+                      {t("ops.collection.loading_view_records")}
+                    </span>
+                  </div>
+                ) : creditsForShop.length === 0 ? (
                   <p className="px-4 py-6 text-sm text-slate-500">{t("ops.collection.no_collections_for_shop")}</p>
                 ) : filteredCredits.length === 0 ? (
                   <p className="px-4 py-6 text-center text-sm text-slate-500">
@@ -923,7 +963,7 @@ export function EditCollectionModal({
                     </table>
                     {visibleCredits.length >= 10 && (
                       <p className="border-t border-slate-100 bg-slate-50/60 px-4 py-2 text-xs text-slate-400">
-                        {t("ops.collection.showing_latest_10", { count: recentList.length })}
+                        {t("ops.collection.showing_latest_10", { count: creditsForShop.length })}
                       </p>
                     )}
                   </div>

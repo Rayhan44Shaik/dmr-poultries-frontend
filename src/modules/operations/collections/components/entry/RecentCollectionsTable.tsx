@@ -614,6 +614,9 @@ export default function RecentCollectionsTable({
             setPageSize(next);
             setCurrentPage(1);
           }}
+          /* `1 2 … 20`, not `1 2 3 4 5 … 20`: the strip shares this toolbar
+           * with search and Reset, so it stays compact at 20 pages. */
+          compact
         />
       )}
     </div>
