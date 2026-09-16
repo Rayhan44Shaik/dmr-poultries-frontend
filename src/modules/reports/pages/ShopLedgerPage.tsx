@@ -9,6 +9,7 @@ import {
   Bird,
   Calendar,
   CalendarDays,
+  CalendarRange,
   CheckCircle2,
   CheckSquare,
   Download,
@@ -176,13 +177,51 @@ const mapRowToTx = (row: ShopLedgerRow): LedgerTransaction => {
   };
 };
 
-const toDateDefault = () => format(new Date(), "yyyy-MM-dd");
-const toWeekAgoDefault = () => format(subDays(new Date(), 7), "yyyy-MM-dd");
+/** ISO week start — the Monday (local time) of the week containing `date`. */
+function mondayOf(date: Date): Date {
+  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const day = d.getDay(); // 0 = Sun … 6 = Sat
+  d.setDate(d.getDate() - (day === 0 ? 6 : day - 1));
+  return d;
+}
 
-/** yyyy-MM-dd → dd-MM-yyyy for display (WhatsApp text, weekly labels). */
+/**
+ * Default ledger window — one full Monday → Sunday week.
+ *
+ * If the current week is already complete (today IS Sunday) it is used;
+ * while a week is still in progress the ledger defaults to the PREVIOUS
+ * complete week, so the statement always covers a finished Mon–Sun cycle.
+ */
+function defaultWeekRange(): { from: string; to: string } {
+  const now = new Date();
+  const monday = mondayOf(now);
+  if (now.getDay() === 0) {
+    return { from: format(monday, "yyyy-MM-dd"), to: format(now, "yyyy-MM-dd") };
+  }
+  return {
+    from: format(subDays(monday, 7), "yyyy-MM-dd"),
+    to: format(subDays(monday, 1), "yyyy-MM-dd"),
+  };
+}
+
+const toDateDefault = () => defaultWeekRange().to;
+const toWeekAgoDefault = () => defaultWeekRange().from;
+
+/** yyyy-MM-dd → dd-MM-yyyy (day-month-year) for table cells and exports. */
 const formatDisplayDate = (value: string): string => {
   const parts = value.split("-");
   return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : value;
+};
+
+const WEEKDAY_SHORT = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"] as const;
+
+/** yyyy-MM-dd → short weekday ("Mon"). Parsed LOCALLY — a UTC parse would
+ *  roll the day back one in IST and label Tuesday rows as Monday. */
+const weekdayOf = (value: string): string => {
+  const parts = value.split("-").map(Number);
+  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return "";
+  const [year, month, day] = parts;
+  return WEEKDAY_SHORT[new Date(year, month - 1, day).getDay()];
 };
 
 const normalizePaymentMode = (value?: string): string => {
@@ -985,6 +1024,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     }
     const headers = [
       "Date",
+      "Day",
       "Particulars",
       "Type",
       "Payment Mode",
@@ -996,7 +1036,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       "Balance",
     ];
     const data = rows.map((tx) => [
-      tx.date,
+      formatDisplayDate(tx.date),
+      weekdayOf(tx.date),
       tx.particulars,
       tx.type === "sale" ? "Sale" : tx.type === "collection" ? "Collection" : "Correction",
       normalizePaymentMode(tx.paymentMode) || "-",
@@ -1786,10 +1827,15 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             </div>
             <h3 className="text-base font-bold text-slate-800 tracking-tight">Shop Ledger</h3>
           </div>
-          <span className="rounded-full border border-blue-100 bg-blue-50/80 px-2.5 py-1 text-[11px] font-bold text-blue-700 tabular-nums whitespace-nowrap">
-            {totalRows === 0 ? "No rows" : `${totalRows} row${totalRows === 1 ? "" : "s"}`}
-            {appliedSelectedShop !== "All Shops" ? ` · ${appliedSelectedShop}` : ""}
-          </span>
+          <div className="flex items-center gap-2 min-w-0">
+            <span className="rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1 text-[11px] font-semibold text-slate-600 tabular-nums whitespace-nowrap">
+              {formatDisplayDate(appliedDateFrom)} → {formatDisplayDate(appliedDateTo)}
+            </span>
+            <span className="rounded-full border border-blue-100 bg-blue-50/80 px-2.5 py-1 text-[11px] font-bold text-blue-700 tabular-nums whitespace-nowrap">
+              {totalRows === 0 ? "No rows" : `${totalRows} row${totalRows === 1 ? "" : "s"}`}
+              {appliedSelectedShop !== "All Shops" ? ` · ${appliedSelectedShop}` : ""}
+            </span>
+          </div>
         </div>
         <div className="overflow-x-auto max-h-[70vh]">
             <table className="min-w-full text-sm">
@@ -1798,6 +1844,13 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   {/* Flat 2D icons — no solid tiles, just the coloured glyph */}
                   <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
                     {sortableHeader("date", <CalendarDays size={16} className="text-indigo-500 shrink-0" />, "Date")}
+                  </th>
+                  {/* Day of week — a quick glance column beside the date */}
+                  <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
+                    <span className="inline-flex items-center gap-1.5 justify-center">
+                      <CalendarRange size={16} className="text-blue-500 shrink-0" />
+                      Day
+                    </span>
                   </th>
                   <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
                     {sortableHeader("particulars", <Store size={16} className="text-emerald-500 shrink-0" />, "Particulars")}
@@ -1830,7 +1883,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               <tbody className="divide-y divide-slate-100">
                 {visibleRows.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="py-12 text-center text-slate-400">
+                    <td colSpan={9} className="py-12 text-center text-slate-400">
                       {ledgerLoading ? "Loading ledger..." : "No transactions found for the selected filters."}
                     </td>
                   </tr>
@@ -1851,7 +1904,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                           key={`${isOpening ? "opening" : tx.collectionNo || tx.particulars}-${idx}`}
                           className={`transition-colors ${isOpening ? "bg-amber-50/50 font-semibold" : "hover:bg-slate-50/80"}`}
                         >
-                          <td className="px-4 py-3 text-xs font-medium text-slate-600">{tx.date}</td>
+                          <td className="px-4 py-3 text-xs font-medium text-slate-600 tabular-nums">{formatDisplayDate(tx.date)}</td>
+                          <td className="px-4 py-3 text-center text-xs font-semibold text-slate-500">{weekdayOf(tx.date)}</td>
                           <td className="px-4 py-3 text-xs font-medium text-slate-700">
                             {tx.particulars}
                             {!isOpening && (
@@ -1877,7 +1931,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     })}
                     {visibleRows.length > 1 && (
                       <tr className="bg-slate-100/80 font-bold border-t-2 border-slate-300">
-                        <td className="px-4 py-3 text-xs text-slate-700" colSpan={2}>TOTAL</td>
+                        <td className="px-4 py-3 text-xs text-slate-700" colSpan={3}>TOTAL</td>
                         <td className="px-4 py-3 text-center text-xs text-slate-800">{summary.totalBirds}</td>
                         <td className="px-4 py-3 text-center text-xs text-slate-800">{summary.totalWeight.toFixed(2)}</td>
                         <td className="px-4 py-3 text-center text-xs text-slate-800">-</td>
