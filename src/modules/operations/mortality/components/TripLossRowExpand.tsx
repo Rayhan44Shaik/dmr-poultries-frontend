@@ -1,21 +1,31 @@
 // src/modules/operations/mortality/components/TripLossRowExpand.tsx
 // Expandable detail for ONE completed trip — the panel behind the row chevron.
 //
-// TWO SIMPLE TABLES, stacked and full width — the same detail-card idiom the
-// Fleet module uses (label left, value right-aligned, two label/value pairs per
-// row, hairline dividers, nothing else):
+// ONE card, ONE table, full width. The three groups are sections stacked inside
+// that single table, separated by full-width section rows:
 //
-//   1. TRIP DETAILS — trip no · day · vehicle · supervisor · driver ·
-//      source farm · loaders · helpers (+ status chip in the title bar)
-//   2. WEIGHTS — Farm · Delivered · Mortality · Weight Loss, each with birds,
-//      weight and percentage, closed by a tinted Survival Rate strip
+//   ┌ TRIP DETAILS ────────────────────────────── [ Completed ] ┐
+//   │ TRIP NO      TRP-…-001  │ DAY         Wed, 16 Sep 2026    │
+//   │ VEHICLE      TS09UB1074 │ SUPERVISOR  Ravi Rao           │
+//   │ DRIVER       Yesu Kumar │ SOURCE FARM Sai Sreenivasa…    │
+//   │ LOADERS      Jagadish…  │ HELPERS     Jagadish Rao, …    │
+//   ├ WEIGHTS ──────────────────────────────────────────────────┤
+//   │ NAME                            BIRDS   WEIGHT        %   │
+//   │ Farm                              319  636.09 kg  100.00% │
+//   │ …                                                          │
+//   ├ RATES ────────────────────────────────────────────────────┤
+//   │ SURVIVAL RATE                       97.49%                 │
+//   │ MORTALITY %      2.51%   │ LOSS %  2.13%                   │
+//   └───────────────────────────────────────────────────────────┘
+//
+// Four equal columns carry every section: the first column of each half is the
+// field name, the next is its data, right-aligned so each half ends cleanly at
+// its edge. Section rows span all four columns, so the card reads as one table
+// rather than three boxes with gaps between them.
 //
 // No shop-wise delivery list here: the shop COUNT already sits on the trip row,
-// and the shop-level detail lives in the Delivery module where it is actionable.
-// Rows are one line tall and the two cards sit 10px apart — nothing is padded
-// out, nothing is repeated.
+// and shop-level detail lives in the Delivery module where it is actionable.
 
-import { Fragment } from "react";
 import { HeartPulse, Scale, Truck } from "lucide-react";
 import type { TripLossAnalysis } from "../hooks/useTripLossAnalysis";
 import { formatNumber, formatWeight } from "../../../../utils/format";
@@ -27,97 +37,77 @@ interface TripLossRowExpandProps {
 }
 
 /**
- * Card shell: tinted title bar + hairline body — the Fleet detail-card idiom.
- *
- * Each card carries its own mark in a small tinted tile, the same treatment the
- * table header uses for the page: the glyph says what the card is, and the tile
- * colour keeps the three cards apart at a glance —
+ * Section marks. Each group owns one colour family, so the three blocks stay
+ * distinguishable inside the single table:
  *   indigo = the trip · rose = the weights · emerald = the rates.
  */
-const CARD_TILES = {
+const SECTION_TILES = {
   indigo: "border-indigo-100 bg-indigo-50/70 text-indigo-500",
   rose: "border-rose-100 bg-rose-50/70 text-rose-500",
   emerald: "border-emerald-100 bg-emerald-50/70 text-emerald-600",
 } as const;
 
-type CardTone = keyof typeof CARD_TILES;
+type SectionTone = keyof typeof SECTION_TILES;
 
-function Card({
+/** A full-width band that opens a section of the table. */
+function SectionRow({
   icon: Icon,
   tone,
   title,
+  colSpan,
   action,
-  children,
 }: {
   icon: typeof Truck;
-  tone: CardTone;
+  tone: SectionTone;
   title: string;
+  colSpan: number;
   action?: React.ReactNode;
-  children: React.ReactNode;
 }) {
   return (
-    <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-2.5 py-1">
-        <h4 className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-wider text-slate-900">
-          <span
-            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border shadow-inner ${CARD_TILES[tone]}`}
-          >
-            <Icon size={12} strokeWidth={2.4} aria-hidden="true" />
+    <tr className="bg-slate-50/80">
+      <th colSpan={colSpan} scope="colgroup" className="px-3 py-1.5 text-left">
+        <span className="flex items-center justify-between gap-2">
+          <span className="flex items-center gap-2 text-[10.5px] font-bold uppercase tracking-wider text-slate-900">
+            <span
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border shadow-inner ${SECTION_TILES[tone]}`}
+            >
+              <Icon size={12} strokeWidth={2.4} aria-hidden="true" />
+            </span>
+            {title}
           </span>
-          {title}
-        </h4>
-        {action}
-      </div>
-      {children}
-    </div>
+          {action}
+        </span>
+      </th>
+    </tr>
   );
 }
 
-type DetailField = {
+/** One label │ value pair, filling two of the four columns. */
+function Pair({ label, value, tone, rule = true }: {
   label: string;
   value: React.ReactNode;
   tone?: string;
-  /** Crew lists may wrap; single values stay on one line and truncate. */
-  wrap?: boolean;
-  title?: string;
-};
-
-/**
- * Label and value widths.
- *
- * Both are pinned in pixels and the table is content-width rather than
- * `w-full`, exactly like the weights table: the entry, its rule and the next
- * entry sit together, and whatever width is left over stays as whitespace on
- * the right instead of being stretched into the gaps between the columns.
- */
-const LABEL_WIDTH = "w-[78px]";
-const VALUE_WIDTH = "w-[196px]";
-
-/** One field row: bright-black name │ data. */
-function FieldRow({ fields }: { fields: DetailField[] }) {
+  /** Draw the hairline between this pair's name and its data. */
+  rule?: boolean;
+}) {
   return (
-    <tr>
-      {fields.map((field, index) => (
-        <Fragment key={index}>
-          <th
-            scope="row"
-            className={`${LABEL_WIDTH} px-2.5 py-2.5 text-left align-middle text-[10.5px] font-bold uppercase leading-tight tracking-wide text-slate-900 ${
-              index === 2 ? "border-l border-slate-100" : ""
-            }`}
-          >
-            {field.label}
-          </th>
-          <td
-            className={`${VALUE_WIDTH} border-l border-slate-200 px-2.5 py-2.5 align-middle text-[12.5px] font-semibold tabular-nums ${
-              field.tone ?? "text-slate-700"
-            } ${field.wrap ? "" : "truncate"}`}
-            title={field.title}
-          >
-            {field.value}
-          </td>
-        </Fragment>
-      ))}
-    </tr>
+    <>
+      <th
+        scope="row"
+        className={`w-1/4 px-3 py-2.5 text-left align-middle text-[10.5px] font-bold uppercase leading-tight tracking-wide text-slate-900 ${
+          rule ? "border-l border-slate-100" : ""
+        }`}
+      >
+        {label}
+      </th>
+      <td
+        className={`w-1/4 border-l border-slate-200 px-3 py-2.5 text-right align-middle text-[12.5px] font-semibold tabular-nums ${
+          tone ?? "text-slate-700"
+        }`}
+      >
+        {value}
+      </td>
+    </>
   );
 }
 
@@ -125,51 +115,47 @@ export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
   const { t, language } = useI18n();
   const crew = (names?: string[]) => (names && names.length > 0 ? names.join(", ") : "—");
 
-  // TWO label/value pairs per row — trip no + day, vehicle + supervisor, then
-  // driver + farm and the crew. Two columns keep each line short enough that the
-  // label and its value read as one entry.
-  const detailRows: Array<[DetailField, DetailField]> = [
+  /** Trip facts, two pairs per row — trip no + day, vehicle + supervisor, … */
+  const detailRows: Array<Array<{ label: string; value: React.ReactNode; tone?: string }>> = [
     [
       { label: t("ops.mortality.field.trip_no"), value: record.tripNo, tone: "text-indigo-600" },
       { label: t("ops.trip.day"), value: formatTripListDay(record.tripDate, language) },
     ],
     [
-      { label: t("common.vehicle"), value: record.vehicleNo || "—", title: record.vehicleNo || undefined },
+      { label: t("common.vehicle"), value: record.vehicleNo || "—" },
       { label: t("common.supervisor"), value: record.supervisorName || "—" },
     ],
     [
       { label: t("common.driver"), value: record.driverName || "—" },
-      {
-        label: t("ops.mortality.field.source_farm"),
-        value: record.sourceFarm || "—",
-        title: record.sourceFarm || undefined,
-      },
+      { label: t("ops.mortality.field.source_farm"), value: record.sourceFarm || "—" },
     ],
     [
-      { label: t("ops.trip.field.loaders"), value: crew(record.loaders), wrap: true },
-      { label: t("ops.trip.field.helpers"), value: crew(record.helpers), wrap: true },
+      { label: t("ops.trip.field.loaders"), value: crew(record.loaders) },
+      { label: t("ops.trip.field.helpers"), value: crew(record.helpers) },
     ],
   ];
 
-  // Quantities only — the percentages live in the Rates box beside this table,
-  // so no figure is printed twice inside the same panel.
-  const weightRows: Array<{ label: string; birds: React.ReactNode; weight: string; tone: string }> = [
+  /** Quantities, one row per measure, with that measure's own percentage. */
+  const weightRows: Array<{ label: string; birds: React.ReactNode; weight: string; pct: string; tone: string }> = [
     {
       label: t("ops.mortality.detail.farm"),
       birds: formatNumber(record.farmBirds),
       weight: formatWeight(record.farmWeight),
+      pct: "100.00%",
       tone: "text-amber-700",
     },
     {
       label: t("ops.mortality.detail.delivered"),
       birds: formatNumber(record.deliveredBirds),
       weight: formatWeight(record.deliveredWeight),
+      pct: `${((record.deliveredWeight / Math.max(record.farmWeight, 1)) * 100).toFixed(2)}%`,
       tone: "text-sky-700",
     },
     {
       label: t("ops.mortality.detail.mortality"),
       birds: formatNumber(record.mortalityCount),
       weight: formatWeight(record.mortalityWeight),
+      pct: `${record.mortalityPercentage.toFixed(2)}%`,
       tone: "text-orange-600",
     },
     {
@@ -177,120 +163,126 @@ export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
       // Loss is a weight figure; it has no bird count of its own.
       birds: <span className="text-slate-300">—</span>,
       weight: formatWeight(record.weightLoss),
+      pct: `${record.weightLossPercentage.toFixed(2)}%`,
       tone: "text-rose-600",
     },
   ];
 
+  const numericHead = "w-1/4 border-l border-slate-200 px-3 py-2 text-right text-[10.5px] font-bold uppercase tracking-wide text-slate-900";
+
   return (
-    <div className="border-t border-slate-200/80 bg-slate-100/60 px-2 py-2">
-      <div className="space-y-1.5">
-        {/* ── 1. TRIP DETAILS ─────────────────────────────────────────── */}
-        <Card
-          icon={Truck}
-          tone="indigo"
-          title={t("ops.mortality.detail.trip_overview")}
-          action={
-            <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-[1px] text-[10px] font-bold uppercase tracking-wide text-emerald-700">
-              {record.status}
+    <div className="border-t border-slate-200/80 bg-slate-100/60 px-2 py-2.5">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        {/* ── Card header — the trip section, so the table opens straight into
+            its first rows. ────────────────────────────────────────────── */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/80 px-3 py-1.5">
+          <h4 className="flex items-center gap-2 text-[10.5px] font-bold uppercase tracking-wider text-slate-900">
+            <span
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border shadow-inner ${SECTION_TILES.indigo}`}
+            >
+              <Truck size={12} strokeWidth={2.4} aria-hidden="true" />
             </span>
-          }
-        >
-          <table className="table-fixed border-collapse">
-            <tbody className="divide-y divide-slate-100">
-              {detailRows.map((row, rowIndex) => (
-                <FieldRow key={rowIndex} fields={row} />
-              ))}
-            </tbody>
-          </table>
-        </Card>
-
-        {/* ── 2. WEIGHTS + RATES ──────────────────────────────────────── */}
-        {/* Two small boxes side by side rather than one wide one: the table
-            holds the quantities, the box beside it holds the rates. Rows are
-            one line tall and the columns are sized to their content, so each
-            box is only as big as what it prints. */}
-        <div className="grid items-start gap-1.5 lg:grid-cols-[max-content_max-content]">
-          <Card icon={Scale} tone="rose" title={t("ops.mortality.detail.weight_summary")}>
-            {/* Content-width table: the columns are pinned in pixels so they
-                stay packed together, and the card simply keeps the whitespace
-                that is left over. */}
-            <table className="table-fixed border-collapse text-[12.5px]">
-              <thead>
-                {/* Bright-black column names over a neat rule… */}
-                <tr className="border-b border-slate-200 text-[10.5px] uppercase tracking-wide text-slate-900">
-                  <th className="w-[124px] px-2.5 py-2 text-left font-bold">{t("common.name")}</th>
-                  <th className="w-[72px] border-l border-slate-200 px-2.5 py-2 text-right font-bold">
-                    {t("common.birds")}
-                  </th>
-                  <th className="w-[96px] border-l border-slate-200 px-2.5 py-2 text-right font-bold">
-                    {t("common.weight")}
-                  </th>
-                </tr>
-              </thead>
-              {/* …and the same rule running down between every field and its
-                  data, so a row reads name │ birds │ weight. */}
-              <tbody className="divide-y divide-slate-100">
-                {weightRows.map((row) => (
-                  <tr key={row.label}>
-                    <td className="px-2.5 py-2.5 font-medium text-slate-700">{row.label}</td>
-                    <td
-                      className={`border-l border-slate-100 px-2.5 py-2.5 text-right font-semibold tabular-nums ${row.tone}`}
-                    >
-                      {row.birds}
-                    </td>
-                    <td
-                      className={`border-l border-slate-100 px-2.5 py-2.5 text-right font-semibold tabular-nums ${row.tone}`}
-                    >
-                      {row.weight}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </Card>
-
-          {/* The rates the trip is judged on, as one small box. */}
-          <Card icon={HeartPulse} tone="emerald" title={t("ops.mortality.detail.rates")}>
-            {/* The same compact label │ value table as the cards above. */}
-            <table className="table-fixed border-collapse">
-              <tbody className="divide-y divide-slate-100">
-                <tr className="border-b border-emerald-100 bg-emerald-50/70">
-                  <th
-                    scope="row"
-                    className={`${LABEL_WIDTH} px-2.5 py-2.5 text-left align-middle text-[10.5px] font-bold uppercase leading-tight tracking-wide text-emerald-700`}
-                  >
-                    {t("ops.mortality.field.survival_rate")}
-                  </th>
-                  <td className="w-[104px] px-2.5 py-2.5 align-middle text-right text-[15px] font-extrabold leading-none tabular-nums text-emerald-700">
-                    {(record.survivalRate * 100).toFixed(2)}%
-                  </td>
-                </tr>
-                <tr>
-                  <th
-                    scope="row"
-                    className={`${LABEL_WIDTH} px-2.5 py-2.5 text-left align-middle text-[10.5px] font-bold uppercase leading-tight tracking-wide text-slate-900`}
-                  >
-                    {t("ops.mortality.field.mortality_pct")}
-                  </th>
-                  <td className="border-l border-slate-200 px-2.5 py-2.5 text-right text-[12.5px] font-bold tabular-nums text-orange-600">
-                    {record.mortalityPercentage.toFixed(2)}%
-                  </td>
-                </tr>
-                <tr>
-                  <th
-                    scope="row"
-                    className={`${LABEL_WIDTH} px-2.5 py-2.5 text-left align-middle text-[10.5px] font-bold uppercase leading-tight tracking-wide text-slate-900`}
-                  >
-                    {t("ops.mortality.field.weight_loss_pct")}
-                  </th>
-                  <td className="border-l border-slate-200 px-2.5 py-2.5 text-right text-[12.5px] font-bold tabular-nums text-rose-600">
-                    {record.weightLossPercentage.toFixed(2)}%
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </Card>
+            {t("ops.mortality.detail.trip_overview")}
+          </h4>
+          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-[1px] text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+            {record.status}
+          </span>
         </div>
+
+        <table className="w-full table-fixed border-collapse text-[12.5px]">
+          <tbody className="divide-y divide-slate-100">
+            {/* ── TRIP DETAILS ─────────────────────────────────────── */}
+            {detailRows.map((row, rowIndex) => (
+              <tr key={rowIndex}>
+                {row.map((field, fieldIndex) => (
+                  <Pair
+                    key={fieldIndex}
+                    label={field.label}
+                    value={field.value}
+                    tone={field.tone}
+                    rule={fieldIndex === 1}
+                  />
+                ))}
+              </tr>
+            ))}
+
+            {/* ── WEIGHTS ──────────────────────────────────────────── */}
+            <SectionRow
+              icon={Scale}
+              tone="rose"
+              title={t("ops.mortality.detail.weight_summary")}
+              colSpan={4}
+            />
+            <tr>
+              <th scope="col" className="w-1/4 px-3 py-2 text-left text-[10.5px] font-bold uppercase tracking-wide text-slate-900">
+                {t("common.name")}
+              </th>
+              <th scope="col" className={numericHead}>
+                {t("common.birds")}
+              </th>
+              <th scope="col" className={numericHead}>
+                {t("common.weight")}
+              </th>
+              <th scope="col" className={numericHead}>
+                %
+              </th>
+            </tr>
+            {weightRows.map((row) => (
+              <tr key={row.label}>
+                <th
+                  scope="row"
+                  className="w-1/4 px-3 py-2.5 text-left align-middle text-[12.5px] font-medium text-slate-700"
+                >
+                  {row.label}
+                </th>
+                <td className={`w-1/4 border-l border-slate-100 px-3 py-2.5 text-right align-middle font-semibold tabular-nums ${row.tone}`}>
+                  {row.birds}
+                </td>
+                <td className={`w-1/4 border-l border-slate-100 px-3 py-2.5 text-right align-middle font-semibold tabular-nums ${row.tone}`}>
+                  {row.weight}
+                </td>
+                <td className={`w-1/4 border-l border-slate-100 px-3 py-2.5 text-right align-middle font-semibold tabular-nums ${row.tone}`}>
+                  {row.pct}
+                </td>
+              </tr>
+            ))}
+
+            {/* ── RATES ────────────────────────────────────────────── */}
+            <SectionRow
+              icon={HeartPulse}
+              tone="emerald"
+              title={t("ops.mortality.detail.rates")}
+              colSpan={4}
+            />
+            <tr>
+              <th
+                scope="row"
+                className="w-1/4 bg-emerald-50/70 px-3 py-2.5 text-left align-middle text-[10.5px] font-bold uppercase leading-tight tracking-wide text-emerald-700"
+              >
+                {t("ops.mortality.field.survival_rate")}
+              </th>
+              <td
+                colSpan={3}
+                className="bg-emerald-50/70 px-3 py-2.5 text-right align-middle text-[15px] font-extrabold tabular-nums text-emerald-700"
+              >
+                {(record.survivalRate * 100).toFixed(2)}%
+              </td>
+            </tr>
+            <tr>
+              <Pair
+                label={t("ops.mortality.field.mortality_pct")}
+                value={`${record.mortalityPercentage.toFixed(2)}%`}
+                tone="text-orange-600"
+                rule={false}
+              />
+              <Pair
+                label={t("ops.mortality.field.weight_loss_pct")}
+                value={`${record.weightLossPercentage.toFixed(2)}%`}
+                tone="text-rose-600"
+              />
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   );

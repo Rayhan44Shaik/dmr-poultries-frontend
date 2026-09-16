@@ -180,32 +180,32 @@ ok("table: expand affordance kept", tableHtml.includes("Expand trip") && tableHt
   ok("table: the scroller is measured for the panel width", source.includes("new ResizeObserver") && source.includes("clientWidth") && tableHtml.includes("overflow-x-auto"), "scroll container is not measured");
 }
 
-/* ── 3b. The expanded row panel (the "dropdown") ──────────────────────── */
+/* ── 3b. The expanded row panel — ONE card, ONE table, full width ─────── */
 {
   const expandModule = await server.ssrLoadModule("/src/modules/operations/mortality/components/TripLossRowExpand.tsx");
-  const expandHtml = render(React.createElement(expandModule.default, { record: rows[0] }));
-  ok("panel: trip + vehicle facts", expandHtml.includes(rows[0].tripNo) && expandHtml.includes(rows[0].vehicleNo) && expandHtml.includes(rows[0].driverName));
-  ok("panel: three small cards (trip + weights + rates)", (expandHtml.match(/<h4/g) || []).length === 3, `h4=${(expandHtml.match(/<h4/g) || []).length}`);
-  ok("panel: no shop-wise delivery card", !expandHtml.includes("Delivery Output") && !expandHtml.includes("Total Delivery") && !expandHtml.includes(">Shop<"), "the shop table is still mounted");
-  ok("panel: weights table is a plain table — no bars", !expandHtml.includes('style="width') && !expandHtml.includes("animate-pulse"));
-  ok("panel: trip facts use the shared labels", expandHtml.includes("Vehicle") && expandHtml.includes("Supervisor") && expandHtml.includes("Source Farm") && expandHtml.includes("Driver") && expandHtml.includes("Loaders") && expandHtml.includes("Helpers"));
-  // The reference idiom: label left, value RIGHT — nothing is left dangling.
-  ok("panel: value follows its label (nothing stretched to the cell edge)", (expandHtml.match(/w-\[78px\]/g) || []).length >= 8, `cells=${(expandHtml.match(/w-\[78px\]/g) || []).length}`);
-  ok("panel: trip details is a compact label/value table, not stretched halves", (expandHtml.match(/<table/g) || []).length === 3 && !expandHtml.includes("sm:grid-cols-2") && !expandHtml.includes("flex-1"), `tables=${(expandHtml.match(/<table/g) || []).length}`);
-  ok("panel: every field row is label │ value in four pinned cells", (expandHtml.match(/w-\[196px\]/g) || []).length === 8, `value cells=${(expandHtml.match(/w-\[196px\]/g) || []).length}`);
-  ok("panel: each card title carries its own mark in a tinted tile", (expandHtml.match(/h-5 w-5 shrink-0 items-center justify-center rounded-md border/g) || []).length === 3, `tiles=${(expandHtml.match(/h-5 w-5 shrink-0/g) || []).length}`);
-  ok("panel: card colours are one family each (indigo / rose / emerald)", expandHtml.includes("border-indigo-100 bg-indigo-50/70") && expandHtml.includes("border-rose-100 bg-rose-50/70") && expandHtml.includes("border-emerald-100 bg-emerald-50/70"));
-  ok("panel: columns are tighter again (78px labels, px-2.5 cells)", (expandHtml.match(/w-\[78px\]/g) || []).length >= 8, `labels=${(expandHtml.match(/w-\[78px\]/g) || []).length}`);
-  ok("panel: weights columns pinned in px so they stay packed", (expandHtml.match(/w-\[(124|72|96)px\]/g) || []).length === 3, `px cols=${(expandHtml.match(/w-\[[0-9]+px\]/g) || []).length}`);
-  ok("panel: field names are bright black", (expandHtml.match(/text-slate-900/g) || []).length >= 4, `black headings=${(expandHtml.match(/text-slate-900/g) || []).length}`);
-  ok("panel: a neat rule sits between each field name and its data", (expandHtml.match(/border-l border-slate-200/g) || []).length >= 10, `rules=${(expandHtml.match(/border-l border-slate-200/g) || []).length}`);
-  ok("panel: weights columns are ruled apart too", (expandHtml.match(/border-l border-slate-100/g) || []).length >= 6, `column rules=${(expandHtml.match(/border-l border-slate-100/g) || []).length}`);
-  ok("panel: weights box is small — three content-sized columns, no % column", expandHtml.includes("table-fixed border-collapse") && !expandHtml.includes(">%<"), "weights table not content-sized");
-  ok("panel: weights and rates are two content-width boxes side by side", expandHtml.includes("lg:grid-cols-[max-content_max-content]") && expandHtml.includes("items-start") && !expandHtml.includes("w-[42%]"));
-  ok("panel: rates box carries survival + mortality % + loss %", expandHtml.includes("Survival Rate") && expandHtml.includes("Mortality %") && expandHtml.includes("Loss %"));
-  ok("panel: table rows use the same rhythm as the grid (py-2.5)", (expandHtml.match(/py-2\.5/g) || []).length >= 12, `rows=${(expandHtml.match(/py-2\.5/g) || []).length}`);
-  ok("panel: rows are one line tall", expandHtml.includes("py-2.5") && !expandHtml.includes("py-4"));
-  ok("panel: survival rate closes the weights card as a tinted strip", expandHtml.includes("bg-emerald-50/70") && expandHtml.includes("Survival Rate"));
+  const expandHtml = render(React.createElement(expandModule.default, { record: { ...rows[0], loaders: ["Jagadish Reddy", "Mohan Naidu"], helpers: ["Jagadish Rao", "Yesu Reddy"] } }));
+
+  ok("panel: ONE card", (expandHtml.match(/rounded-xl border border-slate-200 bg-white/g) || []).length === 1, `cards=${(expandHtml.match(/rounded-xl border border-slate-200 bg-white/g) || []).length}`);
+  ok("panel: ONE table", (expandHtml.match(/<table/g) || []).length === 1, `tables=${(expandHtml.match(/<table/g) || []).length}`);
+  ok("panel: the table fills the card", expandHtml.includes("w-full table-fixed"));
+  ok("panel: sections are stacked as full-width bands inside it", (expandHtml.match(/colSpan="4"/g) || []).length === 2, `bands=${(expandHtml.match(/colSpan="4"/g) || []).length}`);
+  ok("panel: four equal columns carry every row", (expandHtml.match(/w-1\/4/g) || []).length >= 20, `quarter cells=${(expandHtml.match(/w-1\/4/g) || []).length}`);
+  ok("panel: trip + weights + rates titles present", ["Trip Details", "Weights", "Rates"].every((title) => expandHtml.includes(title)));
+  ok("panel: card title carries the trip mark", expandHtml.includes("border-indigo-100 bg-indigo-50/70") && expandHtml.includes("border-rose-100 bg-rose-50/70") && expandHtml.includes("border-emerald-100 bg-emerald-50/70"));
+  ok("panel: values are right-aligned so each half closes cleanly", (expandHtml.match(/text-right align-middle/g) || []).length >= 12, `right-aligned=${(expandHtml.match(/text-right align-middle/g) || []).length}`);
+  ok("panel: name │ data hairline inside every pair", (expandHtml.match(/border-l border-slate-200 px-3/g) || []).length >= 10, `rules=${(expandHtml.match(/border-l border-slate-200 px-3/g) || []).length}`);
+
+  const detailRow = expandHtml.slice(expandHtml.indexOf("Trip No"), expandHtml.indexOf("Weights"));
+  ok("panel: every trip field is on the card", ["Trip No", "Day", "Vehicle", "Supervisor", "Driver", "Source Farm", "Loaders", "Helpers"].every((label) => detailRow.includes(label)));
+  ok("panel: loaders and helpers print their names", expandHtml.includes("Jagadish Reddy, Mohan Naidu") && expandHtml.includes("Jagadish Rao, Yesu Reddy"));
+
+  const weightsRow = expandHtml.slice(expandHtml.indexOf("Weights"), expandHtml.indexOf("Rates"));
+  ok("panel: weights section has its own column headings", ["Name", "Birds", "Weight"].every((head) => weightsRow.includes(head)) && weightsRow.includes(">%<"));
+  ok("panel: weights rows carry birds, weight and percentage", (weightsRow.match(/100.00%|2.13%/g) || []).length >= 2 && weightsRow.includes("636.09 kg") && weightsRow.includes("13.55 kg"));
+
+  const ratesRow = expandHtml.slice(expandHtml.indexOf("Rates"));
+  ok("panel: rates close the table", ratesRow.includes("Survival Rate") && ratesRow.includes("97.49%") && ratesRow.includes("Mortality %") && ratesRow.includes("Loss %"));
+  ok("panel: nothing is printed twice inside the panel", expandHtml.includes("Delivery Output") === false && expandHtml.includes("Total Delivery") === false);
 }
 
 /* ── 3c. Delivery data — the shop endpoint still backs the numbers ─────── */
