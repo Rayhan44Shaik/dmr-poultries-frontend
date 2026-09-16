@@ -4,30 +4,20 @@ import type { LucideIcon } from "lucide-react";
 import { useI18n } from "../../../../i18n";
 import type {
   DashboardSpanFleet,
-  SpanFleetParticipant,
   SpanFleetRoster,
 } from "../services/dashboardService";
 
 /**
- * Active Fleet — span-scoped roster tiles with INLINE lists (no tooltips).
- * Only the people and vehicles that actually ran a trip inside the selected
- * date window are counted (the line under the "Active Fleet" heading names
- * the same span); the active masters register rides along as the small
- * "of N active" denominator for context. Tiles: Vehicles, Drivers,
- * Supervisors, Helpers, Loaders — shops are deliberately not part of it.
- *
- * Directly below the tiles the ACTIVE (worked-in-span) lists of the four
- * crew registers are always on screen — one column each (Drivers,
- * Supervisors, Helpers, Loaders), busiest first, with trips / shops / farms
- * detail. Per review the ACTIVE vehicle list is not needed in any scenario,
- * so vehicles have no always-on column — their idle side shows on demand,
- * exactly like the crew's.
- *
- * CLICK any tile (crew or Vehicles) → that register's "did not run in this
- * range" members appear below the lists as a one-by-one HORIZONTAL scroll
- * line; selecting the tile again closes it, selecting another register
- * switches it. Nothing idle is shown when no tile is selected.
- * Register-Inactive (out of service) members carry an "Inactive" badge.
+ * Active Fleet — span-scoped tiles with NO lists of who worked. Hovering or
+ * clicking never surfaces "active trips" details anywhere:
+ *  - Tiles (always on screen) show only the worked/active count for the
+ *    selected window ("22 / 22 style"), the register name and a share bar.
+ *  - CLICK any tile → that register's "did not run in this range" members
+ *    appear below the tiles as a one-by-one HORIZONTAL scroll line;
+ *    selecting the tile again closes it, selecting another register
+ *    switches it. Register-Inactive (out of service) members carry an
+ *    "Inactive" badge. The worked/active roster lists themselves are
+ *    deliberately never rendered.
  */
 interface ActiveCountsProps {
   rosters: DashboardSpanFleet;
@@ -57,20 +47,6 @@ export default function ActiveCounts({ rosters }: ActiveCountsProps) {
   const { t } = useI18n();
   /** Selected tile drives the idle line; clicking it again closes it. */
   const [selected, setSelected] = useState<RosterKey | null>(null);
-
-  /** Per-span detail for one participant, shaped by what the register knows. */
-  const participantDetail = (key: RosterKey, p: SpanFleetParticipant): string => {
-    if (key === "vehicles" && p.weightKg != null) {
-      return t("ops.dashboard.detail_trips_weight", { trips: p.trips, weight: p.weightKg.toLocaleString("en-IN") });
-    }
-    if (key === "drivers" && p.shops != null) {
-      return t("ops.dashboard.detail_trips_shops", { trips: p.trips, shops: p.shops });
-    }
-    if (key === "supervisors" && p.farms != null) {
-      return t("ops.dashboard.detail_trips_farms", { trips: p.trips, farms: p.farms });
-    }
-    return t("ops.dashboard.detail_trips", { trips: p.trips });
-  };
 
   const selectedRoster = selected ? rosters[selected] ?? EMPTY : null;
   const selectedLabel = selected ? t(`ops.dashboard.active_${selected}`) : "";
@@ -137,62 +113,9 @@ export default function ActiveCounts({ rosters }: ActiveCountsProps) {
         })}
       </div>
 
-      {/* ── The ACTIVE (worked-in-span) lists of the four crew registers,
-            always on screen below the tiles — one column each, busiest
-            first. Vehicles have no always-on column per review: neither the
-            active nor the idle vehicle list sits here permanently; the idle
-            vehicles open on tile click below. No tooltips anywhere. ──────── */}
-      <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 border-t border-slate-100 pt-3">
-        {TILES.filter((tile) => tile.key !== "vehicles").map((tile) => {
-          const stat: SpanFleetRoster = rosters[tile.key] ?? EMPTY;
-          const registerLabel = t(`ops.dashboard.active_${tile.key}`);
-          return (
-            <div key={`list-${tile.key}`} className="min-w-0">
-              <div className="flex items-center justify-between gap-1.5 border-b border-slate-100 pb-1">
-                <span className="truncate text-[11px] font-bold text-slate-800">{registerLabel}</span>
-                <span
-                  className={`shrink-0 rounded-full px-1.5 py-px text-[9.5px] font-black tabular-nums ring-1 ring-inset ${
-                    stat.worked > 0
-                      ? "bg-emerald-50 text-emerald-700 ring-emerald-100"
-                      : "bg-slate-50 text-slate-500 ring-slate-100"
-                  }`}
-                >
-                  {t("ops.dashboard.on_trips_count", { count: stat.worked })}
-                </span>
-              </div>
-              {stat.items.length > 0 ? (
-                <ul className="mt-1.5 max-h-48 space-y-1 overflow-y-auto pr-0.5 text-[10px] text-slate-500">
-                  {stat.items.map((item) => (
-                    <li key={`${tile.key}-${item.name}`} className="flex items-start gap-1.5">
-                      <span aria-hidden="true" className="mt-[4.5px] h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-400" />
-                      <span className="min-w-0">
-                        <span className="block truncate font-semibold text-slate-700">
-                          {item.name}
-                        </span>
-                        <span className="block truncate tabular-nums text-slate-400">
-                          {participantDetail(tile.key, item)}
-                        </span>
-                      </span>
-                    </li>
-                  ))}
-                  {stat.overflow > 0 && (
-                    <li className="pt-0.5 text-center font-bold text-slate-400">
-                      {t("ops.dashboard.more_items", { count: stat.overflow })}
-                    </li>
-                  )}
-                </ul>
-              ) : (
-                <p className="mt-1.5 text-[10px] text-slate-400">
-                  {t("ops.dashboard.no_trips_range")}
-                </p>
-              )}
-            </div>
-          );
-        })}
-      </div>
-
       {/* ── Selected register's "did not run in this range" line — chips in a
-            one-by-one HORIZONTAL scroll row, toggled by the tile click ────── */}
+            one-by-one HORIZONTAL scroll row, toggled by the tile click. The
+            active/worked-trip lists are never rendered, by design. ────────── */}
       {selected && selectedRoster && (
         <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50/60 p-3.5">
           <div className="flex items-center justify-between gap-2">
