@@ -1,158 +1,329 @@
-import { Search } from "lucide-react";
-import Select from "react-select";
-import { ModernDatePicker } from "./ModernDatePicker";
+import React from "react";
+import {
+  FileText,
+  FileSpreadsheet,
+  Search,
+  Calendar,
+  Truck,
+  User,
+  Layers,
+  RotateCcw,
+  ArrowUpDown,
+  Plus,
+} from "lucide-react";
+import { DatePicker } from "../../../../components/common/DatePicker";
+import {
+  opsFilterCardClass,
+  opsFilterLabelClass,
+  opsInputClass,
+  opsSecondaryButtonClass,
+  opsPrimaryButtonClass,
+  opsPdfButtonClass,
+  opsExcelButtonClass,
+} from "../../../../shared/ui/operationsStyles";
+import { useI18n } from "../../../../i18n";
+import { BrandRefreshButton } from "../../../../ui";
+import MasterDropdown, { type MasterDropdownOption } from "../../../masters/components/MasterDropdown";
+import type { FuelSortKey } from "../types/fuelExpense";
+import { localizeTripViewText } from "../../vehicle-trips/utils/tripViewLocalization";
 
 interface Props {
   fromDate: string;
   toDate: string;
-  selectedVehicles: string[];
-  activeVehicles: string[];
+  vehicle: string;
+  driver: string;
+  sourceType: string;
+  sortBy: FuelSortKey | null;
+  sortDir: "asc" | "desc";
+  search: string;
   setFromDate: (v: string) => void;
   setToDate: (v: string) => void;
-  setSelectedVehicles: (v: string[]) => void;
-  onSearch: () => void;
+  setVehicle: (v: string) => void;
+  setDriver: (v: string) => void;
+  setSourceType: (v: string) => void;
+  setSort: (sortBy: FuelSortKey | null, sortDir: "asc" | "desc") => void;
+  setSearch: (v: string) => void;
   onReset: () => void;
+  vehicles?: readonly MasterDropdownOption[];
+  drivers?: readonly MasterDropdownOption[];
+  onAddFuelBill?: () => void;
+  isFormOpen?: boolean;
+  onExportPDF?: () => void;
+  onRefresh?: () => void;
+  onExportExcel?: () => void;
+  hasFilters?: boolean;
 }
 
-const parseDate = (str: string) => (str ? new Date(str + "T00:00:00") : null);
-const formatDate = (date: Date | null) => {
-  if (!date) return "";
-  const d = new Date(date);
-  const month = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${d.getFullYear()}-${month}-${day}`;
-};
-
-export function FuelFilters({
+function FuelFilters({
   fromDate,
   toDate,
-  selectedVehicles,
-  activeVehicles,
+  vehicle,
+  driver,
+  sourceType,
+  sortBy,
+  sortDir,
+  search,
   setFromDate,
   setToDate,
-  setSelectedVehicles,
-  onSearch,
+  setVehicle,
+  setDriver,
+  setSourceType,
+  setSort,
+  setSearch,
   onReset,
+  vehicles = [],
+  drivers = [],
+  onAddFuelBill,
+  isFormOpen = false,
+  onExportPDF,
+  onRefresh,
+  onExportExcel,
+  hasFilters = false,
 }: Props) {
-  const vehicleOptions = activeVehicles.map((v) => ({ value: v, label: v }));
+  const { t, language } = useI18n();
 
-  const selectStyles = {
-    control: (base: any) => ({
-      ...base,
-      borderRadius: "0.5rem",
-      borderColor: "#e2e8f0",
-      boxShadow: "none",
-      minHeight: "2.5rem",
-      fontSize: "0.875rem",
-      "&:hover": { borderColor: "#94a3b8" },
-      "&:focus-within": { borderColor: "#3b82f6", boxShadow: "0 0 0 2px rgba(59, 130, 246, 0.15)" },
-    }),
-    option: (base: any, { isFocused, isSelected }: any) => ({
-      ...base,
-      backgroundColor: isSelected ? "#2563eb" : isFocused ? "#eff6ff" : "white",
-      color: isSelected ? "white" : "#1e293b",
-      fontSize: "0.875rem",
-      padding: "0.625rem 0.75rem", // Adjusted padding to ensure ~40px height per item
-    }),
-    menu: (base: any) => ({ ...base, zIndex: 50 }),
-    placeholder: (base: any) => ({ ...base, color: "#94a3b8", fontSize: "0.875rem" }),
-    multiValue: (base: any) => ({
-      ...base,
-      backgroundColor: "#e0f2fe",
-      borderRadius: 4,
-    }),
-    multiValueLabel: (base: any) => ({
-      ...base,
-      color: "#0369a1",
-      fontSize: "12px",
-      fontWeight: 500,
-    }),
-    multiValueRemove: (base: any) => ({
-      ...base,
-      color: "#0369a1",
-      ":hover": { backgroundColor: "#bae6fd", color: "#0c4a6e" },
-    }),
-    indicatorsContainer: (base: any) => ({
-      ...base,
-      height: "auto",
-    }),
-    clearIndicator: (base: any) => ({
-      ...base,
-      padding: "0 4px",
-    }),
-    valueContainer: (base: any) => ({
-      ...base,
-      padding: "0 4px",
-      flexWrap: "nowrap",
-      overflow: "hidden",
-    }),
+  const withoutSentinel = (
+    options: readonly MasterDropdownOption[],
+    sentinel: string
+  ) => options.filter((option) => option.value !== sentinel);
+
+  const localizeOptions = (options: readonly MasterDropdownOption[]) =>
+    options.map((option) => ({
+      ...option,
+      label: localizeTripViewText(option.label, language),
+      searchText: option.searchText || option.label,
+    }));
+
+  const vehicleOptions = localizeOptions(withoutSentinel(vehicles, "All Vehicles"));
+  const driverOptions = localizeOptions(withoutSentinel(drivers, "All Drivers"));
+
+  const sourceOptions: MasterDropdownOption[] = [
+    { value: "TRIP", label: t("ops.fuel.trip_diesel") },
+    { value: "MANUAL", label: t("ops.fuel.manual_bill") },
+  ];
+
+  const sortOptions: MasterDropdownOption[] = [
+    { value: "billNo:asc", label: `${t("ops.fuel.bill_no")} — ${t("ops.trip.sort_az")}` },
+    { value: "billNo:desc", label: `${t("ops.fuel.bill_no")} — ${t("ops.trip.sort_za")}` },
+    { value: "date:desc", label: `${t("common.date")} — ${t("ops.trip.sort_latest_first")}` },
+    { value: "date:asc", label: `${t("common.date")} — ${t("ops.trip.sort_oldest_first")}` },
+    { value: "vehicleNo:asc", label: `${t("common.vehicle")} — ${t("ops.trip.sort_az")}` },
+    { value: "vehicleNo:desc", label: `${t("common.vehicle")} — ${t("ops.trip.sort_za")}` },
+    { value: "driverName:asc", label: `${t("common.driver")} — ${t("ops.trip.sort_az")}` },
+    { value: "driverName:desc", label: `${t("common.driver")} — ${t("ops.trip.sort_za")}` },
+    { value: "litres:desc", label: `${t("ops.fuel.litres")} — ${t("ops.trip.sort_high_low")}` },
+    { value: "litres:asc", label: `${t("ops.fuel.litres")} — ${t("ops.trip.sort_low_high")}` },
+    { value: "rate:desc", label: `${t("ops.fuel.rate_per_l")} — ${t("ops.trip.sort_high_low")}` },
+    { value: "rate:asc", label: `${t("ops.fuel.rate_per_l")} — ${t("ops.trip.sort_low_high")}` },
+    { value: "amount:desc", label: `${t("ops.fuel.amount_inr")} — ${t("ops.trip.sort_high_low")}` },
+    { value: "amount:asc", label: `${t("ops.fuel.amount_inr")} — ${t("ops.trip.sort_low_high")}` },
+    { value: "meterReading:desc", label: `${t("ops.fuel.meter_km")} — ${t("ops.trip.sort_high_low")}` },
+    { value: "meterReading:asc", label: `${t("ops.fuel.meter_km")} — ${t("ops.trip.sort_low_high")}` },
+  ];
+
+  const sortValue = sortBy ? `${sortBy}:${sortDir}` : "";
+  const setSortValue = (value: string) => {
+    if (!value) {
+      setSort(null, "asc");
+      return;
+    }
+    const [key, direction] = value.split(":");
+    const selected = sortOptions.some((option) => option.value === value);
+    if (!selected) return;
+    setSort(key as FuelSortKey, direction === "desc" ? "desc" : "asc");
   };
 
   return (
-    <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 space-y-4">
-      {/* Inputs Row */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-start">
-        {/* From Date - 25% (1/4 columns) */}
-        <div className="md:col-span-1">
-          <label className="text-sm font-semibold text-slate-700 block mb-1.5">From Date</label>
-          <ModernDatePicker
-            id="from-date"
-            selected={parseDate(fromDate)}
-            onChange={(date) => setFromDate(formatDate(date))}
-            placeholder="Select start"
-            className="w-full"
+    <div className={opsFilterCardClass}>
+      {/* ── Top Filters Row: 4 Primary Filters ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+        <div>
+          <label className={opsFilterLabelClass}>
+            <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
+            <span>{t("common.from")}</span>
+          </label>
+          <DatePicker
+            value={fromDate}
+            onChange={setFromDate}
+            placeholder={t("placeholder.enter_date")}
+            className="w-full text-xs font-medium"
           />
         </div>
 
-        {/* To Date - 25% (1/4 columns) */}
-        <div className="md:col-span-1">
-          <label className="text-sm font-semibold text-slate-700 block mb-1.5">To Date</label>
-          <ModernDatePicker
-            id="to-date"
-            selected={parseDate(toDate)}
-            onChange={(date) => setToDate(formatDate(date))}
-            placeholder="Select end"
-            className="w-full"
+        <div>
+          <label className={opsFilterLabelClass}>
+            <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
+            <span>{t("common.to")}</span>
+          </label>
+          <DatePicker
+            value={toDate}
+            onChange={setToDate}
+            placeholder={t("placeholder.enter_date")}
+            className="w-full text-xs font-medium"
           />
         </div>
 
-        {/* Vehicles - 50% (2/4 columns) */}
-        <div className="md:col-span-2">
-          <label className="text-sm font-semibold text-slate-700 block mb-1.5">Vehicles</label>
-          <Select
+        <div>
+          <label className={opsFilterLabelClass}>
+            <Truck size={17} className="text-emerald-500 flex-shrink-0" />
+            <span>{t("common.vehicle")}</span>
+          </label>
+          <MasterDropdown
+            hideLabel
+            label={t("common.vehicle")}
+            value={vehicle === "All Vehicles" ? "" : vehicle}
             options={vehicleOptions}
-            value={vehicleOptions.filter((opt) => selectedVehicles.includes(opt.value))}
-            onChange={(selected) => {
-              setSelectedVehicles(selected ? selected.map((s: any) => s.value) : []);
-            }}
-            isMulti
-            isSearchable
-            placeholder="Select vehicles..."
-            styles={selectStyles}
-            maxMenuHeight={200} // Strictly sets the dropdown menu to fit ~5 items
+            onChange={(next) => setVehicle(next || "All Vehicles")}
+            placeholder={t("ops.fuel.all_vehicles")}
+            searchable
+            allowClear
+            className="w-full"
+          />
+        </div>
+
+        <div>
+          <label className={opsFilterLabelClass}>
+            <User size={17} className="text-emerald-500 flex-shrink-0" />
+            <span>{t("common.driver")}</span>
+          </label>
+          <MasterDropdown
+            hideLabel
+            label={t("common.driver")}
+            value={driver === "All Drivers" ? "" : driver}
+            options={driverOptions}
+            onChange={(next) => setDriver(next || "All Drivers")}
+            placeholder={t("ops.fuel.all_drivers")}
+            searchable
+            allowClear
             className="w-full"
           />
         </div>
       </div>
 
-      {/* Divider matching the image */}
-      <hr className="border-slate-100" />
+      {/* ── Secondary Row: Source, Sort, Search ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3.5 items-end pt-1">
+        <div className="lg:col-span-3">
+          <label className={opsFilterLabelClass}>
+            <Layers size={17} className="text-indigo-500 flex-shrink-0" />
+            <span>{t("ops.fuel.source")}</span>
+          </label>
+          <MasterDropdown
+            hideLabel
+            label={t("ops.fuel.source")}
+            value={sourceType === "All" ? "" : sourceType}
+            options={sourceOptions}
+            onChange={(next) => setSourceType(next || "All")}
+            placeholder={t("ops.fuel.all_sources")}
+            searchable
+            allowClear
+            className="w-full"
+          />
+        </div>
 
-      {/* Actions Row */}
-      <div className="flex items-center gap-3 justify-end">
+        <div className="lg:col-span-3">
+          <label className={opsFilterLabelClass}>
+            <ArrowUpDown size={17} className="text-violet-500 flex-shrink-0" />
+            <span>{t("ops.trip.sort_by")}</span>
+          </label>
+          <MasterDropdown
+            hideLabel
+            label={t("ops.trip.sort_by")}
+            value={sortValue}
+            options={sortOptions}
+            onChange={setSortValue}
+            placeholder={t("ops.trip.no_sorting")}
+            searchable
+            allowClear
+            className="w-full"
+          />
+        </div>
+
+        <div className="lg:col-span-6">
+          <label className={opsFilterLabelClass}>
+            <Search size={17} className="text-slate-400 flex-shrink-0" />
+            <span>{t("ops.fuel.search_label")}</span>
+          </label>
+          <div className="relative">
+            <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+            <input
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder={t("ops.fuel.search_placeholder")}
+              className={`${opsInputClass} pl-10`}
+            />
+          </div>
+        </div>
+      </div>
+
+      {/* ── Action Toolbar: Order = Reset, Refresh, Add Fuel Bill, PDF, Excel ── */}
+      <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100 flex-wrap">
+        {/* 1. Reset Filters */}
         <button
-          onClick={onSearch}
-          className="h-10 px-5 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all shadow-sm flex items-center gap-1.5 active:scale-95"
-        >
-          <Search size={16} /> Search
-        </button>
-        <button
+          type="button"
           onClick={onReset}
-          className="h-10 px-5 rounded-lg border border-red-500 bg-white text-red-600 text-sm font-medium transition-all hover:bg-red-50 active:scale-95"
+          className={`group relative ${opsSecondaryButtonClass}`}
+          aria-label={t("common.reset")}
         >
-          Reset
+          <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]">
+            <RotateCcw size={14} />
+          </span>
+          <span>{t("common.reset")}</span>
         </button>
+
+        {/* 2. Refresh */}
+        {onRefresh && <BrandRefreshButton onClick={onRefresh} />}
+
+        {/* 3. Add Fuel Bill */}
+        {onAddFuelBill && (
+          <button
+            type="button"
+            onClick={onAddFuelBill}
+            className={`group relative ${opsPrimaryButtonClass} active:scale-95 transition-transform duration-150`}
+            aria-label={isFormOpen ? t("ops.fuel.hide_form") : t("ops.fuel.add_bill")}
+          >
+            <span className="inline-flex motion-safe:group-hover:rotate-90 transition-transform duration-200">
+              <Plus size={16} />
+            </span>
+            <span>{isFormOpen ? t("ops.fuel.hide_form") : t("ops.fuel.add_bill")}</span>
+          </button>
+        )}
+
+        {/* 4. PDF (Enabled only when filter applied) */}
+        {onExportPDF && (
+          <button
+            type="button"
+            onClick={onExportPDF}
+            disabled={!hasFilters}
+            className={`group relative ${opsPdfButtonClass}`}
+            aria-label={t("reports.export_pdf") || "PDF"}
+            title={!hasFilters ? (language === "te" ? "PDF ఎగుమతి చేయడానికి ఫిల్టర్ వర్తించండి" : "Apply a filter to export PDF") : (language === "te" ? "PDF నివేదిక ఎగుమతి చేయండి" : "Export PDF Report")}
+          >
+            <span className={`inline-flex ${hasFilters ? "motion-safe:group-hover:animate-[var(--animate-action-pdf)]" : ""}`}>
+              <FileText size={15} />
+            </span>
+            <span>PDF</span>
+          </button>
+        )}
+
+        {/* 5. Excel (Enabled only when filter applied) */}
+        {onExportExcel && (
+          <button
+            type="button"
+            onClick={onExportExcel}
+            disabled={!hasFilters}
+            className={`group relative ${opsExcelButtonClass}`}
+            aria-label={t("reports.export_excel") || "Excel"}
+            title={!hasFilters ? (language === "te" ? "Excel ఎగుమతి చేయడానికి ఫిల్టర్ వర్తించండి" : "Apply a filter to export Excel") : (language === "te" ? "Excel నివేదిక ఎగుమతి చేయండి" : "Export Excel Report")}
+          >
+            <span className={`inline-flex ${hasFilters ? "motion-safe:group-hover:animate-[var(--animate-action-excel)]" : ""}`}>
+              <FileSpreadsheet size={15} />
+            </span>
+            <span>Excel</span>
+          </button>
+        )}
       </div>
     </div>
   );
 }
+
+export default React.memo(FuelFilters);

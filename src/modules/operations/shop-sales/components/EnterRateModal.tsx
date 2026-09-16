@@ -92,7 +92,7 @@ export default function EnterRateModal({
   isSaving = false,
   loadError,
   shops = [],
-  shopsLoading = false,
+  shopsLoading: _shopsLoading = false,
 }: Props) {
   const { t, language } = useI18n();
   const [deliveries, setDeliveries] = useState<Trip["deliveries"]>([]);

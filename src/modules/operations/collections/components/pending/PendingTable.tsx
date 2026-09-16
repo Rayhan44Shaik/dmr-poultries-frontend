@@ -1,6 +1,6 @@
 import { Eye, Trash2 } from "lucide-react";
 import type { CollectionPendingSummaryRow } from "../../types/collection";
-import { opsTableHeaderBarClass, opsTableThClass, opsTableTdClass, opsTableRowClass, opsTableDivideClass, opsTableCardClass } from "../../../../../shared/ui/operationsStyles";
+import { opsTableThClass, opsTableTdClass, opsTableRowClass, opsTableDivideClass, opsTableCardClass } from "../../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../../i18n";
 
 const formatCurrency = (amount: number) =>
@@ -54,8 +54,6 @@ export function PendingTable({
       onSelectShop(shopName);
     }
   };
-
-  const selectedShop = data.find((s) => s.shopName === selectedShopName);
 
   if (data.length === 0) {
     return (

@@ -220,7 +220,7 @@ export default function CollectionPerformanceChart({
   );
   const propSnapshotKey = useMemo(() => {
     const firstShop = data[0]?.shopName ?? "";
-    const lastShop = data.at(-1)?.shopName ?? "";
+    const lastShop = data[data.length - 1]?.shopName ?? "";
     return [fromDate, toDate, totalSales, totalCollections, totalPending, data.length, firstShop, lastShop].join("|");
   }, [data, fromDate, toDate, totalSales, totalCollections, totalPending]);
   const activeLocalSnapshot = localSnapshot?.key === propSnapshotKey ? localSnapshot.snapshot : null;

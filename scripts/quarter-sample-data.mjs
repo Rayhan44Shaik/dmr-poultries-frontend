@@ -671,25 +671,38 @@ for (const date of OP_DATES) {
     // ── Step 5: diesel + expenses ─────────────────────────────────────────
     const dieselLitres = round(totalKm / (5 + r()), 2);
     const dieselRate = round(94 + r() * 6, 2);
+    const numDiesel = tripSeq % 4 === 0 ? 3 : tripSeq % 2 === 0 ? 2 : 1;
     const dieselEntries =
       stage >= 5
-        ? [
-            {
-              id: tripSeq * 10 + 1,
-              rowIndex: 1,
-              litres: dieselLitres,
-              rate: dieselRate,
-              amount: round(dieselLitres * dieselRate, 2),
-              meter: openingMeter + between(r, 5, 40),
-              bunkName: pick(r, ["HP Petro Bunk", "IOC Fuel Point", "BPCL Highway Bunk", "Reliance Fuel"]),
-              gpsLat: round(17.2 + r() * 0.6, 6),
-              gpsLon: round(78.2 + r() * 0.6, 6),
-              gpsAccuracy: between(r, 4, 18),
-              gpsCapturedAt: ts(date, "07:45:00"),
+        ? Array.from({ length: numDiesel }, (_, di) => {
+            const partLitres = round(dieselLitres / numDiesel, 2);
+            const partRate = round(dieselRate + (di * 0.4 - 0.2), 2);
+            const bunk = pick(r, [
+              "HP Petro Bunk - Benz Circle",
+              "IOC Fuel Point - NH16",
+              "BPCL Highway Bunk - Guntur",
+              "Reliance Fuel Hub - Vijayawada",
+              "Nayara Energy Fuel Station - Eluru",
+            ]);
+            const lat = round(16.5062 + (r() - 0.5) * 0.4 + di * 0.05, 6);
+            const lon = round(80.6480 + (r() - 0.5) * 0.4 + di * 0.05, 6);
+            const meter = openingMeter + between(r, 5, 20) + di * Math.max(20, Math.floor(totalKm / numDiesel));
+            return {
+              id: tripSeq * 10 + di + 1,
+              rowIndex: di + 1,
+              litres: partLitres,
+              rate: partRate,
+              amount: round(partLitres * partRate, 2),
+              meter,
+              bunkName: bunk,
+              gpsLat: lat,
+              gpsLon: lon,
+              gpsAccuracy: between(r, 4, 15),
+              gpsCapturedAt: ts(date, `0${7 + di * 3}:45:00`),
               submitted: true,
-              submittedAt: ts(date, "07:46:00"),
-            },
-          ]
+              submittedAt: ts(date, `0${7 + di * 3}:46:00`),
+            };
+          })
         : [];
 
     const deliveryTolls = money(r, 0, 600, 10);
@@ -1391,15 +1404,71 @@ function buildLedger(shopId) {
 // 8. FUEL EXPENSES — trip-linked + manual bills across the quarter
 // ═══════════════════════════════════════════════════════════════════════════
 
+// ═══════════════════════════════════════════════════════════════════════════
+// 8. FUEL EXPENSES — trip-linked + manual bills across the quarter
+// ═══════════════════════════════════════════════════════════════════════════
+
+function sampleFuelBillSvg({ billNo, vehicleNo, driverName, bunk, litres, rate, amount, date, meter }) {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420">
+  <rect width="640" height="420" fill="#f8fafc"/>
+  <rect x="16" y="16" width="608" height="388" rx="18" fill="#ffffff" stroke="#cbd5e1" stroke-width="2"/>
+  <rect x="16" y="16" width="608" height="68" rx="18" fill="#0d9488"/>
+  <text x="40" y="46" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="bold" fill="#ffffff">DMR POULTRIES — FUEL RECEIPT</text>
+  <text x="40" y="68" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#ccfbf1">Diesel Fill Voucher · Original Slip</text>
+  <text x="600" y="52" text-anchor="end" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#ffffff" font-weight="bold">${billNo || 'FUEL-RECEIPT'}</text>
+  <line x1="40" y1="106" x2="600" y2="106" stroke="#e2e8f0" stroke-width="2"/>
+  
+  <text x="40" y="136" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#64748b" font-weight="bold">PETROL BUNK</text>
+  <text x="200" y="136" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" fill="#0f172a">${bunk || 'HP Petro Bunk'}</text>
+  
+  <text x="40" y="166" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#64748b" font-weight="bold">VEHICLE NO</text>
+  <text x="200" y="166" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" fill="#0f172a">${vehicleNo || '—'}</text>
+  
+  <text x="40" y="196" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#64748b" font-weight="bold">DRIVER</text>
+  <text x="200" y="196" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#0f172a">${driverName || '—'}</text>
+
+  <text x="40" y="226" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#64748b" font-weight="bold">DATE</text>
+  <text x="200" y="226" font-family="Helvetica, Arial, sans-serif" font-size="14" fill="#0f172a">${date || ''}</text>
+
+  <text x="40" y="256" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#64748b" font-weight="bold">ODOMETER</text>
+  <text x="200" y="256" font-family="Helvetica, Arial, sans-serif" font-size="14" font-weight="bold" fill="#0f172a">${meter ? `${meter.toLocaleString()} KM` : '—'}</text>
+
+  <rect x="40" y="276" width="560" height="96" rx="14" fill="#f0fdf4" stroke="#86efac"/>
+  <text x="64" y="310" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#166534" font-weight="bold">DIESEL QUANTITY &amp; RATE</text>
+  <text x="64" y="342" font-family="Helvetica, Arial, sans-serif" font-size="20" font-weight="bold" fill="#0f172a">${litres} L @ ₹${rate}/L</text>
+  
+  <text x="360" y="310" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#166534" font-weight="bold">TOTAL AMOUNT PAID</text>
+  <text x="360" y="348" font-family="Helvetica, Arial, sans-serif" font-size="26" font-weight="bold" fill="#15803d">₹ ${Number(amount).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</text>
+
+  <text x="600" y="394" text-anchor="end" font-family="Helvetica, Arial, sans-serif" font-size="11" fill="#94a3b8">Computer generated fuel voucher · DMR Poultries System</text>
+</svg>`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+
 const FUEL_EXPENSES = [];
 let fuelSeq = 0;
 for (const t of TRIPS) {
   for (const d of t.dieselEntries ?? []) {
     fuelSeq += 1;
     const r = rng(6000 + fuelSeq);
+    const billNo = `FUEL-${t.tripDate.replaceAll("-", "")}-${String(fuelSeq).padStart(4, "0")}`;
+    const bunk = d.bunkName || pick(r, ["HP Petro Bunk - Benz Circle", "IOC Fuel Point - NH16", "BPCL Highway Bunk - Guntur", "Reliance Fuel Hub - Vijayawada"]);
+    const lat = d.gpsLat || round(16.5062 + (r() - 0.5) * 0.4, 6);
+    const lon = d.gpsLon || round(80.6480 + (r() - 0.5) * 0.4, 6);
+    const imgData = sampleFuelBillSvg({
+      billNo,
+      vehicleNo: t.vehicleNo,
+      driverName: t.driverName,
+      bunk,
+      litres: d.litres,
+      rate: d.rate,
+      amount: d.amount,
+      date: t.tripDate,
+      meter: d.meter,
+    });
     FUEL_EXPENSES.push({
       id: String(fuelSeq),
-      billNo: `FUEL-${t.tripDate.replaceAll("-", "")}-${String(fuelSeq).padStart(4, "0")}`,
+      billNo,
       billDate: t.tripDate,
       sourceType: "TRIP",
       vehicleId: t.vehicleId,
@@ -1414,17 +1483,19 @@ for (const t of TRIPS) {
       fuelRate: d.rate,
       liters: d.litres,
       amount: d.amount,
-      pumpName: d.bunkName,
-      remarks: "Trip diesel (Step 5)",
-      gpsLat: d.gpsLat,
-      gpsLon: d.gpsLon,
-      gpsAccuracy: d.gpsAccuracy,
-      gpsCapturedAt: d.gpsCapturedAt,
-      status: dayDiff(t.tripDate, TODAY) <= 2 && fuelSeq % 5 === 0 ? "Pending" : "Approved",
+      pumpName: bunk,
+      remarks: `Trip diesel (${t.tripNo})`,
+      gpsLat: lat,
+      gpsLon: lon,
+      gpsAccuracy: d.gpsAccuracy || between(r, 4, 18),
+      gpsCapturedAt: d.gpsCapturedAt || ts(t.tripDate, "07:45:00"),
+      imageData: imgData,
+      imageName: `${billNo}.svg`,
+      status: "Approved",
       createdAt: ts(t.tripDate, "07:50:00"),
       createdBy: t.supervisorName,
       approvedAt: ts(t.tripDate, "21:10:00"),
-      approvedBy: "Owner",
+      approvedBy: "Trip Completion",
       updatedAt: ts(t.tripDate, "21:10:00"),
     });
   }
@@ -1437,9 +1508,31 @@ for (let i = 0; i < 120; i += 1) {
   const v = ACTIVE_VEHICLES[i % ACTIVE_VEHICLES.length];
   const rate = round(94 + r() * 6, 2);
   const liters = round(20 + r() * 60, 2);
+  const billNo = `FUEL-M-${date.replaceAll("-", "")}-${String(i + 1).padStart(3, "0")}`;
+  const bunk = pick(r, [
+    "HP Petro Bunk - Benz Circle",
+    "IOC Fuel Point - NH16",
+    "BPCL Highway Bunk - Guntur",
+    "Shell Select - Vijayawada",
+    "Nayara Energy Station - Eluru",
+  ]);
+  const lat = round(16.48 + r() * 0.6, 6);
+  const lon = round(80.55 + r() * 0.6, 6);
+  const meter = (VEHICLE_METER.get(v.id) ?? 50000) - between(r, 100, 4000);
+  const imgData = sampleFuelBillSvg({
+    billNo,
+    vehicleNo: v.vehicleNumber,
+    driverName: DRIVERS[i % DRIVERS.length].employeeName,
+    bunk,
+    litres: liters,
+    rate,
+    amount: round(liters * rate, 2),
+    date,
+    meter,
+  });
   FUEL_EXPENSES.push({
     id: String(fuelSeq),
-    billNo: `FUEL-M-${date.replaceAll("-", "")}-${String(i + 1).padStart(3, "0")}`,
+    billNo,
     billDate: date,
     sourceType: "MANUAL",
     vehicleId: v.id,
@@ -1450,12 +1543,18 @@ for (let i = 0; i < 120; i += 1) {
     supervisorName: SUPERVISORS[i % SUPERVISORS.length].employeeName,
     tripId: null,
     tripNo: null,
-    currentMeter: (VEHICLE_METER.get(v.id) ?? 50000) - between(r, 100, 4000),
+    currentMeter: meter,
     fuelRate: rate,
     liters,
     amount: round(liters * rate, 2),
-    pumpName: pick(r, ["HP Petro Bunk", "IOC Fuel Point", "BPCL Highway Bunk", "Shell Select"]),
+    pumpName: bunk,
     remarks: "Manual top-up",
+    gpsLat: lat,
+    gpsLon: lon,
+    gpsAccuracy: between(r, 5, 15),
+    gpsCapturedAt: ts(date, "10:45:00"),
+    imageData: imgData,
+    imageName: `${billNo}.svg`,
     status: i % 11 === 0 ? "Rejected" : i % 4 === 0 ? "Pending" : "Approved",
     createdAt: ts(date, "11:00:00"),
     createdBy: "Office",
@@ -4222,13 +4321,18 @@ function createCollectionRow(body) {
 function createFuelRow(body) {
   const id = nextNumericId(FUEL_EXPENSES.map((f) => ({ id: Number(f.id) })));
   const date = String(body.billDate ?? TODAY);
-  const sameDay = FUEL_EXPENSES.filter((f) => f.billDate === date).length + 1;
+  let sameDay = FUEL_EXPENSES.filter((f) => f.billDate === date).length + 1;
+  let candidateBillNo = body.billNo || `FUEL-M-${date.replaceAll("-", "")}-${pad3(sameDay)}`;
+  while (FUEL_EXPENSES.some((f) => f.billNo === candidateBillNo)) {
+    sameDay += 1;
+    candidateBillNo = `FUEL-M-${date.replaceAll("-", "")}-${pad3(sameDay)}`;
+  }
   const vehicle = body.vehicleId
     ? VEHICLE_BY_ID.get(Number(body.vehicleId))
     : VEHICLES.find((v) => v.vehicleNumber === body.vehicleNo);
   const row = {
     id: String(id),
-    billNo: body.billNo ?? `FUEL-M-${date.replaceAll("-", "")}-${pad3(sameDay)}`,
+    billNo: candidateBillNo,
     billDate: date,
     sourceType: body.sourceType ?? "MANUAL",
     vehicleId: vehicle?.id ?? null,

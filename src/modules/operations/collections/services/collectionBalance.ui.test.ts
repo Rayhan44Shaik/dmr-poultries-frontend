@@ -25,8 +25,6 @@ const enDictSrc = read("../../../../i18n/modules/operations.en.ts");
 const enMainDictSrc = read("../../../../i18n/en.ts");
 const entryHookSrc = read("../hooks/useCollectionEntry.ts");
 const summarySrc = read("../components/entry/OutstandingSummary.tsx");
-const amountSrc = read("../components/entry/CollectionAmount.tsx");
-const pendingPageSrc = read("../pages/PendingCollectionsPage.tsx");
 const tableSrc = read("../components/entry/RecentCollectionsTable.tsx");
 const serviceSrc = read("./collectionService.ts");
 

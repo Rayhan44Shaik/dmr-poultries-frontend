@@ -180,7 +180,6 @@ export async function generateAssignmentSheetPdf({
     }
     const labelCol = contentWidth * 0.24;
     const valueCol = (contentWidth - labelCol * 2) / 2;
-    const overlays = new Map<string, string>();
     autoTable(doc, {
       body: pairs,
       startY: y,

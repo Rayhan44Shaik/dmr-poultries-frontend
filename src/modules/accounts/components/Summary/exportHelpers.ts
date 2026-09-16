@@ -70,7 +70,6 @@ export const exportPDF = async (
   doc.setFontSize(6.5);
   doc.setTextColor(148, 163, 184);
   const genText = `Generated: ${format(new Date(), 'dd MMM yyyy, hh:mm a')}`;
-  const genW = doc.getStringUnitWidth(genText) * 6.5 / doc.internal.scaleFactor;
   doc.text(genText, pageWidth - margin - 2 - 40, 18);
 
   // ─── KPI cards below header (light, simple) ─────────────────────

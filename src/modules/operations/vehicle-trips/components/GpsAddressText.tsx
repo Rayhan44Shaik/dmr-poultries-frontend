@@ -28,8 +28,15 @@ export function GpsAddressText({
     : address?.trim() || (status === "failed" || status === "resolved" ? coordFallback : fallbackText);
   const clampClass = maxLines === 1 ? "line-clamp-1" : maxLines === 2 ? "line-clamp-2" : "";
 
+  const fullTitle = hasCoords
+    ? `${displayText} (Lat: ${latNum!.toFixed(6)}°N, Lon: ${lonNum!.toFixed(6)}°E)`
+    : displayText;
+
   return (
-    <span className={`inline-flex min-w-0 items-start gap-1.5 ${className ?? ""}`}>
+    <span
+      className={`inline-flex min-w-0 items-start gap-1.5 ${className ?? ""}`}
+      title={fullTitle}
+    >
       {status === "resolving" ? <Loader2 size={13} className="mt-0.5 shrink-0 animate-spin" /> : <MapPin size={13} className="mt-0.5 shrink-0" />}
       <span className={`min-w-0 ${clampClass}`}>{displayText}</span>
     </span>

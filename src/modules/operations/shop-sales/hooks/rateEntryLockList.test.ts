@@ -34,7 +34,6 @@ describe("Rate Entry lock list resilience", () => {
 
   it("second confirmed lock is idempotent on local list state", () => {
     let trips = [tripA, tripB];
-    const lockedIds = new Set<number>([tripA.id]);
     trips = dropLockedTripFromList(trips, tripA.id);
     trips = dropLockedTripFromList(trips, tripA.id);
     assert.deepEqual(trips, [tripB]);
