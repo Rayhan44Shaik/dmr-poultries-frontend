@@ -1630,6 +1630,15 @@ function buildSampleDocs(row) {
 MAINTENANCE.forEach((row, idx) => {
   if (idx % 3 === 1) row.documents = buildSampleDocs(row);
 });
+// A small audit trail of soft-deleted records — the same state the DELETE
+// handler writes (`deleted` + `deletedAt`, no row removed). Fleet → Maintenance
+// Entry's "Deleted" view and the History page's Deleted filter read exactly
+// these rows, so the tab is demonstrable without deleting anything live.
+MAINTENANCE.forEach((row, idx) => {
+  if ((idx + 1) % 47 !== 0) return;
+  row.deleted = true;
+  row.deletedAt = ts(addDays(String(row.date).slice(0, 10), 2), "11:30:00");
+});
 
 const PERMIT_TYPES = ["insurance", "fitness", "permit", "puc", "rc"];
 const PERMITS = [];
@@ -4276,7 +4285,22 @@ function createPaymentRow(body) {
 
 // ── Fleet maintenance (multipart) ──────────────────────────────────────────
 
-/** Parse a multipart/form-data body into fields + document metadata. */
+/** Bytes of documents uploaded through the entry form, keyed by document id.
+ * They are kept out of the row objects on purpose: the maintenance list stays a
+ * small JSON payload, while GET /fleet/maintenance/:id/documents/:docId can
+ * stream the exact file the user attached. Seeded documents (no stored bytes)
+ * keep streaming the generated bill SVG / invoice PDF instead. */
+const MAINT_DOC_BYTES = new Map();
+
+/** Row-shape for one uploaded document: bytes go to the side map, metadata
+ *  (id/maintenanceId/fileName/mimeType/fileSize/createdAt) goes to the row. */
+function storeUploadedDocument(maintenanceId, raw, index, offset = 0) {
+  const { bytes, ...meta } = raw ?? {};
+  const id = 900000 + Number(maintenanceId) * 10 + Number(offset) + Number(index);
+  if (bytes && bytes.length) MAINT_DOC_BYTES.set(id, bytes);
+  return { id, maintenanceId: Number(maintenanceId), ...meta, createdAt: nowIso() };
+}
+
 function parseMultipart(req, contentType) {
   const match = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(contentType ?? "");
   if (!match) return { fields: {}, documents: [] };
@@ -4305,6 +4329,10 @@ function parseMultipart(req, contentType) {
             fileName: fileMatch[1] || "document",
             mimeType: /content-type:\s*([^\r\n]+)/i.exec(headers)?.[1]?.trim() || "application/octet-stream",
             fileSize: Buffer.byteLength(value, "latin1"),
+            // latin1 is byte-transparent, so the uploaded blob survives the
+            // multipart scan unchanged and the viewer downloads exactly what
+            // the entry form attached (see MAINT_DOC_BYTES below).
+            bytes: Buffer.from(value, "latin1"),
           });
         } else {
           fields[name] = value;
@@ -4330,12 +4358,31 @@ function buildMaintenanceRow(fields, documents, existing) {
   const parts = parseJson(fields.parts, []);
   const nextServiceByType = parseJson(fields.nextServiceByType, {});
   const date = String(fields.date ?? existing?.date ?? TODAY).slice(0, 10);
+  // The entry form submits `maintenanceType` as a JSON array (the multi-select
+  // keeps its own list). Every reader in the Fleet module — the tables, the
+  // timeline, the edit form, the localization helpers — expects the stored
+  // comma-separated string used by the seeded rows, so normalize here: an
+  // array is joined, a string is kept, and an omitted field keeps the value
+  // already on the record.
+  const rawMaintenanceType = (() => {
+    const value = fields.maintenanceType;
+    if (value == null || value === "") return null;
+    if (Array.isArray(value)) return value;
+    return parseJson(value, null) ?? String(value);
+  })();
+  const maintenanceType = Array.isArray(rawMaintenanceType)
+    ? rawMaintenanceType.map((value) => String(value).trim()).filter(Boolean).join(", ")
+    : typeof rawMaintenanceType === "string" && rawMaintenanceType.trim()
+      ? rawMaintenanceType.trim()
+      : Array.isArray(existing?.maintenanceType)
+        ? existing.maintenanceType.join(", ")
+        : (existing?.maintenanceType ?? "");
   const base = {
     vehicleId: Number(fields.vehicleId ?? existing?.vehicleId ?? 0),
     vehicleNo: vehicle?.vehicleNumber ?? existing?.vehicleNo ?? "",
     date: ts(date, "12:00:00"),
     currentKM: Number(fields.currentKM ?? existing?.currentKM ?? 0),
-    maintenanceType: parseJson(fields.maintenanceType, existing?.maintenanceType ?? []),
+    maintenanceType,
     serviceType: fields.serviceType ?? existing?.serviceType ?? "",
     garage: fields.garage ?? existing?.garage ?? "",
     mechanic: fields.mechanic ?? existing?.mechanic ?? "",
@@ -4350,22 +4397,31 @@ function buildMaintenanceRow(fields, documents, existing) {
   };
   if (existing) {
     Object.assign(existing, base);
+    // The edit form marks attachments for removal and submits their ids — honour
+    // them, otherwise a removed bill/spare-part document would come back on the
+    // next read.
+    const removedIds = new Set(parseJson(fields.removeDocumentIds, []).map((id) => Number(id)));
+    for (const removedId of removedIds) MAINT_DOC_BYTES.delete(Number(removedId));
     existing.documents = [
-      ...(existing.documents ?? []),
-      ...documents.map((d, i) => ({
-        id: 900000 + existing.id * 10 + i,
-        maintenanceId: existing.id,
-        ...d,
-        createdAt: nowIso(),
-      })),
+      ...(existing.documents ?? []).filter((doc) => !removedIds.has(Number(doc.id))),
+      ...documents.map((d, i) => storeUploadedDocument(existing.id, d, i, (existing.documents ?? []).length)),
     ];
     return existing;
   }
   const id = nextNumericId(MAINTENANCE);
-  const sameDay = MAINTENANCE.filter((m) => String(m.date).slice(0, 10) === date).length + 1;
+  // Same bill-number family as the seeded rows (`MNT-YYYYMMDD-NNNN`, a running
+  // sequence), so the number column, the search filter and the printed bill all
+  // read the same whether the record came from the dataset or the entry form.
+  const nextBillSeq =
+    MAINTENANCE.reduce((max, m) => {
+      const n = Number(String(m.billNo ?? m.billNumber ?? "").split("-").pop());
+      return Number.isFinite(n) && n > max ? n : max;
+    }, 0) + 1;
+  const billNo = `MNT-${date.replaceAll("-", "")}-${String(nextBillSeq).padStart(4, "0")}`;
   return {
     id,
-    billNo: `MNT-${date.replaceAll("-", "")}-${pad3(sameDay)}`,
+    billNo,
+    billNumber: billNo,
     paymentStatus: "pending",
     status: "pending",
     createdBy: "web-user",
@@ -4373,12 +4429,7 @@ function buildMaintenanceRow(fields, documents, existing) {
     approvedBy: null,
     approvedAt: null,
     deleted: false,
-    documents: documents.map((d, i) => ({
-      id: 900000 + id * 10 + i,
-      maintenanceId: id,
-      ...d,
-      createdAt: nowIso(),
-    })),
+    documents: documents.map((d, i) => storeUploadedDocument(id, d, i)),
     ...base,
   };
 }
@@ -5359,7 +5410,12 @@ const server = http.createServer(async (req, res) => {
       const row = MAINTENANCE.find((x) => Number(x.id) === Number(mm[1]));
       const doc = (row?.documents ?? []).find((d) => Number(d.id) === Number(mm[2]));
       if (!doc) return send(404, { error: "not_found" });
-      const body = doc.kind === "pdf" ? Buffer.from(sampleBillPdf(row), "latin1") : Buffer.from(sampleBillSvg(row), "utf8");
+      // Uploaded documents stream their stored bytes; the seeded sample bills
+      // keep streaming generated content picked from the declared file type.
+      const uploaded = MAINT_DOC_BYTES.get(Number(doc.id));
+      if (uploaded) return sendFile(200, uploaded, doc.mimeType || "application/octet-stream");
+      const isPdfDoc = doc.kind === "pdf" || /pdf/i.test(doc.mimeType || "");
+      const body = isPdfDoc ? Buffer.from(sampleBillPdf(row), "latin1") : Buffer.from(sampleBillSvg(row), "utf8");
       return sendFile(200, body, doc.mimeType);
     }
     if (m(/^\/api\/fleet\/maintenance\/(\d+)\/approve$/) && method === "POST") {
@@ -5399,17 +5455,76 @@ const server = http.createServer(async (req, res) => {
           meter: VEHICLE_METER.get(v.id) ?? 50000,
         }))
       );
+    // Universal vehicle meter ledger consumed by the Fleet → Maintenance
+    // History timeline (`VehicleMeterEvent` in
+    // src/modules/fleet-operations/components/maintenance/MaintenanceTimeline.tsx).
+    // It is a PROJECTION over rows that already exist in this dataset — the
+    // vehicle's trips (start/end odometer), its fuel bills (meter at filling)
+    // and its maintenance records (odometer at service) — never new data:
+    //   · Trip Start + Trip End share the trip number as `ref`, so the timeline
+    //     consolidates both into ONE trip card with the distance covered.
+    //   · Fuel bills between a trip's start and end instants are attributed to
+    //     that trip; the rest stay standalone FUEL rows.
+    //   · Rows are ordered chronologically and carry the delta from the
+    //     previous reading on the same vehicle.
     if (m(/^\/api\/fleet\/vehicles\/(\d+)\/meter-history$/)) {
       const vid = Number(m(/^\/api\/fleet\/vehicles\/(\d+)\/meter-history$/)[1]);
-      return send(
-        200,
-        TRIPS.filter((t) => t.vehicleId === vid && t.closingMeter).map((t) => ({
-          date: t.tripDate,
-          meter: t.closingMeter,
-          source: "TRIP_END",
-          reference: t.tripNo,
-        }))
+      const events = [];
+      for (const t of TRIPS) {
+        if (t.vehicleId !== vid || t.deleted || !t.closingMeter) continue;
+        events.push({
+          vehicleId: vid,
+          sourceType: "TRIP_START",
+          recordId: `TRIP-START-${t.id}`,
+          ref: t.tripNo,
+          meter: Number(t.openingMeter) || 0,
+          eventDate: t.tripDate,
+          eventInstant: t.startTime || ts(t.tripDate, "05:00:00"),
+        });
+        events.push({
+          vehicleId: vid,
+          sourceType: "TRIP_END",
+          recordId: `TRIP-END-${t.id}`,
+          ref: t.tripNo,
+          meter: Number(t.closingMeter) || 0,
+          eventDate: t.tripDate,
+          eventInstant: t.endTime || ts(t.tripDate, "19:00:00"),
+        });
+      }
+      for (const f of FUEL_EXPENSES) {
+        if (f.vehicleId !== vid) continue;
+        events.push({
+          vehicleId: vid,
+          sourceType: "FUEL",
+          recordId: `FUEL-${f.id}`,
+          ref: f.billNo,
+          meter: Number(f.currentMeter) || 0,
+          eventDate: f.billDate,
+          eventInstant: f.gpsCapturedAt || f.createdAt || ts(f.billDate, "11:00:00"),
+        });
+      }
+      for (const row of MAINTENANCE) {
+        if (row.vehicleId !== vid || row.deleted) continue;
+        events.push({
+          vehicleId: vid,
+          sourceType: "MAINTENANCE",
+          recordId: `MNT-${row.id}`,
+          ref: row.billNumber,
+          meter: Number(row.currentKM) || 0,
+          eventDate: String(row.date).slice(0, 10),
+          eventInstant: row.date,
+        });
+      }
+      events.sort(
+        (a, b) =>
+          String(a.eventInstant).localeCompare(String(b.eventInstant)) || a.meter - b.meter
       );
+      let previousMeter = null;
+      for (const event of events) {
+        event.diffFromPrevious = previousMeter == null ? null : round(event.meter - previousMeter, 2);
+        previousMeter = event.meter;
+      }
+      return send(200, events);
     }
     if (p === "/api/fleet/permits") return send(200, PERMITS);
     if (p === "/api/fleet/permits/summary") {

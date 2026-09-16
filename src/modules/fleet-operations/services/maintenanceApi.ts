@@ -30,9 +30,15 @@ export interface MaintenanceListParams {
   limit?: number;
 }
 
-/** Server-generated bill number format, e.g. MNT-20260813-001 */
+/**
+ * Server-generated bill number format, e.g. MNT-20260813-0045.
+ *
+ * The seeded quarter rows and the entry form both use `MNT-YYYYMMDD-NNNN` — a
+ * running 4-digit sequence — so the validator accepts 3 or 4 digits and never
+ * rejects a bill number the API actually issues.
+ */
 export const isServerBillNo = (billNo?: string | null): boolean =>
-  /^MNT-\d{8}-\d{3}$/.test(billNo ?? '');
+  /^MNT-\d{8}-\d{3,4}$/.test(billNo ?? '');
 
 /** Map a backend FleetMaintenance row into the frontend MaintenanceEvent shape. */
 export function mapMaintenanceToEvent(record: any): MaintenanceEvent {
