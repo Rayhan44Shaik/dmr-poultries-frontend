@@ -1,4 +1,4 @@
-import type { FuelExpense, FuelSortKey, FuelSourceType, FuelUiStatus } from "../types/fuelExpense";
+import type { FuelExpense, FuelSortKey, FuelUiStatus } from "../types/fuelExpense";
 
 export type FuelQuickTab = "ALL" | "PENDING" | "APPROVED" | "TRIP" | "MANUAL";
 
@@ -9,8 +9,6 @@ export interface FuelClientFilters {
   vehicleNo?: string;
   driverId?: number;
   driverName?: string;
-  supervisorId?: number;
-  supervisorName?: string;
   sourceType?: string;
   status?: string;
   quickTab?: FuelQuickTab;
@@ -30,7 +28,6 @@ function matchesGlobalSearch(bill: FuelExpense, search: string): boolean {
     bill.tripNo,
     bill.vehicleNo,
     bill.driverName,
-    bill.supervisorName,
     bill.petrolBunk,
     bill.sourceType,
     bill.status,
@@ -54,8 +51,6 @@ export function filterFuelExpenses(
     vehicleNo,
     driverId,
     driverName,
-    supervisorId,
-    supervisorName,
     sourceType,
     status,
     quickTab = "ALL",
@@ -66,6 +61,9 @@ export function filterFuelExpenses(
   const to = dateOnly(toDate);
 
   return bills.filter((bill) => {
+    const isTrip = bill.sourceType === "TRIP" || !!bill.tripNo;
+    const effectiveStatus: FuelUiStatus = isTrip ? "Approved" : bill.status;
+
     const billDate = dateOnly(bill.date);
     if ((from && (!billDate || billDate < from)) || (to && (!billDate || billDate > to))) return false;
 
@@ -75,18 +73,15 @@ export function filterFuelExpenses(
     if (driverId != null && Number(bill.driverId) !== driverId) return false;
     if (driverName && driverName !== "All Drivers" && bill.driverName !== driverName) return false;
 
-    if (supervisorId != null && Number(bill.supervisorId) !== supervisorId) return false;
-    if (supervisorName && supervisorName !== "All Supervisors" && bill.supervisorName !== supervisorName) return false;
-
-    // Quick tab filtering
-    if (quickTab === "PENDING" && bill.status !== "Pending") return false;
-    if (quickTab === "APPROVED" && bill.status !== "Approved") return false;
-    if (quickTab === "TRIP" && bill.sourceType !== "TRIP") return false;
-    if (quickTab === "MANUAL" && bill.sourceType !== "MANUAL") return false;
+    // Quick tab filtering: ONLY manual bills can ever be pending!
+    if (quickTab === "PENDING" && (isTrip || effectiveStatus !== "Pending")) return false;
+    if (quickTab === "APPROVED" && effectiveStatus !== "Approved") return false;
+    if (quickTab === "TRIP" && !isTrip) return false;
+    if (quickTab === "MANUAL" && isTrip) return false;
 
     // Dropdown filters (if explicit)
-    if (sourceType && sourceType !== "All" && bill.sourceType !== (sourceType as FuelSourceType)) return false;
-    if (status && status !== "All" && bill.status !== (status as FuelUiStatus)) return false;
+    if (sourceType && sourceType !== "All" && (isTrip ? "TRIP" : "MANUAL") !== sourceType) return false;
+    if (status && status !== "All" && effectiveStatus !== status) return false;
 
     return matchesGlobalSearch(bill, search);
   });

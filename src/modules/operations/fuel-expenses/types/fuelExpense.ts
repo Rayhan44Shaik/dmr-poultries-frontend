@@ -25,8 +25,8 @@ export interface FuelExpense {
   vehicleNo: string;
   driverId: number;
   driverName: string;
-  supervisorId: number;
-  supervisorName: string;
+  supervisorId?: number;
+  supervisorName?: string;
   tripId?: number | null;
   tripNo?: string | null;
   meterReading: number;

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useImperativeHandle, forwardRef, useRef } from "react";
 import Select from "react-select";
-import { MapPin, Upload, X, Loader2 } from "lucide-react";
+import { MapPin, Upload, X, Loader2, Fuel } from "lucide-react";
 import type { FuelExpense, FuelExpenseDraft } from "../types/fuelExpense";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { opsReactSelectStyles } from "../../../../shared/ui/operationsStyles";
@@ -14,7 +14,6 @@ interface Props {
   initialData?: FuelExpense | null;
   vehicles: any[];
   drivers: any[];
-  supervisors: any[];
   onCancel?: () => void;
 }
 
@@ -29,7 +28,6 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
   initialData,
   vehicles,
   drivers,
-  supervisors,
   onCancel,
 }, ref) => {
   const { showNotification } = useSafeNotification();
@@ -40,8 +38,6 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
   const [vehicleNo, setVehicleNo] = useState("");
   const [driverId, setDriverId] = useState<number>(0);
   const [driverName, setDriverName] = useState("");
-  const [supervisorId, setSupervisorId] = useState<number>(0);
-  const [supervisorName, setSupervisorName] = useState("");
   const [meterReading, setMeterReading] = useState<number>(0);
   const [minMeterReading, setMinMeterReading] = useState<number>(0);
   const [amount, setAmount] = useState<number>(0);
@@ -61,8 +57,6 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
 
   const activeVehicles = vehicles.filter(v => (v.status?.toLowerCase() === "active"));
 
-  // ✅ Validator used for min meter reading checks; warning banner intentionally not shown
-
   useEffect(() => {
     if (initialData && editingId) {
       setDate(initialData.date);
@@ -70,8 +64,6 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
       setVehicleNo(initialData.vehicleNo);
       setDriverId(initialData.driverId);
       setDriverName(initialData.driverName);
-      setSupervisorId(initialData.supervisorId);
-      setSupervisorName(initialData.supervisorName);
       setMeterReading(initialData.meterReading);
       setMinMeterReading(initialData.meterReading);
       setAmount(initialData.amount);
@@ -102,8 +94,6 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
     setVehicleNo("");
     setDriverId(0);
     setDriverName("");
-    setSupervisorId(0);
-    setSupervisorName("");
     setMeterReading(0);
     setMinMeterReading(0);
     setAmount(0);
@@ -128,7 +118,6 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
 
   const vehicleOptions = activeVehicles.map((v) => ({ value: v.id, label: v.vehicleNumber }));
   const driverOptions = drivers.map((d) => ({ value: d.id, label: d.employeeName }));
-  const supervisorOptions = supervisors.map((s) => ({ value: s.id, label: s.employeeName }));
 
   const selectStyles = opsReactSelectStyles();
 
@@ -235,8 +224,6 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
       vehicleNo,
       driverId,
       driverName,
-      supervisorId,
-      supervisorName,
       meterReading,
       amount,
       rate,
@@ -271,42 +258,88 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
         }
       `}</style>
 
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 md:p-6 space-y-4">
-        <h3 className="text-sm font-semibold text-slate-700">
-          {editingId ? "Edit Fuel Bill" : "Add Fuel Bill"}
-        </h3>
-
-        {/* ✅ Removed the pending warning banner */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-md p-4 md:p-6 space-y-4 animate-in fade-in slide-in-from-top-3 duration-200">
+        <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="p-2 bg-emerald-50 text-emerald-600 rounded-xl border border-emerald-100">
+              <Fuel size={18} />
+            </div>
+            <h3 className="text-sm font-bold text-slate-800">
+              {editingId ? "Edit Fuel Bill" : "Add Fuel Bill (Manual Entry)"}
+            </h3>
+          </div>
+          {onCancel && (
+            <button
+              onClick={onCancel}
+              className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-full transition"
+            >
+              <X size={18} />
+            </button>
+          )}
+        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Date */}
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Date <span className="text-red-500">*</span></label>
-            <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500" />
+            <label className="text-xs font-semibold text-slate-600 block mb-1">
+              Date <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="date"
+              value={date}
+              onChange={(e) => setDate(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500"
+            />
           </div>
 
           {/* Vehicle */}
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Vehicle <span className="text-red-500">*</span></label>
-            <Select options={vehicleOptions} value={vehicleOptions.find((opt) => opt.value === vehicleId) || null} onChange={handleVehicleChange} isSearchable placeholder="Select Vehicle" styles={selectStyles} />
+            <label className="text-xs font-semibold text-slate-600 block mb-1">
+              Vehicle <span className="text-red-500">*</span>
+            </label>
+            <Select
+              options={vehicleOptions}
+              value={vehicleOptions.find((opt) => opt.value === vehicleId) || null}
+              onChange={handleVehicleChange}
+              isSearchable
+              placeholder="Select Vehicle"
+              styles={selectStyles}
+            />
           </div>
 
           {/* Driver */}
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Driver <span className="text-red-500">*</span></label>
-            <Select options={driverOptions} value={driverOptions.find((opt) => opt.value === driverId) || null} onChange={(selected) => { const d = drivers.find((x) => x.id === selected?.value); if (d) { setDriverId(d.id); setDriverName(d.employeeName); } }} isSearchable placeholder="Select Driver" styles={selectStyles} />
-          </div>
-
-          {/* Supervisor */}
-          <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Supervisor <span className="text-red-500">*</span></label>
-            <Select options={supervisorOptions} value={supervisorOptions.find((opt) => opt.value === supervisorId) || null} onChange={(selected) => { const s = supervisors.find((x) => x.id === selected?.value); if (s) { setSupervisorId(s.id); setSupervisorName(s.employeeName); } }} isSearchable placeholder="Select Supervisor" styles={selectStyles} />
+            <label className="text-xs font-semibold text-slate-600 block mb-1">
+              Driver <span className="text-red-500">*</span>
+            </label>
+            <Select
+              options={driverOptions}
+              value={driverOptions.find((opt) => opt.value === driverId) || null}
+              onChange={(selected) => {
+                const d = drivers.find((x) => x.id === selected?.value);
+                if (d) {
+                  setDriverId(d.id);
+                  setDriverName(d.employeeName);
+                }
+              }}
+              isSearchable
+              placeholder="Select Driver"
+              styles={selectStyles}
+            />
           </div>
 
           {/* Meter Reading */}
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Meter Reading (KM) <span className="text-red-500">*</span></label>
-            <input type="number" value={meterReading || ""} onChange={(e) => setMeterReading(Number(e.target.value))} className="no-spinner w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500" placeholder="0" />
+            <label className="text-xs font-semibold text-slate-600 block mb-1">
+              Meter Reading (KM) <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              value={meterReading || ""}
+              onChange={(e) => setMeterReading(Number(e.target.value))}
+              className="no-spinner w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500"
+              placeholder="0"
+            />
             {minMeterReading > 0 && (
               <div className="text-[10px] text-slate-400 mt-0.5">Minimum allowed: {minMeterReading} KM</div>
             )}
@@ -314,32 +347,66 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
 
           {/* Litres */}
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Fuel Quantity (Litres) <span className="text-red-500">*</span></label>
-            <input type="number" step="0.01" value={litres || ""} onChange={(e) => setLitres(Number(e.target.value))} className="no-spinner w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500" placeholder="0.00" />
+            <label className="text-xs font-semibold text-slate-600 block mb-1">
+              Fuel Quantity (Litres) <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              value={litres || ""}
+              onChange={(e) => setLitres(Number(e.target.value))}
+              className="no-spinner w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500"
+              placeholder="0.00"
+            />
           </div>
 
           {/* Rate */}
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Fuel Rate (₹/Litre) <span className="text-red-500">*</span></label>
-            <input type="number" step="0.01" value={rate || ""} onChange={(e) => setRate(Number(e.target.value))} className="no-spinner w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500" placeholder="0.00" />
+            <label className="text-xs font-semibold text-slate-600 block mb-1">
+              Fuel Rate (₹/Litre) <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              value={rate || ""}
+              onChange={(e) => setRate(Number(e.target.value))}
+              className="no-spinner w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500"
+              placeholder="0.00"
+            />
           </div>
 
           {/* Amount (preview) */}
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Amount (₹) — litres × rate</label>
-            <input type="number" step="0.01" value={amount} readOnly className="no-spinner w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700" />
+            <label className="text-xs font-semibold text-slate-600 block mb-1">
+              Amount (₹) — litres × rate
+            </label>
+            <input
+              type="number"
+              step="0.01"
+              value={amount}
+              readOnly
+              className="no-spinner w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700"
+            />
           </div>
 
           {/* Petrol Bunk with GPS button */}
           <div className="lg:col-span-2">
-            <label className="text-xs font-medium text-slate-500 block mb-1">Petrol Bunk <span className="text-red-500">*</span></label>
+            <label className="text-xs font-semibold text-slate-600 block mb-1">
+              Petrol Bunk <span className="text-red-500">*</span>
+            </label>
             <div className="flex items-center gap-2">
-              <input type="text" value={petrolBunk} onChange={(e) => setPetrolBunk(e.target.value)} className="flex-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500" placeholder="Enter bunk name" />
+              <input
+                type="text"
+                value={petrolBunk}
+                onChange={(e) => setPetrolBunk(e.target.value)}
+                className="flex-1 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500"
+                placeholder="Enter bunk name"
+              />
               <button
                 type="button"
                 onClick={fetchGPSLocation}
                 disabled={isFetchingLocation}
-                className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg border border-slate-200 text-sm font-medium hover:bg-slate-200 transition disabled:opacity-60"
+                className="flex items-center gap-1.5 px-3 py-2 bg-slate-100 text-slate-700 rounded-lg border border-slate-200 text-sm font-medium hover:bg-slate-200 transition disabled:opacity-60 cursor-pointer"
               >
                 {isFetchingLocation ? <Loader2 size={16} className="animate-spin" /> : <MapPin size={16} />}
                 <span className="hidden sm:inline">GPS</span>
@@ -357,18 +424,18 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
 
           {/* Image Upload */}
           <div>
-            <label className="text-xs font-medium text-slate-500 block mb-1">Bill Image</label>
+            <label className="text-xs font-semibold text-slate-600 block mb-1">Bill Receipt Photo</label>
             <div className="flex items-center gap-2">
               <input type="file" accept="image/*" ref={fileInputRef} onChange={handleImageChange} className="hidden" />
               <button
                 type="button"
                 onClick={() => fileInputRef.current?.click()}
-                className="px-3 py-2 bg-slate-100 text-slate-700 rounded-lg border border-slate-200 text-sm font-medium hover:bg-slate-200 transition"
+                className="px-3 py-2 bg-slate-100 text-slate-700 rounded-lg border border-slate-200 text-sm font-medium hover:bg-slate-200 transition cursor-pointer"
               >
                 <Upload size={16} className="inline mr-1" /> Upload
               </button>
               {image && (
-                <button type="button" onClick={removeImage} className="text-red-500 hover:text-red-700">
+                <button type="button" onClick={removeImage} className="text-red-500 hover:text-red-700 cursor-pointer">
                   <X size={18} />
                 </button>
               )}
@@ -382,20 +449,34 @@ export const FuelEntryForm = forwardRef<FuelEntryFormRef, Props>(({
           </div>
 
           {/* Remarks */}
-          <div className="lg:col-span-3">
-            <label className="text-xs font-medium text-slate-500 block mb-1">Remarks (Optional)</label>
-            <input type="text" value={remarks} onChange={(e) => setRemarks(e.target.value)} className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500" placeholder="Any remarks..." />
+          <div className="lg:col-span-2">
+            <label className="text-xs font-semibold text-slate-600 block mb-1">Remarks (Optional)</label>
+            <input
+              type="text"
+              value={remarks}
+              onChange={(e) => setRemarks(e.target.value)}
+              className="w-full rounded-lg border border-slate-200 px-3 py-2 text-sm focus:border-emerald-500"
+              placeholder="Any remarks..."
+            />
           </div>
         </div>
 
-        <div className="flex gap-3 justify-end">
+        <div className="flex gap-3 justify-end pt-2 border-t border-slate-100">
           {onCancel && (
-            <button onClick={onCancel} className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium hover:bg-slate-50">
+            <button
+              type="button"
+              onClick={onCancel}
+              className="px-4 py-2 border border-slate-300 rounded-xl text-sm font-semibold text-slate-700 hover:bg-slate-50 transition cursor-pointer"
+            >
               Cancel
             </button>
           )}
-          <button onClick={handleSubmit} className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-medium shadow-sm transition active:scale-95">
-            {editingId ? "Update Bill" : "Save Bill"}
+          <button
+            type="button"
+            onClick={handleSubmit}
+            className="px-5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-sm font-semibold shadow-sm transition active:scale-95 cursor-pointer"
+          >
+            {editingId ? "Update Bill" : "Save Fuel Bill"}
           </button>
         </div>
       </div>

@@ -7,7 +7,6 @@ import {
   Calendar,
   Truck,
   User,
-  UserCog,
   Layers,
   RotateCcw,
   ArrowUpDown,
@@ -35,7 +34,6 @@ interface Props {
   toDate: string;
   vehicle: string;
   driver: string;
-  supervisor: string;
   sourceType: string;
   status: string;
   sortBy: FuelSortKey | null;
@@ -45,7 +43,6 @@ interface Props {
   setToDate: (v: string) => void;
   setVehicle: (v: string) => void;
   setDriver: (v: string) => void;
-  setSupervisor: (v: string) => void;
   setSourceType: (v: string) => void;
   setStatus: (v: string) => void;
   setSort: (sortBy: FuelSortKey | null, sortDir: "asc" | "desc") => void;
@@ -53,7 +50,6 @@ interface Props {
   onReset: () => void;
   vehicles?: readonly MasterDropdownOption[];
   drivers?: readonly MasterDropdownOption[];
-  supervisors?: readonly MasterDropdownOption[];
   onAddFuelBill?: () => void;
   isFormOpen?: boolean;
   onExportPDF?: () => void;
@@ -70,7 +66,6 @@ function FuelFilters({
   toDate,
   vehicle,
   driver,
-  supervisor,
   sourceType,
   status,
   sortBy,
@@ -80,7 +75,6 @@ function FuelFilters({
   setToDate,
   setVehicle,
   setDriver,
-  setSupervisor,
   setSourceType,
   setStatus,
   setSort,
@@ -88,7 +82,6 @@ function FuelFilters({
   onReset,
   vehicles = [],
   drivers = [],
-  supervisors = [],
   onAddFuelBill,
   isFormOpen = false,
   onExportPDF,
@@ -108,7 +101,6 @@ function FuelFilters({
 
   const vehicleOptions = withoutSentinel(vehicles, "All Vehicles");
   const driverOptions = withoutSentinel(drivers, "All Drivers");
-  const supervisorOptions = withoutSentinel(supervisors, "All Supervisors");
 
   const sourceOptions: MasterDropdownOption[] = [
     { value: "TRIP", label: "TRIP (Trip Diesel)" },
@@ -116,7 +108,7 @@ function FuelFilters({
   ];
 
   const statusOptions: MasterDropdownOption[] = [
-    { value: "Pending", label: "Pending Approval" },
+    { value: "Pending", label: "Pending Approval (Manual)" },
     { value: "Approved", label: "Approved" },
     { value: "Rejected", label: "Rejected" },
   ];
@@ -156,8 +148,8 @@ function FuelFilters({
 
   return (
     <div className={opsFilterCardClass}>
-      {/* ── Top Filters Row ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+      {/* ── Top Filters Row: 4 Essential Columns ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         <div>
           <label className={opsFilterLabelClass}>
             <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
@@ -219,27 +211,9 @@ function FuelFilters({
             className="w-full"
           />
         </div>
-
-        <div>
-          <label className={opsFilterLabelClass}>
-            <UserCog size={17} className="text-purple-500 flex-shrink-0" />
-            <span>{t("common.supervisor")}</span>
-          </label>
-          <MasterDropdown
-            hideLabel
-            label={t("common.supervisor")}
-            value={supervisor === "All Supervisors" ? "" : supervisor}
-            options={supervisorOptions}
-            onChange={(next) => setSupervisor(next || "All Supervisors")}
-            placeholder="All Supervisors"
-            searchable
-            allowClear
-            className="w-full"
-          />
-        </div>
       </div>
 
-      {/* ── Secondary Row: Source, Status, Sort, Search, Actions ── */}
+      {/* ── Secondary Row: Source, Status, Sort, Search ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3.5 items-end pt-1">
         <div className="lg:col-span-2">
           <label className={opsFilterLabelClass}>
@@ -277,7 +251,7 @@ function FuelFilters({
           />
         </div>
 
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-3">
           <label className={opsFilterLabelClass}>
             <ArrowUpDown size={17} className="text-violet-500 flex-shrink-0" />
             <span>{t("ops.trip.sort_by")}</span>
@@ -295,7 +269,7 @@ function FuelFilters({
           />
         </div>
 
-        <div className="lg:col-span-6">
+        <div className="lg:col-span-5">
           <label className={opsFilterLabelClass}>
             <Search size={17} className="text-slate-400 flex-shrink-0" />
             <span>Search Fuel Bills</span>
@@ -312,23 +286,9 @@ function FuelFilters({
         </div>
       </div>
 
-      {/* ── Action Toolbar: All on ONE unified line with animations ── */}
+      {/* ── Action Toolbar: Order = Reset, Refresh, Add Fuel Bill, PDF, Excel ── */}
       <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100 flex-wrap">
-        <div className="flex items-center gap-2.5 flex-wrap">
-          {onAddFuelBill && (
-            <button
-              type="button"
-              onClick={onAddFuelBill}
-              className={`group relative ${opsPrimaryButtonClass}`}
-              aria-label="Add Fuel Bill"
-            >
-              <span className="inline-flex motion-safe:group-hover:scale-110 transition-transform">
-                <Plus size={16} />
-              </span>
-              <span>{isFormOpen ? "Hide Fuel Form" : "Add Fuel Bill"}</span>
-            </button>
-          )}
-
+        <div className="flex items-center gap-2">
           {showViewButton && onViewSelected && (
             <button
               ref={viewButtonRef}
@@ -345,7 +305,8 @@ function FuelFilters({
           )}
         </div>
 
-        <div className="flex items-center gap-2 justify-end flex-wrap">
+        <div className="flex items-center gap-2.5 justify-end flex-wrap">
+          {/* 1. Reset Filters */}
           <button
             type="button"
             onClick={onReset}
@@ -358,8 +319,25 @@ function FuelFilters({
             <span>{t("common.reset")}</span>
           </button>
 
+          {/* 2. Refresh */}
           {onRefresh && <BrandRefreshButton onClick={onRefresh} />}
 
+          {/* 3. Add Fuel Bill */}
+          {onAddFuelBill && (
+            <button
+              type="button"
+              onClick={onAddFuelBill}
+              className={`group relative ${opsPrimaryButtonClass} active:scale-95 transition-transform duration-150`}
+              aria-label="Add Fuel Bill"
+            >
+              <span className="inline-flex motion-safe:group-hover:rotate-90 transition-transform duration-200">
+                <Plus size={16} />
+              </span>
+              <span>{isFormOpen ? "Hide Fuel Form" : "Add Fuel Bill"}</span>
+            </button>
+          )}
+
+          {/* 4. PDF (Enabled only when filter applied) */}
           {onExportPDF && (
             <button
               type="button"
@@ -367,6 +345,7 @@ function FuelFilters({
               disabled={!hasFilters}
               className={`group relative ${opsPdfButtonClass}`}
               aria-label={t("reports.export_pdf") || "PDF"}
+              title={!hasFilters ? "Apply a filter to export PDF" : "Export PDF Report"}
             >
               <span className={`inline-flex ${hasFilters ? "motion-safe:group-hover:animate-[var(--animate-action-pdf)]" : ""}`}>
                 <FileText size={15} />
@@ -375,6 +354,7 @@ function FuelFilters({
             </button>
           )}
 
+          {/* 5. Excel (Enabled only when filter applied) */}
           {onExportExcel && (
             <button
               type="button"
@@ -382,6 +362,7 @@ function FuelFilters({
               disabled={!hasFilters}
               className={`group relative ${opsExcelButtonClass}`}
               aria-label={t("reports.export_excel") || "Excel"}
+              title={!hasFilters ? "Apply a filter to export Excel" : "Export Excel Report"}
             >
               <span className={`inline-flex ${hasFilters ? "motion-safe:group-hover:animate-[var(--animate-action-excel)]" : ""}`}>
                 <FileSpreadsheet size={15} />

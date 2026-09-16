@@ -29,7 +29,6 @@ type FuelExpensesPageProps = { embedded?: boolean };
 
 const ALL_VEHICLES = "All Vehicles";
 const ALL_DRIVERS = "All Drivers";
-const ALL_SUPERVISORS = "All Supervisors";
 
 function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
   const { showNotification } = useSafeNotification();
@@ -52,7 +51,6 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
   const [toDate, setToDate] = useState("");
   const [vehicle, setVehicle] = useState(ALL_VEHICLES);
   const [driver, setDriver] = useState(ALL_DRIVERS);
-  const [supervisor, setSupervisor] = useState(ALL_SUPERVISORS);
   const [sourceType, setSourceType] = useState("All");
   const [statusFilter, setStatusFilter] = useState("All");
   const [quickTab, setQuickTab] = useState<FuelQuickTab>("ALL");
@@ -101,25 +99,8 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     });
   }, [masterEmployees]);
 
-  const supervisorOptions = useMemo<MasterDropdownOption[]>(() => {
-    const seen = new Set<string>();
-    return masterEmployees.flatMap((emp) => {
-      const roleText = `${emp.department || ""} ${emp.role || ""}`.toLowerCase();
-      const isSupervisor = roleText.includes("supervisor");
-      const name = String(emp.employeeName || "").trim();
-      const active = String(emp.status ?? "Active") !== "Inactive";
-      if (!isSupervisor || !name || !active || seen.has(name)) return [];
-      seen.add(name);
-      return [{ value: name, label: name, searchText: name }];
-    });
-  }, [masterEmployees]);
-
   const driversList = useMemo(
     () => masterEmployees.filter((e) => (e.department || e.role || "").toLowerCase().includes("driver")),
-    [masterEmployees]
-  );
-  const supervisorsList = useMemo(
-    () => masterEmployees.filter((e) => (e.department || e.role || "").toLowerCase().includes("supervisor")),
     [masterEmployees]
   );
 
@@ -146,14 +127,13 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
       toDate,
       vehicleNo: vehicle === ALL_VEHICLES ? "" : vehicle,
       driverName: driver === ALL_DRIVERS ? "" : driver,
-      supervisorName: supervisor === ALL_SUPERVISORS ? "" : supervisor,
       sourceType: sourceType === "All" ? "" : sourceType,
       status: statusFilter === "All" ? "" : statusFilter,
       search,
     });
-  }, [expenses, fromDate, toDate, vehicle, driver, supervisor, sourceType, statusFilter, search]);
+  }, [expenses, fromDate, toDate, vehicle, driver, sourceType, statusFilter, search]);
 
-  // ── Live Tab Counts ──
+  // ── Live Tab Counts (Trip is ALWAYS Approved; ONLY manual can be Pending) ──
   const tabCounts = useMemo(() => {
     return {
       all: baseFilteredBills.length,
@@ -186,26 +166,23 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     return allFilteredBills.find((b) => b.id === selectedId) || null;
   }, [allFilteredBills, selectedId]);
 
-  // ── Check if any active filter is applied ──
+  // ── Active Filters: KPI cards & PDF/Excel are enabled ONLY when filters applied ──
   const hasFilters =
     fromDate !== "" ||
     toDate !== "" ||
     vehicle !== ALL_VEHICLES ||
     driver !== ALL_DRIVERS ||
-    supervisor !== ALL_SUPERVISORS ||
     sourceType !== "All" ||
     statusFilter !== "All" ||
-    quickTab !== "ALL" ||
     search.trim() !== "";
 
-  // ── Summary Totals for KPI Cards ──
+  // ── Summary Totals for KPI Cards (computed over filtered results) ──
   const summaryTotals = useMemo(() => {
     const totalLitres = allFilteredBills.reduce((sum, b) => sum + (b.litres || 0), 0);
     const totalAmount = allFilteredBills.reduce((sum, b) => sum + (b.amount || 0), 0);
-    const pendingCount = allFilteredBills.filter((b) => b.status === "Pending").length;
-    const approvedCount = allFilteredBills.filter((b) => b.status === "Approved").length;
+    const pendingCount = allFilteredBills.filter((b) => b.sourceType === "MANUAL" && b.status === "Pending").length;
+    const approvedCount = allFilteredBills.filter((b) => b.status === "Approved" || b.sourceType === "TRIP").length;
 
-    // Approximate fleet efficiency if meter readings are recorded
     const billsWithMeter = allFilteredBills.filter((b) => b.meterReading > 0 && b.litres > 0);
     const avgMileage =
       billsWithMeter.length > 0 && totalLitres > 0
@@ -247,7 +224,6 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     setToDate("");
     setVehicle(ALL_VEHICLES);
     setDriver(ALL_DRIVERS);
-    setSupervisor(ALL_SUPERVISORS);
     setSourceType("All");
     setStatusFilter("All");
     setQuickTab("ALL");
@@ -261,6 +237,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
 
   // ── Check if bill is editable (within 10 days) ──
   const canEditDelete = useCallback((bill: FuelExpense): boolean => {
+    if (bill.sourceType === "TRIP") return false;
     if (!bill.createdDate && !bill.date) return true;
     const created = new Date(bill.createdDate || bill.date);
     const now = new Date();
@@ -283,7 +260,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     const target = bill || selectedBill;
     if (!target) return;
     if (target.sourceType === "TRIP") {
-      showNotification("Trip diesel bills cannot be edited directly in Fuel Expenses.", "error");
+      showNotification("Trip diesel bills are linked to trips and auto-approved on trip completion.", "info");
       return;
     }
     if (!canEditDelete(target)) {
@@ -303,6 +280,10 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
   const handleDelete = useCallback((bill?: FuelExpense) => {
     const target = bill || selectedBill;
     if (!target) return;
+    if (target.sourceType === "TRIP") {
+      showNotification("Trip diesel bills are part of completed trips and cannot be deleted here.", "info");
+      return;
+    }
     if (!canEditDelete(target)) {
       showNotification("Delete not allowed – bill is older than 10 days.", "error");
       return;
@@ -313,12 +294,12 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
   const handleApprove = useCallback((bill?: FuelExpense) => {
     const target = bill || selectedBill;
     if (!target) return;
-    if (target.status === "Approved") {
-      showNotification("Bill is already approved.", "info");
+    if (target.sourceType === "TRIP") {
+      showNotification("Trip diesel bills are auto-approved upon trip completion.", "info");
       return;
     }
-    if (target.sourceType === "TRIP") {
-      showNotification("Trip diesel bills are automatically approved with the trip.", "info");
+    if (target.status === "Approved") {
+      showNotification("Bill is already approved.", "info");
       return;
     }
     void approveExpense(target.id);
@@ -354,7 +335,6 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
         "Trip No",
         "Vehicle",
         "Driver",
-        "Supervisor",
         "Meter (KM)",
         "Litres",
         "Rate (₹/L)",
@@ -369,13 +349,12 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
         b.tripNo || "—",
         b.vehicleNo,
         b.driverName || "—",
-        b.supervisorName || "—",
         b.meterReading > 0 ? b.meterReading.toString() : "—",
         b.litres.toFixed(2),
         b.rate.toFixed(2),
         b.amount.toFixed(2),
         b.petrolBunk || "—",
-        b.status,
+        b.sourceType === "TRIP" ? "Approved" : b.status,
       ]);
       const filename = `Fuel_Expenses_${new Date().toISOString().split("T")[0]}`;
 
@@ -385,7 +364,6 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
           : null,
         vehicle !== ALL_VEHICLES ? { label: "Vehicle", value: vehicle } : null,
         driver !== ALL_DRIVERS ? { label: "Driver", value: driver } : null,
-        supervisor !== ALL_SUPERVISORS ? { label: "Supervisor", value: supervisor } : null,
         sourceType !== "All" ? { label: "Source", value: sourceType } : null,
         statusFilter !== "All" ? { label: "Status", value: statusFilter } : null,
         quickTab !== "ALL" ? { label: "Tab", value: quickTab } : null,
@@ -400,7 +378,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
           { label: "Approved Bills", value: String(summaryTotals.approvedCount) },
           { label: "Pending Bills", value: String(summaryTotals.pendingCount) },
         ],
-        numericColumns: [7, 8, 9, 10],
+        numericColumns: [6, 7, 8, 9],
       });
       showNotification("PDF exported successfully!", "success");
     } catch {
@@ -408,7 +386,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     } finally {
       exportBusyRef.current = null;
     }
-  }, [allFilteredBills, fromDate, toDate, vehicle, driver, supervisor, sourceType, statusFilter, quickTab, summaryTotals, showNotification]);
+  }, [allFilteredBills, fromDate, toDate, vehicle, driver, sourceType, statusFilter, quickTab, summaryTotals, showNotification]);
 
   const handleExportExcel = useCallback(async () => {
     if (exportBusyRef.current) return;
@@ -425,7 +403,6 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
         "Trip No",
         "Vehicle",
         "Driver",
-        "Supervisor",
         "Meter Reading (KM)",
         "Litres",
         "Rate (₹/L)",
@@ -440,13 +417,12 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
         b.tripNo || "—",
         b.vehicleNo,
         b.driverName || "—",
-        b.supervisorName || "—",
         b.meterReading,
         b.litres,
         b.rate,
         b.amount,
         b.petrolBunk || "—",
-        b.status,
+        b.sourceType === "TRIP" ? "Approved" : b.status,
       ]);
       const filename = `Fuel_Expenses_${new Date().toISOString().split("T")[0]}`;
       exportToExcel("Fuel Expenses Register", headers, rows, filename);
@@ -476,7 +452,6 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
         toDate={toDate}
         vehicle={vehicle}
         driver={driver}
-        supervisor={supervisor}
         sourceType={sourceType}
         status={statusFilter}
         sortBy={sortBy}
@@ -486,7 +461,6 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
         setToDate={(v) => { setToDate(v); setCurrentPage(1); }}
         setVehicle={(v) => { setVehicle(v); setCurrentPage(1); }}
         setDriver={(v) => { setDriver(v); setCurrentPage(1); }}
-        setSupervisor={(v) => { setSupervisor(v); setCurrentPage(1); }}
         setSourceType={(v) => { setSourceType(v); setCurrentPage(1); }}
         setStatus={(v) => { setStatusFilter(v); setCurrentPage(1); }}
         setSort={handleExplicitSort}
@@ -494,7 +468,6 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
         onReset={handleResetFilters}
         vehicles={vehicleOptions}
         drivers={driverOptions}
-        supervisors={supervisorOptions}
         onAddFuelBill={() => setShowForm(!showForm)}
         isFormOpen={showForm}
         onExportPDF={() => void handleExportPDF()}
@@ -506,18 +479,22 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
         viewButtonRef={viewButtonRef}
       />
 
-      {/* ── KPI Summary Cards ── */}
-      <FuelKPICards
-        totalLitres={summaryTotals.totalLitres}
-        totalAmount={summaryTotals.totalAmount}
-        pendingCount={summaryTotals.pendingCount}
-        approvedCount={summaryTotals.approvedCount}
-        avgMileage={summaryTotals.avgMileage}
-      />
+      {/* ── KPI Summary Cards (Appear smoothly ONLY when filter is active) ── */}
+      {hasFilters && (
+        <div className="animate-in fade-in slide-in-from-top-1 duration-200">
+          <FuelKPICards
+            totalLitres={summaryTotals.totalLitres}
+            totalAmount={summaryTotals.totalAmount}
+            pendingCount={summaryTotals.pendingCount}
+            approvedCount={summaryTotals.approvedCount}
+            avgMileage={summaryTotals.avgMileage}
+          />
+        </div>
+      )}
 
       {/* ── Add / Edit Fuel Bill Form Drawer ── */}
       {showForm && (
-        <div className="animate-in fade-in slide-in-from-top-2 duration-200">
+        <div className="animate-in fade-in slide-in-from-top-3 duration-300">
           <FuelEntryForm
             onSave={async (data) => {
               const ok = await saveExpense(data);
@@ -535,7 +512,6 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
             initialData={editingData}
             vehicles={masterVehicles}
             drivers={driversList}
-            supervisors={supervisorsList}
             onCancel={() => {
               setShowForm(false);
               setEditingId(null);
