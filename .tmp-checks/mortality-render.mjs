@@ -302,6 +302,16 @@ ok("table: expand affordance kept", tableHtml.includes("Expand trip") && tableHt
   ok("panel: every value starts from the left", (expandHtml.match(/text-left align-middle/g) || []).length >= 12 && !expandHtml.includes("text-right align-middle"), `left=${(expandHtml.match(/text-left align-middle/g) || []).length} right=${(expandHtml.match(/text-right align-middle/g) || []).length}`);
   ok("panel: no cell in the panel is right-aligned at all", !expandHtml.includes("text-right"), "a cell is still right-aligned");
   ok("panel: name │ data hairline inside every pair", (expandHtml.match(/border-l border-slate-200 px-3/g) || []).length >= 10, `rules=${(expandHtml.match(/border-l border-slate-200 px-3/g) || []).length}`);
+  // HOVER INSIDE THE PANEL: every data line marks itself, so a name and the value
+  // it belongs to are read together — trip details, weights and rates alike.
+  ok("panel: every data line highlights on hover", (expandHtml.match(/hover:bg-emerald-50\/50/g) || []).length >= 8, `hover lines=${(expandHtml.match(/hover:bg-emerald-50\/50/g) || []).length}`);
+  ok("panel: the survival strip deepens on hover", (expandHtml.match(/group-hover:bg-emerald-100\/70/g) || []).length === 2, "survival strip does not react");
+  ok("panel: the section bands do not pretend to be data", !/<tr[^>]*bg-slate-50\/80[^>]*hover:/.test(expandHtml), "a section band highlights");
+  {
+    const { readFileSync: readPanel } = await import("node:fs");
+    const panelSource = readPanel("src/modules/operations/mortality/components/TripLossRowExpand.tsx", "utf8");
+    ok("panel: the band is defined once, not pasted per row", (panelSource.match(/const LINE_HOVER/g) || []).length === 1, "hover styling is duplicated");
+  }
 
   const detailRow = expandHtml.slice(expandHtml.indexOf("Trip No"), expandHtml.indexOf("Weights"));
   ok("panel: every trip field is on the card", ["Trip No", "Day", "Vehicle", "Supervisor", "Driver", "Source Farm", "Loaders", "Helpers"].every((label) => detailRow.includes(label)));
