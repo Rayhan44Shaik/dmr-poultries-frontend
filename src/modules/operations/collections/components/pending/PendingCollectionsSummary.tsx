@@ -51,7 +51,9 @@ function PendingCollectionsSummary({
   const outstanding = inr(totalOutstanding);
   const sales = inr(weeklySales);
   const collections = inr(weeklyCollections);
-  const recovery = `${Number(recoveryPercentage || 0).toFixed(2)}%`;
+  // No sales this week → no base to recover against, so the card says so with
+  // a dash rather than printing a 0.00 % that claims nothing came in.
+  const recovery = weeklySales > 0 ? `${Number(recoveryPercentage || 0).toFixed(2)}%` : "—";
 
   const cards: KpiCardItem[] = [
     {

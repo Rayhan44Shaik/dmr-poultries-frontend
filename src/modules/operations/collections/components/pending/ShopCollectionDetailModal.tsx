@@ -275,9 +275,21 @@ function ShopCollectionDetailView({
     [t],
   );
 
-  const totalCollections = shopCollections.reduce((sum, c) => sum + c.amount, 0);
+  /**
+   * The money figures count APPROVED collections only.
+   *
+   * `shopCollections` is the whole history — pending and deleted rows included,
+   * because they are what the table lists and what the 10-second delete acts
+   * on — but money that has not been approved yet is not collected money. The
+   * two headline cards therefore answer from the approved rows alone, which is
+   * also the scope of the page's own "Recent Collections" and "Last Collection"
+   * columns, so the popup can never disagree with the table it was opened from.
+   */
+  const approvedCollections = shopCollections.filter((c) => c.status === "Approved");
+  const totalCollections = approvedCollections.reduce((sum, c) => sum + (Number(c.amount) || 0), 0);
   const currentOutstanding = collectionService.getShopBalance(shopName);
-  const lastCollectionDate = shopCollections.length > 0 ? shopCollections[0].collectionDate : null;
+  const lastCollectionDate =
+    approvedCollections.length > 0 ? approvedCollections[0].collectionDate : null;
 
   const searchTerm = search.trim().toLowerCase();
   const filteredRecent = searchTerm
@@ -360,14 +372,14 @@ function ShopCollectionDetailView({
     },
     {
       id: "collections",
-      label: t("ops.collection.total_collections"),
+      label: `${t("ops.collection.total_collections")} · ${t("ops.collection.approved_only")}`,
       value: <span className="tabular-nums">{collectionsValue}</span>,
       Icon: Wallet,
       tone: "emerald",
     },
     {
       id: "last",
-      label: t("ops.collection.last_collection"),
+      label: `${t("ops.collection.last_collection")} · ${t("ops.collection.approved_only")}`,
       value: <span className="text-base">{formatDate(lastCollectionDate)}</span>,
       Icon: Calendar,
       tone: "blue",

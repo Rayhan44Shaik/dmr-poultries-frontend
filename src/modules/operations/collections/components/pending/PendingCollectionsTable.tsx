@@ -289,7 +289,16 @@ function PendingCollectionsTable({
                       <td className={`px-3.5 py-3 text-right text-xs font-bold whitespace-nowrap ${balanceColor}`}>{formatBalance(balance)}</td>
                       <td className="px-3.5 py-3 text-right text-xs font-bold whitespace-nowrap text-blue-600">{formatCurrency(weeklySales)}</td>
                       <td className="px-3.5 py-3 text-right text-xs font-bold whitespace-nowrap text-green-600">{formatCurrency(weeklyCollections)}</td>
-                      <td className={`px-3.5 py-3 text-right text-xs font-bold whitespace-nowrap ${recoveryColor}`}>{recovery.toFixed(1)}%</td>
+                      <td
+                        className={`px-3.5 py-3 text-right text-xs font-bold whitespace-nowrap ${
+                          weeklySales > 0 ? recoveryColor : "text-slate-400"
+                        }`}
+                      >
+                        {/* Nothing sold this week means there is no base to
+                            recover against — a dash says that; "0.0 %" would
+                            claim the shop recovered nothing. */}
+                        {weeklySales > 0 ? `${recovery.toFixed(1)}%` : "—"}
+                      </td>
                       <td className="px-3.5 py-3 text-center text-xs font-medium whitespace-nowrap text-slate-600">{formatDate(shop.lastCollectionDate)}</td>
                       <td className="px-3.5 py-3 text-center">
                         {shop.overdueDays != null && shop.overdueDays > 0 ? (
@@ -333,7 +342,9 @@ function PendingCollectionsTable({
                   </td>
                   <td className="px-3.5 py-3 text-right tabular-nums text-blue-700">{money(overall.weeklySales)}</td>
                   <td className="px-3.5 py-3 text-right tabular-nums text-green-700">{money(overall.weeklyApprovedCollections)}</td>
-                  <td className="px-3.5 py-3 text-right tabular-nums text-purple-700">{overall.recoveryPercentage.toFixed(2)}%</td>
+                  <td className="px-3.5 py-3 text-right tabular-nums text-purple-700">
+                    {overall.weeklySales > 0 ? `${overall.recoveryPercentage.toFixed(2)}%` : "—"}
+                  </td>
                   <td className="px-3.5 py-3 text-center tabular-nums text-slate-700">{formatDate(overall.lastCollectionDate)}</td>
                   <td className="px-3.5 py-3 text-center">
                     {overall.overdueShops > 0 ? (

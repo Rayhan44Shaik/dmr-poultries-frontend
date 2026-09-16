@@ -11,6 +11,7 @@ export default {
   'ops.collection.amount_greater_zero': 'మొత్తం సున్నా కంటే ఎక్కువగా ఉండాలి.',
   'ops.collection.amount_title': 'మొత్తం',
   'ops.collection.approved_collections': 'ఆమోదించిన కలెక్షన్లు',
+  'ops.collection.approved_only': 'ఆమోదించినవి మాత్రమే',
   'ops.collection.approved_sales': 'ఆమోదించిన అమ్మకాలు',
   'ops.collection.pending_sales': 'పెండింగ్ అమ్మకాలు',
   'ops.collection.approved_success': 'కలెక్షన్ ఆమోదించాం.',

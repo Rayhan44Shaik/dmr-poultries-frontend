@@ -11,6 +11,7 @@ export default {
   'ops.collection.amount_greater_zero': 'Amount must be greater than zero.',
   'ops.collection.amount_title': 'Amount',
   'ops.collection.approved_collections': 'Approved Collections',
+  'ops.collection.approved_only': 'approved only',
   'ops.collection.approved_sales': 'Approved Sales',
   'ops.collection.pending_sales': 'Pending Sales',
   'ops.collection.approved_success': 'Collection approved successfully.',
