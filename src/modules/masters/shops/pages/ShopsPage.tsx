@@ -156,7 +156,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
       shop.city,
       shop.associationType || "—",
       shop.paperRate.toString(),
-      `₹${Number(shop.openingBalance || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      `₹${Number(shop.currentBalance || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}\n(${t("masters.shops.table.opening_short")} ₹${Number(shop.openingBalance || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })})`,
     ]);
 
     autoTable(doc, {
@@ -223,6 +223,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
       t("masters.shops.table.city"),
       t("masters.shops.table.association_type"),
       t("masters.shops.table.paper_rate"),
+      t("masters.shops.table.balance"),
       t("masters.shops.table.opening_balance"),
     ];
     const rows = filteredShops.map((shop, index) => [
@@ -233,7 +234,8 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
       shop.city,
       shop.associationType || "—",
       shop.paperRate.toString(),
-      `₹${Number(shop.openingBalance || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      Number(shop.currentBalance || 0),
+      Number(shop.openingBalance || 0),
     ]);
     const filename = `${t("masters.shops.title")}_${new Date().toISOString().split("T")[0]}`;
 

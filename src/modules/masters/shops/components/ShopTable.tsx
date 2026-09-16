@@ -69,8 +69,11 @@ function ShopTable({
             <th className={`${thBase} text-center`}>
               {t("masters.shops.table.paper_rate")}
             </th>
+            {/* Balance, not just the opening figure: the current balance is
+              * what collections move, so it leads — the opening balance it was
+              * computed from stays underneath as the audit trail. */}
             <th className={`${thBase} text-right`}>
-              {t("masters.shops.table.opening_balance")}
+              {t("masters.shops.table.balance")}
             </th>
             <th className={`${thBase} text-center`}>
               {t("masters.shops.table.status")}
@@ -83,6 +86,8 @@ function ShopTable({
         <tbody className="divide-y divide-slate-100">
           {orderedShops.map((shop, index) => {
             const hasAssociation = Boolean(shop.associationType?.trim());
+            // The shop's live balance — the figure collections move.
+            const liveBalance = Number(shop.currentBalance ?? 0);
             return (
               <tr
                 key={shop.id}
@@ -143,10 +148,18 @@ function ShopTable({
                   </span>
                 </td>
 
-                <td
-                  className={`${tdBase} whitespace-nowrap text-right font-medium tabular-nums text-slate-700`}
-                >
-                  {formatOpeningBalance(shop.openingBalance)}
+                <td className={`${tdBase} whitespace-nowrap text-right tabular-nums`}>
+                  <span
+                    className={`block font-semibold ${
+                      liveBalance > 0 ? "text-emerald-700" : "text-slate-700"
+                    }`}
+                    title={t("masters.shops.table.current_balance")}
+                  >
+                    {formatOpeningBalance(liveBalance)}
+                  </span>
+                  <span className="block text-[11px] font-medium text-slate-400">
+                    {t("masters.shops.table.opening_short")} {formatOpeningBalance(shop.openingBalance)}
+                  </span>
                 </td>
 
                 <td className={`${tdBase} text-center`}>

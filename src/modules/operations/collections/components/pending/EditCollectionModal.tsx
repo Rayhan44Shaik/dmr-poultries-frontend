@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import {
   X, Save, Eye, Calendar, User, CreditCard, Hash, IndianRupee, FileText, Loader2,
   FileDown, Trash2, Store, Activity, Wallet, Clock, UserCog, Search, Settings2,
@@ -15,6 +15,7 @@ import { exportCollectionPdf } from "../../utils/exportCollectionPdf";
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 import { notify as globalNotify } from "../../../../../ui/notifications/notificationStore";
 import { PendingDeleteNotification } from "../../../../../components/common/PendingDeleteNotification";
+import { useFocusTrap } from "../../../../../hooks/useFocusTrap";
 import { usePendingDelete } from "../../../../../hooks/usePendingDelete";
 
 const formatCurrency = (amount: number) =>
@@ -56,6 +57,19 @@ export function EditCollectionModal({
   onRefresh,
 }: EditCollectionModalProps) {
   const { t, language } = useI18n();
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  /**
+   * Keyboard containment. Tab and Shift+Tab cycle through the popup's own
+   * controls — PDF, close, the credits rows and their delete action, the
+   * search box, Close — and never leak into the table behind it. Escape is
+   * still owned by the shell, so the popup closes exactly as it always did.
+   */
+  useFocusTrap({
+    active: isOpen,
+    containerRef: panelRef,
+    initialFocus: "container",
+  });
   // Telugu view: dates render with Telugu month/weekday names, but every
   // NUMERIC value (amounts, counts, reference numbers) stays in Latin digits
   // so the figures remain unambiguous, exactly as the Trip view does it.
@@ -67,9 +81,26 @@ export function EditCollectionModal({
 
   // Backend-sourced "Recent 10 Shop Credits": newest first, max 10, per shop,
   // across every status (including deleted history).
+  //
+  // Rows are keyed by collection id, so a record can never be listed twice even
+  // if two sources describe it (page cache + backend, or a row that arrives
+  // while the previous response is still settling).
+  const mergeCredits = useCallback((rows: CollectionApiEntry[]): CollectionApiEntry[] => {
+    const byId = new Map<string, CollectionApiEntry>();
+    for (const row of rows) {
+      const key = String(row.id);
+      if (!byId.has(key)) byId.set(key, row);
+    }
+    return [...byId.values()];
+  }, []);
+
   const [recentList, setRecentList] = useState<CollectionApiEntry[]>([]);
   /** Free-text filter over this shop's credits. */
   const [creditSearch, setCreditSearch] = useState("");
+  /** One focusable handle per rendered row, so the arrow keys can walk them. */
+  const creditRowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
+  /** Row the pointer last touched, so Up/Down resumes from there. */
+  const [creditFocusIndex, setCreditFocusIndex] = useState(0);
   const [recentLoading, setRecentLoading] = useState(false);
 
   const shopCollections = allCollections
@@ -126,6 +157,22 @@ export function EditCollectionModal({
   }, [pickedApi]);
   const selected = pickedFromRecent ?? pickedCached ?? collection ?? latest;
 
+  /**
+   * A cheap fingerprint of this shop's register. Approving, deleting or adding
+   * an entry rewrites it, which re-reads the credits list — so the table inside
+   * the popup is always the server's answer, never a leftover from the moment
+   * the popup opened.
+   */
+  const creditsSignature = useMemo(
+    () =>
+      allCollections
+        .filter((c) => c.shopName === shopName)
+        .map((c) => `${c.id}:${c.status}:${c.amount}`)
+        .sort()
+        .join("|"),
+    [allCollections, shopName],
+  );
+
   const [formData, setFormData] = useState({
     collectionNo: "",
     collectionDate: "",
@@ -147,7 +194,7 @@ export function EditCollectionModal({
     collectionService
       .fetchRecentCollectionsForShop(shopId, 10)
       .then((rows) => {
-        if (!cancelled) setRecentList(rows);
+        if (!cancelled) setRecentList(mergeCredits(rows));
       })
       .catch(() => {
         // Fall back to the page-level cache so the modal never goes empty.
@@ -159,7 +206,7 @@ export function EditCollectionModal({
     return () => {
       cancelled = true;
     };
-  }, [isOpen, shopName]);
+  }, [isOpen, shopName, creditsSignature, mergeCredits]);
 
   useEffect(() => {
     if (selected) {
@@ -214,6 +261,64 @@ export function EditCollectionModal({
     });
   }), [recentList, creditSearch, t, dateLocale, language, tr]);
 
+  /**
+   * Keyboard model for the credits table — the same one the Trip List uses:
+   *
+   *   ↑ / ↓        move the highlight one row (and focus it)
+   *   Home / End   jump to the first / last row
+   *   Enter/Space  open the highlighted row
+   *   Tab          leaves the table for the next control, as it should
+   *
+   * Focus follows the selection, so the row that is highlighted is always the
+   * row the browser is on — screen readers and the visible ring never disagree.
+   */
+  const focusCreditRow = (index: number, total: number) => {
+    if (total === 0) return;
+    const next = Math.min(Math.max(index, 0), total - 1);
+    setCreditFocusIndex(next);
+    const row = creditRowRefs.current[next];
+    row?.focus();
+    row?.scrollIntoView({ block: "nearest" });
+    const id = row?.dataset.collectionId;
+    if (id) setPickedId(id);
+  };
+
+  const handleCreditRowKeyDown = (
+    event: React.KeyboardEvent<HTMLTableRowElement>,
+    index: number,
+    total: number,
+  ) => {
+    switch (event.key) {
+      case "ArrowDown":
+        event.preventDefault();
+        focusCreditRow(index + 1, total);
+        break;
+      case "ArrowUp":
+        event.preventDefault();
+        focusCreditRow(index - 1, total);
+        break;
+      case "Home":
+        event.preventDefault();
+        focusCreditRow(0, total);
+        break;
+      case "End":
+        event.preventDefault();
+        focusCreditRow(total - 1, total);
+        break;
+      default:
+        break;
+    }
+  };
+
+  /** Exactly what the table renders: the shop's latest ten, search applied. */
+  const visibleCredits = useMemo(() => filteredCredits.slice(0, 10), [filteredCredits]);
+
+  /** Typing restarts the keyboard walk from the top of the filtered list. */
+  const handleCreditSearchChange = (value: string) => {
+    setCreditSearch(value);
+    setCreditFocusIndex(0);
+  };
+
   const handleChange = (field: string, value: any) => {
     setFormData((prev) => ({ ...prev, [field]: value }));
   };
@@ -255,7 +360,7 @@ export function EditCollectionModal({
         shopName,
         // Exactly the rows the view table shows, so the PDF and the screen
         // can never disagree — including when the search box is filtering.
-        recent: filteredCredits.slice(0, 10),
+        recent: visibleCredits,
       });
       if (language === "te") globalNotify.info(t("ops.collection.pdf_english_note"));
     } catch {
@@ -263,7 +368,7 @@ export function EditCollectionModal({
     } finally {
       setPdfBusy(false);
     }
-  }, [shopName, filteredCredits, language, t]);
+  }, [shopName, visibleCredits, language, t]);
 
   /* --------------------------------------------------------------------
    * Delete — permitted ONLY within 10 days of the entry date. The window is
@@ -400,7 +505,11 @@ export function EditCollectionModal({
     // (max-w 96rem, max-h 100vh − header − gaps), centred against the whole
     // page including the sidebar, with no backdrop blur.
     <AppShellModal open={isOpen} onClose={onClose} panelClassName="bg-white">
-      <div className="bg-white w-full h-full overflow-hidden flex flex-col rounded-2xl">
+      <div
+        ref={panelRef}
+        tabIndex={-1}
+        className="bg-white w-full h-full overflow-hidden flex flex-col rounded-2xl outline-none"
+      >
         {/* Header — matches the Trip view: gradient strip, gradient icon tile,
           * title + status line, circular close button. */}
         <div className="border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/80 rounded-t-2xl">
@@ -622,14 +731,21 @@ export function EditCollectionModal({
                       <input
                         type="text"
                         value={creditSearch}
-                        onChange={(e) => setCreditSearch(e.target.value)}
+                        onChange={(e) => handleCreditSearchChange(e.target.value)}
+                        onKeyDown={(event) => {
+                          // ↓ from the search box drops straight into the rows,
+                          // so the whole popup can be driven from the keyboard.
+                          if (event.key !== "ArrowDown") return;
+                          event.preventDefault();
+                          focusCreditRow(creditFocusIndex, visibleCredits.length);
+                        }}
                         placeholder={t("ops.collection.search_collections_placeholder")}
                         className="h-9 w-56 rounded-lg border border-slate-200 bg-white pl-9 pr-8 text-sm outline-none transition-all focus:border-emerald-500 focus:ring-2 focus:ring-emerald-400/20 sm:w-64"
                       />
                       {creditSearch && (
                         <button
                           type="button"
-                          onClick={() => setCreditSearch("")}
+                          onClick={() => handleCreditSearchChange("")}
                           aria-label={t("common.clear")}
                           className="group absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
                         >
@@ -687,13 +803,13 @@ export function EditCollectionModal({
                               {t("common.day")}
                             </span>
                           </th>
-                          <th className="px-3 py-3 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
+                          <th className="py-3 pl-3 pr-5 text-right text-xs font-bold text-slate-500 uppercase tracking-wider">
                             <span className="inline-flex w-full items-center justify-end gap-1.5">
                               <IndianRupee size={14} className="shrink-0 text-emerald-600" />
                               {t("table.amount")}
                             </span>
                           </th>
-                          <th className="px-3 py-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
+                          <th className="border-l border-slate-200 py-3 pl-5 pr-3 text-left text-xs font-bold text-slate-500 uppercase tracking-wider">
                             <span className="inline-flex items-center gap-1.5">
                               <UserCog size={14} className="shrink-0 text-violet-500" />
                               {t("table.collector")}
@@ -720,21 +836,31 @@ export function EditCollectionModal({
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100 bg-white">
-                        {filteredCredits.slice(0, 10).map((col, index) => {
+                        {visibleCredits.map((col, index) => {
                           const isRowSelected = selected != null && String(selected.id) === String(col.id);
                           return (
                           <tr
                             key={col.id}
+                            ref={(node) => {
+                              creditRowRefs.current[index] = node;
+                            }}
+                            data-collection-id={String(col.id)}
                             tabIndex={0}
                             role="button"
                             aria-selected={isRowSelected}
-                            onClick={() => setPickedId(String(col.id))}
+                            onClick={() => {
+                              setCreditFocusIndex(index);
+                              setPickedId(String(col.id));
+                            }}
+                            onFocus={() => setCreditFocusIndex(index)}
                             onKeyDown={(event) => {
                               if (event.target !== event.currentTarget) return;
                               if (event.key === "Enter" || event.key === " ") {
                                 event.preventDefault();
                                 setPickedId(String(col.id));
+                                return;
                               }
+                              handleCreditRowKeyDown(event, index, visibleCredits.length);
                             }}
                             className={`cursor-pointer outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
                               isRowSelected
@@ -751,10 +877,10 @@ export function EditCollectionModal({
                             <td className="px-4 py-3 text-xs text-slate-600 tabular-nums whitespace-nowrap">
                               {formatTripListDay(col.collectionDate, language)}
                             </td>
-                            <td className="px-3 py-3 text-right text-xs font-bold tabular-nums text-slate-800 whitespace-nowrap">
+                            <td className="py-3 pl-3 pr-5 text-right text-sm font-bold tabular-nums text-slate-900 whitespace-nowrap">
                               {formatCurrency(Number(col.amount) || 0)}
                             </td>
-                            <td className="px-3 py-3 text-xs font-medium text-slate-600 truncate">
+                            <td className="border-l border-slate-100 py-3 pl-5 pr-3 text-xs font-medium text-slate-600 truncate">
                               {tr(col.collector) || "-"}
                             </td>
                             <td className="px-4 py-3 text-xs text-slate-600">
@@ -795,7 +921,7 @@ export function EditCollectionModal({
                         })}
                       </tbody>
                     </table>
-                    {filteredCredits.length >= 10 && (
+                    {visibleCredits.length >= 10 && (
                       <p className="border-t border-slate-100 bg-slate-50/60 px-4 py-2 text-xs text-slate-400">
                         {t("ops.collection.showing_latest_10", { count: recentList.length })}
                       </p>

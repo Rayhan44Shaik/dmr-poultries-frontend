@@ -28,6 +28,10 @@ import {
 } from "../../../../api";
 import { calculateCollectorSummary, calculatePaymentModeSummary } from "../utils/collectionCalculation";
 import { assertUniqueCollectionNumbers } from "../utils/collectionNumberIntegrity";
+import {
+  notifyShopDataChanged,
+  type ShopDataChangeReason,
+} from "../../../../shared/events/shopDataEvents";
 
 /** Sizes for list fetches when pagination is unavoidable. */
 const PAGE_SIZE = 200;
@@ -407,13 +411,48 @@ function getEntriesForShop(shopName: string): CollectionApiEntry[] {
   return getEntries().filter((e) => e.shopName === shopName);
 }
 
+
+/* ==================================================================
+   balance-change announcements — see shared/events/shopDataEvents.ts
+================================================================== */
+
+/**
+ * Tells every mounted shop-balance surface (Shop master, Shop Ledger,
+ * Pending Collections, the entry ledger) that this shop's balance moved, so
+ * each of them refetches from the API instead of showing a stale figure.
+ *
+ * `snapshot` is the row as it looked BEFORE the write, because a delete removes
+ * it from the collection register but must still name the shop it affected.
+ */
+function announceShopBalanceChange(
+  snapshot: { shopId?: number | null; shopName?: string | null } | null | undefined,
+  reason: ShopDataChangeReason,
+  source: "collection-entry" | "pending-collections" = "collection-entry",
+): void {
+  notifyShopDataChanged({
+    shopId: snapshot?.shopId ?? null,
+    shopName: snapshot?.shopName ?? null,
+    reason,
+    source,
+  });
+}
+
+/** The cached entry for an id, including soft-deleted rows. */
+function findEntrySnapshot(id: string | number): CollectionApiEntry | undefined {
+  return entriesCache.find((entry) => String(entry.id) === String(id));
+}
+
 /* ==================================================================
    mutations â€” backend is the authority
 ================================================================== */
 async function saveCollection(input: CollectionEntryInput): Promise<CollectionApiEntry> {
   const { data } = await apiPost<Record<string, unknown>>(COLLECTION_PATH, input);
   await refreshFromBackend();
-  return mapRawEntry(data);
+  const saved = mapRawEntry(data);
+  // A new pending collection doesn't move the balance yet, but it does change
+  // the shop's register — every shop view re-reads so nothing is left behind.
+  announceShopBalanceChange(saved, "created");
+  return saved;
 }
 
 async function saveCollectionLegacy(entry: {
@@ -459,7 +498,9 @@ async function updateCollection(collection: Collection): Promise<boolean> {
       }
     );
     void data;
+    const snapshot = findEntrySnapshot(collection.numericId);
     await refreshFromBackend();
+    announceShopBalanceChange(snapshot, "updated");
     return true;
   } catch (error) {
     handleApiError(error);
@@ -469,8 +510,12 @@ async function updateCollection(collection: Collection): Promise<boolean> {
 
 async function deleteCollection(id: string): Promise<boolean> {
   try {
+    // Read the row first: after the delete the balance has to be republished
+    // under the shop it belonged to, and the id alone would not tell us which.
+    const snapshot = findEntrySnapshot(id);
     await apiDelete(`${COLLECTION_PATH}/${Number(id)}`);
     await refreshFromBackend();
+    announceShopBalanceChange(snapshot, "deleted");
     return true;
   } catch (error) {
     handleApiError(error);
@@ -486,8 +531,10 @@ async function deleteCollection(id: string): Promise<boolean> {
  */
 async function deletePendingCollection(id: string): Promise<{ success: boolean; message?: string }> {
   try {
+    const snapshot = findEntrySnapshot(id);
     await apiDelete(`${COLLECTION_PATH}/pending/${Number(id)}`);
     await refreshFromBackend();
+    announceShopBalanceChange(snapshot, "deleted", "pending-collections");
     return { success: true };
   } catch (error) {
     const message = handleApiError(error);
@@ -500,6 +547,9 @@ async function approveCollection(
   approvedBy: string = "Admin"
 ): Promise<{ success: boolean; balance?: number }> {
   try {
+    // Snapshot before the write: an approval moves the balance, and every
+    // shop-facing screen has to republish it under the right shop id.
+    const snapshot = findEntrySnapshot(id);
     const { data } = await apiPatch<Record<string, unknown>>(`${COLLECTION_PATH}/${Number(id)}/status`, {
       status: "Approved",
       approvedBy,
@@ -508,6 +558,7 @@ async function approveCollection(
     const balance =
       data && data.currentBalance != null ? Number(data.currentBalance) : undefined;
     await refreshFromBackend();
+    announceShopBalanceChange(snapshot, "approved");
     return { success: true, balance };
   } catch (error) {
     handleApiError(error);
@@ -517,12 +568,14 @@ async function approveCollection(
 
 async function rejectCollection(id: string, rejectedBy: string = "Admin", reason?: string): Promise<boolean> {
   try {
+    const snapshot = findEntrySnapshot(id);
     await apiPatch(`${COLLECTION_PATH}/${Number(id)}/status`, {
       status: "Rejected",
       rejectedBy,
       reason,
     });
     await refreshFromBackend();
+    announceShopBalanceChange(snapshot, "rejected");
     return true;
   } catch (error) {
     handleApiError(error);

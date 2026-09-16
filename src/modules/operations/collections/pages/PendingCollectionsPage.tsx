@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { collectionService } from "../services/collectionService";
+import { onShopDataChanged } from "../../../../shared/events/shopDataEvents";
 import { useShops } from "../../../masters/shops/hooks/useShops";
 import type { Collection, CollectionPendingSummaryRow, CollectionPendingSummaryTotals } from "../types/collection";
 import type { Shop } from "../../../masters/shops/types/shop";
@@ -146,6 +147,33 @@ export default function PendingCollectionsPage() {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  /**
+   * Approving or deleting a collection anywhere moves the balance this page
+   * reports. Re-reading the register keeps the rows and the KPI strip honest
+   * without a manual refresh; `useShops` re-reads the shop side of the same
+   * change through the same signal.
+   */
+  useEffect(
+    () =>
+      onShopDataChanged(() => {
+        void loadData();
+        // The row's own balance and the KPI strip come from the pending
+        // summary, not from the collection register, so that read is repeated
+        // too — an approval must move these figures immediately.
+        if (!appliedToDate) return;
+        void collectionService
+          .fetchPendingSummary(appliedToDate)
+          .then((payload) => {
+            setPendingSummaryRows(payload.shops);
+            setPendingTotals(payload.totals);
+          })
+          .catch(() => {
+            /* keep the last good summary rather than blanking the table */
+          });
+      }),
+    [loadData, appliedToDate],
+  );
 
   // Initialize default date range (current week Mon-Sun)
   useEffect(() => {

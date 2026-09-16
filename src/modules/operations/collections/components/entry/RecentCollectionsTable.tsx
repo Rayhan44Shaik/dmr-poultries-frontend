@@ -10,6 +10,7 @@ import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocal
 import { formatTripListDay } from "../../../vehicle-trips/utils/formatTripListDay";
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 import { opsSecondaryButtonClass } from "../../../../../shared/ui/operationsStyles";
+import { BrandRefreshButton } from "../../../../../ui";
 import { collectionStatusKey, collectionStatusLabel } from "../../utils/collectionStatusLabel";
 import {
   collectionShopKey,
@@ -27,6 +28,13 @@ interface Props {
   onReject: (id: string) => void;
   onEdit: (collection: RecentCollection) => void;
   onViewShop: (shopName: string) => void;
+  /**
+   * Reloads the recent feed from the backend. Lives here, on the results card,
+   * beside Reset — the filter bar above stays a pure entry form.
+   */
+  onRefresh?: () => void | Promise<void>;
+  /** Drives the refresh control's dancing-hen busy state. */
+  refreshing?: boolean;
   /** Fires whenever the highlighted row changes, so the page can mirror it. */
   onSelectionChange?: (collection: RecentCollection | null) => void;
 }
@@ -59,6 +67,8 @@ export default function RecentCollectionsTable({
   onApprove,
   onEdit,
   onViewShop,
+  onRefresh,
+  refreshing = false,
   onSelectionChange,
 }: Props) {
   const { t, language } = useI18n();
@@ -254,6 +264,15 @@ export default function RecentCollectionsTable({
   const clearSearch = () => updateSearch("");
   const resetTable = () => updateSearch("");
 
+  /** Refresh clears the highlight first: the reloaded feed may not hold the
+    * row that was selected a moment ago, and a dangling highlight is worse
+    * than none. */
+  const refreshTable = () => {
+    setCurrentPage(1);
+    selectRow(null);
+    void onRefresh?.();
+  };
+
   /** Approved actions always select first, then open that exact entry. */
   const viewApprovedCollection = (collection: RecentCollection) => {
     selectRow(collection);
@@ -360,6 +379,16 @@ export default function RecentCollectionsTable({
             </span>
             {t("common.reset")}
           </button>
+
+          {onRefresh && (
+            <BrandRefreshButton
+              onClick={refreshTable}
+              loading={refreshing || isLoading}
+              ariaLabel={t("common.refresh")}
+            >
+              {t("common.refresh")}
+            </BrandRefreshButton>
+          )}
         </div>
       </div>
 
