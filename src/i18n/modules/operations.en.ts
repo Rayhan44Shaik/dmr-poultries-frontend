@@ -190,6 +190,8 @@ export default {
   'ops.dashboard.collection_performance.recovery': 'Recovery',
   'ops.dashboard.collection_performance.overall_aria': '{value}% of selected-period sales collected',
   'ops.dashboard.collection_performance.sort_label': 'Sort by',
+  'ops.dashboard.collection_performance.shop_label': 'Shop',
+  'ops.dashboard.collection_performance.all_shops': 'All shops',
   'ops.dashboard.collection_performance.sort_outstanding': 'Highest pending',
   'ops.dashboard.collection_performance.sort_sales': 'Highest sales',
   'ops.dashboard.collection_performance.sort_collections': 'Highest collections',

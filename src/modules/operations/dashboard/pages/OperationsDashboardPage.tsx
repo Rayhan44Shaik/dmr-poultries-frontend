@@ -884,6 +884,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
             data={data.collectionPerformanceByShop}
             totalSales={data.totalSalesAmount}
             totalCollections={data.totalCollections}
+            totalPending={data.pendingCollections}
             fromDate={calendarFrom}
             toDate={calendarTo}
           />

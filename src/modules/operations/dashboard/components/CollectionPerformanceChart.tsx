@@ -1,5 +1,5 @@
 import { useMemo, useRef, useState, type CSSProperties } from "react";
-import { ArrowUpRight, BarChart3 } from "lucide-react";
+import { ArrowUpRight, BarChart3, RotateCcw } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { useI18n } from "../../../../i18n";
@@ -17,6 +17,7 @@ interface CollectionPerformanceChartProps {
   data: CollectionPerformanceDatum[];
   totalSales: number;
   totalCollections: number;
+  totalPending?: number;
   fromDate: string;
   toDate: string;
 }
@@ -26,6 +27,8 @@ const PENDING_COLLECTIONS_URL = "/operations?tab=pending-collections";
 
 const safeAmount = (value: number): number =>
   Number.isFinite(value) && value > 0 ? value : 0;
+
+const shopKey = (shopName: string): string => shopName.trim().toLocaleLowerCase("en-IN");
 
 const formatPeriod = (fromDate: string, toDate: string, language: string): string => {
   const locale = language === "te" ? "te-IN" : "en-IN";
@@ -156,11 +159,13 @@ export default function CollectionPerformanceChart({
   data,
   totalSales,
   totalCollections,
+  totalPending,
   fromDate,
   toDate,
 }: CollectionPerformanceChartProps) {
   const { t, language } = useI18n();
   const [sortBy, setSortBy] = useState<CollectionPerformanceSort>("outstanding");
+  const [selectedShop, setSelectedShop] = useState("");
   const [sortAnimationId, setSortAnimationId] = useState(0);
   const [shopTooltip, setShopTooltip] = useState<ShopTooltipState | null>(null);
   const chartRef = useRef<HTMLElement | null>(null);
@@ -206,15 +211,43 @@ export default function CollectionPerformanceChart({
     [t],
   );
   const rows = useMemo(() => normalizeCollectionPerformance(data), [data]);
-  const visibleRows = useMemo(
-    () => sortCollectionPerformance(rows, sortBy).slice(0, MAX_VISIBLE_SHOPS),
-    [rows, sortBy],
+  const shopOptions = useMemo<MasterDropdownOption[]>(
+    () => rows
+      .slice()
+      .sort((a, b) => a.shopName.localeCompare(b.shopName, "en-IN"))
+      .map((row) => {
+        const inactive = row.shopStatus === "Inactive";
+        return {
+          value: shopKey(row.shopName),
+          label: inactive ? `${row.shopName} · ${t("common.inactive")}` : row.shopName,
+          searchText: row.shopName,
+          keywords: `${row.shopStatus ?? "Active"} ${row.shopName}`,
+        };
+      }),
+    [rows, t],
   );
+  const sortedRows = useMemo(() => sortCollectionPerformance(rows, sortBy), [rows, sortBy]);
+  const selectedRow = useMemo(
+    () => rows.find((row) => shopKey(row.shopName) === selectedShop) ?? null,
+    [rows, selectedShop],
+  );
+  const visibleRows = useMemo(() => {
+    if (!selectedRow) return sortedRows.slice(0, MAX_VISIBLE_SHOPS);
+    return [
+      selectedRow,
+      ...sortedRows
+        .filter((row) => shopKey(row.shopName) !== selectedShop)
+        .slice(0, MAX_VISIBLE_SHOPS - 1),
+    ];
+  }, [selectedRow, selectedShop, sortedRows]);
 
-  const sales = safeAmount(totalSales);
-  const collections = safeAmount(totalCollections);
-  const gap = Math.max(0, sales - collections);
-  const recovery = sales > 0 ? (collections / sales) * 100 : 0;
+  const rowPendingTotal = rows.reduce((total, row) => total + safeAmount(row.outstandingAmount), 0);
+  const sales = selectedRow ? safeAmount(selectedRow.salesAmount) : safeAmount(totalSales);
+  const collections = selectedRow ? safeAmount(selectedRow.collectionAmount) : safeAmount(totalCollections);
+  const pending = selectedRow
+    ? safeAmount(selectedRow.outstandingAmount)
+    : safeAmount(totalPending ?? rowPendingTotal);
+  const recovery = sales > 0 ? (collections / sales) * 100 : collections > 0 ? 100 : 0;
 
   const setSortValue = (value: string) => {
     const nextSort = value ? value as CollectionPerformanceSort : "outstanding";
@@ -224,6 +257,23 @@ export default function CollectionPerformanceChart({
     setSortBy(nextSort);
     setSortAnimationId((current) => current + 1);
   };
+
+  const setShopValue = (value: string) => {
+    if (value && !shopOptions.some((option) => option.value === value)) return;
+    if (value === selectedShop) return;
+    setShopTooltip(null);
+    setSelectedShop(value);
+    setSortAnimationId((current) => current + 1);
+  };
+
+  const resetView = () => {
+    if (!selectedShop && sortBy === "outstanding") return;
+    setShopTooltip(null);
+    setSelectedShop("");
+    setSortBy("outstanding");
+    setSortAnimationId((current) => current + 1);
+  };
+  const hasViewFilter = Boolean(selectedShop) || sortBy !== "outstanding";
 
   const showShopTooltip = (
     row: CollectionPerformanceDatum,
@@ -282,18 +332,6 @@ export default function CollectionPerformanceChart({
           </div>
 
           <div className="flex w-full min-w-0 flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-center sm:justify-end">
-            <MasterDropdown
-              hideLabel
-              label={t("ops.dashboard.collection_performance.sort_label")}
-              value={sortBy}
-              options={sortOptions}
-              onChange={setSortValue}
-              placeholder={t("ops.dashboard.collection_performance.sort_outstanding")}
-              searchable
-              portal={false}
-              className="w-full sm:w-48 lg:w-52"
-              triggerClassName="h-9 rounded-xl border-slate-200 bg-white/95 px-3 text-[11.5px] font-semibold shadow-xs"
-            />
             <div className="flex shrink-0 items-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50/65 px-1.5 py-1">
               <RecoveryRing value={recovery} size={40} />
               <div className="leading-tight">
@@ -308,11 +346,49 @@ export default function CollectionPerformanceChart({
       </header>
 
       <div className="flex flex-col p-2.5">
+        <div className="mb-2 grid grid-cols-[minmax(0,1.05fr)_minmax(0,0.9fr)_2.25rem] gap-1.5">
+          <MasterDropdown
+            hideLabel
+            label={t("ops.dashboard.collection_performance.shop_label")}
+            value={selectedShop}
+            options={shopOptions}
+            onChange={setShopValue}
+            placeholder={t("ops.dashboard.collection_performance.all_shops")}
+            searchable
+            allowClear
+            portal={false}
+            className="min-w-0"
+            triggerClassName="h-9 rounded-xl border-slate-200 bg-white/95 px-3 text-[11px] font-semibold shadow-xs"
+          />
+          <MasterDropdown
+            hideLabel
+            label={t("ops.dashboard.collection_performance.sort_label")}
+            value={sortBy}
+            options={sortOptions}
+            onChange={setSortValue}
+            placeholder={t("ops.dashboard.collection_performance.sort_outstanding")}
+            searchable
+            portal={false}
+            className="min-w-0"
+            triggerClassName="h-9 rounded-xl border-slate-200 bg-white/95 px-3 text-[11px] font-semibold shadow-xs"
+          />
+          <button
+            type="button"
+            onClick={resetView}
+            disabled={!hasViewFilter}
+            title={t("common.reset")}
+            aria-label={t("common.reset")}
+            className="flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-xs transition hover:border-emerald-200 hover:bg-emerald-50 hover:text-emerald-700 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <RotateCcw size={13} aria-hidden="true" />
+          </button>
+        </div>
+
         <div className="grid grid-cols-3 gap-1.5">
           {[
             [t("ops.dashboard.collection_performance.sales"), sales, "border-slate-200 bg-slate-50/80 text-slate-700"],
             [t("ops.dashboard.collection_performance.collected"), collections, "border-emerald-200 bg-emerald-50/75 text-emerald-700"],
-            [t("ops.dashboard.collection_performance.gap"), gap, "border-orange-200 bg-orange-50/80 text-orange-700"],
+            [t("ops.dashboard.collection_performance.gap"), pending, "border-orange-200 bg-orange-50/80 text-orange-700"],
           ].map(([label, value, tone]) => (
             <div key={String(label)} className={`min-w-0 rounded-lg border px-2 py-1 text-center ${tone}`}>
               <span className="block truncate text-[8.5px] font-black uppercase tracking-wide opacity-60">

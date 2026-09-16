@@ -3,6 +3,8 @@ export interface CollectionPerformanceDatum {
   salesAmount: number;
   collectionAmount: number;
   outstandingAmount: number;
+  shopId?: number;
+  shopStatus?: "Active" | "Inactive" | string;
 }
 
 export type CollectionPerformanceSort =
@@ -53,10 +55,14 @@ export function normalizeCollectionPerformance(
       salesAmount: 0,
       collectionAmount: 0,
       outstandingAmount: 0,
+      shopId: candidate.shopId,
+      shopStatus: candidate.shopStatus,
     };
     current.salesAmount += safeAmount(candidate.salesAmount);
     current.collectionAmount += safeAmount(candidate.collectionAmount);
     current.outstandingAmount += safeAmount(candidate.outstandingAmount);
+    current.shopId ??= candidate.shopId;
+    current.shopStatus ??= candidate.shopStatus;
     unique.set(key, current);
   }
 

@@ -190,6 +190,8 @@ export default {
   'ops.dashboard.collection_performance.recovery': 'రికవరీ',
   'ops.dashboard.collection_performance.overall_aria': 'ఎంచుకున్న కాలపు అమ్మకాలలో {value}% వసూలైంది',
   'ops.dashboard.collection_performance.sort_label': 'క్రమం',
+  'ops.dashboard.collection_performance.shop_label': 'షాప్',
+  'ops.dashboard.collection_performance.all_shops': 'అన్ని షాపులు',
   'ops.dashboard.collection_performance.sort_outstanding': 'అధిక పెండింగ్',
   'ops.dashboard.collection_performance.sort_sales': 'అధిక అమ్మకాలు',
   'ops.dashboard.collection_performance.sort_collections': 'అధిక కలెక్షన్లు',

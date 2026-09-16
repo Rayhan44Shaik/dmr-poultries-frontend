@@ -99,6 +99,142 @@ function toNumber(value: unknown): number {
   return Number.isFinite(n) ? n : 0;
 }
 
+interface DashboardShopLookupRow {
+  id?: number;
+  shopName: string;
+  shopStatus?: "Active" | "Inactive" | string;
+  currentBalance?: number;
+}
+
+interface DashboardPendingLookupRow {
+  shopId?: number;
+  shopName: string;
+  currentPending: number;
+}
+
+const shopLookupKey = (shopName: string): string => shopName.trim().toLocaleLowerCase("en-IN");
+
+function normalizeShopStatus(status: unknown): "Active" | "Inactive" {
+  return status === "Active" ? "Active" : "Inactive";
+}
+
+function mapDashboardShopLookup(raw: Record<string, unknown>): DashboardShopLookupRow | null {
+  const shopName = String(raw.shopName ?? raw.shop_name ?? "").trim();
+  if (!shopName) return null;
+  return {
+    id: raw.id != null ? Number(raw.id) : undefined,
+    shopName,
+    shopStatus: normalizeShopStatus(raw.status),
+    currentBalance: toNumber(raw.currentBalance ?? raw.current_balance),
+  };
+}
+
+function mapDashboardPendingLookup(raw: Record<string, unknown>): DashboardPendingLookupRow | null {
+  const shopName = String(raw.shopName ?? raw.shop_name ?? "").trim();
+  if (!shopName) return null;
+  return {
+    shopId: raw.shopId != null ? Number(raw.shopId) : raw.shop_id != null ? Number(raw.shop_id) : undefined,
+    shopName,
+    currentPending: Math.max(0, toNumber(raw.currentPending ?? raw.current_pending ?? raw.pendingAmount ?? raw.pending_amount)),
+  };
+}
+
+async function fetchDashboardShops(): Promise<DashboardShopLookupRow[]> {
+  try {
+    const { data } = await apiGet<Record<string, unknown>[]>("/masters/shops");
+    return (Array.isArray(data) ? data : []).flatMap((row) => {
+      const mapped = mapDashboardShopLookup(row);
+      return mapped ? [mapped] : [];
+    });
+  } catch {
+    return [];
+  }
+}
+
+async function fetchDashboardPendingCollections(): Promise<DashboardPendingLookupRow[]> {
+  try {
+    const { data } = await apiGet<Record<string, unknown>[]>("/operations/collections/pending");
+    return (Array.isArray(data) ? data : []).flatMap((row) => {
+      const mapped = mapDashboardPendingLookup(row);
+      return mapped ? [mapped] : [];
+    });
+  } catch {
+    return [];
+  }
+}
+
+function enrichCollectionPerformanceRows(
+  rows: readonly CollectionPerformanceDatum[],
+  shops: readonly DashboardShopLookupRow[],
+  pendingRows: readonly DashboardPendingLookupRow[],
+): CollectionPerformanceDatum[] {
+  if (shops.length === 0 && pendingRows.length === 0) return [...rows];
+
+  const byShop = new Map<string, CollectionPerformanceDatum>();
+  const ensure = (shopName: string): CollectionPerformanceDatum => {
+    const key = shopLookupKey(shopName);
+    const current = byShop.get(key);
+    if (current) return current;
+    const created: CollectionPerformanceDatum = {
+      shopName,
+      salesAmount: 0,
+      collectionAmount: 0,
+      outstandingAmount: 0,
+    };
+    byShop.set(key, created);
+    return created;
+  };
+
+  for (const row of rows) {
+    const shopName = String(row.shopName ?? "").trim();
+    if (!shopName) continue;
+    const current = ensure(shopName);
+    current.salesAmount += Math.max(0, toNumber(row.salesAmount));
+    current.collectionAmount += Math.max(0, toNumber(row.collectionAmount));
+    current.outstandingAmount += Math.max(0, toNumber(row.outstandingAmount));
+    current.shopId ??= row.shopId;
+    current.shopStatus ??= row.shopStatus;
+  }
+
+  for (const shop of shops) {
+    const current = ensure(shop.shopName);
+    current.shopId ??= shop.id;
+    current.shopStatus = shop.shopStatus;
+    // Inactive shops are selectable for pending follow-up, but they should not
+    // inherit old sales into the selected-period recovery chart.
+    if (shop.shopStatus === "Inactive") current.salesAmount = 0;
+    if (shop.currentBalance && shop.currentBalance > current.outstandingAmount) {
+      current.outstandingAmount = Math.max(0, shop.currentBalance);
+    }
+  }
+
+  for (const pending of pendingRows) {
+    const current = ensure(pending.shopName);
+    current.shopId ??= pending.shopId;
+    current.outstandingAmount = Math.max(0, pending.currentPending);
+  }
+
+  return [...byShop.values()].sort((a, b) => a.shopName.localeCompare(b.shopName, "en-IN"));
+}
+
+async function enrichOperationsDashboardData(data: DashboardData): Promise<DashboardData> {
+  const [shops, pendingRows] = await Promise.all([
+    fetchDashboardShops(),
+    fetchDashboardPendingCollections(),
+  ]);
+
+  if (shops.length === 0 && pendingRows.length === 0) return data;
+
+  return {
+    ...data,
+    collectionPerformanceByShop: enrichCollectionPerformanceRows(
+      data.collectionPerformanceByShop,
+      shops,
+      pendingRows,
+    ),
+  };
+}
+
 /**
  * Older dashboard APIs expose only top sales and live pending lists. Keep the
  * new chart useful against that contract while preferring the exact-period
@@ -208,7 +344,7 @@ export async function loadOperationsDashboard(
     const { data } = await apiGet<OperationsDashboardApiResponse>(DASHBOARD_PATH, {
       params: Object.keys(params).length > 0 ? params : undefined,
     });
-    return mapDashboardResponse(data);
+    return enrichOperationsDashboardData(mapDashboardResponse(data));
   } catch {
     // The development preview has no production dashboard API. Use a complete
     // in-memory showcase so every Operations Dashboard panel can be reviewed;
