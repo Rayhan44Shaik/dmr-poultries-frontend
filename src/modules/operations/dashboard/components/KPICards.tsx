@@ -363,9 +363,9 @@ const KPICard = memo(function KPICard({
               {t(kpiCardShortLabel(label))}
             </span>
           </div>
-          <div className="flex flex-shrink-0 flex-col items-center gap-1">
+          <div className="flex w-12 flex-shrink-0 flex-col items-center justify-center gap-1 text-center @min-[96px]:w-[3.25rem] @min-[120px]:w-14">
             <div
-              className={`${config.bg} flex h-6 w-6 items-center justify-center rounded-lg shadow-md transition-transform duration-300 group-hover:scale-110 @min-[96px]:h-[1.875rem] @min-[96px]:w-[1.875rem] @min-[120px]:h-9 @min-[120px]:w-9`}
+              className={`${config.bg} mx-auto flex h-6 w-6 items-center justify-center rounded-lg shadow-md transition-transform duration-300 group-hover:scale-110 @min-[96px]:h-[1.875rem] @min-[96px]:w-[1.875rem] @min-[120px]:h-9 @min-[120px]:w-9`}
             >
               <Icon
                 className="h-3.5 w-3.5 text-white @min-[96px]:h-4 @min-[96px]:w-4 @min-[120px]:h-[18px] @min-[120px]:w-[18px]"
@@ -373,7 +373,7 @@ const KPICard = memo(function KPICard({
               />
             </div>
             <span
-              className="inline-flex max-w-full items-center rounded-full bg-slate-50 px-1.5 py-0.5 text-[7px] font-black uppercase tracking-[0.04em] text-slate-400 ring-1 ring-inset ring-slate-100 @min-[96px]:text-[7.5px] @min-[120px]:text-[8px]"
+              className="inline-flex w-full max-w-full items-center justify-center whitespace-nowrap rounded-full bg-slate-50 px-1 py-0.5 text-center text-[7px] font-black uppercase tracking-[0.04em] text-slate-400 ring-1 ring-inset ring-slate-100 @min-[96px]:px-1.5 @min-[96px]:text-[7.5px] @min-[120px]:text-[8px]"
               title={periodChip}
             >
               {periodChip}
