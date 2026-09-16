@@ -1,6 +1,6 @@
 // src/modules/operations/dashboard/pages/OperationsDashboardPage.tsx
 
-import { useState, useRef, useEffect, useMemo, type CSSProperties } from "react";
+import { useState, useRef, useEffect, useMemo, useCallback, type CSSProperties } from "react";
 import { Link } from "react-router-dom";
 import { addDays, startOfMonth, subMonths } from "date-fns";
 import { useDashboardData } from "../hooks/useDashboardData";
@@ -9,6 +9,7 @@ import OperationalTrendsChart from "../components/OperationalTrendsChart";
 import { useOperationalTrends } from "../hooks/useOperationalTrends";
 import { granularityForRange, type Granularity } from "../utils/trendSeries";
 import CollectionsPie from "../components/CollectionsPie";
+import PaymentRegisterChart from "../components/PaymentRegisterChart";
 import RecentTripsTable from "../components/RecentTripsTable";
 import ActiveCounts from "../components/ActiveCounts";
 import CollectionPerformanceChart from "../components/CollectionPerformanceChart";
@@ -30,6 +31,10 @@ import { useI18n } from "../../../../i18n";
 import { getQuarterSampleInfo, type SampleQuarter } from "../../../../sample/quarterSample";
 import { kickApprovalSnapshot } from "../../../approvals/services/approvalSnapshot";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
+import {
+  loadPaymentRegisterSummary,
+  type PaymentRegisterSummary,
+} from "../services/paymentRegisterSummary";
 
 // -------- Helper: render a dashboard date as "12 Sep 2026" --------
 const formatDashboardDate = (value: string, locale = "en-IN"): string => {
@@ -616,6 +621,43 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   const calendarFrom = toInputDateString(startDate);
   const calendarTo = toInputDateString(endDate);
 
+  const [paymentRegister, setPaymentRegister] = useState<PaymentRegisterSummary | null>(null);
+  const [paymentRegisterLoading, setPaymentRegisterLoading] = useState(true);
+  const [paymentRegisterError, setPaymentRegisterError] = useState<string | null>(null);
+  const paymentRegisterRequestRef = useRef(0);
+
+  const loadPaymentRegister = useCallback(async () => {
+    if (!calendarFrom || !calendarTo) {
+      setPaymentRegister(null);
+      setPaymentRegisterLoading(false);
+      return;
+    }
+
+    const requestId = ++paymentRegisterRequestRef.current;
+    setPaymentRegisterLoading(true);
+    setPaymentRegisterError(null);
+    try {
+      const summary = await loadPaymentRegisterSummary(calendarFrom, calendarTo);
+      if (requestId !== paymentRegisterRequestRef.current) return;
+      setPaymentRegister(summary);
+    } catch (err) {
+      if (requestId !== paymentRegisterRequestRef.current) return;
+      setPaymentRegister(null);
+      setPaymentRegisterError(err instanceof Error ? err.message : "Unable to load approved payments");
+    } finally {
+      if (requestId === paymentRegisterRequestRef.current) {
+        setPaymentRegisterLoading(false);
+      }
+    }
+  }, [calendarFrom, calendarTo]);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => {
+      void loadPaymentRegister();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadPaymentRegister]);
+
   /* The window on screen, handed to the KPI tiles: each tile deep-links to its
      analysis page filtered to these exact dates, and the link also carries the
      equal-length window before them, so the analysis page can compare the same
@@ -642,42 +684,27 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
     ? GRANULARITY_BY_VIEW[trendView]
     : defaultGranularity;
 
-  // Light the chip the calendar is already showing, so the card and the
-  // calendar always agree: an exact match first, then any month-to-date range.
+  // Light a preset only when the calendar exactly matches that preset.
+  // Any hand-picked span stays under Custom range, even if it happens to be
+  // 7 or 30 days, so the Trip & Weight Movement card always tells the truth.
   const calendarMatchesPreset = (["today", "week", "month"] as const).find((view) => {
     const preset = windowForView(view, dashboardAnchor);
     return preset.from === calendarFrom && preset.to === calendarTo;
   });
-  /* A calendar that merely SPANS a day, a week or a month lights that chip too,
-     even when its dates are not exactly the preset's — if the page is showing a
-     week, this card reads a week. The card still totals the calendar's own
-     dates until a chip is actually tapped. */
-  const activeTrendView: TrendView =
-    trendView ??
-    calendarMatchesPreset ??
-    (rangeDays === 1
-      ? "today"
-      : rangeDays === 7
-        ? "week"
-        : rangeDays != null && rangeDays >= 28 && rangeDays <= 31
-          ? "month"
-          : null);
+  const activeTrendView: TrendView = trendView ?? calendarMatchesPreset ?? null;
 
-  // Anything the calendar picked by hand is its own option, so this card can
-  // read it too. It carries no count: the presets count trips, while this one
-  // is whatever range the calendar holds.
-  const trendViewsWithCalendar: TrendViewOption[] = calendarMatchesPreset
-    ? trendViews
-    : [
-        ...trendViews,
-        {
-          key: null,
-          label: t("ops.dashboard.trend.custom"),
-          /* While the card is reading the calendar, it already holds the
-             count for that range — no second request needed. */
-          count: activeTrendView === null ? trendsQuery.trends?.totalTrips ?? null : null,
-        },
-      ];
+  // Keep Custom range visible at all times: it means "follow the dashboard
+  // calendar" and is the way back from Today / Week / Month.
+  const trendViewsWithCalendar: TrendViewOption[] = [
+    ...trendViews,
+    {
+      key: null,
+      label: t("ops.dashboard.trend.custom"),
+      /* While the card is reading the calendar, it already holds the count for
+         that exact custom span — no second request needed. */
+      count: activeTrendView === null ? trendsQuery.trends?.totalTrips ?? null : null,
+    },
+  ];
 
   const handleRangeChange = (s: Date | undefined, e: Date | undefined) => {
     rangeTouchedRef.current = true;
@@ -687,11 +714,17 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
 
   // Manual "refresh everything" — dashboard KPIs/charts AND pending counters.
   const [refreshing, setRefreshing] = useState(false);
+  const [dashboardAnimationKey, setDashboardAnimationKey] = useState(0);
   const handleRefreshAll = async () => {
     if (refreshing) return;
     setRefreshing(true);
+    // Replay every visible chart immediately, even when the refreshed totals
+    // are unchanged and the API answers from cache with the same values.
+    setDashboardAnimationKey((key) => key + 1);
+    trendsQuery.refetch();
+    countersQuery.refetch();
     try {
-      await Promise.all([refetch(), kickApprovalSnapshot()]);
+      await Promise.all([refetch(), kickApprovalSnapshot(), loadPaymentRegister()]);
       showNotification("Dashboard refreshed — pending counts and charts are up to date", "success", 3200);
     } catch {
       showNotification("Could not refresh — please try again", "error", 3200);
@@ -847,6 +880,9 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
               loading={trendsQuery.loading}
               error={trendsQuery.error}
               onRetry={trendsQuery.refetch}
+              animationKey={dashboardAnimationKey}
+              fromDate={trendWindow.from}
+              toDate={trendWindow.to}
             />
           </div>
         </div>
@@ -874,34 +910,45 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
               {windowLabel(calendarFrom, calendarTo, trendLocale)}
             </p>
           </div>
-          <CollectionsPie data={data.collectionsByMode || []} />
+          <CollectionsPie data={data.collectionsByMode || []} animationKey={dashboardAnimationKey} />
         </div>
       </div>
 
       <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-12">
-        <div className="min-w-0 lg:col-span-7">
+        <div className="min-w-0 lg:col-span-6">
           <CollectionPerformanceChart
             data={data.collectionPerformanceByShop}
             totalSales={data.totalSalesAmount}
             totalCollections={data.totalCollections}
+            totalPending={data.pendingCollections}
             fromDate={calendarFrom}
             toDate={calendarTo}
+            animationKey={dashboardAnimationKey}
           />
         </div>
 
-        <div className="flex min-w-0 flex-col justify-start gap-4 rounded-2xl border border-slate-200/60 bg-white p-5 shadow-sm transition-shadow hover:shadow-md lg:col-span-5">
-          <div className="flex items-center justify-between">
-            <div>
-              <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.live_infrastructure")}</span>
-              <h3 className="mt-0.5 text-sm font-black text-slate-800">{t("ops.dashboard.recent_transit")}</h3>
-            </div>
-            <div className="flex items-center gap-1.5 rounded-full border border-slate-100 bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-500">
-              <ArrowRightLeft size={10} className="text-slate-400" /> {t("ops.dashboard.auto_updates")}
-            </div>
+        <div className="min-w-0 lg:col-span-6">
+          <PaymentRegisterChart
+            summary={paymentRegister}
+            loading={paymentRegisterLoading}
+            error={paymentRegisterError}
+            animationKey={dashboardAnimationKey}
+          />
+        </div>
+      </div>
+
+      <div className="flex min-w-0 flex-col justify-start gap-4 rounded-2xl border border-slate-200/60 bg-white p-5 shadow-sm transition-shadow hover:shadow-md">
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.live_infrastructure")}</span>
+            <h3 className="mt-0.5 text-sm font-black text-slate-800">{t("ops.dashboard.recent_transit")}</h3>
           </div>
-          <div className="w-full overflow-x-auto rounded-xl border border-slate-100 text-xs">
-            <RecentTripsTable trips={data.recentTrips || []} />
+          <div className="flex items-center gap-1.5 rounded-full border border-slate-100 bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-500">
+            <ArrowRightLeft size={10} className="text-slate-400" /> {t("ops.dashboard.auto_updates")}
           </div>
+        </div>
+        <div className="w-full overflow-x-auto rounded-xl border border-slate-100 text-xs">
+          <RecentTripsTable trips={data.recentTrips || []} />
         </div>
       </div>
 

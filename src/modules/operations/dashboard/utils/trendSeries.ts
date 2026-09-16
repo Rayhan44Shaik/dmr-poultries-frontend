@@ -39,6 +39,67 @@ export const tickKg = (value: number, locale = "en-IN"): string => {
 const monthName = (monthIndex: number, locale = "en-IN"): string =>
   new Date(2026, monthIndex, 1).toLocaleDateString(locale, { month: "short" });
 
+const toLocalDate = (date: Date): Date =>
+  new Date(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate(), 12);
+
+const parseLocalDate = (value?: string): Date | null => {
+  if (!value) return null;
+  const date = new Date(`${value}T12:00:00`);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+const fullDate = (date: Date, locale = "en-IN"): string =>
+  date.toLocaleDateString(locale, { day: "2-digit", month: "short", year: "numeric" }).replace(",", "");
+
+function isoWeekRange(raw: string): { week: number; start: Date; end: Date } | null {
+  const match = /^(\d{4})-W(\d{1,2})$/.exec(raw);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const week = Number(match[2]);
+  if (!Number.isFinite(year) || !Number.isFinite(week) || week < 1 || week > 53) return null;
+
+  // ISO week 1 is the week containing 4 Jan; weeks start on Monday.
+  const startUtc = new Date(Date.UTC(year, 0, 4));
+  const dayNumber = startUtc.getUTCDay() || 7;
+  startUtc.setUTCDate(startUtc.getUTCDate() - dayNumber + 1 + (week - 1) * 7);
+  const endUtc = new Date(startUtc);
+  endUtc.setUTCDate(startUtc.getUTCDate() + 6);
+  return { week, start: toLocalDate(startUtc), end: toLocalDate(endUtc) };
+}
+
+function monthRange(raw: string): { start: Date; end: Date } | null {
+  const match = /^(\d{4})-(\d{1,2})$/.exec(raw);
+  if (!match) return null;
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  if (!Number.isFinite(year) || !Number.isFinite(month) || month < 1 || month > 12) return null;
+  return {
+    start: new Date(year, month - 1, 1, 12),
+    end: new Date(year, month, 0, 12),
+  };
+}
+
+export function formatBucketDateRange(
+  raw: string,
+  locale = "en-IN",
+  clipFrom?: string,
+  clipTo?: string,
+): { start: string; end: string } | null {
+  const baseRange = raw.includes("W") ? isoWeekRange(raw) : monthRange(raw);
+  if (!baseRange) return null;
+
+  const clipStart = parseLocalDate(clipFrom);
+  const clipEnd = parseLocalDate(clipTo);
+  const start = clipStart && clipStart > baseRange.start ? clipStart : baseRange.start;
+  const end = clipEnd && clipEnd < baseRange.end ? clipEnd : baseRange.end;
+  if (start > end) return null;
+
+  return {
+    start: fullDate(start, locale),
+    end: fullDate(end, locale),
+  };
+}
+
 /** "2026-08-10" → "10 Aug"; "2026-W33" → "W33" ("వా33"); "2026-9" → "Sep 2026". */
 export function formatBucket(raw: string, locale = "en-IN"): string {
   if (!raw) return "";

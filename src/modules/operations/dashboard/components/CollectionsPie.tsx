@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Cell, Pie, PieChart, ResponsiveContainer, Sector, Tooltip, type PieSectorShapeProps } from "recharts";
+import { Cell, Pie, PieChart, ResponsiveContainer, Sector, type PieSectorShapeProps } from "recharts";
 import { useI18n } from "../../../../i18n";
 import { formatINRCompact } from "../../../../utils/format";
 
@@ -29,6 +29,7 @@ function lighten(hex: string, amt = 0.22): string {
 
 interface CollectionsPieProps {
   data: { name: string; value: number }[];
+  animationKey?: number;
 }
 
 interface EnrichedMode {
@@ -40,7 +41,7 @@ interface EnrichedMode {
 }
 
 /** Ease-out count-up for the centre total (rAF driven, ~900 ms). */
-function useCountUp(target: number, duration = 900): number {
+function useCountUp(target: number, duration = 900, replayKey = 0): number {
   const [value, setValue] = useState(0);
   const anim = useRef({ target: 0, start: 0, frame: 0 });
 
@@ -60,7 +61,7 @@ function useCountUp(target: number, duration = 900): number {
     };
     s.frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(s.frame);
-  }, [target, duration]);
+  }, [target, duration, replayKey]);
 
   return value;
 }
@@ -98,40 +99,11 @@ function CollectionStat({
   );
 }
 
-function CollectionTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: Array<{ payload?: unknown }>;
-}) {
-  if (!active) return null;
-  const item = payload?.[0]?.payload as Partial<EnrichedMode> | undefined;
-  if (!item || typeof item.name !== "string") return null;
-
-  const value = Number(item.value) || 0;
-  const percent = Number(item.percent) || 0;
-  const color = typeof item.color === "string" ? item.color : "#64748b";
-
-  return (
-    <div className="min-w-[190px] rounded-xl border border-slate-200 bg-white/95 px-3 py-2.5 shadow-xl shadow-slate-900/10 backdrop-blur-sm">
-      <div className="flex items-center gap-2 border-b border-slate-100 pb-1.5">
-        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
-        <p className="text-[11px] font-black uppercase tracking-wider text-slate-500">{item.name}</p>
-      </div>
-      <p className="mt-2 text-[16px] font-black tabular-nums text-slate-800">{formatINRCompact(value)}</p>
-      <p className="mt-0.5 text-[12px] font-black tabular-nums" style={{ color }}>
-        {percent.toFixed(1)}% of collection streams
-      </p>
-    </div>
-  );
-}
-
 /**
  * Payment-mode donut with stable bank/cash colours, direct amount/share
  * callouts, a selected-period total, and the existing KPI summary beneath it.
  */
-export default function CollectionsPie({ data }: CollectionsPieProps) {
+export default function CollectionsPie({ data, animationKey = 0 }: CollectionsPieProps) {
   const { t } = useI18n();
   const chartData = useMemo(() => data ?? [], [data]);
 
@@ -150,15 +122,15 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
     () => enrichedData.reduce((sum, d) => sum + d.value, 0),
     [enrichedData]
   );
-  const animatedTotal = useCountUp(total);
+  const animatedTotal = useCountUp(total, 900, animationKey);
 
   // Signature of the exact data on screen. When a NEW range's data lands the
   // signature changes, which re-keys the scene + KPI footer and replays the
   // whole entrance choreography. Identical data (session-cache hits) keeps
   // the same signature — no flicker on instant range switches.
   const dataSignature = useMemo(
-    () => chartData.map((d) => `${d.name}:${Math.round(Number(d.value) || 0)}`).join("|"),
-    [chartData]
+    () => `${animationKey}|${chartData.map((d) => `${d.name}:${Math.round(Number(d.value) || 0)}`).join("|")}`,
+    [chartData, animationKey]
   );
 
   // recharts v3: the per-sector shape gets `isActive` for the hovered slice —
@@ -307,7 +279,6 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
                       <Cell key={d.gid} fill={`url(#cs-grad-${d.gid})`} />
                     ))}
                   </Pie>
-                  <Tooltip content={<CollectionTooltip />} cursor={false} />
                 </PieChart>
               </ResponsiveContainer>
             </div>

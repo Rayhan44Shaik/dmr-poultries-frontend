@@ -3,6 +3,8 @@ export interface CollectionPerformanceDatum {
   salesAmount: number;
   collectionAmount: number;
   outstandingAmount: number;
+  shopId?: number;
+  shopStatus?: "Active" | "Inactive" | string;
 }
 
 export type CollectionPerformanceSort =
@@ -31,8 +33,9 @@ const shopKey = (shopName: string): string => shopName.trim().toLocaleLowerCase(
 export const collectionRecoveryPercentage = (
   row: Pick<CollectionPerformanceDatum, "salesAmount" | "collectionAmount">,
 ): number => {
-  if (row.salesAmount <= 0) return row.collectionAmount > 0 ? 100 : 0;
-  return (row.collectionAmount / row.salesAmount) * 100;
+  const salesAmount = safeAmount(row.salesAmount);
+  if (salesAmount <= 0) return 0;
+  return (safeAmount(row.collectionAmount) / salesAmount) * 100;
 };
 
 /**
@@ -53,10 +56,14 @@ export function normalizeCollectionPerformance(
       salesAmount: 0,
       collectionAmount: 0,
       outstandingAmount: 0,
+      shopId: candidate.shopId,
+      shopStatus: candidate.shopStatus,
     };
     current.salesAmount += safeAmount(candidate.salesAmount);
     current.collectionAmount += safeAmount(candidate.collectionAmount);
     current.outstandingAmount += safeAmount(candidate.outstandingAmount);
+    current.shopId ??= candidate.shopId;
+    current.shopStatus ??= candidate.shopStatus;
     unique.set(key, current);
   }
 

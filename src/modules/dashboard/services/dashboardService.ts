@@ -94,26 +94,21 @@ export interface DashboardData {
 /* ------------------------------------------------------------------ */
 /*  Quarter sample API — every business row the dashboard renders       */
 /* ------------------------------------------------------------------ */
-/** Trips/fuel are read this many days back — the fleet card needs each
- *  vehicle's *latest* trip and last fuel bill, not just this week's. */
-const SAMPLE_WINDOW_DAYS = 30;
-/** Shop sales/collections only feed the today / yesterday KPIs and the 7-day
- *  series, so a tight window keeps the payload small while still returning
- *  every row the dashboard can display. */
-const SAMPLE_SERIES_WINDOW_DAYS = 10;
 const SAMPLE_ROW_LIMIT = 500;
 /** Hard stop so a mis-reported `totalPages` can never loop forever. */
 const SAMPLE_MAX_PAGES = 40;
 
-function isoDaysAgo(days: number): string {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
-}
+type SampleDateRange = Pick<SampleQuarter, "fromDate" | "toDate">;
 
-/** Inclusive `fromDate`/`toDate` window ending today, `days` back. */
-function sampleRange(days: number): { fromDate: string; toDate: string } {
-  return { fromDate: isoDaysAgo(days), toDate: isoDaysAgo(0) };
+/**
+ * The overview dashboard must read the same quarter window advertised by
+ * scripts/quarter-sample-data.mjs. Do not derive a separate browser-clock
+ * window here: SAMPLE_TODAY can be pinned and the sample server runs on IST, so
+ * using its manifest is the only way to keep Overview, Operations and reports
+ * tied to the exact same rows.
+ */
+function sampleQuarterRange(quarter: SampleDateRange): { fromDate: string; toDate: string } {
+  return { fromDate: quarter.fromDate, toDate: quarter.toDate };
 }
 
 /* ---- row-level helpers (the two servers spell some fields differently) ---- */
@@ -165,11 +160,11 @@ async function fetchSampleRows(
   return rows;
 }
 
-/** GET /api/operations/trip-list — real vehicle trips for the last 30 days. */
-async function fetchSampleTrips(): Promise<Trip[]> {
+/** GET /api/operations/trip-list — every real vehicle trip in the sample quarter. */
+async function fetchSampleTrips(quarter: SampleDateRange): Promise<Trip[]> {
   try {
     const rows = await fetchSampleRows("/operations/trip-list", {
-      ...sampleRange(SAMPLE_WINDOW_DAYS),
+      ...sampleQuarterRange(quarter),
       // `latestTrips` renders the head of this array, so ask the endpoint for
       // newest-first (sortBy/sortDir are part of the documented trip-list
       // contract) instead of relying on the server's insertion order.
@@ -212,10 +207,10 @@ function toFuelExpense(row: Record<string, unknown>): FuelExpense {
   };
 }
 
-/** GET /api/operations/fuel-expenses — the same window as the trips read. */
-async function fetchSampleFuel(): Promise<FuelExpense[]> {
+/** GET /api/operations/fuel-expenses — every fuel bill in the sample quarter. */
+async function fetchSampleFuel(quarter: SampleDateRange): Promise<FuelExpense[]> {
   try {
-    const rows = await fetchSampleRows("/operations/fuel-expenses", sampleRange(SAMPLE_WINDOW_DAYS));
+    const rows = await fetchSampleRows("/operations/fuel-expenses", sampleQuarterRange(quarter));
     return rows.map(toFuelExpense);
   } catch {
     return [];
@@ -264,12 +259,12 @@ function toShopSale(row: Record<string, unknown>): ShopSale {
   };
 }
 
-/** GET /api/operations/shop-sales — delivery lines behind the sales KPIs. */
-async function fetchSampleShopSales(): Promise<ShopSale[]> {
+/** GET /api/operations/shop-sales — every booked delivery line in the sample quarter. */
+async function fetchSampleShopSales(quarter: SampleDateRange): Promise<ShopSale[]> {
   try {
     const rows = await fetchSampleRows(
       "/operations/shop-sales",
-      sampleRange(SAMPLE_SERIES_WINDOW_DAYS)
+      sampleQuarterRange(quarter)
     );
     return rows.map(toShopSale).filter((s) => s.tripDate);
   } catch {
@@ -309,11 +304,11 @@ function toCollection(row: Record<string, unknown>): Collection {
   };
 }
 
-/** GET /api/operations/collection-entry — the collections register. */
-async function fetchSampleCollections(): Promise<Collection[]> {
+/** GET /api/operations/collection-entry — every live collection row in the sample quarter. */
+async function fetchSampleCollections(quarter: SampleDateRange): Promise<Collection[]> {
   try {
     const rows = await fetchSampleRows("/operations/collection-entry", {
-      ...sampleRange(SAMPLE_SERIES_WINDOW_DAYS),
+      ...sampleQuarterRange(quarter),
       includeDeleted: "false",
     });
     return rows
@@ -380,14 +375,14 @@ function toMaintenanceRow(row: Record<string, unknown>): MaintenanceRow {
 }
 
 /**
- * GET /api/fleet/maintenance — jobs for the same 30-day window as trips/fuel.
+ * GET /api/fleet/maintenance — every job in the sample quarter.
  * Feeds the fleet card's per-vehicle service note and the activity timeline;
  * without it every vehicle read "No open issues" while the Fleet module showed
  * 300+ jobs from the same dataset.
  */
-async function fetchSampleMaintenance(): Promise<MaintenanceRow[]> {
+async function fetchSampleMaintenance(quarter: SampleDateRange): Promise<MaintenanceRow[]> {
   try {
-    const rows = await fetchSampleRows("/fleet/maintenance", sampleRange(SAMPLE_WINDOW_DAYS));
+    const rows = await fetchSampleRows("/fleet/maintenance", sampleQuarterRange(quarter));
     return rows
       .map(toMaintenanceRow)
       .filter((m) => m.date && (m.vehicleNo || m.vehicleId))
@@ -548,21 +543,22 @@ export async function loadDashboardData(): Promise<DashboardData> {
   // activity timeline empty while every other page of every module was fully
   // populated from the same dataset.
   //
-  // So when the sample server identifies itself, read the very rows it
-  // generated for the window the dashboard renders and merge them in — API
-  // rows first, so they always win over a stale/partial local cache, and any
-  // locally-only row is still kept. Production is untouched: the probe
-  // resolves to null outside dev/preview and against a real backend.
+  // So when the sample server identifies itself, read the complete quarter it
+  // generated — using the manifest's from/to dates, not a new frontend window —
+  // and merge those rows in. API rows come first, so they always win over a
+  // stale/partial local cache, and any locally-only row is still kept.
+  // Production is untouched: the probe resolves to null outside dev/preview and
+  // against a real backend.
   const sampleQuarter = (await getQuarterSampleInfo())?.quarter ?? null;
   if (sampleQuarter) {
     const [apiTrips, apiFuel, apiShopSales, apiCollections, apiPending, apiMaintenance] =
       await Promise.all([
-        fetchSampleTrips(),
-        fetchSampleFuel(),
-        fetchSampleShopSales(),
-        fetchSampleCollections(),
+        fetchSampleTrips(sampleQuarter),
+        fetchSampleFuel(sampleQuarter),
+        fetchSampleShopSales(sampleQuarter),
+        fetchSampleCollections(sampleQuarter),
         fetchSamplePendingCollections(),
-        fetchSampleMaintenance(),
+        fetchSampleMaintenance(sampleQuarter),
       ]);
     trips = mergeById(apiTrips, trips);
     fuelExpenses = mergeById(apiFuel, fuelExpenses);

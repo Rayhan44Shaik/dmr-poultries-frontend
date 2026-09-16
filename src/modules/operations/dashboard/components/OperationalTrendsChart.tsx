@@ -22,6 +22,7 @@ import {
   aggregateOperational,
   compactKg,
   formatBucket,
+  formatBucketDateRange,
   formatBucketLong,
   plain,
   previousBySortKey,
@@ -38,23 +39,28 @@ interface OperationalTrendsChartProps {
   loading?: boolean;
   error?: string | null;
   onRetry?: () => void;
+  /** Bumped by the page-level refresh button so Recharts replays its entrance. */
+  animationKey?: number;
+  /** Exact window the chart is reading; used to clip week/month tooltip ranges. */
+  fromDate?: string;
+  toDate?: string;
 }
 
 const COLOR = {
-  trips: "#4338ca",
-  farmWeight: "#64748b",
-  delivered: "#2563eb",
+  trips: "#0284c7",
+  farmWeight: "#0d9488",
+  delivered: "#7c3aed",
   mortality: "#e11d48",
-  weightLoss: "#f59e0b",
+  weightLoss: "#d97706",
 } as const;
 
-/** Bright plot colours mirror the dashboard reference without changing KPIs. */
+/** Calm sky/teal/lavender plot colours: softer on the eyes than the older bright palette. */
 const PLOT_COLOR = {
-  trips: "#2583eb",
-  farmWeight: "#10b981",
-  delivered: "#f59e0b",
-  mortality: "#8b5cf6",
-  weightLoss: "#f43f5e",
+  trips: "#0ea5e9",
+  farmWeight: "#2dd4bf",
+  delivered: "#a78bfa",
+  mortality: "#fda4af",
+  weightLoss: "#fbbf24",
 } as const;
 
 type TrendChartMode = "barLine" | "area" | "stacked";
@@ -81,21 +87,48 @@ function ChartTooltip({
   previous,
   t,
   locale,
+  fromDate,
+  toDate,
 }: {
   point: OperationalBucket;
   label: string;
   previous: OperationalBucket | null;
   t: (key: string, vars?: Record<string, string | number>) => string;
   locale: string;
+  fromDate?: string;
+  toDate?: string;
 }) {
   const tripsDelta = signed(point.trips, previous?.trips);
   const farmDelta = signed(point.farmWeight, previous?.farmWeight);
+  const bucketRange = formatBucketDateRange(label, locale, fromDate, toDate);
 
   return (
     <div className="min-w-[236px] rounded-xl border border-slate-200 bg-white/95 px-3 py-2.5 shadow-xl shadow-slate-900/10 backdrop-blur-sm">
-      <p className="mb-2 border-b border-slate-100 pb-1.5 text-[11px] font-black uppercase tracking-wider text-slate-500">
-        {formatBucketLong(label, locale)}
-      </p>
+      <div className="mb-2 border-b border-slate-100 pb-2">
+        <p className="text-[11px] font-black uppercase tracking-wider text-slate-500">
+          {formatBucketLong(label, locale)}
+        </p>
+        {bucketRange ? (
+          <div className="mt-2 grid grid-cols-2 gap-1.5">
+            <span className="rounded-lg bg-slate-50 px-2 py-1">
+              <span className="block text-[8.5px] font-black uppercase tracking-wide text-slate-400">
+                {t("ops.dashboard.start_date")}
+              </span>
+              <strong className="mt-0.5 block whitespace-nowrap text-[10.5px] font-black tabular-nums text-slate-700">
+                {bucketRange.start}
+              </strong>
+            </span>
+            <span className="rounded-lg bg-slate-50 px-2 py-1">
+              <span className="block text-[8.5px] font-black uppercase tracking-wide text-slate-400">
+                {t("ops.dashboard.end_date")}
+              </span>
+              <strong className="mt-0.5 block whitespace-nowrap text-[10.5px] font-black tabular-nums text-slate-700">
+                {bucketRange.end}
+              </strong>
+            </span>
+          </div>
+        ) : null}
+      </div>
 
       <div className="space-y-1.5">
         <Row color={PLOT_COLOR.trips} label={t("ops.dashboard.trips")} value={plain(point.trips, 0, locale)} delta={tripsDelta} />
@@ -216,6 +249,9 @@ export default function OperationalTrendsChart({
   loading = false,
   error = null,
   onRetry,
+  animationKey = 0,
+  fromDate,
+  toDate,
 }: OperationalTrendsChartProps) {
   const { t, language } = useI18n();
   const locale = language === "te" ? "te-IN" : "en-IN";
@@ -308,8 +344,8 @@ export default function OperationalTrendsChart({
               onClick={() => setChartMode(mode.value)}
               className={`rounded-md px-2.5 py-1 text-[9.5px] font-extrabold transition-colors ${
                 chartMode === mode.value
-                  ? "bg-white text-blue-700 shadow-sm ring-1 ring-inset ring-slate-200"
-                  : "text-slate-400 hover:text-slate-700"
+                  ? "bg-white text-sky-700 shadow-sm ring-1 ring-inset ring-sky-100"
+                  : "text-slate-400 hover:text-sky-700"
               }`}
             >
               {t(mode.labelKey)}
@@ -319,36 +355,40 @@ export default function OperationalTrendsChart({
       </div>
 
       {/* ── Plot ─────────────────────────────────────────────────────── */}
-      <div className="min-h-[8.75rem] w-full flex-1" style={{ minHeight: "8.75rem" }}>
+      <div
+        key={`${animationKey}-${chartMode}-${granularity}-${data.length}-${data[0]?.date ?? ""}`}
+        className="min-h-[8.75rem] w-full flex-1 animate-fade-in"
+        style={{ minHeight: "8.75rem" }}
+      >
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 12, right: 2, bottom: 0, left: -8 }} barGap={2}>
             <defs>
               <linearGradient id="ot-trips-area" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={PLOT_COLOR.trips} stopOpacity={0.16} />
+                <stop offset="0%" stopColor={PLOT_COLOR.trips} stopOpacity={0.14} />
                 <stop offset="100%" stopColor={PLOT_COLOR.trips} stopOpacity={0} />
               </linearGradient>
               <linearGradient id="ot-farm" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#34d399" />
+                <stop offset="0%" stopColor="#ccfbf1" />
                 <stop offset="100%" stopColor={PLOT_COLOR.farmWeight} />
               </linearGradient>
               <linearGradient id="ot-delivered" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#fbbf24" />
+                <stop offset="0%" stopColor="#ede9fe" />
                 <stop offset="100%" stopColor={PLOT_COLOR.delivered} />
               </linearGradient>
               <linearGradient id="ot-mortality" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#a78bfa" />
+                <stop offset="0%" stopColor="#fff1f2" />
                 <stop offset="100%" stopColor={PLOT_COLOR.mortality} />
               </linearGradient>
               <linearGradient id="ot-loss" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#fb7185" />
+                <stop offset="0%" stopColor="#fef9c3" />
                 <stop offset="100%" stopColor={PLOT_COLOR.weightLoss} />
               </linearGradient>
               <filter id="ot-line-shadow" x="-20%" y="-20%" width="140%" height="160%">
-                <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor={PLOT_COLOR.trips} floodOpacity={0.24} />
+                <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor={PLOT_COLOR.trips} floodOpacity={0.18} />
               </filter>
             </defs>
 
-            <CartesianGrid stroke="#eef2f7" strokeDasharray="3 6" vertical />
+            <CartesianGrid stroke="#f1f5f9" strokeDasharray="3 6" vertical />
             <XAxis
               dataKey="date"
               tickFormatter={(value: string) => formatBucket(value, locale)}
@@ -386,10 +426,12 @@ export default function OperationalTrendsChart({
                     previous={previous.get(point.sortKey) ?? null}
                     t={t}
                     locale={locale}
+                    fromDate={fromDate}
+                    toDate={toDate}
                   />
                 );
               }}
-              cursor={{ fill: "rgba(37,131,235,0.05)", radius: 6 }}
+              cursor={{ fill: "rgba(14,165,233,0.07)", radius: 6 }}
             />
 
             {chartMode === "barLine" ? (
