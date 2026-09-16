@@ -160,7 +160,14 @@ export interface SpanFleetParticipant {
  */
 export interface SpanIdleItem {
   name: string;
-  detail?: string;
+  /** Vehicle type label (vehicles only), e.g. "Mahindra Bolero Pickup". */
+  type?: string;
+  /**
+   * Most recent trip date this member EVER worked (YYYY-MM-DD), read across
+   * the full trip feed — the idle line answers "when did they last work?",
+   * which the joining date could never say for a span they were absent in.
+   */
+  lastTripDate?: string;
 }
 
 /**
@@ -204,9 +211,12 @@ export interface DashboardSpanFleet {
 const TOOLTIP_ITEM_LIMIT = 30;
 /** The quarter sample never approaches this many trips per window. */
 const TRIP_ROW_LIMIT = 1500;
+/** Whole-feed pull for "last worked" dates — comfortably above a quarter. */
+const TRIP_ALL_ROW_LIMIT = 5000;
 
 /** What one trip row contributes to the span rosters. */
 interface SpanTripRow {
+  tripDate: string;
   vehicleNo: string;
   driverName: string;
   supervisorName: string;
@@ -231,6 +241,7 @@ function mapSpanTripRow(raw: Record<string, unknown>): SpanTripRow {
       ? deliveries.reduce((acc, d) => acc + toNumber(d.weight), 0)
       : toNumber(raw.totalDeliveredWeight ?? raw.deliveredWeight);
   return {
+    tripDate: String(raw.tripDate ?? raw.trip_date ?? "").slice(0, 10),
     vehicleNo: String(raw.vehicleNo ?? raw.vehicle_no ?? "").trim(),
     driverName: String(raw.driverName ?? raw.driver_name ?? "").trim(),
     supervisorName: String(raw.supervisorName ?? raw.supervisor_name ?? "").trim(),
@@ -295,19 +306,12 @@ function activeCrewCount(employees: readonly Record<string, unknown>[], departme
   return crewDeptRows(employees, department).filter((row) => row.status === "Active").length;
 }
 
-/** "Joined …" line for a crew member, matching the register's record. */
-function crewJoinedDetail(row: Record<string, unknown>, department: string): string | undefined {
-  const joined = String(row.joiningDate ?? "").trim();
-  if (joined) return `Joined ${joined}`;
-  const dept = String(row.department ?? department).trim();
-  return dept || undefined;
-}
-
 /** Aggregate the span's trip rows into the five on-trip rosters. */
 function buildSpanFleet(
   trips: readonly Record<string, unknown>[],
   vehicles: readonly Record<string, unknown>[],
   employees: readonly Record<string, unknown>[],
+  allTrips: readonly Record<string, unknown>[],
 ): DashboardSpanFleet {
   const vehiclesByName = new Map<string, ParticipantBucket>();
   const driversByName = new Map<string, ParticipantBucket>();
@@ -330,6 +334,25 @@ function buildSpanFleet(
     for (const name of trip.loaders) bumpParticipant(loadersByName, name);
   }
 
+  // Every name from the FULL trip feed → its most recent trip date. The idle
+  // line shows "last worked" from this, never the joining date: the question
+  // a reader has about someone missing from the span is when they ran last.
+  // YYYY-MM-DD strings compare correctly, so a max-scan is enough.
+  const lastTripByName = new Map<string, string>();
+  const rememberLastTrip = (name: string, tripDate: string): void => {
+    if (!name || !tripDate) return;
+    const current = lastTripByName.get(name);
+    if (!current || current < tripDate) lastTripByName.set(name, tripDate);
+  };
+  for (const raw of allTrips) {
+    const trip = mapSpanTripRow(raw);
+    rememberLastTrip(trip.vehicleNo, trip.tripDate);
+    rememberLastTrip(trip.driverName, trip.tripDate);
+    rememberLastTrip(trip.supervisorName, trip.tripDate);
+    for (const name of trip.helpers) rememberLastTrip(name, trip.tripDate);
+    for (const name of trip.loaders) rememberLastTrip(name, trip.tripDate);
+  }
+
   // ACTIVE register members that ran NO trip in the span — the "did not run
   // in this range" line shown when a tile is selected. Register-Inactive
   // (out-of-service) members are excluded entirely: they sit outside the
@@ -338,15 +361,15 @@ function buildSpanFleet(
     if (row.status !== "Active") return [];
     const name = String(row.vehicleNumber ?? row.number ?? "").trim();
     if (!name || vehiclesByName.has(name)) return [];
-    const detail = String(row.vehicleType ?? "").trim();
-    return [{ name, detail: detail || undefined }];
+    const type = String(row.vehicleType ?? "").trim();
+    return [{ name, type: type || undefined, lastTripDate: lastTripByName.get(name) }];
   });
   const crewIdle = (department: string, participants: Map<string, ParticipantBucket>): SpanIdleItem[] =>
     crewDeptRows(employees, department).flatMap((row) => {
       if (row.status !== "Active") return [];
       const name = String(row.employeeName ?? "").trim();
       if (!name || participants.has(name)) return [];
-      return [{ name, detail: crewJoinedDetail(row, department) }];
+      return [{ name, lastTripDate: lastTripByName.get(name) }];
     });
 
   return {
@@ -398,6 +421,26 @@ async function fetchSpanTrips(fromDate?: string, toDate?: string): Promise<Recor
     const { data } = await apiGet<Record<string, unknown> | Record<string, unknown>[]>(
       "/operations/trip-list",
       { params },
+    );
+    if (Array.isArray(data)) return data;
+    const rows = (data as { data?: unknown } | null)?.data;
+    return Array.isArray(rows) ? (rows as Record<string, unknown>[]) : [];
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * The whole trip feed (no window) — only the idle line reads it, to pin the
+ * "last worked" date of register members missing from the selected span.
+ * Returns null on failure like fetchSpanTrips; the builder degrades to
+ * "no trips recorded" when a date cannot be found.
+ */
+async function fetchAllTrips(): Promise<Record<string, unknown>[] | null> {
+  try {
+    const { data } = await apiGet<Record<string, unknown> | Record<string, unknown>[]>(
+      "/operations/trip-list",
+      { params: { limit: TRIP_ALL_ROW_LIMIT, sortBy: "tripDate", sortDir: "desc" } },
     );
     if (Array.isArray(data)) return data;
     const rows = (data as { data?: unknown } | null)?.data;
@@ -539,12 +582,13 @@ function enrichCollectionPerformanceRows(
 }
 
 async function enrichOperationsDashboardData(data: DashboardData, fromDate?: string, toDate?: string): Promise<DashboardData> {
-  const [shops, pendingRows, vehicles, employees, spanTrips] = await Promise.all([
+  const [shops, pendingRows, vehicles, employees, spanTrips, allTrips] = await Promise.all([
     fetchDashboardShops(),
     fetchDashboardPendingCollections(),
     fetchDashboardVehicles(),
     fetchDashboardEmployees(),
     fetchSpanTrips(fromDate, toDate),
+    fetchAllTrips(),
   ]);
 
   if (shops.length === 0 && pendingRows.length === 0 && vehicles.length === 0 && employees.length === 0 && spanTrips === null) return data;
@@ -558,9 +602,10 @@ async function enrichOperationsDashboardData(data: DashboardData, fromDate?: str
     ),
     // The Active Fleet panel is span-scoped: only the people and vehicles
     // that ran a trip inside the selected window are counted, with the
-    // active masters register riding along as the small denominator.
+    // active masters register riding along as the small denominator. The
+    // whole feed is not counted — it only pins idle members' last-worked day.
     ...(spanTrips
-      ? { spanFleet: buildSpanFleet(spanTrips, vehicles, employees) }
+      ? { spanFleet: buildSpanFleet(spanTrips, vehicles, employees, allTrips ?? []) }
       : {}),
   };
 }

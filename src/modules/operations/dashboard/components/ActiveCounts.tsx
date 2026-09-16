@@ -46,9 +46,20 @@ const TILES: TileDef[] = [
 const EMPTY: SpanFleetRoster = { worked: 0, activeTotal: 0, items: [], overflow: 0, idle: [], idleOverflow: 0 };
 
 export default function ActiveCounts({ rosters }: ActiveCountsProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   /** Selected tile drives the idle line; clicking it again closes it. */
   const [selected, setSelected] = useState<RosterKey | null>(null);
+
+  /** "16 Aug 2026" in the UI's own language for an idle member's last run. */
+  const formatLastTrip = (isoDate: string): string => {
+    const date = new Date(`${isoDate}T00:00:00`);
+    if (Number.isNaN(date.getTime())) return isoDate;
+    return date.toLocaleDateString(language === "te" ? "te-IN" : "en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
 
   const selectedRoster = selected ? rosters[selected] ?? EMPTY : null;
   const selectedLabel = selected ? t(`ops.dashboard.active_${selected}`) : "";
@@ -137,9 +148,14 @@ export default function ActiveCounts({ rosters }: ActiveCountsProps) {
                   className="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] shadow-sm"
                 >
                   <span className="truncate font-semibold text-slate-700">{item.name}</span>
-                  {item.detail ? (
-                    <span className="block truncate tabular-nums text-slate-400">{item.detail}</span>
+                  {item.type ? (
+                    <span className="block truncate text-slate-400">{item.type}</span>
                   ) : null}
+                  <span className="block truncate tabular-nums text-slate-400">
+                    {item.lastTripDate
+                      ? t("ops.dashboard.last_worked", { date: formatLastTrip(item.lastTripDate) })
+                      : t("ops.dashboard.no_trips_yet")}
+                  </span>
                 </li>
               ))}
               {selectedRoster.idleOverflow > 0 && (
