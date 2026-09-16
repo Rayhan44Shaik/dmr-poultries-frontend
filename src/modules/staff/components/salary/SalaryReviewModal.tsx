@@ -155,6 +155,17 @@ function SalaryReviewModalBody({
 
   const filteredIds = useMemo(() => filtered.map((r) => r.id), [filtered]);
   const selectedCount = selectedIds.size;
+  // Per-chip counts from the FULL record set — the chips must always show
+  // what each filter WILL list, even when a side is empty (e.g. nothing
+  // submitted yet → Paid = 0).
+  const statusCounts = useMemo(
+    () => ({
+      all: records.length,
+      unpaid: records.filter((r) => r.status !== "Paid").length,
+      paid: records.filter((r) => r.status === "Paid").length,
+    }),
+    [records]
+  );
   // Send-once: submitted (Paid) employees can be sent — the Send Payslip
   // button enables only while at least one submitted payslip is still
   // unsent on BOTH channels. Sending on either channel reduces the count.
@@ -406,25 +417,36 @@ function SalaryReviewModalBody({
                     <span className="inline-flex items-center gap-0.5 rounded-lg bg-slate-100/80 p-0.5" role="group" aria-label={t("staff.register.filter_by_status")}>
                       {(
                         [
-                          { value: "all", label: t("common.all") },
-                          { value: "unpaid", label: t("common.pending") },
-                          { value: "paid", label: t("common.paid") },
+                          { value: "all", label: t("common.all"), count: statusCounts.all },
+                          { value: "unpaid", label: t("common.pending"), count: statusCounts.unpaid },
+                          { value: "paid", label: t("common.paid"), count: statusCounts.paid },
                         ] as const
-                      ).map((opt) => (
-                        <button
-                          key={opt.value}
-                          type="button"
-                          onClick={() => handleStatusFilterChange(opt.value)}
-                          aria-pressed={statusFilter === opt.value}
-                          className={`rounded-md px-2 py-1 text-xs font-semibold transition ${
-                            statusFilter === opt.value
-                              ? "bg-white text-emerald-700 shadow-sm"
-                              : "text-slate-500 hover:text-slate-800"
-                          }`}
-                        >
-                          {opt.label}
-                        </button>
-                      ))}
+                      ).map((opt) => {
+                        const active = statusFilter === opt.value;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => handleStatusFilterChange(opt.value)}
+                            aria-pressed={active}
+                            title={`${opt.label} — ${opt.count}`}
+                            className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-bold transition-all duration-200 ${
+                              active
+                                ? "bg-emerald-600 text-white shadow-sm"
+                                : "text-slate-500 hover:bg-white hover:text-slate-800"
+                            }`}
+                          >
+                            {opt.label}
+                            <span
+                              className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold tabular-nums transition-colors duration-200 ${
+                                active ? "bg-white/25 text-white" : "bg-white text-slate-500 ring-1 ring-slate-200"
+                              }`}
+                            >
+                              {opt.count}
+                            </span>
+                          </button>
+                        );
+                      })}
                     </span>
                     <span className="text-slate-300">|</span>
                     {/* All/None act on the employees VISIBLE under the current
@@ -526,10 +548,23 @@ function SalaryReviewModalBody({
                       );
                     })}
                   </ul>
-                ) : (
+                ) : query.trim() ? (
                   <p className="px-2 py-8 text-center text-xs text-slate-400">
                     {t("staff.review.no_match")}
                   </p>
+                ) : (
+                  <div className="px-3 py-8 text-center">
+                    <p className="text-xs font-semibold text-slate-500">
+                      {statusFilter === "paid"
+                        ? t("staff.review.empty_paid")
+                        : t("staff.review.empty_pending")}
+                    </p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-slate-400">
+                      {statusFilter === "paid"
+                        ? t("staff.review.empty_paid_hint")
+                        : t("staff.review.empty_pending_hint")}
+                    </p>
+                  </div>
                 )}
               </div>
             </aside>
