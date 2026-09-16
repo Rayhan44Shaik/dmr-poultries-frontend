@@ -36,6 +36,8 @@ interface PaymentRegisterChartProps {
   summary: PaymentRegisterSummary | null;
   loading: boolean;
   error?: string | null;
+  /** Bumped by the page-level refresh button so this chart replays its motion. */
+  animationKey?: number;
 }
 
 interface PaymentTypeChartRow extends PaymentRegisterTypeSummary {
@@ -108,6 +110,13 @@ function formatPeriod(fromDate: string, toDate: string): string {
   return `${format(fromDate)} – ${format(toDate)}${Number.isFinite(year) ? ` ${year}` : ""}`;
 }
 
+function lighten(hex: string, amt = 0.28): string {
+  const n = hex.replace("#", "");
+  const c = [0, 2, 4].map((i) => parseInt(n.slice(i, i + 2), 16));
+  const f = (value: number) => Math.round(value + (255 - value) * amt);
+  return `rgb(${f(c[0])}, ${f(c[1])}, ${f(c[2])})`;
+}
+
 function paymentModeColor(name: string): string {
   const key = name.toLocaleLowerCase("en-IN");
   if (key.includes("union")) return "#3b82f6";
@@ -163,7 +172,7 @@ function TypeTooltip({
   const payees = Array.isArray(item.payees) ? item.payees : [];
 
   return (
-    <div className="max-h-[16rem] w-72 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-3 text-[10px] text-slate-500 shadow-xl shadow-slate-900/12">
+    <div className="max-h-[13.5rem] w-64 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-3 text-[10px] text-slate-500 shadow-xl shadow-slate-900/12">
       <div className="flex min-w-0 items-start justify-between gap-2 border-b border-slate-100 pb-2">
         <p className="min-w-0 break-words text-[12px] font-bold leading-snug text-slate-800">
           {item.type}
@@ -236,7 +245,7 @@ function EmptyState({ error }: { error?: string | null }) {
           <div className="min-w-0">
             <Link to="/accounts?tab=paid-payments" className="group/title inline-flex min-w-0 items-center gap-1.5">
               <h2 className="truncate text-base font-black tracking-tight text-slate-900 transition-colors group-hover/title:text-sky-700">
-                Payment Register
+                Payments
               </h2>
               <ArrowUpRight size={13} className="shrink-0 text-slate-300 group-hover/title:text-sky-600" aria-hidden="true" />
             </Link>
@@ -257,7 +266,7 @@ function EmptyState({ error }: { error?: string | null }) {
   );
 }
 
-export default function PaymentRegisterChart({ summary, loading, error }: PaymentRegisterChartProps) {
+export default function PaymentRegisterChart({ summary, loading, error, animationKey = 0 }: PaymentRegisterChartProps) {
   const chartRows = useMemo<PaymentTypeChartRow[]>(() => {
     return (summary?.typeRows ?? []).map((row, index) => ({
       ...row,
@@ -278,7 +287,7 @@ export default function PaymentRegisterChart({ summary, loading, error }: Paymen
 
   const totalAmount = summary?.totalAmount ?? 0;
   const totalCount = summary?.totalCount ?? 0;
-  const dataKey = `${summary?.fromDate ?? ""}:${summary?.toDate ?? ""}:${chartRows.map((row) => `${row.type}-${Math.round(row.amount)}`).join("|")}`;
+  const dataKey = `${animationKey}:${summary?.fromDate ?? ""}:${summary?.toDate ?? ""}:${chartRows.map((row) => `${row.type}-${Math.round(row.amount)}`).join("|")}`;
 
   if (loading && !summary) return <PaymentSkeleton />;
   if (error || !summary || summary.totalCount === 0) return <EmptyState error={error} />;
@@ -286,13 +295,13 @@ export default function PaymentRegisterChart({ summary, loading, error }: Paymen
   return (
     <>
       <style>{PAYMENT_REGISTER_ANIMATION_STYLES}</style>
-      <section className="relative z-0 flex h-full min-h-[31rem] min-w-0 flex-col overflow-visible rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-900/5">
+      <section className="relative z-0 flex h-full min-h-[31rem] min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm shadow-slate-900/5">
         <header className="border-b border-slate-100 bg-gradient-to-r from-slate-50/90 via-white to-sky-50/30 px-4 py-2.5">
           <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
             <div className="min-w-0">
               <Link to="/accounts?tab=paid-payments" className="group/title inline-flex min-w-0 items-center gap-1.5">
                 <h2 className="truncate text-base font-black tracking-tight text-slate-900 transition-colors group-hover/title:text-sky-700">
-                  Payment Register
+                  Payments
                 </h2>
                 <ArrowUpRight size={13} className="shrink-0 text-slate-300 group-hover/title:text-sky-600" aria-hidden="true" />
               </Link>
@@ -302,13 +311,18 @@ export default function PaymentRegisterChart({ summary, loading, error }: Paymen
               </p>
             </div>
 
-            <div className="group flex shrink-0 items-center gap-1.5 rounded-xl border border-sky-100 bg-gradient-to-br from-sky-50 to-white px-1.5 py-1 shadow-xs">
-              <span className="relative grid h-9 w-9 shrink-0 place-items-center rounded-full bg-white text-sky-600 shadow-sm ring-1 ring-inset ring-sky-100">
+            <div key={`payment-total-${dataKey}`} className="group flex shrink-0 items-center gap-1.5 rounded-xl border border-sky-100 bg-gradient-to-br from-sky-50 to-white px-1.5 py-1 shadow-xs">
+              <span
+                className="relative grid h-10 w-10 shrink-0 place-items-center rounded-full text-sky-600 shadow-sm transition-transform duration-300 group-hover:scale-105"
+                style={{ background: "conic-gradient(from 140deg, #bae6fd, #10b981, #fde68a, #bae6fd)" }}
+              >
                 <span
                   className={`absolute inset-0 rounded-full bg-sky-300/25 ${loading ? "payment-register-rupee-glow" : "opacity-0 transition-opacity duration-300 group-hover:opacity-100"}`}
                   aria-hidden="true"
                 />
-                <span className="absolute inset-1 rounded-full border border-sky-100/80" aria-hidden="true" />
+                <span className="absolute inset-[3px] rounded-full bg-white shadow-inner" aria-hidden="true" />
+                <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-emerald-400 ring-2 ring-white" aria-hidden="true" />
+                <span className="absolute bottom-1 left-1 h-1 w-1 rounded-full bg-amber-400 ring-2 ring-white" aria-hidden="true" />
                 <IndianRupee className="relative h-4 w-4" strokeWidth={2.8} aria-hidden="true" />
               </span>
               <p className="leading-tight">
@@ -338,7 +352,15 @@ export default function PaymentRegisterChart({ summary, loading, error }: Paymen
                 margin={{ top: 8, right: 20, bottom: 8, left: 2 }}
                 barGap={7}
               >
-                <CartesianGrid stroke="#e2e8f0" strokeDasharray="3 5" horizontal={false} />
+                <defs>
+                  {chartRows.map((row, index) => (
+                    <linearGradient key={row.type} id={`pr-type-${index}`} x1="0" y1="0" x2="1" y2="0">
+                      <stop offset="0%" stopColor={lighten(row.colour, 0.52)} />
+                      <stop offset="100%" stopColor={row.colour} />
+                    </linearGradient>
+                  ))}
+                </defs>
+                <CartesianGrid stroke="#edf2f7" strokeDasharray="3 6" horizontal={false} />
                 <XAxis type="number" hide domain={[0, "dataMax"]} />
                 <YAxis
                   type="category"
@@ -351,18 +373,19 @@ export default function PaymentRegisterChart({ summary, loading, error }: Paymen
                 <Tooltip
                   content={<TypeTooltip />}
                   cursor={{ fill: "rgba(226,232,240,0.35)" }}
-                  allowEscapeViewBox={{ x: true, y: true }}
-                  wrapperStyle={{ zIndex: 60, pointerEvents: "none", outline: "none" }}
+                  allowEscapeViewBox={{ x: false, y: false }}
+                  wrapperStyle={{ zIndex: 40, pointerEvents: "none", outline: "none" }}
                 />
                 <Bar
                   dataKey="amount"
                   radius={[0, 12, 12, 0]}
                   barSize={11}
+                  background={{ fill: "#f1f5f9", radius: 12 }}
                   animationBegin={120}
-                  animationDuration={1050}
+                  animationDuration={1120}
                   animationEasing="ease-out"
                 >
-                  {chartRows.map((row) => <Cell key={row.type} fill={row.colour} />)}
+                  {chartRows.map((row, index) => <Cell key={row.type} fill={`url(#pr-type-${index})`} />)}
                   <LabelList
                     dataKey="amount"
                     position="right"

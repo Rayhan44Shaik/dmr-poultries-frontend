@@ -38,6 +38,8 @@ interface OperationalTrendsChartProps {
   loading?: boolean;
   error?: string | null;
   onRetry?: () => void;
+  /** Bumped by the page-level refresh button so Recharts replays its entrance. */
+  animationKey?: number;
 }
 
 const COLOR = {
@@ -216,6 +218,7 @@ export default function OperationalTrendsChart({
   loading = false,
   error = null,
   onRetry,
+  animationKey = 0,
 }: OperationalTrendsChartProps) {
   const { t, language } = useI18n();
   const locale = language === "te" ? "te-IN" : "en-IN";
@@ -319,7 +322,11 @@ export default function OperationalTrendsChart({
       </div>
 
       {/* ── Plot ─────────────────────────────────────────────────────── */}
-      <div className="min-h-[8.75rem] w-full flex-1" style={{ minHeight: "8.75rem" }}>
+      <div
+        key={`${animationKey}-${chartMode}-${granularity}-${data.length}-${data[0]?.date ?? ""}`}
+        className="min-h-[8.75rem] w-full flex-1 animate-fade-in"
+        style={{ minHeight: "8.75rem" }}
+      >
         <ResponsiveContainer width="100%" height="100%">
           <ComposedChart data={data} margin={{ top: 12, right: 2, bottom: 0, left: -8 }} barGap={2}>
             <defs>

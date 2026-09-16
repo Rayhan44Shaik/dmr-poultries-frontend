@@ -29,6 +29,7 @@ function lighten(hex: string, amt = 0.22): string {
 
 interface CollectionsPieProps {
   data: { name: string; value: number }[];
+  animationKey?: number;
 }
 
 interface EnrichedMode {
@@ -40,7 +41,7 @@ interface EnrichedMode {
 }
 
 /** Ease-out count-up for the centre total (rAF driven, ~900 ms). */
-function useCountUp(target: number, duration = 900): number {
+function useCountUp(target: number, duration = 900, replayKey = 0): number {
   const [value, setValue] = useState(0);
   const anim = useRef({ target: 0, start: 0, frame: 0 });
 
@@ -60,7 +61,7 @@ function useCountUp(target: number, duration = 900): number {
     };
     s.frame = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(s.frame);
-  }, [target, duration]);
+  }, [target, duration, replayKey]);
 
   return value;
 }
@@ -131,7 +132,7 @@ function CollectionTooltip({
  * Payment-mode donut with stable bank/cash colours, direct amount/share
  * callouts, a selected-period total, and the existing KPI summary beneath it.
  */
-export default function CollectionsPie({ data }: CollectionsPieProps) {
+export default function CollectionsPie({ data, animationKey = 0 }: CollectionsPieProps) {
   const { t } = useI18n();
   const chartData = useMemo(() => data ?? [], [data]);
 
@@ -150,15 +151,15 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
     () => enrichedData.reduce((sum, d) => sum + d.value, 0),
     [enrichedData]
   );
-  const animatedTotal = useCountUp(total);
+  const animatedTotal = useCountUp(total, 900, animationKey);
 
   // Signature of the exact data on screen. When a NEW range's data lands the
   // signature changes, which re-keys the scene + KPI footer and replays the
   // whole entrance choreography. Identical data (session-cache hits) keeps
   // the same signature — no flicker on instant range switches.
   const dataSignature = useMemo(
-    () => chartData.map((d) => `${d.name}:${Math.round(Number(d.value) || 0)}`).join("|"),
-    [chartData]
+    () => `${animationKey}|${chartData.map((d) => `${d.name}:${Math.round(Number(d.value) || 0)}`).join("|")}`,
+    [chartData, animationKey]
   );
 
   // recharts v3: the per-sector shape gets `isActive` for the hovered slice —

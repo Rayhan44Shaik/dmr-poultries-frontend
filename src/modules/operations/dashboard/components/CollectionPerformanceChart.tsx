@@ -22,6 +22,8 @@ interface CollectionPerformanceChartProps {
   totalPending?: number;
   fromDate: string;
   toDate: string;
+  /** Bumped by the page-level refresh button so the chart replays its motion. */
+  animationKey?: number;
 }
 
 const MAX_VISIBLE_SHOPS = 10;
@@ -164,6 +166,7 @@ export default function CollectionPerformanceChart({
   totalPending,
   fromDate,
   toDate,
+  animationKey = 0,
 }: CollectionPerformanceChartProps) {
   const { t, language } = useI18n();
   const [sortBy, setSortBy] = useState<CollectionPerformanceSort>("outstanding");
@@ -367,7 +370,7 @@ export default function CollectionPerformanceChart({
 
           <div className="flex w-full min-w-0 flex-col gap-2 sm:ml-auto sm:w-auto sm:flex-row sm:items-center sm:justify-end">
             <div className="flex shrink-0 items-center gap-1 rounded-lg border border-emerald-100 bg-emerald-50/65 px-1.5 py-1">
-              <RecoveryRing value={recovery} size={42} />
+              <RecoveryRing key={`summary-${animationKey}-${sortAnimationId}`} value={recovery} size={42} />
               <p className="text-[8px] font-black uppercase tracking-wide text-emerald-700">
                 {t("ops.dashboard.collection_performance.recovery")}
               </p>
@@ -460,7 +463,7 @@ export default function CollectionPerformanceChart({
               const rowRecovery = collectionRecoveryPercentage(row);
               return (
                 <article
-                  key={`${sortAnimationId}-${row.shopName}`}
+                  key={`${animationKey}-${sortAnimationId}-${row.shopName}`}
                   tabIndex={0}
                   aria-label={`${row.shopName}, ${t("ops.dashboard.collection_performance.recovery")}: ${rowRecovery.toFixed(1)}%, ${t("ops.dashboard.collection_performance.gap")}: ${formatINR(row.outstandingAmount)}`}
                   className="collection-recovery-shop-card group relative min-w-0 rounded-xl border border-slate-100 bg-gradient-to-r from-white to-slate-50/60 px-2.5 py-1 shadow-xs transition-colors duration-150 hover:from-emerald-50/35 hover:to-white focus:bg-emerald-50/30"

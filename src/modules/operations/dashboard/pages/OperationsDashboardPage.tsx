@@ -729,9 +729,15 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
 
   // Manual "refresh everything" — dashboard KPIs/charts AND pending counters.
   const [refreshing, setRefreshing] = useState(false);
+  const [dashboardAnimationKey, setDashboardAnimationKey] = useState(0);
   const handleRefreshAll = async () => {
     if (refreshing) return;
     setRefreshing(true);
+    // Replay every visible chart immediately, even when the refreshed totals
+    // are unchanged and the API answers from cache with the same values.
+    setDashboardAnimationKey((key) => key + 1);
+    trendsQuery.refetch();
+    countersQuery.refetch();
     try {
       await Promise.all([refetch(), kickApprovalSnapshot(), loadPaymentRegister()]);
       showNotification("Dashboard refreshed — pending counts and charts are up to date", "success", 3200);
@@ -889,6 +895,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
               loading={trendsQuery.loading}
               error={trendsQuery.error}
               onRetry={trendsQuery.refetch}
+              animationKey={dashboardAnimationKey}
             />
           </div>
         </div>
@@ -916,7 +923,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
               {windowLabel(calendarFrom, calendarTo, trendLocale)}
             </p>
           </div>
-          <CollectionsPie data={data.collectionsByMode || []} />
+          <CollectionsPie data={data.collectionsByMode || []} animationKey={dashboardAnimationKey} />
         </div>
       </div>
 
@@ -929,6 +936,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
             totalPending={data.pendingCollections}
             fromDate={calendarFrom}
             toDate={calendarTo}
+            animationKey={dashboardAnimationKey}
           />
         </div>
 
@@ -937,6 +945,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
             summary={paymentRegister}
             loading={paymentRegisterLoading}
             error={paymentRegisterError}
+            animationKey={dashboardAnimationKey}
           />
         </div>
       </div>
