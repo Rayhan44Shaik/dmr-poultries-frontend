@@ -4308,13 +4308,18 @@ function createCollectionRow(body) {
 function createFuelRow(body) {
   const id = nextNumericId(FUEL_EXPENSES.map((f) => ({ id: Number(f.id) })));
   const date = String(body.billDate ?? TODAY);
-  const sameDay = FUEL_EXPENSES.filter((f) => f.billDate === date).length + 1;
+  let sameDay = FUEL_EXPENSES.filter((f) => f.billDate === date).length + 1;
+  let candidateBillNo = body.billNo || `FUEL-M-${date.replaceAll("-", "")}-${pad3(sameDay)}`;
+  while (FUEL_EXPENSES.some((f) => f.billNo === candidateBillNo)) {
+    sameDay += 1;
+    candidateBillNo = `FUEL-M-${date.replaceAll("-", "")}-${pad3(sameDay)}`;
+  }
   const vehicle = body.vehicleId
     ? VEHICLE_BY_ID.get(Number(body.vehicleId))
     : VEHICLES.find((v) => v.vehicleNumber === body.vehicleNo);
   const row = {
     id: String(id),
-    billNo: body.billNo ?? `FUEL-M-${date.replaceAll("-", "")}-${pad3(sameDay)}`,
+    billNo: candidateBillNo,
     billDate: date,
     sourceType: body.sourceType ?? "MANUAL",
     vehicleId: vehicle?.id ?? null,

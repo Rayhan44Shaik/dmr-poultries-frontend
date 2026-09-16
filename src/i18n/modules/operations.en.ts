@@ -1166,4 +1166,12 @@ export default {
   'ops.fuel.already_approved': 'Bill is already approved.',
   'ops.fuel.manual_entry': 'Manual Entry',
   'ops.fuel.deleted_bill': 'Deleted Bill',
+  'ops.fuel.approved_fuel_history': 'Approved Fuel History',
+  'ops.fuel.pending_fuel_bills': 'Pending Fuel Bills',
+  'ops.fuel.deleted_fuel_bills': 'Deleted Fuel Bills',
+  'ops.fuel.vehicle_fuel_history': 'Vehicle Fuel History',
+  'ops.fuel.approved_records': 'Approved Records',
+  'ops.fuel.pending_records': 'Pending Records',
+  'ops.fuel.deleted_records': 'Deleted Records',
+  'ops.fuel.all_records': 'All Records',
 };

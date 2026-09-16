@@ -33,6 +33,7 @@ import {
 } from "lucide-react";
 import AppShellModal from "../../../../ui/AppShellModal";
 import type { FuelExpense } from "../types/fuelExpense";
+import type { FuelQuickTab } from "../utils/filterFuelExpenses";
 import { formatVehicleNumber } from "../../../../utils/format";
 import { formatTripListDay } from "../../vehicle-trips/utils/formatTripListDay";
 import { localizeTripViewText } from "../../vehicle-trips/utils/tripViewLocalization";
@@ -53,6 +54,8 @@ export interface FuelViewModalProps {
   vehicleBills?: FuelExpense[];
   /** Set when the record can still be edited — shows the in-view Edit action. */
   canEdit?: boolean;
+  /** Active status tab context (ALL, PENDING, APPROVED, DELETED) */
+  activeTab?: FuelQuickTab;
   /** Edit from inside the view — closes the modal and loads the form. */
   onEdit?: (bill: FuelExpense) => void;
   onClose: () => void;
@@ -64,6 +67,7 @@ function FuelViewModalContent({
   vehicles = [],
   vehicleBills = [],
   canEdit = false,
+  activeTab,
   onEdit,
   onClose,
 }: FuelViewModalProps) {
@@ -95,30 +99,73 @@ function FuelViewModalContent({
   const rawVehicleNo = vehicleObj?.vehicleNumber || currentRecord?.vehicleNo || "";
   const vehicleNumber = formatVehicleNumber(rawVehicleNo);
 
-  /** LEFT PANEL list — every APPROVED fuel entry of this vehicle,
-   *  newest first, narrowable by source (Trip / Manual). */
-  const approvedHistory = useMemo(() => {
-    if (!vehicleBills.length && currentRecord) return [currentRecord];
-    return vehicleBills
-      .filter((r) => {
-        const isDeleted = r.deleted === true || r.status === "Deleted";
-        if (isDeleted && r.id !== currentRecord?.id) return false;
-        const isTrip = r.sourceType === "TRIP" || !!r.tripNo;
-        const isApproved = isTrip || r.status === "Approved";
-        if (!isApproved && r.id !== currentRecord?.id) return false;
+  const isDeleted = currentRecord?.deleted === true || currentRecord?.status === "Deleted";
+  const isTrip = currentRecord?.sourceType === "TRIP" || !!currentRecord?.tripNo || !!currentRecord?.tripId;
+  const isApproved = !isDeleted && (isTrip || currentRecord?.status === "Approved");
+  const isPending = !isDeleted && !isTrip && !isApproved;
 
-        if (sourceFilter === "TRIP" && !isTrip) return false;
-        if (sourceFilter === "MANUAL" && isTrip) return false;
+  const effectiveTab: FuelQuickTab = activeTab
+    ? activeTab
+    : isDeleted
+    ? "DELETED"
+    : isPending
+    ? "PENDING"
+    : isApproved
+    ? "APPROVED"
+    : "ALL";
+
+  const sidebarTitle =
+    effectiveTab === "APPROVED"
+      ? t("ops.fuel.approved_fuel_history") || "Approved Fuel History"
+      : effectiveTab === "PENDING"
+      ? t("ops.fuel.pending_fuel_bills") || "Pending Fuel Bills"
+      : effectiveTab === "DELETED"
+      ? t("ops.fuel.deleted_fuel_bills") || "Deleted Fuel Bills"
+      : t("ops.fuel.vehicle_fuel_history") || "Vehicle Fuel History";
+
+  /** LEFT PANEL list — filtered vehicle entries matching active tab context:
+   *  - APPROVED tab: ONLY Approved bills of this vehicle
+   *  - PENDING tab: ONLY Pending bills of this vehicle
+   *  - DELETED tab: ONLY Deleted bills of this vehicle
+   *  - ALL tab: All active bills of this vehicle
+   *  newest first, narrowable by source (Trip / Manual). */
+  const vehicleHistory = useMemo(() => {
+    if (!vehicleBills.length && currentRecord) return [currentRecord];
+    const filtered = vehicleBills
+      .filter((r) => {
+        const isRecDel = r.deleted === true || r.status === "Deleted";
+        const isRecTrp = r.sourceType === "TRIP" || !!r.tripNo;
+        const isRecApp = !isRecDel && (isRecTrp || r.status === "Approved");
+        const isRecPnd = !isRecDel && !isRecTrp && r.status === "Pending";
+
+        if (effectiveTab === "APPROVED") {
+          if (!isRecApp && r.id !== currentRecord?.id) return false;
+        } else if (effectiveTab === "PENDING") {
+          if (!isRecPnd && r.id !== currentRecord?.id) return false;
+        } else if (effectiveTab === "DELETED") {
+          if (!isRecDel && r.id !== currentRecord?.id) return false;
+        } else {
+          // ALL tab: active rows only
+          if (isRecDel && r.id !== currentRecord?.id) return false;
+        }
+
+        if (sourceFilter === "TRIP" && !isRecTrp) return false;
+        if (sourceFilter === "MANUAL" && isRecTrp) return false;
         return true;
       })
       .sort((a, b) => new Date(b.date || b.createdDate || 0).getTime() - new Date(a.date || a.createdDate || 0).getTime());
-  }, [vehicleBills, currentRecord, sourceFilter]);
+
+    if (currentRecord && !filtered.some((f) => f.id === currentRecord.id)) {
+      filtered.unshift(currentRecord);
+    }
+    return filtered;
+  }, [vehicleBills, currentRecord, effectiveTab, sourceFilter]);
 
   // Roving focus for the left list — ArrowUp/Down moves the active record.
   const listRefs = useRef(new Map<string, HTMLButtonElement>());
   const moveActive = (fromId: string, step: 1 | -1) => {
-    const index = approvedHistory.findIndex((r) => String(r.id) === fromId);
-    const next = approvedHistory[index + step];
+    const index = vehicleHistory.findIndex((r) => String(r.id) === fromId);
+    const next = vehicleHistory[index + step];
     if (!next) return;
     setActive(next);
     const element = listRefs.current.get(String(next.id));
@@ -134,7 +181,7 @@ function FuelViewModalContent({
     try {
       await generateFuelPdf(
         currentRecord,
-        approvedHistory,
+        vehicleHistory,
         vehicleNumber,
         language,
         t
@@ -142,13 +189,9 @@ function FuelViewModalContent({
     } finally {
       setPdfBusy(false);
     }
-  }, [currentRecord, approvedHistory, vehicleNumber, language, t, pdfBusy]);
+  }, [currentRecord, vehicleHistory, vehicleNumber, language, t, pdfBusy]);
 
   if (!isOpen || !currentRecord) return null;
-
-  const isDeleted = currentRecord.deleted === true || currentRecord.status === "Deleted";
-  const isTrip = currentRecord.sourceType === "TRIP" || !!currentRecord.tripNo || !!currentRecord.tripId;
-  const isApproved = !isDeleted && (isTrip || currentRecord.status === "Approved");
 
   const vehicleDisplay = localizeTripViewText(vehicleNumber, language);
   const driverDisplay = localizeTripViewText(currentRecord.driverName || "—", language);
@@ -251,15 +294,15 @@ function FuelViewModalContent({
         {/* ── Body — Split Layout: Left Expanded Sidebar (w-96) + Right (Active record details) ── */}
         <div className="flex min-h-0 flex-1 flex-col lg:flex-row">
           
-          {/* ── LEFT PANEL — Generous sidebar with every approved fuel entry of this vehicle ── */}
+          {/* ── LEFT PANEL — Generous sidebar with filtered fuel entries of this vehicle ── */}
           <aside className="flex w-full flex-shrink-0 flex-col border-b border-slate-100 bg-slate-50/40 lg:w-[380px] lg:border-b-0 lg:border-r">
             <div className="flex items-center justify-between px-4 pt-4">
               <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
                 <Truck size={13} className="flex-shrink-0 text-slate-400" />
-                <span>{t("fleet.maintenance_view.all_records") || "All Records"}</span>
+                <span>{sidebarTitle}</span>
               </p>
               <span className="rounded-full bg-white px-2.5 py-0.5 text-[11px] font-bold tabular-nums text-slate-600 ring-1 ring-slate-200 shadow-xs">
-                {approvedHistory.length}
+                {vehicleHistory.length}
               </span>
             </div>
 
@@ -283,12 +326,12 @@ function FuelViewModalContent({
 
             {/* Scrollable list of vehicle fuel entries */}
             <div className="max-h-64 min-h-0 flex-1 overflow-y-auto p-3 lg:max-h-none space-y-2">
-              {approvedHistory.length === 0 ? (
+              {vehicleHistory.length === 0 ? (
                 <p className="py-8 text-center text-xs font-medium text-slate-400">
                   {t("ops.fuel.no_records") || "No records found"}
                 </p>
               ) : (
-                approvedHistory.map((rec) => {
+                vehicleHistory.map((rec) => {
                   const isSelected = String(rec.id) === String(currentRecord.id);
                   const isRecTrip = rec.sourceType === "TRIP" || !!rec.tripNo;
                   const hasGps = rec.gpsLat != null && rec.gpsLon != null && !(Number(rec.gpsLat) === 0 && Number(rec.gpsLon) === 0);

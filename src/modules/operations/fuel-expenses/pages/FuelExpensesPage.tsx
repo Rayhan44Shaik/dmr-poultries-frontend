@@ -543,6 +543,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
         isOpen={viewModalOpen}
         bill={viewingBill}
         vehicles={masterVehicles}
+        activeTab={quickTab}
         vehicleBills={
           viewingBill
             ? deduplicatedExpenses.filter(

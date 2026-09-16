@@ -1176,4 +1176,12 @@ export default {
   'ops.fuel.already_approved': 'బిల్లు ఇప్పటికే ఆమోదించబడింది.',
   'ops.fuel.manual_entry': 'మాన్యువల్ నమోదు',
   'ops.fuel.deleted_bill': 'తొలగించిన బిల్లు',
+  'ops.fuel.approved_fuel_history': 'ఆమోదించబడిన ఇంధన చరిత్ర',
+  'ops.fuel.pending_fuel_bills': 'పెండింగ్‌లో ఉన్న ఇంధన బిల్లులు',
+  'ops.fuel.deleted_fuel_bills': 'తొలగించబడిన ఇంధన బిల్లులు',
+  'ops.fuel.vehicle_fuel_history': 'వాహన ఇంధన చరిత్ర',
+  'ops.fuel.approved_records': 'ఆమోదించిన రికార్డులు',
+  'ops.fuel.pending_records': 'పెండింగ్ రికార్డులు',
+  'ops.fuel.deleted_records': 'తొలగించిన రికార్డులు',
+  'ops.fuel.all_records': 'అన్ని రికార్డులు',
 };
