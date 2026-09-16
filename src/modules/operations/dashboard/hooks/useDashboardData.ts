@@ -74,7 +74,6 @@ const initialData: DashboardData = {
   usedHelpers: 0,
   usedShops: 0,
   usedFarms: 0,
-  moduleCounts: null,
   sampleQuarter: null,
 };
 

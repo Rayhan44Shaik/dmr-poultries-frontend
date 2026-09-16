@@ -14,7 +14,6 @@ import PaymentRegisterChart from "../components/PaymentRegisterChart";
 import ActiveCounts from "../components/ActiveCounts";
 import CollectionPerformanceChart from "../components/CollectionPerformanceChart";
 import PendingApprovalsPanel from "../components/PendingApprovalsPanel";
-import QuarterOperationsMap from "../components/QuarterOperationsMap";
 import {
   Calendar,
   CalendarClock,
@@ -29,8 +28,7 @@ import {
 import { DatePicker } from "../../../../components/common/DatePicker";
 import { useI18n } from "../../../../i18n";
 import { getQuarterSampleInfo, type SampleQuarter } from "../../../../sample/quarterSample";
-import { greetingForHour } from "../../../../utils/format";
-import { getCurrentUser } from "../../../settings/services";
+import { FIXED_DASHBOARD_GREETING } from "../../../settings/services";
 import { kickApprovalSnapshot } from "../../../approvals/services/approvalSnapshot";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import {
@@ -600,13 +598,10 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   const { t, language: uiLanguage } = useI18n();
   const trendLocale = uiLanguage === "te" ? "te-IN" : "en-IN";
 
-  // Time-of-day greeting + signed-in user name, in the UI language — one
-  // render-time value, no timers, so the header can never blink or lag.
-  const greetingName = getCurrentUser().name;
   const greetingHeader = (
     <div className="min-w-0">
       <h1 className="truncate text-lg font-black tracking-tight text-slate-900 sm:text-xl">
-        {greetingForHour()}, {greetingName} 👋
+        {FIXED_DASHBOARD_GREETING}
       </h1>
       <span aria-hidden="true" className="mt-1 block h-0.5 w-10 rounded-full bg-emerald-400" />
     </div>
@@ -1074,16 +1069,6 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
         />
       </div>
 
-      {/* The quarter sample already publishes the exact register totals. Keep
-          those numbers visible and link each one to the page that owns it;
-          no rows are manufactured or re-counted in the dashboard. */}
-      {data.moduleCounts ? (
-        <QuarterOperationsMap
-          counts={data.moduleCounts}
-          fromDate={calendarFrom}
-          toDate={calendarTo}
-        />
-      ) : null}
     </div>
   );
 }
