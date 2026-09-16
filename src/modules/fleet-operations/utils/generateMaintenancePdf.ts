@@ -71,20 +71,22 @@ function buildSheet(
     [t("common.status"), status],
     [t("common.remarks"), record.remarks || "—"],
   ];
-  // Two EQUAL side-by-side columns, each column its own label/value pairs
-  // (left column gets the first half of the fields, right the second).
+  // Two EQUAL side-by-side cards, each its own label/value rows — matching
+  // the view's two-column layout (left: identity/driver, right: job/status).
   const half = Math.ceil(detailPairs.length / 2);
-  const column = (pairs: [string, string][], last: boolean) =>
+  const column = (pairs: [string, string][]) =>
     pairs
       .map(
-        ([label, value]) => `
-        <div style="padding:7px 10px;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:${MUTED};background:#f8fafc;border-bottom:1px solid ${LINE};${last ? '' : `border-right:1px solid ${LINE};`}">${esc(label)}</div>
-        <div style="padding:7px 10px;font-size:12px;font-weight:700;color:${INK};word-break:break-word;border-bottom:1px solid ${LINE};${last ? '' : `border-right:1px solid ${LINE};`}">${esc(value)}</div>`
+        ([label, value], index) => `
+        <div style="display:flex;justify-content:space-between;gap:14px;padding:7px 10px;${index > 0 ? `border-top:1px solid ${LINE};` : ''}">
+          <span style="width:96px;flex-shrink:0;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:${MUTED};padding-top:2px;">${esc(label)}</span>
+          <span style="min-width:0;flex:1;text-align:right;font-size:12px;font-weight:700;color:${INK};word-break:break-word;">${esc(value)}</span>
+        </div>`
       )
       .join("");
-  const cells = `<div style="display:grid;grid-template-columns:1fr 1fr;grid-column-gap:14px;">
-        <div style="display:grid;grid-template-columns:auto 1fr;border:1px solid ${LINE};border-radius:8px;overflow:hidden;">${column(detailPairs.slice(0, half), false)}</div>
-        <div style="display:grid;grid-template-columns:auto 1fr;border:1px solid ${LINE};border-radius:8px;overflow:hidden;">${column(detailPairs.slice(half), true)}</div>
+  const cells = `<div style="margin:0 24px;display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+        <div style="border:1px solid ${LINE};border-radius:8px;overflow:hidden;background:#ffffff;">${column(detailPairs.slice(0, half))}</div>
+        <div style="border:1px solid ${LINE};border-radius:8px;overflow:hidden;background:#ffffff;">${column(detailPairs.slice(half))}</div>
       </div>`;
 
   const partsRows = parts

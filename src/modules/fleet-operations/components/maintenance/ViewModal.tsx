@@ -270,11 +270,12 @@ const ViewModalInner: React.FC<ViewModalProps> = ({ record, vehicles, onClose, c
             </div>
           </section>
 
-          {/* All record details — one neat table, bold labels, bright values */}
-          <section className="overflow-hidden rounded-xl border border-slate-200 animate-fade-in-up" style={{ animationDelay: '40ms' }}>
-            <table className="min-w-full text-sm">
-              <tbody className="divide-y divide-slate-100">
-                {([
+          {/* All record details — two EQUAL side-by-side columns of
+              label/value rows (like the vehicle block). */}
+          <section className="animate-fade-in-up" style={{ animationDelay: '40ms' }}>
+            <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:gap-4">
+              {(() => {
+                const rows: [string, string][] = [
                   [t('fleet.maintenance_view.bill_number'), active.billNumber || '—'],
                   [t('common.date'), formatTripListDay(active.date || active.createdAt, language)],
                   [t('common.vehicle'), vehicleNumber],
@@ -290,16 +291,31 @@ const ViewModalInner: React.FC<ViewModalProps> = ({ record, vehicles, onClose, c
                       : active.nextServiceKM ? `${Number(active.nextServiceKM).toLocaleString()} KM` : '—'],
                   [t('common.status'), statusLabel],
                   [t('common.remarks'), active.remarks || '—'],
-                ] as [string, string][]).map(([label, value]) => (
-                  <tr key={label} className="hover:bg-slate-50/60 transition-colors">
-                    <th scope="row" className="w-44 bg-slate-50/70 px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 align-top">
-                      {label}
-                    </th>
-                    <td className="px-4 py-2.5 text-[13px] font-bold text-slate-800 break-words">{value}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                ];
+                const half = Math.ceil(rows.length / 2);
+                const column = (items: [string, string][], first: boolean) => (
+                  <dl className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+                    {items.map(([label, value], index) => (
+                      <div
+                        key={label}
+                        className={`flex items-start justify-between gap-4 px-4 py-2.5 ${
+                          index > 0 ? 'border-t border-slate-100' : ''
+                        } ${first ? 'lg:border-r lg:border-slate-100' : ''} hover:bg-slate-50/60 transition-colors`}
+                      >
+                        <dt className="w-28 flex-shrink-0 text-[11px] font-bold uppercase tracking-wider text-slate-400 pt-0.5">{label}</dt>
+                        <dd className="min-w-0 flex-1 break-words text-right text-[13px] font-bold text-slate-800">{value}</dd>
+                      </div>
+                    ))}
+                  </dl>
+                );
+                return (
+                  <>
+                    {column(rows.slice(0, half), true)}
+                    {column(rows.slice(half), false)}
+                  </>
+                );
+              })()}
+            </div>
           </section>
 
           {/* Parts — full bill breakdown */}
