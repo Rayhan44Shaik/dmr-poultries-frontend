@@ -8,25 +8,31 @@
 // never disagree, and nothing is re-derived on the client beyond summing the
 // server's own per-trip numbers into buckets.
 //
-// Rows are returned whole (capped) and bucketed in the component, so switching
-// daily / weekly / monthly never costs another request.
+// Every filtered page is read and bucketed in the component, so switching
+// daily / weekly / monthly never costs another request or drops part of a
+// custom range.
 
 import { apiGet } from "../../../../api";
 import type { MortalityRow } from "../../mortality/services/mortalityAnalysisApi";
 
 const BASE = "/operations/mortality-analysis";
 
-/** Hard ceiling on rows pulled for the chart. */
-export const TREND_ROW_CAP = 2000;
+/** A responsive page size; all pages in the selected range are followed. */
+export const TREND_PAGE_SIZE = 500;
 
 export interface OperationalTrends {
+  /** Every completed trip in the requested inclusive date range. */
   rows: MortalityRow[];
-  /** Trips in the API's whole filtered set (may exceed `rows.length`). */
+  /** Server-reported count for the same filtered range. */
   totalTrips: number;
-  /** Trips actually bucketed into the chart. */
-  countedTrips: number;
-  /** True when the cap bit and the chart covers only the newest trips. */
-  truncated: boolean;
+}
+
+interface OperationalTrendsPage {
+  data?: MortalityRow[];
+  meta?: {
+    total?: number;
+    totalPages?: number;
+  };
 }
 
 export interface OperationalTrendsQuery {
@@ -57,25 +63,56 @@ export async function fetchOperationalTrends(
   query: OperationalTrendsQuery,
   signal?: AbortSignal
 ): Promise<OperationalTrends> {
-  const params: Record<string, string | number> = {
-    limit: TREND_ROW_CAP,
+  const baseParams: Record<string, string | number> = {
+    limit: TREND_PAGE_SIZE,
     sortBy: "tripDate",
+    // Ascending keeps chart buckets naturally ordered even before aggregation.
     sortDir: "asc",
   };
-  if (query.fromDate) params.fromDate = query.fromDate;
-  if (query.toDate) params.toDate = query.toDate;
+  if (query.fromDate) baseParams.fromDate = query.fromDate;
+  if (query.toDate) baseParams.toDate = query.toDate;
 
-  const { data } = await apiGet<Record<string, unknown>>(BASE, { params, signal });
-
-  const rows = (Array.isArray(data) ? data : ((data?.data as MortalityRow[] | undefined) ?? [])) as MortalityRow[];
-  const total = toNumber((data as { meta?: { total?: number } } | null)?.meta?.total) || rows.length;
-
-  return {
-    rows,
-    totalTrips: total,
-    countedTrips: rows.length,
-    truncated: rows.length < total,
+  const fetchPage = async (page: number): Promise<OperationalTrendsPage | MortalityRow[]> => {
+    const { data } = await apiGet<OperationalTrendsPage | MortalityRow[]>(BASE, {
+      params: { ...baseParams, page },
+      signal,
+    });
+    return data;
   };
+
+  const first = await fetchPage(1);
+  // Older backends may return a bare array. It has no pagination metadata, so
+  // it is necessarily the complete response supplied by that backend.
+  if (Array.isArray(first)) {
+    return { rows: first, totalTrips: first.length };
+  }
+
+  const rows = Array.isArray(first.data) ? [...first.data] : [];
+  const totalTrips = Number(first.meta?.total);
+  const totalPages = Number(first.meta?.totalPages);
+  if (!Number.isSafeInteger(totalTrips) || totalTrips < 0 || !Number.isSafeInteger(totalPages) || totalPages < 1) {
+    throw new Error("The completed-trips API did not provide valid pagination metadata");
+  }
+
+  // Read every page sequentially so an AbortSignal can stop the work between
+  // requests. A chart never presents a partial custom-range total as final.
+  for (let page = 2; page <= totalPages; page += 1) {
+    const result = await fetchPage(page);
+    if (Array.isArray(result)) {
+      throw new Error("The completed-trips API changed its pagination response");
+    }
+    if (!Array.isArray(result.data)) {
+      throw new Error("The completed-trips API returned an incomplete page");
+    }
+    rows.push(...result.data);
+  }
+
+  const distinctTrips = new Set(rows.map((row) => row.tripId));
+  if (rows.length !== totalTrips || distinctTrips.size !== totalTrips) {
+    throw new Error("The completed-trips API returned an incomplete range");
+  }
+
+  return { rows, totalTrips };
 }
 
 /**

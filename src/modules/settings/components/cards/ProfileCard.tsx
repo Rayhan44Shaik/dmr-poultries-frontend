@@ -23,12 +23,12 @@ export const ProfileCard: React.FC = () => {
 
   // Initial user form state
   const [profileData, setProfileData] = useState({
-    fullName: "Rubulla",
+    fullName: "Ruhulla",
     department: "Administration",
     email: "info@dmrpoultries.com",
     designation: "Owner",
     mobile: "+91 9122456789",
-    username: "rubullaadmin",
+    username: "ruhullaadmin",
     employeeId: "DMR001",
     dateJoined: "01-Jan-2020",
     language: "English",

@@ -364,12 +364,12 @@ export const NAV_SECTIONS: NavSection[] = [
         keywords: "maintenance service garage",
       },
       {
-        label: "Maintenance List",
+        label: "Maintenance Timeline",
         labelKey: "nav.maintenanceHistory",
         path: "/fleet?tab=history",
         icon: History,
         tone: "cyan",
-        keywords: "maintenance history records",
+        keywords: "maintenance history timeline service",
       },
 
       {

@@ -1,249 +1,414 @@
-import { memo, useEffect, useMemo, useState } from 'react';
-import {
-  AlertCircle,
-  CalendarDays,
-  CheckCircle2,
-  FilterX,
-  IndianRupee,
-  Paperclip,
-  Search,
-  Truck,
-  Wrench,
-} from 'lucide-react';
-import { RefreshButton } from '../../../ui';
-import { notify } from '../../../ui/notifications/notificationStore';
-import { uiSearchInputClass } from '../../../shared/ui/uiTokens';
-import { DatePicker } from '../../../components/common/DatePicker';
-import { apiGet } from '../../../api';
-import { useI18n, translateStatus } from '../../../i18n';
-import ErrorBoundary from '../components/common/ErrorBoundary';
-import SearchableSelect from '../../../components/common/SearchableSelect';
-import MaintenanceTimeline, { type VehicleMeterEvent } from '../components/maintenance/MaintenanceTimeline';
-import UpcomingServices from '../components/maintenance/UpcomingServices';
-import { useMaintenanceData } from '../hooks/useMaintenanceData';
-import { formatVehicleNumber } from '../../../utils/format';
-import { localizeMaintenanceText } from '../utils/maintenanceLocalization';
-import { safeDate } from '../utils/maintenanceHelpers';
-import { useEmployees } from '../../masters/employees/hooks/useEmployees';
+import { memo, useEffect, useMemo, useRef, useState } from "react";
+import { AlertCircle } from "lucide-react";
+import { useSafeNotification } from "../../../hooks/useSafeNotification";
+import { useI18n } from "../../../i18n";
+import { apiGet } from "../../../api";
+import ErrorBoundary from "../components/common/ErrorBoundary";
+import MaintenanceFilters, {
+  type MaintenanceSortKey,
+} from "../components/maintenance/MaintenanceFilters";
+import MaintenanceKPICards from "../components/maintenance/MaintenanceKPICards";
+import MaintenanceTimeline, {
+  type VehicleMeterEvent,
+} from "../components/maintenance/MaintenanceTimeline";
+import UpcomingServices from "../components/maintenance/UpcomingServices";
+import { useMaintenanceData } from "../hooks/useMaintenanceData";
+import { formatVehicleNumber } from "../../../utils/format";
+import { MAINTENANCE_TYPES } from "../utils/constants";
+import { useEmployees } from "../../masters/employees/hooks/useEmployees";
+import type { MaintenanceEvent } from "../types";
 
-interface MaintenanceHistoryPageProps { embedded?: boolean }
+interface MaintenanceHistoryPageProps {
+  embedded?: boolean;
+}
 
-const STATUS_OPTIONS = ['Approved', 'Pending', 'Deleted'] as const;
-
-const MaintenanceHistoryPage = ({ embedded = false }: MaintenanceHistoryPageProps) => {
-  const { t, language } = useI18n();
-  const data = useMaintenanceData('history');
-  const { employees } = useEmployees();
-  const [meterEvents, setMeterEvents] = useState<VehicleMeterEvent[]>([]);
-
-  // Drivers are pulled from the Employees master, restricted to department === 'Driver'.
-  const drivers = useMemo(
-    () => employees.filter((e) => String(e.department || '').trim().toLowerCase() === 'driver'),
-    [employees]
+function sortMaintenanceRecords(
+  records: readonly MaintenanceEvent[],
+  sortDir: "asc" | "desc",
+): MaintenanceEvent[] {
+  // Timeline sorting is intentionally calendar-only: a timeline must preserve
+  // a truthful chronological sequence when maintenance and meter events meet.
+  const multiplier = sortDir === "asc" ? 1 : -1;
+  return [...records].sort(
+    (left, right) =>
+      String(left.date || left.createdAt || "")
+        .slice(0, 10)
+        .localeCompare(
+          String(right.date || right.createdAt || "").slice(0, 10),
+        ) * multiplier,
   );
+}
 
-  // All filter controls are "pending" until the user clicks Search. Nothing is
-  // pushed to the hook (and therefore neither table re-queries) until Search is
-  // pressed — the tables below only react to the Search action.
-  const [pending, setPending] = useState({
-    vehicle: 'all',
-    driver: 'all',
-    maintenanceType: 'all',
-    serviceType: 'all',
-    status: 'all',
-    fromDate: '',
-    toDate: '',
-    search: '',
-  });
-  const [pendingTypes, setPendingTypes] = useState<string[]>([]);
-  const setPendingField = <K extends keyof typeof pending>(key: K, value: typeof pending[K]) =>
-    setPending((prev) => ({ ...prev, [key]: value }));
+const meterDateKey = (event: VehicleMeterEvent) =>
+  String(event.eventDate || event.eventInstant || "").slice(0, 10);
 
-  // Search is the single "apply" trigger: it commits every pending filter value
-  // to the data hook at once, so both tables re-run with the new filters.
-  const applyFilters = () => {
-    data.setSelectedVehicle(pending.vehicle);
-    data.setSelectedMaintenanceType(pendingTypes.length ? pendingTypes.join('|') : 'all');
-    data.setSelectedDriver(pending.driver);
-    data.setSelectedMaintenanceType(pending.maintenanceType);
-    data.setSelectedServiceType(pending.serviceType);
-    data.setSelectedStatus(pending.status);
-    data.setFromDate(pending.fromDate);
-    data.setToDate(pending.toDate);
-    data.setSearchQuery(pending.search.trim());
-  };
+const withinDateRange = (
+  date: string,
+  fromDate: string,
+  toDate: string,
+) =>
+  Boolean(date) &&
+  (!fromDate || date >= fromDate) &&
+  (!toDate || date <= toDate);
 
-  // Clear resets every pending filter AND the hook, returning both tables to the
-  // full unfiltered view (all approved maintenance + all upcoming services).
-  const clearFilters = () => {
-    setPending({ vehicle: 'all', driver: 'all', maintenanceType: 'all', serviceType: 'all', status: 'all', fromDate: '', toDate: '', search: '' });
-    setPendingTypes([]);
-    data.resetFilters();
-  };
+/**
+ * Sum only completed trips whose start and end readings are inside the active
+ * calendar range. This avoids inventing partial-trip mileage at a range edge
+ * and keeps the KPI equal to the trip distances shown in the timeline.
+ */
+function completedTripDistance(
+  meterEvents: readonly VehicleMeterEvent[],
+  fromDate: string,
+  toDate: string,
+): number {
+  const trips = new Map<
+    string,
+    { start?: VehicleMeterEvent; end?: VehicleMeterEvent }
+  >();
 
-  // Trip/Fuel meter events for the timeline. When a single vehicle is selected we
-  // hit the per-vehicle endpoint; when "All Vehicles" is selected we fan out to every
-  // vehicle's meter-history in parallel and merge, so the timeline shows every
-  // vehicle's trips and fuel bills (time-sorted alongside maintenance).
-  useEffect(() => {
-    let cancelled = false;
-    if (!data.selectedVehicle) { setMeterEvents([]); return; }
-
-    if (data.selectedVehicle === 'all') {
-      const ids = (data.vehicles || []).map((v: any) => Number(v.id)).filter(Boolean);
-      if (ids.length === 0) { setMeterEvents([]); return; }
-      Promise.all(
-        ids.map((id: number) =>
-          apiGet<VehicleMeterEvent[]>(`/fleet/vehicles/${id}/meter-history`)
-            .then((res) => res.data || [])
-            .catch(() => [])
-        )
-      )
-        .then((lists) => {
-          if (cancelled) return;
-          const merged = lists.flat().filter((event) => event.sourceType !== 'MAINTENANCE');
-          setMeterEvents(merged);
-        })
-        .catch(() => { if (!cancelled) setMeterEvents([]); });
+  meterEvents.forEach((event) => {
+    if (event.sourceType !== "TRIP_START" && event.sourceType !== "TRIP_END") {
       return;
     }
+    const key = `${event.vehicleId}:${event.ref}`;
+    const trip = trips.get(key) || {};
+    if (event.sourceType === "TRIP_START") trip.start = event;
+    if (event.sourceType === "TRIP_END") trip.end = event;
+    trips.set(key, trip);
+  });
 
-    apiGet<VehicleMeterEvent[]>(`/fleet/vehicles/${data.selectedVehicle}/meter-history`)
-      .then((response) => { if (!cancelled) setMeterEvents((response.data || []).filter((event) => event.sourceType !== 'MAINTENANCE')); })
-      .catch(() => { if (!cancelled) setMeterEvents([]); });
-    return () => { cancelled = true; };
+  return Math.round(
+    [...trips.values()].reduce((total, trip) => {
+      const start = trip.start;
+      const end = trip.end;
+      if (
+        !start ||
+        !end ||
+        !withinDateRange(meterDateKey(start), fromDate, toDate) ||
+        !withinDateRange(meterDateKey(end), fromDate, toDate)
+      ) {
+        return total;
+      }
+      const distance = Number(end.meter) - Number(start.meter);
+      return Number.isFinite(distance) && distance > 0 ? total + distance : total;
+    }, 0),
+  );
+}
+
+const MaintenanceHistoryPage = ({
+  embedded = false,
+}: MaintenanceHistoryPageProps) => {
+  const { t } = useI18n();
+  const { employees } = useEmployees();
+  const { showNotification } = useSafeNotification();
+  const data = useMaintenanceData('history');
+  const [meterEvents, setMeterEvents] = useState<VehicleMeterEvent[]>([]);
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const refreshRequested = useRef(false);
+
+  // Drivers remain available from the master even when a narrow date/type
+  // filter has no rows. Historic names stay searchable when someone has left.
+  const driverOptions = useMemo(() => {
+    const options = new Map<string, { value: string; label: string }>();
+    employees
+      .filter(
+        (employee) =>
+          String(employee.department || "")
+            .trim()
+            .toLowerCase() === "driver",
+      )
+      .forEach((employee) => {
+        const value = String(employee.id || "");
+        const label = String(employee.employeeName || "").trim();
+        if (value && label) options.set(value, { value, label });
+      });
+    data.drivers.forEach((driver) => {
+      if (!options.has(driver.id)) {
+        options.set(driver.id, { value: driver.id, label: driver.name });
+      }
+    });
+    return [...options.values()].sort((left, right) =>
+      left.label.localeCompare(right.label),
+    );
+  }, [data.drivers, employees]);
+
+  const maintenanceTypes = useMemo(
+    () =>
+      [...new Set([...MAINTENANCE_TYPES, ...data.maintenanceTypes])].sort(
+        (left, right) => left.localeCompare(right),
+      ),
+    [data.maintenanceTypes],
+  );
+
+  const vehicleOptions = useMemo(
+    () =>
+      data.vehicles
+        .map((vehicle) => {
+          const value = String(vehicle.id || "");
+          const vehicleNumber = String(
+            vehicle.vehicleNumber || vehicle.vehicleNo || "",
+          ).trim();
+          return value && vehicleNumber
+            ? {
+                value,
+                label: formatVehicleNumber(vehicleNumber),
+                searchText: vehicleNumber,
+              }
+            : null;
+        })
+        .filter(
+          (
+            option,
+          ): option is { value: string; label: string; searchText: string } =>
+            option !== null,
+        ),
+    [data.vehicles],
+  );
+
+  // The secondary timeline mixes approved maintenance with trip/fuel odometer
+  // events. Its meter ledger remains scoped to the selected vehicle(s).
+  useEffect(() => {
+    let cancelled = false;
+    if (data.selectedVehicle === "all") {
+      const ids = data.vehicles
+        .map((vehicle) => Number(vehicle.id))
+        .filter(Boolean);
+      if (ids.length === 0) return;
+      Promise.all(
+        ids.map((id) =>
+          apiGet<VehicleMeterEvent[]>(`/fleet/vehicles/${id}/meter-history`)
+            .then((response) => response.data || [])
+            .catch(() => []),
+        ),
+      )
+        .then((lists) => {
+          if (!cancelled) {
+            setMeterEvents(
+              lists
+                .flat()
+                .filter((event) => event.sourceType !== "MAINTENANCE"),
+            );
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setMeterEvents([]);
+        });
+    } else {
+      apiGet<VehicleMeterEvent[]>(
+        `/fleet/vehicles/${data.selectedVehicle}/meter-history`,
+      )
+        .then((response) => {
+          if (!cancelled) {
+            setMeterEvents(
+              (response.data || []).filter(
+                (event) => event.sourceType !== "MAINTENANCE",
+              ),
+            );
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setMeterEvents([]);
+        });
+    }
+    return () => {
+      cancelled = true;
+    };
   }, [data.selectedVehicle, data.vehicles]);
 
-  // Date-range filter applied to meter events (trip starts/ends and fuel bills)
-  // so the timeline honours the From/To dates just like the maintenance list does.
-  // Trip rows are kept if their eventDate falls inside the range.
+  const resultsReady = !data.historyLoading && !data.historyError;
   const filteredMeterEvents = useMemo(() => {
     if (!data.fromDate && !data.toDate) return meterEvents;
-    return meterEvents.filter((m) => {
-      const d = m.eventDate;
-      if (!d) return true;
-      if (data.fromDate && d < data.fromDate) return false;
-      if (data.toDate && d > data.toDate) return false;
+    return meterEvents.filter((event) => {
+      const date = String(event.eventDate || "").slice(0, 10);
+      if (!date) return true;
+      if (data.fromDate && date < data.fromDate) return false;
+      if (data.toDate && date > data.toDate) return false;
       return true;
     });
-  }, [meterEvents, data.fromDate, data.toDate]);
+  }, [data.fromDate, data.toDate, meterEvents]);
 
-  // Approved Maintenance Timeline:
-  //  - By default (no active filter) it shows ALL approved records with full detail.
-  //  - Only when a filter is applied does it narrow to the matching subset.
-  const allApproved = data.approvedHistory;
-  const filteredApproved = useMemo(
-    () => data.filtered.filter((record) => record.paymentStatus === 'approved' && !record.deletedAt),
-    [data.filtered]
-  );
-  const timelineSource = data.hasActiveFilters ? filteredApproved : allApproved;
-  const sorted = useMemo(
-    () => [...timelineSource].sort((a, b) => safeDate(b.date).getTime() - safeDate(a.date).getTime()),
-    [timelineSource]
-  );
-  const timelineEvents = sorted;
+  const timelineEvents = useMemo(() => {
+    const filteredApproved = data.filtered.filter(
+      (record) => record.paymentStatus === "approved" && !record.deletedAt,
+    );
+    const source = data.hasActiveFilters
+      ? filteredApproved
+      : data.approvedHistory.length
+        ? data.approvedHistory
+        : filteredApproved;
+    return sortMaintenanceRecords(source, sortDir);
+  }, [
+    data.approvedHistory,
+    data.filtered,
+    data.hasActiveFilters,
+    sortDir,
+  ]);
 
-  // Upcoming Services also honours the active filters (vehicle + date range).
+  const timelineStats = useMemo(
+    () => ({
+      totalCost: timelineEvents.reduce(
+        (sum, record) => sum + Number(record.totalCost || 0),
+        0,
+      ),
+      totalServices: timelineEvents.length,
+      totalDistance: completedTripDistance(
+        meterEvents,
+        data.fromDate,
+        data.toDate,
+      ),
+    }),
+    [data.fromDate, data.toDate, meterEvents, timelineEvents],
+  );
+
   const visibleUpcoming = useMemo(() => {
-    let list = data.upcomingServices;
-    if (data.selectedVehicle !== 'all') {
-      list = list.filter((item: any) => String(item.vehicle?.id) === String(data.selectedVehicle));
+    let services = data.upcomingServices;
+    if (data.selectedVehicle !== "all") {
+      services = services.filter(
+        (item) => String(item.vehicle?.id) === String(data.selectedVehicle),
+      );
     }
     if (data.fromDate || data.toDate) {
-      const from = data.fromDate ? safeDate(data.fromDate).getTime() : -Infinity;
-      const to = data.toDate ? safeDate(data.toDate).getTime() : Infinity;
-      list = list.filter((item: any) => {
-        const d = item.lastMaint?.date ? safeDate(item.lastMaint.date).getTime() : null;
-        return d == null || (d >= from && d <= to);
+      services = services.filter((item) => {
+        const date = String(item.lastMaint?.date || "").slice(0, 10);
+        if (!date) return true;
+        if (data.fromDate && date < data.fromDate) return false;
+        if (data.toDate && date > data.toDate) return false;
+        return true;
       });
     }
-    return list;
-  }, [data.upcomingServices, data.selectedVehicle, data.fromDate, data.toDate]);
+    return services;
+  }, [data.fromDate, data.selectedVehicle, data.toDate, data.upcomingServices]);
 
-  const cards = [
-    { label: t('fleet.maintenance_history.total_maintenance'), value: data.historyStats.total, icon: Wrench, tone: 'bg-blue-50 text-blue-600' },
-    { label: t('fleet.maintenance_history.total_cost'), value: `₹${data.historyStats.totalCost.toLocaleString('en-IN')}`, icon: IndianRupee, tone: 'bg-violet-50 text-violet-600' },
-    { label: t('status.approved'), value: data.historyStats.approved, icon: CheckCircle2, tone: 'bg-emerald-50 text-emerald-600' },
-    { label: t('status.pending'), value: data.historyStats.pending, icon: AlertCircle, tone: 'bg-amber-50 text-amber-600' },
-    { label: t('fleet.maintenance_history.vehicles_serviced'), value: data.historyStats.vehiclesServiced, icon: Truck, tone: 'bg-cyan-50 text-cyan-600' },
-    { label: t('fleet.maintenance_history.documents'), value: data.historyStats.documents, icon: Paperclip, tone: 'bg-slate-100 text-slate-600' },
-  ];
+  // A refresh toast is emitted after the replacement response completes, never
+  // at click time, so a failed refresh cannot appear successful.
+  useEffect(() => {
+    if (!refreshRequested.current || data.historyLoading) return;
+    refreshRequested.current = false;
+    if (!data.historyError) {
+      showNotification(t("notification.data_refreshed"), "success");
+    }
+  }, [data.historyError, data.historyLoading, showNotification, t]);
+
+  const updateFilter = (update: () => void) => update();
+
+  const updateSort = (
+    _nextSortBy: MaintenanceSortKey,
+    nextSortDir: "asc" | "desc",
+  ) => {
+    setSortDir(nextSortDir);
+  };
+
+  const resetFilters = () => {
+    data.resetFilters();
+    updateSort("date", "desc");
+    showNotification(t("fleet.maintenance_history.filters_reset"), "info");
+  };
+
+  const handleRefresh = () => {
+    if (data.historyLoading) return;
+    refreshRequested.current = true;
+    data.refresh();
+  };
 
   return (
     <ErrorBoundary>
-      <div className={`w-full space-y-5 ${embedded ? '' : 'min-h-screen bg-slate-50 px-4 py-6 md:px-8'}`}>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-6">
-          {cards.map(({ label, value, icon: Icon, tone }) => <div key={label} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className={`mb-3 flex h-9 w-9 items-center justify-center rounded-xl ${tone}`}><Icon size={17} /></div><p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{label}</p><p className="mt-1 truncate text-lg font-black text-slate-800">{value}</p></div>)}
-        </div>
+      <div
+        className={`w-full space-y-5 animate-in fade-in duration-200 ${
+          embedded
+            ? ""
+            : "min-h-screen bg-slate-50/50 px-3 py-4 text-slate-800 md:px-6"
+        }`}
+      >
+        <MaintenanceFilters
+          fromDate={data.fromDate}
+          toDate={data.toDate}
+          vehicle={data.selectedVehicle === "all" ? "" : data.selectedVehicle}
+          driver={data.selectedDriver === "all" ? "" : data.selectedDriver}
+          maintenanceType={
+            data.selectedMaintenanceType === "all"
+              ? ""
+              : data.selectedMaintenanceType
+          }
+          sortBy="date"
+          sortDir={sortDir}
+          search={data.searchQuery}
+          vehicles={vehicleOptions}
+          drivers={driverOptions}
+          maintenanceTypes={maintenanceTypes}
+          loading={data.historyLoading}
+          setFromDate={(value) => updateFilter(() => data.setFromDate(value))}
+          setToDate={(value) => updateFilter(() => data.setToDate(value))}
+          setVehicle={(value) =>
+            updateFilter(() => data.setSelectedVehicle(value || "all"))
+          }
+          setDriver={(value) =>
+            updateFilter(() => data.setSelectedDriver(value || "all"))
+          }
+          setMaintenanceType={(value) =>
+            updateFilter(() => data.setSelectedMaintenanceType(value || "all"))
+          }
+          setSort={updateSort}
+          setSearch={(value) => updateFilter(() => data.setSearchQuery(value))}
+          onReset={resetFilters}
+          onRefresh={handleRefresh}
+        />
 
-        <div className="relative overflow-visible rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="flex flex-wrap items-end gap-3">
-            <div className="w-40"><DatePicker value={pending.fromDate} onChange={(v) => setPendingField('fromDate', v)} placeholder={t('reports.date_from')} /></div>
-            <div className="w-40"><DatePicker value={pending.toDate} onChange={(v) => setPendingField('toDate', v)} placeholder={t('reports.date_to')} /></div>
-            <SearchableSelect
-              label={t('common.vehicle')}
-              value={pending.vehicle === 'all' ? '' : pending.vehicle}
-              placeholder={t('fleet.maintenance_history.all_vehicles')}
-              options={data.vehicles.map((vehicle: any) => ({ value: String(vehicle.id), label: formatVehicleNumber(String(vehicle.vehicleNumber || '')) }))}
-              onChange={(v) => setPendingField('vehicle', v || 'all')}
-              searchable
-              widthClass="w-48"
-            />
-            <SearchableSelect
-              label={t('common.driver')}
-              value={pending.driver === 'all' ? '' : pending.driver}
-              placeholder={t('fleet.maintenance_history.all_drivers')}
-              options={drivers.map((driver) => ({ value: String(driver.id), label: driver.employeeName }))}
-              onChange={(v) => setPendingField('driver', v || 'all')}
-              searchable
-              widthClass="w-48"
-            />
-            <SearchableSelect
-              label={t('operations.maintenance_type')}
-              value=""
-              placeholder={t('fleet.maintenance_history.all_maintenance_types')}
-              options={(data.maintenanceTypes as string[]).map((type) => ({ value: type, label: localizeMaintenanceText(type, language) }))}
-              onChange={() => {}}
-              multi
-              selectedValues={pendingTypes}
-              onToggleValue={(type) => setPendingTypes((current) => (current.includes(type) ? current.filter((x) => x !== type) : [...current, type]))}
-              onClearValues={() => setPendingTypes([])}
-              searchable
-              widthClass="w-56"
-            />
-            <SearchableSelect
-              label={t('fleet.maintenance_form.service_type')}
-              value={pending.serviceType === 'all' ? '' : pending.serviceType}
-              placeholder={t('fleet.maintenance_history.all_service_types')}
-              options={data.serviceTypes}
-              onChange={(v) => setPendingField('serviceType', v || 'all')}
-              searchable
-              widthClass="w-48"
-            />
-            <SearchableSelect
-              label={t('common.status')}
-              value={pending.status === 'all' ? '' : pending.status}
-              placeholder={t('fleet.maintenance_history.all_statuses')}
-              options={STATUS_OPTIONS.map((status) => ({ value: status, label: translateStatus(t, status) }))}
-              onChange={(v) => setPendingField('status', v || 'all')}
-              widthClass="w-44"
-            />
-            <div className="relative min-w-[220px] flex-1"><Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" /><input value={pending.search} onChange={(e) => setPendingField('search', e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') applyFilters(); }} placeholder={t('fleet.maintenance_history.search_placeholder')} className={uiSearchInputClass} /></div>
-            <button onClick={applyFilters} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50"><Search size={14} /> {t('common.search')}</button>
-            <button onClick={clearFilters} className="inline-flex h-10 items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-600 hover:bg-slate-50"><FilterX size={14} /> {t('common.clear')}</button>
-            <RefreshButton onClick={() => { data.refresh(); notify.success('Trip Data Refreshed.'); }}>{t('common.refresh')}</RefreshButton>
+
+        {resultsReady ? <MaintenanceKPICards {...timelineStats} /> : null}
+
+        {data.historyError || data.error ? (
+          <div className="flex items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
+            <span className="flex items-center gap-2">
+              <AlertCircle size={17} />
+              {data.historyError || data.error}
+            </span>
+            <button
+              type="button"
+              onClick={handleRefresh}
+              className="font-bold underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400"
+            >
+              {t("common.retry")}
+            </button>
           </div>
-          <p className="mt-3 flex items-center gap-1.5 text-[11px] text-slate-400"><CalendarDays size={12} /> {t('fleet.maintenance_history.filter_hint')}</p>
-        </div>
+        ) : null}
 
-        {(data.historyError || data.error) && <div className="flex items-center justify-between rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700"><span className="flex items-center gap-2"><AlertCircle size={17} />{data.historyError || data.error}</span><button onClick={data.refresh} className="font-bold underline">{t('common.retry')}</button></div>}
-
-        <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-2"><div className="border-b border-slate-100 px-5 py-4"><h3 className="text-sm font-bold text-slate-800">{t('fleet.maintenance_history.approved_timeline')}</h3></div><div className="p-5"><MaintenanceTimeline events={timelineEvents} meterEvents={filteredMeterEvents} vehicles={data.vehicles} hasActiveFilters={data.hasActiveFilters} onClearFilters={data.resetFilters} /></div></div>
-          <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm"><div className="border-b border-slate-100 px-5 py-4"><h3 className="text-sm font-bold text-slate-800">{t('fleet.maintenance_history.upcoming_service')}</h3></div><div className="p-5"><UpcomingServices services={visibleUpcoming} /></div></div>
-        </div>
+        {resultsReady ? (
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-2">
+              <div className="border-b border-slate-100 px-5 py-4">
+                <h2 className="text-sm font-bold text-slate-800">
+                  {t("fleet.maintenance_history.approved_timeline")}
+                </h2>
+              </div>
+              <div className="p-5">
+                <MaintenanceTimeline
+                  events={timelineEvents}
+                  meterEvents={filteredMeterEvents}
+                  vehicles={data.vehicles}
+                  vehicleHistory={
+                    data.approvedHistory.length
+                      ? data.approvedHistory
+                      : timelineEvents
+                  }
+                  hasActiveFilters={data.hasActiveFilters}
+                  sortDirection={sortDir}
+                  onClearFilters={resetFilters}
+                />
+              </div>
+            </section>
+            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              <div className="border-b border-slate-100 px-5 py-4">
+                <h2 className="text-sm font-bold text-slate-800">
+                  {t("fleet.maintenance_history.upcoming_service")}
+                </h2>
+              </div>
+              <div className="p-5">
+                <UpcomingServices services={visibleUpcoming} />
+              </div>
+            </section>
+          </div>
+        ) : null}
       </div>
-
     </ErrorBoundary>
   );
 };

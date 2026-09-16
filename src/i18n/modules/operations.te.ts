@@ -339,7 +339,6 @@ export default {
   'ops.dashboard.trend.mortality_weight': 'మరణాల బరువు',
   'ops.dashboard.trend.title': 'ట్రిప్పులు & బరువు వివరాలు',
   'ops.dashboard.trend.today': 'నేడు',
-  'ops.dashboard.trend.truncated': 'చార్ట్‌లు ఈ పరిధిలోని {count} ఇటీవలి ట్రిప్పులను చూపుతాయి',
   'ops.dashboard.trend.view_mortality': 'బరువు తగ్గుదల విశ్లేషణను తెరవండి',
   'ops.dashboard.trend.week': 'వారం',
   'ops.dashboard.trend.weight_loss': 'బరువు తగ్గుదల',

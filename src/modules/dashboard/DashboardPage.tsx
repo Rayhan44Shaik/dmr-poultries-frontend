@@ -14,8 +14,8 @@ import {
 import { useExecutiveDashboard } from "./hooks/useExecutiveDashboard";
 import { useNotification } from "../../context/NotificationContext";
 import { useI18n } from "../../i18n";
-import { formatDateLong, greetingForHour } from "../../utils/format";
-import { getCurrentUser } from "../../modules/settings/services";
+import { formatDateLong } from "../../utils/format";
+import { FIXED_DASHBOARD_GREETING } from "../../modules/settings/services";
 import KpiCard from "./components/KpiCard";
 import ChartCard from "./components/ChartCard";
 import TodayTripsTable from "./components/TodayTripsTable";
@@ -35,8 +35,7 @@ function DashboardPage() {
   const { showNotification } = useNotification();
   const { t } = useI18n();
 
-  const user = getCurrentUser();
-  const greeting = `${greetingForHour()}, ${user?.name ?? "Owner"} 👋`;
+  const greeting = FIXED_DASHBOARD_GREETING;
 
   const handleLoadDemo = async () => {
     await loadDemo();

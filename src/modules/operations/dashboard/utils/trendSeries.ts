@@ -198,6 +198,12 @@ export interface OperationalRow {
   weightLoss: number;
 }
 
+export interface OperationalRange {
+  /** Inclusive ISO calendar endpoints of the global/custom dashboard range. */
+  fromDate?: string;
+  toDate?: string;
+}
+
 export interface OperationalBucket {
   /** Bucket key — "2026-09-12", "2026-W37" or "2026-9". */
   date: string;
@@ -238,8 +244,26 @@ export interface OperationalSummary {
 
 const share = (part: number, whole: number): number => (whole > 0 ? (part / whole) * 100 : 0);
 
+/**
+ * Whether a trip belongs in an inclusive dashboard window. The trends API is
+ * already asked for these exact dates; retaining this guard makes the chart
+ * correct even if a proxy/cache ever supplies an over-broad response.
+ */
+export function isOperationalRowInRange(
+  tripDate: string,
+  { fromDate, toDate }: OperationalRange = {}
+): boolean {
+  const day = String(tripDate).slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return false;
+  return (!fromDate || day >= fromDate) && (!toDate || day <= toDate);
+}
+
 /** Bucket completed trips into day / week / month rows, oldest first. */
-export function aggregateOperational(rows: OperationalRow[], granularity: Granularity): OperationalBucket[] {
+export function aggregateOperational(
+  rows: OperationalRow[],
+  granularity: Granularity,
+  range: OperationalRange = {}
+): OperationalBucket[] {
   type Acc = {
     trips: number;
     farmBirds: number;
@@ -254,6 +278,7 @@ export function aggregateOperational(rows: OperationalRow[], granularity: Granul
   const groups = new Map<string, Acc>();
 
   for (const row of rows) {
+    if (!isOperationalRowInRange(row.tripDate, range)) continue;
     const { key, sortKey } = bucketOf(String(row.tripDate).slice(0, 10), granularity);
     const acc =
       groups.get(key) ??

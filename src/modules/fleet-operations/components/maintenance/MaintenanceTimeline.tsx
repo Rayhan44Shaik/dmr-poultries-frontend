@@ -1,9 +1,11 @@
 import { memo, useMemo, useState, type ReactNode } from 'react';
 import { format } from 'date-fns';
-import { Wrench, Battery, Disc, Settings, Droplets, Wind, CircleDot, Milestone, Activity, Hash, Paperclip, Calendar, FilterX, Route, Fuel } from 'lucide-react';
+import { Wrench, Battery, Disc, Settings, Droplets, Wind, CircleDot, Milestone, Activity, Hash, Paperclip, Calendar, FilterX, Route, Fuel, Truck } from 'lucide-react';
 import type { MaintenanceEvent } from '../../types';
+import type { Vehicle } from '../../../masters/vehicles/types/vehicle';
+import { formatVehicleNumber } from '../../../../utils/format';
 import { safeDate } from '../../utils/maintenanceHelpers';
-import BillDetailsModal from './BillDetailsModal';
+import ViewModal from './ViewModal';
 
 /** One row from GET /fleet/vehicles/:vehicleId/meter-history (backend/src/utils/vehicleMeterLedger.ts) — the
  * same universal ledger used for write-time validation, reused here read-only for the timeline. */
@@ -24,8 +26,13 @@ interface MaintenanceTimelineProps {
    * alongside the maintenance cards below — MAINTENANCE-sourced rows are
    * expected to already be excluded (they're covered by `events` above). */
   meterEvents?: VehicleMeterEvent[];
-  vehicles: any[];
+  vehicles: Vehicle[];
+  /** Full approved history; the selected-record view uses this for its
+   * same-vehicle detail list without bringing back a maintenance table. */
+  vehicleHistory?: MaintenanceEvent[];
   hasActiveFilters?: boolean;
+  /** Ascending/descending calendar order from the history filter bar. */
+  sortDirection?: 'asc' | 'desc';
   onClearFilters?: () => void;
 }
 
@@ -81,9 +88,21 @@ interface TripGroup {
   fuels: VehicleMeterEvent[];
 }
 
-const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, hasActiveFilters = false, onClearFilters }: MaintenanceTimelineProps) => {
-  const [selectedBill, setSelectedBill] = useState<MaintenanceEvent | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+/** A single consistent visual treatment for every registration in the feed. */
+const VehicleRegistration = ({ value }: { value?: string | number }) => {
+  const rawValue = value == null ? '' : String(value);
+  const registration = formatVehicleNumber(rawValue);
+  if (!rawValue || registration === '—') return null;
+  return (
+    <span className="inline-flex items-center gap-1 rounded-md border border-sky-100 bg-sky-50 px-1.5 py-0.5 text-xs font-bold tracking-wide text-sky-700">
+      <Truck className="h-3 w-3 shrink-0 text-sky-500" aria-hidden="true" />
+      {registration}
+    </span>
+  );
+};
+
+const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, vehicleHistory = [], hasActiveFilters = false, sortDirection = 'desc', onClearFilters }: MaintenanceTimelineProps) => {
+  const [selectedRecord, setSelectedRecord] = useState<MaintenanceEvent | null>(null);
 
 // Sort by the actual maintenance date, newest first (never by the MNT number).
   const timelineEvents = useMemo(() => {
@@ -150,12 +169,13 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, hasActiveFilt
       time: safeDate(data.eventDate).getTime(),
       data,
     }));
-    return [...maintRows, ...tripRowItems, ...orphanRows].sort((a, b) => b.time - a.time);
-  }, [timelineEvents, tripRows, orphanFuelRows]);
+    return [...maintRows, ...tripRowItems, ...orphanRows].sort((a, b) =>
+      sortDirection === 'asc' ? a.time - b.time : b.time - a.time
+    );
+  }, [timelineEvents, tripRows, orphanFuelRows, sortDirection]);
 
-  const handleBillClick = (event: MaintenanceEvent) => {
-    setSelectedBill(event);
-    setIsModalOpen(true);
+  const handleRecordSelect = (event: MaintenanceEvent) => {
+    setSelectedRecord(event);
   };
 
   if (!mergedTimeline || mergedTimeline.length === 0) {
@@ -210,7 +230,7 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, hasActiveFilt
             const endMeter = trip.endEvent?.meter ?? null;
             const distance = startMeter != null && endMeter != null ? Math.max(0, endMeter - startMeter) : null;
             const tripVehicle = vehicles.find((v) => String(v.id) === String(trip.vehicleId));
-            const tripVehicleNo = tripVehicle?.vehicleNumber || '';
+            const tripVehicleNo = tripVehicle?.vehicleNumber || tripVehicle?.vehicleNo || '';
             const tripDate = trip.startEvent?.eventDate || trip.endEvent?.eventDate || '';
             return (
               <div key={`trip-${trip.ref}`} className={`relative pl-14 ${isLast ? 'pb-1' : 'pb-6'}`}>
@@ -224,11 +244,7 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, hasActiveFilt
                       <span className="text-xs font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
                         {trip.ref}
                       </span>
-                      {tripVehicleNo && (
-                        <span className="text-xs font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
-                          {tripVehicleNo}
-                        </span>
-                      )}
+                      <VehicleRegistration value={tripVehicleNo} />
                     </div>
                     <div className="text-right shrink-0">
                       <span className="inline-flex items-center gap-0.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 shadow-sm">
@@ -237,9 +253,11 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, hasActiveFilt
                     </div>
                   </div>
 
-                  <div className="mt-2.5 flex items-center gap-1.5 text-xs text-gray-500 font-medium">
-                    <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                    {tripDate ? format(safeDate(tripDate), 'dd MMM yyyy') : '—'}
+                  <div className="mt-3">
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
+                      <Calendar className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />
+                      {tripDate ? format(safeDate(tripDate), 'dd MMM yyyy') : '—'}
+                    </span>
                   </div>
 
                   <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">
@@ -269,7 +287,7 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, hasActiveFilt
               ? 'border-orange-200 bg-orange-50 text-orange-600'
               : 'border-sky-200 bg-sky-50 text-sky-600';
             const meterVehicle = vehicles.find((v) => String(v.id) === String(m.vehicleId));
-            const meterVehicleNo = meterVehicle?.vehicleNumber || '';
+            const meterVehicleNo = meterVehicle?.vehicleNumber || meterVehicle?.vehicleNo || '';
             return (
               <div key={`meter-${m.sourceType}-${m.recordId}`} className={`relative pl-14 ${isLast ? 'pb-1' : 'pb-6'}`}>
                 <div className={`absolute left-5 -translate-x-1/2 top-1 z-10 w-8 h-8 rounded-full border flex items-center justify-center shadow-sm ${classes}`}>
@@ -282,11 +300,7 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, hasActiveFilt
                       <span className="text-xs font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
                         {m.ref}
                       </span>
-                      {meterVehicleNo && (
-                        <span className="text-xs font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
-                          {meterVehicleNo}
-                        </span>
-                      )}
+                      <VehicleRegistration value={meterVehicleNo} />
                     </div>
                     <div className="text-right shrink-0">
                       <span className="inline-flex items-center gap-0.5 px-2.5 py-1 bg-slate-50 border border-slate-200 rounded-lg text-sm font-bold text-slate-700 shadow-sm">
@@ -294,11 +308,13 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, hasActiveFilt
                       </span>
                     </div>
                   </div>
-                  <div className="mt-2.5 flex items-center gap-1.5 text-xs text-gray-500 font-medium">
-                    <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                    {format(safeDate(m.eventDate), 'dd MMM yyyy')}
+                  <div className="mt-3 flex flex-wrap items-center gap-2">
+                    <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
+                      <Calendar className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />
+                      {format(safeDate(m.eventDate), 'dd MMM yyyy')}
+                    </span>
                     {m.diffFromPrevious != null && (
-                      <span className={`ml-2 text-[11px] font-semibold ${m.diffFromPrevious < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
+                      <span className={`text-[11px] font-semibold ${m.diffFromPrevious < 0 ? 'text-rose-600' : 'text-emerald-600'}`}>
                         {m.diffFromPrevious >= 0 ? '+' : ''}
                         {m.diffFromPrevious.toLocaleString('en-IN')} KM
                       </span>
@@ -311,7 +327,7 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, hasActiveFilt
 
           const event = row.data;
           const matchedVehicle = vehicles.find(v => String(v.id) === String(event.vehicleId));
-          const vehicleNo = matchedVehicle?.vehicleNumber || event.vehicleNo || '';
+          const vehicleNo = matchedVehicle?.vehicleNumber || matchedVehicle?.vehicleNo || event.vehicleNo || '';
           const node = getTimelineNode(event);
           const title = String(event.serviceType || '').trim() || String(event.maintenanceType || '').trim() || 'Maintenance';
           const typeBadge = String(event.maintenanceType || '').trim();
@@ -326,7 +342,19 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, hasActiveFilt
               </div>
 
               {/* Maintenance card */}
-              <div className="bg-white hover:bg-slate-50/50 border border-slate-200/70 rounded-xl p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition-all">
+              <article
+                role="button"
+                tabIndex={0}
+                onClick={() => handleRecordSelect(event)}
+                onKeyDown={(keyboardEvent) => {
+                  if (keyboardEvent.key === "Enter" || keyboardEvent.key === " ") {
+                    keyboardEvent.preventDefault();
+                    handleRecordSelect(event);
+                  }
+                }}
+                aria-label={`View approved maintenance ${event.billNumber || event.maintenanceType}`}
+                className="group cursor-pointer rounded-xl border border-slate-200/70 bg-white p-4 text-left shadow-sm transition-all hover:border-sky-200 hover:bg-sky-50/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2"
+              >
                 {/* Top row: title, badges, documents, amount */}
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -339,32 +367,26 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, hasActiveFilt
                         </span>
                       )}
 
-                      {vehicleNo && (
-                        <span className="text-xs font-semibold text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">
-                          {vehicleNo}
-                        </span>
-                      )}
+                      <VehicleRegistration value={vehicleNo} />
 
                       {event.billNumber && (
-                        <button
-                          onClick={() => handleBillClick(event)}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-green-600 bg-green-50 border border-green-200 px-1.5 py-0.5 rounded hover:bg-green-100 hover:border-green-300 transition-colors cursor-pointer"
-                          title="Click to view bill details"
+                        <span
+                          className="inline-flex items-center gap-1 rounded border border-emerald-200 bg-emerald-50 px-1.5 py-0.5 text-xs font-semibold text-emerald-700"
+                          title="Open approved maintenance details"
                         >
                           <Hash className="w-3 h-3" />
                           {event.billNumber}
-                        </button>
+                        </span>
                       )}
 
                       {docCount > 0 && (
-                        <button
-                          onClick={() => handleBillClick(event)}
-                          className="inline-flex items-center gap-1 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded hover:bg-blue-50 hover:text-blue-700 hover:border-blue-200 transition-colors cursor-pointer"
+                        <span
+                          className="inline-flex items-center gap-1 rounded border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-xs font-semibold text-slate-600"
                           title={`${docCount} document${docCount > 1 ? 's' : ''} attached`}
                         >
                           <Paperclip className="w-3 h-3" />
                           {docCount}
-                        </button>
+                        </span>
                       )}
                     </div>
                   </div>
@@ -377,19 +399,24 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, hasActiveFilt
                 </div>
 
                 {/* Second row: actual maintenance date */}
-                <div className="mt-2.5 flex items-center gap-1.5 text-xs text-gray-500 font-medium">
-                  <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                  {format(safeDate(event.date), 'dd MMM yyyy')}
+                <div className="mt-3">
+                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
+                    <Calendar className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />
+                    {format(safeDate(event.date), 'dd MMM yyyy')}
+                  </span>
                 </div>
 
                 {/* Third row: operational information */}
-                <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">
-                  <span className="inline-flex items-center gap-1 font-semibold text-gray-600">
-                    <Milestone className="w-3.5 h-3.5 text-gray-400" />
-                    Log Profile: {event.currentKM.toLocaleString('en-IN')} KM
+                <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
+                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-violet-100 bg-violet-50 px-2 py-1 font-semibold text-violet-700">
+                    <Milestone className="h-3.5 w-3.5 text-violet-500" aria-hidden="true" />
+                    <span>Log Profile</span>
+                    <strong className="tabular-nums text-violet-800">
+                      {event.currentKM.toLocaleString('en-IN')} KM
+                    </strong>
                   </span>
                   {event.nextServiceKM > 0 && (
-                    <span className="font-medium text-gray-500">
+                    <span className="inline-flex items-center gap-1 rounded-lg border border-cyan-100 bg-cyan-50 px-2 py-1 font-semibold text-cyan-700">
                       Next Target: {event.nextServiceKM.toLocaleString('en-IN')} KM
                     </span>
                   )}
@@ -415,27 +442,25 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, hasActiveFilt
                     &quot;{event.remarks}&quot;
                   </div>
                 )}
-              </div>
+              </article>
             </div>
           );
         })}
       </div>
       {mergedTimeline.length > visibleTimeline.length && (
         <p className="px-5 pt-3 text-center text-[11px] font-semibold text-slate-400">
-          Showing latest {visibleTimeline.length} of {mergedTimeline.length} events. Narrow the date or vehicle filter to see more.
+          Showing {visibleTimeline.length} of {mergedTimeline.length} events. Narrow the date or vehicle filter to see more.
         </p>
       )}
 
-      {/* Bill Details Modal */}
-      <BillDetailsModal
-        isOpen={isModalOpen}
-        bill={selectedBill}
-        vehicles={vehicles}
-        onClose={() => {
-          setIsModalOpen(false);
-          setSelectedBill(null);
-        }}
-      />
+      {selectedRecord ? (
+        <ViewModal
+          record={selectedRecord}
+          vehicles={vehicles}
+          vehicleHistory={vehicleHistory}
+          onClose={() => setSelectedRecord(null)}
+        />
+      ) : null}
     </>
   );
 };

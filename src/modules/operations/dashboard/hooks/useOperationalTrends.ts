@@ -8,7 +8,7 @@
 //
 // Windows already fetched are remembered for the session, so flicking between
 // Today / Week / Month / Custom paints instantly instead of waiting on the
-// network — the data is still refetched behind it, so it can never go stale.
+// network. Each selected window is still refreshed in the background.
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
@@ -18,13 +18,17 @@ import {
 
 const DEBOUNCE_MS = 120;
 
-/** Session cache — small, and bounded so a long session cannot grow it. */
+/** Session cache — bounded by both window count and row volume. */
 const CACHE_LIMIT = 12;
+const CACHE_ROW_LIMIT = 2_000;
 const cache = new Map<string, OperationalTrends>();
 
 const keyOf = (fromDate?: string, toDate?: string): string => `${fromDate ?? ""}..${toDate ?? ""}`;
 
 const remember = (key: string, value: OperationalTrends): void => {
+  // A very large custom period stays exact, but is deliberately not retained
+  // for the rest of the session.
+  if (value.rows.length > CACHE_ROW_LIMIT) return;
   cache.delete(key);
   cache.set(key, value);
   if (cache.size > CACHE_LIMIT) {
@@ -55,14 +59,20 @@ interface TrendsState {
   error: string | null;
 }
 
-export function useOperationalTrends(fromDate?: string, toDate?: string): OperationalTrendsState {
-  const key = keyOf(fromDate, toDate);
-  const cached = cache.get(key) ?? null;
+export function useOperationalTrends(
+  fromDate?: string,
+  toDate?: string,
+  enabled = true
+): OperationalTrendsState {
+  // The first page load waits for the sample manifest's business date. While
+  // paused, do not issue an unbounded request with missing range parameters.
+  const key = enabled ? keyOf(fromDate, toDate) : "";
+  const cached = enabled ? (cache.get(key) ?? null) : null;
 
   const [state, setState] = useState<TrendsState>(() => ({
     key,
     trends: null,
-    loading: true,
+    loading: enabled,
     error: null,
   }));
 
@@ -71,9 +81,11 @@ export function useOperationalTrends(fromDate?: string, toDate?: string): Operat
   // screen while the new figures load (no blank flash, no skeleton).
   if (state.key !== key) {
     setState(
-      cached
-        ? { key, trends: cached, loading: false, error: null }
-        : { key, trends: state.trends, loading: true, error: null }
+      !enabled
+        ? { key, trends: null, loading: false, error: null }
+        : cached
+          ? { key, trends: cached, loading: false, error: null }
+          : { key, trends: state.trends, loading: true, error: null }
     );
   }
 
@@ -81,6 +93,7 @@ export function useOperationalTrends(fromDate?: string, toDate?: string): Operat
   const requestIdRef = useRef(0);
 
   useEffect(() => {
+    if (!enabled) return;
     const requestId = ++requestIdRef.current;
     const controller = new AbortController();
 
@@ -101,7 +114,7 @@ export function useOperationalTrends(fromDate?: string, toDate?: string): Operat
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [fromDate, toDate, key, reloadToken]);
+  }, [fromDate, toDate, enabled, key, reloadToken]);
 
   const refetch = useCallback(() => setReloadToken((token) => token + 1), []);
 
