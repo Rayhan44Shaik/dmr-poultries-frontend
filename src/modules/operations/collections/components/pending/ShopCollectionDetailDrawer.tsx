@@ -1,10 +1,10 @@
 import { useState, useEffect } from "react";
-import { X, Eye, IndianRupee, Calendar, User, CreditCard, Hash, FileText, Trash2, Loader2, AlertCircle } from "lucide-react";
+import { X, Eye, IndianRupee, Calendar, User, CreditCard, Hash, FileText, Trash2, Loader2 } from "lucide-react";
 import type { Collection, CollectionApiEntry } from "../../types/collection";
 import { collectionService } from "../../services/collectionService";
 import { useSafeNotification } from "../../../../../hooks/useSafeNotification";
 import { confirmDialog } from "../../../../../ui/confirm/confirmStore";
-import { opsSecondaryButtonClass, opsPrimaryButtonClass } from "../../../../../shared/ui/operationsStyles";
+import { opsSecondaryButtonClass } from "../../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../../i18n";
 
 const formatCurrency = (amount: number) =>

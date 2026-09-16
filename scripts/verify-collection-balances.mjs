@@ -828,6 +828,7 @@ describe("sales, cross-module sync and contract", () => {
       .filter(
         (row) =>
           row.deleted !== true &&
+          (row.shopId === 1 || row.shopName === s.shopName) &&
           (row.status ?? "Approved") === "Approved" &&
           (row.saleDate ?? row.tripDate) >= s.weekStart &&
           (row.saleDate ?? row.tripDate) <= s.weekEnd,

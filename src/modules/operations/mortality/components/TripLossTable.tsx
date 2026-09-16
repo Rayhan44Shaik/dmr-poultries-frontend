@@ -19,7 +19,6 @@ import {
   Feather,
   Package,
   Percent,
-  RotateCcw,
   Route as RouteIcon,
   SearchX,
   Store,
@@ -219,7 +218,7 @@ export default function TripLossTable({
   loading = false,
   emptyAll = false,
   filtersApplied = false,
-  onReset,
+  onReset: _onReset,
 }: TripLossTableProps) {
   const { t } = useI18n();
   const [expanded, setExpanded] = useState<Set<number>>(new Set());

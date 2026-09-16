@@ -1,4 +1,7 @@
-import { Fuel, IndianRupee, FileText, CheckCircle, TrendingUp } from "lucide-react";
+import React from "react";
+import { Fuel, IndianRupee, FileText, CheckCircle, TrendingUp, Gauge } from "lucide-react";
+import { compactKpiValue, KpiCardGrid, KpiMetricValue, type KpiCardItem } from "../../../../ui";
+import { useI18n } from "../../../../i18n";
 
 interface Props {
   totalLitres: number;
@@ -6,7 +9,7 @@ interface Props {
   pendingCount: number;
   approvedCount: number;
   avgMileage: number | null;
-  recentTripMileage: number | null;
+  recentTripMileage?: number | null;
 }
 
 export function FuelKPICards({
@@ -15,73 +18,76 @@ export function FuelKPICards({
   pendingCount,
   approvedCount,
   avgMileage,
-  recentTripMileage,
+  recentTripMileage = null,
 }: Props) {
-  const baseCards = [
+  const { t, language } = useI18n();
+
+  const litres = compactKpiValue(totalLitres, 2);
+  const cost = compactKpiValue(totalAmount, 2);
+  const pending = compactKpiValue(pendingCount);
+  const approved = compactKpiValue(approvedCount);
+  const mileage = avgMileage !== null ? compactKpiValue(avgMileage, 2) : null;
+  const recentMileage = recentTripMileage !== null && recentTripMileage !== undefined ? compactKpiValue(recentTripMileage, 2) : null;
+
+  const isTe = language === "te";
+
+  const cards: KpiCardItem[] = [
     {
-      title: "Total Fuel (L)",
-      value: totalLitres.toFixed(2),
-      icon: <Fuel size={20} />,
-      bg: "bg-blue-50",
-      text: "text-blue-700",
+      id: "litres",
+      label: t("ops.fuel.total_fuel"),
+      value: <KpiMetricValue metric={litres} unit="L" />,
+      tooltip: isTe ? `మొత్తం ఇంధనం: ${litres.exact} లీటర్లు` : `Total Fuel: ${litres.exact} Litres`,
+      Icon: Fuel,
+      tone: "blue",
     },
     {
-      title: "Total Cost (₹)",
-      value: `₹ ${totalAmount.toFixed(2)}`,
-      icon: <IndianRupee size={20} />,
-      bg: "bg-green-50",
-      text: "text-green-700",
+      id: "cost",
+      label: t("ops.fuel.total_cost"),
+      value: <KpiMetricValue metric={cost} prefix="₹ " />,
+      tooltip: isTe ? `మొత్తం ఖర్చు: ₹ ${cost.exact}` : `Total Cost: ₹ ${cost.exact}`,
+      Icon: IndianRupee,
+      tone: "emerald",
     },
     {
-      title: "Pending Bills",
-      value: pendingCount,
-      icon: <FileText size={20} />,
-      bg: "bg-yellow-50",
-      text: "text-yellow-700",
+      id: "pending",
+      label: t("ops.fuel.pending_bills"),
+      value: <KpiMetricValue metric={pending} />,
+      tooltip: isTe ? `పెండింగ్ ఆమోదం: ${pending.exact}` : `Pending Approval: ${pending.exact}`,
+      Icon: FileText,
+      tone: "amber",
     },
     {
-      title: "Approved Bills",
-      value: approvedCount,
-      icon: <CheckCircle size={20} />,
-      bg: "bg-emerald-50",
-      text: "text-emerald-700",
+      id: "approved",
+      label: t("ops.fuel.approved_bills"),
+      value: <KpiMetricValue metric={approved} />,
+      tooltip: isTe ? `ఆమోదించబడింది: ${approved.exact}` : `Approved: ${approved.exact}`,
+      Icon: CheckCircle,
+      tone: "cyan",
     },
     {
-      title: "Avg Efficiency (KM/L)",
-      value: avgMileage !== null ? avgMileage.toFixed(2) : "—",
-      icon: <TrendingUp size={20} />,
-      bg: "bg-cyan-50",
-      text: "text-cyan-700",
+      id: "mileage",
+      label: t("ops.fuel.avg_efficiency"),
+      value: mileage ? <KpiMetricValue metric={mileage} unit="KM/L" /> : "—",
+      tooltip: mileage ? (isTe ? `ఫ్లీట్ సామర్థ్యం: ${mileage.exact} KM/L` : `Fleet Efficiency: ${mileage.exact} KM/L`) : (isTe ? "మైలేజ్ డేటా లేదు" : "No mileage data"),
+      Icon: TrendingUp,
+      tone: "violet",
     },
   ];
 
-  const extraCards = recentTripMileage !== null ? [
-    {
-      title: "Recent Trip Mileage (KM/L)",
-      value: recentTripMileage.toFixed(2),
-      icon: <TrendingUp size={20} />,
-      bg: "bg-indigo-50",
-      text: "text-indigo-700",
-    },
-  ] : [];
+  if (recentMileage) {
+    cards.push({
+      id: "recent-mileage",
+      label: t("ops.fuel.recent_trip_mileage"),
+      value: <KpiMetricValue metric={recentMileage} unit="KM/L" />,
+      tooltip: isTe ? `ఇటీవలి ట్రిప్: ${recentMileage.exact} KM/L` : `Recent Trip: ${recentMileage.exact} KM/L`,
+      Icon: Gauge,
+      tone: "rose",
+    });
+  }
 
-  const allCards = [...baseCards, ...extraCards];
-  const gridCols = allCards.length === 5 ? "lg:grid-cols-5" : "lg:grid-cols-6";
+  const gridClass = cards.length === 6 ? "lg:grid-cols-6" : "lg:grid-cols-5";
 
-  return (
-    <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2 ${gridCols}`}>
-      {allCards.map((card) => (
-        <div
-          key={card.title}
-          className={`flex items-center justify-between rounded-lg border border-slate-200 p-4 shadow-sm ${card.bg}`}
-        >
-          <div>
-            <div className="text-xs font-medium text-slate-500">{card.title}</div>
-            <div className={`text-xl font-bold ${card.text}`}>{card.value}</div>
-          </div>
-          <div className={`rounded-full p-2 ${card.bg} ${card.text}`}>{card.icon}</div>
-        </div>
-      ))}
-    </div>
-  );
+  return <KpiCardGrid items={cards} gridClassName={gridClass} ariaLabel={t("ops.fuel.title")} />;
 }
+
+export default React.memo(FuelKPICards);

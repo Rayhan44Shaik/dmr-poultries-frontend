@@ -1,16 +1,19 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   fuelExpenseService,
   type FuelListMeta,
   type FuelListSummary,
 } from "../services/fuelExpenseService";
 import type { FuelExpense, FuelExpenseDraft } from "../types/fuelExpense";
+import { useI18n } from "../../../../i18n";
 
 type NotificationFn = (msg: string, type?: "success" | "error" | "info") => void;
 
 export function useFuelExpenses(showNotification?: NotificationFn) {
+  const { t } = useI18n();
   const [expenses, setExpenses] = useState<FuelExpense[]>([]);
-  const [meta, setMeta] = useState<FuelListMeta>({ total: 0, page: 1, limit: 10, totalPages: 1 });
+  const [deletedMap, setDeletedMap] = useState<Map<string, FuelExpense>>(new Map());
+  const [meta, setMeta] = useState<FuelListMeta>({ total: 0, page: 1, limit: 1000, totalPages: 1 });
   const [summary, setSummary] = useState<FuelListSummary>({
     totalLitres: 0,
     totalAmount: 0,
@@ -22,69 +25,55 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
   const [loading, setLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(10);
 
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
-  const [selectedVehicles, setSelectedVehicles] = useState<string[]>([]);
-  const [sourceType, setSourceType] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
-  const [tripNo, setTripNo] = useState("");
-  const [billNo, setBillNo] = useState("");
+  const requestSeqRef = useRef(0);
 
   const refresh = useCallback(async () => {
+    const seq = requestSeqRef.current + 1;
+    requestSeqRef.current = seq;
     setLoading(true);
     setError(null);
     try {
       const result = await fuelExpenseService.list({
-        page: currentPage,
-        limit: pageSize,
-        fromDate,
-        toDate,
-        vehicleNo: selectedVehicles[0] || "",
-        sourceType,
-        status: statusFilter,
-        tripNo,
-        billNo,
+        page: 1,
+        limit: 2000,
       });
-      setExpenses(result.data);
+      if (requestSeqRef.current !== seq) return;
+      
+      // Merge active result data with locally tracked deleted records
+      setExpenses(() => {
+        const activeIds = new Set(result.data.map((r) => r.id));
+        const combined = [...result.data];
+        for (const [delId, delItem] of deletedMap.entries()) {
+          if (!activeIds.has(delId)) {
+            combined.push(delItem);
+          }
+        }
+        return combined;
+      });
       setMeta(result.meta);
       setSummary(result.summary);
     } catch (err) {
+      if (requestSeqRef.current !== seq) return;
       const message = err instanceof Error ? err.message : "Failed to load fuel expenses.";
       setError(message);
       showNotification?.(message, "error");
     } finally {
-      setLoading(false);
+      if (requestSeqRef.current === seq) {
+        setLoading(false);
+      }
     }
-  }, [
-    currentPage,
-    pageSize,
-    fromDate,
-    toDate,
-    selectedVehicles,
-    sourceType,
-    statusFilter,
-    tripNo,
-    billNo,
-    showNotification,
-  ]);
+  }, [showNotification, deletedMap]);
 
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
-  // The API summary covers the complete filtered register. `expenses` is only
-  // the current table page, so reducing it here would make the quarter totals
-  // jump every time the user paginates.
-  const filteredSummary = summary;
-
   const saveExpense = async (expense: FuelExpenseDraft) => {
     setIsSaving(true);
     try {
       await fuelExpenseService.save(expense);
-      showNotification?.("Fuel bill saved successfully!", "success");
+      showNotification?.(t("ops.fuel.refreshed"), "success");
       await refresh();
       return true;
     } catch (err) {
@@ -99,7 +88,7 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
     setIsSaving(true);
     try {
       await fuelExpenseService.update(id, updates);
-      showNotification?.("Fuel bill updated successfully!", "success");
+      showNotification?.(t("ops.fuel.refreshed"), "success");
       await refresh();
       return true;
     } catch (err) {
@@ -113,9 +102,21 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
   const deleteExpense = async (id: string) => {
     setIsSaving(true);
     try {
+      const target = expenses.find((e) => e.id === id);
       await fuelExpenseService.remove(id);
-      showNotification?.("Fuel bill deleted successfully!", "success");
-      await refresh();
+      if (target) {
+        const deletedRecord: FuelExpense = {
+          ...target,
+          status: "Deleted",
+          deleted: true,
+          deletedAt: new Date().toISOString(),
+        };
+        setDeletedMap((prev) => new Map(prev).set(id, deletedRecord));
+        setExpenses((prev) =>
+          prev.map((e) => (e.id === id ? deletedRecord : e))
+        );
+      }
+      showNotification?.(t("ops.fuel.deleted_success"), "success");
       return true;
     } catch (err) {
       showNotification?.(err instanceof Error ? err.message : "Failed to delete fuel bill.", "error");
@@ -129,7 +130,7 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
     setIsSaving(true);
     try {
       await fuelExpenseService.approve(id);
-      showNotification?.("Fuel bill approved successfully!", "success");
+      showNotification?.(t("ops.fuel.approved_success"), "success");
       await refresh();
       return true;
     } catch (err) {
@@ -140,66 +141,18 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
     }
   };
 
-  const rejectExpense = async (id: string, reason: string) => {
-    setIsSaving(true);
-    try {
-      await fuelExpenseService.reject(id, reason);
-      showNotification?.("Fuel bill rejected.", "success");
-      await refresh();
-      return true;
-    } catch (err) {
-      showNotification?.(err instanceof Error ? err.message : "Failed to reject fuel bill.", "error");
-      return false;
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const resetFilters = () => {
-    setFromDate("");
-    setToDate("");
-    setSelectedVehicles([]);
-    setSourceType("");
-    setStatusFilter("");
-    setTripNo("");
-    setBillNo("");
-    setCurrentPage(1);
-  };
-
   return {
     expenses,
     filteredData: expenses,
-    paginatedData: expenses,
-    currentPage,
-    setCurrentPage,
-    pageSize,
-    setPageSize,
-    totalPages: meta.totalPages,
-    totalCount: meta.total,
-    fromDate,
-    setFromDate,
-    toDate,
-    setToDate,
-    selectedVehicles,
-    setSelectedVehicles,
-    sourceType,
-    setSourceType,
-    statusFilter,
-    setStatusFilter,
-    tripNo,
-    setTripNo,
-    billNo,
-    setBillNo,
-    resetFilters,
-    refresh,
+    meta,
+    summary,
     loading,
     isSaving,
     error,
-    filteredSummary,
+    refresh,
     saveExpense,
     updateExpense,
     deleteExpense,
     approveExpense,
-    rejectExpense,
   };
 }

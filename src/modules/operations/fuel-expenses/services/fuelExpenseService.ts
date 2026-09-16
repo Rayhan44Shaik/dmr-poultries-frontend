@@ -85,11 +85,12 @@ function mapStatus(status: string): FuelUiStatus {
 }
 
 function mapRow(row: ApiFuel): FuelExpense {
+  const isTrip = row.sourceType === "TRIP" || !!row.tripNo || !!row.tripId;
   return {
     id: row.id,
     billNo: row.billNo,
     date: row.billDate,
-    sourceType: row.sourceType === "TRIP" ? "TRIP" : "MANUAL",
+    sourceType: isTrip ? "TRIP" : "MANUAL",
     vehicleId: row.vehicleId ?? 0,
     vehicleNo: row.vehicleNo ?? "",
     driverId: row.driverId ?? 0,
@@ -108,11 +109,12 @@ function mapRow(row: ApiFuel): FuelExpense {
     gpsLon: row.gpsLon ?? null,
     gpsAccuracy: row.gpsAccuracy ?? null,
     gpsCapturedAt: row.gpsCapturedAt ?? null,
-    status: mapStatus(row.status),
+    // Trip diesel bills are automatically approved on trip completion; only manual bills can be pending
+    status: isTrip ? "Approved" : mapStatus(row.status),
     createdDate: row.createdAt ?? "",
     createdBy: row.createdBy ?? "",
     approvedDate: row.approvedAt ?? undefined,
-    approvedBy: row.approvedBy ?? undefined,
+    approvedBy: isTrip ? "Trip Completion" : (row.approvedBy ?? undefined),
     updatedDate: row.updatedAt ?? undefined,
     image: row.imageData ?? undefined,
     imageName: row.imageName ?? undefined,
