@@ -15,6 +15,8 @@ import ViewModal from '../components/maintenance/ViewModal';
 import { MAINTENANCE_TYPES } from '../utils/constants';
 import type { MaintenanceEvent } from '../types';
 import { RotateCcw, Save, Wrench, X, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { opsSecondaryButtonClass } from '../../../shared/ui/operationsStyles';
+import { PAGINATION_DEFAULT_PAGE_SIZE } from '../../../shared/ui/uiTokens';
 
 const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
   const { t } = useI18n();
@@ -47,7 +49,7 @@ const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
 
   // --- Deleted records (soft-deleted from backend, exposed by the hook) ---
   const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(5);
+  const [pageSize, setPageSize] = useState(PAGINATION_DEFAULT_PAGE_SIZE);
 
   // --- Form hook ---
   const {
@@ -303,29 +305,38 @@ const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
   return (
     <ErrorBoundary>
       <div className="w-full space-y-4">
-        {/* Form Card */}
+        {/* Form Card — header treatment identical to Recent Trip Activity */}
         <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-200 bg-slate-50/50 flex items-center justify-between">
+          <div className="px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-slate-50 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-blue-50 rounded-xl border border-blue-100 text-blue-600">
-                <Wrench size={18} />
+              <div className="h-9 w-9 rounded-xl bg-blue-50/70 border border-blue-100 flex items-center justify-center text-blue-500 shadow-inner">
+                <Wrench className="w-5 h-5" />
               </div>
-              <h2 className="text-base font-bold text-slate-800">{t('fleet.maintenance_entry.title')}</h2>
+              <h2 className="text-base font-bold text-slate-800 tracking-tight">{t('fleet.maintenance_entry.title')}</h2>
             </div>
             <div className="flex items-center gap-2">
+              {/* Reset — same animated chrome as the Trip List filter reset */}
               <button
+                type="button"
                 onClick={handleReset}
-                className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-semibold text-slate-700 border border-slate-300 rounded-xl hover:bg-slate-50 transition shadow-xs"
+                className={`group relative ${opsSecondaryButtonClass}`}
+                aria-label={t('common.reset')}
               >
-                <RotateCcw size={14} />
+                <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>
                 {t('common.reset')}
               </button>
+              {/* Save — spring pop on hover, spinner while saving */}
               <button
+                type="button"
                 onClick={onSave}
                 disabled={loading}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition shadow-sm hover:shadow disabled:opacity-50"
+                className="group relative inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition shadow-sm hover:shadow disabled:opacity-50 active:scale-[0.98]"
               >
-                <Save size={14} />
+                {loading ? (
+                  <span className="inline-flex h-4 w-4 animate-spin rounded-full border-2 border-white/40 border-t-white" aria-hidden="true" />
+                ) : (
+                  <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-add)]"><Save size={14} /></span>
+                )}
                 {loading ? t('common.saving') : (form.id ? t('fleet.maintenance_entry.update') : t('common.save'))}
               </button>
             </div>
@@ -369,30 +380,26 @@ const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
         )}
 
         {/* Latest Records Table */}
-        <div className="bg-white border border-slate-200 rounded-2xl shadow-xs overflow-hidden p-5">
-          {recordsLoading ? (
-            <div className="py-12 text-center text-sm font-semibold text-slate-500">{t('fleet.maintenance_entry.loading_records')}</div>
-          ) : (
-          <LatestMaintenanceTable
-            records={displayRecords}
-            vehicles={vehicles}
-            viewMode={viewMode}
-            onView={handleView}
-            onEdit={handleEdit}
-            onDelete={startDeletion}
-            onApprove={handleApprove}
-            isEditable={isEditable}
-            currentPage={currentPage}
-            onPageChange={setCurrentPage}
-            pageSize={pageSize}
-            onPageSizeChange={(size) => {
-              setPageSize(size);
-              setCurrentPage(1);
-            }}
-            onToggleView={handleViewToggle}
-          />
-          )}
-        </div>
+        <LatestMaintenanceTable
+          records={displayRecords}
+          vehicles={vehicles}
+          viewMode={viewMode}
+          onView={handleView}
+          onEdit={handleEdit}
+          onDelete={startDeletion}
+          onApprove={handleApprove}
+          isEditable={isEditable}
+          isLoading={recordsLoading}
+          onRefresh={refreshMaintenance}
+          currentPage={currentPage}
+          onPageChange={setCurrentPage}
+          pageSize={pageSize}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setCurrentPage(1);
+          }}
+          onToggleView={handleViewToggle}
+        />
 
         {/* View Modal */}
         {viewModalOpen && viewRecord && (

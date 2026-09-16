@@ -2,10 +2,13 @@ import React, { memo, useState } from 'react';
 import Select from 'react-select';
 import { useI18n } from '../../../../i18n';
 import { DatePicker } from '../../../../components/common/DatePicker';
-import { Car, User, Gauge, Wrench, Cog, Building2, UserCog, FileText, Paperclip, Upload, Trash2, File as FileIcon, AlertTriangle } from 'lucide-react';
+import { Gauge, Wrench, Cog, Building2, UserCog, FileText, Paperclip, Upload, Trash2, File as FileIcon, AlertTriangle, Truck } from 'lucide-react';
 import PartsTable from './PartsTable';
 import type { PartItem } from '../../types';
 import { maintenanceApi } from '../../services/maintenanceApi';
+// Trip-List field chrome — identical labels, inputs and dropdowns.
+import { opsFilterLabelClass, opsInputClass } from '../../../../shared/ui/operationsStyles';
+import MasterDropdown from '../../../masters/components/MasterDropdown';
 
 export interface FormDocumentItem {
   key: string;
@@ -73,8 +76,7 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
   const { t } = useI18n();
   const [kmError, setKmError] = useState<string | null>(null);
 
-  const inputClass =
-    'w-full h-10 pl-10 pr-3 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition bg-white';
+  const inputClass = `${opsInputClass} pl-10`;
 
   const handleCurrentKMChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const val = e.target.value;
@@ -137,35 +139,23 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* 1. Vehicle */}
         <div>
-          <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-            {t('common.vehicle')} <span className="text-red-500">*</span>
+          <label className={opsFilterLabelClass}>
+            <Truck size={17} className="text-emerald-500 flex-shrink-0" />
+            <span>{t('common.vehicle')}</span>
+            <span className="text-rose-500">*</span>
           </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
-              <Car size={16} className="text-slate-400" />
-            </div>
-            <Select
-              key={`vehicle-${selectKey}`}
-              options={vehicleOptions}
-              value={vehicleOptions.find(opt => opt.value === form.vehicleId)}
-              onChange={onVehicleChange}
-              placeholder={t('operations.select_vehicle')}
-              isClearable
-              className="text-sm"
-              styles={{
-                control: (base) => ({
-                  ...base,
-                  minHeight: '40px',
-                  paddingLeft: '28px',
-                  borderColor: '#cbd5e1',
-                  boxShadow: 'none',
-                  borderRadius: '0.75rem',
-                  '&:hover': { borderColor: '#94a3b8' }
-                }),
-                placeholder: (base) => ({ ...base, color: '#9ca3af' }),
-              }}
-            />
-          </div>
+          <MasterDropdown
+            key={`vehicle-${selectKey}`}
+            hideLabel
+            label={t('common.vehicle')}
+            value={form.vehicleId}
+            options={vehicleOptions}
+            onChange={(next) => onVehicleChange(next ? { value: next } : null)}
+            placeholder={t('operations.select_vehicle')}
+            searchable
+            allowClear
+            className="w-full"
+          />
         </div>
 
         {/* 3. Date */}
@@ -181,35 +171,25 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
 
         {/* 4. Driver */}
         <div>
-          <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-            {t('common.driver')}
+          <label className={opsFilterLabelClass}>
+            <UserCog size={17} className="text-violet-500 flex-shrink-0" />
+            <span>{t('common.driver')}</span>
           </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
-              <User size={16} className="text-slate-400" />
-            </div>
-            <Select
-              key={`driver-${selectKey}`}
-              options={driverOptions}
-              value={driverOptions.find(opt => opt.value === form.driverId)}
-              onChange={onDriverChange}
-              placeholder={t('operations.select_driver')}
-              isClearable
-              className="text-sm"
-              styles={{
-                control: (base) => ({
-                  ...base,
-                  minHeight: '40px',
-                  paddingLeft: '28px',
-                  borderColor: '#cbd5e1',
-                  boxShadow: 'none',
-                  borderRadius: '0.75rem',
-                  '&:hover': { borderColor: '#94a3b8' }
-                }),
-                placeholder: (base) => ({ ...base, color: '#9ca3af' }),
-              }}
-            />
-          </div>
+          <MasterDropdown
+            key={`driver-${selectKey}`}
+            hideLabel
+            label={t('common.driver')}
+            value={form.driverId}
+            options={driverOptions}
+            onChange={(next) => {
+              const match = driverOptions.find((opt) => String(opt.value) === String(next));
+              onDriverChange(next ? { value: next, label: match?.label ?? next } : null);
+            }}
+            placeholder={t('operations.select_driver')}
+            searchable
+            allowClear
+            className="w-full"
+          />
         </div>
       </div>
 
@@ -217,8 +197,10 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* 5. Current KM */}
         <div>
-          <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-            {t('fleet.maintenance_form.current_km')} <span className="text-red-500">*</span>
+          <label className={opsFilterLabelClass}>
+            <Gauge size={17} className="text-orange-500 flex-shrink-0" />
+            <span>{t('fleet.maintenance_form.current_km')}</span>
+            <span className="text-rose-500">*</span>
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -237,8 +219,9 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
 
         {/* 7. Garage */}
         <div>
-          <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-            {t('operations.maintenance_garage')}
+          <label className={opsFilterLabelClass}>
+            <Building2 size={17} className="text-amber-500 flex-shrink-0" />
+            <span>{t('operations.maintenance_garage')}</span>
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -256,8 +239,9 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
 
         {/* 8. Mechanic */}
         <div>
-          <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-            {t('fleet.maintenance_form.mechanic')}
+          <label className={opsFilterLabelClass}>
+            <UserCog size={17} className="text-indigo-500 flex-shrink-0" />
+            <span>{t('fleet.maintenance_form.mechanic')}</span>
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -278,40 +262,38 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {/* 9. Maintenance Type - big box (multi) */}
         <div>
-          <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-            {t('operations.maintenance_type')} <span className="text-red-500">*</span>
+          <label className={opsFilterLabelClass}>
+            <Cog size={17} className="text-slate-400 flex-shrink-0" />
+            <span>{t('operations.maintenance_type')}</span>
+            <span className="text-rose-500">*</span>
           </label>
-          <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none z-10">
-              <Cog size={16} className="text-slate-400" />
-            </div>
-            <Select
-              key={`maintenance-${selectKey}`}
-              options={maintenanceOptions}
-              value={maintenanceOptions.filter(opt => form.maintenanceType.includes(opt.value))}
-              onChange={onMaintenanceChange}
-              placeholder={t('fleet.maintenance_form.select_types')}
-              isMulti
-              isClearable
-              className="text-sm"
-              styles={{
-                control: (base) => ({
-                  ...base,
-                  minHeight: '40px',
-                  paddingLeft: '28px',
-                  borderColor: '#cbd5e1',
-                  boxShadow: 'none',
-                  borderRadius: '0.75rem',
-                  '&:hover': { borderColor: '#94a3b8' }
-                }),
-                placeholder: (base) => ({ ...base, color: '#9ca3af' }),
-              }}
-            />
-          </div>
+          <Select
+            key={`maintenance-${selectKey}`}
+            options={maintenanceOptions}
+            value={maintenanceOptions.filter(opt => form.maintenanceType.includes(opt.value))}
+            onChange={onMaintenanceChange}
+            placeholder={t('fleet.maintenance_form.select_types')}
+            isMulti
+            isClearable
+            className="text-sm"
+            styles={{
+              control: (base) => ({
+                ...base,
+                minHeight: '40px',
+                borderColor: '#cbd5e1',
+                boxShadow: 'none',
+                borderRadius: '0.75rem',
+                fontSize: '13px',
+                '&:hover': { borderColor: '#94a3b8' }
+              }),
+              placeholder: (base) => ({ ...base, color: '#9ca3af' }),
+            }}
+          />
 
           {/* Next Service KM — one target per selected maintenance type */}
-          <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mt-3 mb-1.5">
-            {t('fleet.maintenance_form.next_service_km')}
+          <label className={`${opsFilterLabelClass} mt-3`}>
+            <Gauge size={17} className="text-cyan-500 flex-shrink-0" />
+            <span>{t('fleet.maintenance_form.next_service_km')}</span>
           </label>
           {form.maintenanceType.length === 0 ? (
             <div className="flex h-10 items-center rounded-xl border border-dashed border-slate-300 bg-slate-50 px-3 text-xs text-slate-400">
@@ -361,8 +343,10 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
 
         {/* 10. Service Type */}
         <div>
-          <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-            {t('fleet.maintenance_form.service_type')} <span className="text-red-500">*</span>
+          <label className={opsFilterLabelClass}>
+            <Wrench size={17} className="text-purple-500 flex-shrink-0" />
+            <span>{t('fleet.maintenance_form.service_type')}</span>
+            <span className="text-rose-500">*</span>
           </label>
           <div className="relative">
             <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
@@ -380,8 +364,9 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
 
         {/* 11. Remarks */}
         <div>
-          <label className="block text-xs font-semibold text-slate-600 uppercase tracking-wider mb-1.5">
-            {t('common.remarks')}
+          <label className={opsFilterLabelClass}>
+            <FileText size={17} className="text-emerald-500 flex-shrink-0" />
+            <span>{t('common.remarks')}</span>
           </label>
           <div className="relative">
             <div className="absolute top-2.5 left-3 pointer-events-none">
@@ -416,9 +401,9 @@ const MaintenanceForm: React.FC<MaintenanceFormProps> = ({
             </p>
           </div>
           <label
-            className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition cursor-pointer shrink-0"
+            className="group relative inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold text-white bg-blue-600 rounded-lg hover:bg-blue-700 transition cursor-pointer shrink-0 active:scale-95"
           >
-            <Upload size={14} />
+            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-add)]"><Upload size={14} /></span>
             {t('fleet.maintenance_form.add_document')}
             <input
               type="file"
