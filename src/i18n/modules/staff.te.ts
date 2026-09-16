@@ -421,6 +421,8 @@ export default {
   'staff.register.kpi_payout': 'మొత్తం చెల్లింపు',
   'staff.register.submitted_ok':
 '{count} జీతాల రికార్డు(లు) విజయవంతంగా సమర్పించబడ్డాయి.',
+  'staff.register.payslips_queued': 'సమర్పించిన ఉద్యోగుల కోసం {count} పేస్లిప్ ఇమెయిల్‌లు క్యూలో వేయబడ్డాయి.',
+  'staff.register.submit_none_pending': 'ఎంచుకున్న అందరూ ఇప్పటికే సమర్పించబడ్డారు లేదా చెల్లించబడ్డారు — సమర్పించడానికి ఏమీ లేదు.',
   'staff.register.send_ok': '{sent} పేస్లిప్(లు) {channel} ద్వారా పంపబడ్డాయి.',
   'staff.register.send_partial': '{sent} పంపబడ్డాయి, {failed} విఫలమయ్యాయి. విఫలమైనవి మళ్లీ ప్రయత్నించండి.',
   'staff.register.submit_failed': 'ఎంచుకున్న జీతాలు సమర్పించలేకపోయాము.',

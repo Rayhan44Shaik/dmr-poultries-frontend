@@ -421,6 +421,8 @@ export default {
   'staff.register.kpi_paid': 'Paid',
   'staff.register.kpi_payout': 'Net payout',
   'staff.register.submitted_ok': 'Submitted {count} salary record(s) successfully.',
+  'staff.register.payslips_queued': '{count} payslip email(s) queued for the submitted employees.',
+  'staff.register.submit_none_pending': 'Everyone selected is already submitted or paid — nothing to submit.',
   'staff.register.submit_failed': 'Unable to submit selected salaries.',
   'staff.register.download_failed': 'Unable to download payslip.',
   'staff.register.downloaded_ok': 'Downloaded {count} payslip PDF(s).',

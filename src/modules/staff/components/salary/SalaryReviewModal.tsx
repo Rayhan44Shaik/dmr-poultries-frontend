@@ -34,7 +34,6 @@ import {
   ListChecks,
   CheckSquare,
   Square,
-  Send,
   ChevronDown,
 } from "lucide-react";
 import { AppShellModal, Button } from "../../../../ui";
@@ -69,8 +68,6 @@ export type SalaryReviewModalProps = {
   onDownloadSelected: (ids: string[]) => void;
   /** Download the given ids as ONE combined PDF (one page per employee). */
   onDownloadSelectedCombined: (ids: string[]) => void;
-  /** Open the Send Payslips popup (submitted employees only). */
-  onSendPayslips: () => void;
 };
 
 type FieldKey = AmountFieldKey;
@@ -98,7 +95,6 @@ function SalaryReviewModalBody({
   onToggleSelectAll,
   onDownloadSelected,
   onDownloadSelectedCombined,
-  onSendPayslips,
 }: SalaryReviewModalProps) {
   const { t, language, toggleLanguage } = useI18n();
   const titleId = useId();
@@ -166,19 +162,14 @@ function SalaryReviewModalBody({
     }),
     [records]
   );
-  // Send-once: submitted (Paid) employees can be sent — the Send Payslip
-  // button enables only while at least one submitted payslip is still
-  // unsent on BOTH channels. Sending on either channel reduces the count.
-  const submittedCount = useMemo(
-    () =>
-      records.filter(
-        (r) =>
-          (r.status === "Paid" || r.status === "Submitted") &&
-          (r.emailsSent ?? 0) === 0 &&
-          (r.whatsappsSent ?? 0) === 0
-      ).length,
-    [records]
+  // ONE-TIME SUBMIT: only the PENDING employees inside the selection are
+  // submitted. Already Submitted/Paid rows are never submitted again — even
+  // when "All" is selected — so the button counts exactly those.
+  const pendingSelectedIds = useMemo(
+    () => records.filter((r) => selectedIds.has(r.id) && r.status === "Pending").map((r) => r.id),
+    [records, selectedIds]
   );
+  const pendingSelectedCount = pendingSelectedIds.length;
 
   const handleQueryChange = useCallback((value: string) => {
     setQuery(value);
@@ -321,13 +312,15 @@ function SalaryReviewModalBody({
   }, [selected, drafts, onSaveRecord]);
 
   const handleSubmit = useCallback(() => {
-    // Submit first (Pending → Paid); payslips are sent afterwards from the
-    // Send Payslips popup. A dirty edit on the viewed employee is saved first.
-    if (selectedCount === 0) return;
+    // Submit ONLY the pending employees of the selection (Pending → Paid) —
+    // one time. Already submitted/paid rows are skipped. A dirty edit on the
+    // viewed employee is saved first; the payslip email goes out from the
+    // page handler for exactly the submitted rows.
+    if (pendingSelectedCount === 0) return;
     const afterSave =
       selected && dirty[selected.id] ? handleSave() : Promise.resolve();
-    afterSave.then(() => onSubmitSelected([...selectedIds]));
-  }, [selected, selectedCount, dirty, handleSave, onSubmitSelected, selectedIds]);
+    afterSave.then(() => onSubmitSelected(pendingSelectedIds));
+  }, [selected, pendingSelectedCount, pendingSelectedIds, dirty, handleSave, onSubmitSelected]);
 
   return (
     <AppShellModal open onClose={onClose} panelClassName="bg-white" ariaLabelledBy={titleId}>
@@ -726,28 +719,16 @@ function SalaryReviewModalBody({
               )}
             </div>
             <Button
-              variant="secondary"
-              onClick={onSendPayslips}
-              disabled={submittedCount === 0}
-              icon={
-                <span className={`inline-flex ${uiActionIconMotionClass.mail}`}>
-                  <Send size={13} />
-                </span>
-              }
-            >
-              {t("staff.review.send_payslips")} ({submittedCount})
-            </Button>
-            <Button
               variant="success"
               onClick={handleSubmit}
-              disabled={selectedCount === 0}
+              disabled={pendingSelectedCount === 0}
               icon={
                 <span className={`inline-flex ${uiActionIconMotionClass.approve}`}>
                   <ClipboardCheck size={15} />
                 </span>
               }
             >
-              {t("staff.review.submit_selected")} ({selectedCount})
+              {t("staff.review.submit_selected")} ({pendingSelectedCount})
             </Button>
           </div>
         </div>

@@ -56,6 +56,7 @@ import { SalaryTable } from "../components/salary/salaryTable";
 import { SalaryView } from "../components/salary/SalaryView";
 import { SalaryReviewModal } from "../components/salary/SalaryReviewModal";
 import { SendPayslipsModal } from "../components/salary/SendPayslipsModal";
+import { EMAIL_TEMPLATES } from "../components/salary/payslipMessages";
 import { SAMPLE_EMPLOYEE_LIST } from "../services/staffSampleData";
 import type { SalaryRecord } from "../types/staffDashboard";
 
@@ -351,17 +352,43 @@ function SalaryRegisterPage() {
 
   const handleSubmitSelected = useCallback(
     async (ids: string[]) => {
-      if (ids.length === 0) return;
+      // ONE-TIME SUBMIT: only PENDING rows of the selection move to Paid.
+      // Already Submitted/Paid rows are skipped — selecting "All" can never
+      // submit (or pay) anyone twice.
+      const byId = new Map(allRecords.map((r) => [r.id, r]));
+      const pendingIds = ids.filter((id) => byId.get(id)?.status === "Pending");
+      if (pendingIds.length === 0) {
+        setSubmitMonthOpen(false);
+        showNotification(t("staff.register.submit_none_pending"), "info");
+        return;
+      }
       try {
-        const result = await bulkUpdateSalaryStatus(ids, {
+        const result = await bulkUpdateSalaryStatus(pendingIds, {
           status: "Paid",
           paymentDate: todayBusinessDate(),
           paymentMode: "Bank Transfer",
         });
         await refresh();
+        // Payslip emails go out automatically — and ONLY for the rows that
+        // were submitted now (never for the rest of the register).
+        const submittedIds = result.updated.map((r) => r.id);
+        let queued = 0;
+        try {
+          const sent = await emailSalaryPayslips(submittedIds, {
+            language,
+            subject: EMAIL_TEMPLATES[language].subject.replace("{month}", formatMonthName(month, language)),
+            body: EMAIL_TEMPLATES[language].body("{name}", formatMonthName(month, language)),
+          });
+          queued = sent.sent;
+        } catch {
+          /* payslip service unreachable — the submit itself still stands */
+        }
+        await refresh();
         setSubmitMonthOpen(false);
         showNotification(
-          t("staff.register.submitted_ok", { count: result.updated.length }),
+          queued > 0
+            ? `${t("staff.register.submitted_ok", { count: result.updated.length })} ${t("staff.register.payslips_queued", { count: queued })}`
+            : t("staff.register.submitted_ok", { count: result.updated.length }),
           "success"
         );
       } catch (error) {
@@ -371,7 +398,7 @@ function SalaryRegisterPage() {
         );
       }
     },
-    [refresh, showNotification, t]
+    [allRecords, refresh, showNotification, t, language, month]
   );
 
   const handleDownload = useCallback(
@@ -823,7 +850,6 @@ function SalaryRegisterPage() {
           onToggleSelectAll={toggleSelectAll}
           onDownloadSelected={(ids) => void handleDownloadSelected(ids)}
           onDownloadSelectedCombined={(ids) => void handleDownloadSelectedCombined(ids)}
-          onSendPayslips={() => openSendFor(submittedRecords, "email")}
         />
       )}
 
