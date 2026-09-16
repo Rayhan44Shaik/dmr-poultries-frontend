@@ -147,6 +147,10 @@ const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose, canEdi
 
           {/* Details grid — the who / where / what of the job */}
           <section className="animate-fade-in-up" style={{ animationDelay: '40ms' }}>
+            <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
+              <Wrench size={14} className="flex-shrink-0 text-blue-500" />
+              {t('fleet.maintenance_view.service_details')}
+            </p>
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <DetailCell icon={<User size={13} className="text-indigo-500" />} label={t('common.driver')}>
                 {record.driverName || '—'}

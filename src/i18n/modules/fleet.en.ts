@@ -158,6 +158,7 @@ export default {
   'fleet.maintenance_view.documents_count': 'Documents ({count})',
   'fleet.maintenance_view.parts_title': 'Parts / Spare Parts',
   'fleet.maintenance_view.record_title': 'Maintenance Record',
+  'fleet.maintenance_view.service_details': 'Service Details',
 
   'fleet.timeline.clear_filters': 'Clear Filters',
   'fleet.timeline.driver': 'Driver: {driver}',

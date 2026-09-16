@@ -23,7 +23,6 @@ interface LatestMaintenanceTableProps {
   onView: (record: MaintenanceEvent) => void;
   onDelete: (record: MaintenanceEvent) => void;
   onApprove: (record: MaintenanceEvent) => void;
-  isEditable: (createdAt?: string) => boolean;
   /** Refresh the records from the API — BrandRefreshButton beside the search. */
   onRefresh?: () => void;
   /** True while the API load/refresh is in flight → spinner row, frozen pager. */
@@ -42,7 +41,6 @@ const LatestMaintenanceTable = ({
   onView,
   onDelete,
   onApprove,
-  isEditable,
   onRefresh,
   isLoading = false,
   currentPage,
@@ -210,21 +208,22 @@ const LatestMaintenanceTable = ({
               </button>
               {viewMode !== 'deleted' && (
                 <>
-                  {/* Delete — pending AND approved (approval is final for edit,
-                      removal still allowed) with the 10s undo timer */}
+                  {/* Delete — available on EVERY record (pending, approved and
+                      older ones alike; approval only blocks EDIT). Only an
+                      in-flight 10s undo disables it. */}
                   <button
                     type="button"
                     onClick={(e) => { e.stopPropagation(); if (selectedRecord.id) requestDelete(selectedRecord.id, { label: t('fleet.maintenance_table.deleting', { vehicle: resolveVehicleNumber(selectedRecord) }) }); setSelectedId(null); }}
-                    disabled={!isEditable(selectedRecord.date) || isPending(selectedRecord.id)}
+                    disabled={isPending(selectedRecord.id)}
                     title={t('common.delete')}
                     aria-label={t('common.delete')}
                     className={`group relative h-8 w-8 rounded-xl flex items-center justify-center transition-all shadow-sm ${
-                      isEditable(selectedRecord.date) && !isPending(selectedRecord.id)
+                      !isPending(selectedRecord.id)
                         ? 'bg-rose-50/70 hover:bg-rose-50/80 text-rose-500 border border-rose-200/60 active:scale-95'
                         : 'bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed'
                     }`}
                   >
-                    <span className={`inline-flex ${isEditable(selectedRecord.date) && !isPending(selectedRecord.id) ? uiActionIconMotionClass.delete : ''}`}><Trash2 size={14} /></span>
+                    <span className={`inline-flex ${!isPending(selectedRecord.id) ? uiActionIconMotionClass.delete : ''}`}><Trash2 size={14} /></span>
                   </button>
                   {canApprove && (
                     <button

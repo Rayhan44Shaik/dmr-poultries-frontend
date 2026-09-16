@@ -1278,6 +1278,103 @@ for (const v of VEHICLES) {
   }
 }
 
+// ── Sample bill documents ──────────────────────────────────────────────────
+// Every third maintenance record carries a small bill image + a one-page PDF
+// so the document gallery, sizes and the lightbox viewer are demonstrable.
+// The files are generated deterministically from the record itself.
+function sampleBillSvg(row) {
+  const esc = (v) =>
+    String(v ?? "-").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const items = [
+    ["Bill No", row.billNumber],
+    ["Vehicle", row.vehicleNo],
+    ["Date", String(row.date || "").slice(0, 10)],
+    ["Garage", row.garage],
+    ["Mechanic", row.mechanic],
+    ["Service", row.serviceType],
+    ["Types", row.maintenanceType],
+    ["Odometer", `${row.currentKM} km`],
+    ["Total", `Rs. ${Number(row.totalCost).toLocaleString("en-IN")}`],
+  ];
+  const rows = items
+    .map(
+      ([k, v], i) => `
+    <text x="24" y="${158 + i * 34}" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#64748b" font-weight="bold">${esc(k.toUpperCase())}</text>
+    <text x="24" y="${176 + i * 34}" font-family="Helvetica, Arial, sans-serif" font-size="15" fill="#0f172a" font-weight="bold">${esc(v)}</text>
+    <line x1="24" y1="${188 + i * 34}" x2="336" y2="${188 + i * 34}" stroke="#e2e8f0" stroke-width="1"/>`
+    )
+    .join("");
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="360" height="500" viewBox="0 0 360 500">
+  <rect width="360" height="500" fill="#ffffff"/>
+  <rect width="360" height="86" fill="#0d7a3f"/>
+  <text x="24" y="40" font-family="Helvetica, Arial, sans-serif" font-size="20" fill="#ffffff" font-weight="bold">DMR POULTRIES</text>
+  <text x="24" y="64" font-family="Helvetica, Arial, sans-serif" font-size="12" fill="#d1fae5">Maintenance Service Bill</text>
+  <text x="336" y="40" text-anchor="end" font-family="Helvetica, Arial, sans-serif" font-size="13" fill="#ffffff" font-weight="bold">ORIGINAL</text>${rows}
+  <text x="24" y="484" font-family="Helvetica, Arial, sans-serif" font-size="10" fill="#94a3b8">Computer generated sample bill - DMR Poultries Fleet System</text>
+</svg>`;
+}
+
+function sampleBillPdf(row) {
+  const esc = (v) =>
+    String(v ?? "-").replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)");
+  const lines = [
+    "DMR POULTRIES - MAINTENANCE INVOICE",
+    `Bill: ${row.billNumber}`,
+    `Vehicle: ${row.vehicleNo}   |   Odometer: ${row.currentKM} km`,
+    `Date: ${String(row.date || "").slice(0, 10)}`,
+    `Garage: ${row.garage || "-"}   |   Mechanic: ${row.mechanic || "-"}`,
+    `Service: ${row.serviceType || "-"}`,
+    `Types: ${row.maintenanceType || "-"}`,
+    `Total: INR ${Number(row.totalCost).toLocaleString("en-IN")}`,
+  ];
+  const stream =
+    "BT /F1 12 Tf 40 780 Td 20 TL\n" +
+    lines.map((l) => `(${esc(l)}) Tj T*`).join("\n") +
+    "\nET";
+  const objs = {
+    1: "<< /Type /Catalog /Pages 2 0 R >>",
+    2: "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    3: "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 4 0 R >> >> /Contents 5 0 R >>",
+    4: "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+    5: `<< /Length ${Buffer.byteLength(stream, "latin1")} >>\nstream\n${stream}\nendstream`,
+  };
+  let pdf = "%PDF-1.4\n";
+  const offsets = [0];
+  for (let i = 1; i <= 5; i++) {
+    offsets[i] = Buffer.byteLength(pdf, "latin1");
+    pdf += `${i} 0 obj\n${objs[i]}\nendobj\n`;
+  }
+  const xrefPos = Buffer.byteLength(pdf, "latin1");
+  pdf += "xref\n0 6\n0000000000 65535 f \n";
+  for (let i = 1; i <= 5; i++) pdf += `${String(offsets[i]).padStart(10, "0")} 00000 n \n`;
+  pdf += `trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${xrefPos}\n%%EOF`;
+  return pdf;
+}
+
+function buildSampleDocs(row) {
+  const svg = Buffer.from(sampleBillSvg(row), "utf8");
+  const pdf = Buffer.from(sampleBillPdf(row), "latin1");
+  return [
+    {
+      id: 1,
+      fileName: `bill-${row.billNumber}.svg`,
+      mimeType: "image/svg+xml",
+      fileSize: svg.length,
+      kind: "svg",
+    },
+    {
+      id: 2,
+      fileName: `invoice-${row.billNumber}.pdf`,
+      mimeType: "application/pdf",
+      fileSize: pdf.length,
+      kind: "pdf",
+    },
+  ];
+}
+MAINTENANCE.forEach((row, idx) => {
+  if (idx % 3 === 1) row.documents = buildSampleDocs(row);
+});
+
 const PERMIT_TYPES = ["insurance", "fitness", "permit", "puc", "rc"];
 const PERMITS = [];
 let permitSeq = 0;
@@ -4131,6 +4228,16 @@ const server = http.createServer(async (req, res) => {
     });
     res.end(JSON.stringify(body));
   };
+  // Raw file response (sample bill documents).
+  const sendFile = (code, body, contentType) => {
+    res.writeHead(code, {
+      "Content-Type": contentType,
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Headers": "*",
+      "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+    });
+    res.end(body);
+  };
   if (method === "OPTIONS") return send(204, {});
 
   const m = (re) => p.match(re);
@@ -4962,6 +5069,14 @@ const server = http.createServer(async (req, res) => {
     if (m(/^\/api\/fleet\/maintenance\/(\d+)\/documents$/) && method === "GET") {
       const row = MAINTENANCE.find((x) => Number(x.id) === Number(m(/^\/api\/fleet\/maintenance\/(\d+)\/documents$/)[1]));
       return send(200, row?.documents ?? []);
+    }
+    if (m(/^\/api\/fleet\/maintenance\/(\d+)\/documents\/(\d+)$/) && method === "GET") {
+      const mm = m(/^\/api\/fleet\/maintenance\/(\d+)\/documents\/(\d+)$/);
+      const row = MAINTENANCE.find((x) => Number(x.id) === Number(mm[1]));
+      const doc = (row?.documents ?? []).find((d) => Number(d.id) === Number(mm[2]));
+      if (!doc) return send(404, { error: "not_found" });
+      const body = doc.kind === "pdf" ? Buffer.from(sampleBillPdf(row), "latin1") : Buffer.from(sampleBillSvg(row), "utf8");
+      return sendFile(200, body, doc.mimeType);
     }
     if (m(/^\/api\/fleet\/maintenance\/(\d+)\/approve$/) && method === "POST") {
       const row = MAINTENANCE.find((x) => Number(x.id) === Number(m(/^\/api\/fleet\/maintenance\/(\d+)\/approve$/)[1]));

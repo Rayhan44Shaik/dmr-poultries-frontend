@@ -387,7 +387,6 @@ const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
           onView={handleView}
           onDelete={startDeletion}
           onApprove={handleApprove}
-          isEditable={isEditable}
           isLoading={recordsLoading}
           onRefresh={refreshMaintenance}
           currentPage={currentPage}
