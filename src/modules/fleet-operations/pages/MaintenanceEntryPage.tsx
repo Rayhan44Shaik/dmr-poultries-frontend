@@ -111,7 +111,7 @@ const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
 
   // --- Options ---
   const vehicleOptions = useMemo(() => {
-    return vehicles.map((v: any) => ({ value: v.id, label: v.vehicleNumber }));
+    return vehicles.map((v: any) => ({ value: v.id, label: formatVehicleNumber(String(v.vehicleNumber || v.vehicleNo || '')) }));
   }, [vehicles]);
 
   const driverOptions = useMemo(() => {
