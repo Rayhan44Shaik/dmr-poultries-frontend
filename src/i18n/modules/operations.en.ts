@@ -211,7 +211,6 @@ export default {
   'ops.dashboard.kpi_compare_title': '{current} vs {previous} · previous {days}d',
   'ops.dashboard.kpi_no_baseline': 'No completed data for the previous {days} days',
   'ops.dashboard.kpi_no_change': 'No change',
-  'ops.dashboard.kpi_period_days': '~ Last {days} days',
   'ops.dashboard.kpi_prev_value': 'was {value}',
   'ops.dashboard.vs_prev': 'vs prev {days}d',
   'ops.dashboard.kpi_pending_collections': 'Pending Collections',
