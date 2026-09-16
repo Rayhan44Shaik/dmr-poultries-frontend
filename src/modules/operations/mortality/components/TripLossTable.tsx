@@ -248,8 +248,6 @@ export default function TripLossTable({
    * ↑/↓ reads as a single trip after another rather than a pile of open panels.
    */
   const [openTripId, setOpenTripId] = useState<number | null>(null);
-  /** The trip the grid is ON — highlighted in the table, click or keyboard alike. */
-  const [selectedTripId, setSelectedTripId] = useState<number | null>(null);
   /** Row elements by trip id, so ↑/↓ can move focus down the grid. */
   const rowRefs = useRef(new Map<number, HTMLTableRowElement>());
   /**
@@ -287,21 +285,9 @@ export default function TripLossTable({
    */
   const moveTo = useCallback((next: TripLossAnalysis | undefined, follow: boolean) => {
     if (!next) return;
-    setSelectedTripId(next.tripId);
     if (follow) setOpenTripId(next.tripId);
     requestAnimationFrame(() => rowRefs.current.get(next.tripId)?.focus());
   }, []);
-
-  /**
-   * The highlighted trip. An explicit selection always wins; with none — the
-   * first paint of a page, or a jump to another page — the grid rests on the
-   * first trip it is showing, so the ↑↓ affordance is never missing and never
-   * points at a trip that is not on screen.
-   */
-  const activeTripId =
-    selectedTripId !== null && records.some((row) => row.tripId === selectedTripId)
-      ? selectedTripId
-      : records[0]?.tripId ?? null;
 
   /**
    * Keyboard contract for the grid — the same one the Trip List table uses:
@@ -474,7 +460,7 @@ export default function TripLossTable({
                   key={col.key}
                   className={`px-3 py-3 align-middle text-[12px] font-bold uppercase tracking-wider ${alignClass(
                     col.align
-                  )} ${col.key === "serial" ? "w-24" : ""}`}
+                  )} ${col.key === "serial" ? "w-12" : ""}`}
                 >
                   {sortable(col)}
                 </th>
@@ -545,7 +531,6 @@ export default function TripLossTable({
             ) : (
               records.map((r, index) => {
                 const isOpen = openTripId === r.tripId;
-                const isActive = activeTripId === r.tripId;
                 const serialNo = (page - 1) * pageSize + index + 1;
                 return (
                   <Fragment key={r.tripId}>
@@ -562,29 +547,14 @@ export default function TripLossTable({
                         // row takes focus first, so the keyboard walks on from the
                         // trip the operator just picked.
                         event.currentTarget.focus();
-                        setSelectedTripId(r.tripId);
                         toggle(r.tripId);
                       }}
-                      onFocus={() => setSelectedTripId(r.tripId)}
-                      className={`cursor-pointer select-none outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 hover:bg-emerald-50/30 ${
-                        isOpen
-                          ? "bg-emerald-50/70"
-                          : isActive
-                            ? "bg-emerald-50/40"
-                            : index % 2 === 0
-                              ? "bg-white"
-                              : "bg-slate-50/20"
+                      className={`cursor-pointer select-none outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 hover:bg-slate-50/60 ${
+                        isOpen ? "bg-slate-50/60" : index % 2 === 0 ? "bg-white" : "bg-slate-50/20"
                       }`}
                     >
-                      {/* The edge bar marks the trip the grid is on, and the ↑↓ pair
-                          sits with it: which trip is being referred to, and how to
-                          step to the next one, in the same glance. */}
-                      <td
-                        className={`w-24 border-l-2 px-3 py-3.5 transition-colors duration-150 ${
-                          isActive || isOpen ? "border-emerald-500" : "border-transparent"
-                        }`}
-                      >
-                        <span className="flex items-center gap-1.5">
+                      <td className="w-12 px-3 py-3.5">
+                        <span className="flex items-center justify-center gap-1.5">
                           <button
                             type="button"
                             onClick={(event) => {
@@ -597,44 +567,9 @@ export default function TripLossTable({
                           >
                             {isOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                           </button>
-                          <span
-                            className={`text-[12.5px] font-medium tabular-nums ${
-                              isActive || isOpen ? "text-emerald-700" : "text-slate-400"
-                            }`}
-                          >
+                          <span className="text-[12.5px] font-medium tabular-nums text-slate-400">
                             {formatNumber(serialNo)}
                           </span>
-                          {(isActive || isOpen) && (
-                            <span className="inline-flex items-center rounded-md border border-emerald-200 bg-white px-0.5 py-[1px] shadow-sm">
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  moveTo(records[index - 1], isOpen);
-                                }}
-                                disabled={index === 0}
-                                title={t("ops.mortality.aria.previous_trip")}
-                                aria-label={t("ops.mortality.aria.previous_trip")}
-                                className="cursor-pointer rounded p-0.5 text-emerald-600 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-30"
-                              >
-                                <ArrowUp size={10} strokeWidth={2.6} />
-                              </button>
-                              <span className="h-3 w-px bg-emerald-100" aria-hidden="true" />
-                              <button
-                                type="button"
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  moveTo(records[index + 1], isOpen);
-                                }}
-                                disabled={index === records.length - 1}
-                                title={t("ops.mortality.aria.next_trip")}
-                                aria-label={t("ops.mortality.aria.next_trip")}
-                                className="cursor-pointer rounded p-0.5 text-emerald-600 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-30"
-                              >
-                                <ArrowDown size={10} strokeWidth={2.6} />
-                              </button>
-                            </span>
-                          )}
                         </span>
                       </td>
 

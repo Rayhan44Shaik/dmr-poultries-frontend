@@ -1004,8 +1004,6 @@ export default {
   'ops.mortality.loading': 'పూర్తయిన ట్రిప్పులు లోడ్ అవుతున్నాయి…',
   'ops.mortality.updating': 'నవీకరిస్తోంది…',
   'ops.mortality.aria.expand': 'ట్రిప్‌ను విస్తరించండి',
-  'ops.mortality.aria.previous_trip': 'మునుపటి ట్రిప్',
-  'ops.mortality.aria.next_trip': 'తదుపరి ట్రిప్',
   'ops.mortality.aria.collapse': 'ట్రిప్‌ను కుదించండి',
 
   // Rate Entry list
