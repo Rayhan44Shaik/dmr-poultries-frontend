@@ -10,6 +10,7 @@ type NotificationFn = (msg: string, type?: "success" | "error" | "info") => void
 
 export function useFuelExpenses(showNotification?: NotificationFn) {
   const [expenses, setExpenses] = useState<FuelExpense[]>([]);
+  const [deletedMap, setDeletedMap] = useState<Map<string, FuelExpense>>(new Map());
   const [meta, setMeta] = useState<FuelListMeta>({ total: 0, page: 1, limit: 1000, totalPages: 1 });
   const [summary, setSummary] = useState<FuelListSummary>({
     totalLitres: 0,
@@ -31,13 +32,23 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
     setLoading(true);
     setError(null);
     try {
-      // Fetch the full register for snappy client-side filtering, sorting, tab counts, and pagination
       const result = await fuelExpenseService.list({
         page: 1,
         limit: 2000,
       });
       if (requestSeqRef.current !== seq) return;
-      setExpenses(result.data);
+      
+      // Merge active result data with locally tracked deleted records
+      setExpenses(() => {
+        const activeIds = new Set(result.data.map((r) => r.id));
+        const combined = [...result.data];
+        for (const [delId, delItem] of deletedMap.entries()) {
+          if (!activeIds.has(delId)) {
+            combined.push(delItem);
+          }
+        }
+        return combined;
+      });
       setMeta(result.meta);
       setSummary(result.summary);
     } catch (err) {
@@ -50,7 +61,7 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
         setLoading(false);
       }
     }
-  }, [showNotification]);
+  }, [showNotification, deletedMap]);
 
   useEffect(() => {
     void refresh();
@@ -89,9 +100,21 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
   const deleteExpense = async (id: string) => {
     setIsSaving(true);
     try {
+      const target = expenses.find((e) => e.id === id);
       await fuelExpenseService.remove(id);
+      if (target) {
+        const deletedRecord: FuelExpense = {
+          ...target,
+          status: "Deleted",
+          deleted: true,
+          deletedAt: new Date().toISOString(),
+        };
+        setDeletedMap((prev) => new Map(prev).set(id, deletedRecord));
+        setExpenses((prev) =>
+          prev.map((e) => (e.id === id ? deletedRecord : e))
+        );
+      }
       showNotification?.("Fuel bill deleted successfully!", "success");
-      await refresh();
       return true;
     } catch (err) {
       showNotification?.(err instanceof Error ? err.message : "Failed to delete fuel bill.", "error");
@@ -116,21 +139,6 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
     }
   };
 
-  const rejectExpense = async (id: string, reason: string) => {
-    setIsSaving(true);
-    try {
-      await fuelExpenseService.reject(id, reason);
-      showNotification?.("Fuel bill rejected.", "success");
-      await refresh();
-      return true;
-    } catch (err) {
-      showNotification?.(err instanceof Error ? err.message : "Failed to reject fuel bill.", "error");
-      return false;
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   return {
     expenses,
     filteredData: expenses,
@@ -144,6 +152,5 @@ export function useFuelExpenses(showNotification?: NotificationFn) {
     updateExpense,
     deleteExpense,
     approveExpense,
-    rejectExpense,
   };
 }

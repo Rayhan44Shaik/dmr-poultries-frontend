@@ -132,12 +132,13 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     });
   }, [deduplicatedExpenses, fromDate, toDate, vehicle, driver, sourceType, search]);
 
-  // ── Live Tab Counts (All, Pending, Approved) ──
+  // ── Live Tab Counts (All, Pending, Approved, Deleted) ──
   const tabCounts = useMemo(() => {
     return {
-      all: baseFilteredBills.length,
-      pending: baseFilteredBills.filter((b) => b.sourceType !== "TRIP" && !b.tripNo && b.status === "Pending").length,
-      approved: baseFilteredBills.filter((b) => b.status === "Approved" || b.sourceType === "TRIP" || !!b.tripNo).length,
+      all: baseFilteredBills.filter((b) => !b.deleted && b.status !== "Deleted").length,
+      pending: baseFilteredBills.filter((b) => !b.deleted && b.sourceType !== "TRIP" && !b.tripNo && b.status === "Pending").length,
+      approved: baseFilteredBills.filter((b) => !b.deleted && (b.status === "Approved" || b.sourceType === "TRIP" || !!b.tripNo)).length,
+      deleted: baseFilteredBills.filter((b) => b.deleted === true || b.status === "Deleted").length,
     };
   }, [baseFilteredBills]);
 

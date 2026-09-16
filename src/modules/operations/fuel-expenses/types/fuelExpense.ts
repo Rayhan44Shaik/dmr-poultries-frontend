@@ -1,5 +1,5 @@
 export type FuelSourceType = "TRIP" | "MANUAL";
-export type FuelUiStatus = "Pending" | "Approved" | "Rejected";
+export type FuelUiStatus = "Pending" | "Approved" | "Rejected" | "Deleted";
 
 export type FuelSortKey =
   | "billNo"
@@ -40,6 +40,9 @@ export interface FuelExpense {
   gpsAccuracy?: number | null;
   gpsCapturedAt?: string | null;
   status: FuelUiStatus;
+  deleted?: boolean;
+  deletedAt?: string;
+  deletedReason?: string;
   createdDate: string;
   createdBy: string;
   approvedDate?: string;
@@ -54,4 +57,3 @@ export type FuelExpenseDraft = Omit<
   FuelExpense,
   "id" | "billNo" | "createdDate" | "createdBy" | "status" | "sourceType"
 >;
-

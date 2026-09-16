@@ -1,6 +1,6 @@
 import type { FuelExpense, FuelSortKey, FuelUiStatus } from "../types/fuelExpense";
 
-export type FuelQuickTab = "ALL" | "PENDING" | "APPROVED";
+export type FuelQuickTab = "ALL" | "PENDING" | "APPROVED" | "DELETED";
 
 export interface FuelClientFilters {
   fromDate?: string;
@@ -76,8 +76,9 @@ export function filterFuelExpenses(
   const to = dateOnly(toDate);
 
   return bills.filter((bill) => {
+    const isDeleted = bill.deleted === true || bill.status === "Deleted";
     const isTrip = bill.sourceType === "TRIP" || !!bill.tripNo;
-    const effectiveStatus: FuelUiStatus = isTrip ? "Approved" : bill.status;
+    const effectiveStatus: FuelUiStatus = isDeleted ? "Deleted" : isTrip ? "Approved" : bill.status;
 
     const billDate = dateOnly(bill.date);
     if ((from && (!billDate || billDate < from)) || (to && (!billDate || billDate > to))) return false;
@@ -88,9 +89,15 @@ export function filterFuelExpenses(
     if (driverId != null && Number(bill.driverId) !== driverId) return false;
     if (driverName && driverName !== "All Drivers" && bill.driverName !== driverName) return false;
 
-    // Quick tab filtering: ONLY manual bills can ever be pending!
-    if (quickTab === "PENDING" && (isTrip || effectiveStatus !== "Pending")) return false;
-    if (quickTab === "APPROVED" && effectiveStatus !== "Approved") return false;
+    // Quick tab filtering:
+    if (quickTab === "DELETED") {
+      if (!isDeleted) return false;
+    } else {
+      // Active tabs (ALL, PENDING, APPROVED) exclude deleted rows
+      if (isDeleted) return false;
+      if (quickTab === "PENDING" && (isTrip || effectiveStatus !== "Pending")) return false;
+      if (quickTab === "APPROVED" && effectiveStatus !== "Approved") return false;
+    }
 
     // Dropdown filters (if explicit)
     if (sourceType && sourceType !== "All" && (isTrip ? "TRIP" : "MANUAL") !== sourceType) return false;

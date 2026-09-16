@@ -16,6 +16,7 @@ import {
   Pencil,
   Trash2,
   CheckCircle,
+  AlertCircle,
   Fuel,
   Route,
   Sparkles,
@@ -51,6 +52,7 @@ interface Props {
     all: number;
     pending: number;
     approved: number;
+    deleted: number;
   };
 }
 
@@ -83,7 +85,7 @@ export function FuelBillTable({
   onSortChange,
   activeTab = "ALL",
   onTabChange,
-  tabCounts = { all: 0, pending: 0, approved: 0 },
+  tabCounts = { all: 0, pending: 0, approved: 0, deleted: 0 },
 }: Props) {
   const { t, language } = useI18n();
   const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
@@ -141,27 +143,25 @@ export function FuelBillTable({
       ? tabCounts.all
       : activeTab === "PENDING"
       ? tabCounts.pending
-      : tabCounts.approved;
+      : activeTab === "APPROVED"
+      ? tabCounts.approved
+      : tabCounts.deleted;
 
   const tabs = [
     { id: "ALL" as const, label: "All" },
     { id: "PENDING" as const, label: "Pending" },
     { id: "APPROVED" as const, label: "Approved" },
+    { id: "DELETED" as const, label: "Deleted" },
   ];
 
+  const isSelectedDeleted = selectedBill?.deleted === true || selectedBill?.status === "Deleted";
+  const isSelectedPending = selectedBill && !isSelectedDeleted && selectedBill.sourceType !== "TRIP" && !selectedBill.tripNo && selectedBill.status === "Pending";
+
   const canDeleteSelected =
-    selectedBill &&
-    selectedBill.sourceType !== "TRIP" &&
-    !selectedBill.tripNo &&
-    selectedBill.status === "Pending" &&
-    (canEditDelete ? canEditDelete(selectedBill) : true);
+    isSelectedPending && (canEditDelete ? canEditDelete(selectedBill) : true);
 
   const canEditSelected =
-    selectedBill &&
-    selectedBill.sourceType !== "TRIP" &&
-    !selectedBill.tripNo &&
-    selectedBill.status === "Pending" &&
-    (canEditDelete ? canEditDelete(selectedBill) : true);
+    isSelectedPending && (canEditDelete ? canEditDelete(selectedBill) : true);
 
   return (
     <div className="w-full">
@@ -182,7 +182,7 @@ export function FuelBillTable({
             {selectedTabCount}
           </span>
 
-          {/* Segmented status toggle — labels only with respective colors */}
+          {/* Segmented status toggle: All, Pending, Approved, Deleted */}
           {onTabChange && (
             <div className="flex items-center p-0.5 ml-2 border border-slate-200/80 rounded-lg overflow-hidden bg-slate-50 shadow-sm">
               {tabs.map((tab) => {
@@ -192,7 +192,9 @@ export function FuelBillTable({
                     ? "bg-slate-200/80 text-slate-800 shadow-sm font-bold"
                     : tab.id === "PENDING"
                     ? "bg-orange-50/80 text-orange-500 shadow-sm font-bold"
-                    : "bg-emerald-50/80 text-emerald-600 shadow-sm font-bold";
+                    : tab.id === "APPROVED"
+                    ? "bg-emerald-50/80 text-emerald-600 shadow-sm font-bold"
+                    : "bg-rose-50/80 text-rose-500 shadow-sm font-bold";
 
                 return (
                   <button
@@ -200,7 +202,7 @@ export function FuelBillTable({
                     type="button"
                     onClick={() => onTabChange(tab.id)}
                     aria-pressed={isActive}
-                    className={`inline-flex items-center px-5 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                    className={`inline-flex items-center px-4 sm:px-5 py-1.5 text-xs font-semibold rounded-md transition-all ${
                       isActive
                         ? activeClass
                         : "bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-200/50"
@@ -214,9 +216,9 @@ export function FuelBillTable({
           )}
         </div>
 
-        {/* Selected Row Actions Bar if a row is selected */}
+        {/* Selected Row Actions Bar at Table Top */}
         {selectedBill && (
-          <div className="flex items-center gap-2 animate-in fade-in duration-150">
+          <div className="flex items-center gap-2 animate-in fade-in duration-150 flex-wrap">
             {onView && (
               <button
                 type="button"
@@ -245,7 +247,7 @@ export function FuelBillTable({
               </button>
             )}
 
-            {selectedBill.sourceType !== "TRIP" && selectedBill.status === "Pending" && onApprove && (
+            {isSelectedPending && onApprove && (
               <button
                 type="button"
                 onClick={() => onApprove(selectedBill)}
@@ -403,6 +405,7 @@ export function FuelBillTable({
             ) : (
               bills.map((bill, index) => {
                 const isSelected = bill.id === selectedId;
+                const isDeleted = bill.deleted === true || bill.status === "Deleted";
                 const serialNo = startIndex + index + 1;
                 const isTrip = bill.sourceType === "TRIP" || !!bill.tripNo;
 
@@ -418,7 +421,9 @@ export function FuelBillTable({
                     onKeyDown={(e) => handleRowKeyDown(e, index)}
                     aria-selected={isSelected}
                     className={`cursor-pointer outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
-                      isSelected
+                      isDeleted
+                        ? "bg-red-50/50 hover:bg-red-50/80 border-l-4 border-l-red-400"
+                        : isSelected
                         ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200"
                         : "hover:bg-slate-50/80"
                     }`}
@@ -435,9 +440,16 @@ export function FuelBillTable({
                     </td>
 
                     {/* Bill No with Source Logo beside it */}
-                    <td className="px-4 py-4 font-bold text-slate-800 text-xs whitespace-nowrap">
+                    <td className={`px-4 py-4 font-bold text-xs whitespace-nowrap ${isDeleted ? "text-slate-400 line-through opacity-70" : "text-slate-800"}`}>
                       <div className="flex items-center gap-2">
-                        {isTrip ? (
+                        {isDeleted ? (
+                          <span
+                            className="inline-flex items-center justify-center h-6 w-6 rounded-lg bg-rose-50 border border-rose-200/80 text-rose-500 shadow-xs shrink-0"
+                            title="Deleted Bill"
+                          >
+                            <AlertCircle size={13} strokeWidth={2.5} />
+                          </span>
+                        ) : isTrip ? (
                           <span
                             className="inline-flex items-center justify-center h-6 w-6 rounded-lg bg-indigo-50 border border-indigo-200/80 text-indigo-600 shadow-xs shrink-0"
                             title={bill.tripNo ? `Trip Diesel (${bill.tripNo})` : "Trip Diesel"}
@@ -452,7 +464,7 @@ export function FuelBillTable({
                             <Sparkles size={13} strokeWidth={2.5} />
                           </span>
                         )}
-                        <span className="font-mono text-slate-800 font-bold">{bill.billNo}</span>
+                        <span className="font-mono font-bold">{bill.billNo}</span>
                       </div>
                     </td>
 
