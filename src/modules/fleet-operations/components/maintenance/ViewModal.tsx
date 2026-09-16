@@ -10,11 +10,15 @@
 
 import React from 'react';
 import {
-  Truck, Wrench, FileText, Paperclip, ChevronDown, CheckCircle2, Clock,
+  Truck, Wrench, Paperclip, ChevronDown, CheckCircle2, Clock,
   XCircle, IndianRupee, Package, X, Pencil, FileDown,
 } from 'lucide-react';
 import { generateMaintenancePdf } from '../../utils/generateMaintenancePdf';
 import AppShellModal from '../../../../ui/AppShellModal';
+import { ScopedI18nProvider } from '../../../../i18n';
+import { ViewLanguageToggle } from '../../../../ui/ViewLanguageToggle';
+import { ActionTooltip } from '../../../../ui/ActionTooltip';
+import { uiPdfButtonClass } from '../../../../shared/ui/uiTokens';
 import { useI18n, translateStatus } from '../../../../i18n';
 import { uiActionIconMotionClass } from '../../../../shared/ui/uiTokens';
 import { formatTripListDay } from '../../../operations/vehicle-trips/utils/formatTripListDay';
@@ -36,8 +40,8 @@ interface ViewModalProps {
   onEdit?: (record: MaintenanceEvent) => void;
 }
 
-const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose, canEdit = false, onEdit, vehicleHistory = [] }) => {
-  const { t, language } = useI18n();
+const ViewModalInner: React.FC<ViewModalProps> = ({ record, vehicles, onClose, canEdit = false, onEdit, vehicleHistory = [] }) => {
+  const { t, language, toggleLanguage } = useI18n();
   // Documents section starts OPEN; the chevron hides/shows the gallery.
   const [docsOpen, setDocsOpen] = React.useState(true);
   // Left panel filter — narrow the vehicle's approved list by type.
@@ -86,7 +90,7 @@ const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose, canEdi
     if (pdfBusy) return;
     setPdfBusy(true);
     try {
-      await generateMaintenancePdf(active, vehicleHistory, vehicleNumber, language);
+      await generateMaintenancePdf(active, vehicleHistory, vehicleNumber, language, t);
     } finally {
       setPdfBusy(false);
     }
@@ -140,6 +144,15 @@ const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose, canEdi
               {statusPill.icon}
               {statusLabel}
             </span>
+            {/* Popup-scoped language — same toggle as the trip view */}
+            <ViewLanguageToggle
+              language={language}
+              onToggle={toggleLanguage}
+              tone="emerald"
+              labelMode="target"
+              ariaLabel={t('fleet.maintenance_view.popup_language_toggle')}
+              tooltip={<ActionTooltip label={t('fleet.maintenance_view.popup_language_tooltip')} side="bottom" />}
+            />
             {/* Trip-view close: white circle, red on hover, lifts on hover */}
             <button
               type="button"
@@ -344,10 +357,11 @@ const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose, canEdi
             type="button"
             onClick={handlePdf}
             disabled={pdfBusy}
-            className="group relative inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-6 py-2.5 text-xs font-semibold text-slate-700 transition-all hover:bg-slate-200 active:scale-95 disabled:opacity-60"
+            className={`group relative ${uiPdfButtonClass} disabled:opacity-60`}
+            aria-label="PDF"
           >
             {pdfBusy ? (
-              <span className="inline-flex h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" aria-hidden="true" />
+              <span className="inline-flex h-4 w-4 animate-spin rounded-full border-2 border-rose-200 border-t-rose-500" aria-hidden="true" />
             ) : (
               <span className={`inline-flex ${uiActionIconMotionClass.pdf}`}><FileDown size={15} /></span>
             )}
@@ -378,4 +392,13 @@ const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose, canEdi
   );
 };
 
-export default React.memo(ViewModal);
+function ScopedViewModal(props: ViewModalProps) {
+  const { language } = useI18n();
+  return (
+    <ScopedI18nProvider initialLanguage={language}>
+      <ViewModalInner {...props} />
+    </ScopedI18nProvider>
+  );
+}
+
+export default React.memo(ScopedViewModal);

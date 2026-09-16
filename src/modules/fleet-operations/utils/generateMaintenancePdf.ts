@@ -1,198 +1,202 @@
 // src/modules/fleet-operations/utils/generateMaintenancePdf.ts
 //
 // DMR POULTRIES — Maintenance Record PDF (A4 portrait).
-// Neat table-form document: branded header, full record details, the parts
-// bill, the total, and the vehicle's COMPLETE maintenance history till now.
+// Rendered from a styled DOM sheet and captured with html2canvas, so Telugu
+// shapes perfectly (jsPDF core fonts cannot render Telugu script). The layout
+// mirrors the view: branded header, the record's details in an EQUAL
+// two-pair-per-column grid, the parts bill, the total band and the vehicle's
+// complete maintenance history.
 
 import jsPDF from "jspdf";
-import autoTable from "jspdf-autotable";
-import henImage from "../../../assets/dmr-hen.jpg";
-import {
-  drawPreparedDmrPoultryHeader,
-  prepareDmrPoultryHeaderAssets,
-  type DmrPoultryHeaderAssets,
-} from "../../../utils/drawDmrPoultryHeader";
+import html2canvas from "html2canvas";
 import { formatTripListDay } from "../../operations/vehicle-trips/utils/formatTripListDay";
 import type { MaintenanceEvent } from "../types";
 
-type RGB = [number, number, number];
-const NAVY: RGB = [15, 35, 79];
-const EMERALD: RGB = [5, 150, 105];
-const MUTED: RGB = [90, 100, 115];
-const GRID_LINE: RGB = [203, 213, 225];
-const TEXT_DARK: RGB = [30, 41, 59];
+type Translate = (key: string, params?: Record<string, string | number>) => string;
 
-const money = (value: number) =>
-  `INR ${Number(value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+const inr = (value: number) =>
+  `Rs. ${Number(value || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 
-const statusLabel = (row: MaintenanceEvent) => {
-  if (row.deletedAt) return "Deleted";
-  if (row.paymentStatus === "approved") return "Approved";
-  return "Pending";
+const statusLabel = (row: MaintenanceEvent, t: Translate) => {
+  if (row.deletedAt) return t("status.deleted");
+  if (row.paymentStatus === "approved") return t("status.approved");
+  return t("status.pending");
 };
+
+const esc = (v: string) =>
+  String(v ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+const BRAND_GREEN = "#0d7a3f";
+const INK = "#0f172a";
+const MUTED = "#64748b";
+const LINE = "#e2e8f0";
+
+/** Builds the printable sheet. All sizes are px @ 794 width (= A4 @96dpi). */
+function buildSheet(
+  record: MaintenanceEvent,
+  vehicleHistory: MaintenanceEvent[],
+  vehicleNumber: string,
+  language: "en" | "te",
+  t: Translate
+): HTMLElement {
+  const sheet = document.createElement("div");
+  sheet.style.cssText = `position:fixed;left:-10000px;top:0;width:794px;background:#ffffff;color:${INK};font-family:system-ui,-apple-system,'Segoe UI',Roboto,'Noto Sans Telugu',sans-serif;font-size:13px;line-height:1.45;`;
+
+  const day = (row: MaintenanceEvent) => formatTripListDay(row.date || row.createdAt, language);
+  const status = statusLabel(record, t);
+  const types = (record.maintenanceType || "").split(",").map((s) => s.trim()).filter(Boolean);
+  const nextByType = record.nextServiceByType || {};
+  const parts = Array.isArray(record.parts) ? record.parts : [];
+
+  // ── Details — EQUAL two-pair columns (label | value | label | value) ──
+  const detailPairs: [string, string][] = [
+    [t("fleet.maintenance_view.bill_number"), record.billNumber || "—"],
+    [t("common.date"), day(record)],
+    [t("common.vehicle"), vehicleNumber],
+    [t("fleet.maintenance_form.current_km"), `${Number(record.currentKM || 0).toLocaleString("en-IN")} KM`],
+    [t("common.driver"), record.driverName || "—"],
+    [t("fleet.maintenance_form.service_type"), record.serviceType || "—"],
+    [t("operations.maintenance_garage"), record.garage || "—"],
+    [t("fleet.maintenance_form.mechanic"), record.mechanic || "—"],
+    [t("operations.maintenance_type"), types.length ? types.join(", ") : "—"],
+    [t("fleet.maintenance_form.next_service_km"),
+      types.length
+        ? types.map((tp) => `${tp}: ${nextByType[tp] != null ? `${Number(nextByType[tp]).toLocaleString("en-IN")} KM` : "—"}`).join(" · ")
+        : record.nextServiceKM ? `${Number(record.nextServiceKM).toLocaleString("en-IN")} KM` : "—"],
+    [t("common.status"), status],
+    [t("common.remarks"), record.remarks || "—"],
+  ];
+  const cells = detailPairs
+    .map(
+      ([label, value]) => `
+        <div style="border-right:1px solid ${LINE};border-bottom:1px solid ${LINE};padding:7px 10px;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;color:${MUTED};background:#f8fafc;">${esc(label)}</div>
+        <div style="border-right:1px solid ${LINE};border-bottom:1px solid ${LINE};padding:7px 10px;font-size:12px;font-weight:700;color:${INK};word-break:break-word;">${esc(value)}</div>`
+    )
+    .join("");
+
+  const partsRows = parts
+    .map(
+      (p, i) => `
+      <tr style="background:${i % 2 ? "#fbfdfc" : "#ffffff"};">
+        <td style="padding:6px 10px;border-bottom:1px solid ${LINE};font-weight:600;">${esc(p.name || "-")}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid ${LINE};color:${MUTED};">${esc(p.specification || "-")}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid ${LINE};text-align:center;font-weight:700;">${p.quantity ?? 0}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid ${LINE};text-align:right;">${inr(Number(p.rate || 0))}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid ${LINE};text-align:right;font-weight:700;">${inr(Number(p.amount || 0))}</td>
+      </tr>`
+    )
+    .join("");
+
+  const historyRows = vehicleHistory
+    .map((row, i) => {
+      const st = statusLabel(row, t);
+      const tone = row.deletedAt ? "#b91c1c" : row.paymentStatus === "approved" ? "#047857" : "#b45309";
+      const typeList = (row.maintenanceType || "").split(",").filter((s) => s.trim());
+      return `
+      <tr style="background:${i % 2 ? "#fbfdfc" : "#ffffff"};">
+        <td style="padding:6px 10px;border-bottom:1px solid ${LINE};white-space:nowrap;font-weight:600;">${esc(day(row))}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid ${LINE};font-weight:700;color:${BRAND_GREEN};">${esc(row.billNumber || "-")}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid ${LINE};">${esc(typeList[0] || "-")}${typeList.length > 1 ? ` +${typeList.length - 1}` : ""}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid ${LINE};color:${MUTED};">${esc(row.garage || "-")}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid ${LINE};color:${MUTED};">${esc(row.mechanic || "-")}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid ${LINE};text-align:right;font-weight:600;">${Number(row.currentKM || 0).toLocaleString("en-IN")}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid ${LINE};text-align:right;font-weight:700;">${inr(Number(row.totalCost || 0))}</td>
+        <td style="padding:6px 10px;border-bottom:1px solid ${LINE};text-align:center;color:${tone};font-weight:700;">${esc(st)}</td>
+      </tr>`;
+    })
+    .join("");
+
+  const th = (label: string, align = "left") =>
+    `<th style="padding:7px 10px;text-align:${align};background:#f1f5f9;color:#334155;font-size:9.5px;font-weight:700;letter-spacing:.05em;text-transform:uppercase;border-bottom:2px solid ${LINE};">${esc(label)}</th>`;
+
+  sheet.innerHTML = `
+    <div style="background:${BRAND_GREEN};padding:18px 24px;color:#ffffff;">
+      <div style="display:flex;justify-content:space-between;align-items:baseline;">
+        <div style="font-size:21px;font-weight:800;letter-spacing:.02em;">DMR POULTRIES</div>
+        <div style="font-size:11px;font-weight:600;color:#d1fae5;">${esc(t("fleet.maintenance_view.original"))}</div>
+      </div>
+      <div style="margin-top:2px;font-size:12px;color:#d1fae5;font-weight:600;">${esc(t("fleet.maintenance_view.report_title"))}</div>
+    </div>
+
+    <div style="display:flex;justify-content:space-between;align-items:center;padding:14px 24px 10px;">
+      <div style="font-size:16px;font-weight:800;color:${BRAND_GREEN};">${esc(vehicleNumber)}</div>
+      <div style="font-size:11px;color:${MUTED};font-weight:600;">${esc(record.billNumber || "-")} · ${esc(status)}</div>
+    </div>
+
+    <div style="margin:0 24px;display:grid;grid-template-columns:110px 1fr 110px 1fr;border:1px solid ${LINE};border-radius:8px;overflow:hidden;">
+      ${cells}
+    </div>
+
+    ${
+      parts.length
+        ? `<div style="margin:16px 24px 0;font-size:12px;font-weight:800;color:${INK};">${esc(t("fleet.maintenance_form.parts_title"))}</div>
+    <table style="margin:6px 24px 0;width:calc(100% - 48px);border-collapse:collapse;border:1px solid ${LINE};">
+      <thead><tr>${th(t("fleet.parts.item_name"))}${th(t("fleet.parts.specification"))}${th(t("fleet.parts.qty"), "center")}${th(t("fleet.parts.rate"), "right")}${th(t("fleet.parts.amount"), "right")}</tr></thead>
+      <tbody>${partsRows}</tbody>
+    </table>`
+        : ""
+    }
+
+    <div style="margin:16px 24px 0;display:flex;justify-content:space-between;align-items:center;background:linear-gradient(90deg,#ecfdf5,#ffffff 55%,#ecfdf5);border:1px solid #a7f3d0;border-radius:8px;padding:10px 14px;">
+      <span style="font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:#047857;">${esc(t("fleet.parts.total_cost"))}</span>
+      <span style="font-size:16px;font-weight:800;color:#047857;">${inr(Number(record.totalCost || 0))}</span>
+    </div>
+
+    ${
+      vehicleHistory.length
+        ? `<div style="margin:18px 24px 0;font-size:12px;font-weight:800;color:${INK};">${esc(t("fleet.maintenance_view.all_records"))} — ${esc(vehicleNumber)} (${vehicleHistory.length})</div>
+    <table style="margin:6px 24px 0;width:calc(100% - 48px);border-collapse:collapse;border:1px solid ${LINE};">
+      <thead><tr>${th(t("common.date"))}${th(t("fleet.maintenance_view.bill_number"))}${th(t("operations.maintenance_type"))}${th(t("operations.maintenance_garage"))}${th(t("fleet.maintenance_form.mechanic"))}${th(t("fleet.maintenance_form.current_km"), "right")}${th(t("fleet.parts.total_cost"), "right")}${th(t("common.status"), "center")}</tr></thead>
+      <tbody>${historyRows}</tbody>
+    </table>`
+        : ""
+    }
+
+    <div style="margin:18px 24px 0;padding:10px 0 16px;border-top:1px solid ${LINE};font-size:9.5px;color:#94a3b8;text-align:center;">
+      ${esc(t("fleet.maintenance_view.pdf_footer"))}
+    </div>`;
+
+  document.body.appendChild(sheet);
+  return sheet;
+}
 
 export async function generateMaintenancePdf(
   record: MaintenanceEvent,
   vehicleHistory: MaintenanceEvent[],
   vehicleNumber: string,
-  language: "en" | "te" = "en"
+  language: "en" | "te" = "en",
+  t: Translate
 ): Promise<void> {
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const margin = 12;
-  const assets: DmrPoultryHeaderAssets = await prepareDmrPoultryHeaderAssets({ henUrl: henImage });
+  const sheet = buildSheet(record, vehicleHistory, vehicleNumber, language, t);
+  try {
+    // Fonts/images inside the sheet need a beat to lay out before capture.
+    await new Promise((resolve) => requestAnimationFrame(() => resolve(null)));
+    const canvas = await html2canvas(sheet, { scale: 2, backgroundColor: "#ffffff", logging: false, useCORS: true });
+    const pdf = new jsPDF({ unit: "mm", format: "a4", orientation: "portrait" });
+    const pageW = pdf.internal.pageSize.getWidth();
+    const pageH = pdf.internal.pageSize.getHeight();
 
-  const lastTableY = (fallback: number): number => {
-    const table = (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable;
-    return table?.finalY ?? fallback;
-  };
-
-  let y = drawPreparedDmrPoultryHeader(
-    doc,
-    {
-      margin,
-      top: 9,
-      businessName: "DMR POULTRIES",
-    },
-    assets
-  );
-
-  // ── Title band ──
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(13);
-  doc.setTextColor(...NAVY);
-  doc.text(`Maintenance Record — ${vehicleNumber}`, margin, y + 8);
-  doc.setFontSize(9);
-  doc.setTextColor(...MUTED);
-  doc.setFont("helvetica", "normal");
-  doc.text(
-    `${record.billNumber || "-"} · ${statusLabel(record)}`,
-    doc.internal.pageSize.getWidth() - margin,
-    y + 8,
-    { align: "right" }
-  );
-  y += 12;
-
-  // ── Record details (label/value grid) ──
-  const typeList = (record.maintenanceType || "").split(",").map((s) => s.trim()).filter(Boolean);
-  const nextByType = record.nextServiceByType || {};
-  const details: [string, string][] = [
-    ["Bill Number", record.billNumber || "-"],
-    ["Date", formatTripListDay(record.date || record.createdAt, language)],
-    ["Vehicle", vehicleNumber],
-    ["Current KM", `${Number(record.currentKM || 0).toLocaleString("en-IN")} km`],
-    ["Driver", record.driverName || "-"],
-    ["Service Type", record.serviceType || "-"],
-    ["Garage", record.garage || "-"],
-    ["Mechanic", record.mechanic || "-"],
-    ["Maintenance Types", typeList.length ? typeList.join(", ") : "-"],
-    ["Next Service KM",
-      typeList.length
-        ? typeList.map((tp) => `${tp}: ${nextByType[tp] != null ? Number(nextByType[tp]).toLocaleString("en-IN") : "-"} km`).join("  |  ")
-        : record.nextServiceKM
-          ? `${Number(record.nextServiceKM).toLocaleString("en-IN")} km`
-          : "-"],
-    ["Status", statusLabel(record)],
-    ["Remarks", record.remarks || "-"],
-  ];
-  autoTable(doc, {
-    body: details,
-    startY: y,
-    theme: "grid",
-    styles: { fontSize: 8.5, cellPadding: 2.2, textColor: TEXT_DARK, lineColor: GRID_LINE, lineWidth: 0.15 },
-    columnStyles: {
-      0: { cellWidth: 38, fontStyle: "bold", textColor: MUTED },
-      1: { cellWidth: "auto" },
-    },
-    margin: { left: margin, right: margin },
-    didParseCell: (data) => {
-      if (data.section === "body" && data.column.index === 1) {
-        data.cell.styles.fontStyle = "bold";
-      }
-    },
-  });
-  y = lastTableY(y) + 5;
-
-  // ── Parts bill ──
-  const parts = Array.isArray(record.parts) ? record.parts : [];
-  if (parts.length > 0) {
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(...NAVY);
-    doc.text("Parts / Spare Parts", margin, y + 4);
-    y += 6;
-    autoTable(doc, {
-      head: [["Item", "Specification", "Qty", "Rate", "Amount"]],
-      body: parts.map((p) => [
-        p.name || "-",
-        p.specification || "-",
-        String(p.quantity ?? 0),
-        money(Number(p.rate || 0)).replace("INR ", "Rs. "),
-        money(Number(p.amount || 0)).replace("INR ", "Rs. "),
-      ]),
-      startY: y,
-      theme: "grid",
-      headStyles: { fillColor: NAVY, textColor: [255, 255, 255], fontSize: 8.5 },
-      styles: { fontSize: 8.5, cellPadding: 2.2, textColor: TEXT_DARK, lineColor: GRID_LINE, lineWidth: 0.15 },
-      columnStyles: {
-        2: { halign: "center", cellWidth: 14 },
-        3: { halign: "right", cellWidth: 28 },
-        4: { halign: "right", cellWidth: 30 },
-      },
-      margin: { left: margin, right: margin },
-    });
-    y = lastTableY(y) + 5;
-  }
-
-  // ── Total band ──
-  doc.setFillColor(...EMERALD);
-  doc.roundedRect(margin, y, doc.internal.pageSize.getWidth() - margin * 2, 10, 1.5, 1.5, "F");
-  doc.setFont("helvetica", "bold");
-  doc.setFontSize(10);
-  doc.setTextColor(255, 255, 255);
-  doc.text("TOTAL COST", margin + 4, y + 6.6);
-  doc.text(money(Number(record.totalCost || 0)), doc.internal.pageSize.getWidth() - margin - 4, y + 6.6, { align: "right" });
-  y += 14;
-
-  // ── All maintenance records of this vehicle ──
-  if (vehicleHistory.length > 0) {
-    if (y > doc.internal.pageSize.getHeight() - 60) {
-      doc.addPage();
-      y = drawPreparedDmrPoultryHeader(doc, { margin, top: 9, businessName: "DMR POULTRIES" }, assets);
+    // Slice the tall capture into A4 pages.
+    const pxPerMm = canvas.width / pageW;
+    const pageHpx = Math.floor(pageH * pxPerMm);
+    const pages = Math.max(1, Math.ceil(canvas.height / pageHpx));
+    for (let i = 0; i < pages; i++) {
+      const sliceH = Math.min(pageHpx, canvas.height - i * pageHpx);
+      const slice = document.createElement("canvas");
+      slice.width = canvas.width;
+      slice.height = sliceH;
+      const ctx = slice.getContext("2d");
+      if (!ctx) break;
+      ctx.fillStyle = "#ffffff";
+      ctx.fillRect(0, 0, slice.width, slice.height);
+      ctx.drawImage(canvas, 0, i * pageHpx, canvas.width, sliceH, 0, 0, canvas.width, sliceH);
+      if (i > 0) pdf.addPage();
+      pdf.addImage(slice.toDataURL("image/jpeg", 0.92), "JPEG", 0, 0, pageW, sliceH / pxPerMm, undefined, "FAST");
     }
-    doc.setFont("helvetica", "bold");
-    doc.setFontSize(10);
-    doc.setTextColor(...NAVY);
-    doc.text(`All Maintenance Records — ${vehicleNumber} (${vehicleHistory.length})`, margin, y + 4);
-    y += 6;
-    autoTable(doc, {
-      head: [["Date", "Bill No", "Types", "Garage", "Mechanic", "KM", "Cost", "Status"]],
-      body: vehicleHistory.map((row) => [
-        formatTripListDay(row.date || row.createdAt, language),
-        row.billNumber || "-",
-        (row.maintenanceType || "-").split(",")[0].trim() +
-          ((row.maintenanceType || "").split(",").filter((s) => s.trim()).length > 1
-            ? ` +${(row.maintenanceType || "").split(",").filter((s) => s.trim()).length - 1}`
-            : ""),
-        row.garage || "-",
-        row.mechanic || "-",
-        Number(row.currentKM || 0).toLocaleString("en-IN"),
-        money(Number(row.totalCost || 0)).replace("INR ", "Rs. "),
-        statusLabel(row),
-      ]),
-      startY: y,
-      theme: "grid",
-      headStyles: { fillColor: NAVY, textColor: [255, 255, 255], fontSize: 8 },
-      styles: { fontSize: 7.6, cellPadding: 1.8, textColor: TEXT_DARK, lineColor: GRID_LINE, lineWidth: 0.15 },
-      columnStyles: {
-        5: { halign: "right", cellWidth: 18 },
-        6: { halign: "right", cellWidth: 24 },
-        7: { halign: "center", cellWidth: 18 },
-      },
-      margin: { left: margin, right: margin },
-    });
+    pdf.save(`maintenance-${vehicleNumber}-${record.billNumber || record.id || "record"}.pdf`);
+  } finally {
+    sheet.remove();
   }
-
-  doc.save(`maintenance-${vehicleNumber}-${record.billNumber || record.id || "record"}.pdf`);
 }
 
 export default generateMaintenancePdf;
