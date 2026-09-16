@@ -151,16 +151,16 @@ export interface SpanFleetParticipant {
 }
 
 /**
- * One register member that ran NO trip in the selected span — shown when a
- * tile is selected ("select the tile again and it goes"). Register-Inactive
- * (out of service) members are included, flagged so the UI can badge them
- * differently from actives that were merely idle in the window.
+ * One ACTIVE register member that ran NO trip in the selected span — shown
+ * when a tile is selected ("select the tile again and it goes"). Register-
+ * Inactive (out-of-service) members are excluded on purpose: they are not
+ * part of the tile's "X / Y" denominator either, so a tile reading 29 / 29
+ * can never surprise the reader with an idle row (worked and idle always
+ * add up to exactly the active register size).
  */
 export interface SpanIdleItem {
   name: string;
   detail?: string;
-  /** Master register says Inactive (out of service), not just idle this span. */
-  registerInactive: boolean;
 }
 
 /**
@@ -330,20 +330,23 @@ function buildSpanFleet(
     for (const name of trip.loaders) bumpParticipant(loadersByName, name);
   }
 
-  // Register members that ran NO trip in the span — the "inactive in this
-  // range" line shown when a tile is selected. Register-Inactive members are
-  // included but flagged, so the UI can badge them differently.
+  // ACTIVE register members that ran NO trip in the span — the "did not run
+  // in this range" line shown when a tile is selected. Register-Inactive
+  // (out-of-service) members are excluded entirely: they sit outside the
+  // tile's denominator, so worked + idle always equals the active total.
   const vehiclesIdle: SpanIdleItem[] = vehicles.flatMap((row) => {
+    if (row.status !== "Active") return [];
     const name = String(row.vehicleNumber ?? row.number ?? "").trim();
     if (!name || vehiclesByName.has(name)) return [];
     const detail = String(row.vehicleType ?? "").trim();
-    return [{ name, detail: detail || undefined, registerInactive: row.status !== "Active" }];
+    return [{ name, detail: detail || undefined }];
   });
   const crewIdle = (department: string, participants: Map<string, ParticipantBucket>): SpanIdleItem[] =>
     crewDeptRows(employees, department).flatMap((row) => {
+      if (row.status !== "Active") return [];
       const name = String(row.employeeName ?? "").trim();
       if (!name || participants.has(name)) return [];
-      return [{ name, detail: crewJoinedDetail(row, department), registerInactive: row.status !== "Active" }];
+      return [{ name, detail: crewJoinedDetail(row, department) }];
     });
 
   return {

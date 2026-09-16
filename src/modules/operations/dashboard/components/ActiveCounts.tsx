@@ -15,9 +15,11 @@ import type {
  *  - CLICK any tile → that register's "did not run in this range" members
  *    appear below the tiles as a one-by-one HORIZONTAL scroll line;
  *    selecting the tile again closes it, selecting another register
- *    switches it. Register-Inactive (out of service) members carry an
- *    "Inactive" badge. The worked/active roster lists themselves are
- *    deliberately never rendered.
+ *    switches it. Only ACTIVE register members can appear there — a tile
+ *    reading "29 / 29" therefore shows "Everyone ran trips in this range"
+ *    (worked + idle always equals the tile's active denominator), and
+ *    out-of-service members never surface. The worked/active roster lists
+ *    themselves are deliberately never rendered.
  */
 interface ActiveCountsProps {
   rosters: DashboardSpanFleet;
@@ -134,14 +136,7 @@ export default function ActiveCounts({ rosters }: ActiveCountsProps) {
                   key={`idle-${selected}-${item.name}`}
                   className="shrink-0 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-[10px] shadow-sm"
                 >
-                  <span className="flex items-center gap-1.5">
-                    <span className="truncate font-semibold text-slate-700">{item.name}</span>
-                    {item.registerInactive && (
-                      <span className="shrink-0 rounded-full bg-rose-50 px-1.5 py-px text-[9px] font-black text-rose-600 ring-1 ring-inset ring-rose-100">
-                        {t("common.inactive")}
-                      </span>
-                    )}
-                  </span>
+                  <span className="truncate font-semibold text-slate-700">{item.name}</span>
                   {item.detail ? (
                     <span className="block truncate tabular-nums text-slate-400">{item.detail}</span>
                   ) : null}
