@@ -1,10 +1,9 @@
 import { memo, useState, useMemo, useEffect, useRef } from 'react';
 import {
-  Eye, Trash2, CheckCircle2, Truck,
+  Trash2, CheckCircle2,
   Search, Paperclip, Hash, Calendar, Wrench, Store, User, Gauge, Clock, Wallet, History, X, RotateCcw
 } from 'lucide-react';
 import { useI18n, translateStatus } from '../../../../i18n';
-import { safeDate } from '../../utils/maintenanceHelpers';
 import MasterDropdown from '../../../masters/components/MasterDropdown';
 import { MAINTENANCE_TYPES } from '../../utils/constants';
 // Recent-Trip-Activity chrome + global pagination standard.
@@ -21,9 +20,6 @@ export type ViewMode = 'pending' | 'approved' | 'deleted';
 
 interface LatestMaintenanceTableProps {
   records: MaintenanceEvent[];
-  /** FULL maintenance list — powers the Approved tab's per-vehicle expansion
-   *  (one row per vehicle, expand to see every record of that vehicle). */
-  allRecords?: MaintenanceEvent[];
   vehicles: any[];
   viewMode: ViewMode;
   onView: (record: MaintenanceEvent) => void;
@@ -42,7 +38,6 @@ interface LatestMaintenanceTableProps {
 
 const LatestMaintenanceTable = ({
   records,
-  allRecords = [],
   vehicles,
   viewMode,
   onView,
@@ -58,12 +53,10 @@ const LatestMaintenanceTable = ({
 }: LatestMaintenanceTableProps) => {
   const { t, language } = useI18n();
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedId, setSelectedId] = useState<string | null>(null);
-  // Approved tab expansion — which vehicle's full record list is open.
-  const [expandedVehicle, setExpandedVehicle] = useState<string | null>(null);
   // Maintenance Type filter — same neat dropdown as the form's Driver field.
   const [typeFilter, setTypeFilter] = useState<string>('');
   const tableRef = useRef<HTMLDivElement>(null);
+  const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
 
   const { requestDelete, cancel, isPending, pendingItems } = usePendingDelete<string>(async (id) => {
     const record = records.find((item) => item.id === id);
@@ -82,31 +75,14 @@ const LatestMaintenanceTable = ({
     return '—';
   };
 
-  /** Every maintenance record per vehicle id, newest first — the Approved tab
-   *  shows one row per vehicle and expands to this list (collection-entry
-   *  approved pattern: one row per shop → all records inside). */
-  const vehicleHistory = useMemo(() => {
-    const map = new Map<string, MaintenanceEvent[]>();
-    for (const rec of allRecords) {
-      if (!rec.vehicleId) continue;
-      const key = String(rec.vehicleId);
-      const list = map.get(key);
-      if (list) list.push(rec);
-      else map.set(key, [rec]);
-    }
-    for (const list of map.values()) {
-      list.sort((a, b) => safeDate(b.date).getTime() - safeDate(a.date).getTime());
-    }
-    return map;
-  }, [allRecords]);
-
   const filteredRecords = useMemo(() => {
+    // Type filter first, then the free-text search over the surviving rows.
     const afterType = typeFilter
       ? validRecords.filter((rec) => (rec.maintenanceType || '').split(',').map((x) => x.trim()).includes(typeFilter))
       : validRecords;
     const term = searchTerm.trim().toLowerCase();
     if (!term) return afterType;
-    return validRecords.filter(rec => {
+    return afterType.filter(rec => {
       const vehicleNumber = resolveVehicleNumber(rec);
       const searchable = [
         rec.billNumber,
@@ -127,8 +103,6 @@ const LatestMaintenanceTable = ({
   }, [validRecords, typeFilter, searchTerm, vehicles]);
 
   const totalRecords = filteredRecords.length;
-  const startIndex = (currentPage - 1) * pageSize + 1;
-  void startIndex;
 
   const paginatedRecords = filteredRecords.slice(
     (currentPage - 1) * pageSize,
@@ -143,21 +117,31 @@ const LatestMaintenanceTable = ({
     }
   }, [actualTotalPages, currentPage, onPageChange, totalRecords]);
 
-  const handleRowClick = (id: string) => {
-    setSelectedId(prev => (prev === id ? null : id));
+  /** Roving keyboard: ArrowUp/Down walks the visible rows, Enter opens the
+   *  view — the same interaction as Recent Trip Activity. */
+  const moveRowFocus = (fromIndex: number, step: 1 | -1) => {
+    const next = paginatedRecords[fromIndex + step];
+    if (!next?.id) return;
+    const element = rowRefs.current.get(next.id);
+    if (element) {
+      element.focus();
+      element.scrollIntoView({ block: 'nearest' });
+    }
   };
 
-  const selectedRecord = filteredRecords.find(r => r.id === selectedId) || null;
-
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      if (tableRef.current && !tableRef.current.contains(event.target as Node)) {
-        setSelectedId(null);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
+  const handleRowKeyDown = (event: React.KeyboardEvent<HTMLTableRowElement>, index: number) => {
+    if (event.target !== event.currentTarget) return;
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      const rec = paginatedRecords[index];
+      if (rec) onView(rec);
+      return;
+    }
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+      event.preventDefault();
+      moveRowFocus(index, event.key === 'ArrowDown' ? 1 : -1);
+    }
+  };
 
   const getFirstMaintenanceType = (types: string): string => {
     if (!types) return '-';
@@ -170,14 +154,14 @@ const LatestMaintenanceTable = ({
   };
 
   const getEmptyText = () => {
-    if (searchTerm) return t('empty.search_no_results');
+    if (searchTerm || typeFilter) return t('empty.search_no_results');
     if (viewMode === 'pending') return t('fleet.maintenance_table.no_pending');
     if (viewMode === 'approved') return t('fleet.maintenance_table.no_approved');
     return t('fleet.maintenance_table.no_deleted');
   };
 
-  const isSelectedRecordApproved = selectedRecord?.paymentStatus === 'approved';
-  const canApprove = viewMode !== 'deleted' && selectedRecord && !isSelectedRecordApproved;
+  // Column count for the empty-state row.
+  const colCount = 9 + (viewMode === 'deleted' ? 1 : 0) + (viewMode === 'pending' ? 1 : 0);
 
   return (
     <div ref={tableRef} className="bg-white border border-slate-200/80 rounded-2xl shadow-xl shadow-slate-100 overflow-hidden">
@@ -210,7 +194,7 @@ const LatestMaintenanceTable = ({
               <button
                 key={mode}
                 type="button"
-                onClick={() => { setExpandedVehicle(null); onToggleView(mode); }}
+                onClick={() => onToggleView(mode)}
                 aria-pressed={viewMode === mode}
                 className={`inline-flex items-center px-5 py-1.5 text-xs font-semibold rounded-md transition-all ${
                   viewMode === mode
@@ -224,55 +208,8 @@ const LatestMaintenanceTable = ({
           </div>
         </div>
 
-        {/* Row actions, search, Reset and Refresh — trip activity arrangement */}
+        {/* Type filter, search, Reset and Refresh — trip activity arrangement */}
         <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-          {selectedRecord && (
-            <div className="flex items-center gap-1 mr-2">
-              {/* Icon-only actions — Edit lives INSIDE the View modal, not here */}
-              <button
-                type="button"
-                onClick={(e) => { e.stopPropagation(); onView(selectedRecord); }}
-                title={t('common.view')}
-                aria-label={t('common.view')}
-                className="group relative h-8 w-8 rounded-xl flex items-center justify-center transition-all shadow-sm bg-blue-50/70 hover:bg-blue-50/80 text-blue-500 border border-blue-200/60 active:scale-95"
-              >
-                <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]"><Eye size={14} /></span>
-              </button>
-              {viewMode !== 'deleted' && (
-                <>
-                  {/* Delete — available on EVERY record (pending, approved and
-                      older ones alike; approval only blocks EDIT). Only an
-                      in-flight 10s undo disables it. */}
-                  <button
-                    type="button"
-                    onClick={(e) => { e.stopPropagation(); if (selectedRecord.id) requestDelete(selectedRecord.id, { label: t('fleet.maintenance_table.deleting', { vehicle: resolveVehicleNumber(selectedRecord) }) }); setSelectedId(null); }}
-                    disabled={isPending(selectedRecord.id)}
-                    title={t('common.delete')}
-                    aria-label={t('common.delete')}
-                    className={`group relative h-8 w-8 rounded-xl flex items-center justify-center transition-all shadow-sm ${
-                      !isPending(selectedRecord.id)
-                        ? 'bg-rose-50/70 hover:bg-rose-50/80 text-rose-500 border border-rose-200/60 active:scale-95'
-                        : 'bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed'
-                    }`}
-                  >
-                    <span className={`inline-flex ${!isPending(selectedRecord.id) ? uiActionIconMotionClass.delete : ''}`}><Trash2 size={14} /></span>
-                  </button>
-                  {canApprove && (
-                    <button
-                      type="button"
-                      onClick={(e) => { e.stopPropagation(); onApprove(selectedRecord); setSelectedId(null); }}
-                      title={t('common.approve')}
-                      aria-label={t('common.approve')}
-                      className="group relative h-8 w-8 rounded-xl flex items-center justify-center transition-all shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700 active:scale-95"
-                    >
-                      <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-approve)]"><CheckCircle2 size={14} /></span>
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
-          )}
-
           <div className="w-40 sm:w-44">
             <MasterDropdown
               hideLabel
@@ -282,7 +219,7 @@ const LatestMaintenanceTable = ({
                 { value: '', label: t('common.all') },
                 ...MAINTENANCE_TYPES.map((type) => ({ value: type, label: type })),
               ]}
-              onChange={(next) => { setTypeFilter(next || ''); setSelectedId(null); setExpandedVehicle(null); onPageChange(1); }}
+              onChange={(next) => { setTypeFilter(next || ''); onPageChange(1); }}
               placeholder={t('operations.maintenance_type')}
               searchable
               allowClear
@@ -297,7 +234,6 @@ const LatestMaintenanceTable = ({
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
-                setSelectedId(null);
                 onPageChange(1);
               }}
               placeholder={t('fleet.maintenance_table.search_placeholder')}
@@ -307,7 +243,6 @@ const LatestMaintenanceTable = ({
               <button
                 onClick={() => {
                   setSearchTerm('');
-                  setSelectedId(null);
                   onPageChange(1);
                 }}
                 className="absolute right-2 top-1/2 -translate-y-1/2 w-5 h-5 flex items-center justify-center text-slate-400 hover:text-slate-600 bg-white hover:bg-slate-100 rounded-md transition-colors"
@@ -321,12 +256,12 @@ const LatestMaintenanceTable = ({
           <div className="h-5 w-px bg-slate-200 hidden sm:block" />
 
           <div className="flex items-center gap-1">
-            {/* Reset — clears the search + selection, animated like the trip list reset */}
+            {/* Reset — clears the search + filters, animated like the trip list reset */}
             <button
               type="button"
               onClick={() => {
                 setSearchTerm('');
-                setSelectedId(null);
+                setTypeFilter('');
                 onPageChange(1);
               }}
               className="group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm bg-slate-50 hover:bg-slate-100 text-slate-500 border border-slate-200/70 active:scale-95"
@@ -421,14 +356,30 @@ const LatestMaintenanceTable = ({
                       <span>{t('fleet.maintenance_table.docs')}</span>
                     </div>
                   </th>
+                  {viewMode === 'pending' && (
+                    <th className="px-4 py-3 text-center text-sm font-bold uppercase tracking-wider whitespace-nowrap">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <CheckCircle2 size={13} className="text-emerald-500 shrink-0" />
+                        <span>{t('common.actions')}</span>
+                      </div>
+                    </th>
+                  )}
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
-                {paginatedRecords.map((rec) => {
-                  const isSelected = selectedId === rec.id;
+                {isLoading ? (
+                  <tr>
+                    <td colSpan={colCount} className="py-16 text-center text-sm font-medium text-slate-400">
+                      <span className="inline-flex items-center gap-2">
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600" aria-hidden="true" />
+                        {t('fleet.maintenance_entry.loading_records')}
+                      </span>
+                    </td>
+                  </tr>
+                ) : (
+                paginatedRecords.map((rec, index) => {
                   const firstType = getFirstMaintenanceType(rec.maintenanceType);
                   const allTypes = getAllMaintenanceTypes(rec.maintenanceType);
-                  const isApproved = rec.paymentStatus === 'approved';
                   const isDeleted = viewMode === 'deleted';
                   const typeCount = rec.maintenanceType
                     ? rec.maintenanceType.split(',').filter(s => s.trim()).length
@@ -437,70 +388,51 @@ const LatestMaintenanceTable = ({
                   return (
                     <tr
                       key={rec.id}
-                      className={`group hover:bg-slate-50/80 transition-colors duration-150 cursor-pointer ${
-                        isSelected
-                          ? 'bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200'
-                          : 'border-l-4 border-l-transparent'
-                      }`}
-                      onClick={() => {
-                        handleRowClick(rec.id);
-                        if (viewMode === 'approved') {
-                          setExpandedVehicle((current) => (current === String(rec.vehicleId) ? null : String(rec.vehicleId)));
-                        }
+                      ref={(element) => {
+                        if (element && rec.id) rowRefs.current.set(rec.id, element);
+                        else if (rec.id) rowRefs.current.delete(rec.id);
                       }}
+                      tabIndex={0}
+                      aria-label={`${rec.billNumber || ''} ${resolveVehicleNumber(rec)}`}
+                      onKeyDown={(event) => handleRowKeyDown(event, index)}
+                      className="group cursor-pointer outline-none transition-colors duration-150 hover:bg-slate-50/80 border-l-4 border-l-transparent focus-visible:border-l-blue-400 focus-visible:bg-blue-50/40"
+                      onClick={() => onView(rec)}
                     >
                       <td className="px-4 py-3 whitespace-nowrap">
-                        <div className="flex items-start gap-1.5">
-                          <div className="w-[13px] shrink-0 mt-0.5" />
-                          <div className="flex flex-col items-start gap-1">
-                            <span className={`inline-flex items-center gap-1.5 text-xs font-bold rounded-md px-2 py-0.5 border ${
-                              isDeleted
-                                ? 'bg-rose-50 text-rose-700 border-rose-100/80'
-                                : isApproved
-                                  ? 'bg-emerald-50 text-emerald-700 border-emerald-100/80'
-                                  : 'bg-orange-50 text-orange-700 border-orange-100/80'
-                            }`}>
-                              {rec.billNumber || '-'}
+                        <span className={`inline-flex items-center gap-1.5 text-xs font-bold rounded-md px-2 py-0.5 border ${
+                          isDeleted
+                            ? 'bg-rose-50 text-rose-700 border-rose-100/80'
+                            : rec.paymentStatus === 'approved'
+                              ? 'bg-emerald-50 text-emerald-700 border-emerald-100/80'
+                              : 'bg-orange-50 text-orange-700 border-orange-100/80'
+                        }`}>
+                          {rec.billNumber || '-'}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-3 text-left whitespace-nowrap">
+                        <span className="text-xs font-medium text-slate-600 whitespace-nowrap">
+                          {formatTripListDay((rec as any).date || rec.createdAt, language)}
+                        </span>
+                      </td>
+
+                      <td className="px-4 py-3 text-left whitespace-nowrap">
+                        <span title={allTypes} className="text-xs text-slate-600 cursor-help">
+                          {firstType}
+                          {typeCount > 1 && (
+                            <span className="text-xs text-slate-400 ml-1">
+                              {t('fleet.maintenance_table.more', { count: typeCount - 1 })}
                             </span>
-                          </div>
-                        </div>
+                          )}
+                        </span>
                       </td>
 
                       <td className="px-4 py-3 text-left whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-[13px] shrink-0" />
-                          <span className="text-xs font-medium text-slate-600 whitespace-nowrap">
-                            {formatTripListDay((rec as any).date || rec.createdAt, language)}
-                          </span>
-                        </div>
+                        <span className="text-xs text-slate-600">{rec.garage || '-'}</span>
                       </td>
 
                       <td className="px-4 py-3 text-left whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-[13px] shrink-0" />
-                          <span title={allTypes} className="text-xs text-slate-600 cursor-help">
-                            {firstType}
-                            {typeCount > 1 && (
-                              <span className="text-xs text-slate-400 ml-1">
-                                {t('fleet.maintenance_table.more', { count: typeCount - 1 })}
-                              </span>
-                            )}
-                          </span>
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-3 text-left whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-[13px] shrink-0" />
-                          <span className="text-xs text-slate-600">{rec.garage || '-'}</span>
-                        </div>
-                      </td>
-
-                      <td className="px-4 py-3 text-left whitespace-nowrap">
-                        <div className="flex items-center gap-1.5">
-                          <div className="w-[13px] shrink-0" />
-                          <span className="text-xs text-slate-600">{rec.mechanic || '-'}</span>
-                        </div>
+                        <span className="text-xs text-slate-600">{rec.mechanic || '-'}</span>
                       </td>
 
                       <td className="px-4 py-3 text-right text-xs font-semibold text-slate-700 whitespace-nowrap tabular-nums">
@@ -517,12 +449,9 @@ const LatestMaintenanceTable = ({
 
                       {isDeleted && (
                         <td className="px-4 py-3 text-left whitespace-nowrap">
-                          <div className="flex items-center gap-1.5">
-                            <div className="w-[13px] shrink-0" />
-                            <span className="text-xs text-slate-500">
-                              {rec.deletedAt ? new Date(rec.deletedAt).toLocaleString() : '-'}
-                            </span>
-                          </div>
+                          <span className="text-xs text-slate-500">
+                            {rec.deletedAt ? new Date(rec.deletedAt).toLocaleString() : '-'}
+                          </span>
                         </td>
                       )}
 
@@ -540,74 +469,39 @@ const LatestMaintenanceTable = ({
                           <span className="text-xs text-slate-300">—</span>
                         )}
                       </td>
+
+                      {/* Row actions — Pending only: Approve + Delete (10s undo).
+                          Approved rows: no actions at all — clicking the row
+                          opens the full view. */}
+                      {viewMode === 'pending' && (
+                        <td className="px-4 py-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                          <span className="inline-flex items-center justify-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => onApprove(rec)}
+                              title={t('common.approve')}
+                              aria-label={t('common.approve')}
+                              className="group relative h-8 w-8 rounded-xl flex items-center justify-center transition-all shadow-sm bg-emerald-50/70 hover:bg-emerald-500 text-emerald-600 hover:text-white border border-emerald-200/60 active:scale-95"
+                            >
+                              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-approve)]"><CheckCircle2 size={14} /></span>
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => { if (rec.id) requestDelete(rec.id, { label: t('fleet.maintenance_table.deleting', { vehicle: resolveVehicleNumber(rec) }) }); }}
+                              disabled={!rec.id || isPending(rec.id)}
+                              title={t('common.delete')}
+                              aria-label={t('common.delete')}
+                              className="group relative h-8 w-8 rounded-xl flex items-center justify-center transition-all shadow-sm bg-rose-50/70 hover:bg-rose-500 text-rose-500 hover:text-white border border-rose-200/60 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                            >
+                              <span className={`inline-flex ${!isPending(rec.id) ? uiActionIconMotionClass.delete : ''}`}><Trash2 size={14} /></span>
+                            </button>
+                          </span>
+                        </td>
+                      )}
                     </tr>
                   );
-                })}
-                {viewMode === 'approved' &&
-                  expandedVehicle &&
-                  paginatedRecords.some((r) => String(r.vehicleId) === expandedVehicle) &&
-                  (() => {
-                    const history = vehicleHistory.get(expandedVehicle) ?? [];
-                    const vehicle = vehicles.find((v) => String(v.id) === expandedVehicle);
-                    const label = vehicle?.vehicleNumber || history[0]?.vehicleNo || expandedVehicle;
-                    const colSpan = 9;
-                    return (
-                      <tr key={`history-${expandedVehicle}`}>
-                        <td colSpan={colSpan} className="bg-slate-50/80 p-0">
-                          <div className="animate-fade-in-up border-y border-slate-100">
-                            <p className="flex items-center gap-2 px-4 py-2 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-                              <Truck size={13} className="text-slate-400" />
-                              {label}
-                              <span className="rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-slate-500 ring-1 ring-slate-200 tabular-nums">
-                                {history.length}
-                              </span>
-                              <span className="font-medium normal-case text-slate-400">
-                                — scroll to see all records
-                              </span>
-                            </p>
-                            <div className="max-h-72 overflow-y-auto">
-                              <table className="min-w-full text-sm">
-                                <tbody className="divide-y divide-slate-100 bg-white">
-                                  {history.map((sub) => (
-                                    <tr
-                                      key={sub.id}
-                                      className="cursor-pointer transition-colors hover:bg-blue-50/40"
-                                      onClick={(e) => { e.stopPropagation(); onView(sub); }}
-                                    >
-                                      <td className="px-4 py-2 pl-10 text-xs font-medium text-slate-600 whitespace-nowrap">
-                                        {formatTripListDay(sub.date || sub.createdAt, language)}
-                                      </td>
-                                      <td className="px-4 py-2 text-xs">
-                                        <span className={`inline-flex items-center rounded-md border px-2 py-0.5 text-[11px] font-bold ${
-                                          sub.paymentStatus === 'approved'
-                                            ? 'border-emerald-100/80 bg-emerald-50 text-emerald-700'
-                                            : sub.deletedAt
-                                              ? 'border-rose-100/80 bg-rose-50 text-rose-700'
-                                              : 'border-orange-100/80 bg-orange-50 text-orange-700'
-                                        }`}>
-                                          {sub.billNumber || '—'}
-                                        </span>
-                                      </td>
-                                      <td className="px-4 py-2 text-xs text-slate-600">{(sub.maintenanceType || '—').split(',')[0]}</td>
-                                      <td className="px-4 py-2 text-xs text-slate-500">{sub.garage || '—'}</td>
-                                      <td className="px-4 py-2 text-right text-xs font-semibold text-slate-700 tabular-nums">{Number(sub.currentKM || 0).toLocaleString()}</td>
-                                      <td className="px-4 py-2 text-right text-xs font-bold text-blue-700 tabular-nums">₹{Number(sub.totalCost || 0).toFixed(2)}</td>
-                                      <td className="px-4 py-2 text-right">
-                                        <span className="inline-flex items-center gap-1 text-[11px] font-semibold text-blue-500">
-                                          <Eye size={12} />
-                                          {t('common.view')}
-                                        </span>
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })()}
+                })
+                )}
               </tbody>
             </table>
           </div>
@@ -618,7 +512,7 @@ const LatestMaintenanceTable = ({
               page={currentPage}
               pageSize={pageSize}
               totalItems={totalRecords}
-              onPageChange={(next) => { setSelectedId(null); onPageChange(next); }}
+              onPageChange={onPageChange}
               onPageSizeChange={onPageSizeChange}
               disabled={isLoading}
             />

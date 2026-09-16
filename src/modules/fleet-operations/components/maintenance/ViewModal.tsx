@@ -10,10 +10,10 @@
 
 import React from 'react';
 import {
-  Hash, Truck, Calendar, Gauge, Cog, Wrench, Building2, UserCog, User,
-  FileText, Paperclip, ChevronDown, CheckCircle2, Clock, XCircle, IndianRupee,
-  Package, X, Pencil,
+  Truck, Wrench, FileText, Paperclip, ChevronDown, CheckCircle2, Clock,
+  XCircle, IndianRupee, Package, X, Pencil, FileDown,
 } from 'lucide-react';
+import { generateMaintenancePdf } from '../../utils/generateMaintenancePdf';
 import AppShellModal from '../../../../ui/AppShellModal';
 import { useI18n, translateStatus } from '../../../../i18n';
 import { uiActionIconMotionClass } from '../../../../shared/ui/uiTokens';
@@ -36,35 +36,13 @@ interface ViewModalProps {
   onEdit?: (record: MaintenanceEvent) => void;
 }
 
-/** Icon-led definition cell — label over value, the shared detail style. */
-function DetailCell({
-  icon,
-  label,
-  children,
-  className = '',
-}: {
-  icon: React.ReactNode;
-  label: string;
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div className={`min-w-0 rounded-xl border border-slate-100 bg-slate-50/50 px-3.5 py-3 ${className}`}>
-      <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-        <span className="flex-shrink-0">{icon}</span>
-        <span className="truncate">{label}</span>
-      </p>
-      <div className="mt-1 truncate text-[13px] font-semibold text-slate-800">{children}</div>
-    </div>
-  );
-}
-
 const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose, canEdit = false, onEdit, vehicleHistory = [] }) => {
   const { t, language } = useI18n();
   // Documents section starts OPEN; the chevron hides/shows the gallery.
   const [docsOpen, setDocsOpen] = React.useState(true);
   // Left panel filter — narrow the vehicle's approved list by type.
   const [typeFilter, setTypeFilter] = React.useState('');
+  const [pdfBusy, setPdfBusy] = React.useState(false);
   // The record whose details are displayed. Clicking a row in the vehicle's
   // full history swaps it in — the view-collection interaction. When the
   // parent opens a different record, state resets during render (the React
@@ -87,8 +65,32 @@ const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose, canEdi
     [vehicleHistory, typeFilter]
   );
 
+  // Roving focus for the left list — ArrowUp/Down moves the active record.
+  const listRefs = React.useRef(new Map<string, HTMLButtonElement>());
+  const moveActive = (fromId: string, step: 1 | -1) => {
+    const index = approvedHistory.findIndex((r) => String(r.id) === fromId);
+    const next = approvedHistory[index + step];
+    if (!next) return;
+    setActive(next);
+    const element = listRefs.current.get(String(next.id));
+    if (element) {
+      element.focus();
+      element.scrollIntoView({ block: 'nearest' });
+    }
+  };
+
   const vehicle = vehicles.find((v: any) => String(v.id) === String(active.vehicleId));
   const vehicleNumber = vehicle?.vehicleNumber || active.vehicleNo || '—';
+
+  const handlePdf = async () => {
+    if (pdfBusy) return;
+    setPdfBusy(true);
+    try {
+      await generateMaintenancePdf(active, vehicleHistory, vehicleNumber, language);
+    } finally {
+      setPdfBusy(false);
+    }
+  };
   const isApproved = active.paymentStatus === 'approved';
   const isDeleted = Boolean(active.deletedAt);
 
@@ -194,8 +196,18 @@ const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose, canEdi
                       <button
                         key={sub.id}
                         type="button"
+                        ref={(element) => {
+                          if (element) listRefs.current.set(String(sub.id), element);
+                          else listRefs.current.delete(String(sub.id));
+                        }}
+                        onKeyDown={(event) => {
+                          if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
+                            event.preventDefault();
+                            moveActive(String(sub.id), event.key === 'ArrowDown' ? 1 : -1);
+                          }
+                        }}
                         onClick={() => setActive(sub)}
-                        className={`w-full rounded-xl border px-3 py-2.5 text-left transition-all ${
+                        className={`w-full rounded-xl border px-3 py-2.5 text-left outline-none transition-all focus-visible:border-blue-300 focus-visible:ring-2 focus-visible:ring-blue-200 ${
                           rowActive
                             ? 'border-blue-200 bg-white shadow-sm ring-1 ring-blue-200'
                             : 'border-transparent hover:border-slate-200 hover:bg-white/70'
@@ -219,81 +231,36 @@ const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose, canEdi
           {/* RIGHT — the selected record: bill number, every detail, parts,
               total and the documents. */}
           <div className="min-w-0 flex-1 space-y-5 overflow-y-auto px-6 py-5 md:px-8">
-          {/* Identity band */}
-          <div className="flex flex-wrap items-center gap-2.5 animate-fade-in-up">
-            <span className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-sm font-bold ${
-              isDeleted
-                ? 'border-rose-100/80 bg-rose-50 text-rose-700'
-                : isApproved
-                  ? 'border-emerald-100/80 bg-emerald-50 text-emerald-700'
-                  : 'border-orange-100/80 bg-orange-50 text-orange-700'
-            }`}>
-              <Hash size={14} />
-              {active.billNumber || '—'}
-            </span>
-            <span className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm font-semibold text-slate-700 shadow-xs">
-              <Calendar size={14} className="flex-shrink-0 text-blue-500" />
-              {formatTripListDay(active.date || active.createdAt, language)}
-            </span>
-            <span className="inline-flex items-center gap-1.5 rounded-lg border border-orange-100 bg-orange-50/60 px-3 py-1.5 text-sm font-bold text-slate-700 shadow-xs">
-              <Gauge size={14} className="flex-shrink-0 text-orange-500" />
-              {Number(active.currentKM || 0).toLocaleString()} KM
-            </span>
-          </div>
-
-          {/* Details grid — the who / where / what of the job */}
-          <section className="animate-fade-in-up" style={{ animationDelay: '40ms' }}>
-            <p className="mb-2 flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-slate-500">
-              <Wrench size={14} className="flex-shrink-0 text-blue-500" />
-              {t('fleet.maintenance_view.service_details')}
-            </p>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-              <DetailCell icon={<User size={13} className="text-indigo-500" />} label={t('common.driver')}>
-                {active.driverName || '—'}
-              </DetailCell>
-              <DetailCell icon={<Wrench size={13} className="text-purple-500" />} label={t('fleet.maintenance_form.service_type')}>
-                {active.serviceType || '—'}
-              </DetailCell>
-              <DetailCell icon={<Building2 size={13} className="text-amber-500" />} label={t('operations.maintenance_garage')}>
-                {active.garage || '—'}
-              </DetailCell>
-              <DetailCell icon={<UserCog size={13} className="text-cyan-500" />} label={t('fleet.maintenance_form.mechanic')}>
-                {active.mechanic || '—'}
-              </DetailCell>
-              <DetailCell icon={<Cog size={13} className="text-slate-500" />} label={t('operations.maintenance_type')}>
-                {maintTypes.length > 0 ? (
-                  <span className="flex flex-wrap gap-1.5">
-                    {maintTypes.map((type) => (
-                      <span key={type} className="rounded-md border border-slate-200 bg-white px-2 py-0.5 text-[11px] font-bold text-slate-600 shadow-xs">
-                        {type}
-                      </span>
-                    ))}
-                  </span>
-                ) : '—'}
-              </DetailCell>
-              <DetailCell icon={<Gauge size={13} className="text-cyan-500" />} label={t('fleet.maintenance_form.next_service_km')}>
-                {maintTypes.length > 0 ? (
-                  <span className="flex flex-wrap gap-1.5">
-                    {maintTypes.map((type) => (
-                      <span key={type} className="inline-flex items-center gap-1 rounded-md border border-cyan-100 bg-cyan-50/60 px-2 py-0.5 text-[11px] font-semibold text-cyan-700">
-                        {type}: {nextByType[type] != null ? `${Number(nextByType[type]).toLocaleString()} KM` : '—'}
-                      </span>
-                    ))}
-                  </span>
-                ) : active.nextServiceKM
-                  ? `${Number(active.nextServiceKM).toLocaleString()} KM`
-                  : '—'}
-              </DetailCell>
-            </div>
-            {active.remarks ? (
-              <div className="mt-3 rounded-xl border border-slate-100 bg-slate-50/50 px-3.5 py-3">
-                <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  <FileText size={13} className="flex-shrink-0 text-emerald-500" />
-                  {t('common.remarks')}
-                </p>
-                <p className="mt-1 whitespace-pre-wrap break-words text-[13px] font-medium text-slate-700">{active.remarks}</p>
-              </div>
-            ) : null}
+          {/* All record details — one neat table, bold labels, bright values */}
+          <section className="overflow-hidden rounded-xl border border-slate-200 animate-fade-in-up" style={{ animationDelay: '40ms' }}>
+            <table className="min-w-full text-sm">
+              <tbody className="divide-y divide-slate-100">
+                {([
+                  [t('fleet.maintenance_view.bill_number'), active.billNumber || '—'],
+                  [t('common.date'), formatTripListDay(active.date || active.createdAt, language)],
+                  [t('common.vehicle'), vehicleNumber],
+                  [t('fleet.maintenance_form.current_km'), `${Number(active.currentKM || 0).toLocaleString()} KM`],
+                  [t('common.driver'), active.driverName || '—'],
+                  [t('fleet.maintenance_form.service_type'), active.serviceType || '—'],
+                  [t('operations.maintenance_garage'), active.garage || '—'],
+                  [t('fleet.maintenance_form.mechanic'), active.mechanic || '—'],
+                  [t('operations.maintenance_type'), maintTypes.length ? maintTypes.join(', ') : '—'],
+                  [t('fleet.maintenance_form.next_service_km'),
+                    maintTypes.length
+                      ? maintTypes.map((type) => `${type}: ${nextByType[type] != null ? `${Number(nextByType[type]).toLocaleString()} KM` : '—'}`).join(' · ')
+                      : active.nextServiceKM ? `${Number(active.nextServiceKM).toLocaleString()} KM` : '—'],
+                  [t('common.status'), statusLabel],
+                  [t('common.remarks'), active.remarks || '—'],
+                ] as [string, string][]).map(([label, value]) => (
+                  <tr key={label} className="hover:bg-slate-50/60 transition-colors">
+                    <th scope="row" className="w-44 bg-slate-50/70 px-4 py-2.5 text-left text-[11px] font-bold uppercase tracking-wider text-slate-500 align-top">
+                      {label}
+                    </th>
+                    <td className="px-4 py-2.5 text-[13px] font-bold text-slate-800 break-words">{value}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           </section>
 
           {/* Parts — full bill breakdown */}
@@ -372,6 +339,20 @@ const ViewModal: React.FC<ViewModalProps> = ({ record, vehicles, onClose, canEdi
 
         {/* Footer — gradient strip, Edit inside the view (trip close style) */}
         <div className="flex items-center justify-end gap-3 rounded-b-2xl border-t border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 px-6 py-4">
+          {/* PDF — the full record + the vehicle's complete history, table form */}
+          <button
+            type="button"
+            onClick={handlePdf}
+            disabled={pdfBusy}
+            className="group relative inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-6 py-2.5 text-xs font-semibold text-slate-700 transition-all hover:bg-slate-200 active:scale-95 disabled:opacity-60"
+          >
+            {pdfBusy ? (
+              <span className="inline-flex h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" aria-hidden="true" />
+            ) : (
+              <span className={`inline-flex ${uiActionIconMotionClass.pdf}`}><FileDown size={15} /></span>
+            )}
+            PDF
+          </button>
           {showEdit && (
             <button
               type="button"

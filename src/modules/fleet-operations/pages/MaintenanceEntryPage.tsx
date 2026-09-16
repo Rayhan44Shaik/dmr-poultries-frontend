@@ -382,7 +382,6 @@ const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
         {/* Latest Records Table */}
         <LatestMaintenanceTable
           records={displayRecords}
-          allRecords={maintenance}
           vehicles={vehicles}
           viewMode={viewMode}
           onView={handleView}
