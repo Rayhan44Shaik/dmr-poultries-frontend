@@ -4,7 +4,6 @@ import {
   Calendar,
   RotateCcw,
   Search,
-  Store,
   Truck,
   User,
   Wrench,
@@ -32,21 +31,18 @@ type Props = {
   vehicle: string;
   driver: string;
   maintenanceType: string;
-  serviceType: string;
   sortBy: MaintenanceSortKey;
   sortDir: "asc" | "desc";
   search: string;
   vehicles: readonly MasterDropdownOption[];
   drivers: readonly MasterDropdownOption[];
   maintenanceTypes: readonly string[];
-  serviceTypes: readonly string[];
   loading: boolean;
   setFromDate: (value: string) => void;
   setToDate: (value: string) => void;
   setVehicle: (value: string) => void;
   setDriver: (value: string) => void;
   setMaintenanceType: (value: string) => void;
-  setServiceType: (value: string) => void;
   setSort: (key: MaintenanceSortKey, direction: "asc" | "desc") => void;
   setSearch: (value: string) => void;
   onReset: () => void;
@@ -54,10 +50,10 @@ type Props = {
 };
 
 /**
- * A roomy, two-row maintenance filter surface. It keeps Trip List's coloured
- * labels, immediate search feedback, animated reset and branded hen refresh,
- * but deliberately omits a Status control: timeline maintenance is approved
- * service history, not a status-management queue.
+ * A precise two-row maintenance filter surface: the date range, vehicle and
+ * driver share the first row; maintenance type, timeline sort and search share
+ * the second. Status, Service Type and record-count clutter are intentionally
+ * excluded from this focused history workspace.
  */
 function MaintenanceFilters({
   fromDate,
@@ -65,21 +61,18 @@ function MaintenanceFilters({
   vehicle,
   driver,
   maintenanceType,
-  serviceType,
   sortBy,
   sortDir,
   search,
   vehicles,
   drivers,
   maintenanceTypes,
-  serviceTypes,
   loading,
   setFromDate,
   setToDate,
   setVehicle,
   setDriver,
   setMaintenanceType,
-  setServiceType,
   setSort,
   setSearch,
   onReset,
@@ -102,12 +95,6 @@ function MaintenanceFilters({
     label: localizeMaintenanceText(type, language),
     searchText: type,
   }));
-  const localizedServiceTypes = serviceTypes.map((type) => ({
-    value: type,
-    label: localizeMaintenanceText(type, language),
-    searchText: type,
-  }));
-
   const selectSort = (value: string) => {
     if (!sortOptions.some((option) => option.value === value)) return;
     const [, direction] = value.split(":");
@@ -116,7 +103,7 @@ function MaintenanceFilters({
 
   return (
     <section className={opsFilterCardClass} aria-label={t("common.filter")}>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div>
           <label className={opsFilterLabelClass}>
             <Calendar size={17} className="shrink-0 text-emerald-500" />
@@ -179,6 +166,9 @@ function MaintenanceFilters({
             className="w-full"
           />
         </div>
+      </div>
+
+      <div className="grid grid-cols-1 items-end gap-3 border-t border-slate-100 pt-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.25fr)_auto]">
         <div>
           <label className={opsFilterLabelClass}>
             <Wrench size={17} className="shrink-0 text-violet-500" />
@@ -198,26 +188,6 @@ function MaintenanceFilters({
         </div>
         <div>
           <label className={opsFilterLabelClass}>
-            <Store size={17} className="shrink-0 text-amber-500" />
-            <span>{t("fleet.maintenance_form.service_type")}</span>
-          </label>
-          <MasterDropdown
-            hideLabel
-            label={t("fleet.maintenance_form.service_type")}
-            value={serviceType}
-            options={localizedServiceTypes}
-            onChange={setServiceType}
-            placeholder={t("fleet.maintenance_history.all_service_types")}
-            searchable
-            allowClear
-            className="w-full"
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 items-end gap-4 border-t border-slate-100 pt-4 lg:grid-cols-12">
-        <div className="lg:col-span-4">
-          <label className={opsFilterLabelClass}>
             <ArrowUpDown size={17} className="shrink-0 text-violet-500" />
             <span>{t("common.sort_by")}</span>
           </label>
@@ -232,7 +202,7 @@ function MaintenanceFilters({
             className="w-full"
           />
         </div>
-        <div className="lg:col-span-5">
+        <div>
           <label className={opsFilterLabelClass}>
             <Search size={17} className="shrink-0 text-slate-400" />
             <span>{t("common.search")}</span>
@@ -264,7 +234,7 @@ function MaintenanceFilters({
             ) : null}
           </div>
         </div>
-        <div className="flex flex-wrap items-center justify-start gap-2 lg:col-span-3 lg:justify-end">
+        <div className="flex shrink-0 items-center justify-start gap-2 xl:justify-end">
           <button
             type="button"
             onClick={onReset}

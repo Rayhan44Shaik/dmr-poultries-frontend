@@ -103,8 +103,6 @@ export function useMaintenanceData(scope: 'entry' | 'history' | 'all' = 'all') {
   const [selectedVehicle, setSelectedVehicle] = useState('all');
   const [selectedDriver, setSelectedDriver] = useState('all');
   const [selectedMaintenanceType, setSelectedMaintenanceType] = useState('all');
-  const [selectedServiceType, setSelectedServiceType] = useState('all');
-  const [selectedStatus, setSelectedStatus] = useState('all');
   const [fromDate, setFromDate] = useState('');
   const [toDate, setToDate] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
@@ -188,7 +186,7 @@ export function useMaintenanceData(scope: 'entry' | 'history' | 'all' = 'all') {
     };
   }, [refreshKey, scope]);
 
-  // Type, service, and free-text search are applied locally because those
+  // Maintenance type and free-text search are applied locally because those
   // fields are not part of every deployed API contract. Search therefore feels
   // immediate and cannot be overwritten by a late request for an older phrase.
   useEffect(() => {
@@ -206,8 +204,6 @@ export function useMaintenanceData(scope: 'entry' | 'history' | 'all' = 'all') {
           driverId: selectedDriver === 'all' ? undefined : selectedDriver,
           fromDate: fromDate || undefined,
           toDate: toDate || undefined,
-          status: selectedStatus === 'all' || selectedStatus === 'Deleted' ? undefined : selectedStatus,
-          includeDeleted: selectedStatus === 'Deleted',
         });
         if (!cancelled) {
           historyHasLoaded.current = true;
@@ -223,7 +219,7 @@ export function useMaintenanceData(scope: 'entry' | 'history' | 'all' = 'all') {
       }
     })();
     return () => { cancelled = true; };
-  }, [fromDate, refreshKey, scope, selectedDriver, selectedStatus, selectedVehicle, toDate]);
+  }, [fromDate, refreshKey, scope, selectedDriver, selectedVehicle, toDate]);
 
   const approvedHistory = useMemo(
     () => {
@@ -238,11 +234,6 @@ export function useMaintenanceData(scope: 'entry' | 'history' | 'all' = 'all') {
     historyRecords.forEach((record) => String(record.maintenanceType || '').split(',').forEach((type) => {
       if (type.trim()) values.add(type.trim());
     }));
-    return [...values].sort((a, b) => a.localeCompare(b));
-  }, [historyRecords]);
-
-  const serviceTypes = useMemo(() => {
-    const values = new Set(historyRecords.map((record) => String(record.serviceType || '').trim()).filter(Boolean));
     return [...values].sort((a, b) => a.localeCompare(b));
   }, [historyRecords]);
 
@@ -262,16 +253,13 @@ export function useMaintenanceData(scope: 'entry' | 'history' | 'all' = 'all') {
 
   const filtered = useMemo(() => historyRecords.filter((record) => {
     // Guard the visible set as well: older API deployments may ignore a query
-    // parameter, but the table and KPIs must still reflect the chosen filters.
+    // parameter, but the timeline must still reflect the chosen filters.
     if (selectedVehicle !== 'all' && String(record.vehicleId) !== String(selectedVehicle)) return false;
     if (selectedDriver !== 'all' && String(record.driverId) !== String(selectedDriver)) return false;
     const date = maintenanceDateKey(record);
     if (fromDate && (!date || date < fromDate)) return false;
     if (toDate && (!date || date > toDate)) return false;
-    if (selectedStatus === 'Deleted' && !record.deletedAt) return false;
-    if (selectedStatus === 'Pending' && (record.paymentStatus !== 'pending' || record.deletedAt)) return false;
-    if (selectedStatus === 'Approved' && (record.paymentStatus !== 'approved' || record.deletedAt)) return false;
-    if (selectedStatus === 'all' && record.deletedAt) return false;
+    if (record.deletedAt) return false;
     if (selectedMaintenanceType !== 'all') {
       // Multi-select stores choices pipe-separated; a record matches when ANY
       // of its comma-separated types is picked.
@@ -279,7 +267,6 @@ export function useMaintenanceData(scope: 'entry' | 'history' | 'all' = 'all') {
       const recordTypes = String(record.maintenanceType || '').split(',').map((value) => value.trim());
       if (wanted.length > 0 && !recordTypes.some((type) => wanted.includes(type))) return false;
     }
-    if (selectedServiceType !== 'all' && String(record.serviceType || '') !== selectedServiceType) return false;
     if (searchQuery.trim()) {
       const needle = searchQuery.trim().toLowerCase();
       const vehicleNo = vehicleNumberById.get(String(record.vehicleId)) || record.vehicleNo || '';
@@ -287,16 +274,7 @@ export function useMaintenanceData(scope: 'entry' | 'history' | 'all' = 'all') {
       if (!values.some((value) => String(value || '').toLowerCase().includes(needle))) return false;
     }
     return true;
-  }), [fromDate, historyRecords, searchQuery, selectedDriver, selectedMaintenanceType, selectedServiceType, selectedStatus, selectedVehicle, toDate, vehicleNumberById]);
-
-  const historyStats = useMemo(() => ({
-    total: filtered.length,
-    totalCost: filtered.reduce((sum, record) => sum + Number(record.totalCost || 0), 0),
-    approved: filtered.filter((record) => record.paymentStatus === 'approved' && !record.deletedAt).length,
-    pending: filtered.filter((record) => record.paymentStatus === 'pending' && !record.deletedAt).length,
-    vehiclesServiced: new Set(filtered.map((record) => String(record.vehicleId)).filter(Boolean)).size,
-    documents: filtered.reduce((sum, record) => sum + (record.documents?.length || 0), 0),
-  }), [filtered]);
+  }), [fromDate, historyRecords, searchQuery, selectedDriver, selectedMaintenanceType, selectedVehicle, toDate, vehicleNumberById]);
 
   const upcomingServices = useMemo((): UpcomingService[] => {
     const list: UpcomingService[] = [];
@@ -372,12 +350,12 @@ export function useMaintenanceData(scope: 'entry' | 'history' | 'all' = 'all') {
   }, [approvedHistory, latestMeters, selectedVehicle, vehicles]);
 
   const hasActiveFilters = selectedVehicle !== 'all' || selectedDriver !== 'all' ||
-    selectedMaintenanceType !== 'all' || selectedServiceType !== 'all' || selectedStatus !== 'all' ||
+    selectedMaintenanceType !== 'all' ||
     Boolean(fromDate || toDate || searchQuery);
 
   const resetFilters = useCallback(() => {
     setSelectedVehicle('all'); setSelectedDriver('all'); setSelectedMaintenanceType('all');
-    setSelectedServiceType('all'); setSelectedStatus('all'); setFromDate(''); setToDate(''); setSearchQuery('');
+    setFromDate(''); setToDate(''); setSearchQuery('');
   }, []);
 
   const refresh = useCallback(() => {
@@ -387,10 +365,10 @@ export function useMaintenanceData(scope: 'entry' | 'history' | 'all' = 'all') {
 
   return {
     vehicles, maintenance, approvedMaintenance, approvedHistory, deletedRecords,
-    filtered, maintenanceTypes, serviceTypes, drivers, historyStats, upcomingServices,
+    filtered, maintenanceTypes, drivers, upcomingServices,
     selectedVehicle, setSelectedVehicle, selectedDriver, setSelectedDriver,
-    selectedMaintenanceType, setSelectedMaintenanceType, selectedServiceType, setSelectedServiceType,
-    selectedStatus, setSelectedStatus, fromDate, setFromDate, toDate, setToDate,
+    selectedMaintenanceType, setSelectedMaintenanceType,
+    fromDate, setFromDate, toDate, setToDate,
     searchQuery, setSearchQuery, hasActiveFilters, resetFilters,
     loading, historyLoading, error, historyError, refresh,
   };
