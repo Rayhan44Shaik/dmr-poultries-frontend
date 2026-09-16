@@ -25,7 +25,22 @@ interface TripLossRowExpandProps {
   record: TripLossAnalysis;
 }
 
-/** Card shell: tinted title bar + hairline body — the Fleet detail-card idiom. */
+/**
+ * Card shell: tinted title bar + hairline body — the Fleet detail-card idiom.
+ *
+ * Each card carries its own mark in a small tinted tile, the same treatment the
+ * table header uses for the page: the glyph says what the card is, and the tile
+ * colour keeps the three cards apart at a glance —
+ *   indigo = the trip · rose = the weights · emerald = the rates.
+ */
+const CARD_TILES = {
+  indigo: "border-indigo-100 bg-indigo-50/70 text-indigo-500",
+  rose: "border-rose-100 bg-rose-50/70 text-rose-500",
+  emerald: "border-emerald-100 bg-emerald-50/70 text-emerald-600",
+} as const;
+
+type CardTone = keyof typeof CARD_TILES;
+
 function Card({
   icon: Icon,
   tone,
@@ -34,16 +49,20 @@ function Card({
   children,
 }: {
   icon: typeof Truck;
-  tone: string;
+  tone: CardTone;
   title: string;
   action?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-3 py-1">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-2.5 py-1">
         <h4 className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-wider text-slate-900">
-          <Icon size={13} className={tone} aria-hidden="true" />
+          <span
+            className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border shadow-inner ${CARD_TILES[tone]}`}
+          >
+            <Icon size={12} strokeWidth={2.4} aria-hidden="true" />
+          </span>
           {title}
         </h4>
         {action}
@@ -70,14 +89,14 @@ type DetailField = {
  */
 function Cell({ field }: { field: DetailField }) {
   return (
-    <div className="flex items-baseline gap-2 px-3 py-2.5">
+    <div className="flex items-baseline gap-1.5 px-2.5 py-2.5">
       {/* Bright-black field name … */}
-      <span className="w-[92px] shrink-0 text-[10.5px] font-bold uppercase tracking-wide text-slate-900">
+      <span className="w-[78px] shrink-0 text-[10.5px] font-bold uppercase tracking-wide text-slate-900">
         {field.label}
       </span>
-      {/* … a neat hairline … then the data. */}
+      {/* … a neat hairline … then the data, hard against the name. */}
       <span
-        className={`min-w-0 flex-1 border-l border-slate-200 pl-2.5 text-[12.5px] font-semibold tabular-nums ${
+        className={`min-w-0 flex-1 border-l border-slate-200 pl-2 text-[12.5px] font-semibold tabular-nums ${
           field.tone ?? "text-slate-700"
         } ${field.wrap ? "" : "truncate"}`}
         title={field.title}
@@ -149,12 +168,12 @@ export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
   ];
 
   return (
-    <div className="border-t border-slate-200/80 bg-slate-100/60 px-2.5 py-2">
-      <div className="space-y-2">
+    <div className="border-t border-slate-200/80 bg-slate-100/60 px-2 py-2">
+      <div className="space-y-1.5">
         {/* ── 1. TRIP DETAILS ─────────────────────────────────────────── */}
         <Card
           icon={Truck}
-          tone="text-indigo-500"
+          tone="indigo"
           title={t("ops.mortality.detail.trip_overview")}
           action={
             <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-[1px] text-[10px] font-bold uppercase tracking-wide text-emerald-700">
@@ -181,17 +200,20 @@ export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
             holds the quantities, the box beside it holds the rates. Rows are
             one line tall and the columns are sized to their content, so each
             box is only as big as what it prints. */}
-        <div className="grid gap-2 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
-          <Card icon={Scale} tone="text-rose-500" title={t("ops.mortality.detail.weight_summary")}>
-            <table className="w-full table-fixed border-collapse text-[12.5px]">
+        <div className="grid gap-1.5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+          <Card icon={Scale} tone="rose" title={t("ops.mortality.detail.weight_summary")}>
+            {/* Content-width table: the columns are pinned in pixels so they
+                stay packed together, and the card simply keeps the whitespace
+                that is left over. */}
+            <table className="table-fixed border-collapse text-[12.5px]">
               <thead>
                 {/* Bright-black column names over a neat rule… */}
                 <tr className="border-b border-slate-200 text-[10.5px] uppercase tracking-wide text-slate-900">
-                  <th className="w-[46%] px-3 py-2 text-left font-bold">{t("common.name")}</th>
-                  <th className="w-[24%] border-l border-slate-200 px-3 py-2 text-right font-bold">
+                  <th className="w-[124px] px-2.5 py-2 text-left font-bold">{t("common.name")}</th>
+                  <th className="w-[72px] border-l border-slate-200 px-2.5 py-2 text-right font-bold">
                     {t("common.birds")}
                   </th>
-                  <th className="w-[30%] border-l border-slate-200 px-3 py-2 text-right font-bold">
+                  <th className="w-[96px] border-l border-slate-200 px-2.5 py-2 text-right font-bold">
                     {t("common.weight")}
                   </th>
                 </tr>
@@ -201,14 +223,14 @@ export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
               <tbody className="divide-y divide-slate-100">
                 {weightRows.map((row) => (
                   <tr key={row.label}>
-                    <td className="px-3 py-2.5 font-medium text-slate-700">{row.label}</td>
+                    <td className="px-2.5 py-2.5 font-medium text-slate-700">{row.label}</td>
                     <td
-                      className={`border-l border-slate-100 px-3 py-2.5 text-right font-semibold tabular-nums ${row.tone}`}
+                      className={`border-l border-slate-100 px-2.5 py-2.5 text-right font-semibold tabular-nums ${row.tone}`}
                     >
                       {row.birds}
                     </td>
                     <td
-                      className={`border-l border-slate-100 px-3 py-2.5 text-right font-semibold tabular-nums ${row.tone}`}
+                      className={`border-l border-slate-100 px-2.5 py-2.5 text-right font-semibold tabular-nums ${row.tone}`}
                     >
                       {row.weight}
                     </td>
@@ -219,8 +241,8 @@ export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
           </Card>
 
           {/* The rates the trip is judged on, as one small box. */}
-          <Card icon={HeartPulse} tone="text-emerald-600" title={t("ops.mortality.detail.rates")}>
-            <div className="flex items-center justify-between gap-3 border-b border-emerald-100 bg-emerald-50/70 px-3 py-2.5">
+          <Card icon={HeartPulse} tone="emerald" title={t("ops.mortality.detail.rates")}>
+            <div className="flex items-center justify-between gap-3 border-b border-emerald-100 bg-emerald-50/70 px-2.5 py-2.5">
               <span className="text-[10.5px] font-bold uppercase tracking-wide text-emerald-700">
                 {t("ops.mortality.field.survival_rate")}
               </span>
@@ -229,19 +251,19 @@ export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
               </span>
             </div>
             <div className="divide-y divide-slate-100">
-              <div className="flex items-center gap-2 px-3 py-2.5">
-                <span className="w-[92px] shrink-0 text-[10.5px] font-bold uppercase tracking-wide text-slate-900">
+              <div className="flex items-center gap-1.5 px-2.5 py-2.5">
+                <span className="w-[78px] shrink-0 text-[10.5px] font-bold uppercase tracking-wide text-slate-900">
                   {t("ops.mortality.field.mortality_pct")}
                 </span>
-                <span className="flex-1 border-l border-slate-200 pl-2.5 text-right text-[12.5px] font-bold tabular-nums text-orange-600">
+                <span className="flex-1 border-l border-slate-200 pl-2 text-right text-[12.5px] font-bold tabular-nums text-orange-600">
                   {record.mortalityPercentage.toFixed(2)}%
                 </span>
               </div>
-              <div className="flex items-center gap-2 px-3 py-2.5">
-                <span className="w-[92px] shrink-0 text-[10.5px] font-bold uppercase tracking-wide text-slate-900">
+              <div className="flex items-center gap-1.5 px-2.5 py-2.5">
+                <span className="w-[78px] shrink-0 text-[10.5px] font-bold uppercase tracking-wide text-slate-900">
                   {t("ops.mortality.field.weight_loss_pct")}
                 </span>
-                <span className="flex-1 border-l border-slate-200 pl-2.5 text-right text-[12.5px] font-bold tabular-nums text-rose-600">
+                <span className="flex-1 border-l border-slate-200 pl-2 text-right text-[12.5px] font-bold tabular-nums text-rose-600">
                   {record.weightLossPercentage.toFixed(2)}%
                 </span>
               </div>

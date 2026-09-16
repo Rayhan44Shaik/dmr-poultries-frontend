@@ -881,7 +881,7 @@ export default {
   'ops.mortality.section.completed_trips': 'Completed Trips',
   'ops.mortality.section.count': '{count} trips',
   // Header affordance: the chevron column opens the trip panel.
-  'ops.mortality.hint.expand': 'Open a row for vehicle + shop-wise delivery',
+  'ops.mortality.hint.keys': 'move rows · Enter opens the trip panel',
 
   // KPI cards
   'ops.mortality.kpi.completed_trips': 'Completed Trips',

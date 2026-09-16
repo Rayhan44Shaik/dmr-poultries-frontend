@@ -19,7 +19,7 @@
 // The table shell is ALWAYS rendered. Empty states, loading and the pagination
 // footer all live INSIDE it, so the grid never disappears.
 
-import { Fragment, useEffect, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowDown,
   ArrowUp,
@@ -236,6 +236,8 @@ export default function TripLossTable({
 }: TripLossTableProps) {
   const { t, language } = useI18n();
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
+  /** Row elements by trip id, so ↑/↓ can move focus down the grid. */
+  const rowRefs = useRef(new Map<number, HTMLTableRowElement>());
   /**
    * Width of the VISIBLE table area.
    *
@@ -259,13 +261,54 @@ export default function TripLossTable({
     return () => observer.disconnect();
   }, []);
 
-  const toggle = (id: number) =>
-    setExpanded((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  const toggle = useCallback(
+    (id: number) =>
+      setExpanded((prev) => {
+        const next = new Set(prev);
+        if (next.has(id)) next.delete(id);
+        else next.add(id);
+        return next;
+      }),
+    []
+  );
+
+  /**
+   * Keyboard contract for the grid — the same one the Trip List table uses:
+   *
+   *   ↑ / ↓   move to the row above / below
+   *   Enter   open or close that trip's detail panel (Space does the same)
+   *   Escape  close the open panel without moving
+   *
+   * Focus stays on the row itself, so the browser's own scroll-into-view keeps
+   * the target visible; inner controls (the chevron button) keep their normal
+   * key behaviour because events from them are ignored here.
+   */
+  const handleRowKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLTableRowElement>, rowIndex: number) => {
+      if (event.target !== event.currentTarget) return;
+      const row = records[rowIndex];
+      if (!row) return;
+
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        toggle(row.tripId);
+        return;
+      }
+      if (event.key === "Escape") {
+        if (!expanded.has(row.tripId)) return;
+        event.preventDefault();
+        toggle(row.tripId);
+        return;
+      }
+      if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+
+      event.preventDefault();
+      const next = records[rowIndex + (event.key === "ArrowDown" ? 1 : -1)];
+      if (!next) return;
+      requestAnimationFrame(() => rowRefs.current.get(next.tripId)?.focus());
+    },
+    [records, expanded, toggle]
+  );
 
   const onSort = (col: Column) => {
     if (!col.sortKey) return;
@@ -339,9 +382,15 @@ export default function TripLossTable({
             {t("ops.mortality.section.count", { count: formatNumber(totalRecords) })}
           </span>
         </div>
-        <p className="ml-auto hidden items-center gap-1 text-[11px] font-medium text-slate-400 lg:inline-flex">
-          <ChevronRight size={12} aria-hidden="true" />
-          {t("ops.mortality.hint.expand")}
+        <p className="ml-auto hidden items-center gap-1.5 text-[11px] font-medium text-slate-400 lg:inline-flex">
+          <span
+            className="inline-flex items-center gap-0.5 rounded-md border border-slate-200 bg-white px-1.5 py-[1px] text-slate-500 shadow-sm"
+            aria-hidden="true"
+          >
+            <ArrowUp size={10} strokeWidth={2.6} />
+            <ArrowDown size={10} strokeWidth={2.6} />
+          </span>
+          {t("ops.mortality.hint.keys")}
         </p>
       </div>
 
@@ -429,7 +478,14 @@ export default function TripLossTable({
                 return (
                   <Fragment key={r.tripId}>
                     <tr
-                      className={`transition-colors duration-150 hover:bg-slate-50/60 ${
+                      ref={(element) => {
+                        if (element) rowRefs.current.set(r.tripId, element);
+                        else rowRefs.current.delete(r.tripId);
+                      }}
+                      tabIndex={0}
+                      onKeyDown={(event) => handleRowKeyDown(event, index)}
+                      aria-expanded={isOpen}
+                      className={`outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 hover:bg-slate-50/60 ${
                         isOpen ? "bg-slate-50/60" : index % 2 === 0 ? "bg-white" : "bg-slate-50/20"
                       }`}
                     >

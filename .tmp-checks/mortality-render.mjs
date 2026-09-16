@@ -138,7 +138,7 @@ ok("table: card header bar title", tableHtml.includes("Completed Trips"));
 ok("table: count pill uses the trip total", tableHtml.includes("525"), "count pill missing");
 ok("table: count sits in the title block right after the title", /Completed Trips<\/h3>\s*<span[^>]*>[\s\S]{0,220}525 trips/.test(tableHtml), "count pill is not beside the title");
 ok("table: broken-heart mortality mark in a flat rose tile", tableHtml.includes("heart-crack") && tableHtml.includes("border-rose-100 bg-rose-50/70") && !tableHtml.includes("from-rose-500 to-orange-400"), "mortality mark missing or still glossy");
-ok("table: header hints at the row panel", tableHtml.includes("Open a row for vehicle"), "expand hint missing");
+ok("table: header shows the keyboard hint", tableHtml.includes("move rows") && tableHtml.includes("Enter opens the trip panel"), "keyboard hint missing");
 // Every metric glyph must live in the HEADER only — never repeated per row.
 {
   const headerEnd = tableHtml.indexOf("</thead>");
@@ -159,6 +159,15 @@ ok("table: paired sort arrows present", (tableHtml.match(/lucide-arrow-(up|down)
 ok("table: global pagination renders", tableHtml.includes("Showing") && tableHtml.includes("of 525"), "global pagination missing");
 ok("table: rows-per-page control from the global pager", tableHtml.includes("Rows per page"), "rows per page missing");
 ok("table: header glyphs are coloured lucide icons", (tableHtml.match(/text-(indigo|violet|amber|emerald|sky|orange|rose)-500/g) || []).length >= 10, "icon tones missing");
+{
+  const { readFileSync } = await import("node:fs");
+  const source = readFileSync("src/modules/operations/mortality/components/TripLossTable.tsx", "utf8");
+  ok("keys: rows are focusable", (tableHtml.match(/tabindex="0"/g) || []).length === rows.length, `focusable=${(tableHtml.match(/tabindex="0"/g) || []).length}`);
+  ok("keys: arrow up/down move between rows", source.includes('event.key !== "ArrowDown" && event.key !== "ArrowUp"') && source.includes("rowRefs.current.get(next.tripId)?.focus()"), "arrow navigation missing");
+  ok("keys: Enter/Space opens and Escape closes the panel", source.includes('event.key === "Enter" || event.key === " "') && source.includes('event.key === "Escape"') && source.includes("toggle(row.tripId)"), "open/close keys missing");
+  ok("keys: focused row is visible (focus ring)", tableHtml.includes("focus-visible:ring-inset focus-visible:ring-emerald-400"), "no focus ring");
+}
+
 ok("table: expand affordance kept", tableHtml.includes("Expand trip") && tableHtml.includes("aria-expanded"), "expand control missing");
 // The expanded cell belongs to a table that can be wider than its scroller, so
 // the panel must be pinned to the scroller's edge — otherwise its right half
@@ -181,12 +190,16 @@ ok("table: expand affordance kept", tableHtml.includes("Expand trip") && tableHt
   ok("panel: weights table is a plain table — no bars", !expandHtml.includes('style="width') && !expandHtml.includes("animate-pulse"));
   ok("panel: trip facts use the shared labels", expandHtml.includes("Vehicle") && expandHtml.includes("Supervisor") && expandHtml.includes("Source Farm") && expandHtml.includes("Driver") && expandHtml.includes("Loaders") && expandHtml.includes("Helpers"));
   // The reference idiom: label left, value RIGHT — nothing is left dangling.
-  ok("panel: value follows its label (nothing stretched to the cell edge)", (expandHtml.match(/w-\[92px\]/g) || []).length >= 8, `cells=${(expandHtml.match(/w-\[92px\]/g) || []).length}`);
+  ok("panel: value follows its label (nothing stretched to the cell edge)", (expandHtml.match(/w-\[78px\]/g) || []).length >= 8, `cells=${(expandHtml.match(/w-\[78px\]/g) || []).length}`);
   ok("panel: trip details are TWO columns, not four", (expandHtml.match(/sm:grid-cols-2/g) || []).length === 4 && !expandHtml.includes("lg:grid-cols-4"));
+  ok("panel: each card title carries its own mark in a tinted tile", (expandHtml.match(/h-5 w-5 shrink-0 items-center justify-center rounded-md border/g) || []).length === 3, `tiles=${(expandHtml.match(/h-5 w-5 shrink-0/g) || []).length}`);
+  ok("panel: card colours are one family each (indigo / rose / emerald)", expandHtml.includes("border-indigo-100 bg-indigo-50/70") && expandHtml.includes("border-rose-100 bg-rose-50/70") && expandHtml.includes("border-emerald-100 bg-emerald-50/70"));
+  ok("panel: columns are tighter again (78px labels, px-2.5 cells)", (expandHtml.match(/w-\[78px\]/g) || []).length >= 8, `labels=${(expandHtml.match(/w-\[78px\]/g) || []).length}`);
+  ok("panel: weights columns pinned in px so they stay packed", (expandHtml.match(/w-\[(124|72|96)px\]/g) || []).length === 3, `px cols=${(expandHtml.match(/w-\[[0-9]+px\]/g) || []).length}`);
   ok("panel: field names are bright black", (expandHtml.match(/text-slate-900/g) || []).length >= 4, `black headings=${(expandHtml.match(/text-slate-900/g) || []).length}`);
-  ok("panel: a neat rule sits between each field name and its data", (expandHtml.match(/border-l border-slate-200 pl-2\.5/g) || []).length >= 6, `rules=${(expandHtml.match(/border-l border-slate\.200/g) || []).length}`);
-  ok("panel: weights columns are ruled apart too", (expandHtml.match(/border-l border-slate-100 px-3/g) || []).length >= 8, "column rules missing");
-  ok("panel: weights box is small — three content-sized columns, no % column", expandHtml.includes("table-fixed") && (expandHtml.match(/w-\[(46|24|30)%\]/g) || []).length === 3 && !expandHtml.includes(">%<"), `cols=${(expandHtml.match(/w-\[[0-9]+%\]/g) || []).length}`);
+  ok("panel: a neat rule sits between each field name and its data", (expandHtml.match(/border-l border-slate-200/g) || []).length >= 10, `rules=${(expandHtml.match(/border-l border-slate-200/g) || []).length}`);
+  ok("panel: weights columns are ruled apart too", (expandHtml.match(/border-l border-slate-100/g) || []).length >= 6, `column rules=${(expandHtml.match(/border-l border-slate-100/g) || []).length}`);
+  ok("panel: weights box is small — three content-sized columns, no % column", expandHtml.includes("table-fixed border-collapse") && !expandHtml.includes(">%<"), "weights table not content-sized");
   ok("panel: weights and rates are two small boxes side by side (no 42% filler card)", expandHtml.includes("lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]") && !expandHtml.includes("w-[42%]"));
   ok("panel: rates box carries survival + mortality % + loss %", expandHtml.includes("Survival Rate") && expandHtml.includes("Mortality %") && expandHtml.includes("Loss %"));
   ok("panel: table rows use the same rhythm as the grid (py-2.5)", (expandHtml.match(/py-2\.5/g) || []).length >= 12, `rows=${(expandHtml.match(/py-2\.5/g) || []).length}`);
