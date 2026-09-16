@@ -684,42 +684,27 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
     ? GRANULARITY_BY_VIEW[trendView]
     : defaultGranularity;
 
-  // Light the chip the calendar is already showing, so the card and the
-  // calendar always agree: an exact match first, then any month-to-date range.
+  // Light a preset only when the calendar exactly matches that preset.
+  // Any hand-picked span stays under Custom range, even if it happens to be
+  // 7 or 30 days, so the Trip & Weight Movement card always tells the truth.
   const calendarMatchesPreset = (["today", "week", "month"] as const).find((view) => {
     const preset = windowForView(view, dashboardAnchor);
     return preset.from === calendarFrom && preset.to === calendarTo;
   });
-  /* A calendar that merely SPANS a day, a week or a month lights that chip too,
-     even when its dates are not exactly the preset's — if the page is showing a
-     week, this card reads a week. The card still totals the calendar's own
-     dates until a chip is actually tapped. */
-  const activeTrendView: TrendView =
-    trendView ??
-    calendarMatchesPreset ??
-    (rangeDays === 1
-      ? "today"
-      : rangeDays === 7
-        ? "week"
-        : rangeDays != null && rangeDays >= 28 && rangeDays <= 31
-          ? "month"
-          : null);
+  const activeTrendView: TrendView = trendView ?? calendarMatchesPreset ?? null;
 
-  // Anything the calendar picked by hand is its own option, so this card can
-  // read it too. It carries no count: the presets count trips, while this one
-  // is whatever range the calendar holds.
-  const trendViewsWithCalendar: TrendViewOption[] = calendarMatchesPreset
-    ? trendViews
-    : [
-        ...trendViews,
-        {
-          key: null,
-          label: t("ops.dashboard.trend.custom"),
-          /* While the card is reading the calendar, it already holds the
-             count for that range — no second request needed. */
-          count: activeTrendView === null ? trendsQuery.trends?.totalTrips ?? null : null,
-        },
-      ];
+  // Keep Custom range visible at all times: it means "follow the dashboard
+  // calendar" and is the way back from Today / Week / Month.
+  const trendViewsWithCalendar: TrendViewOption[] = [
+    ...trendViews,
+    {
+      key: null,
+      label: t("ops.dashboard.trend.custom"),
+      /* While the card is reading the calendar, it already holds the count for
+         that exact custom span — no second request needed. */
+      count: activeTrendView === null ? trendsQuery.trends?.totalTrips ?? null : null,
+    },
+  ];
 
   const handleRangeChange = (s: Date | undefined, e: Date | undefined) => {
     rangeTouchedRef.current = true;

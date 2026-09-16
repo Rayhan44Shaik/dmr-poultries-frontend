@@ -257,7 +257,7 @@ export default {
   'ops.dashboard.trend.chart_bar_line': 'Bar + Line',
   'ops.dashboard.trend.chart_area': 'Area',
   'ops.dashboard.trend.chart_stacked': 'Stacked',
-  'ops.dashboard.trend.custom': 'Custom',
+  'ops.dashboard.trend.custom': 'Custom range',
   'ops.dashboard.trend.delivered_weight': 'Delivered weight',
   'ops.dashboard.trend.empty': 'No completed trips in this window',
   'ops.dashboard.trend.empty_hint': 'Trips appear here once they are completed',

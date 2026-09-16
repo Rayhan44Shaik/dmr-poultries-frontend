@@ -311,7 +311,7 @@ const KPICard = memo(function KPICard({
     comparison.kind === "move"
       ? comparison.good
         ? "text-emerald-600"
-        : "text-rose-500"
+        : "text-rose-400"
       : comparison.kind === "flat"
         ? "text-slate-500"
         : "text-slate-400";
@@ -324,6 +324,20 @@ const KPICard = memo(function KPICard({
   const exactValue = `${unit === "₹" ? "₹" : ""}${Math.round(safeNumber(value)).toLocaleString()}${
     unit === "KG" ? " Kg" : ""
   }`;
+  const visibleValueLength = `${displayMain}${displaySuffix}`.replace(/\s/g, "").length;
+  const valueSizeClass =
+    visibleValueLength <= 3
+      ? "text-[22px] @min-[96px]:text-[28px] @min-[120px]:text-[32px]"
+      : visibleValueLength <= 5
+        ? "text-[20px] @min-[96px]:text-[25px] @min-[120px]:text-[29px]"
+        : visibleValueLength <= 8
+          ? "text-[18px] @min-[96px]:text-[23px] @min-[120px]:text-[27px]"
+          : "text-[16px] @min-[96px]:text-[21px] @min-[120px]:text-[25px]";
+  const suffixSizeClass =
+    visibleValueLength <= 5
+      ? "text-[10px] @min-[96px]:text-[12.5px] @min-[120px]:text-[14.5px]"
+      : "text-[9.5px] @min-[96px]:text-[12px] @min-[120px]:text-[14px]";
+  const valueTooltip = displaySuffix ? exactValue : undefined;
 
   const showBreakdown = label === "Total Expenses" && breakdown;
 
@@ -389,12 +403,12 @@ const KPICard = memo(function KPICard({
         {/* line 2 — the main figure, enlarged and centred in the remaining space */}
         <div className="my-auto min-w-0">
           <div
-            className={`min-w-0 truncate text-[18px] font-bold leading-none tracking-tight @min-[96px]:text-[23px] @min-[120px]:text-[27px] ${config.text}`}
-            title={`${t(kpiCardLabel(label))} · ${exactValue} · ${rangeLabel}`}
+            className={`min-w-0 truncate font-bold leading-none tracking-tight ${valueSizeClass} ${config.text}`}
+            title={valueTooltip}
           >
             {displayMain}
             {displaySuffix && (
-              <span className="ml-0.5 text-[9.5px] font-medium text-slate-400 @min-[96px]:text-[12px] @min-[120px]:text-[14px]">
+              <span className={`ml-0.5 font-medium text-slate-400 ${suffixSizeClass}`}>
                 {displaySuffix}
               </span>
             )}

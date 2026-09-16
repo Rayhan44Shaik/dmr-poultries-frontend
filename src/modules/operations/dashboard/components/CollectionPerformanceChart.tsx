@@ -264,8 +264,8 @@ export default function CollectionPerformanceChart({
   const rowSalesTotal = rows.reduce((total, row) => total + safeAmount(row.salesAmount), 0);
   const rowCollectionsTotal = rows.reduce((total, row) => total + safeAmount(row.collectionAmount), 0);
   const rowPendingTotal = rows.reduce((total, row) => total + safeAmount(row.outstandingAmount), 0);
-  const sales = selectedRow ? safeAmount(selectedRow.salesAmount) : safeAmount(rowSalesTotal || sourceTotalSales);
-  const collections = selectedRow ? safeAmount(selectedRow.collectionAmount) : safeAmount(rowCollectionsTotal || sourceTotalCollections);
+  const sales = selectedRow ? safeAmount(selectedRow.salesAmount) : safeAmount(sourceTotalSales || rowSalesTotal);
+  const collections = selectedRow ? safeAmount(selectedRow.collectionAmount) : safeAmount(sourceTotalCollections || rowCollectionsTotal);
   const pending = selectedRow
     ? safeAmount(selectedRow.outstandingAmount)
     : safeAmount(sourceTotalPending ?? rowPendingTotal);
