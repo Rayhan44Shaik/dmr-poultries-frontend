@@ -6,6 +6,7 @@ import {
   ArrowUp,
   ArrowUpDown,
   ArrowUpRight,
+  BarChart3,
   Bird,
   Calendar,
   CalendarDays,
@@ -612,6 +613,31 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     const closingBalance = round2(openingBalance + totalDebit - totalCredit);
     return { openingBalance, totalDebit, totalCredit, totalBirds, totalWeight, closingBalance };
   }, [filteredLedger]);
+
+  /** STATEMENT OVERVIEW — always the FULL ledger for the applied dates + shop
+   *  scope, independent of Report Type / Search. Those filters narrow the
+   *  TABLE (and its TOTAL row) but must never silently zero the headline
+   *  Opening → Sales → Collections → Closing statement, which is what made the
+   *  overview look frozen when a filter was applied. Date / shop changes
+   *  re-fetch `ledgerData`, so Opening and Closing visibly move with them. */
+  const scopeSummary = useMemo(() => {
+    const tx = ledgerData.slice(1);
+    const totalDebit = tx.reduce((sum, t) => sum + t.debit, 0);
+    const totalCredit = tx.reduce((sum, t) => sum + t.credit, 0);
+    const totalBirds = tx
+      .filter((t) => t.type === "sale")
+      .reduce((sum, t) => sum + t.birds, 0);
+    const totalWeight = tx
+      .filter((t) => t.type === "sale")
+      .reduce((sum, t) => sum + t.weight, 0);
+    const openingBalance = ledgerData.length > 0 ? ledgerData[0].balance : 0;
+    const closingBalance = round2(openingBalance + totalDebit - totalCredit);
+    return { openingBalance, totalDebit, totalCredit, totalBirds, totalWeight, closingBalance };
+  }, [ledgerData]);
+
+  /** Rows in the full scope (excluding the pinned Opening row) — used to
+   *  show "X of Y transactions" so every filter visibly does something. */
+  const scopeRows = Math.max(0, ledgerData.length - 1);
 
   const resetPage = useCallback(() => setCurrentPage(1), []);
 
@@ -1866,46 +1892,64 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         </div>
       )}
 
-      {/* ── OVERVIEW — opening → sales → collections → closing for the whole
-             filtered scope (one shop, or every shop when All Shops) ──────── */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <p className="flex items-center gap-1.5 text-xs text-slate-500">
-            <Scale size={13} className="text-indigo-500" /> Opening Balance
+      {/* ── STATEMENT OVERVIEW — the FULL Opening → Sales → Collections →
+             Closing statement for the selected dates + shop. Report Type and
+             Search narrow the table below; they never blank these cards, and
+             date/shop changes visibly move Opening and Closing. ─────────── */}
+      <div>
+        <div className="flex items-end justify-between gap-3 mb-2.5">
+          <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-500">
+            <BarChart3 size={14} className="text-emerald-500" />
+            Statement Overview
+            {appliedSelectedShop !== "All Shops" && (
+              <span className="normal-case tracking-normal font-semibold text-slate-400">— {appliedSelectedShop}</span>
+            )}
           </p>
-          <p className="text-xl font-bold text-indigo-600 tabular-nums">{formatAmount(summary.openingBalance)}</p>
+          <p className="text-[11px] font-semibold text-slate-400 tabular-nums">
+            {totalRows === scopeRows
+              ? `${scopeRows.toLocaleString()} transactions`
+              : `Showing ${totalRows.toLocaleString()} of ${scopeRows.toLocaleString()} transactions`}
+          </p>
         </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <p className="flex items-center gap-1.5 text-xs text-slate-500">
-            <ArrowUpRight size={13} className="text-emerald-500" /> Total Sales (Debit)
-          </p>
-          <p className="text-xl font-bold text-emerald-600 tabular-nums">{formatAmount(summary.totalDebit)}</p>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <p className="flex items-center gap-1.5 text-xs text-slate-500">
-            <ArrowDownLeft size={13} className="text-blue-500" /> Total Collections (Credit)
-          </p>
-          <p className="text-xl font-bold text-blue-600 tabular-nums">{formatAmount(summary.totalCredit)}</p>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <p className="flex items-center gap-1.5 text-xs text-slate-500">
-            <Bird size={13} className="text-amber-500" /> Total Birds
-          </p>
-          <p className="text-xl font-bold text-slate-800 tabular-nums">{summary.totalBirds.toLocaleString()}</p>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <p className="flex items-center gap-1.5 text-xs text-slate-500">
-            <Weight size={13} className="text-cyan-500" /> Total Weight (KG)
-          </p>
-          <p className="text-xl font-bold text-slate-800 tabular-nums">{summary.totalWeight.toFixed(2)}</p>
-        </div>
-        <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
-          <p className="flex items-center gap-1.5 text-xs text-slate-500">
-            <IndianRupee size={13} className="text-violet-500" /> Closing Balance
-          </p>
-          <p className={`text-xl font-bold tabular-nums ${summary.closingBalance >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
-            {formatAmount(summary.closingBalance)}
-          </p>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
+          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+            <p className="flex items-center gap-1.5 text-xs text-slate-500">
+              <Scale size={13} className="text-indigo-500" /> Opening Balance
+            </p>
+            <p className="text-xl font-bold text-indigo-600 tabular-nums">{formatAmount(scopeSummary.openingBalance)}</p>
+          </div>
+          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+            <p className="flex items-center gap-1.5 text-xs text-slate-500">
+              <ArrowUpRight size={13} className="text-emerald-500" /> Total Sales (Debit)
+            </p>
+            <p className="text-xl font-bold text-emerald-600 tabular-nums">{formatAmount(scopeSummary.totalDebit)}</p>
+          </div>
+          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+            <p className="flex items-center gap-1.5 text-xs text-slate-500">
+              <ArrowDownLeft size={13} className="text-blue-500" /> Total Collections (Credit)
+            </p>
+            <p className="text-xl font-bold text-blue-600 tabular-nums">{formatAmount(scopeSummary.totalCredit)}</p>
+          </div>
+          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+            <p className="flex items-center gap-1.5 text-xs text-slate-500">
+              <Bird size={13} className="text-amber-500" /> Total Birds
+            </p>
+            <p className="text-xl font-bold text-slate-800 tabular-nums">{scopeSummary.totalBirds.toLocaleString()}</p>
+          </div>
+          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+            <p className="flex items-center gap-1.5 text-xs text-slate-500">
+              <Weight size={13} className="text-cyan-500" /> Total Weight (KG)
+            </p>
+            <p className="text-xl font-bold text-slate-800 tabular-nums">{scopeSummary.totalWeight.toFixed(2)}</p>
+          </div>
+          <div className="bg-white rounded-xl p-4 border border-slate-200 shadow-sm">
+            <p className="flex items-center gap-1.5 text-xs text-slate-500">
+              <IndianRupee size={13} className="text-violet-500" /> Closing Balance
+            </p>
+            <p className={`text-xl font-bold tabular-nums ${scopeSummary.closingBalance >= 0 ? "text-emerald-600" : "text-rose-600"}`}>
+              {formatAmount(scopeSummary.closingBalance)}
+            </p>
+          </div>
         </div>
       </div>
 
