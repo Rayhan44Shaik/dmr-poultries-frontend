@@ -982,6 +982,20 @@ export default {
   'dashboard.fleet.fuel': 'ఇంధనం {amount}',
   'dashboard.fleet.document_expiring': 'పత్రం 30 రోజులలో గడువు ముగుస్తుంది',
 
+  // Dashboard ActiveResourcesCard (ఫ్లీట్ కార్డ్ కింద)
+  'dashboard.resources.title': 'యాక్టివ్ నెట్‌వర్క్ & వర్క్‌ఫోర్స్',
+  'dashboard.resources.subtitle': 'మొత్తం {total} రికార్డుల్లో {active} యాక్టివ్',
+  'dashboard.resources.view_masters': 'మాస్టర్స్ చూడండి',
+  'dashboard.resources.shops': 'షాపులు',
+  'dashboard.resources.vehicles': 'వాహనాలు',
+  'dashboard.resources.drivers': 'డ్రైవర్లు',
+  'dashboard.resources.supervisors': 'సూపర్‌వైజర్లు',
+  'dashboard.resources.helpers': 'హెల్పర్లు',
+  'dashboard.resources.loaders': 'లోడర్లు',
+  'dashboard.resources.active_of_total': '{total}లో {active} యాక్టివ్',
+  'dashboard.resources.inactive': '{count} ఇన్‌యాక్టివ్',
+  'dashboard.resources.all_active': 'అన్నీ యాక్టివ్',
+
   // Dashboard ActivityTimeline
   'dashboard.activity.title': 'ఇటీవలి కార్యకలాపాలు',
   'dashboard.activity.subtitle': 'వ్యాపారంలో ప్రస్తుత جنبشాలు',

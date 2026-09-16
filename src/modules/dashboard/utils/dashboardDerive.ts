@@ -75,6 +75,18 @@ export interface ActivityItem {
   icon: LucideIcon;
 }
 
+/**
+ * One "active out of total" row of the network & workforce card — the
+ * masters-register headcount (shops, vehicles) and the per-department crew
+ * headcounts (drivers, supervisors, helpers, loaders) with their inactive
+ * remainder (`total − active`). Farms are intentionally excluded.
+ */
+export interface WorkforceStat {
+  key: "shops" | "vehicles" | "drivers" | "supervisors" | "helpers" | "loaders";
+  active: number;
+  total: number;
+}
+
 export interface DerivedDashboard {
   kpis: KpiDatum[];
   salesVsCollections: { date: string; sales: number; collections: number }[];
@@ -85,6 +97,8 @@ export interface DerivedDashboard {
   latestTrips: TripView[];
   pendingCollections: DashboardData["pendingCollections"];
   fleet: FleetVehicleView[];
+  /** Active-out-of-total headcounts below the fleet card. */
+  workforce: WorkforceStat[];
   activity: ActivityItem[];
   hasAnyData: boolean;
   totals: {
@@ -270,6 +284,35 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
     value: fleet.filter((f) => f.status === status).length,
     color: ["#059669", "#0ea5e9", "#94a3b8"][i],
   }));
+
+  /* ----- Active network & workforce (the card below the fleet) -----
+     Every figure comes straight from the masters registers the loader
+     aggregated: Shop/Vehicle masters for the network rows, the employee
+     master grouped by department for the crew rows. A master record stores
+     only Active/Inactive, so "inactive" is always (total − active) — the
+     same rule the KPI tiles above apply. */
+  const crew = (department: WorkforceStat["key"]): { active: number; total: number } => {
+    // "drivers" matches "Driver"/"Drivers" via the prefix after stripping the
+    // trailing plural 's', so either register spelling is honoured.
+    const prefix = department.slice(0, -1);
+    const rows = data.employees.filter((e) => {
+      const dept = String(e.department ?? e.role ?? "").trim().toLowerCase();
+      return dept === department || dept === prefix || `${dept}s` === department;
+    });
+    return {
+      total: rows.length,
+      active: rows.filter((r) => r.status === "Active").length,
+    };
+  };
+
+  const workforce: WorkforceStat[] = [
+    { key: "shops", active: activeShops, total: data.shops.length },
+    { key: "vehicles", active: activeVehicles, total: data.vehicles.length },
+    { key: "drivers", ...crew("drivers") },
+    { key: "supervisors", ...crew("supervisors") },
+    { key: "helpers", ...crew("helpers") },
+    { key: "loaders", ...crew("loaders") },
+  ];
 
   /* ----- Activity timeline ----- */
   const activity: ActivityItem[] = [];
@@ -463,6 +506,7 @@ export function deriveDashboard(data: DashboardData, t?: (key: string, params?: 
     latestTrips: tripViews,
     pendingCollections: positivePendingCollections,
     fleet,
+    workforce,
     activity,
     hasAnyData,
     totals: {

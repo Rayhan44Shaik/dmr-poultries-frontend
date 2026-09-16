@@ -987,6 +987,20 @@ export default {
   'dashboard.fleet.fuel': 'Fuel {amount}',
   'dashboard.fleet.document_expiring': 'Document expiring within 30 days',
 
+  // Dashboard ActiveResourcesCard (below the fleet card)
+  'dashboard.resources.title': 'Active network & workforce',
+  'dashboard.resources.subtitle': '{active} of {total} records active across all masters',
+  'dashboard.resources.view_masters': 'View masters',
+  'dashboard.resources.shops': 'Shops',
+  'dashboard.resources.vehicles': 'Vehicles',
+  'dashboard.resources.drivers': 'Drivers',
+  'dashboard.resources.supervisors': 'Supervisors',
+  'dashboard.resources.helpers': 'Helpers',
+  'dashboard.resources.loaders': 'Loaders',
+  'dashboard.resources.active_of_total': '{active} of {total} active',
+  'dashboard.resources.inactive': '{count} inactive',
+  'dashboard.resources.all_active': 'All active',
+
   // Dashboard ActivityTimeline
   'dashboard.activity.title': 'Recent activity',
   'dashboard.activity.subtitle': 'Latest movements across the business',
