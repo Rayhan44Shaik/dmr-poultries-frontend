@@ -29,6 +29,8 @@ import {
 import { loadShops } from "../../masters/shops/services/shopService";
 import { loadVehicles } from "../../masters/vehicles/services/vehicleService";
 import { loadEmployees } from "../../masters/employees/services/employeeService";
+import type { Shop } from "../../masters/shops/types/shop";
+import { indexOrderAssignments, type AssignmentBucket } from "./orderAssignmentIndex";
 import type { Vehicle } from "../../masters/vehicles/types/vehicle";
 import {
   addLocalDays,
@@ -95,6 +97,18 @@ export async function fetchOrdersData(): Promise<OrdersFetch> {
   trips = uniqueTripsById(liveTrips);
   vehicleList = vehicles.map((v) => ({ id: v.id, noOfBoxes: v.noOfBoxes }));
 
+  // Per-fetch only: reuse sorted rows without caching business data across saves.
+  const sortedRows = new Map<Trip, ShopDelivery[]>();
+  const orderedRows = (trip: Trip) => {
+    let rows = sortedRows.get(trip);
+    if (!rows) {
+      rows = rowsInSequence(trip);
+      sortedRows.set(trip, rows);
+    }
+    return rows;
+  };
+  const assignmentIndex = indexOrderAssignments(trips, orderedRows);
+
   const today = localToday();
   // Ten calendar days always contain the sample generator's latest eight
   // operating days (Sundays are closed). This keeps every Order day advertised
@@ -111,7 +125,7 @@ export async function fetchOrdersData(): Promise<OrdersFetch> {
   const containerQuantitiesByNo = new Map<string, ShopOrderQuantities>();
   for (const container of containers) {
     const q: ShopOrderQuantities = new Map();
-    for (const row of rowsInSequence(container)) {
+    for (const row of orderedRows(container)) {
       const shopId = num(row.shopId);
       if (!shopId || q.has(shopId)) continue;
       q.set(shopId, { boxes: rowBoxes(row), birds: num(row.birds), weight: num(row.weight) });
@@ -129,7 +143,7 @@ export async function fetchOrdersData(): Promise<OrdersFetch> {
   /** Resolve a trip's original order quantities via its order marker. */
   const quantitiesForTrip = (t: Trip): ShopOrderQuantities | undefined => {
     let base: ShopOrderQuantities | undefined;
-    for (const row of rowsInSequence(t)) {
+    for (const row of orderedRows(t)) {
       const ref = parseOrderRef(row.remarks);
       if (ref && containerQuantitiesByNo.has(ref)) {
         base = containerQuantitiesByNo.get(ref);
@@ -172,7 +186,7 @@ export async function fetchOrdersData(): Promise<OrdersFetch> {
     // One container per operational day: a second container for the same day
     // replaces (never merges) so Trip A shops cannot leak into Trip B.
     const rows = uniqueShopRows(
-      rowsInSequence(container).map((row) => ({
+      orderedRows(container).map((row) => ({
         ...row,
         clientKey:
           typeof (row as OrderShopRow).clientKey === "string"
@@ -184,29 +198,7 @@ export async function fetchOrdersData(): Promise<OrdersFetch> {
     // Where each collected shop ended up (persisted vehicle-trip rows) —
     // one bucket PER VEHICLE TRIP, because a shop's order can be SPLIT over
     // several vehicles (40 collected → 20 on TRP-A + 20 on TRP-B).
-    const byShop = new Map<number, Array<{ trip: Trip; rows: ShopDelivery[] }>>();
-    for (const other of trips) {
-      if (other.deleted) continue;
-      const orderRows = rowsInSequence(other).filter(
-        (r) => isOrderPlanRemarks(r.remarks) && parseOrderRef(r.remarks) === container.tripNo
-      );
-      if (orderRows.length === 0) continue;
-      for (const r of orderRows) {
-        const shopId = num(r.shopId);
-        if (!shopId) continue;
-        let buckets = byShop.get(shopId);
-        if (!buckets) {
-          buckets = [];
-          byShop.set(shopId, buckets);
-        }
-        let bucket = buckets.find((b) => b.trip.id === other.id);
-        if (!bucket) {
-          bucket = { trip: other, rows: [] };
-          buckets.push(bucket);
-        }
-        bucket.rows.push(r);
-      }
-    }
+    const byShop = assignmentIndex.get(container.tripNo) ?? new Map<number, AssignmentBucket[]>();
 
     const shops = new Map<number, DayShopAssignment | null>();
     let assignedShops = 0;
@@ -299,7 +291,7 @@ export async function fetchOrdersData(): Promise<OrdersFetch> {
   const viewsByDayTrip = new Map<string, { trip: Trip; rows: Map<number, ShopDelivery> }>();
   for (const trip of trips) {
     if (trip.deleted) continue;
-    const orderRows = rowsInSequence(trip).filter(isOrderPlanRow);
+    const orderRows = orderedRows(trip).filter(isOrderPlanRow);
     if (orderRows.length === 0) continue;
     for (const r of orderRows) {
       const ref = parseOrderRef(r.remarks);
@@ -661,7 +653,11 @@ export type ShopDirectory = Map<
 export type SupervisorDirectory = Map<string, string>; // name (lower) -> mobile
 
 export async function loadShopDirectory(): Promise<ShopDirectory> {
-  const shops = await loadShops().catch(() => []);
+  return buildShopDirectory(await loadShops().catch(() => []));
+}
+
+/** Reuse the already loaded Shop Master list; no second network request. */
+export function buildShopDirectory(shops: readonly Shop[]): ShopDirectory {
   const dir: ShopDirectory = new Map();
   for (const shop of shops) {
     dir.set(shop.id, {

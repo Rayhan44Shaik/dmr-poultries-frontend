@@ -22,13 +22,12 @@ import {
   opsTableTdClass,
   opsTableThClass,
 } from "../../../../shared/ui/operationsStyles";
-import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
-import TripPagination from "../../vehicle-trips/components/TripPagination";
+
+import { Pagination } from "../../../../ui";
 import {
   deliveryProgressPct,
   formatCount,
   formatDayShort,
-  pageRange,
   partitionTrackingTrips,
   trackingSearchHaystack,
 } from "../ordersUtils";
@@ -87,9 +86,9 @@ function usePaged<T>(
 ): [T[], number, number, (p: number) => void] {
   const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
   const [page, setPage] = useState(1);
-  const [lastKey, setLastKey] = useState(`${resetKey}|${items.length}`);
-  if (lastKey !== `${resetKey}|${items.length}`) {
-    setLastKey(`${resetKey}|${items.length}`);
+  const [lastKey, setLastKey] = useState(resetKey);
+  if (lastKey !== resetKey) {
+    setLastKey(resetKey);
     if (page !== 1) setPage(1);
   }
   const safePage = Math.min(page, totalPages);
@@ -203,22 +202,12 @@ function SectionTitle({ label, note }: { label: string; note?: string }) {
   );
 }
 
-function ShowingLabel({ total, page, pageSize }: { total: number; page: number; pageSize: number }) {
-  const { to } = useOrdersI18n();
-  const { from, to: end } = pageRange(total, page, pageSize);
-  return (
-    <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
-      {to("orders.showing_range", { from, to: end, total })}
-    </span>
-  );
-}
-
 /** ONE table with the unified tracking column set. */
 function TrackingTable({
   trips,
   pageSlice,
   safePage,
-  totalPages,
+  refreshing,
   onPageChange,
   pageSize,
   onPageSizeChange,
@@ -229,6 +218,7 @@ function TrackingTable({
   pageSlice: OrdersTrip[];
   safePage: number;
   totalPages: number;
+  refreshing: boolean;
   onPageChange: (p: number) => void;
   pageSize: number;
   onPageSizeChange?: (pageSize: number) => void;
@@ -262,7 +252,7 @@ function TrackingTable({
           </tr>
         </thead>
         <tbody className={opsTableDivideClass}>
-          {pageSlice.map((ot, index) => {
+          {refreshing ? <tr><td colSpan={14}><OrdersTableSkeleton rows={5} /></td></tr> : pageSlice.map((ot, index) => {
             const { trip, progress } = ot;
             const mobile = supervisorOf(ot);
             return (
@@ -363,21 +353,14 @@ function TrackingTable({
           })}
         </tbody>
       </table>
-      {trips.length > 0 && (
-        <div className="w-full flex items-center justify-between flex-wrap gap-1.5 px-4 py-3 bg-white border-t border-slate-100">
-          <ShowingLabel total={trips.length} page={safePage} pageSize={pageSize} />
-          {shouldShowPagination(trips.length) ? (
-            <TripPagination
-              currentPage={safePage}
-              totalPages={totalPages}
-              onPageChange={onPageChange}
-              hidePageInfo
-              pageSize={pageSize}
-              onPageSizeChange={onPageSizeChange}
-            />
-          ) : null}
-        </div>
-      )}
+      <Pagination
+        page={safePage}
+        pageSize={pageSize}
+        totalItems={trips.length}
+        onPageChange={onPageChange}
+        onPageSizeChange={onPageSizeChange}
+        disabled={refreshing}
+      />
     </div>
   );
 }
@@ -427,6 +410,7 @@ function OrdersDeliveryTrackingTab({
   );
 
   const [query, setQuery] = useState("");
+  const [sortMode, setSortMode] = useState("newest");
   const [deliveryFilter, setDeliveryFilter] = useState<DeliveryFilter>("all");
   const [differenceFilter, setDifferenceFilter] = useState<DifferenceFilter>("all");
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
@@ -467,9 +451,9 @@ function OrdersDeliveryTrackingTab({
           deliveryMatches(ot, deliveryFilter) &&
           differenceMatches(ot, differenceFilter) &&
           (!q || haystackFor(ot).includes(q))
-      ),
+      ).sort((a, b) => sortMode === "oldest" ? a.trip.tripDate.localeCompare(b.trip.tripDate) || a.trip.id - b.trip.id : sortMode === "vehicle" ? String(a.trip.vehicleNo).localeCompare(String(b.trip.vehicleNo)) || a.trip.id - b.trip.id : b.trip.tripDate.localeCompare(a.trip.tripDate) || b.trip.id - a.trip.id),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [active, deliveryFilter, differenceFilter, q, to, shopDirectory, supervisorDirectory]
+    [active, sortMode, deliveryFilter, differenceFilter, q, to, shopDirectory, supervisorDirectory]
   );
   const completedFiltered = useMemo(
     () =>
@@ -478,9 +462,9 @@ function OrdersDeliveryTrackingTab({
           deliveryMatches(ot, deliveryFilter) &&
           differenceMatches(ot, differenceFilter) &&
           (!q || haystackFor(ot).includes(q))
-      ),
+      ).sort((a, b) => sortMode === "oldest" ? a.trip.tripDate.localeCompare(b.trip.tripDate) || a.trip.id - b.trip.id : sortMode === "vehicle" ? String(a.trip.vehicleNo).localeCompare(String(b.trip.vehicleNo)) || a.trip.id - b.trip.id : b.trip.tripDate.localeCompare(a.trip.tripDate) || b.trip.id - a.trip.id),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [completed, deliveryFilter, differenceFilter, q, to, shopDirectory, supervisorDirectory]
+    [completed, sortMode, deliveryFilter, differenceFilter, q, to, shopDirectory, supervisorDirectory]
   );
 
   const scope = useMemo(() => {
@@ -509,7 +493,7 @@ function OrdersDeliveryTrackingTab({
     return t;
   }, [activeFiltered, completedFiltered]);
 
-  const filterKey = `${q}|${deliveryFilter}|${differenceFilter}|${completedFrom}|${completedTo}`;
+  const filterKey = `${q}|${sortMode}|${pageSize}|${deliveryFilter}|${differenceFilter}|${completedFrom}|${completedTo}`;
   const [activePage, safeActivePage, activeTotalPages, setActivePage] = usePaged(
     activeFiltered,
     pageSize,
@@ -521,7 +505,7 @@ function OrdersDeliveryTrackingTab({
   if (loading) return <OrdersTableSkeleton rows={5} />;
 
   const actionProps = { pdfBusyId, onPdf, onView };
-  const filtersActive = q !== "" || deliveryFilter !== "all" || differenceFilter !== "all";
+  const filtersActive = sortMode !== "newest" || q !== "" || deliveryFilter !== "all" || differenceFilter !== "all";
   const supervisorOf = (ot: OrdersTrip) => supervisorMobileOf(ot.trip, supervisorDirectory);
 
   return (
@@ -534,6 +518,11 @@ function OrdersDeliveryTrackingTab({
           ariaLabel={to("orders.search_tracking")}
           className="w-full sm:w-64"
         />
+        <OrdersDropdown value={sortMode} onChange={setSortMode} ariaLabel={to("orders.sort")} options={[
+          { value: "newest", label: to("orders.sort_newest") },
+          { value: "oldest", label: to("orders.sort_oldest") },
+          { value: "vehicle", label: to("orders.sort_vehicle_trip") },
+        ]} />
         <OrdersDropdown
           value={deliveryFilter}
           onChange={(v) => setDeliveryFilter(v as DeliveryFilter)}
@@ -553,6 +542,7 @@ function OrdersDeliveryTrackingTab({
             type="button"
             onClick={() => {
               setQuery("");
+              setSortMode("newest");
               setDeliveryFilter("all");
               setDifferenceFilter("all");
             }}
@@ -588,6 +578,7 @@ function OrdersDeliveryTrackingTab({
           />
         ) : (
           <TrackingTable
+            refreshing={refreshing}
             trips={activeFiltered}
             pageSlice={activePage}
             safePage={safeActivePage}
@@ -668,6 +659,7 @@ function OrdersDeliveryTrackingTab({
           />
         ) : (
           <TrackingTable
+            refreshing={refreshing}
             trips={completedFiltered}
             pageSlice={completedPage}
             safePage={safeCompletedPage}

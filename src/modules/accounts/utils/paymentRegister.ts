@@ -13,17 +13,17 @@ export type PaymentExpenseSector = 'farm' | 'fuel' | 'trip' | 'salary' | 'mainte
 export function paymentExpenseSector(paymentType?: string | null, category?: string | null): PaymentExpenseSector {
   const type = (paymentType || '').toLowerCase();
   if (type.includes('farmer') || type.includes('farm')) return 'farm';
-  if (type.includes('fuel')) return 'fuel';
+  if (type.includes('fuel') || type.includes('diesel') || type.includes('petrol')) return 'fuel';
   if (type.includes('maintenance') || type.includes('repair')) return 'maintenance';
   if (type.includes('salary')) return 'salary';
-  if (type.includes('fastag') || type.includes('vehicle') || type.includes('trip')) return 'trip';
+  if (type.includes('fastag') || type.includes('vehicle') || type.includes('trip') || type.includes('toll')) return 'trip';
 
   const legacy = (category || '').toLowerCase();
   if (legacy.includes('farm')) return 'farm';
-  if (legacy.includes('fuel')) return 'fuel';
+  if (legacy.includes('fuel') || legacy.includes('diesel') || legacy.includes('petrol')) return 'fuel';
   if (legacy.includes('maintenance') || legacy.includes('repair') || legacy.includes('insurance')) return 'maintenance';
   if (legacy.includes('salary')) return 'salary';
-  if (legacy.includes('trip') || legacy.includes('vehicle') || legacy.includes('fastag')) return 'trip';
+  if (legacy.includes('trip') || legacy.includes('vehicle') || legacy.includes('fastag') || legacy.includes('toll')) return 'trip';
   return 'office';
 }
 

@@ -29,3 +29,7 @@ export function ordersZebraTone(index: number): string {
 export function ordersTableZebraRow(index: number, extraClass = ""): string {
   return `${opsTableRowClass} ${ordersZebraTone(index)}${extraClass ? ` ${extraClass}` : ""}`;
 }
+
+/** Trip List density: 16px column padding, 20px body and 16px header padding. */
+export const ORDERS_TABLE_TH_CLASS = "px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider text-slate-600 whitespace-nowrap";
+export const ORDERS_TABLE_TD_CLASS = "px-4 py-5 text-[13px] text-slate-600 align-middle";

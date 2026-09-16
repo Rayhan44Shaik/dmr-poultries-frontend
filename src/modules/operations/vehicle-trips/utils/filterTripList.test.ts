@@ -121,3 +121,8 @@ test("Trip List defaults to the newest trip first (oldest falls to the bottom)",
 test("Trip List leaves every record visible when no filter is selected", () => {
   assert.deepEqual(filterTripListTrips(rows, {}).map(({ id }) => id), [1, 2, 3]);
 });
+
+ test("Trip List excludes unfinished and deleted records even when the API returns them", () => {
+  const records = [trip(1), trip(2, { status: 'Approved' as Trip['status'] }), trip(3, { status: 'Pending' }), trip(4, { status: 'Draft' }), trip(5, { deleted: true })];
+  assert.deepEqual(filterTripListTrips(records, {}).map(row => row.id), [1, 2]);
+});

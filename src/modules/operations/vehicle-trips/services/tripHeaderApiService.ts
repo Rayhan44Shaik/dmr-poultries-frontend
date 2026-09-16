@@ -73,6 +73,19 @@ export function formatStartTimeForDisplay(value: unknown): string {
  * "10-09-2026 14:05:33 IST". Unparseable values pass through untouched so
  * legacy HH:MM seed data still renders.
  */
+// Construct once, not once per trip / delivery timestamp. Formatting options
+// are fixed (IST), so reuse is safe across all rows and refreshes.
+const istStampFormatter = new Intl.DateTimeFormat("en-GB", {
+  timeZone: "Asia/Kolkata",
+  hourCycle: "h23",
+  year: "numeric",
+  month: "2-digit",
+  day: "2-digit",
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+});
+
 export function formatIstStamp(value: unknown): string {
   if (!value) return "";
   const raw = String(value).trim();
@@ -80,16 +93,7 @@ export function formatIstStamp(value: unknown): string {
   if (/^\d{2}-\d{2}-\d{4} \d{2}:\d{2}(:\d{2})? IST$/.test(raw)) return raw;
   const parsed = new Date(raw);
   if (Number.isNaN(parsed.getTime())) return raw;
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone: "Asia/Kolkata",
-    hourCycle: "h23",
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-    second: "2-digit",
-  }).formatToParts(parsed);
+  const parts = istStampFormatter.formatToParts(parsed);
   const get = (type: string) => parts.find((p) => p.type === type)?.value ?? "";
   return `${get("day")}-${get("month")}-${get("year")} ${get("hour")}:${get("minute")}:${get("second")} IST`;
 }

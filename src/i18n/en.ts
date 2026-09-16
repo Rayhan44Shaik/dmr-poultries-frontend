@@ -1148,6 +1148,9 @@ export default {
   'masters.shops.location.extract_coordinates': 'Extract Coordinates',
 
   // Accounts Summary
+  'accounts.summary.scope_note': 'Completed / approved trips in',
+  'accounts.summary.loading_data': 'Loading analysis data…',
+  'accounts.summary.trip_navigation': 'Trips',
   'accounts.summary.title': 'Accounts Summary',
   'accounts.summary.period.this_week': 'This Week',
   'accounts.summary.period.week': 'Week',
@@ -1207,8 +1210,8 @@ export default {
   'accounts.summary.expense_rows.maintenance': 'Vehicle Maintenance (₹)',
   'accounts.summary.expense_rows.office': 'Office & Other Expenses (₹)',
   'accounts.summary.expense_rows.total': 'Total Expenses (₹)',
-  'accounts.summary.expense_rows.net_profit': 'Net Profit (₹)',
-  'accounts.summary.disclaimer': 'All amounts are calculated based on the selected date range.',
+  'accounts.summary.expense_rows.net_profit': 'Net Cash Profit (₹)',
+  'accounts.summary.disclaimer': 'Expenses: Approved Payment Register records only. Pending Collection = max(Sales − Collections, 0) for the selected dates; it is not an all-time shop balance.',
 
   // Reports Dashboard
   'reports.dashboard.title': 'Reports Dashboard',

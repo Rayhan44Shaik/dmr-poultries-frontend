@@ -1,292 +1,98 @@
-// src/modules/accounts/components/Summary/SummaryTripViewer.tsx
-// Fast, stable viewer for "No. of Trips" — shows trips one-by-one with sidebar + side buttons.
-// Reuses the dedicated Trip History modal so Recent Trip stays independent.
-// Same backdrop as trip history (bg-black/40, no blur), deterministic, no duplicate requests.
-
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronLeft, ChevronRight, X, Truck, Calendar } from 'lucide-react';
+// Account Analysis only: trip navigation lives inside the read-only modal.
+// No floating controls over the app header and no changes to Trip List views.
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, PanelLeftOpen, PanelLeftClose, Truck, Calendar } from 'lucide-react';
 import type { Trip } from '../../../operations/vehicle-trips/types/trip';
 import { TripHistoryViewModal } from '../../../operations/vehicle-trips/components/TripViewModal';
 import { useShops } from '../../../masters/shops/hooks/useShops';
 import { useBirdTypes } from '../../../masters/bird-types/hooks/useBirdTypes';
+import { useI18n } from '../../../../i18n';
+import { getTripNavigationIndex } from '../../utils/tripNavigation';
+import AppShellModal from '../../../../ui/AppShellModal';
 
-type Props = {
-  open: boolean;
-  trips: Trip[];
-  groupLabel: string;
-  onClose: () => void;
-};
-
-function ordinal(n: number): string {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return n + (s[(v - 20) % 10] || s[v] || s[0]);
-}
+type Props = { open: boolean; trips: Trip[]; groupLabel: string; onClose: () => void };
 
 function SummaryTripViewer({ open, trips, groupLabel, onClose }: Props) {
   const { shops } = useShops();
   const { birdTypes } = useBirdTypes();
-
-  const groupKey = useMemo(() => trips.map((t) => t.id).join(','), [trips]);
-  const [idx, setIdx] = useState(0);
-
-  useEffect(() => {
-    if (!open) return;
-    let cancelled = false;
-    queueMicrotask(() => {
-      if (!cancelled) setIdx(0);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, [open, groupKey]);
-
-  const total = trips.length;
-  const canPrev = idx > 0;
-  const canNext = idx < total - 1;
-  const currentTrip = total > 0 ? trips[idx] : null;
-
-  const goPrev = useCallback(() => setIdx((i) => (i > 0 ? i - 1 : i)), []);
-  const goNext = useCallback(() => setIdx((i) => (i < total - 1 ? i + 1 : i)), [total]);
+  const { t } = useI18n();
+  const [index, setIndex] = useState(0);
+  const [sideOpen, setSideOpen] = useState(false);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const focusSelectedTrip = useRef(false);
+  const groupKey = trips.map(trip => trip.id).join(',');
+  const [lastGroup, setLastGroup] = useState(groupKey);
+  if (lastGroup !== groupKey) { setLastGroup(groupKey); setIndex(0); setSideOpen(false); }
+  const safeIndex = Math.min(index, Math.max(0, trips.length - 1));
+  const current = trips[safeIndex];
+  const previous = useCallback(() => setIndex(value => Math.max(0, value - 1)), []);
+  const next = useCallback(() => setIndex(value => Math.min(trips.length - 1, value + 1)), [trips.length]);
 
   useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === 'ArrowLeft' && canPrev) {
-        e.preventDefault();
-        goPrev();
-      } else if (e.key === 'ArrowRight' && canNext) {
-        e.preventDefault();
-        goNext();
-      } else if (e.key === 'Escape') {
-        onClose();
-      }
+    if (!open || !trips.length) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.altKey || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      const target = event.target as HTMLElement | null;
+      if (target?.closest('input, textarea, select, [contenteditable="true"], [role="combobox"], [role="tablist"], [role="radiogroup"]')) return;
+      // Vertical arrows belong to the selected sidebar, not the document.
+      const inSidebar = Boolean(target && sidebarRef.current?.contains(target));
+      if (!inSidebar && event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+      const nextIndex = getTripNavigationIndex(event.key, safeIndex, trips.length);
+      if (nextIndex === null) return;
+      event.preventDefault();
+      focusSelectedTrip.current = inSidebar;
+      setIndex(nextIndex);
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [open, canPrev, canNext, goPrev, goNext, onClose]);
+  }, [open, trips.length, safeIndex]);
 
   useEffect(() => {
-    if (!open) return;
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => {
-      document.body.style.overflow = prev;
-    };
-  }, [open]);
+    if (!sideOpen) return;
+    const selected = sidebarRef.current?.querySelector<HTMLButtonElement>(`#analysis-trip-${safeIndex}`);
+    if (focusSelectedTrip.current) {
+      selected?.focus({ preventScroll: true });
+      focusSelectedTrip.current = false;
+    }
+    selected?.scrollIntoView({ block: 'nearest' });
+  }, [safeIndex, sideOpen]);
 
   if (!open) return null;
+  if (!current) return <AppShellModal open onClose={onClose}>
+    <div className="p-6"><h2 className="font-semibold">{groupLabel}</h2><p className="mt-2 text-sm text-slate-500">{t('common.no_records')}</p>
+      <button type="button" onClick={onClose} className="mt-4 rounded-lg border px-4 py-2">{t('common.close')}</button>
+    </div>
+  </AppShellModal>;
 
-  if (total === 0 || !currentTrip) {
-    return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
-        <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-700 shadow-xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in-95 duration-150">
-          <div className="px-6 py-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-            <div>
-              <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">{groupLabel}</h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">No trips in this period</p>
-            </div>
-            <button
-              onClick={onClose}
-              aria-label="Close"
-              className="h-8 w-8 rounded-full bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-300 flex items-center justify-center transition"
-            >
-              <X size={16} />
-            </button>
-          </div>
-          <div className="px-6 py-10 text-center">
-            <p className="text-sm text-slate-500 dark:text-slate-400">There are no completed trips for</p>
-            <p className="text-sm font-semibold text-slate-700 dark:text-slate-200 mt-1">{groupLabel}</p>
-            <button
-              onClick={onClose}
-              className="mt-6 px-5 py-2 rounded-xl bg-slate-900 dark:bg-slate-800 hover:bg-black dark:hover:bg-slate-700 text-white text-xs font-semibold transition"
-            >
-              Close
-            </button>
-          </div>
-        </div>
+  const navigation = <div className="relative z-20 shrink-0 border-b border-emerald-100 bg-emerald-50/60 dark:border-slate-700 dark:bg-slate-800">
+    <div className="flex flex-wrap items-center gap-3 px-4 py-3">
+      <button ref={toggleRef} type="button" onClick={() => { focusSelectedTrip.current = !sideOpen; setSideOpen(value => !value); }} aria-expanded={sideOpen} aria-controls="analysis-trip-sidebar"
+        className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-emerald-200 bg-white px-3 text-sm font-semibold text-emerald-800 outline-none focus-visible:ring-2 focus-visible:ring-emerald-500">
+        {sideOpen ? <PanelLeftClose size={18} /> : <PanelLeftOpen size={18} />}{t('accounts.summary.trip_navigation')}
+      </button>
+      <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-600 dark:text-slate-200" title={groupLabel}>{groupLabel}</span>
+      <div className="ml-auto flex items-center gap-2">
+        <button type="button" onClick={previous} disabled={safeIndex === 0} aria-label={t('common.previous')} className="grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-emerald-500"><ChevronLeft size={18} /></button>
+        <span aria-live="polite" className="min-w-16 text-center text-sm font-bold tabular-nums text-emerald-800 dark:text-emerald-200">{safeIndex + 1} / {trips.length}</span>
+        <button type="button" onClick={next} disabled={safeIndex === trips.length - 1} aria-label={t('common.next')} className="grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-emerald-500"><ChevronRight size={18} /></button>
       </div>
-    );
-  }
+    </div>
+    {sideOpen && <nav ref={sidebarRef} id="analysis-trip-sidebar" aria-label={t('accounts.summary.trip_navigation')}
+      onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); setSideOpen(false); toggleRef.current?.focus(); } }}
+      className="absolute left-0 top-full max-h-[65vh] w-80 max-w-[calc(100vw-4rem)] overflow-y-auto rounded-br-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-900">
+      {trips.map((trip, idx) => <button key={trip.id} id={`analysis-trip-${idx}`} type="button" tabIndex={idx === safeIndex ? 0 : -1} onClick={() => setIndex(idx)} aria-keyshortcuts="ArrowUp ArrowDown Home End" aria-current={idx === safeIndex ? 'true' : undefined}
+        className={`mb-1 flex w-full items-start gap-3 rounded-lg border px-3 py-3 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${idx === safeIndex ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-transparent text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'}`}>
+        <span className="min-w-6 font-bold tabular-nums">{idx + 1}</span>
+        <span className="min-w-0"><span className="block truncate font-semibold">{trip.tripNo}</span>
+          <span className="mt-1 flex items-center gap-1.5 text-xs"><Calendar size={12} />{trip.tripDate}</span>
+          <span className="mt-1 flex items-center gap-1.5 text-xs"><Truck size={12} />{trip.vehicleNo}</span>
+        </span>
+      </button>)}
+    </nav>}
+  </div>;
 
-  return (
-    <>
-      {/* Reuse exact trip-history view — same backdrop bg-black/40, no blur */}
-      <TripHistoryViewModal open={open} trip={currentTrip} shops={shops} birdTypes={birdTypes} onClose={onClose} />
-
-      {/* Prominent top-center badge: Trip 10 of 20 — shows X of Y and ordinal 10th */}
-      <div className="fixed top-3 left-1/2 -translate-x-1/2 z-[80] hidden sm:flex pointer-events-none">
-        <div className="pointer-events-auto flex items-center gap-2 rounded-full border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-lg px-3 py-1.5">
-          <span className="inline-flex h-7 min-w-[56px] items-center justify-center rounded-full bg-emerald-600 px-2.5 text-[12px] font-extrabold tabular-nums text-white shadow-sm">
-            {idx + 1} of {total}
-          </span>
-          <span className="text-[11px] font-semibold text-slate-700 dark:text-slate-200 tabular-nums">
-            Trip {idx + 1} of {total}
-          </span>
-          <span className="hidden sm:inline-flex items-center rounded-full bg-slate-100 dark:bg-slate-700 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-slate-600 dark:text-slate-300">
-            {ordinal(idx + 1)} trip
-          </span>
-          <span className="text-[11px] text-slate-400 dark:text-slate-500 hidden md:inline">• {groupLabel}</span>
-        </div>
-      </div>
-
-      {total > 1 && (
-        <>
-          {/* Mobile top bar – horizontal trip switch (visible only on mobile) */}
-          <div className="fixed top-0 left-0 right-0 z-[60] bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-700 shadow-md flex sm:hidden items-center gap-2 px-2 py-2 overflow-hidden">
-            <button
-              type="button"
-              onClick={goPrev}
-              disabled={!canPrev}
-              className={`h-8 w-8 rounded-full border flex items-center justify-center shrink-0 ${canPrev ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400'}`}
-              aria-label="Previous"
-            >
-              <ChevronLeft size={16} />
-            </button>
-            <div className="flex-1 min-w-0">
-              <p className="text-[11px] font-bold text-slate-800 dark:text-slate-100 truncate">{groupLabel} • Trip {idx + 1} of {total}</p>
-              <p className="text-[11px] text-slate-500 dark:text-slate-400 truncate">{currentTrip.tripNo} • {currentTrip.tripDate} • <span className="font-semibold text-emerald-600 dark:text-emerald-400">{idx + 1} of {total}</span></p>
-            </div>
-            <div className="flex items-center gap-1.5 overflow-x-auto max-w-[42vw]">
-              {trips.slice(0, 8).map((trip, i) => (
-                <button
-                  key={trip.id}
-                  onClick={() => setIdx(i)}
-                  className={`h-7 min-w-[28px] rounded-full text-[11px] font-bold border px-2 shrink-0 ${i === idx ? 'bg-emerald-600 border-emerald-600 text-white' : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200'}`}
-                >
-                  {i + 1}
-                </button>
-              ))}
-            </div>
-            <button
-              type="button"
-              onClick={goNext}
-              disabled={!canNext}
-              className={`h-8 w-8 rounded-full border flex items-center justify-center shrink-0 ${canNext ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200' : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400'}`}
-              aria-label="Next"
-            >
-              <ChevronRight size={16} />
-            </button>
-          </div>
-
-          {/* Sidebar – switch between trips (left side, desktop) */}
-          <div className="hidden sm:flex fixed left-0 top-0 bottom-0 z-[60] w-[320px] bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-700 shadow-2xl flex-col animate-in slide-in-from-left duration-200">
-            <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex items-center justify-between gap-2">
-              <div className="min-w-0">
-                <h3 className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate">{groupLabel}</h3>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                  {total} trips • <span className="font-bold text-slate-700 dark:text-slate-200 tabular-nums">Trip {idx + 1} of {total}</span> <span className="ml-1 inline-flex items-center rounded-full bg-emerald-600 px-1.5 py-0.5 text-[10px] font-extrabold text-white">{idx + 1} of {total}</span>
-                </p>
-                <p className="text-[10px] font-medium text-slate-400 dark:text-slate-500">{ordinal(idx + 1)} trip • {idx + 1}/{total}</p>
-              </div>
-              <button
-                onClick={onClose}
-                className="h-7 w-7 rounded-full bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-600 flex items-center justify-center shrink-0"
-                aria-label="Close"
-              >
-                <X size={14} />
-              </button>
-            </div>
-
-            <div className="flex-1 overflow-y-auto p-2 space-y-1.5 bg-white dark:bg-slate-900">
-              {trips.map((trip, i) => {
-                const active = i === idx;
-                return (
-                  <button
-                    key={trip.id}
-                    onClick={() => setIdx(i)}
-                    className={`w-full text-left rounded-xl border px-3 py-2.5 flex items-center gap-3 transition ${
-                      active
-                        ? 'bg-emerald-600 border-emerald-600 text-white shadow-md'
-                        : 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200'
-                    }`}
-                  >
-                    <span
-                      className={`h-7 w-7 rounded-full flex items-center justify-center text-[11px] font-bold shrink-0 border ${
-                        active ? 'bg-white text-emerald-700 border-white' : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-600'
-                      }`}
-                    >
-                      {i + 1}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <div className={`text-xs font-bold truncate ${active ? 'text-white' : 'text-slate-800 dark:text-slate-100'}`}>
-                        {trip.tripNo}
-                      </div>
-                      <div className={`flex items-center gap-1.5 text-[11px] truncate ${active ? 'text-white/80' : 'text-slate-500 dark:text-slate-400'}`}>
-                        <span className="inline-flex items-center gap-1">
-                          <Calendar size={11} /> {trip.tripDate}
-                        </span>
-                        <span>•</span>
-                        <span className="inline-flex items-center gap-1">
-                          <Truck size={11} /> {trip.vehicleNo}
-                        </span>
-                      </div>
-                    </div>
-                    {active && <span className="h-2 w-2 rounded-full bg-white shrink-0" />}
-                  </button>
-                );
-              })}
-            </div>
-
-            <div className="p-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 flex items-center justify-between gap-2">
-              <button
-                type="button"
-                onClick={goPrev}
-                disabled={!canPrev}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition ${
-                  canPrev
-                    ? 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-600'
-                    : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 cursor-not-allowed'
-                }`}
-              >
-                <ChevronLeft size={14} /> Prev
-              </button>
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-50 dark:bg-emerald-500/10 border border-emerald-200 dark:border-emerald-500/20 px-2.5 py-1 text-[11px] font-extrabold tabular-nums text-emerald-700 dark:text-emerald-300">
-                {idx + 1} of {total}
-                <span className="hidden sm:inline font-semibold text-emerald-600/70 dark:text-emerald-400/70">• {ordinal(idx + 1)}</span>
-              </span>
-              <button
-                type="button"
-                onClick={goNext}
-                disabled={!canNext}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border transition ${
-                  canNext
-                    ? 'bg-emerald-600 border-emerald-600 text-white hover:bg-emerald-700'
-                    : 'bg-slate-100 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400 cursor-not-allowed'
-                }`}
-              >
-                Next <ChevronRight size={14} />
-              </button>
-            </div>
-          </div>
-
-          {/* Side chevrons – left/right based on trip number, same style as requested (outside modal) */}
-          <button
-            type="button"
-            onClick={goPrev}
-            disabled={!canPrev}
-            aria-label="Previous trip"
-            className={`hidden sm:flex fixed z-[60] top-1/2 -translate-y-1/2 left-[328px] h-10 w-10 rounded-full shadow-lg border items-center justify-center transition-all active:scale-95 ${
-              canPrev ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700' : 'bg-white/60 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-400 cursor-not-allowed'
-            }`}
-          >
-            <ChevronLeft size={20} />
-          </button>
-          <button
-            type="button"
-            onClick={goNext}
-            disabled={!canNext}
-            aria-label="Next trip"
-            className={`hidden sm:flex fixed z-[60] top-1/2 -translate-y-1/2 right-4 h-10 w-10 rounded-full shadow-lg border items-center justify-center transition-all active:scale-95 ${
-              canNext ? 'bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700' : 'bg-white/60 dark:bg-slate-800/60 border-slate-200 dark:border-slate-700 text-slate-400 cursor-not-allowed'
-            }`}
-          >
-            <ChevronRight size={20} />
-          </button>
-        </>
-      )}
-    </>
-  );
+  return <TripHistoryViewModal open trip={current} shops={shops} birdTypes={birdTypes} onClose={onClose} analysisNavigation={navigation} />;
 }
 
 export default React.memo(SummaryTripViewer);

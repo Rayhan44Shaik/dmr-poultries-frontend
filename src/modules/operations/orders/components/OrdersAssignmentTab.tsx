@@ -34,7 +34,11 @@ import {
   GripVertical,
   LayoutGrid,
   Loader2,
-  RefreshCw,
+  RotateCcw,
+  Calendar,
+  ArrowUpDown,
+  Search,
+  MapPin,
   Save,
   Truck,
   X,
@@ -42,6 +46,8 @@ import {
 } from "lucide-react";
 import type { Trip } from "../../../../shared/trip";
 import {
+  opsFilterCardClass,
+  opsFilterLabelClass,
   opsSecondaryButtonClass,
   opsSectionTitleClass,
   opsTableCardClass,
@@ -52,7 +58,7 @@ import {
   opsTableThClass,
   opsTableRowClass,
 } from "../../../../shared/ui/operationsStyles";
-import TripPagination from "../../vehicle-trips/components/TripPagination";
+import { BrandRefreshButton, Pagination } from "../../../../ui";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import {
   collectionTotals,
@@ -91,20 +97,23 @@ import type {
 import {
   ORDERS_TABLE_FONT_CLASS,
   ordersZebraTone,
+  ordersTableZebraRow,
 } from "../ordersTableStyles";
 import {
   ORDERS_NO_SPINNER,
   OrdersEmptyState,
   OrdersMultiSelect,
-  OrdersIconButton,
   OrdersSearchInput,
   OrdersTableSkeleton,
+  OrdersDateControl,
+  OrdersDropdown,
   WhatsAppIcon,
   onOrdersNumberWheel,
 } from "./OrdersCommon";
+import { compareAssignmentRows, type AssignmentSort } from "../assignmentSort";
 import OrdersWhatsAppConfirmPopup from "./OrdersWhatsAppConfirmPopup";
 
-const AVAILABLE_PAGE_SIZE = 10;
+
 
 let clientKeySeq = 0;
 function newClientKey(): string {
@@ -201,14 +210,51 @@ type Props = {
   refreshing: boolean;
 };
 
+/** Historical days are inspection-only; never mount a writable editor. */
+function AssignmentHistory({ views, query, sortMode, refreshing, cityFilters, shopDirectory, resetVersion }: {
+  views: DayVehicleView[]; query: string; sortMode: AssignmentSort; refreshing: boolean; cityFilters: string[]; shopDirectory: ShopDirectory; resetVersion: number;
+}) {
+  const { to } = useOrdersI18n();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
+  const rows = useMemo(() => {
+    const result = views.flatMap(view => view.rows.map(row => ({ ...row, trip: view.trip })))
+      .filter(row => {
+        const city = villageOf(row.shopId, row.shopName, shopDirectory);
+        return (!cityFilters.length || cityFilters.includes(city)) && [row.shopName, city, row.trip.tripNo, row.trip.vehicleNo].join(' ').toLowerCase().includes(query);
+      });
+    const sortable = (row: typeof result[number]) => ({ name: row.shopName, city: villageOf(row.shopId, row.shopName, shopDirectory), birds: row.birds, boxes: row.boxes, weight: 0, sequence: row.sequence, vehicle: row.trip.vehicleNo ?? '', trip: row.trip.tripNo, assigned: row.delivered });
+    return result.sort((a, b) => compareAssignmentRows(sortable(a), sortable(b), sortMode));
+  }, [views, query, sortMode, cityFilters, shopDirectory]);
+  const resetKey = `${query}|${sortMode}|${pageSize}|${cityFilters.join(',')}|${resetVersion}`;
+  const [lastKey, setLastKey] = useState(resetKey);
+  if (lastKey !== resetKey) { setLastKey(resetKey); setPage(1); }
+  const safePage = Math.min(page, Math.max(1, Math.ceil(rows.length / pageSize)));
+  return <>
+    <div className="border-b border-slate-100 px-4 py-3 text-xs font-semibold text-slate-500">{to("orders.read_only_note")}</div>
+    <div className="overflow-x-auto" aria-busy={refreshing}>
+      <table className={`w-full ${ORDERS_TABLE_FONT_CLASS}`}>
+        <thead><tr className={opsTableHeadRowClass}>
+          {["orders.col_sno", "orders.col_shop_name", "orders.col_village", "orders.col_trip_no", "orders.col_vehicle_no", "orders.col_boxes", "orders.col_birds"].map(key => <th key={key} className={opsTableThClass}>{to(key)}</th>)}
+        </tr></thead>
+        <tbody>{refreshing ? <tr><td colSpan={7}><OrdersTableSkeleton rows={5} /></td></tr> : rows.slice((safePage - 1) * pageSize, safePage * pageSize).map((row, index) => <tr key={`${row.trip.id}-${row.shopId}`} className={ordersTableZebraRow(index)}>
+          <td className={opsTableTdClass}>{(safePage - 1) * pageSize + index + 1}</td><td className={opsTableTdClass}>{row.shopName}</td><td className={opsTableTdClass}>{villageOf(row.shopId, row.shopName, shopDirectory)}</td><td className={opsTableTdClass}>{row.trip.tripNo}</td><td className={opsTableTdClass}>{row.trip.vehicleNo}</td><td className={opsTableTdClass}>{row.boxes}</td><td className={opsTableTdClass}>{row.birds}</td>
+        </tr>)}</tbody>
+      </table>
+      {!refreshing && rows.length === 0 && <OrdersEmptyState title={to("orders.no_search_results")} />}
+    </div>
+    <Pagination page={safePage} pageSize={pageSize} totalItems={rows.length} onPageChange={setPage} onPageSizeChange={setPageSize} disabled={refreshing} />
+  </>;
+}
+
 function OrdersAssignmentTab({
   loading,
   day,
-  today: _today,
-  onDaySelect: _onDaySelect,
+  today,
+  onDaySelect,
   collection,
   eligibleVehicles,
-  dayVehicleViews: _dayVehicleViews,
+  dayVehicleViews,
   shopDirectory,
   supervisorDirectory,
   onChanged,
@@ -222,43 +268,81 @@ function OrdersAssignmentTab({
   const [query, setQuery] = useState("");
   const q = query.trim().toLowerCase();
 
-  // The pool always sorts PENDING FIRST — the top-level Sort dropdown was
-  // removed as clutter (the operational order is the only one used).
-  const sortMode: "pending" | "az" | "za" | "vehicle_trip" = "pending";
+  // Sorting applies to the full matching pool before pagination.
+  const [sortMode, setSortMode] = useState<AssignmentSort>("pending");
+  const [cityFilters, setCityFilters] = useState<string[]>([]);
+  const [resetVersion, setResetVersion] = useState(0);
+  const cityOptions = useMemo(() => {
+    const rows = day < today ? dayVehicleViews.flatMap(view => view.rows) : collection?.rows ?? [];
+    return [...new Set(rows.map(row => villageOf(row.shopId, row.shopName, shopDirectory).trim()).filter(Boolean))]
+      .sort((a, b) => a.localeCompare(b)).map(city => ({ value: city, label: city }));
+  }, [day, today, dayVehicleViews, collection, shopDirectory]);
+  const sortOptions = useMemo(() => {
+    const modes: AssignmentSort[] = ['pending', 'sequence', 'az', 'za', 'city_az', 'city_za', 'birds_asc', 'birds_desc', 'boxes_asc', 'boxes_desc', ...(day === today ? ['weight_asc', 'weight_desc'] as AssignmentSort[] : []), 'vehicle_trip'];
+    const existing: Partial<Record<AssignmentSort, string>> = { pending: 'orders.sort_pending_first', az: 'orders.sort_name_az', za: 'orders.sort_name_za', vehicle_trip: 'orders.sort_vehicle_trip' };
+    return modes.map(value => ({ value, label: to(existing[value] ?? `orders.sort_${value}`) }));
+  }, [day, today, to]);
+  const resetFilters = () => {
+    setQuery('');
+    setSortMode('pending');
+    setCityFilters([]);
+    setResetVersion(value => value + 1);
+    // Reset to today. Today's mounted editor is not remounted, so picks survive.
+    if (day !== today) onDaySelect(today);
+  };
+
 
   if (loading) return <OrdersTableSkeleton rows={4} />;
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-      <div className="px-5 py-2.5 border-b border-slate-200 bg-slate-50/60 flex items-center gap-3 flex-wrap">
-        <OrdersSearchInput
-          value={query}
-          onChange={setQuery}
-          placeholder={to("orders.search_assignment")}
-          className="w-full sm:w-64"
-        />
-        <span className="ml-auto text-[11px] font-semibold text-slate-400 whitespace-nowrap">
-          {to("orders.pool_summary", {
-            collected: collection?.totalShops ?? 0,
-            assigned: collection?.assignedShops ?? 0,
-            available: (collection?.totalShops ?? 0) - (collection?.assignedShops ?? 0),
-          })}
-        </span>
-        <OrdersIconButton
-          label={`${to("orders.refresh")} — ${to("orders.refresh_assignment")}`}
-          onClick={onRefresh}
-          busy={refreshing}
-        >
-          <RefreshCw size={14} />
-        </OrdersIconButton>
-      </div>
+    <div className="space-y-5">
+      <section className={opsFilterCardClass} aria-label={to('orders.assignment_filters')}>
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+          <div>
+            <div className={opsFilterLabelClass}><Calendar size={17} className="text-emerald-500" />{to('orders.col_date')}</div>
+            <OrdersDateControl day={day} today={today} onDaySelect={onDaySelect} t={to} hideDayChip />
+          </div>
+          <div>
+            <div className={opsFilterLabelClass}><ArrowUpDown size={17} className="text-emerald-500" />{to('orders.sort')}</div>
+            <OrdersDropdown value={sortMode} onChange={value => setSortMode(value as AssignmentSort)} ariaLabel={to('orders.sort')} options={sortOptions} widthClass="w-full" />
+          </div>
+          <div>
+            <div className={opsFilterLabelClass}><Search size={17} className="text-emerald-500" />{to('orders.search_label')}</div>
+            <OrdersSearchInput value={query} onChange={setQuery} placeholder={to('orders.search_assignment')} className="w-full" />
+          </div>
+          <div>
+            <div className={opsFilterLabelClass}><MapPin size={17} className="text-emerald-500" />{to('orders.city')}</div>
+            <OrdersMultiSelect values={cityFilters} onChange={setCityFilters} options={cityOptions} ariaLabel={to('orders.filter_city')} placeholder={to('orders.filter_city_all')} widthClass="w-full" />
+          </div>
+          <div className="flex items-end justify-end gap-2 sm:col-span-2 xl:col-span-4">
+            <button type="button" onClick={resetFilters} className={`group ${opsSecondaryButtonClass}`} aria-label={to('common.reset')}>
+              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>{to('common.reset')}
+            </button>
+            <BrandRefreshButton onClick={onRefresh} loading={refreshing} />
+          </div>
+        </div>
+      </section>
 
-      {!collection ? (
+      <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm" aria-label={to('orders.tab_assignment')}>
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-emerald-50/60 via-white to-emerald-50/40 px-6 py-3">
+          <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-600 shadow-inner"><PackageCheck size={20} aria-hidden /></span>
+            <h2 className="text-base font-bold tracking-tight text-slate-800">{to('orders.tab_assignment')}</h2>
+          </div>
+          <span className="text-xs font-medium text-slate-500">{to('orders.pool_summary', { collected: collection?.totalShops ?? 0, assigned: collection?.assignedShops ?? 0, available: (collection?.totalShops ?? 0) - (collection?.assignedShops ?? 0) })}</span>
+        </div>
+
+      {day < today ? (
+        <AssignmentHistory key={day} views={dayVehicleViews} query={q} sortMode={sortMode} refreshing={refreshing} cityFilters={cityFilters} shopDirectory={shopDirectory} resetVersion={resetVersion} />
+      ) : !collection ? (
         <OrdersEmptyState
           title={to("orders.assignment_empty")}
           hint={to("orders.select_order")}
         />
       ) : (
+        <div className="relative" aria-busy={refreshing}>
+        {refreshing && <div className="absolute inset-0 z-20 bg-white/90"><OrdersTableSkeleton rows={6} /></div>}
+        <div inert={refreshing}>
         <AssignmentEditor
           key={`${day}|${collection.trip.id}`}
           day={day}
@@ -268,10 +352,15 @@ function OrdersAssignmentTab({
           supervisorDirectory={supervisorDirectory}
           q={q}
           sortMode={sortMode}
+          cityFilters={cityFilters}
+          resetVersion={resetVersion}
           onChanged={onChanged}
           onFinished={onFinished}
         />
+        </div>
+        </div>
       )}
+      </section>
     </div>
   );
 }
@@ -286,6 +375,8 @@ function AssignmentEditor({
   supervisorDirectory,
   q,
   sortMode,
+  cityFilters,
+  resetVersion,
   onChanged,
   onFinished,
 }: {
@@ -295,7 +386,9 @@ function AssignmentEditor({
   shopDirectory: ShopDirectory;
   supervisorDirectory: SupervisorDirectory;
   q: string;
-  sortMode: "pending" | "az" | "za" | "vehicle_trip";
+  sortMode: AssignmentSort;
+  cityFilters: string[];
+  resetVersion: number;
   onChanged: () => void;
   /** Assignment finished — page moves to Tab 3. */
   onFinished: (vehicleTrip: Trip) => void;
@@ -802,29 +895,14 @@ function AssignmentEditor({
     delivered: boolean;
   };
   // ── Collected-shops search + filter ─────────────────────────────────────
-  // A real operational day can carry ~100 shops, so the pool has its OWN
-  // search box and a refine filter on top of the tab-level search. They only
-  // narrow the table — the selection lives in `selected`, so ticking shops
-  // while searching/filtering keeps every earlier pick.
-  const [poolQuery, setPoolQuery] = useState("");
+  // Search and city come from the separate filter card. Status stays local
+  // to this pool; none of these filters changes the selected-shop draft.
   // Defaults to PENDING — with ~100 collected shops the operator almost always
   // wants the ones still waiting for a vehicle, not the already-assigned rows.
   const [poolFilter, setPoolFilter] = useState<
     "all" | "pending" | "assigned" | "this_vehicle"
   >("pending");
-  const [cityFilters, setCityFilters] = useState<string[]>([]);
-  const pq = poolQuery.trim().toLowerCase();
   const thisTripNo = vehicle?.trip.tripNo ?? "";
-  const cityOptions = useMemo(() => {
-    const names = new Set<string>();
-    for (const row of collection.rows) {
-      const city = villageOf(row.shopId, row.shopName, shopDirectory).trim();
-      if (city) names.add(city);
-    }
-    return [...names]
-      .sort((a, b) => a.localeCompare(b))
-      .map((name) => ({ value: name, label: name }));
-  }, [collection.rows, shopDirectory]);
   const cityFilterSet = useMemo(() => new Set(cityFilters), [cityFilters]);
   // ── Status counts for the segmented filter (same kind rules as
   //     filteredPool below: "pending" = still needs a vehicle, i.e. pending
@@ -882,44 +960,33 @@ function AssignmentEditor({
       if (poolFilter === "this_vehicle" && !item.onThisVehicle) return;
       const city = villageOf(row.shopId, row.shopName, shopDirectory);
       if (cityFilterSet.size > 0 && !cityFilterSet.has(city)) return;
-      if (q || pq) {
+      if (q) {
         const hay =
           `${row.shopName} ${city} ${parts.map((p) => `${p.vehicleNo} ${p.tripNo}`).join(" ")}`.toLowerCase();
         if (q && !hay.includes(q)) return;
-        if (pq && !hay.includes(pq)) return;
       }
       list.push(item);
     });
-    if (sortMode === "az") {
-      list.sort(
-        (a, b) => (a.shopName || "").localeCompare(b.shopName || "") || a.poolIndex - b.poolIndex
-      );
-    } else if (sortMode === "za") {
-      list.sort(
-        (a, b) => (b.shopName || "").localeCompare(a.shopName || "") || a.poolIndex - b.poolIndex
-      );
-    } else if (sortMode === "vehicle_trip") {
-      // Pending (no vehicle) first, then grouped by Vehicle No → Trip No.
-      const vehicleOf = (r: PoolRow) => r.parts[0]?.vehicleNo ?? "";
-      const tripOf = (r: PoolRow) => r.parts[0]?.tripNo ?? "";
-      list.sort(
-        (a, b) =>
-          vehicleOf(a).localeCompare(vehicleOf(b)) ||
-          tripOf(a).localeCompare(tripOf(b)) ||
-          a.poolIndex - b.poolIndex
-      );
-    } else {
-      // Pending First: shops needing a vehicle up top (collection order),
-      // then the fully-placed ones (collection order).
-      list.sort((a, b) =>
-        a.kind === b.kind ? a.poolIndex - b.poolIndex : a.kind === "assigned" ? 1 : -1
-      );
-    }
+    const sortable = (row: PoolRow) => ({
+      name: row.shopName || '', city: villageOf(row.shopId, row.shopName, shopDirectory),
+      birds: Number(row.birds) || 0, boxes: rowBoxes(row),
+      weight: orderWeightBasis ? weightForBirds(Number(row.birds) || 0, orderWeightBasis) : 0,
+      sequence: row.poolIndex, vehicle: row.parts[0]?.vehicleNo ?? '', trip: row.parts[0]?.tripNo ?? '', assigned: row.kind === 'assigned',
+    });
+    list.sort((a, b) => compareAssignmentRows(sortable(a), sortable(b), sortMode));
     return list;
-  }, [collection, q, pq, poolFilter, cityFilterSet, thisTripNo, shopDirectory, sortMode]);
+  }, [collection, q, poolFilter, cityFilterSet, thisTripNo, shopDirectory, sortMode, orderWeightBasis]);
 
   const [availablePage, setAvailablePage] = useState(1);
-  const availableKey = `${q}|${pq}|${poolFilter}|${cityFilters.join(",")}|${sortMode}|${filteredPool.length}`;
+  const [lastResetVersion, setLastResetVersion] = useState(resetVersion);
+  if (lastResetVersion !== resetVersion) {
+    setLastResetVersion(resetVersion);
+    setPoolFilter('pending');
+    setAvailablePage(1);
+  }
+
+  const [availablePageSize, setAvailablePageSize] = useState(10);
+  const availableKey = `${q}|${poolFilter}|${cityFilters.join(",")}|${sortMode}|${availablePageSize}`;
   const [lastAvailableKey, setLastAvailableKey] = useState(availableKey);
   if (lastAvailableKey !== availableKey) {
     setLastAvailableKey(availableKey);
@@ -927,14 +994,14 @@ function AssignmentEditor({
   }
   const availableTotalPages = Math.max(
     1,
-    Math.ceil(filteredPool.length / AVAILABLE_PAGE_SIZE)
+    Math.ceil(filteredPool.length / availablePageSize)
   );
   const safeAvailablePage = Math.min(availablePage, availableTotalPages);
   const availableStartIndex =
-    filteredPool.length === 0 ? 0 : (safeAvailablePage - 1) * AVAILABLE_PAGE_SIZE;
+    filteredPool.length === 0 ? 0 : (safeAvailablePage - 1) * availablePageSize;
   const pageAvailable = filteredPool.slice(
-    (safeAvailablePage - 1) * AVAILABLE_PAGE_SIZE,
-    safeAvailablePage * AVAILABLE_PAGE_SIZE
+    (safeAvailablePage - 1) * availablePageSize,
+    safeAvailablePage * availablePageSize
   );
 
   // ── Delivery state of a selected shop from persisted day data ───────────
@@ -1116,21 +1183,6 @@ function AssignmentEditor({
               );
             })}
           </div>
-          {/* Search sits beside the city filter — both refine the pool. */}
-          <OrdersSearchInput
-            value={poolQuery}
-            onChange={setPoolQuery}
-            placeholder={to("orders.search_pool")}
-            className="w-full sm:w-52 sm:flex-1 lg:w-60 lg:flex-none"
-          />
-          <OrdersMultiSelect
-            values={cityFilters}
-            onChange={setCityFilters}
-            options={cityOptions}
-            ariaLabel={to("orders.filter_city")}
-            placeholder={to("orders.filter_city_all")}
-            widthClass="w-48"
-          />
           <div className="ml-auto flex items-center gap-2 flex-wrap">
             {selected.length > 0 && (
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm">
@@ -1152,7 +1204,7 @@ function AssignmentEditor({
         <div className="px-4 py-5">
           <OrdersEmptyState
             title={
-              pq
+              q
                 ? to("orders.no_search_results")
                 : poolFilter !== "all" || cityFilters.length > 0
                   ? to("orders.no_filter_results")
@@ -1237,15 +1289,13 @@ function AssignmentEditor({
               </tbody>
             </table>
           </div>
-          {filteredPool.length > AVAILABLE_PAGE_SIZE && (
-            <div className="px-4 py-2.5 border-t border-slate-100">
-              <TripPagination
-                currentPage={safeAvailablePage}
-                totalPages={availableTotalPages}
-                onPageChange={setAvailablePage}
-              />
-            </div>
-          )}
+          <Pagination
+            page={safeAvailablePage}
+            pageSize={availablePageSize}
+            totalItems={filteredPool.length}
+            onPageChange={setAvailablePage}
+            onPageSizeChange={(size) => { setAvailablePageSize(size); setAvailablePage(1); }}
+          />
         </>
       )}
 

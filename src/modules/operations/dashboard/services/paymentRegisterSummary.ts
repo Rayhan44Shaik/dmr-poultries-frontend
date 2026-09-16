@@ -1,3 +1,4 @@
+import { isApprovedRegisterPayment } from '../../../accounts/utils/approvedExpenses';
 import { apiGet } from "../../../../api";
 
 const PAYMENTS_PATH = "/accounts/payments";
@@ -13,6 +14,7 @@ interface PaymentRegisterApiRow {
   referenceNo?: string;
   category?: string;
   status?: string;
+  deleted?: boolean | number | string;
 }
 
 export interface PaymentRegisterPayeeSummary {
@@ -46,7 +48,7 @@ export interface PaymentRegisterSummary {
   modeRows: PaymentRegisterModeSummary[];
 }
 
-const APPROVED_PAYMENT_STATUS = "approved";
+
 
 function toAmount(value: unknown): number {
   const amount = Number(value);
@@ -106,17 +108,21 @@ function normalisePayment(row: PaymentRegisterApiRow): NormalisedPaymentRow {
   };
 }
 
-function buildSummary(
+export function buildSummary(
   rows: PaymentRegisterApiRow[],
   fromDate: string,
   toDate: string,
 ): PaymentRegisterSummary {
-  // Dashboard must show approved Payment Register rows only. Draft/pending,
-  // cancelled, rejected and any non-approved payment rows are intentionally
-  // excluded here, matching the user's request for approved-only payment data.
-  const approved = rows
-    .map(normalisePayment)
-    .filter((row) => row.status === APPROVED_PAYMENT_STATUS);
+  // Match Analysis: Approved Payment Register rows only, for the
+  // visible dates. Do not trust older servers to apply date query parameters.
+  const unique = new Map<string, PaymentRegisterApiRow>();
+  rows.forEach((row, index) => unique.set(String(row.id ?? row.paymentNo ?? `row-${index}`), row));
+  const approved = [...unique.values()]
+    .filter(row => {
+      const date = String(row.paymentDate ?? '').slice(0, 10);
+      return isApprovedRegisterPayment(row) && date >= fromDate && date <= toDate;
+    })
+    .map(normalisePayment);
 
   const totalAmount = approved.reduce((total, row) => total + row.amount, 0);
   const totalCount = approved.length;

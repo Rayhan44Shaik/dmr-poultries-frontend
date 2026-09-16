@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { endOfWeek, format, startOfWeek } from 'date-fns';
+import { getQuarterSampleRange } from '../../../sample/quarterSample';
 import { useFleetVehicles } from './useFleetVehicles';
 import { handleApiError, isCanceledError } from '../../../api/errors';
 import analyticsApi from '../services/analyticsApi';
@@ -107,12 +108,30 @@ function toView(payload: FleetAnalyticsResponse): AnalyticsView {
   };
 }
 
-export function useAnalyticsData() {
+export function useAnalyticsData(active = true) {
   const { vehicles, loading: vehiclesLoading } = useFleetVehicles();
   const { start: weekStart, end: weekEnd } = getCurrentWeekRange();
   const [fromDate, setFromDateState] = useState(() => dateString(weekStart));
   const [toDate, setToDateState] = useState(() => dateString(weekEnd));
   const [selectedVehicleId, setSelectedVehicleIdState] = useState<number | null>(null);
+  const [sampleRange, setSampleRange] = useState<{ fromDate: string; toDate: string; today: string } | null>(null);
+  const [rangeReady, setRangeReady] = useState(false);
+  const dateEdited = useRef(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    void getQuarterSampleRange().then((range) => {
+      if (cancelled) return;
+      setSampleRange(range);
+      if (range && !dateEdited.current) {
+        setFromDateState(range.fromDate);
+        setToDateState(range.toDate);
+      }
+      setRangeReady(true);
+    });
+    return () => { cancelled = true; };
+  }, []);
+
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
 
@@ -139,12 +158,14 @@ export function useAnalyticsData() {
 
   const setFromDate = useCallback((value: string) => {
     if (!value) return;
+    dateEdited.current = true;
     setFromDateState((current) => (current === value ? current : value));
     setToDateState((currentTo) => (value > currentTo ? value : currentTo));
   }, []);
 
   const setToDate = useCallback((value: string) => {
     if (!value) return;
+    dateEdited.current = true;
     setToDateState((current) => (current === value ? current : value));
     setFromDateState((currentFrom) => (value < currentFrom ? value : currentFrom));
   }, []);
@@ -156,9 +177,10 @@ export function useAnalyticsData() {
   const clearFilters = useCallback(() => {
     const { start, end } = getCurrentWeekRange();
     setSelectedVehicleIdState(null);
-    setFromDateState(dateString(start));
-    setToDateState(dateString(end));
-  }, []);
+    dateEdited.current = true;
+    setFromDateState(sampleRange?.fromDate ?? dateString(start));
+    setToDateState(sampleRange?.toDate ?? dateString(end));
+  }, [sampleRange]);
 
   const refresh = useCallback(() => {
     if (inFlight.current) return;
@@ -167,7 +189,16 @@ export function useAnalyticsData() {
     setRefreshTrigger((t) => t + 1);
   }, []);
 
+  // Tabs stay mounted. Re-entering Analytics must re-read server rollups after
+  // maintenance / EMI edits rather than display the previous tab's snapshot.
+  const wasActive = useRef(active);
   useEffect(() => {
+    if (active && !wasActive.current) refresh();
+    wasActive.current = active;
+  }, [active, refresh]);
+
+  useEffect(() => {
+    if (!rangeReady || !active) return;
     const key = filterKey(fromDate, toDate, selectedVehicleId);
     const hit = refreshNonce === 0 ? fleetCacheGet<FleetAnalyticsResponse>(key) : undefined;
     if (hit) {
@@ -213,7 +244,11 @@ export function useAnalyticsData() {
         setLoading(false);
         setRefreshing(false);
       });
-  }, [fromDate, toDate, selectedVehicleId, refreshNonce]);
+    return () => {
+      loadGen.current = gen + 1;
+      inFlight.current = false;
+    };
+  }, [fromDate, toDate, selectedVehicleId, refreshNonce, rangeReady, active]);
 
   const kpis = data.kpis;
   const stats = useMemo(
@@ -250,6 +285,7 @@ export function useAnalyticsData() {
 
   return {
     stats,
+    sampleRange,
     weeklyData: data.weekly,
     expenseBreakdown: data.costCenters,
     topPerformers: data.topPerformers,

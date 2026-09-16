@@ -1,19 +1,22 @@
 // src/modules/operations/pages/OperationsPages.tsx
 
-import React, { useEffect, useMemo } from "react";
+import React, { Suspense, useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
-import OperationsDashboardPage from "../dashboard/pages/OperationsDashboardPage";
-import TripEntryPage from "../vehicle-trips/pages/TripEntryPage";
-import TripListPage from "../vehicle-trips/pages/TripListPage";
-import ShopSalesPage from "../shop-sales/pages/ShopSalesPage";
-import RatesEntryPage from "../shop-sales/pages/RatesEntryPage";
-import CollectionEntryPage from "../collections/pages/CollectionEntryPage";
-import PendingCollectionsPage from "../collections/pages/PendingCollectionsPage";
-import CollectionReportPage from "../collections/pages/CollectionReportPage";
-import FuelExpensesPage from "../fuel-expenses/pages/FuelExpensesPage";
-import MortalityEntryPage from "../mortality/pages/MortalityEntryPage";
-import OrdersPage from "../orders/pages/OrdersPage";
+import { retryableImport } from "../../../routes/lazyWithRetry";
+import { useI18n } from "../../../i18n";
+
+const OperationsDashboardPage = React.lazy(retryableImport(() => import("../dashboard/pages/OperationsDashboardPage")));
+const TripEntryPage = React.lazy(retryableImport(() => import("../vehicle-trips/pages/TripEntryPage")));
+const TripListPage = React.lazy(retryableImport(() => import("../vehicle-trips/pages/TripListPage")));
+const ShopSalesPage = React.lazy(retryableImport(() => import("../shop-sales/pages/ShopSalesPage")));
+const RatesEntryPage = React.lazy(retryableImport(() => import("../shop-sales/pages/RatesEntryPage")));
+const CollectionEntryPage = React.lazy(retryableImport(() => import("../collections/pages/CollectionEntryPage")));
+const PendingCollectionsPage = React.lazy(retryableImport(() => import("../collections/pages/PendingCollectionsPage")));
+const CollectionReportPage = React.lazy(retryableImport(() => import("../collections/pages/CollectionReportPage")));
+const FuelExpensesPage = React.lazy(retryableImport(() => import("../fuel-expenses/pages/FuelExpensesPage")));
+const MortalityEntryPage = React.lazy(retryableImport(() => import("../mortality/pages/MortalityEntryPage")));
+const OrdersPage = React.lazy(retryableImport(() => import("../orders/pages/OrdersPage")));
 
 // Map tab keys (resolved from ?tab= sidebar deep-links / path aliases)
 // to their child page components.
@@ -32,6 +35,7 @@ const tabComponents: Record<string, React.ComponentType<{ embedded?: boolean }>>
 };
 
 function OperationsPages() {
+  const { t } = useI18n();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -69,9 +73,15 @@ function OperationsPages() {
   }, [activeTab]);
 
   return (
-    <div className="w-full px-4 pb-8 pt-6 sm:px-5 lg:px-6">
-      <div key={activeTab} className="mx-auto w-full max-w-[1600px] animate-page-pop">
-        <ActiveComponent embedded={true} />
+    <div className={activeTab === "orders" ? "w-full" : "w-full px-4 pb-8 pt-6 sm:px-5 lg:px-6"}>
+      <div key={activeTab} className={activeTab === "orders" ? "w-full" : "mx-auto w-full max-w-[1600px] animate-page-pop"}>
+        <Suspense fallback={
+          <div role="status" aria-busy="true" className="animate-pulse rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
+            {t("common.loading")}
+          </div>
+        }>
+          <ActiveComponent embedded={true} />
+        </Suspense>
       </div>
     </div>
   );

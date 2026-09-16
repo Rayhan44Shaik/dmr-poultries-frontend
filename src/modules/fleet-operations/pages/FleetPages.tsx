@@ -78,7 +78,7 @@ function FleetTabPane({ tab, active }: { tab: VisibleFleetTab; active: boolean }
     >
       <Suspense fallback={<FleetTabSkeleton />}>
         <LoadSignaller onLoaded={handleLoaded} />
-        <Component embedded={true} active={tab === "emi" ? active : undefined} />
+        <Component embedded={true} active={active} />
       </Suspense>
     </div>
   );

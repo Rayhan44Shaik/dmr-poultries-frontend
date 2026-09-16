@@ -56,6 +56,8 @@ interface Props {
    * completed trips / Step 1 otherwise. Farm Payment passes 1 (Step 2 —
    * Farm details) because the farm is what a payment reviewer needs first. */
   initialStep?: number;
+  /** Optional in-view navigation supplied only by Account Analysis. */
+  analysisNavigation?: React.ReactNode;
   /** Delivery communication state belongs to Trip History, not Recent Activity. */
   showCommunicationStatus?: boolean;
 }
@@ -217,6 +219,7 @@ function TripViewModal({
   shops,
   birdTypes,
   initialStep,
+  analysisNavigation,
   showCommunicationStatus = true,
 }: Props) {
   const { t, language, toggleLanguage } = useI18n();
@@ -361,6 +364,7 @@ function TripViewModal({
     <>
       <AppShellModal open={open} onClose={onClose} panelClassName="bg-white">
         <div className="bg-white w-full h-full overflow-hidden flex flex-col rounded-2xl">
+          {analysisNavigation}
           {/* Header — rounded top */}
           <div className="border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/80 rounded-t-2xl">
             <div className="px-6 md:px-8 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
