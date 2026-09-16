@@ -51,12 +51,14 @@ const recoveryColor = (value: number): string => {
 function RecoveryRing({ value, size = 46 }: { value: number; size?: number }) {
   const pct = clampPct(value);
   const color = recoveryColor(pct);
-  const radius = 18.5;
+  const radius = 20.4;
+  const strokeWidth = 4.1;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference * (1 - pct / 100);
   const roundedPct = Math.round(pct);
-  const numberFontSize = Math.max(12, Math.round(size * 0.29 * 10) / 10);
-  const percentFontSize = Math.max(8.5, Math.round(size * 0.19 * 10) / 10);
+  const isFullRecovery = roundedPct >= 100;
+  const numberFontSize = Math.max(13, Math.round(size * (isFullRecovery ? 0.27 : 0.31) * 10) / 10);
+  const percentFontSize = Math.max(9, Math.round(size * (isFullRecovery ? 0.17 : 0.2) * 10) / 10);
 
   return (
     <span
@@ -71,7 +73,7 @@ function RecoveryRing({ value, size = 46 }: { value: number; size?: number }) {
           r={radius}
           fill="none"
           stroke="#e2e8f0"
-          strokeWidth="4.8"
+          strokeWidth={strokeWidth}
         />
         <circle
           cx="24"
@@ -79,16 +81,16 @@ function RecoveryRing({ value, size = 46 }: { value: number; size?: number }) {
           r={radius}
           fill="none"
           stroke={color}
-          strokeWidth="4.8"
+          strokeWidth={strokeWidth}
           strokeLinecap={pct >= 99.5 ? "butt" : "round"}
           strokeDasharray={circumference}
           strokeDashoffset={dashOffset}
           transform="rotate(-90 24 24)"
         />
       </svg>
-      <span className="relative flex items-baseline justify-center font-black leading-none tabular-nums tracking-[-0.08em] text-slate-800">
+      <span className="relative flex max-w-[78%] items-center justify-center overflow-visible whitespace-nowrap font-black leading-none tabular-nums tracking-[-0.08em] text-slate-800">
         <span style={{ fontSize: numberFontSize, lineHeight: 1 }}>{roundedPct}</span>
-        <span className="ml-0.5 tracking-normal" style={{ fontSize: percentFontSize, lineHeight: 1 }}>%</span>
+        <span className="ml-px tracking-normal" style={{ fontSize: percentFontSize, lineHeight: 1 }}>%</span>
       </span>
     </span>
   );
@@ -198,7 +200,7 @@ export default function CollectionPerformanceChart({
               triggerClassName="h-9 rounded-xl border-slate-200 bg-white/95 px-3 text-[11.5px] font-semibold shadow-xs"
             />
             <div className="flex shrink-0 items-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50/65 px-2.5 py-1.5">
-              <RecoveryRing value={recovery} size={58} />
+              <RecoveryRing value={recovery} size={66} />
               <div className="leading-tight">
                 <p className="text-[9px] font-black uppercase tracking-wide text-emerald-700">
                   {t("ops.dashboard.collection_performance.recovery")}
@@ -248,11 +250,11 @@ export default function CollectionPerformanceChart({
                   className="group min-w-0 rounded-xl border border-slate-100 bg-gradient-to-r from-white to-slate-50/60 px-2.5 py-1.5 shadow-xs transition-colors duration-150 hover:from-emerald-50/35 hover:to-white"
                   title={`${row.shopName}\n${t("ops.dashboard.collection_performance.sales")}: ${formatINR(row.salesAmount)}\n${t("ops.dashboard.collection_performance.collected")}: ${formatINR(row.collectionAmount)}\n${t("ops.dashboard.collection_performance.gap")}: ${formatINR(row.outstandingAmount)}`}
                 >
-                  <div className="grid min-w-0 grid-cols-[1.35rem_3.25rem_minmax(0,1fr)_auto] items-center gap-1.5">
+                  <div className="grid min-w-0 grid-cols-[1.35rem_3.65rem_minmax(0,1fr)_auto] items-center gap-1.5">
                     <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-emerald-50 text-[9.5px] font-black tabular-nums text-emerald-700 ring-1 ring-inset ring-emerald-100">
                       {index + 1}
                     </span>
-                    <RecoveryRing value={rowRecovery} size={50} />
+                    <RecoveryRing value={rowRecovery} size={56} />
                     <div className="min-w-0">
                       <p className="truncate text-[12.5px] font-medium leading-tight text-slate-700 transition-colors group-hover:text-slate-900">
                         {row.shopName}
