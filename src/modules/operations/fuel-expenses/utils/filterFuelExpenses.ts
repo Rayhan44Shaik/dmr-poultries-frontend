@@ -58,6 +58,32 @@ export function uniqueFuelExpenses(expenses: readonly FuelExpense[]): FuelExpens
   });
 }
 
+/**
+ * Returns only the latest approved fuel expense per vehicle (distinct on vehicle).
+ * Matches the Approved tab behaviour of the Recent Maintenance Table.
+ */
+export function getLatestApprovedFuelExpensesPerVehicle(bills: readonly FuelExpense[]): FuelExpense[] {
+  const approvedBills = bills.filter((bill) => {
+    const isDeleted = bill.deleted === true || bill.status === "Deleted";
+    const isTrip = bill.sourceType === "TRIP" || !!bill.tripNo;
+    return !isDeleted && (isTrip || bill.status === "Approved");
+  });
+
+  const sorted = [...approvedBills].sort(compareBillsNewestFirst);
+  const seen = new Set<string>();
+  const result: FuelExpense[] = [];
+
+  for (const bill of sorted) {
+    const vehicleKey = String(bill.vehicleNo || bill.vehicleId || "").trim().toUpperCase();
+    if (vehicleKey && !seen.has(vehicleKey)) {
+      seen.add(vehicleKey);
+      result.push(bill);
+    }
+  }
+
+  return result;
+}
+
 export function filterFuelExpenses(
   bills: readonly FuelExpense[],
   {
@@ -75,7 +101,7 @@ export function filterFuelExpenses(
   const from = dateOnly(fromDate);
   const to = dateOnly(toDate);
 
-  return bills.filter((bill) => {
+  const matched = bills.filter((bill) => {
     const isDeleted = bill.deleted === true || bill.status === "Deleted";
     const isTrip = bill.sourceType === "TRIP" || !!bill.tripNo;
     const effectiveStatus: FuelUiStatus = isDeleted ? "Deleted" : isTrip ? "Approved" : bill.status;
@@ -104,6 +130,13 @@ export function filterFuelExpenses(
 
     return matchesGlobalSearch(bill, search);
   });
+
+  // For the Approved tab: return only the latest approved record per vehicle
+  if (quickTab === "APPROVED") {
+    return getLatestApprovedFuelExpensesPerVehicle(matched);
+  }
+
+  return matched;
 }
 
 function compareBillsNewestFirst(left: FuelExpense, right: FuelExpense): number {
@@ -146,3 +179,4 @@ export function sortFuelExpenses(
     return String(left.billNo).localeCompare(String(right.billNo), undefined, { numeric: true }) * direction;
   });
 }
+

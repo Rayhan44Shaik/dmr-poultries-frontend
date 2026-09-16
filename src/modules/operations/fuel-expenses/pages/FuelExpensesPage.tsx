@@ -19,6 +19,7 @@ import {
   filterFuelExpenses,
   sortFuelExpenses,
   uniqueFuelExpenses,
+  getLatestApprovedFuelExpensesPerVehicle,
   type FuelQuickTab,
 } from "../utils/filterFuelExpenses";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
@@ -136,10 +137,15 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
 
   // ── Live Tab Counts (All, Pending, Approved, Deleted) ──
   const tabCounts = useMemo(() => {
+    const approvedBills = baseFilteredBills.filter(
+      (b) => !b.deleted && b.status !== "Deleted" && (b.status === "Approved" || b.sourceType === "TRIP" || !!b.tripNo)
+    );
+    const latestApproved = getLatestApprovedFuelExpensesPerVehicle(approvedBills);
+
     return {
       all: baseFilteredBills.filter((b) => !b.deleted && b.status !== "Deleted").length,
       pending: baseFilteredBills.filter((b) => !b.deleted && b.sourceType !== "TRIP" && !b.tripNo && b.status === "Pending").length,
-      approved: baseFilteredBills.filter((b) => !b.deleted && (b.status === "Approved" || b.sourceType === "TRIP" || !!b.tripNo)).length,
+      approved: latestApproved.length,
       deleted: baseFilteredBills.filter((b) => b.deleted === true || b.status === "Deleted").length,
     };
   }, [baseFilteredBills]);
@@ -536,7 +542,28 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
       <FuelViewModal
         isOpen={viewModalOpen}
         bill={viewingBill}
-        vehicleBills={viewingBill ? deduplicatedExpenses.filter((b) => b.vehicleNo === viewingBill.vehicleNo) : []}
+        vehicles={masterVehicles}
+        vehicleBills={
+          viewingBill
+            ? deduplicatedExpenses.filter(
+                (b) =>
+                  (b.vehicleNo && viewingBill.vehicleNo && b.vehicleNo.toLowerCase() === viewingBill.vehicleNo.toLowerCase()) ||
+                  (b.vehicleId && viewingBill.vehicleId && String(b.vehicleId) === String(viewingBill.vehicleId))
+              )
+            : []
+        }
+        canEdit={Boolean(
+          viewingBill &&
+          viewingBill.sourceType !== "TRIP" &&
+          !viewingBill.tripNo &&
+          viewingBill.status !== "Approved" &&
+          !viewingBill.deleted &&
+          viewingBill.status !== "Deleted"
+        )}
+        onEdit={(billToEdit) => {
+          setViewModalOpen(false);
+          handleEdit(billToEdit);
+        }}
         onClose={() => {
           setViewModalOpen(false);
           setViewingBill(null);
