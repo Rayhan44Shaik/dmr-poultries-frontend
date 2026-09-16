@@ -2,6 +2,7 @@ import React from "react";
 import { Eye, Trash2, Hash, User, CreditCard, Calendar, ShoppingBag, TrendingUp, Phone, Building2 } from "lucide-react";
 import type { PendingReportRow } from "../../types/collection";
 import { useI18n } from "../../../../../i18n";
+import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocalization";
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-IN", {
@@ -50,7 +51,11 @@ function PendingCollectionsTable({
   totalShops,
   isLoading = false,
 }: Props) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+  // Record text (shop and owner names) is transliterated for display only —
+  // selection, view, delete and the row keys keep the stored value.
+  const shown = (value: string | null | undefined) =>
+    localizeTripViewText(value ?? "", language);
   const handleRowClick = (shopName: string) => {
     if (selectedShopName === shopName) {
       onSelectShop(null);
@@ -84,7 +89,7 @@ function PendingCollectionsTable({
           </span>
           {selectedShop && (
             <span className="ml-2 text-[11px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200/70 px-2 py-0.5 rounded-full align-middle">
-              {selectedShop.shopName}
+              {shown(selectedShop.shopName)}
             </span>
           )}
         </h3>
@@ -188,14 +193,19 @@ function PendingCollectionsTable({
                       )}
                       {index + 1}
                     </td>
-                    <td className="px-3.5 py-3 text-xs font-semibold text-slate-700">{shop.shopName}</td>
-                    <td className="px-3.5 py-3 text-xs text-slate-600">{shop.ownerName || "—"}</td>
-                    <td className="px-3.5 py-3 text-xs text-slate-600">{shop.phoneNumber || "—"}</td>
+                    {/* One line per record: the tablet previously wrapped "Anjaneya Broiler
+                      Mart" over three lines and pushed the money columns out of
+                      alignment. The table scrolls horizontally instead. */}
+                    <td className="px-3.5 py-3 text-xs font-semibold whitespace-nowrap text-slate-700">
+                      {shown(shop.shopName)}
+                    </td>
+                    <td className="px-3.5 py-3 text-xs whitespace-nowrap text-slate-600">{shown(shop.ownerName) || "—"}</td>
+                    <td className="px-3.5 py-3 text-xs whitespace-nowrap tabular-nums text-slate-600">{shop.phoneNumber || "—"}</td>
                     <td className="px-3.5 py-3 text-center text-xs font-medium text-slate-600">{formatDate(shop.lastCollectionDate)}</td>
-                    <td className={`px-3.5 py-3 text-right text-xs font-bold ${balanceColor}`}>{formatBalance(balance)}</td>
-                    <td className="px-3.5 py-3 text-right text-xs font-bold text-blue-600">{formatCurrency(weeklySales)}</td>
-                    <td className="px-3.5 py-3 text-right text-xs font-bold text-green-600">{formatCurrency(weeklyCollections)}</td>
-                    <td className={`px-3.5 py-3 text-right text-xs font-bold ${recoveryColor}`}>{recovery.toFixed(1)}%</td>
+                    <td className={`px-3.5 py-3 text-right text-xs font-bold whitespace-nowrap ${balanceColor}`}>{formatBalance(balance)}</td>
+                    <td className="px-3.5 py-3 text-right text-xs font-bold whitespace-nowrap text-blue-600">{formatCurrency(weeklySales)}</td>
+                    <td className="px-3.5 py-3 text-right text-xs font-bold whitespace-nowrap text-green-600">{formatCurrency(weeklyCollections)}</td>
+                    <td className={`px-3.5 py-3 text-right text-xs font-bold whitespace-nowrap ${recoveryColor}`}>{recovery.toFixed(1)}%</td>
                     <td className="px-3.5 py-3 text-center">
                       {shop.overdueDays != null && shop.overdueDays > 0 ? (
                         <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-red-50 text-red-600 text-xs font-medium">

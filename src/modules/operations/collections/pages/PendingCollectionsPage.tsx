@@ -184,6 +184,37 @@ export default function PendingCollectionsPage() {
     setAppliedToDate(sun);
   }, []);
 
+  /**
+   * Every filter applies the moment it changes — the Trip List behaviour, and
+   * the only behaviour that makes the bar honest. Before this, the applied
+   * values were written by Reset and by the initial date-range effect alone,
+   * so picking a shop, a date range, a sort or a recovery threshold in the bar
+   * changed the control but not a single row.
+   *
+   * The search box keeps its 300 ms debounce (it fires per keystroke); the
+   * pickers are single events, so they apply immediately.
+   */
+  useEffect(() => {
+    setAppliedFromDate(fromDate);
+    setAppliedToDate(toDate);
+  }, [fromDate, toDate]);
+
+  useEffect(() => {
+    setAppliedShopName(shopName);
+  }, [shopName]);
+
+  useEffect(() => {
+    setAppliedSortBy(sortBy);
+  }, [sortBy]);
+
+  useEffect(() => {
+    setAppliedRecoveryThreshold(recoveryThreshold);
+  }, [recoveryThreshold]);
+
+  useEffect(() => {
+    setAppliedSearchQuery(debouncedSearchQuery);
+  }, [debouncedSearchQuery]);
+
   // Fetch pending summary when applied date range changes
   useEffect(() => {
     if (!appliedFromDate || !appliedToDate) return;
@@ -408,14 +439,6 @@ export default function PendingCollectionsPage() {
     toast.info(t("ops.collection.filters_reset"));
   };
 
-  const hasPendingFilters =
-    fromDate !== "" ||
-    toDate !== "" ||
-    shopName.trim() !== "" ||
-    recoveryThreshold > 0 ||
-    sortBy !== "alphabeticalAZ" ||
-    searchQuery.trim() !== "";
-
   const hasActiveFilters =
     appliedFromDate !== "" ||
     appliedToDate !== "" ||
@@ -456,7 +479,6 @@ export default function PendingCollectionsPage() {
         setSearchQuery={setSearchQuery}
         onReset={resetFilters}
         onRefresh={refreshData}
-        hasFilters={hasPendingFilters}
       />
 
       {/* KPI Summary Strip */}

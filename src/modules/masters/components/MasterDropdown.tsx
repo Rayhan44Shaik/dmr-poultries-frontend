@@ -386,11 +386,17 @@ export default function MasterDropdown({
               onChange={(event) => {
                 setQuery(event.target.value);
                 const keyword = event.target.value.trim().toLocaleLowerCase();
+                // Must mirror the `filtered` memo above exactly, searchText
+                // included: a translated label (Telugu shop or person name)
+                // only matches the query through its retained raw spelling, and
+                // an active index computed without it would highlight — and
+                // then commit on Enter — the wrong row.
                 const matches = items.filter(
                   (option) =>
                     (allowClear && option.value === "") ||
                     !keyword ||
                     option.label.toLocaleLowerCase().includes(keyword) ||
+                    option.searchText?.toLocaleLowerCase().includes(keyword) ||
                     option.value.toLocaleLowerCase().includes(keyword) ||
                     (option.keywords?.toLocaleLowerCase().includes(keyword) ?? false),
                 );
