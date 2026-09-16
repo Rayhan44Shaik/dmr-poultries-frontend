@@ -55,6 +55,7 @@ import { salaryDisplayText, salaryLocale, salaryMatchesQuery } from "../utils/sa
 import { SalaryTable } from "../components/salary/salaryTable";
 import { SalaryView } from "../components/salary/SalaryView";
 import { SalaryReviewModal } from "../components/salary/SalaryReviewModal";
+import { isSalaryPaid } from "../components/salary/payslipModel";
 import { SendPayslipsModal } from "../components/salary/SendPayslipsModal";
 import { EMAIL_TEMPLATES } from "../components/salary/payslipMessages";
 import { SAMPLE_EMPLOYEE_LIST } from "../services/staffSampleData";
@@ -258,16 +259,16 @@ function SalaryRegisterPage() {
     });
 
     const num = (v: number | undefined | null) => Number(v ?? 0);
-    const statusRank = (s: string) =>
-      s === "Pending" ? 0 : s === "Submitted" ? 1 : 2; // Pending < Submitted < Paid
+    // Single status model — legacy "Submitted" ranks as Paid (isSalaryPaid).
+    const statusRank = (r: Pick<SalaryRecord, "status">) => (isSalaryPaid(r) ? 2 : 0);
     const sorted = [...filtered].sort((a, b) => {
       switch (sortKey) {
         case "name-desc":
           return (b.employeeName || "").localeCompare(a.employeeName || "");
         case "status-pending-first":
-          return statusRank(a.status) - statusRank(b.status) || (a.employeeName || "").localeCompare(b.employeeName || "");
+          return statusRank(a) - statusRank(b) || (a.employeeName || "").localeCompare(b.employeeName || "");
         case "status-paid-first":
-          return statusRank(b.status) - statusRank(a.status) || (a.employeeName || "").localeCompare(b.employeeName || "");
+          return statusRank(b) - statusRank(a) || (a.employeeName || "").localeCompare(b.employeeName || "");
         case "salary-asc":
           return num(a.netSalary) - num(b.netSalary);
         case "salary-desc":
@@ -501,7 +502,7 @@ function SalaryRegisterPage() {
   // Individual payment dates still appear in each employee's payslip view.
   const monthPaidOnDate = useMemo(() => {
     if (allRecords.length === 0) return null;
-    const paid = allRecords.filter((r) => r.status === "Paid");
+    const paid = allRecords.filter((r) => isSalaryPaid(r));
     if (paid.length !== allRecords.length) return null;
     const dates = paid
       .map((r) => r.paymentDate ?? null)
@@ -519,7 +520,7 @@ function SalaryRegisterPage() {
     () =>
       allRecords.filter(
         (r) =>
-          (r.status === "Paid" || r.status === "Submitted") &&
+          isSalaryPaid(r) &&
           (r.emailsSent ?? 0) === 0 &&
           (r.whatsappsSent ?? 0) === 0
       ),

@@ -44,6 +44,7 @@ import { ClassicPayslipSheet } from "./ClassicPayslipSheet";
 import { ViewLanguageToggle } from "../../../../ui/ViewLanguageToggle";
 import {
   computePayslipTotals,
+  isSalaryPaid,
   toAmountValues,
   type AmountFieldKey,
   type AmountValues,
@@ -133,7 +134,7 @@ function SalaryReviewModalBody({
       statusFilter === "all"
         ? records
         : records.filter((r) =>
-            statusFilter === "paid" ? r.status === "Paid" : r.status !== "Paid"
+            statusFilter === "paid" ? isSalaryPaid(r) : !isSalaryPaid(r)
           );
     const q = query.trim();
     if (!q) return byStatus;
@@ -157,8 +158,8 @@ function SalaryReviewModalBody({
   const statusCounts = useMemo(
     () => ({
       all: records.length,
-      unpaid: records.filter((r) => r.status !== "Paid").length,
-      paid: records.filter((r) => r.status === "Paid").length,
+      unpaid: records.filter((r) => !isSalaryPaid(r)).length,
+      paid: records.filter((r) => isSalaryPaid(r)).length,
     }),
     [records]
   );
@@ -527,12 +528,12 @@ function SalaryReviewModalBody({
 
                             <span
                               className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-bold ${
-                                r.status === "Paid" || r.status === "Submitted"
+                                isSalaryPaid(r)
                                   ? "bg-emerald-50 text-emerald-700"
                                   : "bg-amber-50 text-amber-600"
                               }`}
                             >
-                              {r.status === "Paid" || r.status === "Submitted"
+                              {isSalaryPaid(r)
                                 ? t("common.paid")
                                 : t("common.pending")}
                             </span>

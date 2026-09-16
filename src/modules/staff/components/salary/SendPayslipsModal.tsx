@@ -39,6 +39,7 @@ import {
 } from "lucide-react";
 import { AppShellModal, Button } from "../../../../ui";
 import { ScopedI18nProvider, useI18n, type Language } from "../../../../i18n";
+import { isSalaryPaid } from "./payslipModel";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import { usePopupGuard } from "./usePopupGuard";
 import { ViewLanguageToggle } from "../../../../ui/ViewLanguageToggle";
@@ -115,7 +116,7 @@ function SendPayslipsDialog({
 
   // Submitted-only recipient list (defensive: the page already filters).
   const submitted = useMemo(
-    () => records.filter((r) => r.status === "Paid" || r.status === "Submitted"),
+    () => records.filter((r) => isSalaryPaid(r)),
     [records]
   );
   // Everything starts selected; the user may narrow it down.

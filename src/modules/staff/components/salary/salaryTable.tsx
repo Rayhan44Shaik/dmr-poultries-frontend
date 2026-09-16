@@ -29,6 +29,7 @@ import { useI18n, type Language } from "../../../../i18n";
 import { salaryDisplayText, salaryLocale } from "../../utils/salaryDisplay";
 import type { SalaryRecord } from "../../types/staffDashboard";
 import { uiBadgeClass, uiCheckClass } from "../../../../shared/ui/uiTokens";
+import { isSalaryPaid } from "./payslipModel";
 
 /** Render "YYYY-MM-DD" (or ISO) as a readable "28 Sep 2026" string — Telugu
  *  month words when asked, but always Latin digits. */
@@ -72,11 +73,11 @@ type SalaryTableProps = {
 function StatusBadge({ record }: { record: SalaryRecord }) {
   const { t } = useI18n();
   const windowOpen =
-    record.status === "Paid" &&
+    isSalaryPaid(record) &&
     record.correctionWindowDaysRemaining != null &&
     record.correctionWindowDaysRemaining > 0;
 
-  if (record.status === "Pending" || record.status === "Submitted") {
+  if (!isSalaryPaid(record)) {
     return (
       <span className={uiBadgeClass("warning")}>
         {t("common.pending")}
@@ -157,9 +158,8 @@ export function SalaryTable({
     totalGross: records.reduce((s, r) => s + (r.totalGross || 0), 0),
     totalDeductions: records.reduce((s, r) => s + (r.totalDeductions || 0), 0),
     netSalary: records.reduce((s, r) => s + (r.netSalary || 0), 0),
-    pending: records.filter((r) => r.status === "Pending").length,
-    submitted: records.filter((r) => r.status === "Submitted").length,
-    paid: records.filter((r) => r.status === "Paid").length,
+    pending: records.filter((r) => !isSalaryPaid(r)).length,
+    paid: records.filter((r) => isSalaryPaid(r)).length,
     emailsSent: records.reduce((s, r) => s + (r.emailsSent ?? 0), 0),
     whatsappsSent: records.reduce((s, r) => s + (r.whatsappsSent ?? 0), 0),
   };
@@ -279,7 +279,7 @@ export function SalaryTable({
           <tbody className="divide-y divide-slate-100">
             {currentRecords.map((record, index) => {
               const windowOpen =
-                record.status === "Paid" &&
+                isSalaryPaid(record) &&
                 record.correctionWindowDaysRemaining != null &&
                 record.correctionWindowDaysRemaining > 0;
               const serialNo = startIndex + index + 1;
@@ -319,7 +319,7 @@ export function SalaryTable({
                   <td className="px-3 py-4 text-left text-[13px] font-bold tabular-nums text-emerald-700 whitespace-nowrap">{formatVal(record.netSalary)}</td>
                   <td className="px-3 py-4 whitespace-nowrap">
                     <StatusBadge record={record} />
-                    {record.status === "Paid" && windowOpen && (
+                    {windowOpen && (
                       <span className="ml-1 text-[10px] text-amber-600">
                         {record.correctionWindowDaysRemaining}d
                       </span>
@@ -336,7 +336,7 @@ export function SalaryTable({
                           type="button"
                           aria-label={t("staff.table.email_to", { name: salaryDisplayText(record.employeeName, language) })}
                           onClick={() => onEmail(record)}
-                          disabled={saving || record.status !== "Paid"}
+                          disabled={saving || !isSalaryPaid(record)}
                           className="group inline-flex items-center gap-1 rounded-full border border-blue-200/80 bg-blue-50/70 px-2 py-0.5 text-blue-700 transition hover:border-blue-300 hover:bg-blue-100/70 disabled:opacity-40"
                         >
                           <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-mail)]"><Mail size={12} /></span>
@@ -353,7 +353,7 @@ export function SalaryTable({
                           type="button"
                           aria-label={t("staff.table.whatsapp_to", { name: salaryDisplayText(record.employeeName, language) })}
                           onClick={() => onWhatsApp(record)}
-                          disabled={saving || record.status !== "Paid"}
+                          disabled={saving || !isSalaryPaid(record)}
                           className="group inline-flex items-center gap-1 rounded-full border border-emerald-200/80 bg-emerald-50/70 px-2 py-0.5 text-[#128C3E] transition hover:border-emerald-300 hover:bg-emerald-100/70 disabled:opacity-40"
                         >
                           <span className="inline-flex text-[#1DA851] motion-safe:group-hover:animate-[var(--animate-action-whatsapp)]"><WhatsAppBrandIcon size={12} /></span>
@@ -385,8 +385,6 @@ export function SalaryTable({
               <td className="px-3 py-4 text-[11px] tabular-nums font-semibold text-slate-600">
                 <span className="inline-flex flex-wrap items-center gap-x-1 gap-y-0.5 leading-snug">
                   <span className="whitespace-nowrap">{footer.pending} {t("common.pending")}</span>
-                  <span className="text-slate-300" aria-hidden="true">·</span>
-                  <span className="whitespace-nowrap">{footer.submitted} {t("staff.table.submitted")}</span>
                   <span className="text-slate-300" aria-hidden="true">·</span>
                   <span className="whitespace-nowrap">{footer.paid} {t("common.paid")}</span>
                 </span>

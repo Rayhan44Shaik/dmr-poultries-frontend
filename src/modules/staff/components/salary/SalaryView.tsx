@@ -23,7 +23,7 @@ import ScopedI18nProvider from "../../../../i18n/ScopedI18nProvider";
 import { uiButton } from "../../../../shared/ui/uiTokens";
 import { ClassicPayslipSheet } from "./ClassicPayslipSheet";
 import { ViewLanguageToggle } from "../../../../ui/ViewLanguageToggle";
-import { computePayslipTotals, toAmountValues } from "./payslipModel";
+import { computePayslipTotals, isSalaryPaid, toAmountValues } from "./payslipModel";
 import { salaryDisplayText, salaryLocale } from "../../utils/salaryDisplay";
 
 /** Render "YYYY-MM-DD" / ISO as "28 Sep 2026". */
@@ -70,7 +70,7 @@ function SalaryViewBody({
   const totals = computePayslipTotals(values);
 
   const correctionOpen =
-    record.status === "Paid" &&
+    isSalaryPaid(record) &&
     record.correctionWindowDaysRemaining != null &&
     record.correctionWindowDaysRemaining > 0;
 
@@ -141,7 +141,7 @@ function SalaryViewBody({
         </div>
 
         {/* Lifecycle notices — UI state, kept below the formal document */}
-        {record.status === "Paid" && record.paymentDate && (
+        {isSalaryPaid(record) && record.paymentDate && (
           <div className="mx-auto mt-4 flex max-w-[760px] items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800">
             <CheckCircle2 size={14} className="shrink-0" />
             <span>{t("staff.view.paid_on", { date: formatViewDate(record.paymentDate) })}</span>
@@ -156,7 +156,7 @@ function SalaryViewBody({
             <span>{t("staff.view.month_closed")}</span>
           </div>
         )}
-        {record.status === "Paid" && !record.monthClosed && (
+        {isSalaryPaid(record) && !record.monthClosed && (
           <div
             className={`mx-auto mt-4 flex max-w-[760px] items-center gap-2 rounded-xl border p-3 text-xs ${
               correctionOpen
