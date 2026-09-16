@@ -270,9 +270,9 @@ const KPICard = memo(function KPICard({
      measured on the card itself) and keeps `max-w-full` + `shrink-0`, so the
      change and its period are never clipped and never push anything out. */
   let trendChipClasses =
-    "inline-flex w-full max-w-full items-center justify-center gap-0.5 whitespace-nowrap rounded-full px-1 py-0.5 text-center text-[7px] font-black tracking-[0.02em] ring-1 ring-inset shadow-sm @min-[96px]:px-1.5 @min-[96px]:text-[7.5px] @min-[120px]:text-[8px] ";
+    "inline-flex w-full max-w-full items-center justify-center gap-1 whitespace-nowrap rounded-full px-1.5 py-0.5 text-center text-[8px] font-black tracking-[0.02em] ring-1 ring-inset shadow-sm @min-[96px]:text-[8.5px] @min-[120px]:text-[9px] ";
   const trendIconClass =
-    "h-2 w-2 shrink-0 @min-[96px]:h-2.5 @min-[96px]:w-2.5 @min-[120px]:h-3 @min-[120px]:w-3";
+    "h-2.5 w-2.5 shrink-0 @min-[96px]:h-3 @min-[96px]:w-3 @min-[120px]:h-3.5 @min-[120px]:w-3.5";
   let trendIcon: React.ReactNode = null;
   let trendText: string;
   let badgeTitle: string;
@@ -371,7 +371,7 @@ const KPICard = memo(function KPICard({
     >
       <div className="absolute inset-0 bg-gradient-to-br from-white via-white to-slate-50 opacity-80" />
       <div className={`absolute -right-6 top-1/2 h-20 w-20 -translate-y-1/2 rounded-full ${config.bg} opacity-[0.08] blur-sm transition-opacity duration-300 group-hover:opacity-[0.14]`} />
-      <div className="absolute top-2 right-1.5 z-20 flex w-12 items-center justify-center text-center @min-[96px]:right-2 @min-[96px]:w-[3.25rem] @min-[120px]:w-14">
+      <div className="absolute top-2 right-3 z-20 flex w-[4.1rem] items-center justify-center text-center @min-[96px]:right-3.5 @min-[96px]:w-[4.45rem] @min-[120px]:right-4 @min-[120px]:w-[4.8rem]">
         <span className={trendChipClasses} title={`${badgeTitle} · ${rangeLabel}`}>
           {trendIcon}
           <span>{trendText}</span>
