@@ -2,6 +2,7 @@ import MasterStatusBadge from "../../components/MasterStatusBadge";
 import { Pencil } from "lucide-react";
 import type { Shop } from "../types/shop";
 import { useI18n } from "../../../../i18n";
+import { localizeTripViewText } from "../../../operations/vehicle-trips/utils/tripViewLocalization";
 
 type ShopTableProps = {
   shops: Shop[];
@@ -23,8 +24,10 @@ function formatOpeningBalance(value: number | null | undefined): string {
   return inrFormatter.format(Number(value ?? 0));
 }
 
+// Headers wrap rather than clip: "Current Balance" is two words in a fixed
+// column, and truncating a column label is worse than a second line.
 const thBase =
-  "px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap";
+  "px-3 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-slate-500 leading-tight";
 const tdBase = "px-3 py-2.5 align-middle text-sm text-slate-600";
 
 function ShopTable({
@@ -33,7 +36,14 @@ function ShopTable({
   startIndex = 0,
   emptyMessage,
 }: ShopTableProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
+
+  // Telugu reaches the record text too, not just the chrome: shop names, owner
+  // names, cities and association types are transliterated on the way out. The
+  // stored values stay untouched (search, exports and sorting keep working on
+  // the API data), and number-only cells are passed through unchanged.
+  const shown = (value: string | null | undefined) =>
+    localizeTripViewText(value ?? "", language);
 
   // Rows arrive already ordered and paginated from ShopsPage; render as given
   // so S.No lines up with the global position in the filtered list.
@@ -41,18 +51,21 @@ function ShopTable({
 
   return (
     <div className="master-table master-table--shops">
-      <table className="w-full min-w-[1144px] table-fixed border-collapse">
+      <table className="w-full min-w-[1320px] table-fixed border-collapse">
         {/* Fixed, readable minimum column widths keep numbers, status badges and
-            actions aligned. Narrow screens scroll the table, not the page. */}
+            actions aligned. Narrow screens scroll the table, not the page — and
+            the two balance columns are sized so neither figure is ever clipped:
+            ₹1,23,45,678.90 needs the room, and the header may wrap instead. */}
         <colgroup>
           <col style={{ width: 56 }} />
           <col style={{ width: 200 }} />
-          <col style={{ width: 144 }} />
-          <col style={{ width: 120 }} />
+          <col style={{ width: 128 }} />
+          <col style={{ width: 116 }} />
           <col style={{ width: 104 }} />
           <col style={{ width: 112 }} />
-          <col style={{ width: 96 }} />
-          <col style={{ width: 144 }} />
+          <col style={{ width: 88 }} />
+          <col style={{ width: 152 }} />
+          <col style={{ width: 152 }} />
           <col style={{ width: 104 }} />
           <col style={{ width: 64 }} />
         </colgroup>
@@ -69,11 +82,15 @@ function ShopTable({
             <th className={`${thBase} text-center`}>
               {t("masters.shops.table.paper_rate")}
             </th>
-            {/* Balance, not just the opening figure: the current balance is
-              * what collections move, so it leads — the opening balance it was
-              * computed from stays underneath as the audit trail. */}
+            {/* The two balances sit side by side: Opening Balance is the
+              * figure the shop was registered with, Current Balance is what
+              * approvals and deletions move. Side by side they read as a pair;
+              * stacking them made the row taller for no extra information. */}
             <th className={`${thBase} text-right`}>
-              {t("masters.shops.table.balance")}
+              {t("masters.shops.table.opening_balance")}
+            </th>
+            <th className={`${thBase} text-right`}>
+              {t("masters.shops.table.current_balance")}
             </th>
             <th className={`${thBase} text-center`}>
               {t("masters.shops.table.status")}
@@ -102,15 +119,15 @@ function ShopTable({
                 <td className={tdBase}>
                   <span
                     className="block truncate font-semibold text-slate-800"
-                    title={shop.shopName}
+                    title={shown(shop.shopName)}
                   >
-                    {shop.shopName}
+                    {shown(shop.shopName)}
                   </span>
                 </td>
 
                 <td className={tdBase}>
-                  <span className="block truncate" title={shop.ownerName}>
-                    {shop.ownerName || "—"}
+                  <span className="block truncate" title={shown(shop.ownerName)}>
+                    {shown(shop.ownerName) || "—"}
                   </span>
                 </td>
 
@@ -121,15 +138,15 @@ function ShopTable({
                 </td>
 
                 <td className={tdBase}>
-                  <span className="block truncate" title={shop.city}>
-                    {shop.city || "—"}
+                  <span className="block truncate" title={shown(shop.city)}>
+                    {shown(shop.city) || "—"}
                   </span>
                 </td>
 
                 <td className={tdBase}>
                   {hasAssociation ? (
                     <span className="inline-flex items-center rounded-md bg-indigo-50 px-2 py-0.5 text-xs font-medium text-indigo-700 ring-1 ring-inset ring-indigo-200">
-                      {shop.associationType}
+                      {shown(shop.associationType)}
                     </span>
                   ) : (
                     <span className="text-slate-400">—</span>
@@ -148,18 +165,18 @@ function ShopTable({
                   </span>
                 </td>
 
-                <td className={`${tdBase} whitespace-nowrap text-right tabular-nums`}>
-                  <span
-                    className={`block font-semibold ${
-                      liveBalance > 0 ? "text-emerald-700" : "text-slate-700"
-                    }`}
-                    title={t("masters.shops.table.current_balance")}
-                  >
-                    {formatOpeningBalance(liveBalance)}
-                  </span>
-                  <span className="block text-[11px] font-medium text-slate-400">
-                    {t("masters.shops.table.opening_short")} {formatOpeningBalance(shop.openingBalance)}
-                  </span>
+                <td
+                  className={`${tdBase} whitespace-nowrap text-right font-medium tabular-nums text-slate-500`}
+                >
+                  {formatOpeningBalance(shop.openingBalance)}
+                </td>
+
+                <td
+                  className={`${tdBase} whitespace-nowrap text-right font-semibold tabular-nums ${
+                    liveBalance > 0 ? "text-emerald-700" : "text-slate-700"
+                  }`}
+                >
+                  {formatOpeningBalance(liveBalance)}
                 </td>
 
                 <td className={`${tdBase} text-center`}>
@@ -183,7 +200,7 @@ function ShopTable({
           {orderedShops.length === 0 && (
             <tr>
               <td
-                colSpan={10}
+                colSpan={11}
                 className="px-4 py-6 text-center text-sm text-slate-500"
               >
                 {emptyMessage ?? t("masters.shops.no_shops_found")}

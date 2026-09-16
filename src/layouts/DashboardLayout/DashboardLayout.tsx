@@ -7,7 +7,15 @@
 // column animates its offset so nothing jumps.
 // Below `lg` the same entries live in the floating popup.
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useLocation } from "react-router-dom";
 import Sidebar from "../../ui/Sidebar/Sidebar";
 import Header from "../../ui/Header/Header";
@@ -29,7 +37,32 @@ type DashboardLayoutProps = {
 /** Tailwind's `lg` breakpoint — the sidebar is only persistent above it. */
 const LG_QUERY = "(min-width: 1024px)";
 
+/**
+ * "Am I already inside the app shell?" — read by the wrapper below.
+ *
+ * The shell is applied at two layers on purpose: `AppRoutes` loads it via
+ * `lazyShell` (so the chrome streams in parallel with the page chunk) and the
+ * master / operations page modules also render `<DashboardLayout>` when they
+ * are mounted directly (a deep link such as `/masters/shops`, where the page is
+ * the route element and no parent supplies the shell).
+ *
+ * When BOTH apply, the page used to be framed twice: two headers, two
+ * sidebars, two `id="app-scroll"` scroll containers, two notification pollers
+ * and double the DOM — a measurable jank source, plus duplicated landmarks for
+ * screen readers. The flag below makes the shell idempotent: the outermost
+ * instance draws the chrome, every nested one renders its children only.
+ */
+const ShellContext = createContext(false);
+
 function DashboardLayout({ children }: DashboardLayoutProps) {
+  const insideShell = useContext(ShellContext);
+  // Hook-free guard: the frame (and its hooks) lives in <ShellFrame>, so this
+  // early return can never change the number of hooks a mounted instance runs.
+  if (insideShell) return <>{children}</>;
+  return <ShellFrame>{children}</ShellFrame>;
+}
+
+function ShellFrame({ children }: DashboardLayoutProps) {
   const location = useLocation();
   const mainRef = useRef<HTMLElement>(null);
 
@@ -83,6 +116,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
   }, [sidebarMode, setSidebarMode]);
 
   return (
+    <ShellContext.Provider value={true}>
     <div
       className={`h-screen overflow-hidden bg-slate-100/80 transition-[padding] duration-300 ease-out dark:bg-slate-950 ${SIDEBAR_CONTENT_CLASS[sidebarMode]}`}
     >
@@ -100,6 +134,7 @@ function DashboardLayout({ children }: DashboardLayoutProps) {
 
       <ApprovalAlertToaster />
     </div>
+    </ShellContext.Provider>
   );
 }
 

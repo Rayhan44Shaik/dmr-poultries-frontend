@@ -107,13 +107,18 @@ export default function OutstandingSummary({
 
   const periodSubtitle = periodLabel || (periodType === "weekly" ? t("ops.collection.mon_sun_week") : t("ops.collection.daily_period"));
 
-  // "12 Sep 2026 - 18 Sep 2026" style range for the rows that are scoped to
+  // "12 Sep 2026 – 18 Sep 2026" style range for the rows that are scoped to
   // this week, so Opening (before the week) and the in-week rows read as
-  // clearly different periods rather than one undifferentiated list.
-  const weekRange = ledgerLoaded && weekStart && weekEnd ? `${fmtDate(weekStart)} to ${fmtDate(weekEnd)}` : "";
+  // clearly different periods rather than one undifferentiated list. The en
+  // dash matches every other range in the app and needs no translation.
+  const weekRange = ledgerLoaded && weekStart && weekEnd ? `${fmtDate(weekStart)} – ${fmtDate(weekEnd)}` : "";
   const inWeekSubtitle = weekRange || periodSubtitle;
+  // "… – 3 entries" — the count line is translated too, so a Telugu session
+  // never ends a sentence in English.
   const countLabel = (count: number, subtitle: string) =>
-    ledgerLoaded && count > 0 ? `${subtitle} - ${count} ${count === 1 ? "entry" : "entries"}` : subtitle;
+    ledgerLoaded && count > 0
+      ? `${subtitle} - ${count} ${count === 1 ? t("common.entry") : t("common.entries")}`
+      : subtitle;
 
   return (
     <div className="flex h-full w-full flex-col rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">

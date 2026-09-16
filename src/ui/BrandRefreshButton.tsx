@@ -37,6 +37,7 @@
  */
 
 import type { ReactNode } from "react";
+import { useI18n } from "../i18n";
 import henLogo from "../assets/dmr-hen-cut-256.png";
 import { cn } from "../utils/cn";
 import { Button, type ButtonProps } from "./Button";
@@ -108,10 +109,13 @@ export function BrandRefreshButton({
   size,
   ...rest
 }: BrandRefreshButtonProps) {
+  const { t } = useI18n();
   // The hen + the word "Refresh". Pass `compact` for the icon-only variant.
-  const label = children === undefined ? "Refresh" : children;
+  // The default wording follows the active language, so one shared control
+  // covers all ~25 call sites without every page re-translating it.
+  const label = children === undefined ? t("common.refresh") : children;
   const iconOnly = compact || !label;
-  const name = ariaLabel ?? "Refresh data";
+  const name = ariaLabel ?? t("common.refresh_data");
 
   return (
     <Button

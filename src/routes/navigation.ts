@@ -645,6 +645,24 @@ export function resolveRoute(pathname: string): { section?: NavSection; page?: N
     }
   }
 
+  // Pass 3 — deep path that mirrors a query-based child:
+  //   "/masters/shops"      ↔ "/masters?tab=shops"
+  //   "/accounts/market-rate" ↔ "/accounts?tab=market-rate"
+  // The app registers BOTH forms (AppRoutes mounts /masters/shops, the sidebar
+  // links to /masters?tab=shops), and a deep link used to fall through to the
+  // bare section — the header then showed the raw English section label
+  // ("Masters") even in a Telugu session, and the sidebar highlighted nothing.
+  for (const section of NAV_SECTIONS) {
+    for (const child of section.children) {
+      const [childPath, childQuery] = child.path.split("?");
+      if (!childQuery) continue;
+      const params = new URLSearchParams(childQuery);
+      for (const value of params.values()) {
+        if (path === `${childPath}/${value}`) return { section, page: child };
+      }
+    }
+  }
+
   // Fall back to section-level match (e.g. "/masters", "/operations").
   for (const section of NAV_SECTIONS) {
     const paths = section.children.map((c) => c.path.split("?")[0]);

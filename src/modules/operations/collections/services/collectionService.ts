@@ -275,6 +275,67 @@ function rebuildCache() {
   publishPendingCollectionSnapshot(pendingCache);
 }
 
+/* ------------------------------------------------------------------
+   One pass at a time.
+   ------------------------------------------------------------------
+   Three independent consumers ask for a full reload at the same moment on
+   app start — the module warm-up, Collection Entry's mount and Pending
+   Collections' mount. A pass reads EVERY collection and EVERY sale page by
+   page (≈50 requests, several thousand rows to map and cache), so running
+   those in parallel tripled the network work and the parsing cost, which is
+   what made the first paint of /operations janky.
+
+   Callers now share one in-flight pass. A pass that began before the last
+   mutation is never shared, so an approve/delete refresh always reads data
+   written after that mutation. The shared promise never rejects: each joiner
+   applies its own quiet/loud policy to the same outcome.
+------------------------------------------------------------------ */
+type RefreshPassResult = { ok: true } | { ok: false; error: unknown };
+type RefreshPass = { startedAt: number; promise: Promise<RefreshPassResult> };
+
+let inFlightRefresh: RefreshPass | null = null;
+let lastMutationAt = 0;
+
+/** Called by every mutation right before its refresh, so a pass that started
+ *  before the write is not handed out as if it contained the new data. */
+function noteCollectionMutation(): void {
+  lastMutationAt = Date.now();
+}
+
+function startOrJoinRefreshPass(): RefreshPass {
+  if (inFlightRefresh && inFlightRefresh.startedAt >= lastMutationAt) {
+    return inFlightRefresh;
+  }
+  const pass: RefreshPass = {
+    startedAt: Date.now(),
+    promise: (async (): Promise<RefreshPassResult> => {
+      try {
+        const [entries, sales, shops] = await Promise.all([
+          fetchCollections(true),
+          fetchShopSales(true),
+          fetchShops(),
+        ]);
+        // Collection numbers are permanent financial references. Validate the
+        // complete register (including deleted rows) before exposing any tab
+        // so a duplicate can never be silently presented as a valid record.
+        assertUniqueCollectionNumbers(entries);
+        entriesCache = entries;
+        shopSalesCache = sales;
+        shopsCache = shops;
+        rebuildCache();
+        return { ok: true };
+      } catch (error) {
+        return { ok: false, error };
+      }
+    })(),
+  };
+  inFlightRefresh = pass;
+  void pass.promise.then(() => {
+    if (inFlightRefresh === pass) inFlightRefresh = null;
+  });
+  return pass;
+}
+
 /**
  * Pull everything from PostgreSQL and rebuild the cache. Call once at app
  * start (and after every mutation). Synchronous getters then serve fresh data.
@@ -290,28 +351,14 @@ function rebuildCache() {
 export async function refreshFromBackend(options?: {
   quietNotFound?: boolean;
 }): Promise<void> {
-  try {
-    const [entries, sales, shops] = await Promise.all([
-      fetchCollections(options?.quietNotFound),
-      fetchShopSales(options?.quietNotFound),
-      fetchShops(),
-    ]);
-    // Collection numbers are permanent financial references. Validate the
-    // complete register (including deleted rows) before exposing any tab so a
-    // duplicate can never be silently presented as a valid record.
-    assertUniqueCollectionNumbers(entries);
-    entriesCache = entries;
-    shopSalesCache = sales;
-    shopsCache = shops;
-    rebuildCache();
-  } catch (error) {
-    if (options?.quietNotFound && toApiError(error).status === 404) {
-      publishPendingCollectionSnapshot([]);
-      return;
-    }
-    handleApiError(error);
-    throw error;
+  const result = await startOrJoinRefreshPass().promise;
+  if (result.ok) return;
+  if (options?.quietNotFound && toApiError(result.error).status === 404) {
+    publishPendingCollectionSnapshot([]);
+    return;
   }
+  handleApiError(result.error);
+  throw result.error;
 }
 
 /* ==================================================================
@@ -447,6 +494,7 @@ function findEntrySnapshot(id: string | number): CollectionApiEntry | undefined 
 ================================================================== */
 async function saveCollection(input: CollectionEntryInput): Promise<CollectionApiEntry> {
   const { data } = await apiPost<Record<string, unknown>>(COLLECTION_PATH, input);
+  noteCollectionMutation();
   await refreshFromBackend();
   const saved = mapRawEntry(data);
   // A new pending collection doesn't move the balance yet, but it does change
@@ -499,6 +547,7 @@ async function updateCollection(collection: Collection): Promise<boolean> {
     );
     void data;
     const snapshot = findEntrySnapshot(collection.numericId);
+    noteCollectionMutation();
     await refreshFromBackend();
     announceShopBalanceChange(snapshot, "updated");
     return true;
@@ -514,6 +563,7 @@ async function deleteCollection(id: string): Promise<boolean> {
     // under the shop it belonged to, and the id alone would not tell us which.
     const snapshot = findEntrySnapshot(id);
     await apiDelete(`${COLLECTION_PATH}/${Number(id)}`);
+    noteCollectionMutation();
     await refreshFromBackend();
     announceShopBalanceChange(snapshot, "deleted");
     return true;
@@ -533,6 +583,7 @@ async function deletePendingCollection(id: string): Promise<{ success: boolean; 
   try {
     const snapshot = findEntrySnapshot(id);
     await apiDelete(`${COLLECTION_PATH}/pending/${Number(id)}`);
+    noteCollectionMutation();
     await refreshFromBackend();
     announceShopBalanceChange(snapshot, "deleted", "pending-collections");
     return { success: true };
@@ -557,6 +608,7 @@ async function approveCollection(
     // Backend returns the authoritative updated shop balance on approval.
     const balance =
       data && data.currentBalance != null ? Number(data.currentBalance) : undefined;
+    noteCollectionMutation();
     await refreshFromBackend();
     announceShopBalanceChange(snapshot, "approved");
     return { success: true, balance };
@@ -574,6 +626,7 @@ async function rejectCollection(id: string, rejectedBy: string = "Admin", reason
       rejectedBy,
       reason,
     });
+    noteCollectionMutation();
     await refreshFromBackend();
     announceShopBalanceChange(snapshot, "rejected");
     return true;

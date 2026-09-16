@@ -301,14 +301,18 @@ export default function useCollectionEntry() {
     return `${d}/${m}/${y}`;
   };
 
-  // Week range from week bounds (always available, independent of ledgerLoaded)
+  // Week range from week bounds (always available, independent of ledgerLoaded).
+  // The two dates are joined with an en dash, not the word "to": the range is
+  // rendered verbatim in the summary subtitle, so an English joining word here
+  // would survive into a Telugu session. The dash matches every other range in
+  // the app (pagination, trip list) and reads the same in both languages.
   const weekRangeFormatted = weekBounds.weekStart
-    ? `${fmtWeekDate(weekBounds.weekStart)} to ${fmtWeekDate(weekBounds.weekEnd)}`
+    ? `${fmtWeekDate(weekBounds.weekStart)} – ${fmtWeekDate(weekBounds.weekEnd)}`
     : "";
 
   // Also compute week range from weeklySummary when ledger is loaded (for backward compat)
   const ledgerWeekRangeFormatted = weeklySummary.weekStart
-    ? `${fmtWeekDate(weeklySummary.weekStart)} to ${fmtWeekDate(weeklySummary.weekEnd)}`
+    ? `${fmtWeekDate(weeklySummary.weekStart)} – ${fmtWeekDate(weeklySummary.weekEnd)}`
     : "";
 
   // Only show financial data if ledger is loaded.
