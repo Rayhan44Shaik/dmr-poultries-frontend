@@ -47,6 +47,7 @@ import { Pagination } from "../../../../ui";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import TripLossRowExpand from "./TripLossRowExpand";
 import { useI18n } from "../../../../i18n";
+import { uiAnalysisRowHoverClass } from "../../../../shared/ui/uiTokens";
 
 interface TripLossTableProps {
   records: TripLossAnalysis[];
@@ -67,7 +68,7 @@ interface TripLossTableProps {
   /** A real filter has been applied via Search (shows "no results for filter" state). */
   filtersApplied?: boolean;
   onReset?: () => void;
-  /** Localised weight unit, e.g. "kg" / "కేజీ". */
+  /** Localised weight unit, read from the translation table — never hard-coded. */
   weightUnit?: string;
 }
 
@@ -544,7 +545,7 @@ export default function TripLossTable({
                       // that was clicked (a click focuses the row) and deepens on
                       // the open trip, so a whole line of figures can be read
                       // without losing your place.
-                      className={`cursor-pointer select-none outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 hover:bg-emerald-50/60 focus:bg-emerald-50/60 ${
+                      className={`cursor-pointer select-none outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 focus:bg-emerald-50/60 ${uiAnalysisRowHoverClass} ${
                         isOpen ? "bg-emerald-50/70" : index % 2 === 0 ? "bg-white" : "bg-slate-50/20"
                       }`}
                     >

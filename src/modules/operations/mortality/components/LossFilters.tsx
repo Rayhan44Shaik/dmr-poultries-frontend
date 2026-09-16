@@ -36,7 +36,9 @@ import MasterDropdown, {
 } from "../../../masters/components/MasterDropdown";
 import type { LossFilters as Filters, LossSort } from "../hooks/useTripLossAnalysis";
 import type { SortBy } from "../services/mortalityAnalysisApi";
+import { useMemo } from "react";
 import { useI18n } from "../../../../i18n";
+import { localizeTripViewText } from "../../vehicle-trips/utils/tripViewLocalization";
 
 interface LossFiltersProps {
   filters: Filters;
@@ -104,16 +106,28 @@ export default function LossFilters({
 
   // "All …" is the empty value, so the dropdown shows its placeholder and the
   // clear affordance behaves exactly like the Trip List filters.
-  const farmDropdownOptions: MasterDropdownOption[] = farmOptions.map((farm) => ({
-    value: farm,
-    label: farm,
-    searchText: farm,
-  }));
-  const supervisorDropdownOptions: MasterDropdownOption[] = supervisorOptions.map((name) => ({
-    value: name,
-    label: name,
-    searchText: name,
-  }));
+  // The LABEL follows the language, the VALUE never does: a farm or an employee
+  // reads in Telugu script while the API still receives the stored English name.
+  // `searchText` keeps that stored spelling in the menu's match list beside the
+  // Telugu label, so typing "anand" or "ఆనంద్" both find the same option.
+  // Memoised on the list and the language so opening the page, typing in the
+  // search box or toggling a filter never re-transliterates a hundred names.
+  const farmDropdownOptions: MasterDropdownOption[] = useMemo(
+    () => farmOptions.map((farm) => ({
+      value: farm,
+      label: localizeTripViewText(farm, language),
+      searchText: farm,
+    })),
+    [farmOptions, language],
+  );
+  const supervisorDropdownOptions: MasterDropdownOption[] = useMemo(
+    () => supervisorOptions.map((name) => ({
+      value: name,
+      label: localizeTripViewText(name, language),
+      searchText: name,
+    })),
+    [supervisorOptions, language],
+  );
 
   // Field + direction, both translated, so a Telugu session never reads an
   // English ordering label.

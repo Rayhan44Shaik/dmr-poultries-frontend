@@ -33,17 +33,19 @@ import { formatNumber, formatWeight } from "../../../../utils/format";
 import { formatTripListDay } from "../../vehicle-trips/utils/formatTripListDay";
 import { localizeTripViewText } from "../../vehicle-trips/utils/tripViewLocalization";
 import { useI18n } from "../../../../i18n";
+import { uiAnalysisRowHoverClass, uiAnalysisRowHoverOnTintClass } from "../../../../shared/ui/uiTokens";
 
 /**
  * The line the pointer is on. Every data line in the panel carries it — trip
  * details, weights and rates — so hovering marks exactly the row being read and
  * the label stays with its value.
  */
-const LINE_HOVER = "transition-colors duration-150 hover:bg-emerald-50/60";
+// Every data line marks itself under the pointer. The band is not defined here:
+// it is the shared analysis-row token, the same one the grid and the summary use.
 
 interface TripLossRowExpandProps {
   record: TripLossAnalysis;
-  /** Localised weight unit, e.g. "kg" / "కేజీ". */
+  /** Localised weight unit, read from the translation table — never hard-coded. */
   weightUnit?: string;
 }
 
@@ -211,7 +213,7 @@ export default function TripLossRowExpand({ record, weightUnit = "kg" }: TripLos
             {detailRows.map((row, rowIndex) => (
               // The pointer marks the line it is on, so a name and the value it
               // belongs to are read together — the same band the grid uses.
-              <tr key={rowIndex} className={LINE_HOVER}>
+              <tr key={rowIndex} className={uiAnalysisRowHoverClass}>
                 {row.map((field, fieldIndex) => (
                   <Pair
                     key={fieldIndex}
@@ -246,7 +248,7 @@ export default function TripLossRowExpand({ record, weightUnit = "kg" }: TripLos
               </th>
             </tr>
             {weightRows.map((row) => (
-              <tr key={row.label} className={LINE_HOVER}>
+              <tr key={row.label} className={uiAnalysisRowHoverClass}>
                 <th
                   scope="row"
                   className="w-1/4 px-3 py-2.5 text-left align-middle text-[12.5px] font-medium text-slate-700"
@@ -272,7 +274,7 @@ export default function TripLossRowExpand({ record, weightUnit = "kg" }: TripLos
               title={t("ops.mortality.detail.rates")}
               colSpan={4}
             />
-            <tr className="bg-emerald-50/70 transition-colors duration-150 hover:bg-emerald-100/70">
+            <tr className={`bg-emerald-50/70 ${uiAnalysisRowHoverOnTintClass}`}>
               <th
                 scope="row"
                 className="w-1/4 px-3 py-2.5 text-left align-middle text-[10.5px] font-bold uppercase leading-tight tracking-wide text-emerald-700"
@@ -286,7 +288,7 @@ export default function TripLossRowExpand({ record, weightUnit = "kg" }: TripLos
                 {(record.survivalRate * 100).toFixed(2)}%
               </td>
             </tr>
-            <tr className={LINE_HOVER}>
+            <tr className={uiAnalysisRowHoverClass}>
               <Pair
                 label={t("ops.mortality.field.mortality_pct")}
                 value={`${record.mortalityPercentage.toFixed(2)}%`}

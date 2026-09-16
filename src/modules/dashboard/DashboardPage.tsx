@@ -115,7 +115,7 @@ function DashboardPage() {
             className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 py-2 text-[13px] font-semibold text-slate-600 shadow-sm transition-colors hover:border-slate-300 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-800"
           >
             <CreditCard size={15} />
-            {t("common.record_collection")}
+            {t("quick.record_collection")}
           </Link>
           <Link
             to="/operations?tab=trip-entry"
@@ -157,12 +157,12 @@ function DashboardPage() {
             <ChartCard
               title={t("dashboard.sales_vs_collections")}
               subtitle={t("dashboard.sales_vs_collections_sub")}
-              action={{ label: t("quick.shop_sales"), path: "/operations?tab=shop-sales" }}
+              action={{ label: t("operations.shop_sales"), path: "/operations?tab=shop-sales" }}
               className="xl:col-span-2"
             >
               <SalesVsCollectionsChart data={derived} />
             </ChartCard>
-            <ChartCard title={t("dashboard.vehicle_activity")} subtitle={t("dashboard.vehicle_activity_sub")} action={{ label: t("fleet.fleet_status"), path: "/fleet?tab=analytics" }}>
+            <ChartCard title={t("dashboard.vehicle_activity")} subtitle={t("dashboard.vehicle_activity_sub")} action={{ label: t("dashboard.fleet_status"), path: "/fleet?tab=analytics" }}>
               <VehicleActivityDonut data={derived} />
             </ChartCard>
           </div>
@@ -195,7 +195,7 @@ function DashboardPage() {
 ) : (
         <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-slate-200 bg-white/60 px-4 py-16 text-center dark:border-slate-800 dark:bg-slate-900/60">
           <p className="text-sm font-semibold text-slate-700 dark:text-slate-200">{t("dashboard.something_wrong")}</p>
-          <p className="text-xs text-slate-400">{t("common.try_again")}</p>
+          <p className="text-xs text-slate-400">{t("common.retry")}</p>
           <button
             type="button"
             onClick={refetch}

@@ -66,7 +66,11 @@ const summaryModule = await server.ssrLoadModule("/src/modules/operations/mortal
 const pageSource = (await import("node:fs")).readFileSync("src/modules/operations/mortality/pages/MortalityEntryPage.tsx", "utf8");
 // The unit every weight figure prints. Read from the page, so the harness proves
 // what the page does rather than a copy of it.
-const WEIGHT_UNIT = pageModule.MORTALITY_WEIGHT_UNIT;
+// The unit is not the page's private copy: it is one entry in the translation
+// tables, so the harness reads it from the same place the page does.
+const dictSource = (await import("node:fs")).readFileSync;
+const unitIn = (file) => (dictSource(file, "utf8").match(/'ops\.mortality\.weight_unit': '([^']+)'/) || [])[1];
+const WEIGHT_UNIT = unitIn("src/i18n/modules/operations.en.ts");
 // A weight figure prints the number and the Telugu unit — never the Latin "Kg".
 const LATIN_KG = /\d[\d.,]*\s*(kg|Kg|KG)\b/;
 const checkNoLatinKg = (label, html) => ok(`weights: ${label} prints no Latin 'Kg'`, !LATIN_KG.test(html), (html.match(LATIN_KG) || [""])[0]);
@@ -219,12 +223,118 @@ const tableHtml = render(
 );
 
 ok("table: card header bar title", tableHtml.includes("Completed Trips"));
+// ONE SOURCE OF TRUTH for the band: declared once in the design system, imported
+// by every data surface — no surface may paste the class string itself.
+{
+  const { readFileSync } = await import("node:fs");
+  const tokens = readFileSync("src/shared/ui/uiTokens.ts", "utf8");
+  const surfaces = ["TripLossTable.tsx", "TripLossRowExpand.tsx", "CumulativeSummary.tsx"]
+    .map((file) => readFileSync(`src/modules/operations/mortality/components/${file}`, "utf8"));
+  ok("hover: the band is declared exactly once", (tokens.match(/uiAnalysisRowHoverClass =/g) || []).length === 1 && (tokens.match(/uiAnalysisRowHoverOnTintClass =/g) || []).length === 1, "more than one definition");
+  ok("hover: grid, panel and summary import the same band", surfaces.every((file) => file.includes("uiAnalysisRowHoverClass")), "a surface missed the shared band");
+  ok("hover: no surface pastes the band by hand", surfaces.every((file) => !file.includes("hover:bg-emerald-50/60") && !file.includes("hover:bg-emerald-100/70")), "a surface hand-wrote the band");
+  ok("hover: the grid row keeps its pointer and its ring", tableHtml.includes("cursor-pointer") && tableHtml.includes("focus-visible:ring-emerald-400"), "the grid row lost click or keyboard affordance");
+}
+// THE WHOLE APP'S TELUGU, not just this page: the one header control is only a
+// single source of truth if every string it can reach is actually translated.
+{
+  const { readFileSync, readdirSync, statSync } = await import("node:fs");
+  const walk = (dir, out = []) => {
+    for (const entry of readdirSync(dir)) {
+      const full = `${dir}/${entry}`;
+      if (statSync(full).isDirectory()) walk(full, out);
+      else if (/\.(ts|tsx)$/.test(entry) && !entry.includes(".test.")) out.push(full);
+    }
+    return out;
+  };
+  const files = walk("src");
+  const used = new Map();
+  for (const file of files) {
+    if (file.includes("/i18n/")) continue;
+    for (const match of readFileSync(file, "utf8").matchAll(/(?<![.\w])t\(\s*["'`]([A-Za-z0-9_.]+)["'`]/g)) {
+      if (!used.has(match[1])) used.set(match[1], file);
+    }
+  }
+  const defined = new Set();
+  for (const file of files) {
+    if (!file.includes("/i18n/") && !/i18n[^/]*\.ts$/.test(file) && !/Copy\.ts$/.test(file)) continue;
+    // Keys may be quoted, bare, or several to a line (the module copy files pack
+    // them), so any `key:` that opens a string counts as defined.
+    for (const match of readFileSync(file, "utf8").matchAll(/(?:^|[,{\s])(?:'([^']+)'|"([^"]+)"|([A-Za-z_$][\w$]*))\s*:\s*["'`]/gm)) {
+      defined.add(match[1] ?? match[2] ?? match[3]);
+    }
+  }
+  const unresolvable = [...used.keys()].filter((key) => !defined.has(key));
+  ok("i18n: every string on screen resolves to a translation", unresolvable.length === 0, `no entry for ${unresolvable.slice(0, 5).join(", ")}`);
+
+  // The Telugu column of the global tables must cover the English one: a key that
+  // exists only in English reads English in a Telugu session.
+  const table = (file) => {
+    const out = new Map();
+    for (const match of readFileSync(file, "utf8").matchAll(/^\s*(?:'([^']+)'|"([^"]+)")\s*:\s*(['"`])([\s\S]*?)\3,?\s*$/gm)) {
+      out.set(match[1] ?? match[2], match[4]);
+    }
+    return out;
+  };
+  const enTable = table("src/i18n/en.ts");
+  const teTable = table("src/i18n/te.ts");
+  const englishOnly = [...enTable.keys()].filter((key) => !teTable.has(key));
+  ok("i18n: nothing on the page is English-only", englishOnly.length === 0, `${englishOnly.length} keys, e.g. ${englishOnly.slice(0, 5).join(", ")}`);
+
+  // Telugu that came out of a bad pass: another script, or Latin letters welded
+  // onto a Telugu word. Both are unreadable to the operator.
+  const foreign = /[\u0900-\u097F\u0980-\u09FF\u0A80-\u0AFF\u0B80-\u0BFF\u0C80-\u0CFF\u0D00-\u0D7F\u0400-\u04FF\u0600-\u06FF\u4E00-\u9FFF\u3040-\u30FF\uAC00-\uD7AF]/;
+  const glued = /[A-Za-z]{3,}[\u0C00-\u0C7F]|[\u0C00-\u0C7F][A-Za-z]{3,}/;
+  const allowed = /(PDF|EMI|FASTag|GST|IFSC|Excel|WhatsApp|DMR|POULTRIES|ID|KPI|A4|Google|Maps|SHOP|kg|Kg|API|OTP|URL|GPS|UPI|CSV|JSON|HTML|km|MB|GB)/;
+  const broken = [];
+  for (const file of files.filter((name) => name.includes(".te.ts") || name.endsWith("/i18n/te.ts"))) {
+    for (const match of readFileSync(file, "utf8").matchAll(/^\s*(?:'([^']+)'|"([^"]+)")\s*:\s*(['"`])([\s\S]*?)\3,?\s*$/gm)) {
+      const value = match[4];
+      if (!/[\u0C00-\u0C7F]/.test(value)) continue;
+      if (foreign.test(value) || (glued.test(value) && !allowed.test(value))) broken.push(`${match[1] ?? match[2]} => ${value.slice(0, 40)}`);
+    }
+  }
+  ok("telugu: no value in any module carries another script or welded letters", broken.length === 0, broken.slice(0, 4).join(" · "));
+}
+// ONE HEADER CONTROL: this page holds no language state of its own — the app
+// provider is the single source, so switching in the header moves every module.
+{
+  const { readFileSync } = await import("node:fs");
+  const surface = [
+    "pages/MortalityEntryPage.tsx",
+    "components/LossFilters.tsx",
+    "components/TripLossTable.tsx",
+    "components/TripLossRowExpand.tsx",
+    "components/CumulativeSummary.tsx",
+    "components/AppliedFiltersIndicator.tsx",
+  ].map((file) => readFileSync(`src/modules/operations/mortality/${file}`, "utf8")).join("\n");
+  const switcher = readFileSync("src/ui/Header/LanguageSwitcher.tsx", "utf8");
+  ok("language: the page keeps no language state of its own", !surface.includes("useState<Language>") && !surface.includes("setLanguage") && !surface.includes("toggleLanguage"), "the page stores a language");
+  // The switch may keep its own open/closed menu state; what it must NOT keep is
+  // a language of its own — it writes to the one provider every module reads.
+  ok("language: the header switch is the single control", switcher.includes("useI18n") && switcher.includes("setLanguage") && !switcher.includes("useState<Language>") && !switcher.includes("localStorage"), "the header switch keeps its own language");
+  ok("language: the page never branches on the language by hand", !surface.includes('language === "te"'), "a page-level language branch appeared");
+}
 // ── THE WEIGHT UNIT ─────────────────────────────────────────────────────────
 // "Kg need not to display here, only the number required — we want it in Telugu".
-ok("weights: the unit reads in Telugu", WEIGHT_UNIT === "కేజీ" && pageSource.includes('MORTALITY_WEIGHT_UNIT = "కేజీ"'), `unit=${WEIGHT_UNIT}`);
+ok("weights: the unit reads in Telugu", WEIGHT_UNIT === "కేజీ" && unitIn("src/i18n/modules/operations.te.ts") === "కేజీ", `en=${WEIGHT_UNIT} te=${unitIn("src/i18n/modules/operations.te.ts")}`);
 checkNoLatinKg("the grid", tableHtml);
 ok("weights: the figures keep every digit", tableHtml.includes("4,560.47") && tableHtml.includes("16.13"), "a number lost its digits");
-ok("weights: the page owns the unit once, not per figure", (pageSource.match(/MORTALITY_WEIGHT_UNIT/g) || []).length === 3 && !pageSource.includes('t("common.kg")'), "the unit is pasted per figure or still translated");
+// ONE SOURCE OF TRUTH: the unit lives in the translation tables. No page, and no
+// component, carries its own copy of the word.
+{
+  const { readFileSync } = await import("node:fs");
+  const surface = [
+    "pages/MortalityEntryPage.tsx",
+    "components/LossFilters.tsx",
+    "components/TripLossTable.tsx",
+    "components/TripLossRowExpand.tsx",
+    "components/CumulativeSummary.tsx",
+    "components/AppliedFiltersIndicator.tsx",
+  ].map((file) => readFileSync(`src/modules/operations/mortality/${file}`, "utf8")).join("\n");
+  ok("weights: no page or component owns a copy of the unit", !surface.includes("కేజీ"), "a source file hard-codes the unit");
+  ok("weights: the page reads the unit from the dictionary", (pageSource.match(/t\("ops\.mortality\.weight_unit"\)/g) || []).length === 2, "the page does not translate the unit");
+}
 ok("table: count pill uses the trip total", tableHtml.includes("525"), "count pill missing");
 ok("table: count sits in the title block right after the title", /Completed Trips<\/h3>\s*<span[^>]*>[\s\S]{0,220}525 trips/.test(tableHtml), "count pill is not beside the title");
 ok("table: broken-heart mortality mark in a flat rose tile", tableHtml.includes("heart-crack") && tableHtml.includes("border-rose-100 bg-rose-50/70") && !tableHtml.includes("from-rose-500 to-orange-400"), "mortality mark missing or still glossy");
@@ -327,7 +437,8 @@ ok("table: expand affordance kept", tableHtml.includes("Expand trip") && tableHt
   {
     const { readFileSync: readPanel } = await import("node:fs");
     const panelSource = readPanel("src/modules/operations/mortality/components/TripLossRowExpand.tsx", "utf8");
-    ok("panel: the band is defined once, not pasted per row", (panelSource.match(/const LINE_HOVER/g) || []).length === 1, "hover styling is duplicated");
+    ok("panel: the band comes from the shared token, not a local copy", panelSource.includes("uiAnalysisRowHoverClass") && !panelSource.includes("hover:bg-emerald-50/60") && !panelSource.includes("LINE_HOVER"), "the panel defines its own hover");
+    ok("panel: the tinted strip uses the deeper shared token", panelSource.includes("uiAnalysisRowHoverOnTintClass"), "the survival strip hovers on its own rules");
   }
 
   const detailRow = expandHtml.slice(expandHtml.indexOf("Trip No"), expandHtml.indexOf("Weights"));
@@ -378,7 +489,29 @@ const quarterKpis = { totalTrips: 525, farmBirds: 202769, farmWeight: 473557.27,
 const summaryHtml = render(
   React.createElement(summaryModule.default, { kpis: quarterKpis, totalRecords: 525, pageSize: 10, weightUnit: WEIGHT_UNIT }),
 );
+// The cumulative summary reads like the panel below the grid, so it marks the
+// line under the pointer with the same band.
+ok("summary: every data row marks itself", (summaryHtml.match(/transition-colors duration-150 hover:bg-emerald-50\/60/g) || []).length === 4, `hover rows=${(summaryHtml.match(/transition-colors duration-150 hover:bg-emerald-50\/60/g) || []).length}`);
+ok("summary: the survival strip still deepens", summaryHtml.includes("bg-emerald-50/70 transition-colors duration-150 hover:bg-emerald-100/70"), "the strip lost its deeper band");
 checkNoLatinKg("the cumulative summary", summaryHtml);
+// PRODUCTION CHECKS: the page must stay quick, keep long Telugu names inside
+// their columns, and never ship a control without a name.
+{
+  const speedProps = {
+    records: rows, sort: { key: "tripDate", dir: "desc" }, setSort: noop, page: 1,
+    totalPages: 53, totalRecords: 525, pageSize: 10, onPageChange: noop, onPageSizeChange: noop,
+    loading: false, emptyAll: false, filtersApplied: false, onReset: noop, weightUnit: WEIGHT_UNIT,
+  };
+  const started = performance.now();
+  for (let i = 0; i < 30; i += 1) {
+    render(React.createElement(tableModule.default, speedProps));
+    render(React.createElement(summaryModule.default, { kpis: quarterKpis, totalRecords: 525, pageSize: 10, weightUnit: WEIGHT_UNIT }));
+  }
+  const perRender = (performance.now() - started) / 60;
+  ok("speed: a full grid + summary renders in a few milliseconds", perRender < 25, `${perRender.toFixed(2)}ms per render`);
+  ok("clipping: farm and supervisor cells truncate instead of pushing the row", (tableHtml.match(/max-w-\[\d+px\] truncate/g) || []).length >= 2, "a name column can stretch the table");
+}
+
 ok("weights: the summary keeps every digit", summaryHtml.includes("4,73,557.27") && summaryHtml.includes("11,667.65"), "a summary total lost its digits");
 ok("cumulative: ONE card", (summaryHtml.match(/rounded-2xl/g) || []).length === 1, `cards=${(summaryHtml.match(/rounded-2xl/g) || []).length}`);
 ok("cumulative: ONE table", (summaryHtml.match(/<table/g) || []).length === 1, `tables=${(summaryHtml.match(/<table/g) || []).length}`);
@@ -505,6 +638,17 @@ try {
     }),
   );
   ok("live: filter bar renders the farm placeholder", liveFiltersHtml.includes("All Farms"), "placeholder missing");
+  // NO BROKEN BUTTONS: every control on the bar carries a name — an aria-label or
+  // its own text — so screen readers and the keyboard are never left guessing.
+  {
+    const buttons = liveFiltersHtml.match(/<button[\s\S]*?<\/button>/g) || [];
+    const unnamed = buttons.filter((button) => {
+      const aria = /aria-label="[^"]+"/.test(button);
+      const text = button.replace(/<[^>]+>/g, "").trim();
+      return !aria && !text;
+    });
+    ok("buttons: every control on the filter bar is named", buttons.length >= 4 && unnamed.length === 0, `buttons=${buttons.length} unnamed=${unnamed.length}`);
+  }
   ok("live: filter bar renders the supervisor placeholder", liveFiltersHtml.includes("All Supervisors"), "placeholder missing");
 
   // MasterDropdown only portals its option list while open, so prove the live
@@ -627,6 +771,30 @@ try {
       }),
       (html) => noEnglish("the filter bar", html),
     );
+    // A chosen farm / supervisor reads in Telugu on the trigger, while the stored
+    // English spelling stays in the option's search text so typing "anand" finds it.
+    const teFarm = viewModule.localizeTripViewText(options.farms[0], "te");
+    const teSupervisor = viewModule.localizeTripViewText(options.supervisors[0], "te");
+    const teFiltersSelected = renderTe(
+      React.createElement(filtersModule.default, {
+        filters: { fromDate: "", toDate: "", sourceFarm: options.farms[0], supervisor: options.supervisors[0], search: "" },
+        setFilters: noop,
+        appliedFilters: { fromDate: "", toDate: "", sourceFarm: "", supervisor: "", search: "" },
+        farmOptions: options.farms, supervisorOptions: options.supervisors,
+        sort: { key: "tripDate", dir: "desc" }, setSort: noop,
+        onApply: noop, onReset: noop, onRefresh: noop, refreshing: false,
+      }),
+    );
+    ok("telugu: the chosen farm reads in Telugu", teFarm !== options.farms[0] && teFiltersSelected.includes(teFarm), `expected ${teFarm}`);
+    ok("telugu: the chosen supervisor reads in Telugu", teSupervisor !== options.supervisors[0] && teFiltersSelected.includes(teSupervisor), `expected ${teSupervisor}`);
+    {
+      const { readFileSync } = await import("node:fs");
+      const filtersSource = readFileSync("src/modules/operations/mortality/components/LossFilters.tsx", "utf8");
+      const dropdown = readFileSync("src/modules/masters/components/MasterDropdown.tsx", "utf8");
+      ok("search: the stored English spelling stays searchable", filtersSource.includes("label: localizeTripViewText(farm, language)") && filtersSource.includes("label: localizeTripViewText(name, language)") && filtersSource.includes("searchText: farm") && filtersSource.includes("searchText: name"), "the search text was dropped");
+      ok("speed: the reference lists are transliterated once, not per keystroke", (filtersSource.match(/useMemo\(/g) || []).length === 2 && filtersSource.includes("[farmOptions, language]") && filtersSource.includes("[supervisorOptions, language]"), "the dropdown lists rebuild on every render");
+      ok("search: the menu matches the search text as well as the label", dropdown.includes("option.searchText?.toLocaleLowerCase().includes(keyword)") && dropdown.includes("option.label.toLocaleLowerCase().includes(keyword)"), "the menu cannot match both spellings");
+    }
     teRender(
       "the applied-filters indicator",
       React.createElement(indicatorModule.default, {

@@ -93,7 +93,7 @@ export default function PendingCollectionsCard({ pending, totalAmount }: Pending
           to="/operations?tab=pending-collections"
           className="flex items-center justify-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-slate-100"
         >
-          {t("navigation.pendingCollections")}
+          {t("nav.pendingCollections")}
           <ArrowRight size={13} />
         </Link>
       </footer>

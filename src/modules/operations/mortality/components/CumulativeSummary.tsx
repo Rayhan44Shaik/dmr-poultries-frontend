@@ -16,6 +16,7 @@ import { Sigma } from "lucide-react";
 import type { LossKpis } from "../hooks/useTripLossAnalysis";
 import { formatNumber, formatWeight } from "../../../../utils/format";
 import { useI18n } from "../../../../i18n";
+import { uiAnalysisRowHoverClass, uiAnalysisRowHoverOnTintClass } from "../../../../shared/ui/uiTokens";
 
 interface CumulativeSummaryProps {
   kpis: LossKpis;
@@ -23,7 +24,7 @@ interface CumulativeSummaryProps {
   totalRecords: number;
   /** Rows per page, used only to explain the scope. */
   pageSize: number;
-  /** Localised weight unit, e.g. "kg" / "కేజీ". */
+  /** Localised weight unit, read from the translation table — never hard-coded. */
   weightUnit?: string;
 }
 
@@ -115,7 +116,7 @@ export default function CumulativeSummary({ kpis, totalRecords, pageSize, weight
           </tr>
 
           {rows.map((row) => (
-            <tr key={row.key}>
+            <tr key={row.key} className={uiAnalysisRowHoverClass}>
               <th
                 scope="row"
                 className="w-1/4 px-3 py-2.5 text-left align-middle text-[12.5px] font-medium text-slate-700"
@@ -142,16 +143,16 @@ export default function CumulativeSummary({ kpis, totalRecords, pageSize, weight
 
           {/* Survival closes the summary, exactly as it closes the trip panel.
               100 − mortality %: both numbers are the server's. */}
-          <tr>
+          <tr className={`bg-emerald-50/70 ${uiAnalysisRowHoverOnTintClass}`}>
             <th
               scope="row"
-              className="w-1/4 bg-emerald-50/70 px-3 py-2.5 text-left align-middle text-[10.5px] font-bold uppercase leading-tight tracking-wide text-emerald-700"
+              className="w-1/4 px-3 py-2.5 text-left align-middle text-[10.5px] font-bold uppercase leading-tight tracking-wide text-emerald-700"
             >
               {t("ops.mortality.field.survival_rate")}
             </th>
             <td
               colSpan={3}
-              className="bg-emerald-50/70 px-3 py-2.5 text-left align-middle text-[15px] font-extrabold tabular-nums text-emerald-700"
+              className="px-3 py-2.5 text-left align-middle text-[15px] font-extrabold tabular-nums text-emerald-700"
             >
               {(100 - kpis.mortalityPercentage).toFixed(2)}%
             </td>

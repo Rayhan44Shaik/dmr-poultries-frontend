@@ -924,6 +924,10 @@ export default {
   // Expanded detail
   'ops.mortality.detail.trip_overview': 'Trip Details',
   'ops.mortality.detail.farm': 'Farm',
+  // Weight unit printed beside every figure on this page. Telugu in either
+  // language on purpose — the floor reads కేజీ, not the Latin 'Kg'.
+  'ops.mortality.weight_unit': 'కేజీ',
+
   'ops.mortality.detail.delivered': 'Delivered',
   'ops.mortality.detail.weight_summary': 'Weights',
   'ops.mortality.detail.rates': 'Rates',
