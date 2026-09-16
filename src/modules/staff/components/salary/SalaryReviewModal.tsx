@@ -378,7 +378,7 @@ function SalaryReviewModalBody({
                       {(
                         [
                           { value: "all", label: t("common.all") },
-                          { value: "unpaid", label: t("staff.review.unpaid") },
+                          { value: "unpaid", label: t("common.pending") },
                           { value: "paid", label: t("common.paid") },
                         ] as const
                       ).map((opt) => (
@@ -575,10 +575,19 @@ function SalaryReviewModalBody({
             <div className="relative" ref={downloadMenuRef}>
               <Button
                 variant="secondary"
-                onClick={() => setDownloadMenuOpen((o) => !o)}
+                onClick={() => {
+                  // One employee selected → download their single payslip
+                  // straight away; several → offer Individual PDFs or the
+                  // All in One PDF.
+                  if (selectedCount === 1) {
+                    onDownloadSelected([...selectedIds]);
+                  } else {
+                    setDownloadMenuOpen((o) => !o);
+                  }
+                }}
                 disabled={selectedCount === 0}
-                aria-haspopup="menu"
-                aria-expanded={downloadMenuOpen}
+                aria-haspopup={selectedCount > 1 ? "menu" : undefined}
+                aria-expanded={selectedCount > 1 ? downloadMenuOpen : undefined}
                 icon={
                   <span className={`inline-flex ${uiActionIconMotionClass.pdf}`}>
                     <Download size={13} />

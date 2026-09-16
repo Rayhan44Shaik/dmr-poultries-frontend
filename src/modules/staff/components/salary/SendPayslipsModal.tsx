@@ -853,19 +853,6 @@ function SendPayslipsDialog({
           </div>
           {submitted.length > 0 && (
             <div className="flex flex-wrap items-center gap-2">
-              <Button
-                variant="secondary"
-                onClick={() => void handleDownloadAll()}
-                disabled={downloading || targetRecords.length === 0}
-                loading={downloading}
-                icon={
-                  <span className={`inline-flex ${uiActionIconMotionClass.pdf}`}>
-                    <Download size={13} />
-                  </span>
-                }
-              >
-                {downloading ? t("staff.send.preparing") : t("staff.send.download_pdfs")}
-              </Button>
               {channel === "email" ? (
                 <Button
                   variant="primary"

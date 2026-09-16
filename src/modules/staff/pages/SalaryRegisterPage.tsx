@@ -26,7 +26,6 @@ import {
   ArrowUpDown,
   Building2,
   Calendar,
-  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -34,13 +33,11 @@ import {
   ListFilter,
   CheckCircle,
   ClipboardCheck,
-  Download,
   FileText,
-  Files,
-  Loader2,
   Plus,
   RotateCcw,
   Search,
+  Send,
   UserRound,
 } from "lucide-react";
 import { BrandRefreshButton, Button, ConfirmDialog, EmptyState } from "../../../ui";
@@ -139,10 +136,6 @@ function SalaryRegisterPage() {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const monthPickerRef = useRef<HTMLDivElement>(null);
-  // Payslip download menu (filter bar): individual PDFs vs all-in-one PDF.
-  const [downloadMenuOpen, setDownloadMenuOpen] = useState(false);
-  const downloadMenuRef = useRef<HTMLDivElement>(null);
-  const [bulkDownloadBusy, setBulkDownloadBusy] = useState(false);
 
   const {
     records,
@@ -195,17 +188,11 @@ function SalaryRegisterPage() {
       if (monthPickerRef.current && !monthPickerRef.current.contains(e.target as Node)) {
         setIsMonthPickerOpen(false);
       }
-      if (downloadMenuRef.current && !downloadMenuRef.current.contains(e.target as Node)) {
-        setDownloadMenuOpen(false);
-      }
     };
     const handleKeyDown = (e: KeyboardEvent) => {
-      // Escape closes the month popover or the download menu (the page has no
-      // other overlay open at this layer).
-      if (e.key === "Escape") {
-        setIsMonthPickerOpen(false);
-        setDownloadMenuOpen(false);
-      }
+      // Escape closes the month popover (the page has no other overlay open
+      // at this layer).
+      if (e.key === "Escape") setIsMonthPickerOpen(false);
     };
     document.addEventListener("mousedown", handleClickOutside);
     document.addEventListener("keydown", handleKeyDown);
@@ -443,43 +430,14 @@ function SalaryRegisterPage() {
     }
   }, [allRecords, showNotification, t]);
 
-  /** Download payslips as INDIVIDUAL PDFs — one branded A4 file per employee,
-   *  saved sequentially (small stagger so browsers accept each download). */
-  const handleDownloadIndividual = useCallback(async (list: SalaryRecord[]) => {
-    if (list.length === 0) return;
-    setBulkDownloadBusy(true);
-    try {
-      let downloaded = 0;
-      for (const record of list) {
-        try {
-          await downloadPayslipPdf(record);
-          downloaded += 1;
-          if (list.length > 1) await new Promise((r) => setTimeout(r, 400));
-        } catch {
-          /* best-effort; keep going through the register */
-        }
-      }
-      if (downloaded > 0) {
-        showNotification(t("staff.register.downloaded_ok", { count: downloaded }), "success");
-      } else {
-        showNotification(t("staff.register.download_failed"), "error");
-      }
-    } finally {
-      setBulkDownloadBusy(false);
-    }
-  }, [showNotification, t]);
-
   /** Download payslips as ONE combined PDF — every employee on their own page. */
   const handleDownloadCombined = useCallback(async (list: SalaryRecord[]) => {
     if (list.length === 0) return;
-    setBulkDownloadBusy(true);
     try {
       await generateCombinedPayslipPdf(list, "download");
       showNotification(t("staff.register.download_single_ok", { count: list.length }), "success");
     } catch {
       showNotification(t("staff.register.download_failed"), "error");
-    } finally {
-      setBulkDownloadBusy(false);
     }
   }, [showNotification, t]);
 
@@ -768,75 +726,20 @@ function SalaryRegisterPage() {
               <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-approve)]"><ClipboardCheck size={15} /></span>
               {t("staff.register.review_submit")}
             </button>
-            {/* Payslip downloads — individual PDFs (one file per employee) or
-                ALL payslips in ONE combined PDF. No bulk-send entry here:
-                sending lives on the row pills, in Review & Submit, and the
-                Send Payslips popup. */}
-            <div className="relative shrink-0" ref={downloadMenuRef}>
-              <button
-                type="button"
-                onClick={() => setDownloadMenuOpen((o) => !o)}
-                disabled={saving || refreshing || bulkDownloadBusy || visibleRecords.length === 0}
-                aria-haspopup="menu"
-                aria-expanded={downloadMenuOpen}
-                aria-label={t("staff.register.download_menu_label")}
-                className={`group relative whitespace-nowrap ${uiButton("primary", "md")}`}
-              >
-                {bulkDownloadBusy ? (
-                  <Loader2 size={15} className="animate-spin" />
-                ) : (
-                  <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-pdf)]"><Download size={15} /></span>
-                )}
-                {t("staff.register.download_payslips")}
-                <ChevronDown size={13} className={`transition-transform ${downloadMenuOpen ? "rotate-180" : ""}`} />
-              </button>
-              {downloadMenuOpen && (
-                <div
-                  role="menu"
-                  aria-label={t("staff.register.download_menu_label")}
-                  className="absolute bottom-full right-0 z-50 mb-2 w-64 overflow-hidden rounded-2xl border border-slate-200 bg-white p-1.5 shadow-xl animate-scale-in"
-                >
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setDownloadMenuOpen(false);
-                      void handleDownloadIndividual(visibleRecords);
-                    }}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-[13px] font-semibold text-slate-700 transition hover:bg-emerald-50"
-                  >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-slate-100 text-slate-500">
-                      <Files size={15} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block">
-                        {t(visibleRecords.length === 1 ? "staff.register.download_individual_one" : "staff.register.download_individual_other", { count: visibleRecords.length })}
-                      </span>
-                      <span className="block text-[11px] font-medium text-slate-400">{t("staff.register.download_individual_hint")}</span>
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    onClick={() => {
-                      setDownloadMenuOpen(false);
-                      void handleDownloadCombined(visibleRecords);
-                    }}
-                    className="flex w-full items-center gap-2.5 rounded-xl px-3 py-2.5 text-left text-[13px] font-semibold text-slate-700 transition hover:bg-emerald-50"
-                  >
-                    <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-500">
-                      <FileText size={15} />
-                    </span>
-                    <span className="min-w-0 flex-1">
-                      <span className="block">
-                        {t(visibleRecords.length === 1 ? "staff.register.download_single_one" : "staff.register.download_single_other", { count: visibleRecords.length })}
-                      </span>
-                      <span className="block text-[11px] font-medium text-slate-400">{t("staff.register.download_single_hint")}</span>
-                    </span>
-                  </button>
-                </div>
-              )}
-            </div>
+            {/* Send Payslips — the bulk-send entry point. Opens the Send
+                Payslips popup (Mail / WhatsApp) for the submitted employees
+                whose payslip has not gone out yet. Downloads live inside
+                Review & Submit, not on the filter bar. */}
+            <button
+              type="button"
+              onClick={() => openSendFor(submittedRecords, "email")}
+              disabled={saving || refreshing || submittedRecords.length === 0}
+              aria-label={t("staff.register.send_payslips")}
+              className={`group relative shrink-0 whitespace-nowrap ${uiButton("primary", "md")}`}
+            >
+              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-mail)]"><Send size={15} /></span>
+              {t("staff.register.send_payslips")} ({submittedRecords.length})
+            </button>
           </div>
         </div>
       </div>
