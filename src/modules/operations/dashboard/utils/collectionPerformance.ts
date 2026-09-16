@@ -33,8 +33,9 @@ const shopKey = (shopName: string): string => shopName.trim().toLocaleLowerCase(
 export const collectionRecoveryPercentage = (
   row: Pick<CollectionPerformanceDatum, "salesAmount" | "collectionAmount">,
 ): number => {
-  if (row.salesAmount <= 0) return row.collectionAmount > 0 ? 100 : 0;
-  return (row.collectionAmount / row.salesAmount) * 100;
+  const salesAmount = safeAmount(row.salesAmount);
+  if (salesAmount <= 0) return 0;
+  return (safeAmount(row.collectionAmount) / salesAmount) * 100;
 };
 
 /**

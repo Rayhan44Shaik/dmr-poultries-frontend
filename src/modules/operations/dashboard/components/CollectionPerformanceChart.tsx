@@ -106,16 +106,17 @@ const COLLECTION_RECOVERY_ANIMATION_STYLES = `
 `;
 
 function RecoveryRing({ value, size = 46 }: { value: number; size?: number }) {
-  const pct = clampPct(value);
+  const displayPct = Math.max(0, Number.isFinite(value) ? value : 0);
+  const pct = clampPct(displayPct);
   const color = recoveryColor(pct);
   const radius = 20.4;
   const strokeWidth = 4.1;
   const circumference = 2 * Math.PI * radius;
   const dashOffset = circumference * (1 - pct / 100);
-  const roundedPct = Math.round(pct);
-  const isFullRecovery = roundedPct >= 100;
-  const numberFontSize = Math.max(13, Math.round(size * (isFullRecovery ? 0.27 : 0.31) * 10) / 10);
-  const percentFontSize = Math.max(9, Math.round(size * (isFullRecovery ? 0.17 : 0.2) * 10) / 10);
+  const roundedPct = Math.round(displayPct);
+  const isWidePercent = roundedPct >= 100;
+  const numberFontSize = Math.max(12, Math.round(size * (isWidePercent ? 0.25 : 0.31) * 10) / 10);
+  const percentFontSize = Math.max(8.5, Math.round(size * (isWidePercent ? 0.16 : 0.2) * 10) / 10);
   const progressStyle = {
     strokeDasharray: circumference,
     strokeDashoffset: dashOffset,
@@ -268,7 +269,7 @@ export default function CollectionPerformanceChart({
   const pending = selectedRow
     ? safeAmount(selectedRow.outstandingAmount)
     : safeAmount(sourceTotalPending ?? rowPendingTotal);
-  const recovery = sales > 0 ? (collections / sales) * 100 : collections > 0 ? 100 : 0;
+  const recovery = sales > 0 ? (collections / sales) * 100 : 0;
 
   const setSortValue = (value: string) => {
     const nextSort = value ? value as CollectionPerformanceSort : "outstanding";

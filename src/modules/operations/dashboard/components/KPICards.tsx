@@ -307,6 +307,14 @@ const KPICard = memo(function KPICard({
     trendText = "—";
     badgeTitle = t("ops.dashboard.kpi_no_baseline", { days });
   }
+  const wasValueClass =
+    comparison.kind === "move"
+      ? comparison.good
+        ? "text-emerald-600"
+        : "text-rose-500"
+      : comparison.kind === "flat"
+        ? "text-slate-500"
+        : "text-slate-400";
   /* The compact trend chip sits on the top-right edge, while the larger logo
      stays centred on the right edge. */
 
@@ -367,7 +375,7 @@ const KPICard = memo(function KPICard({
         </div>
       </div>
 
-      <div className="relative flex h-full min-w-0 flex-col justify-between gap-1.5 pr-12 @min-[96px]:pr-14 @min-[120px]:pr-16">
+      <div className="relative flex h-full min-w-0 flex-col gap-1.5 pr-12 @min-[96px]:pr-14 @min-[120px]:pr-16">
         {/* line 1 — KPI name; the logo/period stack is centred on the right edge */}
         <div className="min-w-0 pr-1">
           <span
@@ -379,9 +387,9 @@ const KPICard = memo(function KPICard({
         </div>
 
         {/* line 2 — the figure, big and unclipped; previous value sits just under it */}
-        <div className="min-w-0">
+        <div className="my-auto min-w-0">
           <div
-            className={`min-w-0 truncate text-[14px] font-bold leading-none tracking-tight @min-[96px]:text-[19px] @min-[120px]:text-[23px] ${config.text}`}
+            className={`min-w-0 truncate text-[16px] font-bold leading-none tracking-tight @min-[96px]:text-[21px] @min-[120px]:text-[25px] ${config.text}`}
             title={`${t(kpiCardLabel(label))} · ${exactValue} · ${rangeLabel}`}
           >
             {displayMain}
@@ -393,7 +401,7 @@ const KPICard = memo(function KPICard({
           </div>
           {baseline ? (
             <span
-              className="mt-1 block min-w-0 max-w-full truncate text-[8px] font-medium text-slate-400 @min-[96px]:text-[8.5px]"
+              className={`mt-1.5 block min-w-0 max-w-full truncate text-[9.5px] font-bold @min-[96px]:text-[10px] @min-[120px]:text-[10.5px] ${wasValueClass}`}
               title={badgeTitle}
             >
               {t("ops.dashboard.kpi_prev_value", { value: formatWithUnit(prevValue, unit) })}

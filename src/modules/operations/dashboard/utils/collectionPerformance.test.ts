@@ -28,12 +28,16 @@ test("collection performance merges duplicate shop rows and cleans unsafe amount
     salesAmount: 1500,
     collectionAmount: 900,
     outstandingAmount: 600,
+    shopId: undefined,
+    shopStatus: undefined,
   });
   assert.deepEqual(normalized[normalized.length - 1], {
     shopName: "Invalid",
     salesAmount: 0,
     collectionAmount: 0,
     outstandingAmount: 0,
+    shopId: undefined,
+    shopStatus: undefined,
   });
 });
 
@@ -46,7 +50,7 @@ test("collection performance totals and recovery use sales as the 100 percent ba
   assert.equal(summary.outstandingAmount, 680);
   assert.equal(Number(summary.recoveryPercentage.toFixed(2)), 72.61);
   assert.equal(collectionRecoveryPercentage(normalized[0]), 60);
-  assert.equal(collectionRecoveryPercentage(normalized[2]), 100);
+  assert.equal(collectionRecoveryPercentage(normalized[2]), 0);
 });
 
 test("collection performance supports deterministic amount and recovery sorting", () => {
@@ -55,8 +59,8 @@ test("collection performance supports deterministic amount and recovery sorting"
   assert.equal(sortCollectionPerformance(normalized, "outstanding")[0].shopName, "Balaji Traders");
   assert.equal(sortCollectionPerformance(normalized, "collections")[0].shopName, "Balaji Traders");
   assert.equal(sortCollectionPerformance(normalized, "collectionsLow")[0].shopName, "Cash-only adjustment");
-  assert.equal(sortCollectionPerformance(normalized, "recoveryHigh")[0].shopName, "Cash-only adjustment");
-  assert.equal(sortCollectionPerformance(normalized, "recoveryLow")[0].shopName, "Balaji Traders");
+  assert.equal(sortCollectionPerformance(normalized, "recoveryHigh")[0].shopName, "Annapurna Farms");
+  assert.equal(sortCollectionPerformance(normalized, "recoveryLow")[0].shopName, "Cash-only adjustment");
   assert.deepEqual(
     sortCollectionPerformance(normalized, "shop").map((row) => row.shopName),
     ["Annapurna Farms", "Balaji Traders", "Cash-only adjustment"],
