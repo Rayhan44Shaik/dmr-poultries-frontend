@@ -155,13 +155,14 @@ export function FuelBillTable({
   ];
 
   const isSelectedDeleted = selectedBill?.deleted === true || selectedBill?.status === "Deleted";
-  const isSelectedPending = selectedBill && !isSelectedDeleted && selectedBill.sourceType !== "TRIP" && !selectedBill.tripNo && selectedBill.status === "Pending";
-
-  const canDeleteSelected =
-    isSelectedPending && (canEditDelete ? canEditDelete(selectedBill) : true);
-
-  const canEditSelected =
-    isSelectedPending && (canEditDelete ? canEditDelete(selectedBill) : true);
+  const isTripSelected = selectedBill?.sourceType === "TRIP" || !!selectedBill?.tripNo;
+  const isSelectedPending = !!(
+    selectedBill &&
+    !isSelectedDeleted &&
+    !isTripSelected &&
+    (selectedBill.status === "Pending" || (selectedBill.status as string)?.toLowerCase() === "pending") &&
+    (canEditDelete ? canEditDelete(selectedBill) : true)
+  );
 
   return (
     <div className="w-full">
@@ -216,14 +217,14 @@ export function FuelBillTable({
           )}
         </div>
 
-        {/* Selected Row Actions Bar at Table Top */}
+        {/* Selected Row Actions Bar at Table Top: View, Approve, Delete, Edit */}
         {selectedBill && (
           <div className="flex items-center gap-2 animate-in fade-in duration-150 flex-wrap">
             {onView && (
               <button
                 type="button"
                 onClick={() => onView(selectedBill)}
-                className="group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm bg-emerald-50/70 hover:bg-emerald-50/90 text-emerald-600 border border-emerald-200/60 active:scale-95 cursor-pointer"
+                className="group relative h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-all shadow-sm bg-emerald-50/80 hover:bg-emerald-100 text-emerald-700 border border-emerald-200 active:scale-95 cursor-pointer"
                 title={t("common.view")}
               >
                 <span className={`inline-flex ${uiActionIconMotionClass.view}`}>
@@ -233,25 +234,11 @@ export function FuelBillTable({
               </button>
             )}
 
-            {canEditSelected && onEdit && (
-              <button
-                type="button"
-                onClick={() => onEdit(selectedBill)}
-                className="group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-600 border border-emerald-200/60 active:scale-95 cursor-pointer"
-                title={t("common.edit")}
-              >
-                <span className={`inline-flex ${uiActionIconMotionClass.edit}`}>
-                  <Pencil size={13} />
-                </span>
-                <span>{t("common.edit")}</span>
-              </button>
-            )}
-
             {isSelectedPending && onApprove && (
               <button
                 type="button"
                 onClick={() => onApprove(selectedBill)}
-                className="group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 cursor-pointer"
+                className="group relative h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-all shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95 cursor-pointer"
                 title={t("common.approve")}
               >
                 <span className={`inline-flex ${uiActionIconMotionClass.approve}`}>
@@ -261,17 +248,31 @@ export function FuelBillTable({
               </button>
             )}
 
-            {canDeleteSelected && onDelete && (
+            {isSelectedPending && onDelete && (
               <button
                 type="button"
                 onClick={() => onDelete(selectedBill)}
-                className="group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 active:scale-95 cursor-pointer"
+                className="group relative h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-all shadow-sm bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 active:scale-95 cursor-pointer"
                 title={t("common.delete")}
               >
                 <span className={`inline-flex ${uiActionIconMotionClass.delete}`}>
                   <Trash2 size={13} />
                 </span>
                 <span>{t("common.delete")}</span>
+              </button>
+            )}
+
+            {isSelectedPending && onEdit && (
+              <button
+                type="button"
+                onClick={() => onEdit(selectedBill)}
+                className="group relative h-8 px-3 rounded-xl font-semibold text-xs flex items-center gap-1.5 transition-all shadow-sm bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 active:scale-95 cursor-pointer"
+                title={t("common.edit")}
+              >
+                <span className={`inline-flex ${uiActionIconMotionClass.edit}`}>
+                  <Pencil size={13} />
+                </span>
+                <span>{t("common.edit")}</span>
               </button>
             )}
           </div>
