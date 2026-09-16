@@ -2,6 +2,7 @@ import { memo, useMemo, useState, type ReactNode } from 'react';
 import { format } from 'date-fns';
 import { Wrench, Battery, Disc, Settings, Droplets, Wind, CircleDot, Milestone, Activity, Hash, Paperclip, Calendar, FilterX, Route, Fuel } from 'lucide-react';
 import type { MaintenanceEvent } from '../../types';
+import type { Vehicle } from '../../../masters/vehicles/types/vehicle';
 import { safeDate } from '../../utils/maintenanceHelpers';
 import BillDetailsModal from './BillDetailsModal';
 
@@ -24,8 +25,10 @@ interface MaintenanceTimelineProps {
    * alongside the maintenance cards below — MAINTENANCE-sourced rows are
    * expected to already be excluded (they're covered by `events` above). */
   meterEvents?: VehicleMeterEvent[];
-  vehicles: any[];
+  vehicles: Vehicle[];
   hasActiveFilters?: boolean;
+  /** Ascending/descending calendar order from the history filter bar. */
+  sortDirection?: 'asc' | 'desc';
   onClearFilters?: () => void;
 }
 
@@ -81,7 +84,7 @@ interface TripGroup {
   fuels: VehicleMeterEvent[];
 }
 
-const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, hasActiveFilters = false, onClearFilters }: MaintenanceTimelineProps) => {
+const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, hasActiveFilters = false, sortDirection = 'desc', onClearFilters }: MaintenanceTimelineProps) => {
   const [selectedBill, setSelectedBill] = useState<MaintenanceEvent | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
@@ -150,8 +153,10 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, hasActiveFilt
       time: safeDate(data.eventDate).getTime(),
       data,
     }));
-    return [...maintRows, ...tripRowItems, ...orphanRows].sort((a, b) => b.time - a.time);
-  }, [timelineEvents, tripRows, orphanFuelRows]);
+    return [...maintRows, ...tripRowItems, ...orphanRows].sort((a, b) =>
+      sortDirection === 'asc' ? a.time - b.time : b.time - a.time
+    );
+  }, [timelineEvents, tripRows, orphanFuelRows, sortDirection]);
 
   const handleBillClick = (event: MaintenanceEvent) => {
     setSelectedBill(event);
@@ -422,7 +427,7 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, hasActiveFilt
       </div>
       {mergedTimeline.length > visibleTimeline.length && (
         <p className="px-5 pt-3 text-center text-[11px] font-semibold text-slate-400">
-          Showing latest {visibleTimeline.length} of {mergedTimeline.length} events. Narrow the date or vehicle filter to see more.
+          Showing {visibleTimeline.length} of {mergedTimeline.length} events. Narrow the date or vehicle filter to see more.
         </p>
       )}
 

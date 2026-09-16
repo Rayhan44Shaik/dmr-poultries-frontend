@@ -30,7 +30,7 @@ export default {
   'nav.weightLossMortality': 'Weight Loss / Mortality',
   'nav.fuelExpenses': 'Fuel Expenses',
   'nav.maintenanceEntry': 'Maintenance Entry',
-  'nav.maintenanceHistory': 'Maintenance List',
+  'nav.maintenanceHistory': 'Maintenance Timeline',
   'nav.permitsDocuments': 'Permits & Documents',
   'nav.emi': 'EMI',
   'nav.analytics': 'Analytics',

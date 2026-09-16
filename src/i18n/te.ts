@@ -30,7 +30,7 @@ export default {
   'nav.weightLossMortality': 'బరువు నష్టం / మరణాలు',
   'nav.fuelExpenses': 'ఇంధన ఖర్చులు',
   'nav.maintenanceEntry': 'మెయింటెనెన్స్ నమోదు',
-  'nav.maintenanceHistory': 'మెయింటెనెన్స్ జాబితా',
+  'nav.maintenanceHistory': 'మెయింటెనెన్స్ టైమ్‌లైన్',
   'nav.permitsDocuments': 'పర్మిట్లు & పత్రాలు',
   'nav.emi': 'EMI',
   'nav.analytics': 'అనలిటిక్స్',

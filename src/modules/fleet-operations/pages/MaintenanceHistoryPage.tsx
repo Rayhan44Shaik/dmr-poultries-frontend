@@ -1,26 +1,20 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle, History } from "lucide-react";
-import { Pagination } from "../../../ui";
+import { AlertCircle } from "lucide-react";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
 import { useI18n } from "../../../i18n";
 import { apiGet } from "../../../api";
-import { shouldShowPagination } from "../../../shared/ui/paginationStyles";
-import { PAGINATION_DEFAULT_PAGE_SIZE } from "../../../shared/ui/uiTokens";
 import ErrorBoundary from "../components/common/ErrorBoundary";
-import MaintenanceFilters from "../components/maintenance/MaintenanceFilters";
-import MaintenanceKPICards from "../components/maintenance/MaintenanceKPICards";
-import MaintenanceMasterTable, {
+import MaintenanceFilters, {
   type MaintenanceSortKey,
-} from "../components/maintenance/MaintenanceMasterTable";
+} from "../components/maintenance/MaintenanceFilters";
+import MaintenanceKPICards from "../components/maintenance/MaintenanceKPICards";
 import MaintenanceTimeline, {
   type VehicleMeterEvent,
 } from "../components/maintenance/MaintenanceTimeline";
 import UpcomingServices from "../components/maintenance/UpcomingServices";
-import ViewModal from "../components/maintenance/ViewModal";
 import { useMaintenanceData } from "../hooks/useMaintenanceData";
 import { formatVehicleNumber } from "../../../utils/format";
 import { MAINTENANCE_TYPES } from "../utils/constants";
-import { safeDate } from "../utils/maintenanceHelpers";
 import { useEmployees } from "../../masters/employees/hooks/useEmployees";
 import type { MaintenanceEvent } from "../types";
 
@@ -28,66 +22,34 @@ interface MaintenanceHistoryPageProps {
   embedded?: boolean;
 }
 
-function recordStatus(
-  record: MaintenanceEvent,
-): "Approved" | "Pending" | "Deleted" {
-  if (record.deletedAt) return "Deleted";
-  return record.paymentStatus === "approved" ? "Approved" : "Pending";
-}
-
-function comparableValue(
-  record: MaintenanceEvent,
-  key: MaintenanceSortKey,
-): string | number {
-  switch (key) {
-    case "currentKM":
-      return Number(record.currentKM || 0);
-    case "totalCost":
-      return Number(record.totalCost || 0);
-    case "status":
-      return recordStatus(record);
-    case "date":
-      return String(record.date || record.createdAt || "").slice(0, 10);
-    default:
-      return String(record[key] || "");
-  }
-}
-
-/** Sorting is local because every loaded page is already part of the exact
- * active result. A deterministic newest-first fallback matches maintenance
- * operators' workflow while the sort dropdown remains visibly unselected. */
 function sortMaintenanceRecords(
   records: readonly MaintenanceEvent[],
   sortBy: MaintenanceSortKey | null,
   sortDir: "asc" | "desc",
 ): MaintenanceEvent[] {
-  const key = sortBy ?? "date";
+  // Timeline sorting is intentionally calendar-only: a timeline must preserve
+  // a truthful chronological sequence when maintenance and meter events meet.
   const direction = sortBy ? sortDir : "desc";
   const multiplier = direction === "asc" ? 1 : -1;
-  return [...records].sort((left, right) => {
-    const leftValue = comparableValue(left, key);
-    const rightValue = comparableValue(right, key);
-    if (typeof leftValue === "number" && typeof rightValue === "number") {
-      return (leftValue - rightValue) * multiplier;
-    }
-    return (
-      String(leftValue).localeCompare(String(rightValue), undefined, {
-        numeric: true,
-        sensitivity: "base",
-      }) * multiplier
-    );
-  });
+  return [...records].sort(
+    (left, right) =>
+      String(left.date || left.createdAt || "")
+        .slice(0, 10)
+        .localeCompare(
+          String(right.date || right.createdAt || "").slice(0, 10),
+        ) * multiplier,
+  );
 }
 
 function KpiSkeleton() {
   const { t } = useI18n();
   return (
     <section
-      className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5"
+      className="grid grid-cols-2 gap-3 sm:grid-cols-4"
       aria-label={t("common.loading")}
       aria-busy="true"
     >
-      {Array.from({ length: 5 }, (_, index) => (
+      {Array.from({ length: 4 }, (_, index) => (
         <div
           key={index}
           className="min-h-[6.75rem] animate-pulse rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm"
@@ -113,19 +75,12 @@ const MaintenanceHistoryPage = ({
   const { showNotification } = useSafeNotification();
   const data = useMaintenanceData('history');
   const [meterEvents, setMeterEvents] = useState<VehicleMeterEvent[]>([]);
-  const [currentPage, setCurrentPage] = useState(1);
-  const [pageSize, setPageSize] = useState(PAGINATION_DEFAULT_PAGE_SIZE);
   const [sortBy, setSortBy] = useState<MaintenanceSortKey | null>(null);
   const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
-  const [selectedRecordId, setSelectedRecordId] = useState<string | null>(null);
-  const [viewRecord, setViewRecord] = useState<MaintenanceEvent | null>(null);
   const refreshRequested = useRef(false);
-  const tableContainerRef = useRef<HTMLElement>(null);
-  const viewButtonRef = useRef<HTMLButtonElement>(null);
 
-  // Drivers remain available from the master even when the current date/status
-  // filter returns no rows. Historic record drivers are merged in so a driver
-  // who has since left the master can still be used to find their records.
+  // Drivers remain available from the master even when a narrow date/type
+  // filter has no rows. Historic names stay searchable when someone has left.
   const driverOptions = useMemo(() => {
     const options = new Map<string, { value: string; label: string }>();
     employees
@@ -141,8 +96,9 @@ const MaintenanceHistoryPage = ({
         if (value && label) options.set(value, { value, label });
       });
     data.drivers.forEach((driver) => {
-      if (!options.has(driver.id))
+      if (!options.has(driver.id)) {
         options.set(driver.id, { value: driver.id, label: driver.name });
+      }
     });
     return [...options.values()].sort((left, right) =>
       left.label.localeCompare(right.label),
@@ -182,13 +138,12 @@ const MaintenanceHistoryPage = ({
     [data.vehicles],
   );
 
-  // Trip/Fuel meter events for the timeline. When a single vehicle is selected
-  // we hit its ledger; with "All Vehicles" selected, merge the independent
-  // ledgers so the secondary timeline remains complete.
+  // The secondary timeline mixes approved maintenance with trip/fuel odometer
+  // events. Its meter ledger remains scoped to the selected vehicle(s).
   useEffect(() => {
     let cancelled = false;
     if (data.selectedVehicle === "all") {
-      const ids = (data.vehicles || [])
+      const ids = data.vehicles
         .map((vehicle) => Number(vehicle.id))
         .filter(Boolean);
       if (ids.length === 0) return;
@@ -200,39 +155,40 @@ const MaintenanceHistoryPage = ({
         ),
       )
         .then((lists) => {
-          if (cancelled) return;
-          setMeterEvents(
-            lists.flat().filter((event) => event.sourceType !== "MAINTENANCE"),
-          );
+          if (!cancelled) {
+            setMeterEvents(
+              lists
+                .flat()
+                .filter((event) => event.sourceType !== "MAINTENANCE"),
+            );
+          }
         })
         .catch(() => {
           if (!cancelled) setMeterEvents([]);
         });
-      return () => {
-        cancelled = true;
-      };
+    } else {
+      apiGet<VehicleMeterEvent[]>(
+        `/fleet/vehicles/${data.selectedVehicle}/meter-history`,
+      )
+        .then((response) => {
+          if (!cancelled) {
+            setMeterEvents(
+              (response.data || []).filter(
+                (event) => event.sourceType !== "MAINTENANCE",
+              ),
+            );
+          }
+        })
+        .catch(() => {
+          if (!cancelled) setMeterEvents([]);
+        });
     }
-
-    apiGet<VehicleMeterEvent[]>(
-      `/fleet/vehicles/${data.selectedVehicle}/meter-history`,
-    )
-      .then((response) => {
-        if (!cancelled) {
-          setMeterEvents(
-            (response.data || []).filter(
-              (event) => event.sourceType !== "MAINTENANCE",
-            ),
-          );
-        }
-      })
-      .catch(() => {
-        if (!cancelled) setMeterEvents([]);
-      });
     return () => {
       cancelled = true;
     };
   }, [data.selectedVehicle, data.vehicles]);
 
+  const resultsReady = !data.historyLoading && !data.historyError;
   const filteredMeterEvents = useMemo(() => {
     if (!data.fromDate && !data.toDate) return meterEvents;
     return meterEvents.filter((event) => {
@@ -244,110 +200,43 @@ const MaintenanceHistoryPage = ({
     });
   }, [data.fromDate, data.toDate, meterEvents]);
 
-  const resultsReady = !data.historyLoading && !data.historyError;
-  const sortedRecords = useMemo(
-    () => sortMaintenanceRecords(data.filtered, sortBy, sortDir),
-    [data.filtered, sortBy, sortDir],
-  );
-  const safePage = Math.min(
-    currentPage,
-    Math.max(1, Math.ceil(sortedRecords.length / pageSize)),
-  );
-  const paginatedRecords = useMemo(
-    () =>
-      sortedRecords.slice((safePage - 1) * pageSize, safePage * pageSize),
-    [pageSize, safePage, sortedRecords],
-  );
-  const activeSelectedRecordId = selectedRecordId && sortedRecords.some(
-    (record) => String(record.id) === selectedRecordId,
-  ) ? selectedRecordId : null;
-
-  // Match the Trip List selection contract: clicking outside the table or its
-  // View action returns the list to an unselected state.
-  useEffect(() => {
-    const clearSelectionOutsideTable = (event: MouseEvent) => {
-      const target = event.target as Node;
-      if (tableContainerRef.current?.contains(target) || viewButtonRef.current?.contains(target)) return;
-      setSelectedRecordId(null);
-    };
-    document.addEventListener("mousedown", clearSelectionOutsideTable);
-    return () => document.removeEventListener("mousedown", clearSelectionOutsideTable);
-  }, []);
-
-  // A refresh toast is emitted only after the new response completes, never at
-  // click time. That prevents a false success signal when the API rejects it.
-  useEffect(() => {
-    if (!refreshRequested.current || data.historyLoading) return;
-    refreshRequested.current = false;
-    if (data.historyError) return;
-    showNotification(t("notification.data_refreshed"), "success");
-  }, [data.historyError, data.historyLoading, showNotification, t]);
-
-  const resetFilters = () => {
-    data.resetFilters();
-    setSortBy(null);
-    setSortDir("asc");
-    setCurrentPage(1);
-    setSelectedRecordId(null);
-    showNotification(t("fleet.maintenance_history.filters_reset"), "info");
-  };
-
-  const updateFilter = (update: () => void) => {
-    update();
-    setCurrentPage(1);
-    setSelectedRecordId(null);
-  };
-
-  const updateSort = (
-    nextSortBy: MaintenanceSortKey | null,
-    nextSortDir: "asc" | "desc",
-  ) => {
-    setSortBy(nextSortBy);
-    setSortDir(nextSortBy ? nextSortDir : "asc");
-    setCurrentPage(1);
-    setSelectedRecordId(null);
-  };
-
-  const handleColumnSort = (key: MaintenanceSortKey) => {
-    if (sortBy !== key) {
-      updateSort(key, "asc");
-    } else if (sortDir === "asc") {
-      updateSort(key, "desc");
-    } else {
-      updateSort(null, "asc");
-    }
-  };
-
-  const handleRefresh = () => {
-    if (data.historyLoading) return;
-    refreshRequested.current = true;
-    setSelectedRecordId(null);
-    data.refresh();
-  };
-
-  const openSelectedRecord = () => {
-    const selected = sortedRecords.find(
-      (record) => String(record.id) === activeSelectedRecordId,
+  const timelineEvents = useMemo(() => {
+    const filteredApproved = data.filtered.filter(
+      (record) => record.paymentStatus === "approved" && !record.deletedAt,
     );
-    if (!selected) {
-      showNotification(t("fleet.maintenance_history.select_record"), "info");
-      return;
-    }
-    setViewRecord(selected);
-    setSelectedRecordId(null);
-  };
-
-  const activeTimelineRecords = useMemo(() => {
     const source = data.hasActiveFilters
-      ? data.filtered.filter(
-          (record) => record.paymentStatus === "approved" && !record.deletedAt,
-        )
-      : data.approvedHistory;
-    return [...source].sort(
-      (left, right) =>
-        safeDate(right.date).getTime() - safeDate(left.date).getTime(),
-    );
-  }, [data.approvedHistory, data.filtered, data.hasActiveFilters]);
+      ? filteredApproved
+      : data.approvedHistory.length
+        ? data.approvedHistory
+        : filteredApproved;
+    return sortMaintenanceRecords(source, sortBy, sortDir);
+  }, [
+    data.approvedHistory,
+    data.filtered,
+    data.hasActiveFilters,
+    sortBy,
+    sortDir,
+  ]);
+
+  const timelineStats = useMemo(
+    () => ({
+      totalRecords: timelineEvents.length,
+      totalCost: timelineEvents.reduce(
+        (sum, record) => sum + Number(record.totalCost || 0),
+        0,
+      ),
+      vehiclesServiced: new Set(
+        timelineEvents
+          .map((record) => String(record.vehicleId))
+          .filter(Boolean),
+      ).size,
+      documents: timelineEvents.reduce(
+        (sum, record) => sum + (record.documents?.length || 0),
+        0,
+      ),
+    }),
+    [timelineEvents],
+  );
 
   const visibleUpcoming = useMemo(() => {
     let services = data.upcomingServices;
@@ -368,17 +257,37 @@ const MaintenanceHistoryPage = ({
     return services;
   }, [data.fromDate, data.selectedVehicle, data.toDate, data.upcomingServices]);
 
-  const vehicleHistory = useMemo(() => {
-    if (!viewRecord) return [];
-    return data.approvedHistory
-      .filter(
-        (record) => String(record.vehicleId) === String(viewRecord.vehicleId),
-      )
-      .sort(
-        (left, right) =>
-          safeDate(right.date).getTime() - safeDate(left.date).getTime(),
-      );
-  }, [data.approvedHistory, viewRecord]);
+  // A refresh toast is emitted after the replacement response completes, never
+  // at click time, so a failed refresh cannot appear successful.
+  useEffect(() => {
+    if (!refreshRequested.current || data.historyLoading) return;
+    refreshRequested.current = false;
+    if (!data.historyError) {
+      showNotification(t("notification.data_refreshed"), "success");
+    }
+  }, [data.historyError, data.historyLoading, showNotification, t]);
+
+  const updateFilter = (update: () => void) => update();
+
+  const updateSort = (
+    nextSortBy: MaintenanceSortKey | null,
+    nextSortDir: "asc" | "desc",
+  ) => {
+    setSortBy(nextSortBy);
+    setSortDir(nextSortBy ? nextSortDir : "asc");
+  };
+
+  const resetFilters = () => {
+    data.resetFilters();
+    updateSort(null, "asc");
+    showNotification(t("fleet.maintenance_history.filters_reset"), "info");
+  };
+
+  const handleRefresh = () => {
+    if (data.historyLoading) return;
+    refreshRequested.current = true;
+    data.refresh();
+  };
 
   return (
     <ErrorBoundary>
@@ -402,7 +311,6 @@ const MaintenanceHistoryPage = ({
           serviceType={
             data.selectedServiceType === "all" ? "" : data.selectedServiceType
           }
-          status={data.selectedStatus === "all" ? "" : data.selectedStatus}
           sortBy={sortBy}
           sortDir={sortDir}
           search={data.searchQuery}
@@ -410,10 +318,8 @@ const MaintenanceHistoryPage = ({
           drivers={driverOptions}
           maintenanceTypes={maintenanceTypes}
           serviceTypes={data.serviceTypes}
-          resultCount={data.filtered.length}
+          resultCount={timelineEvents.length}
           loading={data.historyLoading}
-          showViewButton={activeSelectedRecordId !== null}
-          viewButtonRef={viewButtonRef}
           setFromDate={(value) => updateFilter(() => data.setFromDate(value))}
           setToDate={(value) => updateFilter(() => data.setToDate(value))}
           setVehicle={(value) =>
@@ -428,24 +334,14 @@ const MaintenanceHistoryPage = ({
           setServiceType={(value) =>
             updateFilter(() => data.setSelectedServiceType(value || "all"))
           }
-          setStatus={(value) =>
-            updateFilter(() => data.setSelectedStatus(value || "all"))
-          }
           setSort={updateSort}
           setSearch={(value) => updateFilter(() => data.setSearchQuery(value))}
           onReset={resetFilters}
           onRefresh={handleRefresh}
-          onViewSelected={openSelectedRecord}
         />
 
         {resultsReady ? (
-          <MaintenanceKPICards
-            totalRecords={data.historyStats.total}
-            totalCost={data.historyStats.totalCost}
-            vehiclesServiced={data.historyStats.vehiclesServiced}
-            approved={data.historyStats.approved}
-            pending={data.historyStats.pending}
-          />
+          <MaintenanceKPICards {...timelineStats} />
         ) : data.historyLoading ? (
           <KpiSkeleton />
         ) : null}
@@ -466,71 +362,30 @@ const MaintenanceHistoryPage = ({
           </div>
         ) : null}
 
-        <section ref={tableContainerRef} className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white text-xs shadow-sm md:text-sm">
-          <div className="flex items-center border-b border-slate-100 bg-gradient-to-r from-blue-50/60 via-white to-blue-50/40 px-5 py-3 sm:px-6">
-            <div className="flex items-center gap-3">
-              <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-blue-100 bg-blue-50/70 text-blue-500 shadow-inner">
-                <History size={19} aria-hidden="true" />
-              </span>
-              <h2 className="text-base font-bold tracking-tight text-slate-800">
-                {t("nav.maintenanceHistory")}
-              </h2>
-            </div>
-          </div>
-          <MaintenanceMasterTable
-            records={resultsReady ? paginatedRecords : []}
-            vehicles={data.vehicles}
-            isLoading={data.historyLoading}
-            selectedRecordId={activeSelectedRecordId}
-            onRowClick={(record) =>
-              setSelectedRecordId((current) =>
-                current === String(record.id) ? null : String(record.id),
-              )
-            }
-            onRowSelect={(record) => setSelectedRecordId(String(record.id))}
-            startIndex={(safePage - 1) * pageSize}
-            sortBy={sortBy}
-            sortDir={sortDir}
-            onSortChange={handleColumnSort}
-          />
-          {resultsReady && shouldShowPagination(sortedRecords.length) ? (
-            <Pagination
-              page={safePage}
-              pageSize={pageSize}
-              totalItems={sortedRecords.length}
-              onPageChange={setCurrentPage}
-              onPageSizeChange={(size) => {
-                setPageSize(size);
-                setCurrentPage(1);
-              }}
-              ariaLabel={t("nav.maintenanceHistory")}
-            />
-          ) : null}
-        </section>
-
         {resultsReady ? (
           <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-2">
               <div className="border-b border-slate-100 px-5 py-4">
-                <h3 className="text-sm font-bold text-slate-800">
+                <h2 className="text-sm font-bold text-slate-800">
                   {t("fleet.maintenance_history.approved_timeline")}
-                </h3>
+                </h2>
               </div>
               <div className="p-5">
                 <MaintenanceTimeline
-                  events={activeTimelineRecords}
+                  events={timelineEvents}
                   meterEvents={filteredMeterEvents}
                   vehicles={data.vehicles}
                   hasActiveFilters={data.hasActiveFilters}
+                  sortDirection={sortBy ? sortDir : "desc"}
                   onClearFilters={resetFilters}
                 />
               </div>
             </section>
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
               <div className="border-b border-slate-100 px-5 py-4">
-                <h3 className="text-sm font-bold text-slate-800">
+                <h2 className="text-sm font-bold text-slate-800">
                   {t("fleet.maintenance_history.upcoming_service")}
-                </h3>
+                </h2>
               </div>
               <div className="p-5">
                 <UpcomingServices services={visibleUpcoming} />
@@ -539,15 +394,6 @@ const MaintenanceHistoryPage = ({
           </div>
         ) : null}
       </div>
-
-      {viewRecord ? (
-        <ViewModal
-          record={viewRecord}
-          vehicles={data.vehicles}
-          vehicleHistory={vehicleHistory}
-          onClose={() => setViewRecord(null)}
-        />
-      ) : null}
     </ErrorBoundary>
   );
 };

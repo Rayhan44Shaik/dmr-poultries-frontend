@@ -2,7 +2,6 @@ import React from "react";
 import {
   ArrowUpDown,
   Calendar,
-  Eye,
   RotateCcw,
   Search,
   Store,
@@ -12,22 +11,20 @@ import {
   X,
 } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
-import { useI18n, translateStatus } from "../../../../i18n";
+import { useI18n } from "../../../../i18n";
 import {
   opsFilterCardClass,
   opsFilterLabelClass,
   opsInputClass,
   opsSecondaryButtonClass,
-  opsViewButtonClass,
 } from "../../../../shared/ui/operationsStyles";
 import { BrandRefreshButton } from "../../../../ui";
 import MasterDropdown, {
   type MasterDropdownOption,
 } from "../../../masters/components/MasterDropdown";
 import { localizeMaintenanceText } from "../../utils/maintenanceLocalization";
-import type { MaintenanceSortKey } from "./MaintenanceMasterTable";
 
-const STATUS_OPTIONS = ["Approved", "Pending", "Deleted"] as const;
+export type MaintenanceSortKey = "date";
 
 type Props = {
   fromDate: string;
@@ -36,7 +33,6 @@ type Props = {
   driver: string;
   maintenanceType: string;
   serviceType: string;
-  status: string;
   sortBy: MaintenanceSortKey | null;
   sortDir: "asc" | "desc";
   search: string;
@@ -46,28 +42,23 @@ type Props = {
   serviceTypes: readonly string[];
   resultCount: number;
   loading: boolean;
-  showViewButton: boolean;
-  viewButtonRef?: React.Ref<HTMLButtonElement>;
   setFromDate: (value: string) => void;
   setToDate: (value: string) => void;
   setVehicle: (value: string) => void;
   setDriver: (value: string) => void;
   setMaintenanceType: (value: string) => void;
   setServiceType: (value: string) => void;
-  setStatus: (value: string) => void;
   setSort: (key: MaintenanceSortKey | null, direction: "asc" | "desc") => void;
   setSearch: (value: string) => void;
   onReset: () => void;
   onRefresh: () => void;
-  onViewSelected: () => void;
 };
 
 /**
- * Maintenance List's direct-manipulation filters intentionally use the exact
- * Trip List surface: calendar/dropdown labels, one responsive toolbar, a
- * clearable search, reset motion, the branded hen refresh control and a
- * selected-row View action.  Values apply as they change; nothing waits for a
- * second "Search" submit button.
+ * A roomy, two-row maintenance filter surface. It keeps Trip List's coloured
+ * labels, immediate search feedback, animated reset and branded hen refresh,
+ * but deliberately omits a Status control: timeline maintenance is approved
+ * service history, not a status-management queue.
  */
 function MaintenanceFilters({
   fromDate,
@@ -76,7 +67,6 @@ function MaintenanceFilters({
   driver,
   maintenanceType,
   serviceType,
-  status,
   sortBy,
   sortDir,
   search,
@@ -86,31 +76,19 @@ function MaintenanceFilters({
   serviceTypes,
   resultCount,
   loading,
-  showViewButton,
-  viewButtonRef,
   setFromDate,
   setToDate,
   setVehicle,
   setDriver,
   setMaintenanceType,
   setServiceType,
-  setStatus,
   setSort,
   setSearch,
   onReset,
   onRefresh,
-  onViewSelected,
 }: Props) {
   const { t, language } = useI18n();
   const sortOptions: MasterDropdownOption[] = [
-    {
-      value: "billNumber:asc",
-      label: `${t("fleet.maintenance_table.mnt_no")} — ${t("ops.trip.sort_az")}`,
-    },
-    {
-      value: "billNumber:desc",
-      label: `${t("fleet.maintenance_table.mnt_no")} — ${t("ops.trip.sort_za")}`,
-    },
     {
       value: "date:desc",
       label: `${t("common.date")} — ${t("ops.trip.sort_latest_first")}`,
@@ -119,59 +97,8 @@ function MaintenanceFilters({
       value: "date:asc",
       label: `${t("common.date")} — ${t("ops.trip.sort_oldest_first")}`,
     },
-    {
-      value: "vehicleNo:asc",
-      label: `${t("common.vehicle")} — ${t("ops.trip.sort_az")}`,
-    },
-    {
-      value: "vehicleNo:desc",
-      label: `${t("common.vehicle")} — ${t("ops.trip.sort_za")}`,
-    },
-    {
-      value: "driverName:asc",
-      label: `${t("common.driver")} — ${t("ops.trip.sort_az")}`,
-    },
-    {
-      value: "driverName:desc",
-      label: `${t("common.driver")} — ${t("ops.trip.sort_za")}`,
-    },
-    {
-      value: "maintenanceType:asc",
-      label: `${t("operations.maintenance_type")} — ${t("ops.trip.sort_az")}`,
-    },
-    {
-      value: "maintenanceType:desc",
-      label: `${t("operations.maintenance_type")} — ${t("ops.trip.sort_za")}`,
-    },
-    {
-      value: "serviceType:asc",
-      label: `${t("fleet.maintenance_form.service_type")} — ${t("ops.trip.sort_az")}`,
-    },
-    {
-      value: "serviceType:desc",
-      label: `${t("fleet.maintenance_form.service_type")} — ${t("ops.trip.sort_za")}`,
-    },
-    {
-      value: "totalCost:asc",
-      label: `${t("fleet.maintenance_history.total_cost")} — ${t("ops.trip.sort_low_high")}`,
-    },
-    {
-      value: "totalCost:desc",
-      label: `${t("fleet.maintenance_history.total_cost")} — ${t("ops.trip.sort_high_low")}`,
-    },
   ];
   const sortValue = sortBy ? `${sortBy}:${sortDir}` : "";
-
-  const selectSort = (value: string) => {
-    if (!value) {
-      setSort(null, "asc");
-      return;
-    }
-    const [key, direction] = value.split(":");
-    if (!sortOptions.some((option) => option.value === value)) return;
-    setSort(key as MaintenanceSortKey, direction === "desc" ? "desc" : "asc");
-  };
-
   const localizedMaintenanceTypes = maintenanceTypes.map((type) => ({
     value: type,
     label: localizeMaintenanceText(type, language),
@@ -183,9 +110,19 @@ function MaintenanceFilters({
     searchText: type,
   }));
 
+  const selectSort = (value: string) => {
+    if (!value) {
+      setSort(null, "asc");
+      return;
+    }
+    const [key, direction] = value.split(":");
+    if (!sortOptions.some((option) => option.value === value)) return;
+    setSort(key as MaintenanceSortKey, direction === "desc" ? "desc" : "asc");
+  };
+
   return (
     <section className={opsFilterCardClass} aria-label={t("common.filter")}>
-      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <div>
           <label className={opsFilterLabelClass}>
             <Calendar size={17} className="shrink-0 text-emerald-500" />
@@ -282,30 +219,10 @@ function MaintenanceFilters({
             className="w-full"
           />
         </div>
-        <div>
-          <label className={opsFilterLabelClass}>
-            <CheckStatusIcon />
-            <span>{t("common.status")}</span>
-          </label>
-          <MasterDropdown
-            hideLabel
-            label={t("common.status")}
-            value={status}
-            options={STATUS_OPTIONS.map((item) => ({
-              value: item,
-              label: translateStatus(t, item),
-            }))}
-            onChange={setStatus}
-            placeholder={t("fleet.maintenance_history.all_statuses")}
-            searchable
-            allowClear
-            className="w-full"
-          />
-        </div>
       </div>
 
-      <div className="grid grid-cols-1 items-end gap-3.5 pt-1 lg:grid-cols-12">
-        <div className="lg:col-span-3">
+      <div className="grid grid-cols-1 items-end gap-4 border-t border-slate-100 pt-4 lg:grid-cols-12">
+        <div className="lg:col-span-4">
           <label className={opsFilterLabelClass}>
             <ArrowUpDown size={17} className="shrink-0 text-violet-500" />
             <span>{t("common.sort_by")}</span>
@@ -362,21 +279,7 @@ function MaintenanceFilters({
               : `${resultCount.toLocaleString("en-IN")} ${t("common.results")}`}
           </p>
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2 lg:col-span-4">
-          {showViewButton ? (
-            <button
-              ref={viewButtonRef}
-              type="button"
-              onClick={onViewSelected}
-              className={`group relative ${opsViewButtonClass}`}
-              aria-label={t("common.view")}
-            >
-              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]">
-                <Eye size={15} />
-              </span>
-              {t("common.view")}
-            </button>
-          ) : null}
+        <div className="flex flex-wrap items-center justify-start gap-2 lg:col-span-3 lg:justify-end">
           <button
             type="button"
             onClick={onReset}
@@ -392,17 +295,6 @@ function MaintenanceFilters({
         </div>
       </div>
     </section>
-  );
-}
-
-function CheckStatusIcon() {
-  return (
-    <span
-      className="inline-flex h-[17px] w-[17px] shrink-0 items-center justify-center rounded-full border-2 border-emerald-500"
-      aria-hidden="true"
-    >
-      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-    </span>
   );
 }
 

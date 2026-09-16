@@ -1,5 +1,5 @@
 import React from "react";
-import { CheckCircle2, IndianRupee, Truck, Wrench, Clock } from "lucide-react";
+import { IndianRupee, Paperclip, Truck, Wrench } from "lucide-react";
 import { useI18n } from "../../../../i18n";
 import {
   compactKpiValue,
@@ -12,24 +12,21 @@ type Props = {
   totalRecords: number;
   totalCost: number;
   vehiclesServiced: number;
-  approved: number;
-  pending: number;
+  documents: number;
 };
 
-/** Exact summary of the records currently shown by Maintenance List. */
+/** A concise, non-status summary for the filtered maintenance timeline. */
 function MaintenanceKPICards({
   totalRecords,
   totalCost,
   vehiclesServiced,
-  approved,
-  pending,
+  documents,
 }: Props) {
   const { t } = useI18n();
   const records = compactKpiValue(totalRecords);
   const cost = compactKpiValue(totalCost, 2);
   const vehicles = compactKpiValue(vehiclesServiced);
-  const approvedRecords = compactKpiValue(approved);
-  const pendingRecords = compactKpiValue(pending);
+  const attachedDocuments = compactKpiValue(documents);
 
   const cards: KpiCardItem[] = [
     {
@@ -57,27 +54,19 @@ function MaintenanceKPICards({
       tone: "amber",
     },
     {
-      id: "maintenance-approved",
-      label: t("status.approved"),
-      value: <KpiMetricValue metric={approvedRecords} />,
-      tooltip: `${t("status.approved")}: ${approvedRecords.exact}`,
-      Icon: CheckCircle2,
-      tone: "emerald",
-    },
-    {
-      id: "maintenance-pending",
-      label: t("status.pending"),
-      value: <KpiMetricValue metric={pendingRecords} />,
-      tooltip: `${t("status.pending")}: ${pendingRecords.exact}`,
-      Icon: Clock,
-      tone: "rose",
+      id: "maintenance-documents",
+      label: t("fleet.maintenance_history.documents"),
+      value: <KpiMetricValue metric={attachedDocuments} />,
+      tooltip: `${t("fleet.maintenance_history.documents")}: ${attachedDocuments.exact}`,
+      Icon: Paperclip,
+      tone: "cyan",
     },
   ];
 
   return (
     <KpiCardGrid
       items={cards}
-      gridClassName="lg:grid-cols-5"
+      gridClassName="lg:grid-cols-4"
       ariaLabel={t("nav.maintenanceHistory")}
     />
   );
