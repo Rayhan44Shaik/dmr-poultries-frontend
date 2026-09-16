@@ -605,6 +605,22 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
     };
   }, [countersQuery.trends, counterToday, counterWeekFrom, counterMonthFrom]);
 
+  // The masters-register snapshot time stamped by the service — shown under
+  // the Active Fleet heading like the Collection Recovery card's timing line.
+  const fleetAsOfLabel = useMemo(() => {
+    const asOf = data?.fleetCounts?.asOf;
+    if (!asOf) return null;
+    const date = new Date(asOf);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toLocaleString(trendLocale, {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  }, [data?.fleetCounts?.asOf, trendLocale]);
+
   // Trip counts ride along with the switcher, so the numbers and the control
   // are the same thing.
   const trendViews: TrendViewOption[] = [
@@ -954,8 +970,15 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
 
       <div className="bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm w-full min-w-0">
         <div className="mb-4">
-          <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.active_ecosystem")}</span>
-          <h3 className="text-sm font-black text-slate-800 mt-0.5">{t("ops.dashboard.active_fleet")}</h3>
+          {/* Only the Active Fleet heading — underline + register snapshot
+              time, in the same treatment the Collection Recovery card uses. */}
+          <h3 className="text-sm font-black text-slate-800">{t("ops.dashboard.active_fleet")}</h3>
+          <span aria-hidden="true" className="mt-1.5 block h-0.5 w-10 rounded-full bg-emerald-400" />
+          {fleetAsOfLabel && (
+            <p className="mt-1.5 text-[10.5px] font-semibold tabular-nums text-slate-400">
+              {t("ops.dashboard.as_of", { time: fleetAsOfLabel })}
+            </p>
+          )}
         </div>
         {/* Active out of the WHOLE register (inactive rows included) for
             Shops · Vehicles · Drivers · Supervisors · Helpers · Loaders.
@@ -963,12 +986,15 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
             dashboard API's own active counters so the panel never blanks. */}
         <ActiveCounts
           counts={{
-            shops: data.fleetCounts?.shops ?? { active: data?.totalShops ?? 0, total: data?.totalShops ?? 0 },
-            vehicles: data.fleetCounts?.vehicles ?? { active: data?.activeVehicles ?? 0, total: data?.activeVehicles ?? 0 },
-            drivers: data.fleetCounts?.drivers ?? { active: data?.activeDrivers ?? 0, total: data?.activeDrivers ?? 0 },
-            supervisors: data.fleetCounts?.supervisors ?? { active: 0, total: 0 },
-            helpers: data.fleetCounts?.helpers ?? { active: data?.activeHelpers ?? 0, total: data?.activeHelpers ?? 0 },
-            loaders: data.fleetCounts?.loaders ?? { active: 0, total: 0 },
+            shops: data.fleetCounts?.shops ?? { active: data?.totalShops ?? 0, total: data?.totalShops ?? 0, inactiveItems: [], inactiveOverflow: 0 },
+            vehicles: data.fleetCounts?.vehicles ?? { active: data?.activeVehicles ?? 0, total: data?.activeVehicles ?? 0, inactiveItems: [], inactiveOverflow: 0 },
+            drivers: data.fleetCounts?.drivers ?? { active: data?.activeDrivers ?? 0, total: data?.activeDrivers ?? 0, inactiveItems: [], inactiveOverflow: 0 },
+            supervisors: data.fleetCounts?.supervisors ?? { active: 0, total: 0, inactiveItems: [], inactiveOverflow: 0 },
+            helpers: data.fleetCounts?.helpers ?? { active: data?.activeHelpers ?? 0, total: data?.activeHelpers ?? 0, inactiveItems: [], inactiveOverflow: 0 },
+            loaders: data.fleetCounts?.loaders ?? { active: 0, total: 0, inactiveItems: [], inactiveOverflow: 0 },
+            // Empty when the register snapshot could not be read (the header
+            // then simply hides the timing line).
+            asOf: data.fleetCounts?.asOf ?? "",
           }}
           used={{
             shops: data?.usedShops ?? 0,

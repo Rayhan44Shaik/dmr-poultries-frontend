@@ -117,6 +117,10 @@ interface DashboardShopLookupRow {
   shopName: string;
   shopStatus?: "Active" | "Inactive" | string;
   currentBalance?: number;
+  /** Register identifiers shown in the tile tooltip's inactive list. */
+  shopNumber?: string;
+  city?: string;
+  village?: string;
 }
 
 interface DashboardPendingLookupRow {
@@ -128,10 +132,20 @@ interface DashboardPendingLookupRow {
 /* ------------------------------------------------------------------ */
 /*  Active Fleet register counts — ACTIVE out of the WHOLE register     */
 /* ------------------------------------------------------------------ */
-/** One register's headcount split: how many are Active out of every row. */
+/** One inactive record named in a tile's tooltip (who/what it is + detail). */
+export interface RegisterInactiveItem {
+  name: string;
+  detail?: string;
+}
+
+/** One register's headcount split, plus exactly WHICH rows are Inactive. */
 export interface RegisterCount {
   active: number;
   total: number;
+  /** The inactive rows themselves, for the tile tooltip (capped at 30). */
+  inactiveItems: RegisterInactiveItem[];
+  /** How many inactive rows exist but are not listed (tooltip "+N more"). */
+  inactiveOverflow: number;
 }
 
 /**
@@ -147,24 +161,50 @@ export interface DashboardFleetCounts {
   supervisors: RegisterCount;
   helpers: RegisterCount;
   loaders: RegisterCount;
+  /**
+   * When these master rows were read (ISO) — the panel renders it as the
+   * register-snapshot timestamp, since register counts are window-independent.
+   */
+  asOf: string;
 }
 
-/** Count rows and their Active share. A master stores only Active/Inactive. */
-function registerCount(rows: readonly Record<string, unknown>[]): RegisterCount {
+/** Cap so even a large register's tooltip stays readable. */
+const INACTIVE_TOOLTIP_LIMIT = 30;
+
+/**
+ * Count rows and their Active share, keeping the Inactive rows themselves.
+ * A master stores only Active/Inactive, so anything not literally "Active"
+ * is Inactive — the same rule the dashboard's KPI tiles apply.
+ */
+function registerCount<T extends { status?: string }>(
+  rows: readonly T[],
+  toItem: (row: T) => RegisterInactiveItem,
+): RegisterCount {
+  const inactive = rows.filter((row) => row.status !== "Active").map(toItem);
   return {
     total: rows.length,
-    active: rows.filter((row) => row.status === "Active").length,
+    active: rows.length - inactive.length,
+    inactiveItems: inactive.slice(0, INACTIVE_TOOLTIP_LIMIT),
+    inactiveOverflow: Math.max(0, inactive.length - INACTIVE_TOOLTIP_LIMIT),
   };
 }
 
 /** Crew headcount for one department, tolerating "Driver"/"Drivers" either way. */
-function crewCount(rows: readonly Record<string, unknown>[], department: string): RegisterCount {
+function crewCount<T extends { status?: string; department?: string; role?: string; employeeName?: string; joiningDate?: string }>(
+  rows: readonly T[],
+  department: string,
+): RegisterCount {
   const want = department.toLowerCase();
   const subset = rows.filter((row) => {
     const dept = String(row.department ?? row.role ?? "").trim().toLowerCase();
     return dept === want || `${dept}s` === want || dept === `${want}s`;
   });
-  return registerCount(subset);
+  return registerCount(subset, (row) => ({
+    name: String(row.employeeName ?? "").trim() || `#${String((row as Record<string, unknown>).id ?? "—")}`,
+    detail: row.joiningDate
+      ? `Joined ${row.joiningDate}`
+      : String(row.department ?? department),
+  }));
 }
 
 /** Assemble the six register counts from the already-fetched master rows. */
@@ -177,12 +217,27 @@ function buildFleetCounts(
     shops: {
       total: shops.length,
       active: shops.filter((shop) => shop.shopStatus === "Active").length,
+      inactiveItems: shops
+        .filter((shop) => shop.shopStatus !== "Active")
+        .slice(0, INACTIVE_TOOLTIP_LIMIT)
+        .map((shop) => ({
+          name: shop.shopName,
+          detail: [shop.shopNumber, shop.city || shop.village].filter(Boolean).join(" · ") || undefined,
+        })),
+      inactiveOverflow: Math.max(
+        0,
+        shops.filter((shop) => shop.shopStatus !== "Active").length - INACTIVE_TOOLTIP_LIMIT,
+      ),
     },
-    vehicles: registerCount(vehicles),
-    drivers: crewCount(employees, "Driver"),
-    supervisors: crewCount(employees, "Supervisor"),
-    helpers: crewCount(employees, "Helper"),
-    loaders: crewCount(employees, "Loader"),
+    vehicles: registerCount(vehicles as { status?: string; vehicleNumber?: string; number?: string; vehicleType?: string; id?: unknown }[], (row) => ({
+      name: String(row.vehicleNumber ?? row.number ?? "").trim() || `#${String(row.id ?? "—")}`,
+      detail: String(row.vehicleType ?? "").trim() || undefined,
+    })),
+    drivers: crewCount(employees as { status?: string; department?: string; role?: string; employeeName?: string; joiningDate?: string }[], "Driver"),
+    supervisors: crewCount(employees as { status?: string; department?: string; role?: string; employeeName?: string; joiningDate?: string }[], "Supervisor"),
+    helpers: crewCount(employees as { status?: string; department?: string; role?: string; employeeName?: string; joiningDate?: string }[], "Helper"),
+    loaders: crewCount(employees as { status?: string; department?: string; role?: string; employeeName?: string; joiningDate?: string }[], "Loader"),
+    asOf: new Date().toISOString(),
   };
 }
 
@@ -215,11 +270,17 @@ function normalizeShopStatus(status: unknown): "Active" | "Inactive" {
 function mapDashboardShopLookup(raw: Record<string, unknown>): DashboardShopLookupRow | null {
   const shopName = String(raw.shopName ?? raw.shop_name ?? "").trim();
   if (!shopName) return null;
+  const shopNumber = String(raw.shopNumber ?? raw.shop_number ?? "").trim();
+  const city = String(raw.city ?? "").trim();
+  const village = String(raw.village ?? "").trim();
   return {
     id: raw.id != null ? Number(raw.id) : undefined,
     shopName,
     shopStatus: normalizeShopStatus(raw.status),
     currentBalance: toNumber(raw.currentBalance ?? raw.current_balance),
+    shopNumber: shopNumber || undefined,
+    city: city || undefined,
+    village: village || undefined,
   };
 }
 
