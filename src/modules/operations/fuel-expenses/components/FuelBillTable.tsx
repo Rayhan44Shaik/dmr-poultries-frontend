@@ -511,17 +511,21 @@ export function FuelBillTable({
 
                     {/* Petrol Bunk & GPS with Tooltip */}
                     <td className="px-4 py-4 text-xs text-slate-600 max-w-[220px]">
-                      <div className="font-medium text-slate-800 truncate" title={bill.petrolBunk}>
+                      <div className="font-semibold text-slate-800 truncate" title={bill.petrolBunk}>
                         {localizeTripViewText(bill.petrolBunk || "—", language)}
                       </div>
-                      {bill.gpsLat != null && bill.gpsLon != null && (
-                        <div className="mt-1" title={`GPS: ${bill.gpsLat.toFixed(5)}, ${bill.gpsLon.toFixed(5)}`}>
+                      {bill.gpsLat != null && bill.gpsLon != null && !(Number(bill.gpsLat) === 0 && Number(bill.gpsLon) === 0) ? (
+                        <div className="mt-1">
                           <GpsAddressText
                             lat={bill.gpsLat}
                             lon={bill.gpsLon}
-                            className="text-[11px] text-emerald-600 font-semibold"
+                            className="text-[11px] text-emerald-600 font-semibold leading-tight"
                             maxLines={1}
                           />
+                        </div>
+                      ) : (
+                        <div className="mt-0.5 text-[11px] text-slate-400 italic">
+                          {t("ops.trip.not_captured")}
                         </div>
                       )}
                     </td>
