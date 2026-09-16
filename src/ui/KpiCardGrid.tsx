@@ -68,7 +68,37 @@ interface Props {
   /** Static Tailwind grid classes, for example `lg:grid-cols-5`. */
   gridClassName?: string;
   ariaLabel?: string;
+  /**
+   * Card size. `default` is the Trip List surface; `compact` is a tighter
+   * card (used where the strip would otherwise dominate the page or a popup)
+   * that keeps the same tone, icon tile and accent bar.
+   */
+  density?: "default" | "compact";
 }
+
+/** Per-density card, label, value, icon-tile, glow and accent classes. */
+const densityClasses = {
+  default: {
+    card: "min-h-[6.75rem] rounded-2xl p-4",
+    label: "text-[11px]",
+    value: "mt-2 text-2xl",
+    iconTile: "h-11 w-11 rounded-xl",
+    iconSize: 22,
+    glow: "-right-7 -top-7 h-24 w-24",
+    accent: "h-1",
+    grid: "gap-3",
+  },
+  compact: {
+    card: "min-h-[5.25rem] rounded-xl px-3.5 py-3",
+    label: "text-[10px]",
+    value: "mt-1.5 text-lg",
+    iconTile: "h-8 w-8 rounded-lg",
+    iconSize: 16,
+    glow: "-right-5 -top-5 h-16 w-16",
+    accent: "h-[0.1875rem]",
+    grid: "gap-2.5",
+  },
+} as const;
 
 const toneClasses: Record<KpiTone, { value: string; icon: string; glow: string; accent: string }> = {
   blue: {
@@ -114,10 +144,11 @@ const toneClasses: Record<KpiTone, { value: string; icon: string; glow: string; 
  * restrained pastel tones, readable values, and recognisable icon tiles rather
  * than dark or visually heavy cards.
  */
-export function KpiCardGrid({ items, gridClassName = "", ariaLabel }: Props) {
+export function KpiCardGrid({ items, gridClassName = "", ariaLabel, density = "default" }: Props) {
+  const dense = densityClasses[density];
   return (
     <section
-      className={`grid grid-cols-2 gap-3 sm:grid-cols-3 ${gridClassName}`}
+      className={`grid grid-cols-2 sm:grid-cols-3 ${dense.grid} ${gridClassName}`}
       aria-label={ariaLabel}
       aria-live="polite"
     >
@@ -127,22 +158,22 @@ export function KpiCardGrid({ items, gridClassName = "", ariaLabel }: Props) {
           <div
             key={id}
             title={tooltip}
-            className={`group relative isolate min-h-[6.75rem] overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md ${tooltip ? "cursor-help" : ""}`}
+            className={`group relative isolate overflow-hidden border border-slate-200/80 bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md ${dense.card} ${tooltip ? "cursor-help" : ""}`}
           >
-            <span className={`pointer-events-none absolute -right-7 -top-7 h-24 w-24 rounded-full ${classes.glow}`} aria-hidden="true" />
-            <span className={`absolute inset-x-0 bottom-0 h-1 ${classes.accent}`} aria-hidden="true" />
+            <span className={`pointer-events-none absolute rounded-full ${dense.glow} ${classes.glow}`} aria-hidden="true" />
+            <span className={`absolute inset-x-0 bottom-0 ${dense.accent} ${classes.accent}`} aria-hidden="true" />
             <div className="relative flex h-full items-start justify-between gap-3">
               <div className="min-w-0">
-                <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{label}</p>
-                <p className={`mt-2 text-2xl font-extrabold leading-none tracking-tight tabular-nums ${classes.value}`}>
+                <p className={`font-bold uppercase tracking-wide text-slate-500 ${dense.label}`}>{label}</p>
+                <p className={`font-extrabold leading-none tracking-tight tabular-nums ${dense.value} ${classes.value}`}>
                   {value}
                 </p>
               </div>
               <span
-                className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border shadow-sm transition-transform duration-200 group-hover:scale-105 ${classes.icon}`}
+                className={`inline-flex shrink-0 items-center justify-center border shadow-sm transition-transform duration-200 group-hover:scale-105 ${dense.iconTile} ${classes.icon}`}
                 aria-hidden="true"
               >
-                <Icon size={22} strokeWidth={2.25} />
+                <Icon size={dense.iconSize} strokeWidth={2.25} />
               </span>
             </div>
           </div>

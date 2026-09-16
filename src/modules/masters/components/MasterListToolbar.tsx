@@ -79,8 +79,34 @@ export default function MasterListToolbar({
           />
         </div>
         {children}
-        {onStatusChange && <MasterDropdown label="Status" value={status ?? ""} options={[{ value: "", label: "All statuses" }, { value: "Active", label: "Active" }, { value: "Inactive", label: "Inactive" }]} onChange={onStatusChange} />}
-        {onSortChange && <MasterDropdown label="Sort by" value={sort ?? "number"} options={[{ value: "number", label: "Number" }, { value: "name", label: "Name" }, { value: "status", label: "Status" }]} onChange={onSortChange} />}
+        {/* Labels and option text run through i18n: this toolbar is shared by
+          * every master list, so a Telugu session must not leave "Sort by" and
+          * "All statuses" sitting in Latin. Option VALUES stay the English
+          * tokens the pages compare against. */}
+        {onStatusChange && (
+          <MasterDropdown
+            label={t("common.status")}
+            value={status ?? ""}
+            options={[
+              { value: "", label: t("common.all_statuses") },
+              { value: "Active", label: t("common.active") },
+              { value: "Inactive", label: t("common.inactive") },
+            ]}
+            onChange={onStatusChange}
+          />
+        )}
+        {onSortChange && (
+          <MasterDropdown
+            label={t("common.sort_by")}
+            value={sort ?? "number"}
+            options={[
+              { value: "number", label: t("common.number") },
+              { value: "name", label: t("common.name") },
+              { value: "status", label: t("common.status") },
+            ]}
+            onChange={onSortChange}
+          />
+        )}
       </div>
       <div
         className="flex flex-wrap items-center gap-2"

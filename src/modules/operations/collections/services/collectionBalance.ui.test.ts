@@ -31,6 +31,9 @@ const tableSrc = read("../components/entry/RecentCollectionsTable.tsx");
 const serviceSrc = read("./collectionService.ts");
 
 test("Opening Balance is correctly displayed as a carried-forward figure", () => {
+  // The summary card is i18n-driven, so assert the keys it renders — the
+  // English literals only ever matched comments and broke on the i18n pass.
+  // en values: "Opening Balance" / "Brought forward from previous week".
   // The summary renders "Opening Balance" + "Brought forward …" through the
   // shared i18n keys; the EN dictionary carries the expected wording.
   assert.match(summarySrc, /t\("ops\.collection\.opening_balance"\)/);
@@ -42,6 +45,8 @@ test("Opening Balance is correctly displayed as a carried-forward figure", () =>
 });
 
 test("The Collection page balance is the backend-authoritative live balance, not a weekly figure", () => {
+  // Outstanding Summary's main KPI is `currentOutstanding` (shops.current_balance).
+  // en values: "Current Outstanding" / "Outstanding Amount (Approved Only)".
   // Outstanding Summary's main KPI is `currentOutstanding` (shops.current_balance),
   // rendered through i18n keys — EN values: "Current Outstanding" /
   // "Outstanding Amount (Approved Only)".
@@ -62,6 +67,7 @@ test("No weekly opening-balance calculation remains in the frontend (balance is 
 });
 
 test("Weekly cards (Approved Sales / Approved Collections / Pending Approval) are week-scoped and informational", () => {
+  // en values: "Approved Sales" / "Approved Collections" / "Pending Approval".
   assert.match(summarySrc, /t\("ops\.collection\.approved_sales"\)/);
   assert.match(summarySrc, /t\("ops\.collection\.approved_collections"\)/);
   assert.match(summarySrc, /t\("operations\.pending_approval"\)/);

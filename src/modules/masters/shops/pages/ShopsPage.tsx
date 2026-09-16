@@ -105,7 +105,9 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     const margin = 14;
     const usableWidth = pageWidth - margin * 2;
 
-    const relativeWeights = [0.06, 0.22, 0.16, 0.14, 0.12, 0.1, 0.08, 0.12];
+    // Nine columns: S.No, shop, owner, mobile, city, association, paper rate,
+    // opening balance, current balance.
+    const relativeWeights = [0.05, 0.19, 0.14, 0.12, 0.1, 0.11, 0.08, 0.1, 0.11];
     const columnStylesConfig: {
       [key: number]: {
         cellWidth: number;
@@ -122,10 +124,11 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
       t("masters.shops.table.association_type"),
       t("masters.shops.table.paper_rate"),
       t("masters.shops.table.opening_balance"),
+      t("masters.shops.table.current_balance"),
     ];
     headers.forEach((_, index) => {
       const computedWidth = usableWidth * relativeWeights[index];
-      const isCentered = index === 0 || index === 6 || index === 7;
+      const isCentered = index === 0 || index === 6;
       columnStylesConfig[index] = {
         cellWidth: computedWidth,
         halign: isCentered ? "center" : "left",
@@ -157,6 +160,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
       shop.associationType || "—",
       shop.paperRate.toString(),
       `₹${Number(shop.openingBalance || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      `₹${Number(shop.currentBalance || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
     ]);
 
     autoTable(doc, {
@@ -224,6 +228,7 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
       t("masters.shops.table.association_type"),
       t("masters.shops.table.paper_rate"),
       t("masters.shops.table.opening_balance"),
+      t("masters.shops.table.current_balance"),
     ];
     const rows = filteredShops.map((shop, index) => [
       (index + 1).toString(),
@@ -233,7 +238,8 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
       shop.city,
       shop.associationType || "—",
       shop.paperRate.toString(),
-      `₹${Number(shop.openingBalance || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      Number(shop.openingBalance || 0),
+      Number(shop.currentBalance || 0),
     ]);
     const filename = `${t("masters.shops.title")}_${new Date().toISOString().split("T")[0]}`;
 

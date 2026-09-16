@@ -20,9 +20,15 @@ interface Props {
   pageSize?: number;
   /** Omit to hide the rows-per-page control. */
   onPageSizeChange?: (pageSize: number) => void;
+  /**
+   * Compact strip: the first page, the current page and its neighbours, then
+   * the last page — `1 2 … 20` instead of `1 2 3 4 5 … 20`. Used where the
+   * strip shares a toolbar with search and actions (Recent Collections).
+   */
+  compact?: boolean;
 }
 
-function TripPagination({ currentPage, totalPages, totalItems, onPageChange, hidePageInfo = false, pageSize, onPageSizeChange }: Props) {
+function TripPagination({ currentPage, totalPages, totalItems, onPageChange, hidePageInfo = false, pageSize, onPageSizeChange, compact = false }: Props) {
   const { t } = useI18n();
   const { from, to } = pageRecordRange(currentPage, pageSize ?? 1, totalItems ?? 0);
   const hasMultiplePages = totalPages > 1;
@@ -42,9 +48,23 @@ function TripPagination({ currentPage, totalPages, totalItems, onPageChange, hid
     return pages;
   };
 
-  const visiblePages = hasMultiplePages ? getPageNumbers() : [1];
-  const showFirstEllipsis = hasMultiplePages && visiblePages[0] > 1;
-  const showLastEllipsis = hasMultiplePages && visiblePages[visiblePages.length - 1] < totalPages;
+  /**
+   * Compact strip: page 1, the current page with one neighbour on each side,
+   * and the last page — deduplicated and ordered, with a gap rendered as an
+   * ellipsis. On page 1 of 20 that reads exactly `1 2 … 20`.
+   */
+  const compactPages = (() => {
+    if (!compact || !hasMultiplePages) return null;
+    const pages = new Set<number>([1, totalPages, currentPage]);
+    if (currentPage > 1) pages.add(currentPage - 1);
+    if (currentPage < totalPages) pages.add(currentPage + 1);
+    return [...pages].sort((left, right) => left - right);
+  })();
+
+  const visiblePages = hasMultiplePages && !compactPages ? getPageNumbers() : [1];
+  const showFirstEllipsis = hasMultiplePages && !compactPages && visiblePages[0] > 1;
+  const showLastEllipsis =
+    hasMultiplePages && !compactPages && visiblePages[visiblePages.length - 1] < totalPages;
   const atFirst = currentPage === 1;
   const atLast = currentPage === totalPages || !hasMultiplePages;
 
@@ -59,7 +79,28 @@ function TripPagination({ currentPage, totalPages, totalItems, onPageChange, hid
         {t("common.previous")}
       </button>
 
-      {hasMultiplePages ? (
+      {compactPages ? (
+        <>
+          {compactPages.map((page, index) => {
+            const previous = compactPages[index - 1];
+            return (
+              <React.Fragment key={page}>
+                {previous != null && page - previous > 1 && (
+                  <span className="px-1 text-slate-400">…</span>
+                )}
+                <button
+                  type="button"
+                  onClick={() => onPageChange(page)}
+                  className={paginationPageBtnClass(page === currentPage)}
+                  aria-current={page === currentPage ? "page" : undefined}
+                >
+                  {page}
+                </button>
+              </React.Fragment>
+            );
+          })}
+        </>
+      ) : hasMultiplePages ? (
         <>
           {showFirstEllipsis && (
             <>

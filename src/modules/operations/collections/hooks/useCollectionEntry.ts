@@ -17,6 +17,7 @@ import { getBanks, loadBanks } from "../../../masters/banks/services/bankService
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { translate } from "../../../../i18n";
 import { confirmDialog } from "../../../../ui/confirm/confirmStore";
+import { onShopDataChanged } from "../../../../shared/events/shopDataEvents";
 
 const EMPTY_WEEKLY: CollectionWeeklySummary = {
   shopId: 0,
@@ -252,6 +253,8 @@ export default function useCollectionEntry() {
 
   const shopId = pendingShop?.shopId ?? collectionService.getShopIdForName(entry.shopName);
 
+  const [ledgerNonce, setLedgerNonce] = useState(0);
+
   // Only auto-fetch weekly summary if ledger has been explicitly loaded
   useEffect(() => {
     if (!ledgerLoaded || !shopId || !entry.collectionDate) {
@@ -272,7 +275,25 @@ export default function useCollectionEntry() {
     return () => {
       cancelled = true;
     };
-  }, [shopId, entry.collectionDate, ledgerLoaded]);
+  }, [shopId, entry.collectionDate, ledgerLoaded, ledgerNonce]);
+
+  /**
+   * Balances also move outside this page — an approval, a delete from Pending
+   * Collections, another tab. Whoever wrote it, this page re-reads the register
+   * and refetches the open shop's ledger, so the Outstanding Summary and the
+   * preview never quote a balance the backend has already moved past.
+   */
+  useEffect(
+    () =>
+      onShopDataChanged((detail) => {
+        refreshPage();
+        if (!ledgerLoaded) return;
+        // A change to a different shop leaves this shop's ledger untouched.
+        if (detail.shopId != null && shopId != null && detail.shopId !== shopId) return;
+        setLedgerNonce((nonce) => nonce + 1);
+      }),
+    [ledgerLoaded, shopId],
+  );
 
   const fmtWeekDate = (iso: string) => {
     if (!iso) return "";
@@ -280,14 +301,18 @@ export default function useCollectionEntry() {
     return `${d}/${m}/${y}`;
   };
 
-  // Week range from week bounds (always available, independent of ledgerLoaded)
+  // Week range from week bounds (always available, independent of ledgerLoaded).
+  // The two dates are joined with an en dash, not the word "to": the range is
+  // rendered verbatim in the summary subtitle, so an English joining word here
+  // would survive into a Telugu session. The dash matches every other range in
+  // the app (pagination, trip list) and reads the same in both languages.
   const weekRangeFormatted = weekBounds.weekStart
-    ? `${fmtWeekDate(weekBounds.weekStart)} to ${fmtWeekDate(weekBounds.weekEnd)}`
+    ? `${fmtWeekDate(weekBounds.weekStart)} – ${fmtWeekDate(weekBounds.weekEnd)}`
     : "";
 
   // Also compute week range from weeklySummary when ledger is loaded (for backward compat)
   const ledgerWeekRangeFormatted = weeklySummary.weekStart
-    ? `${fmtWeekDate(weeklySummary.weekStart)} to ${fmtWeekDate(weeklySummary.weekEnd)}`
+    ? `${fmtWeekDate(weeklySummary.weekStart)} – ${fmtWeekDate(weeklySummary.weekEnd)}`
     : "";
 
   // Only show financial data if ledger is loaded.

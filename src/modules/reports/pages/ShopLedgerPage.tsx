@@ -30,6 +30,7 @@ import Select, { type StylesConfig } from "react-select";
 import { useShops } from "../../masters/shops/hooks/useShops";
 import type { Shop } from "../../masters/shops/types/shop";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
+import { onShopDataChanged } from "../../../shared/events/shopDataEvents";
 import { useI18n } from "../../../i18n";
 import { DatePicker } from "../../../components/common/DatePicker";
 import { apiPost } from "../../../api";
@@ -373,6 +374,16 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     // other ERP tabs): the loader keeps the existing table visible while the
     // data is reloaded, so the page itself is never fully reloaded.
   }, [appliedDateFrom, appliedDateTo, appliedSelectedShop, selectedShopId, buildLedger, refreshNonce]);
+
+  /**
+   * A collection approved or deleted elsewhere moves the very balances this
+   * ledger prints. Bumping the nonce re-reads the server with the filters the
+   * user has applied — the loader keeps the current table visible meanwhile.
+   */
+  useEffect(
+    () => onShopDataChanged(() => setRefreshNonce((nonce) => nonce + 1)),
+    [],
+  );
 
   const filteredLedger = useMemo(() => {
     const opening = ledgerData.slice(0, 1);

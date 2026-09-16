@@ -2,47 +2,38 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { collectionService } from "../services/collectionService";
+import { onShopDataChanged } from "../../../../shared/events/shopDataEvents";
 import { useShops } from "../../../masters/shops/hooks/useShops";
-import type { Collection, CollectionPendingSummaryRow, CollectionPendingSummaryTotals } from "../types/collection";
-import type { Shop } from "../../../masters/shops/types/shop";
-import { useSafeNotification } from "../../../../hooks/useSafeNotification";
+import type {
+  Collection,
+  CollectionPendingSummaryRow,
+  PendingOverallTotals,
+  PendingShopSortDir,
+  PendingShopSortKey,
+} from "../types/collection";
 import { useToast } from "../../../../components/common/ToastProvider";
 import { ShopCollectionDetailModal } from "../components/pending/ShopCollectionDetailModal";
 import PendingCollectionsFilters from "../components/pending/PendingCollectionsFilters";
 import PendingCollectionsSummary from "../components/pending/PendingCollectionsSummary";
 import PendingCollectionsTable from "../components/pending/PendingCollectionsTable";
-import ShopSalesPagination from "../components/pending/ShopSalesPagination";
+import { Pagination } from "../../../../ui";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
+import { todayBusinessDate, weekRange } from "../../../../utils/businessDate";
 import { useI18n } from "../../../../i18n";
 
+/**
+ * The default window: THIS week, Monday → Sunday.
+ *
+ * It reads the shared business-date helper rather than formatting dates by
+ * hand. The old hand-rolled version ran the dates through `toISOString()`,
+ * which converts to UTC: a Monday 00:00 IST becomes the Sunday before it, so
+ * the page opened on a Sunday → Sunday range (eight days, the wrong week's
+ * start) without anyone touching a filter. `weekRange()` works in local
+ * business dates, so Monday is Monday.
+ */
 const getCurrentWeekRange = (): { fromDate: string; toDate: string } => {
-  const today = new Date();
-  const day = today.getDay();
-  const diffToMonday = day === 0 ? -6 : 1 - day;
-  const monday = new Date(today);
-  monday.setDate(today.getDate() + diffToMonday);
-  monday.setHours(0, 0, 0, 0);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  sunday.setHours(23, 59, 59, 999);
-  return {
-    fromDate: monday.toISOString().split("T")[0],
-    toDate: sunday.toISOString().split("T")[0],
-  };
-};
-
-const formatCurrency = (amount: number) =>
-  new Intl.NumberFormat("en-IN", {
-    style: "currency",
-    currency: "INR",
-    minimumFractionDigits: 2,
-  }).format(amount);
-
-const formatDate = (dateStr: string | null | undefined) => {
-  if (!dateStr || dateStr === "-") return "—";
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return "—";
-  return d.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const { from, to } = weekRange();
+  return { fromDate: from, toDate: to };
 };
 
 const DEFAULT_PAGE_SIZE = 15;
@@ -78,7 +69,13 @@ export default function PendingCollectionsPage() {
 
   // Filter state (unapplied)
   const [shopName, setShopName] = useState("");
-  const [sortBy, setSortBy] = useState("alphabeticalAZ");
+  /**
+   * Column order, held as key + direction — one vocabulary shared with the
+   * table headers and the filter bar's Sort By, exactly like Trip List.
+   * `null` means no column order: the register's own sequence.
+   */
+  const [sortBy, setSortBy] = useState<PendingShopSortKey | null>("shopName");
+  const [sortDir, setSortDir] = useState<PendingShopSortDir>("asc");
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [recoveryThreshold, setRecoveryThreshold] = useState(0);
@@ -104,7 +101,8 @@ export default function PendingCollectionsPage() {
 
   // Applied filters
   const [appliedShopName, setAppliedShopName] = useState("");
-  const [appliedSortBy, setAppliedSortBy] = useState("alphabeticalAZ");
+  const [appliedSortBy, setAppliedSortBy] = useState<PendingShopSortKey | null>("shopName");
+  const [appliedSortDir, setAppliedSortDir] = useState<PendingShopSortDir>("asc");
   const [appliedFromDate, setAppliedFromDate] = useState("");
   const [appliedToDate, setAppliedToDate] = useState("");
   const [appliedRecoveryThreshold, setAppliedRecoveryThreshold] = useState(0);
@@ -123,13 +121,13 @@ export default function PendingCollectionsPage() {
 
   // Pending summary from backend (for shops that have collections)
   const [pendingSummaryRows, setPendingSummaryRows] = useState<CollectionPendingSummaryRow[]>([]);
-  const [pendingTotals, setPendingTotals] = useState<CollectionPendingSummaryTotals>({
-    weeklySales: 0,
-    weeklyApprovedCollections: 0,
-    weeklyPendingCollections: 0,
-    balance: 0,
-    recoveryPercentage: 0,
-  });
+  /**
+   * The table is the only thing that loads. Everything below tracks a read that
+   * changes table rows, so the page keeps its filter bar, its KPI strip and its
+   * card header on screen and never flashes a full-page loader.
+   */
+  const [summaryLoading, setSummaryLoading] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const loadData = useCallback(async () => {
     try {
@@ -147,6 +145,50 @@ export default function PendingCollectionsPage() {
     void loadData();
   }, [loadData]);
 
+  /**
+   * The day the backend summary is read FOR: the applied To Date, never later
+   * than today.
+   *
+   * The default window ends on Sunday, so for most of the week the To Date is
+   * still ahead of us. The summary answers "how many days has this shop been
+   * sitting on its dues AS OF <date>", so reading it for a future date made
+   * every shop overdue by the distance to Sunday — today's payers showed as
+   * "4 days overdue" and the cumulative counted all 128 rows as overdue. The
+   * overdue column, the chip in the cumulative row and the row balances now
+   * all answer for today, while the weekly figures stay the week's own.
+   */
+  const summaryAsOfDate = useCallback(() => {
+    const today = todayBusinessDate();
+    if (!appliedToDate) return today;
+    return appliedToDate < today ? appliedToDate : today;
+  }, [appliedToDate]);
+
+  /**
+   * Approving or deleting a collection anywhere moves the balance this page
+   * reports. Re-reading the register keeps the rows and the KPI strip honest
+   * without a manual refresh; `useShops` re-reads the shop side of the same
+   * change through the same signal.
+   */
+  useEffect(
+    () =>
+      onShopDataChanged(() => {
+        void loadData();
+        // The row's own balance and the KPI strip come from the pending
+        // summary, not from the collection register, so that read is repeated
+        // too — an approval must move these figures immediately.
+        if (!appliedToDate) return;
+        void collectionService
+          .fetchPendingSummary(summaryAsOfDate())
+          .then((payload) => {
+            setPendingSummaryRows(payload.shops);
+          })
+          .catch(() => {
+            /* keep the last good summary rather than blanking the table */
+          });
+      }),
+    [loadData, appliedToDate, summaryAsOfDate],
+  );
+
   // Initialize default date range (current week Mon-Sun)
   useEffect(() => {
     const { fromDate: mon, toDate: sun } = getCurrentWeekRange();
@@ -156,16 +198,50 @@ export default function PendingCollectionsPage() {
     setAppliedToDate(sun);
   }, []);
 
+  /**
+   * Every filter applies the moment it changes — the Trip List behaviour, and
+   * the only behaviour that makes the bar honest. Before this, the applied
+   * values were written by Reset and by the initial date-range effect alone,
+   * so picking a shop, a date range, a sort or a recovery threshold in the bar
+   * changed the control but not a single row.
+   *
+   * The search box keeps its 300 ms debounce (it fires per keystroke); the
+   * pickers are single events, so they apply immediately.
+   */
+  useEffect(() => {
+    setAppliedFromDate(fromDate);
+    setAppliedToDate(toDate);
+  }, [fromDate, toDate]);
+
+  useEffect(() => {
+    setAppliedShopName(shopName);
+  }, [shopName]);
+
+  useEffect(() => {
+    setAppliedSortBy(sortBy);
+    setAppliedSortDir(sortDir);
+  }, [sortBy, sortDir]);
+
+  useEffect(() => {
+    setAppliedRecoveryThreshold(recoveryThreshold);
+  }, [recoveryThreshold]);
+
+  useEffect(() => {
+    setAppliedSearchQuery(debouncedSearchQuery);
+  }, [debouncedSearchQuery]);
+
   // Fetch pending summary when applied date range changes
   useEffect(() => {
     if (!appliedFromDate || !appliedToDate) return;
-    void collectionService.fetchPendingSummary(appliedToDate).then((payload) => {
+    setSummaryLoading(true);
+    void collectionService.fetchPendingSummary(summaryAsOfDate()).then((payload) => {
       setPendingSummaryRows(payload.shops);
-      setPendingTotals(payload.totals);
     }).catch(() => {
       setPendingSummaryRows([]);
+    }).finally(() => {
+      setSummaryLoading(false);
     });
-  }, [appliedFromDate, appliedToDate]);
+  }, [appliedFromDate, appliedToDate, summaryAsOfDate]);
 
 // Build the complete report from ALL shops + backend data
   const reportData = useMemo((): PendingReportRow[] => {
@@ -238,27 +314,37 @@ export default function PendingCollectionsPage() {
       data = data.filter((shop) => shop.recoveryPercentage >= appliedRecoveryThreshold);
     }
 
-    switch (appliedSortBy) {
-      case "highestBalance":
-        data.sort((a, b) => b.balance - a.balance);
-        break;
-      case "lowestBalance":
-        data.sort((a, b) => a.balance - b.balance);
-        break;
-      case "alphabeticalAZ":
-        data.sort((a, b) => a.shopName.localeCompare(b.shopName));
-        break;
-      case "alphabeticalZA":
-        data.sort((a, b) => b.shopName.localeCompare(a.shopName));
-        break;
-      case "latestCollection":
-        data.sort((a, b) => (b.lastCollectionDate ?? "").localeCompare(a.lastCollectionDate ?? ""));
-        break;
-      case "oldestCollection":
-        data.sort((a, b) => (a.lastCollectionDate ?? "").localeCompare(b.lastCollectionDate ?? ""));
-        break;
-      default:
-        break;
+    if (appliedSortBy) {
+      const direction = appliedSortDir === "asc" ? 1 : -1;
+      const orderValue = (row: PendingReportRow): string | number => {
+        switch (appliedSortBy) {
+          case "balance":
+            return row.balance;
+          case "weeklySales":
+            return row.weeklySales;
+          case "weeklyApprovedCollections":
+            return row.weeklyApprovedCollections;
+          case "recoveryPercentage":
+            return row.recoveryPercentage;
+          case "overdueDays":
+            // A shop that is not overdue sits below every overdue shop, in both
+            // directions — "not overdue" is an absence, not a small number.
+            return row.overdueDays ?? -1;
+          case "lastCollectionDate":
+            return row.lastCollectionDate ?? "";
+          case "shopName":
+          default:
+            return row.shopName.toLowerCase();
+        }
+      };
+      data.sort((a, b) => {
+        const left = orderValue(a);
+        const right = orderValue(b);
+        if (typeof left === "number" && typeof right === "number") {
+          return (left - right) * direction;
+        }
+        return String(left).localeCompare(String(right)) * direction;
+      });
     }
     return data;
   }, [
@@ -268,11 +354,11 @@ export default function PendingCollectionsPage() {
     appliedFromDate,
     appliedToDate,
     appliedSortBy,
+    appliedSortDir,
     appliedRecoveryThreshold,
   ]);
 
   const totalItems = filteredData.length;
-  const totalPages = Math.ceil(totalItems / pageSize) || 1;
   const paginatedData = useMemo(() => {
     const start = (currentPage - 1) * pageSize;
     return filteredData.slice(start, start + pageSize);
@@ -281,57 +367,93 @@ export default function PendingCollectionsPage() {
   // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1);
-  }, [appliedSearchQuery, appliedShopName, appliedFromDate, appliedToDate, appliedSortBy, appliedRecoveryThreshold]);
+  }, [appliedSearchQuery, appliedShopName, appliedFromDate, appliedToDate, appliedSortBy, appliedSortDir, appliedRecoveryThreshold]);
 
   // Totals for KPI
   const totalOutstanding = filteredData.reduce((sum, s) => sum + s.balance, 0);
   const totalWeeklySales = filteredData.reduce((sum, s) => sum + s.weeklySales, 0);
   const totalWeeklyCollections = filteredData.reduce((sum, s) => sum + s.weeklyApprovedCollections, 0);
-  const avgRecovery = filteredData.length > 0
-    ? filteredData.reduce((sum, s) => sum + s.recoveryPercentage, 0) / filteredData.length
-    : 0;
+  /**
+   * Recovery for the strip: approved collections ÷ sales, over exactly the
+   * rows on screen — the same formula the backend's `totals.recoveryPercentage`
+   * and the dashboard's collection-performance card use.
+   *
+   * It used to be the MEAN of each shop's own percentage, and that is what made
+   * the KPI impossible to reconcile: 90 of the 128 shops in the default week
+   * collected against older dues while selling nothing this week, every one of
+   * them reading 0%, so the average landed on 49.9% beside ₹14,60,000 collected
+   * on ₹4,74,014 of sales. Dividing the two figures the strip already shows
+   * gives the honest 308.01% for the same rows.
+   */
+  const overallRecovery = totalWeeklySales > 0 ? (totalWeeklyCollections / totalWeeklySales) * 100 : 0;
 
-  const getLatestCollection = (shopName: string): Collection | null => {
-    const shopCollections = allCollections
-      .filter((c) => c.shopName === shopName)
-      .sort((a, b) => {
-        const dateA = a.collectionDate || a.createdDate || "";
-        const dateB = b.collectionDate || b.createdDate || "";
-        return dateB.localeCompare(dateA);
-      });
-    return shopCollections.length > 0 ? shopCollections[0] : null;
-  };
+  /**
+   * The cumulative that closes the table. Summed over `filteredData` — the
+   * whole filtered set — never over the rows of the current page, so the same
+   * figures show on page 1 and on the last page.
+   */
+  const overallTotals = useMemo((): PendingOverallTotals | null => {
+    if (filteredData.length === 0) return null;
+    const collectionDates = filteredData
+      .map((row) => row.lastCollectionDate ?? "")
+      .filter((value) => Boolean(value))
+      .sort();
+    return {
+      shops: filteredData.length,
+      balance: totalOutstanding,
+      weeklySales: totalWeeklySales,
+      weeklyApprovedCollections: totalWeeklyCollections,
+      recoveryPercentage: overallRecovery,
+      lastCollectionDate: collectionDates.length > 0 ? collectionDates[collectionDates.length - 1] : null,
+      overdueShops: filteredData.filter((row) => (row.overdueDays ?? 0) > 0).length,
+    };
+  }, [filteredData, totalOutstanding, totalWeeklySales, totalWeeklyCollections, overallRecovery]);
+
+  /** Header click: ascending → descending → back to the register order. */
+  const handleSortChange = useCallback((key: PendingShopSortKey) => {
+    if (sortBy !== key) {
+      setSortBy(key);
+      setSortDir("asc");
+      return;
+    }
+    if (sortDir === "asc") {
+      setSortDir("desc");
+      return;
+    }
+    setSortBy(null);
+    setSortDir("asc");
+  }, [sortBy, sortDir]);
+
+  /** The filter bar's single setter for both halves of the order. */
+  const setSort = useCallback((key: PendingShopSortKey | null, dir: PendingShopSortDir) => {
+    setSortBy(key);
+    setSortDir(dir);
+  }, []);
+
+  /**
+   * Side arrows in the shop view walk the same order the table shows — the
+   * filtered, sorted list — and move the table's highlighted row with them.
+   */
+  const shopPosition = useMemo(
+    () => filteredData.findIndex((row) => row.shopName === selectedShop),
+    [filteredData, selectedShop],
+  );
+
+  const navigateShop = useCallback(
+    (direction: -1 | 1) => {
+      if (shopPosition < 0) return;
+      const next = shopPosition + direction;
+      if (next < 0 || next >= filteredData.length) return;
+      const nextShop = filteredData[next].shopName;
+      setSelectedShop(nextShop);
+      setSelectedShopName(nextShop);
+    },
+    [filteredData, shopPosition],
+  );
 
   const handleView = (shopName: string) => {
     setSelectedShop(shopName);
     setIsModalOpen(true);
-  };
-
-  const handleDelete = async (shopName: string) => {
-    const latest = getLatestCollection(shopName);
-    if (!latest || latest.numericId == null) {
-      toast.error(t("ops.collection.no_collection_to_delete"));
-      return;
-    }
-    const shopId = collectionService.getShopIdForName(shopName);
-    if (shopId != null) {
-      try {
-        const recent = await collectionService.fetchRecentCollectionsForShop(shopId, 1);
-        if (recent[0]?.canDelete === false) {
-          toast.error(t("ops.collection.cannot_delete_window"));
-          return;
-        }
-      } catch {
-        // Eligibility pre-check failed; let backend be authoritative
-      }
-    }
-    const result = await collectionService.deletePendingCollection(String(latest.numericId));
-    if (result.success) {
-      await refreshData();
-      toast.success(t("ops.collection.deleted_success"));
-    } else {
-      toast.error(result.message ?? t("ops.collection.delete_failed"));
-    }
   };
 
   const closeModal = () => {
@@ -340,6 +462,7 @@ export default function PendingCollectionsPage() {
   };
 
   const refreshData = async () => {
+    setRefreshing(true);
     try {
       await Promise.all([
         reloadShops(),
@@ -349,9 +472,8 @@ export default function PendingCollectionsPage() {
       setAllCollections(all);
       if (appliedFromDate && appliedToDate) {
         try {
-          const payload = await collectionService.fetchPendingSummary(appliedToDate);
+          const payload = await collectionService.fetchPendingSummary(summaryAsOfDate());
           setPendingSummaryRows(payload.shops);
-          setPendingTotals(payload.totals);
         } catch {
           // Keep prior summaries if refetch fails
         }
@@ -359,6 +481,8 @@ export default function PendingCollectionsPage() {
       toast.success(t("ops.collection.refreshed"));
     } catch (error) {
       toast.error(t("ops.collection.failed_refresh"));
+    } finally {
+      setRefreshing(false);
     }
   };
 
@@ -367,47 +491,24 @@ export default function PendingCollectionsPage() {
     setFromDate(mon);
     setToDate(sun);
     setShopName("");
-    setSortBy("alphabeticalAZ");
+    setSortBy("shopName");
+    setSortDir("asc");
     setRecoveryThreshold(0);
     setSearchQuery("");
     setAppliedFromDate(mon);
     setAppliedToDate(sun);
     setAppliedShopName("");
-    setAppliedSortBy("alphabeticalAZ");
+    setAppliedSortBy("shopName");
+    setAppliedSortDir("asc");
     setAppliedRecoveryThreshold(0);
     setAppliedSearchQuery("");
     setCurrentPage(1);
     toast.info(t("ops.collection.filters_reset"));
   };
 
-  const hasPendingFilters =
-    fromDate !== "" ||
-    toDate !== "" ||
-    shopName.trim() !== "" ||
-    recoveryThreshold > 0 ||
-    sortBy !== "alphabeticalAZ" ||
-    searchQuery.trim() !== "";
-
-  const hasActiveFilters =
-    appliedFromDate !== "" ||
-    appliedToDate !== "" ||
-    appliedShopName.trim() !== "" ||
-    appliedRecoveryThreshold > 0 ||
-    appliedSortBy !== "alphabeticalAZ" ||
-    appliedSearchQuery.trim() !== "";
-
-  if (shopsLoading || collectionsLoading) {
-    return (
-      <div className="w-full space-y-5">
-        <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-12 text-center">
-          <div className="inline-flex items-center gap-2 text-slate-400 text-sm font-medium">
-            <div className="w-4 h-4 border-2 border-slate-300 border-t-blue-600 rounded-full animate-spin" />
-            {t("ops.collection.loading_pending")}
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // One flag for "the table is reading". The page chrome stays mounted.
+  const firstLoad = shopsLoading || collectionsLoading;
+  const tableLoading = firstLoad || summaryLoading || refreshing;
 
   return (
     <div className="w-full space-y-5 animate-in fade-in duration-500">
@@ -417,18 +518,19 @@ export default function PendingCollectionsPage() {
         toDate={toDate}
         shopName={shopName}
         sortBy={sortBy}
+        sortDir={sortDir}
         shopNames={allShops.map((s) => s.shopName).sort()}
         recoveryThreshold={recoveryThreshold}
         searchQuery={searchQuery}
         setFromDate={setFromDate}
         setToDate={setToDate}
         setShopName={setShopName}
-        setSortBy={setSortBy}
+        setSort={setSort}
         setRecoveryThreshold={setRecoveryThreshold}
         setSearchQuery={setSearchQuery}
         onReset={resetFilters}
         onRefresh={refreshData}
-        hasFilters={hasPendingFilters}
+        refreshing={firstLoad || refreshing}
       />
 
       {/* KPI Summary Strip */}
@@ -436,10 +538,8 @@ export default function PendingCollectionsPage() {
         totalOutstanding={totalOutstanding}
         weeklySales={totalWeeklySales}
         weeklyCollections={totalWeeklyCollections}
-        weeklyRecovery={avgRecovery}
-        fromDate={appliedFromDate}
-        toDate={appliedToDate}
-        shopName={appliedShopName}
+        recoveryPercentage={overallRecovery}
+        isLoading={firstLoad}
       />
 
       {/* Table Section */}
@@ -449,22 +549,25 @@ export default function PendingCollectionsPage() {
           selectedShopName={selectedShopName}
           onSelectShop={setSelectedShopName}
           onView={handleView}
-          onDelete={handleDelete}
-          grandTotalPending={totalOutstanding}
-          grandTotalWeeklySales={totalWeeklySales}
-          grandTotalWeeklyCollections={totalWeeklyCollections}
           totalShops={allShops.length}
+          isLoading={tableLoading}
+          sortBy={sortBy}
+          sortDir={sortDir}
+          onSortChange={handleSortChange}
+          overall={overallTotals}
         />
         {shouldShowPagination(totalItems) && (
-          <ShopSalesPagination
-            currentPage={currentPage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
+          <Pagination
+            compact
+            page={currentPage}
             pageSize={pageSize}
+            totalItems={totalItems}
+            onPageChange={setCurrentPage}
             onPageSizeChange={(size) => {
               setPageSize(size);
               setCurrentPage(1);
             }}
+            disabled={tableLoading}
           />
         )}
       </div>
@@ -476,8 +579,12 @@ export default function PendingCollectionsPage() {
           shopName={selectedShop}
           allCollections={allCollections}
           shops={allShops}
-          latestCollection={getLatestCollection(selectedShop)}
           onRefresh={refreshData}
+          onNavigateShop={navigateShop}
+          canGoPrev={shopPosition > 0}
+          canGoNext={shopPosition >= 0 && shopPosition < filteredData.length - 1}
+          shopIndex={shopPosition >= 0 ? shopPosition + 1 : undefined}
+          shopTotal={filteredData.length}
         />
       )}
     </div>

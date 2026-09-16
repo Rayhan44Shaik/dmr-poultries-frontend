@@ -308,6 +308,41 @@ export interface PendingReportRow {
   hasPendingCollections: boolean;
 }
 
+/**
+ * Columns the Pending Collections table can be ordered by. The table headers
+ * and the filter bar's Sort By control share this one vocabulary in `key:dir`
+ * form — the Trip List arrangement, where clicking a header moves the Sort By
+ * select and picking in the select moves the header arrows.
+ */
+export type PendingShopSortKey =
+  | "shopName"
+  | "balance"
+  | "weeklySales"
+  | "weeklyApprovedCollections"
+  | "recoveryPercentage"
+  | "lastCollectionDate"
+  | "overdueDays";
+
+export type PendingShopSortDir = "asc" | "desc";
+
+/**
+ * The overall cumulative row that closes the Pending Collections table.
+ *
+ * It is deliberately NOT a page subtotal: every figure is the sum over the
+ * whole filtered set, so the last row keeps meaning what it says on page 1,
+ * page 4 and page 20 alike.
+ */
+export interface PendingOverallTotals {
+  shops: number;
+  balance: number;
+  weeklySales: number;
+  weeklyApprovedCollections: number;
+  recoveryPercentage: number;
+  lastCollectionDate: string | null;
+  /** How many shops in the filtered set are past their collection day. */
+  overdueShops: number;
+}
+
 export interface CollectionPendingSummaryTotals {
   weeklySales: number;
   weeklyApprovedCollections: number;

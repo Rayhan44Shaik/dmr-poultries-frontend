@@ -101,7 +101,21 @@ test("Trip List Sort By orders each supported column and direction", () => {
   assert.deepEqual(sortTripListTrips(rows, "tripDate", "desc").map(({ id }) => id), [3, 2, 1]);
   assert.deepEqual(sortTripListTrips(rows, "vehicleNo", "asc").map(({ id }) => id), [1, 2, 3]);
   assert.deepEqual(sortTripListTrips(rows, "totalBirds", "asc").map(({ id }) => id), [1, 2, 3]);
-  assert.deepEqual(sortTripListTrips(rows, null).map(({ id }) => id), [1, 2, 3]);
+});
+
+test("Trip List defaults to the newest trip first (oldest falls to the bottom)", () => {
+  // No column selected: the register reads latest-first, so the trip that just
+  // came in is at the top of page 1 without anyone picking a sort.
+  assert.deepEqual(sortTripListTrips(rows, null).map(({ id }) => id), [3, 2, 1]);
+  assert.deepEqual(sortTripListTrips(rows, undefined).map(({ id }) => id), [3, 2, 1]);
+
+  // Day wins over trip number, and the number breaks same-day ties.
+  const dated = [
+    { ...rows[0], id: 10, tripNo: "TRP-20260915-004", tripDate: "2026-09-15" },
+    { ...rows[0], id: 11, tripNo: "TRP-20260914-002", tripDate: "2026-09-14" },
+    { ...rows[0], id: 12, tripNo: "TRP-20260915-011", tripDate: "2026-09-15" },
+  ];
+  assert.deepEqual(sortTripListTrips(dated, null).map(({ id }) => id), [12, 10, 11]);
 });
 
 test("Trip List leaves every record visible when no filter is selected", () => {

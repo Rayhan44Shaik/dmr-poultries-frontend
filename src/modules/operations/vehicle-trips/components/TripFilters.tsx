@@ -91,27 +91,31 @@ function TripFilters({
   const vehicleOptions = localizeOptions(withoutSentinel(vehicles || [], "All Vehicles"));
   const supervisorOptions = localizeOptions(withoutSentinel(supervisors || [], "All Supervisors"));
   const farmOptions = localizeOptions(withoutSentinel(farms || [], "All Sources"));
+  // Field name + direction, both translated: the whole option list is built
+  // from dictionary keys, so a Telugu session never reads "Weight (kg) —
+  // Low to high" in English. "A to Z" keeps its Latin letters on purpose —
+  // in Telugu it reads the same and stays an ordering symbol, not prose.
   const sortOptions: MasterDropdownOption[] = [
-    { value: "tripNo:asc", label: `${t("operations.trip_no")} — A to Z` },
-    { value: "tripNo:desc", label: `${t("operations.trip_no")} — Z to A` },
-    { value: "tripDate:asc", label: `${t("ops.trip.day")} — Oldest first` },
-    { value: "tripDate:desc", label: `${t("ops.trip.day")} — Latest first` },
-    { value: "vehicleNo:asc", label: `${t("common.vehicle")} — A to Z` },
-    { value: "vehicleNo:desc", label: `${t("common.vehicle")} — Z to A` },
-    { value: "driverName:asc", label: `${t("common.driver")} — A to Z` },
-    { value: "driverName:desc", label: `${t("common.driver")} — Z to A` },
-    { value: "supervisorName:asc", label: `${t("common.supervisor")} — A to Z` },
-    { value: "supervisorName:desc", label: `${t("common.supervisor")} — Z to A` },
-    { value: "sourceFarm:asc", label: `${t("ops.trip.source_farm")} — A to Z` },
-    { value: "sourceFarm:desc", label: `${t("ops.trip.source_farm")} — Z to A` },
-    { value: "totalShops:asc", label: `${t("ops.trip.shops")} — Low to high` },
-    { value: "totalShops:desc", label: `${t("ops.trip.shops")} — High to low` },
-    { value: "totalBirds:asc", label: `${t("common.birds")} — Low to high` },
-    { value: "totalBirds:desc", label: `${t("common.birds")} — High to low` },
-    { value: "totalWeight:asc", label: `${t("ops.trip.weight_kg")} — Low to high` },
-    { value: "totalWeight:desc", label: `${t("ops.trip.weight_kg")} — High to low` },
-    { value: "totalMortality:asc", label: `${t("operations.mortality_count")} — Low to high` },
-    { value: "totalMortality:desc", label: `${t("operations.mortality_count")} — High to low` },
+    { value: "tripNo:asc", label: `${t("operations.trip_no")} — ${t("ops.trip.sort_az")}` },
+    { value: "tripNo:desc", label: `${t("operations.trip_no")} — ${t("ops.trip.sort_za")}` },
+    { value: "tripDate:asc", label: `${t("ops.trip.day")} — ${t("ops.trip.sort_oldest_first")}` },
+    { value: "tripDate:desc", label: `${t("ops.trip.day")} — ${t("ops.trip.sort_latest_first")}` },
+    { value: "vehicleNo:asc", label: `${t("common.vehicle")} — ${t("ops.trip.sort_az")}` },
+    { value: "vehicleNo:desc", label: `${t("common.vehicle")} — ${t("ops.trip.sort_za")}` },
+    { value: "driverName:asc", label: `${t("common.driver")} — ${t("ops.trip.sort_az")}` },
+    { value: "driverName:desc", label: `${t("common.driver")} — ${t("ops.trip.sort_za")}` },
+    { value: "supervisorName:asc", label: `${t("common.supervisor")} — ${t("ops.trip.sort_az")}` },
+    { value: "supervisorName:desc", label: `${t("common.supervisor")} — ${t("ops.trip.sort_za")}` },
+    { value: "sourceFarm:asc", label: `${t("ops.trip.source_farm")} — ${t("ops.trip.sort_az")}` },
+    { value: "sourceFarm:desc", label: `${t("ops.trip.source_farm")} — ${t("ops.trip.sort_za")}` },
+    { value: "totalShops:asc", label: `${t("ops.trip.shops")} — ${t("ops.trip.sort_low_high")}` },
+    { value: "totalShops:desc", label: `${t("ops.trip.shops")} — ${t("ops.trip.sort_high_low")}` },
+    { value: "totalBirds:asc", label: `${t("common.birds")} — ${t("ops.trip.sort_low_high")}` },
+    { value: "totalBirds:desc", label: `${t("common.birds")} — ${t("ops.trip.sort_high_low")}` },
+    { value: "totalWeight:asc", label: `${t("ops.trip.weight_kg")} — ${t("ops.trip.sort_low_high")}` },
+    { value: "totalWeight:desc", label: `${t("ops.trip.weight_kg")} — ${t("ops.trip.sort_high_low")}` },
+    { value: "totalMortality:asc", label: `${t("operations.mortality_count")} — ${t("ops.trip.sort_low_high")}` },
+    { value: "totalMortality:desc", label: `${t("operations.mortality_count")} — ${t("ops.trip.sort_high_low")}` },
   ];
   const sortValue = sortBy ? `${sortBy}:${sortDir}` : "";
   const setSortValue = (value: string) => {
@@ -213,15 +217,15 @@ function TripFilters({
         <div className="lg:col-span-3">
           <label className={opsFilterLabelClass}>
             <ArrowUpDown size={17} className="text-violet-500 flex-shrink-0" />
-            <span>Sort By</span>
+            <span>{t("ops.trip.sort_by")}</span>
           </label>
           <MasterDropdown
             hideLabel
-            label="Sort By"
+            label={t("ops.trip.sort_by")}
             value={sortValue}
             options={sortOptions}
             onChange={setSortValue}
-            placeholder="No sorting"
+            placeholder={t("ops.trip.no_sorting")}
             searchable
             allowClear
             className="w-full"

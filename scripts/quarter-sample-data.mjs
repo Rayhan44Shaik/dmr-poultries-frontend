@@ -171,6 +171,30 @@ function reconcileDeliveryBirdBalance(deliveries, pickupBirds, averageBirdWeight
   }
 }
 
+/**
+ * Drop the rows the balance reconciler consumed entirely — 0 birds AND 0 kg
+ * AND no mortality. Those are not deliveries, and keeping them left junk
+ * "0 birds / ₹0" lines in Shop Sales, Step 4 and the mortality drill-downs.
+ * A row that still carries mortality is KEPT: it is the only record of those
+ * birds dying in transit, and dropping it would break the trip's own
+ * `pickup = delivered + mortality` balance. Removing a genuinely empty row
+ * cannot move any total, so serial numbers are simply renumbered.
+ */
+function removeZeroQuantityDeliveries(deliveries) {
+  for (let index = deliveries.length - 1; index >= 0; index -= 1) {
+    const delivery = deliveries[index];
+    const empty =
+      Number(delivery.birds || 0) <= 0 &&
+      Number(delivery.weight || 0) <= 0 &&
+      Number(delivery.mortality || 0) <= 0 &&
+      Number(delivery.mortKg || 0) <= 0;
+    if (empty) deliveries.splice(index, 1);
+  }
+  deliveries.forEach((delivery, index) => {
+    delivery.serialNo = index + 1;
+  });
+}
+
 /** Every calendar date in the quarter. */
 const DATES = [];
 for (let i = 0; i <= dayDiff(QUARTER.fromDate, QUARTER.toDate); i += 1) {
@@ -542,8 +566,13 @@ for (const date of OP_DATES) {
       status = "Draft";
       stage = 1;
     } else if (daysFromToday === 0) {
-      stage = [1, 2, 3, 4, 5, 5, 4, 3][k];
-      status = stage === 5 ? "Pending" : "Draft";
+      // Today: the first dispatch is already closed (approved + rate-locked) so
+      // today's trend point, mortality row, Shop Sales and rate-entry queue all
+      // carry real data instead of showing an empty day; the second one is on
+      // its way to approval, and the rest keep the wizard states (Step 4 / 3 /
+      // 2 / 1) the Trip Entry demo needs.
+      stage = [5, 5, 4, 4, 3, 2, 1, 4][k];
+      status = stage === 5 ? (k === 0 ? "Completed" : "Pending") : "Draft";
     } else if (daysFromToday <= 3) {
       stage = [5, 5, 4, 3, 2, 1, 5, 5][k];
       status = stage === 5 ? (k % 2 ? "Pending" : "Completed") : "Draft";
@@ -632,6 +661,7 @@ for (const date of OP_DATES) {
     }
 
     reconcileDeliveryBirdBalance(deliveries, totalBirds, avgWeight);
+    removeZeroQuantityDeliveries(deliveries);
     const deliveredBirds = deliveries.reduce((a, d) => a + d.birds, 0);
     const deliveredWeight = round(deliveries.reduce((a, d) => a + d.weight, 0), 2);
     const mortalityCount = deliveries.reduce((a, d) => a + d.mortality, 0);
@@ -671,7 +701,11 @@ for (const date of OP_DATES) {
     const expense = deliveryTolls + pickupTolls + meals + loading + vehicleMaintenance;
 
     // ── Rate Entry sample enrichment: last 20 days have 60% pending for rate entry ──
-    const isRecentForRate = OP_DATES.indexOf(date) >= OP_DATES.length - 20;
+    // Today's closed dispatch is deliberately NOT flipped, so "today" always
+    // carries one approved, rate-locked trip (and today's rate-entry work comes
+    // from the trip that is still Pending).
+    const isRecentForRate =
+      OP_DATES.indexOf(date) >= OP_DATES.length - 20 && date !== SAMPLE_TODAY;
     const makePendingForRateEntry = isRecentForRate && status === "Completed" && r() < 0.6;
     const effectiveStatus = makePendingForRateEntry ? "Pending" : status;
     const effectiveRateLockedAt = makePendingForRateEntry ? null : (status === "Completed" ? ts(date, "20:10:00") : null);
@@ -815,6 +849,9 @@ for (const date of ORDER_DAYS) {
       boxNo,
       shopId: shop.id,
       shopName: shop.shopName,
+      // Shop locality — the Orders tables render it as the CITY column. Shop
+      // Master renamed `village` to `city`; the value is the same locality.
+      village: shop.city,
       birdTypeId: 1,
       birdType: "Broiler",
       birds: boxNo * 10,
@@ -858,6 +895,10 @@ for (const date of ORDER_DAYS) {
     dcWeight: 0,
     totalBirds: rows.reduce((a, x) => a + x.birds, 0),
     boxes: rows.reduce((a, x) => a + x.boxNo, 0),
+    // The day's ordered birds average 2.3 kg (10 birds × 2.3 kg per box row),
+    // so the Orders tables can render the ORDERED weight of a shop before the
+    // collection is assigned to a vehicle.
+    avgBirdWeight: 2.3,
     avgWeight: 0,
     pickupLoadTime: "",
     pickupStepSubmitted: false,
@@ -890,6 +931,221 @@ for (const date of ORDER_DAYS) {
     deleted: false,
     _orderContainer: true,
   });
+}
+
+// ── Orders hand-off: collected orders are assigned to vehicle trips ─────────
+// The live flow is Finish Collection → Order Assignment → Finish Assignment,
+// and Delivery Tracking reads whatever Step 4 captured. Seeding only the
+// collection containers left Tab 3 permanently empty ("0 trips / No pending
+// deliveries"), so the quarter now carries the same hand-off the UI produces:
+//   • every older container is assigned to the vehicle trip(s) that actually
+//     ran on the NEXT operating day — captured rows, with one deliberately
+//     PART-delivered shop per order so the tracking tables carry partial
+//     progress as well as complete deliveries;
+//   • yesterday's container is split — part of it rides a trip that is still
+//     Pending (the "PENDING & IN PROGRESS" table), the rest stays available
+//     for the dispatcher to assign;
+//   • today's in-collection container keeps its shops available, with one
+//     vehicle already holding a few of them (assignment in progress).
+// Rows are written BEFORE Shop Sales / Farm Payments are derived, so an
+// assigned order flows through the ledger exactly like a live assignment.
+const ORDER_ROW_WEIGHT_PER_BIRD = 2.3;
+const vehicleTripsOn = (date) =>
+  TRIPS.filter((t) => !t._orderContainer && t.tripDate === date && t.status === "Completed");
+
+/** First operating day after `date` on which vehicles actually ran. */
+function nextOperatingDayWithTrips(date) {
+  const at = OP_DATES.indexOf(date);
+  for (let i = at + 1; i < OP_DATES.length; i += 1) {
+    if (vehicleTripsOn(OP_DATES[i]).length > 0) return OP_DATES[i];
+  }
+  return null;
+}
+
+/** Re-derive a trip's delivery totals after order rows were merged in. */
+function refreshTripDeliveryTotals(trip) {
+  const deliveries = trip.deliveries ?? [];
+  const captured = deliveries.filter((d) => d.autoCaptureTime);
+  const mortalityCount = deliveries.reduce((a, d) => a + Number(d.mortality || 0), 0);
+  const mortalityWeight = round(
+    deliveries.reduce((a, d) => a + Number(d.mortKg || 0), 0),
+    2,
+  );
+  trip.totalShops = deliveries.length;
+  trip.lastShop = deliveries.length ? deliveries[deliveries.length - 1].shopName : trip.lastShop;
+  trip.totalDeliveredWeight = round(
+    captured.reduce((a, d) => a + Number(d.weight || 0), 0),
+    2,
+  );
+  trip.totalBirdsDelivered = captured.reduce((a, d) => a + Number(d.birds || 0), 0);
+  trip.totalMortalityCount = mortalityCount;
+  trip.totalMortality = mortalityCount;
+  trip.totalMortalityWeight = mortalityWeight;
+  trip.weightLoss = round((trip.dcWeight ?? 0) - trip.totalDeliveredWeight - mortalityWeight, 2);
+  trip.survivalRate =
+    trip.totalBirds > 0 ? round(1 - mortalityCount / trip.totalBirds, 4) : trip.survivalRate;
+}
+
+/**
+ * Vehicle-trip rows for one order: the ORDER decides the shops, Step 4 decides
+ * what was actually captured. `deliveredBoxes` short of the ordered boxes
+ * produces the partial-delivery state (`selectedBoxIds` = delivered boxes).
+ */
+function orderAssignmentRows(planRows, orderTripNo, tripDate, captured, partShopIndex) {
+  const dayRate = RATE_BY_DATE.get(tripDate)?.vij ?? 120;
+  return planRows.map((row, index) => {
+    const perBox = row.birds / Math.max(1, row.boxNo);
+    const part = captured && partShopIndex != null && index === partShopIndex;
+    const boxes = captured ? (part ? Math.max(1, row.boxNo - 2) : row.boxNo) : row.boxNo;
+    const birds = captured ? Math.max(1, Math.round(boxes * perBox)) : row.birds;
+    const weight = captured
+      ? round(birds * ORDER_ROW_WEIGHT_PER_BIRD, 2)
+      : round(row.weight ?? birds * ORDER_ROW_WEIGHT_PER_BIRD, 2);
+    const rate = captured ? dayRate : null;
+    return {
+      id: ++deliverySeq,
+      serialNo: index + 1,
+      boxNo: boxes,
+      shopId: row.shopId,
+      shopName: row.shopName,
+      village: row.village,
+      birdTypeId: 1,
+      birdType: "Broiler",
+      birds,
+      weight,
+      mortality: 0,
+      mortKg: 0,
+      rate,
+      amount: rate == null ? 0 : round(weight * rate, 2),
+      // The order reference is what ties a vehicle row back to its container.
+      remarks: `[ORDER] O:${orderTripNo}`,
+      deliveryMode: "box",
+      ...(captured
+        ? {
+            selectedBoxIds: Array.from({ length: boxes }, (_, box) => box + 1),
+            autoCaptureTime: ts(tripDate, `1${index % 6}:${String((index * 11) % 60).padStart(2, "0")}:00`),
+          }
+        : {}),
+    };
+  });
+}
+
+/**
+ * Merge one order's rows into a vehicle trip and re-tag the trip remark.
+ *
+ * A COMPLETED trip also carries those shops' quantities in its load figures
+ * (DC weight / birds / boxes), because the collected orders rode on it — that
+ * keeps `dcWeight − delivered − mortality` (weight loss) honest instead of
+ * turning negative. Draft/Pending trips keep their own pickup figures: their
+ * assigned rows are still pending capture, and Step 3/4 keep owning the load.
+ */
+function attachOrderRows(trip, orderTripNo, rows) {
+  const kept = (trip.deliveries ?? []).filter(
+    (row) => !String(row.remarks ?? "").startsWith(`[ORDER] O:${orderTripNo}`),
+  );
+  trip.deliveries = [...kept, ...rows].map((row, index) => ({ ...row, serialNo: index + 1 }));
+  const tag = `order:${orderTripNo}`;
+  const tags = String(trip.remarks ?? "")
+    .split("|")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (!tags.includes(tag)) tags.push(tag);
+  trip.remarks = tags.join(" | ");
+
+  if (trip.deliveryStepSubmitted === true) {
+    // Step 4 is submitted, so those shops really travelled on this vehicle —
+    // the load figures must include them, otherwise the trip's weight loss
+    // (dcWeight − delivered − mortality) would go negative.
+    const addedBirds = rows.reduce((a, r) => a + Number(r.birds || 0), 0);
+    const addedWeight = round(rows.reduce((a, r) => a + Number(r.weight || 0), 0), 2);
+    const addedBoxes = rows.reduce((a, r) => a + Number(r.boxNo || 0), 0);
+    trip.totalBirds += addedBirds;
+    trip.birds = trip.totalBirds;
+    trip.dcWeight = round((trip.dcWeight ?? 0) + addedWeight, 2);
+    trip.totalWeight = trip.dcWeight;
+    trip.weight = trip.dcWeight;
+    trip.boxes += addedBoxes;
+    trip.boxNo = trip.boxes;
+    trip.boxDetails = [
+      ...(trip.boxDetails ?? []),
+      ...rows.map((r, i) => ({
+        boxNo: (trip.boxDetails?.length ?? 0) + i + 1,
+        birds: Number(r.birds || 0),
+        weight: Number(r.weight || 0),
+        avgWeight: r.birds ? round(Number(r.weight) / Number(r.birds), 3) : 0,
+      })),
+    ];
+  }
+  refreshTripDeliveryTotals(trip);
+}
+
+// Every container except the two newest is a *finished* collection, so it is
+// the assignment source for the operating day that follows it. The two newest
+// are handled separately below and stay (partly) available for the dispatcher.
+const ORDER_CONTAINERS = TRIPS.filter((t) => t._orderContainer);
+const activeContainer = ORDER_CONTAINERS[ORDER_CONTAINERS.length - 1];
+const latestFinishedContainer = ORDER_CONTAINERS[ORDER_CONTAINERS.length - 2];
+for (const container of ORDER_CONTAINERS) {
+  if (container === activeContainer || container === latestFinishedContainer) continue;
+  const targetDay = nextOperatingDayWithTrips(container.tripDate);
+  if (!targetDay) continue;
+  const targets = vehicleTripsOn(targetDay).slice(0, 2);
+  const planRows = container.deliveries;
+  const perTrip = Math.ceil(planRows.length / targets.length);
+  targets.forEach((trip, index) => {
+    const share = planRows.slice(index * perTrip, (index + 1) * perTrip);
+    if (share.length === 0) return;
+    attachOrderRows(
+      trip,
+      container.tripNo,
+      orderAssignmentRows(share, container.tripNo, trip.tripDate, true, share.length > 2 ? 1 : 0),
+    );
+  });
+}
+
+// Yesterday's finished collection, part-delivered on a trip that is still on
+// the road: five of its shops are captured (one deliberately short) and the
+// remaining rows stay unassigned for the dispatcher, so Tab 3 carries a real
+// "PENDING & IN PROGRESS" row while Tab 2 still has shops to place.
+// Newest first, so the trip shown in Tab 3 sits inside the tab's default
+// [From → To] window instead of on a date from weeks ago.
+const inProgressTrip = [...TRIPS]
+  .filter(
+    (t) =>
+      !t._orderContainer &&
+      t.deliveryStepSubmitted === true &&
+      t.status === "Pending" &&
+      (t.dcWeight ?? 0) > 0,
+  )
+  .sort((a, b) => b.tripDate.localeCompare(a.tripDate) || b.id - a.id)[0];
+if (inProgressTrip && latestFinishedContainer) {
+  const source = latestFinishedContainer;
+  const captured = source.deliveries.slice(0, Math.min(5, source.deliveries.length));
+  attachOrderRows(
+    inProgressTrip,
+    source.tripNo,
+    orderAssignmentRows(captured, source.tripNo, inProgressTrip.tripDate, true, 1),
+  );
+}
+
+// Today's container is still being collected: a few shops are already placed
+// on a vehicle whose Step 4 is open, the rest stay available to assign.
+const eligibleTrip = TRIPS.find(
+  (t) =>
+    !t._orderContainer &&
+    t.tripDate === activeContainer.tripDate &&
+    t.farmStepSubmitted === true &&
+    t.deliveryStepSubmitted !== true &&
+    (t.dcWeight ?? 0) > 0 &&
+    t.vehicleId > 0,
+);
+if (eligibleTrip) {
+  const share = activeContainer.deliveries.slice(0, 4);
+  attachOrderRows(
+    eligibleTrip,
+    activeContainer.tripNo,
+    orderAssignmentRows(share, activeContainer.tripNo, eligibleTrip.tripDate, false, null),
+  );
 }
 
 const TRIP_BY_ID = new Map(TRIPS.map((t) => [t.id, t]));
@@ -2846,6 +3102,10 @@ function materializeTripSales(trip) {
   syncTripDeliveryTotals(trip);
   const affectedShopIds = new Set();
   deliveriesByCapturedTime(trip.deliveries).forEach((delivery, index) => {
+    // A sale exists only once its rate is fixed — approving a trip whose Rate
+    // Entry is still open must not write ₹0 / "₹0.00" lines into Shop Sales.
+    // Locking Rate Entry (which applies every rate first) materializes them.
+    if (delivery.rate == null) return;
     const next = saleFromDelivery(trip, delivery, index + 1);
     const existing = SHOP_SALES.find((sale) => sale.id === delivery.id);
     if (existing) Object.assign(existing, next, { createdAt: existing.createdAt ?? next.createdAt });

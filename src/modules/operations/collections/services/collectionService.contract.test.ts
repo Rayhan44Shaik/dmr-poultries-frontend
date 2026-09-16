@@ -158,9 +158,25 @@ const pendingTableSrc = readFileSync(
   join(__dirname, "../components/pending/PendingTable.tsx"),
   "utf8"
 );
+/**
+ * Deletion moved out of the Pending Collections list and into the shop view:
+ * a row there offers View only, and the record being removed is visible (and
+ * confirmable) inside that view. These guards pin that split so the list cannot
+ * quietly grow a delete action again.
+ */
+const shopViewSrc = readFileSync(
+  join(__dirname, "../components/pending/ShopCollectionDetailModal.tsx"),
+  "utf8"
+);
 
-test("PendingCollectionsPage wires delete to deletePendingCollection(), not deleteCollection()", () => {
-  assert.match(pendingPageSrc, /collectionService\.deletePendingCollection\(/);
+test("PendingCollectionsPage lists shops read-only — no delete from the list", () => {
+  assert.doesNotMatch(pendingPageSrc, /deletePendingCollection\(/);
+  assert.doesNotMatch(pendingPageSrc, /handleDelete/);
+});
+
+test("the shop view owns deletion and calls the pending-specific service", () => {
+  assert.match(shopViewSrc, /collectionService\.deletePendingCollection\(/);
+  assert.doesNotMatch(shopViewSrc, /deleteCollection\(/);
 });
 
 test("PendingCollectionsPage has no client-side 10-day (or any hardcoded day-count) eligibility calculation", () => {
@@ -169,8 +185,10 @@ test("PendingCollectionsPage has no client-side 10-day (or any hardcoded day-cou
   assert.doesNotMatch(pendingPageSrc, /canEditCollection/);
 });
 
-test("PendingCollectionsPage reads backend-authoritative canDelete instead", () => {
-  assert.match(pendingPageSrc, /canDelete/);
+test("the shop view reads the backend-authoritative canDelete before deleting", () => {
+  assert.match(shopViewSrc, /canDelete/);
+  assert.doesNotMatch(shopViewSrc, /diffDays\s*>\s*10/);
+  assert.doesNotMatch(shopViewSrc, /canEditCollection/);
 });
 
 test("PendingCollectionsPage no longer opens the modal in edit mode", () => {

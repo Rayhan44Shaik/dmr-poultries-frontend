@@ -1,6 +1,41 @@
-import { Calculator, AlertTriangle, CheckCircle, Clock, ArrowRight, X, Save, Loader2 } from "lucide-react";
+import { Calculator, AlertTriangle, CheckCircle, Clock, X, Save, Loader2 } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useI18n } from "../../../../../i18n";
+import { amountInWords } from "../../utils/amountInWords";
+
+/**
+ * One line of the collection preview: the period it belongs to (Before
+ * collection / Collection entry / After approval) and the single figure for
+ * that period. The old layout printed the same label twice — once as a section
+ * header and again beside the amount — so each row now names its figure once.
+ */
+function PreviewRow({
+  period,
+  label,
+  value,
+  valueClass,
+  emphasized = false,
+}: {
+  period: string;
+  label: string;
+  value: string;
+  valueClass: string;
+  emphasized?: boolean;
+}) {
+  return (
+    <div
+      className={`flex items-center justify-between gap-3 rounded-lg border bg-white px-3 py-2 ${
+        emphasized ? "border-emerald-200" : "border-slate-200"
+      }`}
+    >
+      <div className="min-w-0">
+        <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{period}</p>
+        <p className="truncate text-[13px] font-semibold text-slate-700">{label}</p>
+      </div>
+      <span className={`shrink-0 text-sm font-bold tabular-nums ${valueClass}`}>{value}</span>
+    </div>
+  );
+}
 
 interface CollectionAmountProps {
   amount: number;
@@ -57,7 +92,7 @@ export default function CollectionAmount({
   isSaving,
   disableSave,
 }: CollectionAmountProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   // Local input state – stores the raw number string (without commas) while editing
   const [inputValue, setInputValue] = useState<string>(
     amount ? amount.toFixed(2) : ""
@@ -108,6 +143,14 @@ export default function CollectionAmount({
     }
     setInputValue(val);
   };
+
+  // Amount in words — read from what is in the box right now, so the words
+  // keep pace with the typing instead of waiting for the field to blur; the
+  // saved `amount` is the fallback whenever the text isn't a number yet.
+  // Blank while nothing is entered, so the hint can show instead.
+  const typedAmount = parseFloat(inputValue.replace(/,/g, ""));
+  const wordsAmount = Number.isNaN(typedAmount) ? amount : typedAmount;
+  const displayAmountWords = wordsAmount > 0 ? amountInWords(wordsAmount, language) : "";
 
   // Determine display values - show zeros when ledger not loaded
   const displayOutstanding = (showSummary && ledgerLoaded) ? currentOutstanding : 0;
@@ -172,7 +215,16 @@ export default function CollectionAmount({
         </div>
       </div>
       {amountError && <p className="mt-1 text-xs text-red-500">{amountError}</p>}
-      <p className="mt-1 text-xs text-slate-400">{t("ops.collection.enter_amount_hint")}</p>
+      {/* The figure read back in words, so a mistyped amount is caught before
+        * saving. Telugu keeps its own words while the digits stay Latin. */}
+      <p
+        className={`mt-1.5 text-xs font-medium ${
+          displayAmountWords ? "text-emerald-700" : "text-slate-400"
+        }`}
+        aria-live="polite"
+      >
+        {displayAmountWords || t("ops.collection.enter_amount_hint")}
+      </p>
 
       {/* Remarks */}
       <div className="mt-4 flex items-center gap-4">
@@ -196,70 +248,60 @@ export default function CollectionAmount({
           {t("ops.collection.preview")}
         </h3>
         
-        {/* BEFORE COLLECTION */}
-        <div className="space-y-2.5">
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-medium text-slate-600">{t("ops.collection.before_collection")}</span>
-            <span className="font-bold text-emerald-700">{t("ops.collection.current_outstanding")}</span>
-          </div>
-          <div className="flex items-center justify-between gap-3 text-sm font-bold text-slate-800 bg-white rounded-lg px-3 py-2 border border-slate-200">
-            <span className="min-w-0 truncate">{t("ops.collection.current_outstanding")}</span>
-            <span className="shrink-0 tabular-nums">{inr(displayOutstanding)}</span>
-          </div>
+        {/* One row per figure. Each row states its period once, so
+          * "Current Outstanding" is never printed twice for the same value. */}
+        <div className="space-y-2">
+        <PreviewRow
+          period={t("ops.collection.before_collection")}
+          label={t("ops.collection.current_outstanding")}
+          value={inr(displayOutstanding)}
+          valueClass="text-slate-800"
+        />
+        <PreviewRow
+          period={t("ops.collection.collection_entry")}
+          label={t("ops.collection.received_today")}
+          value={inr(displayReceived)}
+          valueClass="text-emerald-700"
+          emphasized
+        />
+        <PreviewRow
+          period={t("ops.collection.after_approval")}
+          label={t("ops.collection.projected_balance")}
+          value={formattedProjected}
+          valueClass={
+            displayProjected < 0
+              ? "text-blue-600"
+              : displayProjected === 0
+                ? "text-emerald-700"
+                : "text-rose-600"
+          }
+          emphasized
+        />
 
-          <div className="my-1.5 border-t border-dashed border-slate-200" />
-
-          {/* COLLECTION */}
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-medium text-slate-600">{t("ops.collection.collection_entry")}</span>
-            <span className="font-bold text-emerald-700">{t("ops.collection.pending_approval")}</span>
-          </div>
-          <div className="flex items-center justify-between gap-3 text-sm font-bold text-emerald-700 bg-white rounded-lg px-3 py-2 border border-emerald-100">
-            <span className="flex min-w-0 items-center gap-1.5">
-              <ArrowRight size={14} className="shrink-0 text-emerald-600" />
-              <span className="truncate">{t("ops.collection.received_today")}</span>
-            </span>
-            <span className="shrink-0 tabular-nums">{inr(displayReceived)}</span>
-          </div>
-
-          <div className="my-1.5 border-t border-dashed border-slate-200" />
-
-          {/* AFTER APPROVAL */}
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-medium text-slate-600">{t("ops.collection.after_approval")}</span>
-            <span className="font-bold text-slate-700">{t("ops.collection.projected_balance")}</span>
-          </div>
-          <div className="flex items-center justify-between gap-3 text-sm font-extrabold bg-white rounded-lg px-3 py-2 border border-slate-200">
-            <span className="min-w-0 truncate">{t("ops.collection.projected_after_approval")}</span>
-            <span className={`shrink-0 tabular-nums ${displayProjected < 0 ? "text-blue-600" : displayProjected === 0 ? "text-emerald-700" : "text-rose-600"}`}>
-              {formattedProjected}
-            </span>
-          </div>
-
-          {/* Status Badge */}
-          <div className="pt-1.5">
-            <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium border ${statusClass}`}>
-              {statusIcon}
-              {statusText}
-            </span>
-            {!showSummary || !ledgerLoaded ? (
-              <p className="mt-1.5 text-[11px] text-slate-500">
-                {t("ops.collection.click_view_ledger_hint")}
-              </p>
-            ) : displayProjected < 0 ? (
-              <p className="mt-1.5 text-[11px] text-blue-600">
-                {t("ops.collection.overpaid_hint")}
-              </p>
-            ) : displayProjected === 0 ? (
-              <p className="mt-1.5 text-[11px] text-emerald-600">
-                {t("ops.collection.fully_collected_hint")}
-              </p>
-            ) : (
-              <p className="mt-1.5 text-[11px] text-amber-600">
-                {t("ops.collection.pending_hint")}
-              </p>
-            )}
-          </div>
+          {/* Status line — only once there is a ledger to talk about. Until a
+            * shop is picked the three figures above are enough; no "Select a
+            * shop" chip, no ledger hint competing with the picker. */}
+          {showSummary && ledgerLoaded && (
+            <div className="pt-1">
+              <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium border ${statusClass}`}>
+                {statusIcon}
+                {statusText}
+              </span>
+              {displayProjected < 0 ? (
+                <p className="mt-1.5 text-[11px] text-blue-600">
+                  {t("ops.collection.overpaid_hint")}
+                </p>
+              ) : displayProjected === 0 ? (
+                <p className="mt-1.5 text-[11px] text-emerald-600">
+                  {t("ops.collection.fully_collected_hint")}
+                </p>
+              ) : (
+                <p className="mt-1.5 text-[11px] text-amber-600">
+                  {t("ops.collection.pending_hint")}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       </div>
 

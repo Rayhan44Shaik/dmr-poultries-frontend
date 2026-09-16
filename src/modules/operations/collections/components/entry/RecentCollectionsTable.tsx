@@ -28,8 +28,13 @@ interface Props {
   onReject: (id: string) => void;
   onEdit: (collection: RecentCollection) => void;
   onViewShop: (shopName: string) => void;
-  /** Reloads the recent feed from the backend without changing the active view. */
-  onRefresh: () => void | Promise<void>;
+  /**
+   * Reloads the recent feed from the backend. Lives here, on the results card,
+   * beside Reset — the filter bar above stays a pure entry form.
+   */
+  onRefresh?: () => void | Promise<void>;
+  /** Drives the refresh control's dancing-hen busy state. */
+  refreshing?: boolean;
   /** Fires whenever the highlighted row changes, so the page can mirror it. */
   onSelectionChange?: (collection: RecentCollection | null) => void;
 }
@@ -63,6 +68,7 @@ export default function RecentCollectionsTable({
   onEdit,
   onViewShop,
   onRefresh,
+  refreshing = false,
   onSelectionChange,
 }: Props) {
   const { t, language } = useI18n();
@@ -258,10 +264,13 @@ export default function RecentCollectionsTable({
   const clearSearch = () => updateSearch("");
   const resetTable = () => updateSearch("");
 
+  /** Refresh clears the highlight first: the reloaded feed may not hold the
+    * row that was selected a moment ago, and a dangling highlight is worse
+    * than none. */
   const refreshTable = () => {
     setCurrentPage(1);
     selectRow(null);
-    void onRefresh();
+    void onRefresh?.();
   };
 
   /** Approved actions always select first, then open that exact entry. */
@@ -371,14 +380,15 @@ export default function RecentCollectionsTable({
             {t("common.reset")}
           </button>
 
-          <BrandRefreshButton
-            onClick={refreshTable}
-            loading={isLoading}
-            ariaLabel={t("common.refresh")}
-          >
-            {t("common.refresh")}
-          </BrandRefreshButton>
-
+          {onRefresh && (
+            <BrandRefreshButton
+              onClick={refreshTable}
+              loading={refreshing || isLoading}
+              ariaLabel={t("common.refresh")}
+            >
+              {t("common.refresh")}
+            </BrandRefreshButton>
+          )}
         </div>
       </div>
 
@@ -604,6 +614,9 @@ export default function RecentCollectionsTable({
             setPageSize(next);
             setCurrentPage(1);
           }}
+          /* `1 2 … 20`, not `1 2 3 4 5 … 20`: the strip shares this toolbar
+           * with search and Reset, so it stays compact at 20 pages. */
+          compact
         />
       )}
     </div>

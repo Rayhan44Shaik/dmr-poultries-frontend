@@ -18,6 +18,39 @@ const PHRASE_TE: Record<string, string> = {
   "Spent layer hen": "లేయర్ కోడి",
   "Dual purpose backyard bird": "రెండు ఉపయోగాల ఇంటి పక్షి",
   "Premium black-meat bird": "ప్రీమియం నల్ల మాంసం పక్షి",
+  // Payment modes — data values, so they localise here rather than as i18n
+  // keys. Telugu reads them in Telugu script; the stored value never changes.
+  "Cash": "నగదు",
+  "Union Bank": "యూనియన్ బ్యాంక్",
+  "HDFC Bank": "హెచ్‌డీఎఫ్‌సీ బ్యాంక్",
+  // Cities — the shops master and every filter built from it read these.
+  // Letter-by-letter transliteration mangles them ("హెచ్‌వైడీఈఆర్‌ఏబీఏడి"),
+  // so each one is spelled properly.
+  Anantapur: "అనంతపురం",
+  Eluru: "ఏలూరు",
+  Guntur: "గుంటూరు",
+  Hyderabad: "హైదరాబాద్",
+  Kadapa: "కడప",
+  Kakinada: "కాకినాడ",
+  Karimnagar: "కరీంనగర్",
+  Khammam: "ఖమ్మం",
+  Kurnool: "కర్నూలు",
+  Nalgonda: "నల్గొండ",
+  Nellore: "నెల్లూరు",
+  Nizamabad: "నిజామాబాద్",
+  Ongole: "ఒంగోలు",
+  Rajahmundry: "రాజమహేంద్రవరం",
+  Secunderabad: "సికింద్రాబాద్",
+  Suryapet: "సూర్యాపేట",
+  Tirupati: "తిరుపతి",
+  Vijayawada: "విజయవాడ",
+  Visakhapatnam: "విశాఖపట్నం",
+  Warangal: "వరంగల్",
+  // Association types — master data, printed as badges across the app.
+  Association: "అసోసియేషన్",
+  "Non-Association": "నాన్-అసోసియేషన్",
+  Direct: "డైరెక్ట్",
+  Contract: "కాంట్రాక్ట్",
 };
 
 const WORD_TE: Record<string, string> = {

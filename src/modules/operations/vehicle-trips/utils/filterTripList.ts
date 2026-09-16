@@ -76,12 +76,30 @@ export function filterTripListTrips(
  * API query. This keeps the displayed order reliable on older API versions
  * that return valid filter data but ignore a sort query.
  */
+/**
+ * Default Trip List order — newest first, oldest last.
+ *
+ * With no column chosen, the list reads the way the register is used: the run
+ * that just came in sits at the top, and the earliest trip falls to the bottom
+ * of the page. Trip numbers are date-stamped (TRP-YYYYMMDD-NNN) and the day is
+ * compared first, so the order survives a same-day renumber and never depends
+ * on the order the API happened to return rows in.
+ */
+function compareTripsNewestFirst(left: Trip, right: Trip): number {
+  const byDay = String(right.tripDate ?? "").localeCompare(String(left.tripDate ?? ""));
+  if (byDay !== 0) return byDay;
+  return String(right.tripNo ?? "").localeCompare(String(left.tripNo ?? ""), undefined, {
+    numeric: true,
+    sensitivity: "base",
+  });
+}
+
 export function sortTripListTrips(
   trips: readonly Trip[],
   sortBy: TripListSortKey | null | undefined,
   sortDir: "asc" | "desc" = "asc",
 ): Trip[] {
-  if (!sortBy) return [...trips];
+  if (!sortBy) return [...trips].sort(compareTripsNewestFirst);
 
   const direction = sortDir === "desc" ? -1 : 1;
   const numericKeys = new Set<TripListSortKey>([

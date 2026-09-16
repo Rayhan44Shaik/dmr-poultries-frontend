@@ -58,6 +58,7 @@ import {
   collectionTotals,
   farmCityOf,
   formatCount,
+  formatKg,
   isCapturedRow,
   moveInSequence,
   orderRowsOnTrip,
@@ -442,6 +443,11 @@ function AssignmentEditor({
 
   // ── Capacity math (boxes are the priority figure; hard block) ────────────
   const avgBirdWeight = vehicle ? Number(vehicle.trip.avgBirdWeight) || 0 : 0;
+  // Weight basis for the ORDERED weights: the picked vehicle's own average
+  // bird weight (that is what will be loaded), and the day's collection average
+  // until a vehicle is picked — so planning never shows a column of dashes.
+  const dayAvgBirdWeight = Number(collection?.trip.avgBirdWeight) || 0;
+  const orderWeightBasis = avgBirdWeight || dayAvgBirdWeight;
   const capacity = vehicle ? vehicle.capacity : 0;
   // The vehicle's rows for THIS order are replaced on save, so they never
   // count against its capacity — only boxes from OTHER orders do. (The old
@@ -1223,8 +1229,8 @@ function AssignmentEditor({
                         {formatCount(Math.max(1, Number(row.boxNo) || 0))}
                       </td>
                       <td className={`${opsTableTdClass} text-right text-slate-500`}>
-                        {avgBirdWeight
-                          ? `${weightForBirds(Number(row.birds) || 0, avgBirdWeight).toFixed(2)} kg`
+                        {orderWeightBasis
+                          ? formatKg(weightForBirds(Number(row.birds) || 0, orderWeightBasis))
                           : "—"}
                       </td>
                     </tr>
@@ -1488,8 +1494,8 @@ function AssignmentEditor({
                             </div>
                           </td>
                           <td className={`${opsTableTdClass} text-right text-slate-500`}>
-                            {avgBirdWeight
-                              ? `${weightForBirds(assignedBirdsFor(row), avgBirdWeight).toFixed(2)} kg`
+                            {orderWeightBasis
+                              ? formatKg(weightForBirds(assignedBirdsFor(row), orderWeightBasis))
                               : "—"}
                           </td>
                           <td className={opsTableTdClass}>

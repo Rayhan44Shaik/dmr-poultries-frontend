@@ -354,7 +354,13 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
     ? pendingApprovals.total + notifications.length
     : notifications.length;
 
-  const title = route.page?.labelKey ? t(route.page.labelKey) : (route.page?.label ?? route.section?.label ?? "");
+  // Every level falls back through its i18n key first: a section-level match
+  // (no page) must still read its translated label, never the raw English one.
+  const title = route.page?.labelKey
+    ? t(route.page.labelKey)
+    : (route.page?.label ??
+      (route.section?.labelKey ? t(route.section.labelKey) : route.section?.label) ??
+      "");
   const sectionLabel = route.section?.labelKey ? t(route.section.labelKey) : route.section?.label;
 
 

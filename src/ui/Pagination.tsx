@@ -47,6 +47,7 @@ import { cn } from "../utils/cn";
 import { PageSizeSelect } from "../shared/ui/PageSizeSelect";
 import {
   clampPage,
+  compactPageWindow,
   computeTotalPages,
   pageRecordRange,
   pageWindow,
@@ -72,6 +73,12 @@ export interface PaginationProps {
   /** "Showing 1–20 of 148". Default true. */
   showSummary?: boolean;
   siblingCount?: number;
+  /**
+   * Compact numbering — `1 2 … 20` (first two pages, the current neighbourhood,
+   * the last page). Used by the collection tables; the default renders a full
+   * window instead.
+   */
+  compact?: boolean;
   ariaLabel?: string;
   className?: string;
 }
@@ -85,6 +92,7 @@ export function Pagination({
   disabled = false,
   showSummary = true,
   siblingCount = 1,
+  compact = false,
   ariaLabel,
   className,
 }: PaginationProps) {
@@ -114,7 +122,9 @@ export function Pagination({
   }, [safePage, page]);
 
   const { from, to } = pageRecordRange(safePage, pageSize, totalItems);
-  const items = pageWindow(safePage, totalPages, siblingCount);
+  const items = compact
+    ? compactPageWindow(safePage, totalPages)
+    : pageWindow(safePage, totalPages, siblingCount);
 
   const go = (next: number) => {
     if (disabled) return;

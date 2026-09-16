@@ -356,6 +356,126 @@ async function run() {
   );
   assert.ok(!(await request("/operations/rate-entry")).some((row) => row.id === rateTrip.id));
 
+  // ── Orders hand-off: collection → assignment → delivery tracking ─────────
+  // The Orders page derives all three tabs from /api/trips?full=true, so the
+  // audit replicates its classification exactly: a container is a trip with NO
+  // vehicle whose delivery rows carry the "[ORDER]" marker, and an assignment
+  // is a vehicle row carrying "[ORDER] O:<containerTripNo>".
+  const orderTrips = await request("/trips?full=true");
+  const orderRowList = (trip) =>
+    (Array.isArray(trip.deliveries) ? trip.deliveries : []).filter((row) =>
+      String(row.remarks ?? "").startsWith("[ORDER]"),
+    );
+  const orderRefOf = (row) => String(row.remarks ?? "").match(/\[ORDER\]\s+O:([^\s|]+)/)?.[1] ?? null;
+  const containers = orderTrips.filter(
+    (trip) =>
+      trip.deleted !== true &&
+      !trip.vehicleId &&
+      !trip.vehicleNo &&
+      orderRowList(trip).length > 0,
+  );
+  assert.equal(
+    containers.length,
+    dashboard.moduleCounts.orders,
+    "the Operations quarter map's Orders count must equal the containers on the trips feed",
+  );
+  assert.ok(containers.length > 0, "expected at least one Orders collection container");
+  for (const container of containers) {
+    const rows = orderRowList(container);
+    assert.ok(rows.length >= 20, `${container.tripNo}: a day's collection must carry its shops`);
+    assert.ok(
+      rows.every(
+        (row) =>
+          Number(row.birds) > 0 &&
+          Number(row.boxNo) > 0 &&
+          typeof row.village === "string" &&
+          row.village.length > 0,
+      ),
+      `${container.tripNo}: every plan row must carry birds, boxes and the shop's city`,
+    );
+    // Assignment never exceeds the order: the vehicle rows referencing this
+    // container may split a shop across vehicles but must not inflate it.
+    const assignedBoxes = orderTrips
+      .filter((trip) => trip.deleted !== true && trip.vehicleId > 0)
+      .flatMap((trip) => orderRowList(trip))
+      .filter((row) => orderRefOf(row) === container.tripNo)
+      .reduce((total, row) => total + Number(row.boxNo || 0), 0);
+    const orderedBoxes = rows.reduce((total, row) => total + Number(row.boxNo || 0), 0);
+    assert.ok(
+      assignedBoxes <= orderedBoxes,
+      `${container.tripNo}: assigned boxes (${assignedBoxes}) exceed the ordered boxes (${orderedBoxes})`,
+    );
+  }
+
+  // Assignment history must exist (Tab 2 shows where the shops went), one
+  // order must be FULLY placed (the read-only day history) and one must still
+  // be open so the dispatcher has shops left to assign.
+  const assignedTrips = orderTrips.filter((trip) => trip.deleted !== true && trip.vehicleId > 0);
+  const assignmentBoxesFor = (containerTripNo) =>
+    assignedTrips
+      .flatMap((trip) => orderRowList(trip))
+      .filter((row) => orderRefOf(row) === containerTripNo)
+      .reduce((total, row) => total + Number(row.boxNo || 0), 0);
+  const containerBoxes = (container) =>
+    orderRowList(container).reduce((total, row) => total + Number(row.boxNo || 0), 0);
+  assert.ok(
+    containers.some((container) => assignmentBoxesFor(container.tripNo) > 0),
+    "expected at least one assigned collection order",
+  );
+  assert.ok(
+    containers.some(
+      (container) => assignmentBoxesFor(container.tripNo) === containerBoxes(container),
+    ),
+    "expected at least one fully assigned collection (the read-only assignment history)",
+  );
+  assert.ok(
+    containers.some(
+      (container) => assignmentBoxesFor(container.tripNo) < containerBoxes(container),
+    ),
+    "expected at least one collection with shops still available for Order Assignment",
+  );
+  assert.equal(
+    new Set(
+      orderTrips
+        .filter((trip) => trip.vehicleId > 0)
+        .flatMap((trip) => orderRowList(trip))
+        .map((row) => `${row.id}`),
+    ).size,
+    orderTrips.filter((trip) => trip.vehicleId > 0).flatMap(orderRowList).length,
+    "every assigned row must be a distinct delivery row (no duplicated assignment)",
+  );
+
+  // Delivery Tracking is lifecycle-driven: rows only appear for trips whose
+  // Step 4 was submitted, split by the Trip Entry status — never by a
+  // row-level percentage.
+  const trackingTrips = orderTrips.filter(
+    (trip) =>
+      trip.deleted !== true &&
+      trip.deliveryStepSubmitted === true &&
+      (orderRowList(trip).length > 0 || /order:/.test(String(trip.remarks ?? ""))),
+  );
+  assert.ok(trackingTrips.length > 0, "Delivery Tracking must have trips to show");
+  const inProgressTrips = trackingTrips.filter((trip) => trip.status !== "Completed");
+  const completedOrderTrips = trackingTrips.filter((trip) => trip.status === "Completed");
+  assert.ok(
+    inProgressTrips.length > 0,
+    "expected at least one order-assigned trip in PENDING & IN PROGRESS",
+  );
+  assert.ok(
+    completedOrderTrips.length > 0,
+    "expected at least one Completed order-assigned trip in the tracking history",
+  );
+  for (const trip of trackingTrips) {
+    assert.ok(
+      orderRowList(trip).every((row) => Number(row.birds) > 0 && Number(row.weight) > 0),
+      `${trip.tripNo}: a tracked order row must carry the delivered birds and weight`,
+    );
+    assert.ok(
+      Number(trip.dcWeight) >= Number(trip.totalDeliveredWeight),
+      `${trip.tripNo}: a delivered order must never exceed the dispatched load (weight loss cannot be negative)`,
+    );
+  }
+
   // Fuel page KPIs must describe every filtered row, not only page 1.
   const fuelPageOne = await request("/operations/fuel-expenses?page=1&limit=10");
   const fuelPageTwo = await request("/operations/fuel-expenses?page=2&limit=10");
