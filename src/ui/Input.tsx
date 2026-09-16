@@ -19,7 +19,6 @@ import { forwardRef } from "react";
 import { cn } from "../utils/cn";
 import { Field } from "./Field";
 import {
-  uiFocusRing,
   uiInputClass,
   uiInputErrorClass,
   uiInputReadOnlyClass,

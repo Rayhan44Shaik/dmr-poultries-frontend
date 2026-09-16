@@ -340,6 +340,9 @@ export default {
   'fleet.emi_schedule.unknown': 'తెలియదు',
 
   // ----- Analytics -----
+  'fleet.maintenance_form.invalid_km': 'సరైన ఓడోమీటర్ రీడింగ్ (కి.మీ.) నమోదు చేయండి.',
+  'fleet.analytics.from_date': 'నుండి తేదీ',
+  'fleet.analytics.to_date': 'వరకు తేదీ',
   'fleet.analytics.all_clear': 'అంతా సరే',
   'fleet.analytics.all_vehicles': 'అన్ని వాహనాలు',
   'fleet.analytics.avg_mileage': 'సగటు మైలేజీ',

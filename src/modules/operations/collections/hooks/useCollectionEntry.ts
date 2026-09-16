@@ -6,7 +6,6 @@ import type {
   RecentCollection,
   PaymentMode,
   Collection,
-  CollectionLegacyStatus,
   CollectionWeeklySummary,
   CollectionWeekBounds,
 } from "../types/collection";
@@ -164,10 +163,6 @@ export default function useCollectionEntry() {
     setShowSummary(false);
     setLedgerLoaded(false);
     setWeeklySummary(EMPTY_WEEKLY);
-  }
-
-  function changeShop(shopName: string) {
-    selectShop(shopName);
   }
 
   function resetEntry() {

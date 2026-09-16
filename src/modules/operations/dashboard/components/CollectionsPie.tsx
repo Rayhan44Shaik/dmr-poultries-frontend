@@ -233,7 +233,7 @@ export default function CollectionsPie({ data, animationKey = 0 }: CollectionsPi
         <div className="absolute inset-0 flex items-center justify-center">
           <div
             key={dataSignature}
-            className="relative aspect-square w-full max-w-[20rem] animate-fade-in"
+            className="cs-pie-spin relative aspect-square w-full max-w-[20rem] animate-fade-in"
             style={{ aspectRatio: "1 / 1" }}
           >
             <svg viewBox="0 0 400 400" className="absolute inset-0 h-full w-full" aria-hidden="true">

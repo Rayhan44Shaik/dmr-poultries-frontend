@@ -106,13 +106,13 @@ export default function ShopDeliveryCard({
   emailSending = false,
   emailSendCount = 0,
   emailDisabled = false,
-  emailFailureReason,
+  emailFailureReason: _emailFailureReason,
   onSendEmail,
   whatsappStatus = "pending",
   whatsappSending = false,
   whatsappSendCount = 0,
   whatsappDisabled = false,
-  whatsappFailureReason,
+  whatsappFailureReason: _whatsappFailureReason,
   onSendWhatsApp,
 }: Props) {
   const { t, language } = useI18n();
