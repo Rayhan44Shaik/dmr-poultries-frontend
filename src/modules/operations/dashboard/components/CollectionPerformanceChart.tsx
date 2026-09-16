@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type CSSProperties } from "react";
 import { ArrowUpRight, BarChart3 } from "lucide-react";
 import { Link } from "react-router-dom";
 
@@ -48,6 +48,56 @@ const recoveryColor = (value: number): string => {
   return "#fb923c";
 };
 
+interface ShopTooltipState {
+  row: CollectionPerformanceDatum;
+  recovery: number;
+  left: number;
+  top: number;
+  placement: "top" | "bottom";
+}
+
+const COLLECTION_RECOVERY_ANIMATION_STYLES = `
+@keyframes collection-recovery-card-in {
+  0% { opacity: 0; transform: translateY(8px) scale(0.985); }
+  65% { opacity: 1; }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes collection-recovery-ring-draw {
+  from { stroke-dashoffset: var(--collection-ring-circumference); }
+  to { stroke-dashoffset: var(--collection-ring-dashoffset); }
+}
+@keyframes collection-recovery-digit-pop {
+  0% { opacity: 0; transform: scale(0.72); }
+  70% { opacity: 1; transform: scale(1.08); }
+  100% { opacity: 1; transform: scale(1); }
+}
+@keyframes collection-recovery-tooltip-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.collection-recovery-shop-card {
+  animation: collection-recovery-card-in 420ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.collection-recovery-ring-progress {
+  animation: collection-recovery-ring-draw 720ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.collection-recovery-value {
+  animation: collection-recovery-digit-pop 480ms cubic-bezier(0.16, 1, 0.3, 1) 80ms both;
+  transform-origin: center;
+}
+.collection-recovery-tooltip {
+  animation: collection-recovery-tooltip-in 160ms ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .collection-recovery-shop-card,
+  .collection-recovery-ring-progress,
+  .collection-recovery-value,
+  .collection-recovery-tooltip {
+    animation: none !important;
+  }
+}
+`;
+
 function RecoveryRing({ value, size = 46 }: { value: number; size?: number }) {
   const pct = clampPct(value);
   const color = recoveryColor(pct);
@@ -59,6 +109,12 @@ function RecoveryRing({ value, size = 46 }: { value: number; size?: number }) {
   const isFullRecovery = roundedPct >= 100;
   const numberFontSize = Math.max(13, Math.round(size * (isFullRecovery ? 0.27 : 0.31) * 10) / 10);
   const percentFontSize = Math.max(9, Math.round(size * (isFullRecovery ? 0.17 : 0.2) * 10) / 10);
+  const progressStyle = {
+    strokeDasharray: circumference,
+    strokeDashoffset: dashOffset,
+    "--collection-ring-circumference": circumference,
+    "--collection-ring-dashoffset": dashOffset,
+  } as CSSProperties;
 
   return (
     <span
@@ -83,12 +139,12 @@ function RecoveryRing({ value, size = 46 }: { value: number; size?: number }) {
           stroke={color}
           strokeWidth={strokeWidth}
           strokeLinecap={pct >= 99.5 ? "butt" : "round"}
-          strokeDasharray={circumference}
-          strokeDashoffset={dashOffset}
+          className="collection-recovery-ring-progress"
+          style={progressStyle}
           transform="rotate(-90 24 24)"
         />
       </svg>
-      <span className="relative flex max-w-[78%] items-center justify-center overflow-visible whitespace-nowrap font-black leading-none tabular-nums tracking-[-0.08em] text-slate-800">
+      <span className="collection-recovery-value relative flex max-w-[78%] items-center justify-center overflow-visible whitespace-nowrap font-black leading-none tabular-nums tracking-[-0.08em] text-slate-800">
         <span style={{ fontSize: numberFontSize, lineHeight: 1 }}>{roundedPct}</span>
         <span className="ml-px tracking-normal" style={{ fontSize: percentFontSize, lineHeight: 1 }}>%</span>
       </span>
@@ -105,6 +161,8 @@ export default function CollectionPerformanceChart({
 }: CollectionPerformanceChartProps) {
   const { t, language } = useI18n();
   const [sortBy, setSortBy] = useState<CollectionPerformanceSort>("outstanding");
+  const [sortAnimationId, setSortAnimationId] = useState(0);
+  const [shopTooltip, setShopTooltip] = useState<ShopTooltipState | null>(null);
 
   const sortOptions = useMemo<MasterDropdownOption[]>(
     () => [
@@ -158,16 +216,40 @@ export default function CollectionPerformanceChart({
   const recovery = sales > 0 ? (collections / sales) * 100 : 0;
 
   const setSortValue = (value: string) => {
-    if (!value) {
-      setSortBy("outstanding");
-      return;
-    }
-    if (!sortOptions.some((option) => option.value === value)) return;
-    setSortBy(value as CollectionPerformanceSort);
+    const nextSort = value ? value as CollectionPerformanceSort : "outstanding";
+    if (!sortOptions.some((option) => option.value === nextSort)) return;
+    if (nextSort === sortBy) return;
+    setShopTooltip(null);
+    setSortBy(nextSort);
+    setSortAnimationId((current) => current + 1);
+  };
+
+  const showShopTooltip = (
+    row: CollectionPerformanceDatum,
+    rowRecovery: number,
+    target: HTMLElement,
+  ) => {
+    if (typeof window === "undefined") return;
+    const rect = target.getBoundingClientRect();
+    const tooltipWidth = 256;
+    const tooltipHeight = 150;
+    const viewportWidth = window.innerWidth || document.documentElement.clientWidth;
+    const viewportHeight = window.innerHeight || document.documentElement.clientHeight;
+    const left = Math.min(
+      Math.max(rect.left + rect.width / 2, tooltipWidth / 2 + 10),
+      viewportWidth - tooltipWidth / 2 - 10,
+    );
+    const placement = rect.top > tooltipHeight + 18 || rect.bottom + tooltipHeight > viewportHeight
+      ? "top"
+      : "bottom";
+    const top = placement === "top" ? rect.top - 10 : rect.bottom + 10;
+    setShopTooltip({ row, recovery: rowRecovery, left, top, placement });
   };
 
   return (
-    <section className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
+    <>
+      <style>{COLLECTION_RECOVERY_ANIMATION_STYLES}</style>
+      <section className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200/70 bg-white shadow-sm">
       <header className="border-b border-slate-100 bg-gradient-to-r from-slate-50/90 via-white to-emerald-50/30 px-4 py-3">
         <div className="flex min-w-0 flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
@@ -199,13 +281,13 @@ export default function CollectionPerformanceChart({
               className="w-full sm:w-48 lg:w-52"
               triggerClassName="h-9 rounded-xl border-slate-200 bg-white/95 px-3 text-[11.5px] font-semibold shadow-xs"
             />
-            <div className="flex shrink-0 items-center gap-2 rounded-2xl border border-emerald-100 bg-emerald-50/65 px-2.5 py-1.5">
-              <RecoveryRing value={recovery} size={66} />
+            <div className="flex shrink-0 items-center gap-1.5 rounded-xl border border-emerald-100 bg-emerald-50/65 px-2 py-1">
+              <RecoveryRing value={recovery} size={48} />
               <div className="leading-tight">
-                <p className="text-[9px] font-black uppercase tracking-wide text-emerald-700">
+                <p className="text-[8px] font-black uppercase tracking-wide text-emerald-700">
                   {t("ops.dashboard.collection_performance.recovery")}
                 </p>
-                <p className="text-lg font-black tabular-nums text-slate-900">{recovery.toFixed(1)}%</p>
+                <p className="text-base font-black tabular-nums text-slate-900">{recovery.toFixed(1)}%</p>
               </div>
             </div>
           </div>
@@ -246,9 +328,15 @@ export default function CollectionPerformanceChart({
               const rowRecovery = collectionRecoveryPercentage(row);
               return (
                 <article
-                  key={row.shopName}
-                  className="group min-w-0 rounded-xl border border-slate-100 bg-gradient-to-r from-white to-slate-50/60 px-2.5 py-1.5 shadow-xs transition-colors duration-150 hover:from-emerald-50/35 hover:to-white"
-                  title={`${row.shopName}\n${t("ops.dashboard.collection_performance.sales")}: ${formatINR(row.salesAmount)}\n${t("ops.dashboard.collection_performance.collected")}: ${formatINR(row.collectionAmount)}\n${t("ops.dashboard.collection_performance.gap")}: ${formatINR(row.outstandingAmount)}`}
+                  key={`${sortAnimationId}-${row.shopName}`}
+                  tabIndex={0}
+                  aria-label={`${row.shopName}, ${t("ops.dashboard.collection_performance.recovery")}: ${rowRecovery.toFixed(1)}%, ${t("ops.dashboard.collection_performance.gap")}: ${formatINR(row.outstandingAmount)}`}
+                  className="collection-recovery-shop-card group relative min-w-0 rounded-xl border border-slate-100 bg-gradient-to-r from-white to-slate-50/60 px-2.5 py-1.5 shadow-xs transition-colors duration-150 hover:from-emerald-50/35 hover:to-white focus:bg-emerald-50/30"
+                  style={{ animationDelay: `${index * 32}ms` }}
+                  onFocus={(event) => showShopTooltip(row, rowRecovery, event.currentTarget)}
+                  onBlur={() => setShopTooltip(null)}
+                  onMouseEnter={(event) => showShopTooltip(row, rowRecovery, event.currentTarget)}
+                  onMouseLeave={() => setShopTooltip(null)}
                 >
                   <div className="grid min-w-0 grid-cols-[1.35rem_3.65rem_minmax(0,1fr)_auto] items-center gap-1.5">
                     <span className="flex h-[22px] w-[22px] shrink-0 items-center justify-center rounded-full bg-emerald-50 text-[9.5px] font-black tabular-nums text-emerald-700 ring-1 ring-inset ring-emerald-100">
@@ -266,7 +354,6 @@ export default function CollectionPerformanceChart({
                     <div className="shrink-0 text-right leading-tight">
                       <span
                         className="block rounded-full bg-orange-50 px-1.5 py-1 text-[10.5px] font-black tabular-nums text-orange-700 ring-1 ring-inset ring-orange-100"
-                        title={`${t("ops.dashboard.collection_performance.gap")}: ${formatINR(row.outstandingAmount)}`}
                       >
                         {formatINRCompact(row.outstandingAmount)}
                       </span>
@@ -292,5 +379,63 @@ export default function CollectionPerformanceChart({
         </footer>
       </div>
     </section>
+
+    {shopTooltip ? (
+      <div
+        role="tooltip"
+        className="collection-recovery-tooltip pointer-events-none fixed z-[1000] w-64 rounded-2xl border border-slate-200 bg-white p-3 text-[10px] text-slate-500 shadow-xl shadow-slate-900/12"
+        style={{
+          left: shopTooltip.left,
+          top: shopTooltip.top,
+          transform: shopTooltip.placement === "top" ? "translate(-50%, -100%)" : "translate(-50%, 0)",
+        }}
+      >
+        <span
+          className={`absolute left-1/2 h-2.5 w-2.5 -translate-x-1/2 rotate-45 border-slate-200 bg-white ${
+            shopTooltip.placement === "top"
+              ? "-bottom-1.5 border-b border-r"
+              : "-top-1.5 border-l border-t"
+          }`}
+          aria-hidden="true"
+        />
+        <div className="relative">
+          <div className="flex min-w-0 items-start justify-between gap-2 border-b border-slate-100 pb-2">
+            <p className="min-w-0 break-words text-[12px] font-bold leading-snug text-slate-800">
+              {shopTooltip.row.shopName}
+            </p>
+            <span className="shrink-0 rounded-full bg-emerald-50 px-2 py-1 text-[11px] font-black tabular-nums text-emerald-700 ring-1 ring-inset ring-emerald-100">
+              {shopTooltip.recovery.toFixed(1)}%
+            </span>
+          </div>
+          <dl className="mt-2 grid grid-cols-2 gap-1.5">
+            <div className="rounded-lg bg-slate-50 px-2 py-1.5">
+              <dt className="font-black uppercase tracking-wide text-slate-400">
+                {t("ops.dashboard.collection_performance.sales")}
+              </dt>
+              <dd className="mt-0.5 font-bold tabular-nums text-slate-800">
+                {formatINR(shopTooltip.row.salesAmount)}
+              </dd>
+            </div>
+            <div className="rounded-lg bg-emerald-50 px-2 py-1.5">
+              <dt className="font-black uppercase tracking-wide text-emerald-500">
+                {t("ops.dashboard.collection_performance.collected")}
+              </dt>
+              <dd className="mt-0.5 font-bold tabular-nums text-emerald-700">
+                {formatINR(shopTooltip.row.collectionAmount)}
+              </dd>
+            </div>
+          </dl>
+          <div className="mt-1.5 flex items-center justify-between gap-2 rounded-lg bg-orange-50 px-2 py-1.5 text-orange-700 ring-1 ring-inset ring-orange-100">
+            <span className="font-black uppercase tracking-wide text-orange-500">
+              {t("ops.dashboard.collection_performance.gap")}
+            </span>
+            <strong className="text-[11px] tabular-nums">
+              {formatINR(shopTooltip.row.outstandingAmount)}
+            </strong>
+          </div>
+        </div>
+      </div>
+    ) : null}
+  </>
   );
 }
