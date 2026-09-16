@@ -4,9 +4,13 @@
 // Farm input -> delivery output (shop COUNT only) -> mortality -> weight loss.
 // Individual shop names live in the expandable detail, never in this table.
 //
-// SURFACE — identical to the Trip List table:
-//   • one white card with a tinted header bar (brand glyph + title + count)
-//   • 12px uppercase column headers, each with its own coloured glyph
+// SURFACE — the Trip List table, with a deliberately tighter measure:
+//   • one white card with a tinted header bar: brand tile, title and the trip
+//     count sitting TOGETHER on the left, where the eye lands first
+//   • 12px uppercase column headers, each with its own coloured glyph —
+//     the glyph lives in the HEADER ONLY. Trip List rule: identities and
+//     metrics are never re-badged on every row, which is what made the grid
+//     noisy and wide before.
 //   • paired ↑↓ sort arrows on every sortable column
 //   • a serial "#" column (which is also the expand affordance)
 //   • "Day" — weekday + date — instead of a bare date
@@ -29,8 +33,8 @@ import {
   Scale,
   SearchX,
   ShoppingBag,
-  Store,
   TrendingDown,
+  Truck,
   UserCog,
   Warehouse,
 } from "lucide-react";
@@ -255,7 +259,9 @@ export default function TripLossTable({
     const active = Boolean(col.sortKey) && sort.key === col.sortKey;
     const content = (
       <>
-        {col.icon && <col.icon size={14} className={`shrink-0 ${col.tone ? ICON_TONES[col.tone] : "text-slate-400"}`} />}
+        {col.icon && (
+          <col.icon size={14} className={`shrink-0 ${col.tone ? ICON_TONES[col.tone] : "text-slate-400"}`} />
+        )}
         <span>{col.labelKey ? t(col.labelKey) : col.label}</span>
         {col.sortKey && <SortArrows active={active} dir={sort.dir} />}
       </>
@@ -278,7 +284,7 @@ export default function TripLossTable({
         onClick={() => onSort(col)}
         title={col.titleKey ? t(col.titleKey) : undefined}
         aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
-        className={`group/sort ${innerClass} uppercase tracking-wider text-[12px] font-bold transition-colors hover:text-emerald-700 ${
+        className={`group/sort ${innerClass} text-[12px] font-bold uppercase tracking-wider transition-colors hover:text-emerald-700 ${
           active ? "text-emerald-700" : ""
         }`}
       >
@@ -292,19 +298,27 @@ export default function TripLossTable({
 
   return (
     <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white text-xs shadow-sm md:text-sm">
-      {/* ── Table header bar — the Trip List surface ─────────────────── */}
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-gradient-to-r from-rose-50/60 via-white to-rose-50/40 px-6 py-3">
-        <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-rose-100 bg-rose-50/70 text-rose-500 shadow-inner">
-            <Scale className="h-5 w-5" />
-          </div>
-          <h3 className="text-base font-bold tracking-tight text-slate-800">
+      {/* ── Table header bar ─────────────────────────────────────────────
+          Title and count are one block: "Completed Trips  • 525 trips".
+          The trip count is the first thing read after the title, so it can
+          never look like a stray pill parked at the far edge of the card. */}
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-slate-100 bg-gradient-to-r from-rose-50/70 via-white to-amber-50/40 px-5 py-2.5">
+        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-rose-500 to-orange-400 text-white shadow-[0_6px_14px_-6px_rgba(244,63,94,0.75)] ring-1 ring-rose-200/70">
+          <Truck size={17} strokeWidth={2.4} aria-hidden="true" />
+        </div>
+        <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1">
+          <h3 className="text-[15px] font-bold tracking-tight text-slate-800">
             {t("ops.mortality.section.completed_trips")}
           </h3>
+          <span className="inline-flex items-center gap-1.5 rounded-full border border-rose-200/80 bg-white px-2.5 py-[3px] text-[11px] font-bold tabular-nums text-rose-600 shadow-sm">
+            <span className="h-1.5 w-1.5 rounded-full bg-rose-500" aria-hidden="true" />
+            {t("ops.mortality.section.count", { count: formatNumber(totalRecords) })}
+          </span>
         </div>
-        <span className="rounded-full border border-rose-100 bg-rose-50/70 px-2.5 py-1 text-[11px] font-bold tabular-nums text-rose-600">
-          {t("ops.mortality.section.count", { count: formatNumber(totalRecords) })}
-        </span>
+        <p className="ml-auto hidden items-center gap-1 text-[11px] font-medium text-slate-400 lg:inline-flex">
+          <ChevronRight size={12} aria-hidden="true" />
+          {t("ops.mortality.hint.expand")}
+        </p>
       </div>
 
       <div className="w-full overflow-x-auto">
@@ -314,9 +328,9 @@ export default function TripLossTable({
               {COLUMNS.map((col) => (
                 <th
                   key={col.key}
-                  className={`px-4 py-4 align-middle text-[12px] font-bold uppercase tracking-wider ${alignClass(col.align)} ${
-                    col.key === "serial" ? "w-16" : ""
-                  }`}
+                  className={`px-3 py-2.5 align-middle text-[12px] font-bold uppercase tracking-wider ${alignClass(
+                    col.align
+                  )} ${col.key === "serial" ? "w-12" : ""}`}
                 >
                   {sortable(col)}
                 </th>
@@ -327,17 +341,20 @@ export default function TripLossTable({
           <tbody className="divide-y divide-slate-100">
             {loading ? (
               <>
-                {[0, 1, 2, 3, 4].map((rowIndex) => (
+                {[0, 1, 2, 3, 4, 5].map((rowIndex) => (
                   <tr key={`skeleton-${rowIndex}`}>
-                    <td colSpan={COLUMNS.length} className="px-4 py-4">
-                      <div className="h-6 w-full animate-pulse rounded-lg bg-slate-100" />
+                    <td colSpan={COLUMNS.length} className="px-3 py-2.5">
+                      <div className="h-5 w-full animate-pulse rounded-md bg-slate-100" />
                     </td>
                   </tr>
                 ))}
                 <tr>
-                  <td colSpan={COLUMNS.length} className="px-4 py-2 text-center">
+                  <td colSpan={COLUMNS.length} className="px-3 py-2 text-center">
                     <span className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-slate-400">
-                      <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600" aria-hidden="true" />
+                      <span
+                        className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600"
+                        aria-hidden="true"
+                      />
                       {t("ops.mortality.loading")}
                     </span>
                   </td>
@@ -392,73 +409,79 @@ export default function TripLossTable({
                         isOpen ? "bg-slate-50/60" : index % 2 === 0 ? "bg-white" : "bg-slate-50/20"
                       }`}
                     >
-                      <td className="w-16 px-4 py-4">
+                      <td className="w-12 px-3 py-2.5">
                         <span className="flex items-center justify-center gap-1.5">
                           <button
                             type="button"
                             onClick={() => toggle(r.tripId)}
-                            className="rounded-md p-1 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                            className="rounded-md p-0.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
                             aria-label={isOpen ? t("ops.mortality.aria.collapse") : t("ops.mortality.aria.expand")}
                             aria-expanded={isOpen}
                           >
                             {isOpen ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
                           </button>
-                          <span className="text-[13px] font-medium tabular-nums text-slate-500">
+                          <span className="text-[12.5px] font-medium tabular-nums text-slate-400">
                             {formatNumber(serialNo)}
                           </span>
                         </span>
                       </td>
 
-                      <td className="whitespace-nowrap px-4 py-4 font-bold text-indigo-600">{r.tripNo}</td>
+                      <td className="whitespace-nowrap px-3 py-2.5 font-bold text-indigo-600">{r.tripNo}</td>
 
-                      <td className="whitespace-nowrap px-4 py-4 font-medium text-slate-600">
+                      <td className="whitespace-nowrap px-3 py-2.5 font-medium text-slate-600">
                         {formatTripListDay(r.tripDate, language)}
                       </td>
 
-                      <td className="max-w-[180px] truncate px-4 py-4 font-medium text-slate-700">
+                      <td
+                        className="max-w-[190px] truncate px-3 py-2.5 font-medium text-slate-700"
+                        title={r.sourceFarm || undefined}
+                      >
                         {r.sourceFarm || "—"}
                       </td>
 
-                      <td className="max-w-[160px] truncate px-4 py-4 text-slate-600">
+                      <td
+                        className="max-w-[150px] truncate px-3 py-2.5 text-slate-600"
+                        title={r.supervisorName || undefined}
+                      >
                         {r.supervisorName || "—"}
                       </td>
 
-                      <td className="whitespace-nowrap px-4 py-4 text-center font-semibold tabular-nums text-amber-700">
+                      <td className="whitespace-nowrap px-3 py-2.5 text-center font-semibold tabular-nums text-amber-700">
                         {formatNumber(r.farmBirds)}
                       </td>
 
-                      <td className="whitespace-nowrap px-4 py-4 text-center tabular-nums text-amber-700">
+                      <td className="whitespace-nowrap px-3 py-2.5 text-center tabular-nums text-amber-700">
                         {formatWeight(r.farmWeight)}
                       </td>
 
-                      <td className="whitespace-nowrap px-4 py-4 text-center">
-                        <span className="inline-flex items-center gap-1 rounded-md bg-sky-50 px-2 py-0.5 text-[12px] font-semibold tabular-nums text-slate-700">
-                          <Store size={11} className="text-sky-600" />
-                          {formatNumber(r.deliveryShops)}
-                        </span>
+                      {/* Plain number — the ShoppingBag glyph already names this
+                          column in the header; repeating a badge on every row
+                          is what made the grid noisy. */}
+                      <td className="whitespace-nowrap px-3 py-2.5 text-center font-semibold tabular-nums text-slate-700">
+                        {formatNumber(r.deliveryShops)}
                       </td>
 
-                      <td className="whitespace-nowrap px-4 py-4 text-center font-semibold tabular-nums text-sky-700">
+                      <td className="whitespace-nowrap px-3 py-2.5 text-center font-semibold tabular-nums text-sky-700">
                         {formatNumber(r.deliveredBirds)}
                       </td>
 
-                      <td className="whitespace-nowrap px-4 py-4 text-center tabular-nums text-sky-700">
+                      <td className="whitespace-nowrap px-3 py-2.5 text-center tabular-nums text-sky-700">
                         {formatWeight(r.deliveredWeight)}
                       </td>
 
-                      <td className="whitespace-nowrap px-4 py-4 text-center font-semibold tabular-nums text-orange-600">
+                      <td className="whitespace-nowrap px-3 py-2.5 text-center font-semibold tabular-nums text-orange-600">
                         {formatNumber(r.mortalityCount)}
                       </td>
 
-                      <td className="whitespace-nowrap px-4 py-4 text-center tabular-nums text-orange-600">
+                      <td className="whitespace-nowrap px-3 py-2.5 text-center tabular-nums text-orange-600">
                         {formatWeight(r.mortalityWeight)}
                       </td>
 
-                      <td className="whitespace-nowrap px-4 py-4 text-center font-semibold tabular-nums text-rose-600">
+                      <td className="whitespace-nowrap px-3 py-2.5 text-center font-semibold tabular-nums text-rose-600">
                         {formatWeight(r.weightLoss)}
                       </td>
 
-                      <td className="whitespace-nowrap px-4 py-4 text-center tabular-nums text-rose-600">
+                      <td className="whitespace-nowrap px-3 py-2.5 text-center tabular-nums text-rose-600">
                         {r.weightLossPercentage.toFixed(2)}%
                       </td>
                     </tr>

@@ -920,6 +920,7 @@ export default {
   // Section heading
   'ops.mortality.section.completed_trips': 'పూర్తయిన ట్రిప్పులు',
   'ops.mortality.section.count': '{count} ట్రిప్పులు',
+  'ops.mortality.hint.expand': 'వాహనం + షాపుల వారీ డెలివరీ కోసం వరుస తెరవండి',
 
   // KPI cards
   'ops.mortality.kpi.completed_trips': 'పూర్తయిన ట్రిప్పులు',
@@ -939,9 +940,9 @@ export default {
   'ops.mortality.col.source_farm': 'ఫారం',
   'ops.mortality.col.farm_birds': 'ఫారం పక్షులు',
   'ops.mortality.col.farm_weight': 'ఫారం బరు',
-  'ops.mortality.col.delivery_shops': 'డెలి షాపులు',
-  'ops.mortality.col.delivered_birds': 'డెలి పక్షులు',
-  'ops.mortality.col.delivery_weight': 'డెలి బరు',
+  'ops.mortality.col.delivery_shops': 'షాపులు',
+  'ops.mortality.col.delivered_birds': 'డెలి. పక్షులు',
+  'ops.mortality.col.delivery_weight': 'డెలి. బరు',
   'ops.mortality.col.mortality': 'మరణాలు',
   'ops.mortality.col.mortality_weight': 'మరణాల బరు',
   'ops.mortality.col.weight_loss': 'బరు నష్టం',

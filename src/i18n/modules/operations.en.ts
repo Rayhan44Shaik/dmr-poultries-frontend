@@ -880,6 +880,8 @@ export default {
   // Section heading
   'ops.mortality.section.completed_trips': 'Completed Trips',
   'ops.mortality.section.count': '{count} trips',
+  // Header affordance: the chevron column opens the trip panel.
+  'ops.mortality.hint.expand': 'Open a row for vehicle + shop-wise delivery',
 
   // KPI cards
   'ops.mortality.kpi.completed_trips': 'Completed Trips',
@@ -897,13 +899,13 @@ export default {
 
   // Table columns
   'ops.mortality.col.source_farm': 'Farm',
-  'ops.mortality.col.farm_birds': 'Farm Brds',
+  'ops.mortality.col.farm_birds': 'Farm Birds',
   'ops.mortality.col.farm_weight': 'Farm Wt',
-  'ops.mortality.col.delivery_shops': 'Del Shops',
-  'ops.mortality.col.delivered_birds': 'Del Brds',
-  'ops.mortality.col.delivery_weight': 'Del Wt',
-  'ops.mortality.col.mortality': 'Mort',
-  'ops.mortality.col.mortality_weight': 'Mort Wt',
+  'ops.mortality.col.delivery_shops': 'Shops',
+  'ops.mortality.col.delivered_birds': 'Del. Birds',
+  'ops.mortality.col.delivery_weight': 'Del. Wt',
+  'ops.mortality.col.mortality': 'Mortality',
+  'ops.mortality.col.mortality_weight': 'Mort. Wt',
   'ops.mortality.col.weight_loss': 'Wt Loss',
   'ops.mortality.col.loss_pct': 'Loss %',
 
