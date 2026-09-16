@@ -519,6 +519,7 @@ export default {
   'staff.send.download_count_other': '{count} PDFలు డౌన్‌లోడ్',
   'staff.send.preparing_pdfs': 'PDFలు సిద్ధమవుతున్నాయి...',
   'staff.send.no_email': 'ఈమెయిల్ లేదు',
+  'staff.send.ready': 'సిద్ధం',
   'staff.send.no_phone': 'నంబర్ లేదు',
   'staff.send.empty_title': 'సమర్పించిన పేస్లిప్‌లు లేవు',
   'staff.send.empty_desc': 'ముందు సమీక్ష & సమర్పణలో పేస్లిప్‌లు సమర్పించండి — సమర్పించిన ఉద్యోగులకు మాత్రమే పంపవచ్చు.',

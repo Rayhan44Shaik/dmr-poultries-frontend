@@ -519,6 +519,7 @@ export default {
   'staff.send.download_count_other': 'Download {count} PDFs',
   'staff.send.preparing_pdfs': 'Preparing PDFs...',
   'staff.send.no_email': 'No email on file',
+  'staff.send.ready': 'Ready',
   'staff.send.no_phone': 'No number on file',
   'staff.send.empty_title': 'No submitted payslips',
   'staff.send.empty_desc': 'Submit payslips in Review & Submit first — only submitted employees can be sent.',
