@@ -273,7 +273,7 @@ const KPICard = memo(function KPICard({
   let badgeClasses =
     "inline-flex max-w-full shrink-0 items-center gap-0.5 rounded-full px-1 py-0.5 text-[7.5px] font-semibold whitespace-nowrap @min-[96px]:px-1.5 @min-[96px]:text-[9px] @min-[120px]:text-[9.5px] ";
   let periodChipClasses =
-    "absolute bottom-full left-1/2 mb-1 inline-flex w-full max-w-full -translate-x-1/2 items-center justify-center gap-0.5 whitespace-nowrap rounded-full px-1 py-0.5 text-center text-[7px] font-black uppercase tracking-[0.04em] ring-1 ring-inset @min-[96px]:px-1.5 @min-[96px]:text-[7.5px] @min-[120px]:text-[8px] ";
+    "inline-flex w-full max-w-full items-center justify-center gap-0.5 whitespace-nowrap rounded-full px-1 py-0.5 text-center text-[7px] font-black uppercase tracking-[0.04em] ring-1 ring-inset shadow-sm @min-[96px]:px-1.5 @min-[96px]:text-[7.5px] @min-[120px]:text-[8px] ";
   const trendIconClass =
     "h-2 w-2 shrink-0 @min-[96px]:h-2.5 @min-[96px]:w-2.5 @min-[120px]:h-[11px] @min-[120px]:w-[11px]";
   const periodTrendIconClass =
@@ -324,8 +324,9 @@ const KPICard = memo(function KPICard({
     changeText = "—";
     badgeTitle = t("ops.dashboard.kpi_no_baseline", { days });
   }
-  /* The compact period stays above the right-edge logo and carries the same
-     up/down trend arrow as the comparison badge. */
+  /* The compact period sits on the top-right edge and carries the same up/down
+     trend arrow as the comparison badge, while the larger logo stays centred
+     on the right edge. */
 
   /* The tile prints the compact figure ("₹2.89 Cr", "40,183"); the tooltip
      keeps the exact one ("₹28,870,424", "40,183 Kg") so the full number is
@@ -344,7 +345,7 @@ const KPICard = memo(function KPICard({
      widest real content ("Pending Collections", "₹2.89 Cr", "▲ 494.3% 30 D",
      "No change 30 D", "was ₹40.31 L"):
 
-       line 1  KPI name, with "▲ ~ 7 D" above the logo at the right edge
+       line 1  KPI name, with "▲ ~ 7 D" pinned to the top-right edge
        line 2  the figure, with the previous "was" value directly underneath
        line 3  ▲ 5.7% 7 D   (comparison badge)
 
@@ -367,11 +368,13 @@ const KPICard = memo(function KPICard({
     >
       <div className="absolute inset-0 bg-gradient-to-br from-white via-white to-slate-50 opacity-80" />
       <div className={`absolute -right-6 top-1/2 h-20 w-20 -translate-y-1/2 rounded-full ${config.bg} opacity-[0.08] blur-sm transition-opacity duration-300 group-hover:opacity-[0.14]`} />
-      <div className="absolute right-1.5 top-1/2 z-10 flex h-8 w-12 -translate-y-1/2 items-center justify-center text-center @min-[96px]:right-2 @min-[96px]:h-9 @min-[96px]:w-[3.25rem] @min-[120px]:h-10 @min-[120px]:w-14">
+      <div className="absolute top-2 right-1.5 z-20 flex w-12 items-center justify-center text-center @min-[96px]:right-2 @min-[96px]:w-[3.25rem] @min-[120px]:w-14">
         <span className={periodChipClasses} title={periodChip}>
           {periodTrendIcon}
           {periodChip}
         </span>
+      </div>
+      <div className="absolute right-1.5 top-1/2 z-10 flex h-8 w-12 -translate-y-1/2 items-center justify-center text-center @min-[96px]:right-2 @min-[96px]:h-9 @min-[96px]:w-[3.25rem] @min-[120px]:h-10 @min-[120px]:w-14">
         <div
           className={`${config.bg} mx-auto flex h-8 w-8 items-center justify-center rounded-xl shadow-md transition-transform duration-300 group-hover:scale-110 @min-[96px]:h-9 @min-[96px]:w-9 @min-[120px]:h-10 @min-[120px]:w-10`}
         >

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Cell, Pie, PieChart, ResponsiveContainer, Sector, Tooltip, type PieSectorShapeProps } from "recharts";
+import { Cell, Pie, PieChart, ResponsiveContainer, Sector, type PieSectorShapeProps } from "recharts";
 import { useI18n } from "../../../../i18n";
 import { formatINRCompact } from "../../../../utils/format";
 
@@ -95,35 +95,6 @@ function CollectionStat({
           {`${percent.toFixed(1)}%`}
         </span>
       </span>
-    </div>
-  );
-}
-
-function CollectionTooltip({
-  active,
-  payload,
-}: {
-  active?: boolean;
-  payload?: Array<{ payload?: unknown }>;
-}) {
-  if (!active) return null;
-  const item = payload?.[0]?.payload as Partial<EnrichedMode> | undefined;
-  if (!item || typeof item.name !== "string") return null;
-
-  const value = Number(item.value) || 0;
-  const percent = Number(item.percent) || 0;
-  const color = typeof item.color === "string" ? item.color : "#64748b";
-
-  return (
-    <div className="min-w-[190px] rounded-xl border border-slate-200 bg-white/95 px-3 py-2.5 shadow-xl shadow-slate-900/10 backdrop-blur-sm">
-      <div className="flex items-center gap-2 border-b border-slate-100 pb-1.5">
-        <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
-        <p className="text-[11px] font-black uppercase tracking-wider text-slate-500">{item.name}</p>
-      </div>
-      <p className="mt-2 text-[16px] font-black tabular-nums text-slate-800">{formatINRCompact(value)}</p>
-      <p className="mt-0.5 text-[12px] font-black tabular-nums" style={{ color }}>
-        {percent.toFixed(1)}% of collection streams
-      </p>
     </div>
   );
 }
@@ -308,7 +279,6 @@ export default function CollectionsPie({ data, animationKey = 0 }: CollectionsPi
                       <Cell key={d.gid} fill={`url(#cs-grad-${d.gid})`} />
                     ))}
                   </Pie>
-                  <Tooltip content={<CollectionTooltip />} cursor={false} />
                 </PieChart>
               </ResponsiveContainer>
             </div>
