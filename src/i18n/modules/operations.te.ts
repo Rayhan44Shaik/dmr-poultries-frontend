@@ -920,7 +920,6 @@ export default {
   // Section heading
   'ops.mortality.section.completed_trips': 'పూర్తయిన ట్రిప్పులు',
   'ops.mortality.section.count': '{count} ట్రిప్పులు',
-  'ops.mortality.hint.keys': 'వరుసలు కదలడానికి · ట్రిప్ ప్యానెల్ తెరవడానికి Enter లేదా క్లిక్',
 
   // KPI cards
   'ops.mortality.kpi.completed_trips': 'పూర్తయిన ట్రిప్పులు',

@@ -64,6 +64,12 @@ const summaryModule = await server.ssrLoadModule("/src/modules/operations/mortal
   ok("no-KPI: LossKpiCards.tsx is deleted", !existsSync("src/modules/operations/mortality/components/LossKpiCards.tsx"), "component still on disk");
 }
 const pageSource = (await import("node:fs")).readFileSync("src/modules/operations/mortality/pages/MortalityEntryPage.tsx", "utf8");
+// The unit every weight figure prints. Read from the page, so the harness proves
+// what the page does rather than a copy of it.
+const WEIGHT_UNIT = pageModule.MORTALITY_WEIGHT_UNIT;
+// A weight figure prints the number and the Telugu unit — never the Latin "Kg".
+const LATIN_KG = /\d[\d.,]*\s*(kg|Kg|KG)\b/;
+const checkNoLatinKg = (label, html) => ok(`weights: ${label} prints no Latin 'Kg'`, !LATIN_KG.test(html), (html.match(LATIN_KG) || [""])[0]);
 const hookSource = (await import("node:fs")).readFileSync("src/modules/operations/mortality/hooks/useTripLossAnalysis.ts", "utf8");
 {
   // ONE request per screen: no second "totals" call, no unfiltered peek, no
@@ -208,14 +214,21 @@ const tableHtml = render(
     emptyAll: false,
     filtersApplied: false,
     onReset: noop,
+    weightUnit: WEIGHT_UNIT,
   }),
 );
 
 ok("table: card header bar title", tableHtml.includes("Completed Trips"));
+// ── THE WEIGHT UNIT ─────────────────────────────────────────────────────────
+// "Kg need not to display here, only the number required — we want it in Telugu".
+ok("weights: the unit reads in Telugu", WEIGHT_UNIT === "కేజీ" && pageSource.includes('MORTALITY_WEIGHT_UNIT = "కేజీ"'), `unit=${WEIGHT_UNIT}`);
+checkNoLatinKg("the grid", tableHtml);
+ok("weights: the figures keep every digit", tableHtml.includes("4,560.47") && tableHtml.includes("16.13"), "a number lost its digits");
+ok("weights: the page owns the unit once, not per figure", (pageSource.match(/MORTALITY_WEIGHT_UNIT/g) || []).length === 3 && !pageSource.includes('t("common.kg")'), "the unit is pasted per figure or still translated");
 ok("table: count pill uses the trip total", tableHtml.includes("525"), "count pill missing");
 ok("table: count sits in the title block right after the title", /Completed Trips<\/h3>\s*<span[^>]*>[\s\S]{0,220}525 trips/.test(tableHtml), "count pill is not beside the title");
 ok("table: broken-heart mortality mark in a flat rose tile", tableHtml.includes("heart-crack") && tableHtml.includes("border-rose-100 bg-rose-50/70") && !tableHtml.includes("from-rose-500 to-orange-400"), "mortality mark missing or still glossy");
-ok("table: header shows the keyboard hint", tableHtml.includes("move rows") && tableHtml.includes("Enter or a click opens the trip panel"), "keyboard hint missing");
+ok("table: the header bar is the title, the count and nothing else", !tableHtml.includes("move rows") && !tableHtml.includes("opens the trip panel") && !tableHtml.includes("hint.keys"), "a keyboard hint is still printed beside the title");
 // Every metric glyph must live in the HEADER only — never repeated per row.
 {
   const headerEnd = tableHtml.indexOf("</thead>");
@@ -290,7 +303,9 @@ ok("table: expand affordance kept", tableHtml.includes("Expand trip") && tableHt
 /* ── 3b. The expanded row panel — ONE card, ONE table, full width ─────── */
 {
   const expandModule = await server.ssrLoadModule("/src/modules/operations/mortality/components/TripLossRowExpand.tsx");
-  const expandHtml = render(React.createElement(expandModule.default, { record: { ...rows[0], loaders: ["Jagadish Reddy", "Mohan Naidu"], helpers: ["Jagadish Rao", "Yesu Reddy"] } }));
+  const expandHtml = render(React.createElement(expandModule.default, { record: { ...rows[0], loaders: ["Jagadish Reddy", "Mohan Naidu"], helpers: ["Jagadish Rao", "Yesu Reddy"] }, weightUnit: WEIGHT_UNIT }));
+  checkNoLatinKg("the trip panel", expandHtml);
+  ok("weights: the panel's figures keep every digit", expandHtml.includes("636.09") && expandHtml.includes("13.55") && expandHtml.includes("2.13%"), "a panel number lost its digits");
 
   ok("panel: ONE card", (expandHtml.match(/rounded-xl border border-slate-200 bg-white/g) || []).length === 1, `cards=${(expandHtml.match(/rounded-xl border border-slate-200 bg-white/g) || []).length}`);
   ok("panel: ONE table", (expandHtml.match(/<table/g) || []).length === 1, `tables=${(expandHtml.match(/<table/g) || []).length}`);
@@ -321,7 +336,7 @@ ok("table: expand affordance kept", tableHtml.includes("Expand trip") && tableHt
 
   const weightsRow = expandHtml.slice(expandHtml.indexOf("Weights"), expandHtml.indexOf("Rates"));
   ok("panel: weights section has its own column headings", ["Name", "Birds", "Weight"].every((head) => weightsRow.includes(head)) && weightsRow.includes(">%<"));
-  ok("panel: weights rows carry birds, weight and percentage", (weightsRow.match(/100.00%|2.13%/g) || []).length >= 2 && weightsRow.includes("636.09 kg") && weightsRow.includes("13.55 kg"));
+  ok("panel: weights rows carry birds, weight and percentage", (weightsRow.match(/100.00%|2.13%/g) || []).length >= 2 && weightsRow.includes(`636.09 ${WEIGHT_UNIT}`) && weightsRow.includes(`13.55 ${WEIGHT_UNIT}`));
 
   const ratesRow = expandHtml.slice(expandHtml.indexOf("Rates"));
   ok("panel: rates close the table", ratesRow.includes("Survival Rate") && ratesRow.includes("97.49%") && ratesRow.includes("Mortality %") && ratesRow.includes("Loss %"));
@@ -348,19 +363,23 @@ ok("table: expand affordance kept", tableHtml.includes("Expand trip") && tableHt
 
   // The trip panel itself: facts, crew and the weights table.
   const expandModule = await server.ssrLoadModule("/src/modules/operations/mortality/components/TripLossRowExpand.tsx");
-  const panelHtml = render(React.createElement(expandModule.default, { record }));
+  const panelHtml = render(React.createElement(expandModule.default, { record, weightUnit: WEIGHT_UNIT }));
   ok("panel: trip + vehicle facts from the API", panelHtml.includes(record.tripNo) && panelHtml.includes(record.vehicleNo) && panelHtml.includes(record.driverName));
   ok("panel: loaders named on the trip table", (record.loaders || []).length > 0 && (record.loaders || []).every((name) => panelHtml.includes(name)), `loaders=${(record.loaders || []).join("/")}`);
   ok("panel: helpers named on the trip table", (record.helpers || []).length > 0 && (record.helpers || []).every((name) => panelHtml.includes(name)), `helpers=${(record.helpers || []).join("/")}`);
   ok("panel: survival rate printed", panelHtml.includes(`${(record.survivalRate * 100).toFixed(2)}%`));
+  checkNoLatinKg("the live trip panel", panelHtml);
+  ok("weights: the live panel prints the Telugu unit", panelHtml.includes(` ${WEIGHT_UNIT}`), "no unit on a live figure");
   ok("panel: every i18n key resolved (no raw key leaked)", panelHtml.includes("ops.mortality") === false);
 }
 
 /* ── 4. Cumulative summary through the global grid ────────────────────── */
 const quarterKpis = { totalTrips: 525, farmBirds: 202769, farmWeight: 473557.27, deliveryShops: 6852, deliveredBirds: 196900, deliveredWeight: 454133.18, mortalityCount: 5869, mortalityWeight: 11667.65, mortalityPercentage: 2.89, weightLoss: 7769.05, weightLossPercentage: 1.64 };
 const summaryHtml = render(
-  React.createElement(summaryModule.default, { kpis: quarterKpis, totalRecords: 525, pageSize: 10 }),
+  React.createElement(summaryModule.default, { kpis: quarterKpis, totalRecords: 525, pageSize: 10, weightUnit: WEIGHT_UNIT }),
 );
+checkNoLatinKg("the cumulative summary", summaryHtml);
+ok("weights: the summary keeps every digit", summaryHtml.includes("4,73,557.27") && summaryHtml.includes("11,667.65"), "a summary total lost its digits");
 ok("cumulative: ONE card", (summaryHtml.match(/rounded-2xl/g) || []).length === 1, `cards=${(summaryHtml.match(/rounded-2xl/g) || []).length}`);
 ok("cumulative: ONE table", (summaryHtml.match(/<table/g) || []).length === 1, `tables=${(summaryHtml.match(/<table/g) || []).length}`);
 ok("cumulative: full-width fixed table", summaryHtml.includes("w-full table-fixed"), "table class missing");
@@ -369,8 +388,8 @@ ok("cumulative: every cell starts from the left", (summaryHtml.match(/text-left/
 ok("cumulative: no KPI cards", !summaryHtml.includes("tooltip") && (summaryHtml.match(/<section/g) || []).length === 1 && !summaryHtml.includes("grid-cols"), "card grid leaked in");
 ok("cumulative: says every page, not this page", summaryHtml.includes("not just the 10 rows on screen"), "scope wording missing");
 ok("cumulative: scope repeats trips and shops", summaryHtml.includes("525 trips") && summaryHtml.includes("6,852 shops"), "scope chip missing");
-ok("cumulative: whole-set totals printed", summaryHtml.includes("4,73,557.27 kg") && summaryHtml.includes("4,54,133.18 kg") && summaryHtml.includes("11,667.65 kg"), "totals missing");
-ok("cumulative: weight-loss row has no bird count", summaryHtml.includes("7,769.05 kg") && summaryHtml.includes("—"), "loss row wrong");
+ok("cumulative: whole-set totals printed", summaryHtml.includes(`4,73,557.27 ${WEIGHT_UNIT}`) && summaryHtml.includes(`4,54,133.18 ${WEIGHT_UNIT}`) && summaryHtml.includes(`11,667.65 ${WEIGHT_UNIT}`), "totals missing");
+ok("cumulative: weight-loss row has no bird count", summaryHtml.includes(`7,769.05 ${WEIGHT_UNIT}`) && summaryHtml.includes("—"), "loss row wrong");
 ok("cumulative: survival closes the summary", summaryHtml.includes("97.11%"), "survival row missing");
 ok("cumulative: weights read like the panel", summaryHtml.includes("100.00%") && summaryHtml.includes("95.90%") && summaryHtml.includes("2.89%") && summaryHtml.includes("1.64%"), "percent row missing");
 
@@ -459,10 +478,10 @@ try {
   ok("live: totals are not the visible rows' subtotal", Math.abs(shortPageSum - whole.kpis.farmWeight) > 0.5, `visible sum=${shortPageSum.toFixed(2)} total=${whole.kpis.farmWeight}`);
   const pageSubtotal = pageOne.data.reduce((total, row) => total + row.farmWeight, 0);
   const liveSummaryHtml = render(
-    React.createElement(summaryModule.default, { kpis: pageOne.kpis, totalRecords: pageOne.meta.total, pageSize: 10 }),
+    React.createElement(summaryModule.default, { kpis: pageOne.kpis, totalRecords: pageOne.meta.total, pageSize: 10, weightUnit: WEIGHT_UNIT }),
   );
-  ok("live: summary prints the whole-set total", liveSummaryHtml.includes(formatWeight(allRows.kpis.farmWeight)), formatWeight(allRows.kpis.farmWeight));
-  ok("live: summary is NOT the visible page's subtotal", !liveSummaryHtml.includes(formatWeight(pageSubtotal)), `page subtotal ${formatWeight(pageSubtotal)} leaked`);
+  ok("live: summary prints the whole-set total", liveSummaryHtml.includes(formatWeight(allRows.kpis.farmWeight, WEIGHT_UNIT)), formatWeight(allRows.kpis.farmWeight, WEIGHT_UNIT));
+  ok("live: summary is NOT the visible page's subtotal", !liveSummaryHtml.includes(formatWeight(pageSubtotal, WEIGHT_UNIT)), `page subtotal ${formatWeight(pageSubtotal, WEIGHT_UNIT)} leaked`);
   ok("live: summary counts every matching trip", liveSummaryHtml.includes(`${formatNumberEn(pageOne.meta.total)} trips`), `${pageOne.meta.total} trips`);
   ok("live: summary survival closes with the server's figure", liveSummaryHtml.includes(`${(100 - pageOne.kpis.mortalityPercentage).toFixed(2)}%`), String(pageOne.kpis.mortalityPercentage));
 
@@ -562,26 +581,27 @@ try {
         records: pageOne.data, sort: { key: "tripDate", dir: "desc" }, setSort: noop, page: 1,
         totalPages: pageOne.meta.totalPages, totalRecords: pageOne.meta.total, pageSize: 10,
         onPageChange: noop, onPageSizeChange: noop, loading: false, emptyAll: false, filtersApplied: true,
-        weightUnit: "కేజీ",
+        weightUnit: WEIGHT_UNIT,
       }),
     );
     const tePanelHtml = renderTe(
-      React.createElement(expandModule.default, { record: row, weightUnit: "కేజీ" }),
+      React.createElement(expandModule.default, { record: row, weightUnit: WEIGHT_UNIT }),
     );
     const teSummaryHtml = renderTe(
-      React.createElement(summaryModule.default, { kpis: pageOne.kpis, totalRecords: pageOne.meta.total, pageSize: 10, weightUnit: "కేజీ" }),
+      React.createElement(summaryModule.default, { kpis: pageOne.kpis, totalRecords: pageOne.meta.total, pageSize: 10, weightUnit: WEIGHT_UNIT }),
     );
     noEnglish("the table", teTableHtml);
     noEnglish("the trip panel", tePanelHtml);
     noEnglish("the cumulative summary", teSummaryHtml);
-    ok("telugu: the keyboard hint names the click in Telugu", teTableHtml.includes("Enter లేదా క్లిక్") && !teTableHtml.includes("Enter or a click"), "hint still English");
+    ok("telugu: no stray keyboard hint survives in either language", !teTableHtml.includes("వరుసలు కదలడానికి") && !teTableHtml.includes("Enter లేదా క్లిక్") && !teTableHtml.includes("Enter or a click"), "the hint is still on the page");
     ok("telugu: section titles translated", tePanelHtml.includes("ట్రిప్ వివరాలు") && tePanelHtml.includes("బరువులు") && tePanelHtml.includes("రేట్లు"), "panel titles still English");
     ok("telugu: column names translated", teSummaryHtml.includes("పేరు") && teTableHtml.includes("ట్రిప్ నం.") && teTableHtml.includes("రోజు") && teTableHtml.includes("ఫారం"), "column names still English");
     ok("telugu: status chip translated", tePanelHtml.includes("పూర్తయింది"), "status chip still English");
     ok("telugu: trip number reads in Telugu", tePanelHtml.includes(viewModule.localizeTripViewText(row.tripNo, "te")) && viewModule.localizeTripViewText(row.tripNo, "te") !== row.tripNo, row.tripNo);
     ok("telugu: farm and crew read in Telugu", tePanelHtml.includes(viewModule.localizeTripViewText(row.sourceFarm, "te")) && tePanelHtml.includes(viewModule.localizeTripViewText(row.supervisorName, "te")), "names not localised");
     ok("telugu: figures stay numeric", tePanelHtml.includes(formatNumberEn(row.farmBirds)) && tePanelHtml.includes(row.farmWeight.toFixed(2)) && teTableHtml.includes(formatNumberEn(row.farmBirds)), "figures changed");
-    ok("telugu: weights use the Telugu unit", tePanelHtml.includes("కేజీ") && teSummaryHtml.includes("కేజీ") && !tePanelHtml.includes(" kg"), "unit not localised");
+    ok("telugu: weights use the Telugu unit", tePanelHtml.includes(WEIGHT_UNIT) && teSummaryHtml.includes(WEIGHT_UNIT) && teTableHtml.includes(WEIGHT_UNIT) && !tePanelHtml.includes(" kg"), "unit not localised");
+    ok("weights: one unit for the whole page, both languages", WEIGHT_UNIT === "కేజీ" && tableHtml.includes(WEIGHT_UNIT) && teTableHtml.includes(WEIGHT_UNIT), "English and Telugu print different units");
     ok("telugu: cumulative labels translated", teSummaryHtml.includes("మొత్తం సారాంశం") && teSummaryHtml.includes("పేరు") && teSummaryHtml.includes("పక్షులు"), "summary labels still English");
 
     // The background-query line is part of the page: it must read Telugu as well.
@@ -590,7 +610,7 @@ try {
         records: pageOne.data, sort: { key: "tripDate", dir: "desc" }, setSort: noop, page: 1,
         totalPages: pageOne.meta.totalPages, totalRecords: pageOne.meta.total, pageSize: 10,
         onPageChange: noop, onPageSizeChange: noop, loading: false, reloading: true,
-        emptyAll: false, filtersApplied: true, weightUnit: "కేజీ",
+        emptyAll: false, filtersApplied: true, weightUnit: WEIGHT_UNIT,
       }),
     );
     ok("telugu: the activity line is translated", teBusyHtml.includes("నవీకరిస్తోంది") && !teBusyHtml.includes("Updating"), "activity label still English");

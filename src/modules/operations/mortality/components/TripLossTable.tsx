@@ -426,16 +426,6 @@ export default function TripLossTable({
             {t("ops.mortality.section.count", { count: formatNumber(totalRecords) })}
           </span>
         </div>
-        <p className="ml-auto hidden items-center gap-1.5 text-[11px] font-medium text-slate-400 lg:inline-flex">
-          <span
-            className="inline-flex items-center gap-0.5 rounded-md border border-slate-200 bg-white px-1.5 py-[1px] text-slate-500 shadow-sm"
-            aria-hidden="true"
-          >
-            <ArrowUp size={10} strokeWidth={2.6} />
-            <ArrowDown size={10} strokeWidth={2.6} />
-          </span>
-          {t("ops.mortality.hint.keys")}
-        </p>
       </div>
 
       {/* A background re-fetch is stated as a single quiet line rather than a

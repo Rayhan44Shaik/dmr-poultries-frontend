@@ -30,6 +30,11 @@ import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { opsPageClass } from "../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../i18n";
 
+// The unit on every weight figure. It is domain vocabulary for the floor, so it
+// reads in Telugu whatever the interface language — a weight never prints the
+// Latin "Kg" on this page. Change it here once and every figure follows.
+export const MORTALITY_WEIGHT_UNIT = "కేజీ";
+
 export default function MortalityEntryPage() {
   const analysis = useTripLossAnalysis();
   const { showNotification } = useSafeNotification();
@@ -135,7 +140,7 @@ export default function MortalityEntryPage() {
             emptyAll={showEmptyAll}
             filtersApplied={analysis.summaryVisible}
             onReset={handleReset}
-            weightUnit={t("common.kg")}
+            weightUnit={MORTALITY_WEIGHT_UNIT}
           />
         )}
       </section>
@@ -148,7 +153,7 @@ export default function MortalityEntryPage() {
           kpis={analysis.kpis}
           totalRecords={analysis.totalRecords}
           pageSize={analysis.pageSize}
-          weightUnit={t("common.kg")}
+          weightUnit={MORTALITY_WEIGHT_UNIT}
         />
       )}
     </div>
