@@ -311,9 +311,9 @@ export default function Sidebar({ open, onClose, mode, onModeChange }: SidebarPr
         inert={mode === "hidden" ? true : undefined}
         className={`fixed inset-y-0 left-0 z-40 hidden flex-col overflow-hidden border-r border-slate-200 bg-white shadow-sm transition-[width,opacity,transform] duration-300 ease-out dark:border-slate-800 dark:bg-slate-900 lg:flex ${
           mode === "expanded"
-            ? "w-[260px] opacity-100 translate-x-0"
+            ? "w-[16.25rem] opacity-100 translate-x-0"
             : mode === "rail"
-              ? "w-[72px] opacity-100 translate-x-0"
+              ? "w-[4.5rem] opacity-100 translate-x-0"
               : "pointer-events-none w-0 -translate-x-4 opacity-0"
         }`}
       >
@@ -373,7 +373,7 @@ export default function Sidebar({ open, onClose, mode, onModeChange }: SidebarPr
           onClick={() => onModeChange("expanded")}
           title={`${t("sidebar.showSidebar")} (⌘/Ctrl + B)`}
           aria-label={t("sidebar.showSidebar")}
-          className="fixed left-3 top-[76px] z-40 hidden h-10 w-10 animate-fade-in items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-lg transition-colors hover:border-slate-300 hover:text-emerald-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:text-emerald-400 lg:flex"
+          className="fixed left-3 top-[4.75rem] z-40 hidden h-10 w-10 animate-fade-in items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 shadow-lg transition-colors hover:border-slate-300 hover:text-emerald-600 focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-400 dark:hover:text-emerald-400 lg:flex"
         >
           <PanelLeftOpen size={18} />
         </button>
@@ -390,7 +390,7 @@ export default function Sidebar({ open, onClose, mode, onModeChange }: SidebarPr
           <div
             role="dialog"
             aria-modal="true"
-            className="fixed left-3 top-[72px] z-50 w-[300px] max-w-[calc(100vw-24px)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-pop animate-slide-down dark:border-slate-800 dark:bg-slate-900 sm:left-4 lg:hidden"
+            className="fixed left-3 top-[4.5rem] z-50 w-[18.75rem] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-pop animate-slide-down dark:border-slate-800 dark:bg-slate-900 sm:left-4 lg:hidden"
           >
             {/* Compact brand row */}
             <div className="flex h-12 shrink-0 items-center justify-between border-b border-slate-200/80 pl-4 pr-1.5 dark:border-slate-800">

@@ -15,8 +15,62 @@
       content="DMR Poultries — poultry logistics, operations, accounts, fleet and staff management."
     />
     <title>DMR Poultries</title>
+    <!-- Apply persisted accessibility preferences before CSS/React can paint.
+         Keep this dependency-free and in sync with src/providers/fontScale.ts. -->
+    <script>
+      (function () {
+        var root = document.documentElement;
+        var key = "dmr_font_scale";
+        var legacyKey = "dmr_font_size";
+        var levels = [1, 1.1, 1.2, 1.3, 1.4, 1.5];
+        var scale = 1;
+        var raw = null;
+        try { raw = localStorage.getItem(key); } catch (_) { /* storage unavailable */ }
+
+        if (raw === null) {
+          var legacy = null;
+          try { legacy = localStorage.getItem(legacyKey); } catch (_) { /* storage unavailable */ }
+          if (typeof legacy === "string") {
+            var old = legacy.trim().toLowerCase();
+            scale = old === "large" ? 1.1 : 1;
+            try {
+              localStorage.setItem(key, String(scale));
+              localStorage.removeItem(legacyKey);
+            } catch (_) { /* read-only storage */ }
+          }
+        } else {
+          var match = String(raw).trim().match(/^(\d+(?:\.\d+)?)\s*(%)?$/);
+          if (match) {
+            var numeric = Number(match[1]);
+            if (match[2] || numeric >= 10) numeric = numeric / 100;
+            if (isFinite(numeric)) {
+              numeric = Math.min(1.5, Math.max(1, numeric));
+              scale = levels.reduce(function (nearest, level) {
+                return Math.abs(level - numeric) < Math.abs(nearest - numeric) ? level : nearest;
+              }, 1);
+            }
+          }
+          try {
+            localStorage.setItem(key, String(scale));
+            localStorage.removeItem(legacyKey);
+          } catch (_) { /* read-only storage */ }
+        }
+
+        root.style.setProperty("--dmr-font-scale", String(scale));
+        root.setAttribute("data-font-scale", String(Math.round(scale * 100)));
+
+        /* Avoid a first-paint fallback face when Telugu was already selected. */
+        try {
+          if (localStorage.getItem("dmr-language") === "te") root.lang = "te";
+        } catch (_) { /* language provider will use its safe default */ }
+      })();
+    </script>
     <style>
-      html, body { background: #f8fafc; }
+      html {
+        font-size: calc(100% * var(--dmr-font-scale, 1));
+        background: #f8fafc;
+      }
+      body { background: #f8fafc; }
       #root { background: #f8fafc; min-height: 100vh; }
     </style>
     <!-- Inter is bundled locally via @fontsource/inter (src/index.css) — no
@@ -29,26 +83,26 @@
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: 14px;
+        gap: calc(14px * var(--dmr-font-scale, 1));
         font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
         color: #475569;
       }
       #app-splash .splash-spinner {
-        width: 34px;
-        height: 34px;
+        width: calc(34px * var(--dmr-font-scale, 1));
+        height: calc(34px * var(--dmr-font-scale, 1));
         border-radius: 50%;
-        border: 3px solid #d1fae5;
+        border: calc(3px * var(--dmr-font-scale, 1)) solid #d1fae5;
         border-top-color: #059669;
         animation: splash-spin 0.8s linear infinite;
       }
       #app-splash .splash-title {
-        font-size: 15px;
+        font-size: calc(15px * var(--dmr-font-scale, 1));
         font-weight: 700;
         letter-spacing: -0.01em;
         color: #0f172a;
       }
       #app-splash .splash-sub {
-        font-size: 12px;
+        font-size: calc(12px * var(--dmr-font-scale, 1));
         color: #94a3b8;
       }
       @keyframes splash-spin {

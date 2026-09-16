@@ -11,8 +11,7 @@ import { granularityForRange, type Granularity } from "../utils/trendSeries";
 import CollectionsPie from "../components/CollectionsPie";
 import RecentTripsTable from "../components/RecentTripsTable";
 import ActiveCounts from "../components/ActiveCounts";
-import QuarterOperationsCoverage from "../components/QuarterOperationsCoverage";
-import PendingCollectionsByShop from "../components/PendingCollectionsByShop";
+import CollectionPerformanceChart from "../components/CollectionPerformanceChart";
 import PendingApprovalsPanel from "../components/PendingApprovalsPanel";
 import {
   Calendar,
@@ -795,15 +794,6 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
         actions={headerActions}
       />
 
-      {data.sampleQuarter && data.moduleCounts && calendarFrom && calendarTo ? (
-        <QuarterOperationsCoverage
-          quarter={data.sampleQuarter}
-          counts={data.moduleCounts}
-          fromDate={calendarFrom}
-          toDate={calendarTo}
-        />
-      ) : null}
-
       <div className="relative z-10">
         <KPICards
           current={data}
@@ -814,7 +804,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0 xl:h-[530px]">
+        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0 xl:h-[33.125rem]">
           <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
             <div className="min-w-0">
               {/* The title is the way through to the detail page — no second link. */}
@@ -832,10 +822,9 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
                   className="text-slate-300 transition-all duration-150 group-hover/title:-translate-y-[1px] group-hover/title:translate-x-[1px] group-hover/title:text-emerald-600"
                 />
               </Link>
-              {/* Which window the card is totalling — it moves with the chips.
-                  A chip counts every trip in its window; the card can only
-                  total the completed ones, so say so when the two differ. */}
-              <p className="mt-0.5 text-[10.5px] font-semibold text-slate-400">
+              <span aria-hidden="true" className="mt-1 block h-0.5 w-10 rounded-full bg-blue-500" />
+              {/* Which window the card is totalling — it moves with the chips. */}
+              <p className="mt-1.5 text-[10.5px] font-semibold tabular-nums text-slate-400">
                 {windowLabel(trendWindow.from, trendWindow.to, trendLocale)}
               </p>
             </div>
@@ -851,7 +840,7 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
               without this floor the grid row (sized by content) can collapse
               and clip the whole chart — the inline value makes the floor
               independent of the CSS class. */}
-          <div className="flex w-full flex-1 flex-col overflow-hidden" style={{ minHeight: 200 }}>
+          <div className="flex w-full flex-1 flex-col overflow-hidden" style={{ minHeight: "12.5rem" }}>
             <OperationalTrendsChart
               trends={trendsQuery.trends}
               granularity={trendGranularity}
@@ -864,48 +853,54 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
         
         {/* No overflow-hidden on the card itself: the donut has a centered
             chart stage and the shrink-0 KPI footer below it stays visible. */}
-        <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-5 w-full min-w-0 xl:h-[530px]">
-          <Link
-            to="/operations?tab=collection-report"
-            title={t("nav.collectionReport")}
-            className="group/title -mt-1 inline-flex w-fit items-center gap-1.5"
-          >
-            <h3 className="text-sm font-black text-slate-800 transition-colors group-hover/title:text-emerald-600">
-              {t("ops.dashboard.collection_streams")}
-            </h3>
-            <ArrowUpRight
-              size={13}
-              strokeWidth={2.6}
-              className="text-slate-300 transition-all duration-150 group-hover/title:-translate-y-[1px] group-hover/title:translate-x-[1px] group-hover/title:text-emerald-600"
-            />
-          </Link>
-          <CollectionsPie data={data?.collectionsByMode || []} />
+        <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-5 w-full min-w-0 xl:h-[33.125rem]">
+          <div className="-mt-1 min-w-0">
+            <Link
+              to="/operations?tab=collection-report"
+              title={t("nav.collectionReport")}
+              className="group/title inline-flex min-w-0 items-center gap-1.5"
+            >
+              <h3 className="truncate text-sm font-black text-slate-800 transition-colors group-hover/title:text-emerald-600">
+                {t("ops.dashboard.collection_streams")}
+              </h3>
+              <ArrowUpRight
+                size={13}
+                strokeWidth={2.6}
+                className="shrink-0 text-slate-300 transition-all duration-150 group-hover/title:-translate-y-[1px] group-hover/title:translate-x-[1px] group-hover/title:text-emerald-600"
+              />
+            </Link>
+            <span aria-hidden="true" className="mt-1 block h-0.5 w-10 rounded-full bg-blue-500" />
+            <p className="mt-1.5 truncate text-[10.5px] font-semibold tabular-nums text-slate-400">
+              {windowLabel(calendarFrom, calendarTo, trendLocale)}
+            </p>
+          </div>
+          <CollectionsPie data={data.collectionsByMode || []} />
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-        <div className="lg:col-span-4 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0">
-          <div>
-            <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.credit_allocations")}</span>
-            <h3 className="text-sm font-black text-slate-800 mt-0.5">{t("ops.dashboard.outstanding_balances")}</h3>
-          </div>
-          <div className="w-full overflow-hidden">
-            <PendingCollectionsByShop data={data?.pendingCollectionsByShop || []} />
-          </div>
+      <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-12">
+        <div className="min-w-0 lg:col-span-7">
+          <CollectionPerformanceChart
+            data={data.collectionPerformanceByShop}
+            totalSales={data.totalSalesAmount}
+            totalCollections={data.totalCollections}
+            fromDate={calendarFrom}
+            toDate={calendarTo}
+          />
         </div>
-        
-        <div className="lg:col-span-8 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0">
-          <div className="flex justify-between items-center">
+
+        <div className="flex min-w-0 flex-col justify-start gap-4 rounded-2xl border border-slate-200/60 bg-white p-5 shadow-sm transition-shadow hover:shadow-md lg:col-span-5">
+          <div className="flex items-center justify-between">
             <div>
               <span className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t("ops.dashboard.live_infrastructure")}</span>
-              <h3 className="text-sm font-black text-slate-800 mt-0.5">{t("ops.dashboard.recent_transit")}</h3>
+              <h3 className="mt-0.5 text-sm font-black text-slate-800">{t("ops.dashboard.recent_transit")}</h3>
             </div>
-            <div className="px-2.5 py-1 rounded-full bg-slate-50 border border-slate-100 text-[10px] font-bold text-slate-500 flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 rounded-full border border-slate-100 bg-slate-50 px-2.5 py-1 text-[10px] font-bold text-slate-500">
               <ArrowRightLeft size={10} className="text-slate-400" /> {t("ops.dashboard.auto_updates")}
             </div>
           </div>
-          <div className="w-full overflow-x-auto text-xs rounded-xl border border-slate-100">
-            <RecentTripsTable trips={data?.recentTrips || []} />
+          <div className="w-full overflow-x-auto rounded-xl border border-slate-100 text-xs">
+            <RecentTripsTable trips={data.recentTrips || []} />
           </div>
         </div>
       </div>

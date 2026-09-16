@@ -1,33 +1,16 @@
 // src/modules/operations/dashboard/components/OperationalTrendsChart.tsx
-// OPERATIONAL TRENDS — the dashboard's main analytical chart.
-//
-// What it shows, all in one plot:
-//   • Trips            → indigo line, right axis
-//   • Farm weight      → the height of the stacked weight flow (kg)
-//   • Delivered weight → blue layer of that flow
-//   • Mortality        → rose layer of that flow
-//   • Weight loss      → amber layer of that flow
-//
-// Because farm weight = delivered + mortality + loss holds for every trip, the
-// three layers stack to exactly the farm weight — one smooth flow carries all
-// four weight numbers at once. The footer carries the totals, so the plot stays
-// in kilos and needs no mode toggle.
-//
-// The range comes from the dashboard's global calendar; the bucket (per day /
-// week / month) is chosen by the Today / Week / Month chips in the card header
-// and defaults to whatever the calendar's own length implies, so a reload
-// always lands on the calendar's view. Trips,
-// farm weight, delivered weight, mortality and weight loss are all summed from
-// the completed-trips API — the same endpoint the Weight Loss / Mortality page
-// reads — so the two can never disagree.
+// Trips and weight movement for the Operations Overview. The selected date
+// range is aggregated into stable buckets and can be viewed as grouped bars
+// with a Trips line, overlapping areas, or a stacked weight flow. The KPI
+// summary below the plot remains unchanged across chart styles.
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Area,
+  Bar,
   CartesianGrid,
   ComposedChart,
   Line,
-  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -59,15 +42,28 @@ interface OperationalTrendsChartProps {
 
 const COLOR = {
   trips: "#4338ca",
-  // Neutral slate keeps the farm-weight reference calm while the series below
-  // use a clear blue / rose / amber palette instead of competing greens.
   farmWeight: "#64748b",
   delivered: "#2563eb",
   mortality: "#e11d48",
   weightLoss: "#f59e0b",
 } as const;
 
+/** Bright plot colours mirror the dashboard reference without changing KPIs. */
+const PLOT_COLOR = {
+  trips: "#2583eb",
+  farmWeight: "#10b981",
+  delivered: "#f59e0b",
+  mortality: "#8b5cf6",
+  weightLoss: "#f43f5e",
+} as const;
 
+type TrendChartMode = "barLine" | "area" | "stacked";
+
+const CHART_MODES: ReadonlyArray<{ value: TrendChartMode; labelKey: string }> = [
+  { value: "barLine", labelKey: "ops.dashboard.trend.chart_bar_line" },
+  { value: "area", labelKey: "ops.dashboard.trend.chart_area" },
+  { value: "stacked", labelKey: "ops.dashboard.trend.chart_stacked" },
+];
 
 const signed = (current: number, earlier: number | undefined): string | null => {
   if (earlier == null || earlier === 0) return null;
@@ -102,21 +98,21 @@ function ChartTooltip({
       </p>
 
       <div className="space-y-1.5">
-        <Row color={COLOR.trips} label={t("ops.dashboard.trips")} value={plain(point.trips, 0, locale)} delta={tripsDelta} />
+        <Row color={PLOT_COLOR.trips} label={t("ops.dashboard.trips")} value={plain(point.trips, 0, locale)} delta={tripsDelta} />
         <Row
-          color={COLOR.farmWeight}
+          color={PLOT_COLOR.farmWeight}
           label={t("ops.dashboard.trend.farm_weight")}
           value={`${plain(point.farmWeight, 2, locale)} kg`}
           delta={farmDelta}
         />
         <Row
-          color={COLOR.delivered}
+          color={PLOT_COLOR.delivered}
           label={t("ops.dashboard.trend.delivered_weight")}
           value={`${plain(point.deliveredWeight, 2, locale)} kg`}
           delta={`${point.deliveredPct.toFixed(2)}%`}
         />
         <Row
-          color={COLOR.weightLoss}
+          color={PLOT_COLOR.weightLoss}
           label={t("ops.dashboard.trend.weight_loss")}
           value={`${plain(point.weightLoss, 2, locale)} kg`}
           delta={`${point.weightLossPct.toFixed(2)}%`}
@@ -210,48 +206,6 @@ function useAnimatedNumber(value: number, duration = 520): number {
   return shown;
 }
 
-/**
- * The average marker's caption, on its own plate: a rounded white chip hung
- * just above the dashed line at the right-hand edge, so it can never print
- * across an area or the axis.
- */
-function AverageLabel({
-  viewBox,
-  text,
-}: {
-  viewBox?: { x?: number; y?: number; width?: number };
-  text: string;
-}) {
-  const width = 64;
-  const height = 16;
-  if (!viewBox?.width) return null;
-  const x = (viewBox.x ?? 0) + viewBox.width - width;
-  const y = (viewBox.y ?? 0) - height - 2;
-  return (
-    <g>
-      <rect
-        x={x}
-        y={y}
-        width={width}
-        height={height}
-        rx={8}
-        fill="#ffffff"
-        fillOpacity={0.92}
-        stroke="#bae6fd"
-      />
-      <text
-        x={x + width / 2}
-        y={y + height / 2}
-        textAnchor="middle"
-        dominantBaseline="central"
-        style={{ fontSize: 9.5, fill: "#0369a1", fontWeight: 700 }}
-      >
-        {text}
-      </text>
-    </g>
-  );
-}
-
 /* ------------------------------------------------------------------ */
 /*  Chart                                                              */
 /* ------------------------------------------------------------------ */
@@ -265,6 +219,7 @@ export default function OperationalTrendsChart({
 }: OperationalTrendsChartProps) {
   const { t, language } = useI18n();
   const locale = language === "te" ? "te-IN" : "en-IN";
+  const [chartMode, setChartMode] = useState<TrendChartMode>("barLine");
 
   const rows = trends?.rows;
 
@@ -284,7 +239,7 @@ export default function OperationalTrendsChart({
 
   if (loading && !trends) {
     return (
-      <div className="flex h-[330px] w-full items-center justify-center">
+      <div className="flex h-[20.625rem] w-full items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-[3px] border-slate-200 border-t-emerald-500" />
       </div>
     );
@@ -292,7 +247,7 @@ export default function OperationalTrendsChart({
 
   if (error && !trends) {
     return (
-      <div className="flex h-[330px] w-full flex-col items-center justify-center gap-3 text-center">
+      <div className="flex h-[20.625rem] w-full flex-col items-center justify-center gap-3 text-center">
         <p className="text-[13px] font-semibold text-slate-600">{error}</p>
         {onRetry ? (
           <button
@@ -309,7 +264,7 @@ export default function OperationalTrendsChart({
 
   if (buckets.length === 0) {
     return (
-      <div className="flex h-[330px] w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 text-center">
+      <div className="flex h-[20.625rem] w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 text-center">
         <p className="text-sm font-semibold text-slate-500">{t("ops.dashboard.trend.empty")}</p>
         <p className="text-[11.5px] text-slate-400">{t("ops.dashboard.trend.empty_hint")}</p>
       </div>
@@ -318,36 +273,82 @@ export default function OperationalTrendsChart({
 
   return (
     <div className="flex w-full flex-1 flex-col">
+      <div className="mb-2.5 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[9.5px] font-bold text-slate-500">
+          {[
+            [t("ops.dashboard.trips"), PLOT_COLOR.trips],
+            [t("ops.dashboard.trend.farm_weight"), PLOT_COLOR.farmWeight],
+            [t("ops.dashboard.trend.delivered_weight"), PLOT_COLOR.delivered],
+            [t("ops.dashboard.trend.weight_loss"), PLOT_COLOR.weightLoss],
+          ].map(([label, color]) => (
+            <span key={label} className="inline-flex items-center gap-1.5">
+              <i aria-hidden="true" className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
+              {label}
+            </span>
+          ))}
+          {chartMode === "stacked" ? (
+            <span className="inline-flex items-center gap-1.5">
+              <i aria-hidden="true" className="h-2 w-2 rounded-full" style={{ backgroundColor: PLOT_COLOR.mortality }} />
+              {t("ops.dashboard.trend.mortality_weight")}
+            </span>
+          ) : null}
+        </div>
+
+        <div
+          role="tablist"
+          aria-label={t("ops.dashboard.trend.chart_style")}
+          className="inline-flex items-center rounded-lg border border-slate-200 bg-slate-50 p-0.5"
+        >
+          {CHART_MODES.map((mode) => (
+            <button
+              key={mode.value}
+              type="button"
+              role="tab"
+              aria-selected={chartMode === mode.value}
+              onClick={() => setChartMode(mode.value)}
+              className={`rounded-md px-2.5 py-1 text-[9.5px] font-extrabold transition-colors ${
+                chartMode === mode.value
+                  ? "bg-white text-blue-700 shadow-sm ring-1 ring-inset ring-slate-200"
+                  : "text-slate-400 hover:text-slate-700"
+              }`}
+            >
+              {t(mode.labelKey)}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* ── Plot ─────────────────────────────────────────────────────── */}
-      <div className="min-h-[140px] w-full flex-1" style={{ minHeight: 140 }}>
+      <div className="min-h-[8.75rem] w-full flex-1" style={{ minHeight: "8.75rem" }}>
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart data={data} margin={{ top: 10, right: 2, bottom: 0, left: -8 }}>
+          <ComposedChart data={data} margin={{ top: 12, right: 2, bottom: 0, left: -8 }} barGap={2}>
             <defs>
-              {/* Soft fills give the stacked movement areas depth without
-                  overpowering the trips line. */}
               <linearGradient id="ot-trips-area" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={COLOR.trips} stopOpacity={0.22} />
-                <stop offset="100%" stopColor={COLOR.trips} stopOpacity={0} />
+                <stop offset="0%" stopColor={PLOT_COLOR.trips} stopOpacity={0.16} />
+                <stop offset="100%" stopColor={PLOT_COLOR.trips} stopOpacity={0} />
+              </linearGradient>
+              <linearGradient id="ot-farm" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#34d399" />
+                <stop offset="100%" stopColor={PLOT_COLOR.farmWeight} />
               </linearGradient>
               <linearGradient id="ot-delivered" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={COLOR.delivered} stopOpacity={1} />
-                <stop offset="100%" stopColor={COLOR.delivered} stopOpacity={0.72} />
+                <stop offset="0%" stopColor="#fbbf24" />
+                <stop offset="100%" stopColor={PLOT_COLOR.delivered} />
               </linearGradient>
               <linearGradient id="ot-mortality" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={COLOR.mortality} stopOpacity={1} />
-                <stop offset="100%" stopColor={COLOR.mortality} stopOpacity={0.78} />
+                <stop offset="0%" stopColor="#a78bfa" />
+                <stop offset="100%" stopColor={PLOT_COLOR.mortality} />
               </linearGradient>
               <linearGradient id="ot-loss" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor={COLOR.weightLoss} stopOpacity={1} />
-                <stop offset="100%" stopColor={COLOR.weightLoss} stopOpacity={0.78} />
+                <stop offset="0%" stopColor="#fb7185" />
+                <stop offset="100%" stopColor={PLOT_COLOR.weightLoss} />
               </linearGradient>
-              {/* A touch of depth keeps the trips line readable above the areas. */}
               <filter id="ot-line-shadow" x="-20%" y="-20%" width="140%" height="160%">
-                <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor={COLOR.trips} floodOpacity={0.3} />
+                <feDropShadow dx="0" dy="3" stdDeviation="3" floodColor={PLOT_COLOR.trips} floodOpacity={0.24} />
               </filter>
             </defs>
 
-            <CartesianGrid stroke="#eef2f7" strokeDasharray="4 8" vertical={false} />
+            <CartesianGrid stroke="#eef2f7" strokeDasharray="3 6" vertical />
             <XAxis
               dataKey="date"
               tickFormatter={(value: string) => formatBucket(value, locale)}
@@ -369,7 +370,7 @@ export default function OperationalTrendsChart({
               yAxisId="trips"
               orientation="right"
               allowDecimals={false}
-              tick={{ fontSize: 10, fill: COLOR.trips }}
+              tick={{ fontSize: 10, fill: PLOT_COLOR.trips }}
               tickLine={false}
               axisLine={false}
               width={34}
@@ -388,65 +389,32 @@ export default function OperationalTrendsChart({
                   />
                 );
               }}
-              cursor={{ fill: "rgba(99,102,241,0.05)", radius: 6 }}
+              cursor={{ fill: "rgba(37,131,235,0.05)", radius: 6 }}
             />
 
-            {/* Smooth stacked movement areas replace the heavy bar treatment.
-                The three layers still sum to farm weight, but now read as a
-                continuous flow across the selected date window. */}
-            <Area
-              yAxisId="weight"
-              type="monotone"
-              dataKey="deliveredWeight"
-              stackId="wt"
-              name={t("ops.dashboard.trend.delivered_weight")}
-              stroke={COLOR.delivered}
-              strokeWidth={1.6}
-              fill="url(#ot-delivered)"
-              animationDuration={620}
-              animationEasing="ease-out"
-              connectNulls
-            />
-            <Area
-              yAxisId="weight"
-              type="monotone"
-              dataKey="mortalityWeight"
-              stackId="wt"
-              name={t("ops.dashboard.trend.mortality_weight")}
-              stroke={COLOR.mortality}
-              strokeWidth={1.4}
-              fill="url(#ot-mortality)"
-              animationDuration={620}
-              animationEasing="ease-out"
-              connectNulls
-            />
-            <Area
-              yAxisId="weight"
-              type="monotone"
-              dataKey="lossBar"
-              stackId="wt"
-              name={t("ops.dashboard.trend.weight_loss")}
-              stroke={COLOR.weightLoss}
-              strokeWidth={1.4}
-              fill="url(#ot-loss)"
-              animationDuration={620}
-              animationEasing="ease-out"
-              connectNulls
-            />
-            <ReferenceLine
-              yAxisId="weight"
-              y={totals.avgFarmWeight}
-              stroke={COLOR.farmWeight}
-              strokeDasharray="4 4"
-              strokeOpacity={0.7}
-              strokeWidth={1}
-              /* Its own little plate, so the average never prints over an area. */
-              label={
-                <AverageLabel
-                  text={`${t("ops.dashboard.trend.average")} ${tickKg(totals.avgFarmWeight, locale)}`}
-                />
-              }
-            />
+            {chartMode === "barLine" ? (
+              <>
+                <Bar yAxisId="weight" dataKey="farmWeight" name={t("ops.dashboard.trend.farm_weight")} fill="url(#ot-farm)" radius={[5, 5, 0, 0]} maxBarSize={24} animationDuration={620} />
+                <Bar yAxisId="weight" dataKey="deliveredWeight" name={t("ops.dashboard.trend.delivered_weight")} fill="url(#ot-delivered)" radius={[5, 5, 0, 0]} maxBarSize={24} animationDuration={620} />
+                <Bar yAxisId="weight" dataKey="lossBar" name={t("ops.dashboard.trend.weight_loss")} fill="url(#ot-loss)" radius={[5, 5, 0, 0]} maxBarSize={18} animationDuration={620} />
+              </>
+            ) : null}
+
+            {chartMode === "area" ? (
+              <>
+                <Area yAxisId="weight" type="monotone" dataKey="farmWeight" name={t("ops.dashboard.trend.farm_weight")} stroke={PLOT_COLOR.farmWeight} strokeWidth={1.7} fill="url(#ot-farm)" fillOpacity={0.34} animationDuration={620} connectNulls />
+                <Area yAxisId="weight" type="monotone" dataKey="deliveredWeight" name={t("ops.dashboard.trend.delivered_weight")} stroke={PLOT_COLOR.delivered} strokeWidth={1.5} fill="url(#ot-delivered)" fillOpacity={0.3} animationDuration={620} connectNulls />
+                <Area yAxisId="weight" type="monotone" dataKey="lossBar" name={t("ops.dashboard.trend.weight_loss")} stroke={PLOT_COLOR.weightLoss} strokeWidth={1.4} fill="url(#ot-loss)" fillOpacity={0.24} animationDuration={620} connectNulls />
+              </>
+            ) : null}
+
+            {chartMode === "stacked" ? (
+              <>
+                <Bar yAxisId="weight" dataKey="deliveredWeight" stackId="weight-flow" name={t("ops.dashboard.trend.delivered_weight")} fill="url(#ot-delivered)" maxBarSize={42} animationDuration={620} />
+                <Bar yAxisId="weight" dataKey="mortalityWeight" stackId="weight-flow" name={t("ops.dashboard.trend.mortality_weight")} fill="url(#ot-mortality)" maxBarSize={42} animationDuration={620} />
+                <Bar yAxisId="weight" dataKey="lossBar" stackId="weight-flow" name={t("ops.dashboard.trend.weight_loss")} fill="url(#ot-loss)" radius={[5, 5, 0, 0]} maxBarSize={42} animationDuration={620} />
+              </>
+            ) : null}
 
             <Area
               yAxisId="trips"
@@ -454,7 +422,7 @@ export default function OperationalTrendsChart({
               dataKey="trips"
               stroke="none"
               fill="url(#ot-trips-area)"
-              animationDuration={820}
+              animationDuration={760}
               animationEasing="ease-out"
             />
             <Line
@@ -462,13 +430,13 @@ export default function OperationalTrendsChart({
               type="monotone"
               dataKey="trips"
               name={t("ops.dashboard.trips")}
-              stroke={COLOR.trips}
+              stroke={PLOT_COLOR.trips}
               strokeWidth={2.2}
               strokeLinecap="round"
               filter="url(#ot-line-shadow)"
-              dot={{ r: 2.6, fill: COLOR.trips, strokeWidth: 0 }}
-              activeDot={{ r: 4.5, strokeWidth: 2, stroke: "#fff" }}
-              animationDuration={820}
+              dot={{ r: 3.1, fill: "#fff", stroke: PLOT_COLOR.trips, strokeWidth: 2 }}
+              activeDot={{ r: 4.8, fill: PLOT_COLOR.trips, strokeWidth: 2, stroke: "#fff" }}
+              animationDuration={760}
               animationEasing="ease-out"
             />
           </ComposedChart>

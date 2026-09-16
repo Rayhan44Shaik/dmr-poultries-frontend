@@ -342,7 +342,7 @@ const KPICard = memo(function KPICard({
      full figure plus the full comparison always sit in the tooltips. */
   const cardContent = (
     <div
-      className={`@container group relative flex h-full min-h-[110px] min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${
+      className={`@container group relative flex h-full min-h-[6.875rem] min-w-0 flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white p-2.5 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${
         /* Every tile is a link now, so the pointer leads; only a non-clickable
            Expenses tile would keep the "hover me for the breakdown" cursor. */
         showBreakdown ? (to ? "cursor-pointer" : "cursor-help") : ""
@@ -354,7 +354,7 @@ const KPICard = memo(function KPICard({
         {/* line 1 — logo + name */}
         <div className="flex min-w-0 items-center gap-1 @min-[96px]:gap-2 @min-[120px]:gap-2.5">
           <div
-            className={`${config.bg} flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md shadow-md transition-transform duration-300 group-hover:scale-110 @min-[96px]:h-[26px] @min-[96px]:w-[26px] @min-[96px]:rounded-lg @min-[120px]:h-8 @min-[120px]:w-8`}
+            className={`${config.bg} flex h-5 w-5 flex-shrink-0 items-center justify-center rounded-md shadow-md transition-transform duration-300 group-hover:scale-110 @min-[96px]:h-[1.625rem] @min-[96px]:w-[1.625rem] @min-[96px]:rounded-lg @min-[120px]:h-8 @min-[120px]:w-8`}
           >
             <Icon
               className="h-3 w-3 text-white @min-[96px]:h-3.5 @min-[96px]:w-3.5 @min-[120px]:h-4 @min-[120px]:w-4"

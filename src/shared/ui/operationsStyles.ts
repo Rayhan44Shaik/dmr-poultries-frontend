@@ -158,8 +158,8 @@ export function opsReactSelectStyles(accent = "#059669") {
     control: (base: CSSObjectWithLabel, state: ControlState) => ({
       ...base,
       borderRadius: "0.5rem", // --ds-radius-control
-      minHeight: "40px", // --ds-control-h-lg
-      fontSize: "13px",
+      minHeight: "2.5rem", // --ds-control-h-lg
+      fontSize: "0.8125rem",
       fontWeight: 500,
       borderColor: state.isFocused ? accent : "#cbd5e1", // slate-300
       boxShadow: state.isFocused ? `0 0 0 2px ${accent}33` : "0 1px 2px 0 rgb(15 23 42 / 0.04)",
@@ -171,9 +171,9 @@ export function opsReactSelectStyles(accent = "#059669") {
       ...base,
       backgroundColor: isSelected ? accent : isFocused ? "#f1f5f9" : "transparent", // slate-100
       color: isSelected ? "#ffffff" : "#334155", // slate-700
-      fontSize: "13px",
+      fontSize: "0.8125rem",
       fontWeight: isSelected ? 600 : 500,
-      padding: "8px 12px",
+      padding: "0.5rem 0.75rem",
       cursor: "pointer",
     }),
     menu: (base: CSSObjectWithLabel) => ({
@@ -200,7 +200,7 @@ export function opsReactSelectStyles(accent = "#059669") {
     }),
     singleValue: (base: CSSObjectWithLabel) => ({ ...base, color: "#1e293b", fontWeight: 500 }), // slate-800
     placeholder: (base: CSSObjectWithLabel) => ({ ...base, color: "#94a3b8", fontWeight: 400 }), // slate-400
-    input: (base: CSSObjectWithLabel) => ({ ...base, fontSize: "13px" }),
+    input: (base: CSSObjectWithLabel) => ({ ...base, fontSize: "0.8125rem" }),
     multiValue: (base: CSSObjectWithLabel) => ({
       ...base,
       backgroundColor: "#d1fae5", // emerald-100
@@ -209,7 +209,7 @@ export function opsReactSelectStyles(accent = "#059669") {
     multiValueLabel: (base: CSSObjectWithLabel) => ({
       ...base,
       color: "#065f46", // emerald-800
-      fontSize: "12px",
+      fontSize: "0.75rem",
       fontWeight: 600,
     }),
     multiValueRemove: (base: CSSObjectWithLabel) => ({

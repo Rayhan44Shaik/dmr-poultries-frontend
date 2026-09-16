@@ -4,9 +4,15 @@ import { useI18n } from "../../../../i18n";
 import { formatINRCompact } from "../../../../utils/format";
 
 const COLORS = ["#3b82f6", "#10b981", "#f59e0b", "#ef4444", "#8b5cf6"];
-const PIE_TRACK = { radius: 112, strokeWidth: 48 } as const;
-/** An almost imperceptible ambient revolution — 60 minutes per lap. */
-const ORBIT_MS = 3600_000;
+const PIE_TRACK = { radius: 132, strokeWidth: 48 } as const;
+
+function modeColor(name: string, index: number): string {
+  const key = name.toLocaleLowerCase("en-IN");
+  if (key.includes("union")) return "#3b82f6";
+  if (key.includes("hdfc")) return "#10b981";
+  if (key.includes("cash")) return "#f59e0b";
+  return COLORS[index % COLORS.length];
+}
 
 /** Stable id fragment for a mode name (gradient ids never depend on order). */
 function slug(name: string): string {
@@ -108,13 +114,7 @@ function CollectionTooltip({
   const color = typeof item.color === "string" ? item.color : "#64748b";
 
   return (
-    <div
-      className="min-w-[190px] rounded-xl border border-slate-200 bg-white/95 px-3 py-2.5 shadow-xl shadow-slate-900/10 backdrop-blur-sm"
-      style={{
-        transform: "rotate(calc(-1 * var(--cs-pie-angle, 0deg)))",
-        transformOrigin: "center center",
-      }}
-    >
+    <div className="min-w-[190px] rounded-xl border border-slate-200 bg-white/95 px-3 py-2.5 shadow-xl shadow-slate-900/10 backdrop-blur-sm">
       <div className="flex items-center gap-2 border-b border-slate-100 pb-1.5">
         <span className="h-2 w-2 rounded-full" style={{ backgroundColor: color }} />
         <p className="text-[11px] font-black uppercase tracking-wider text-slate-500">{item.name}</p>
@@ -128,23 +128,8 @@ function CollectionTooltip({
 }
 
 /**
- * Collection Streams — payment-mode donut for the Operations dashboard.
- *
- * Simple & proper by design:
- *  • A flat 2D donut centered in the chart stage, with the payment-mode KPI
- *    row beneath it, matching the Trip Movement chart's footer geometry.
- *  • One KPI box per mode with its exact amount and share, using the same
- *    spacing, typography, border, animation, and grid treatment as Trip
- *    Movement. The row is `shrink-0`, so it stays readable and in sync.
- *  • Loading: an animated donut skeleton (soft track + orbiting arc +
- *    pulsing KPI boxes) until the first data arrives.
- *  • Every load / range change replays a choreographed entrance: the donut
- *    fades in, the slices sweep in, and the centre total counts up while the
- *    KPI values remain directly bound to the same data signature.
- *  • One almost imperceptible ambient revolution of the ring (60 min per lap,
- *    off with reduced-motion); hovering a slice lifts it out, the others stay solid.
- *  • Slice colours are bound to the slice's own name (stable gradient ids),
- *    never to its array position.
+ * Payment-mode donut with stable bank/cash colours, direct amount/share
+ * callouts, a selected-period total, and the existing KPI summary beneath it.
  */
 export default function CollectionsPie({ data }: CollectionsPieProps) {
   const { t } = useI18n();
@@ -156,7 +141,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
       name: d.name,
       value: Number(d.value) || 0,
       percent: total > 0 ? ((Number(d.value) || 0) / total) * 100 : 0,
-      color: COLORS[i % COLORS.length],
+      color: modeColor(d.name, i),
       gid: slug(d.name),
     }));
   }, [chartData]);
@@ -171,7 +156,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
   // signature changes, which re-keys the scene + KPI footer and replays the
   // whole entrance choreography. Identical data (session-cache hits) keeps
   // the same signature — no flicker on instant range switches.
-  const signature = useMemo(
+  const dataSignature = useMemo(
     () => chartData.map((d) => `${d.name}:${Math.round(Number(d.value) || 0)}`).join("|"),
     [chartData]
   );
@@ -196,65 +181,21 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
           outerRadius={oR}
           startAngle={startAngle}
           endAngle={endAngle}
-          cornerRadius={6}
+          cornerRadius={7}
           fill={gid ? `url(#cs-grad-${gid})` : (props.fill ?? "#94a3b8")}
+          stroke="#ffffff"
+          strokeWidth={2}
         />
       );
     },
     []
   );
 
-  // ---- one rotation clock (rAF) — the ring only -------------------------
-  // The donut wrapper makes one very slow ambient revolution; the angle is
-  // derived from wall-clock time, so even a backgrounded tab snaps back to
-  // the correct position the moment it wakes. Off with reduced-motion.
-  const spinRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
-    let frame = 0;
-    let running = false;
-
-    const stop = () => {
-      if (!running) return;
-      running = false;
-      cancelAnimationFrame(frame);
-      if (spinRef.current) {
-        spinRef.current.style.transform = "";
-        spinRef.current.style.setProperty("--cs-pie-angle", "0deg");
-      }
-    };
-
-    const start = () => {
-      if (running) return;
-      running = true;
-      const t0 = performance.now();
-      const tick = (now: number) => {
-        if (!running) return;
-        if (spinRef.current) {
-          const angle = `${((((now - t0) / ORBIT_MS) * 360) % 360).toFixed(3)}deg`;
-          spinRef.current.style.transform = `rotate(${angle})`;
-          spinRef.current.style.setProperty("--cs-pie-angle", angle);
-        }
-        frame = requestAnimationFrame(tick);
-      };
-      frame = requestAnimationFrame(tick);
-    };
-
-    const sync = () => (mq.matches ? stop() : start());
-    sync();
-    mq.addEventListener("change", sync);
-    return () => {
-      mq.removeEventListener("change", sync);
-      cancelAnimationFrame(frame);
-    };
-  }, []);
-
   // The collection KPI row follows the same footer contract as Trip Movement:
   // full width, fixed below the chart, and keyed to the exact data signature.
   const modeKpis = (
     <div
-      key={`kpi-${signature}`}
+      key={`kpi-${dataSignature}`}
       aria-label={t("ops.dashboard.collection_streams")}
       className="mt-3 grid w-full shrink-0 grid-cols-2 gap-2 border-t border-slate-100 pt-3 sm:grid-cols-3"
     >
@@ -268,7 +209,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
   if (chartData.length === 0) {
     return (
       <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col" aria-busy="true">
-        <div className="min-h-[340px] w-full flex-1" style={{ minHeight: 340 }}>
+        <div className="min-h-[21.25rem] w-full flex-1" style={{ minHeight: "21.25rem" }}>
           <div className="flex h-full w-full items-center justify-center">
           <div className="relative aspect-square w-full max-w-[560px]" style={{ aspectRatio: "1 / 1" }}>
             <svg viewBox="0 0 400 400" className="h-full w-full" aria-hidden="true">
@@ -307,7 +248,7 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
         </div>
         <div className="mt-3 grid w-full shrink-0 grid-cols-2 gap-2 border-t border-slate-100 pt-3 sm:grid-cols-3">
           {[0, 1, 2].map((i) => (
-            <div key={i} className="h-[52px] animate-pulse rounded-xl bg-slate-100/80" />
+            <div key={i} className="h-[3.25rem] animate-pulse rounded-xl bg-slate-100/80" />
           ))}
         </div>
       </div>
@@ -316,80 +257,102 @@ export default function CollectionsPie({ data }: CollectionsPieProps) {
 
   return (
     <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
-      {/* The donut stays centered in the available chart stage. Its KPI row
-          follows underneath with the same spacing used by Trip Movement. */}
-      <div className="min-h-[340px] w-full flex-1" style={{ minHeight: 340 }}>
-        <div className="flex h-full w-full items-center justify-center">
+      <div className="relative min-h-[21.25rem] w-full flex-1" style={{ minHeight: "21.25rem" }}>
+        <div className="absolute inset-0 flex items-center justify-center">
           <div
-            key={signature}
-            className="relative aspect-square max-h-full w-full max-w-[560px] animate-fade-in"
+            key={dataSignature}
+            className="relative aspect-square w-full max-w-[20rem] animate-fade-in"
             style={{ aspectRatio: "1 / 1" }}
           >
-          {/* Soft background track behind the enlarged ring (88–136 band).
-              SVG circle so it scales with the scene at every card width. */}
-          <svg viewBox="0 0 400 400" className="absolute inset-0 h-full w-full" aria-hidden="true">
-            <circle
-              cx="200"
-              cy="200"
-              r={PIE_TRACK.radius}
-              fill="none"
-              stroke="rgba(241,245,249,0.8)"
-              strokeWidth={PIE_TRACK.strokeWidth}
-            />
-          </svg>
+            <svg viewBox="0 0 400 400" className="absolute inset-0 h-full w-full" aria-hidden="true">
+              <circle
+                cx="200"
+                cy="200"
+                r={PIE_TRACK.radius}
+                fill="none"
+                stroke="rgba(241,245,249,0.9)"
+                strokeWidth={PIE_TRACK.strokeWidth}
+              />
+            </svg>
 
-          {/* The rotating wrapper — the rAF loop sets its transform. */}
-          <div ref={spinRef} className="cs-pie-spin h-full w-full [will-change:transform]">
-            <div className="h-full w-full [filter:drop-shadow(0_8px_16px_-12px_rgba(15,23,42,0.3))]">
-            <ResponsiveContainer width="100%" height="100%">
-              <PieChart>
-                <defs>
-                  {enrichedData.map((d) => (
-                    <linearGradient key={d.gid} id={`cs-grad-${d.gid}`} x1="0%" y1="0%" x2="0%" y2="100%">
-                      <stop offset="0%" stopColor={lighten(d.color)} />
-                      <stop offset="100%" stopColor={d.color} />
-                    </linearGradient>
-                  ))}
-                </defs>
-                <Pie
-                  data={enrichedData}
-                  dataKey="value"
-                  nameKey="name"
-                  cx="50%"
-                  cy="50%"
-                  innerRadius="44%"
-                  outerRadius="68%"
-                  paddingAngle={3}
-                  cornerRadius={6}
-                  stroke="none"
-                  shape={renderSector}
-                  animationBegin={150}
-                  animationDuration={900}
-                  animationEasing="ease-out"
-                >
-                  {enrichedData.map((d) => (
-                    <Cell key={d.gid} fill={`url(#cs-grad-${d.gid})`} />
-                  ))}
-                </Pie>
-                <Tooltip content={<CollectionTooltip />} cursor={false} />
-              </PieChart>
+            <div className="h-full w-full [filter:drop-shadow(0_10px_18px_-14px_rgba(15,23,42,0.35))]">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <defs>
+                    {enrichedData.map((d) => (
+                      <linearGradient key={d.gid} id={`cs-grad-${d.gid}`} x1="0%" y1="0%" x2="0%" y2="100%">
+                        <stop offset="0%" stopColor={lighten(d.color)} />
+                        <stop offset="100%" stopColor={d.color} />
+                      </linearGradient>
+                    ))}
+                  </defs>
+                  <Pie
+                    data={enrichedData}
+                    dataKey="value"
+                    nameKey="name"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius="54%"
+                    outerRadius="78%"
+                    paddingAngle={3}
+                    cornerRadius={7}
+                    stroke="#ffffff"
+                    strokeWidth={2}
+                    shape={renderSector}
+                    animationBegin={100}
+                    animationDuration={760}
+                    animationEasing="ease-out"
+                  >
+                    {enrichedData.map((d) => (
+                      <Cell key={d.gid} fill={`url(#cs-grad-${d.gid})`} />
+                    ))}
+                  </Pie>
+                  <Tooltip content={<CollectionTooltip />} cursor={false} />
+                </PieChart>
               </ResponsiveContainer>
             </div>
-          </div>
 
-          {/* Centre total — count-up on load / range change (never rotates). */}
-          <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
-            <span className="text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-              {t("ops.dashboard.collection_streams_total")}
-            </span>
-            <span className="mt-1 text-[24px] font-black leading-none tracking-tight text-slate-800 tabular-nums">
-              {formatINRCompact(animatedTotal)}
-            </span>
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-400">
+                {t("ops.dashboard.collection_streams_total")}
+              </span>
+              <span className="mt-1 text-[24px] font-black leading-none tracking-tight text-slate-800 tabular-nums">
+                {formatINRCompact(animatedTotal)}
+              </span>
+            </div>
           </div>
         </div>
+
+        {enrichedData.slice(0, 3).map((mode, index) => {
+          const onLeft = index === 1;
+          const position = index === 0
+            ? "right-0 top-[16%]"
+            : index === 1
+              ? "left-0 top-[43%]"
+              : "right-0 bottom-[16%]";
+          const details = (
+            <span className={onLeft ? "text-left" : "text-right"}>
+              <span className="block max-w-[7.5rem] truncate text-[8.5px] font-bold uppercase tracking-wide text-slate-400">
+                {mode.name}
+              </span>
+              <strong className="block text-[13px] font-black tabular-nums text-slate-800">
+                {formatINRCompact(mode.value)}
+              </strong>
+              <span className="inline-flex items-center gap-1 text-[9.5px] font-black tabular-nums" style={{ color: mode.color }}>
+                <i aria-hidden="true" className="h-1.5 w-1.5 rounded-full" style={{ backgroundColor: mode.color }} />
+                {mode.percent.toFixed(1)}%
+              </span>
+            </span>
+          );
+          return (
+            <div key={`callout-${mode.gid}`} className={`pointer-events-none absolute hidden items-center gap-1.5 sm:flex ${position}`}>
+              {onLeft ? details : <span className="h-px w-7" style={{ backgroundColor: mode.color }} />}
+              {onLeft ? <span className="h-px w-7" style={{ backgroundColor: mode.color }} /> : details}
+            </div>
+          );
+        })}
       </div>
+      {modeKpis}
     </div>
-    {modeKpis}
-  </div>
   );
 }

@@ -1298,11 +1298,11 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   const selectStyles = useMemo<StylesConfig<SelectOption, false>>(() => ({
     control: (base) => ({
       ...base,
-      borderRadius: 8,
+      borderRadius: "0.5rem",
       borderColor: "#cbd5e1",
       boxShadow: "none",
-      minHeight: 38,
-      fontSize: "14px",
+      minHeight: "2.375rem",
+      fontSize: "0.875rem",
       "&:hover": { borderColor: "#94a3b8" },
       "&:focus-within": {
         borderColor: "#3b82f6",
@@ -1313,8 +1313,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       ...base,
       backgroundColor: isSelected ? "#2563eb" : isFocused ? "#eff6ff" : "white",
       color: isSelected ? "white" : "#1e293b",
-      fontSize: "13px",
-      padding: "6px 12px",
+      fontSize: "0.8125rem",
+      padding: "0.375rem 0.75rem",
     }),
     menu: (base) => ({
       ...base,

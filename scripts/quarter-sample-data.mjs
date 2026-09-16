@@ -1767,6 +1767,29 @@ function operationsDashboard(from = QUARTER.fromDate, to = QUARTER.toDate) {
     .slice(0, 10)
     .map(([shopName, amount]) => ({ shopName, amount: round(amount, 2) }));
 
+  // Exact selected-period shop recovery. Sales are the 100% baseline used by
+  // the overview chart; approved collections fill that baseline and the gap is
+  // what remains uncollected inside this date window (not the all-time balance).
+  const shopCollections = new Map();
+  for (const collection of cols) {
+    shopCollections.set(
+      collection.shopName,
+      (shopCollections.get(collection.shopName) ?? 0) + collection.amount,
+    );
+  }
+  const collectionPerformanceByShop = [
+    ...new Set([...shopAmount.keys(), ...shopCollections.keys()]),
+  ].map((shopName) => {
+    const salesAmount = round(shopAmount.get(shopName) ?? 0, 2);
+    const collectionAmount = round(shopCollections.get(shopName) ?? 0, 2);
+    return {
+      shopName,
+      salesAmount,
+      collectionAmount,
+      outstandingAmount: round(Math.max(0, salesAmount - collectionAmount), 2),
+    };
+  });
+
   const modeMap = new Map();
   for (const c of cols) modeMap.set(c.paymentMode, (modeMap.get(c.paymentMode) ?? 0) + c.amount);
   const collectionsByMode = [...modeMap.entries()].map(([name, value]) => ({
@@ -1840,6 +1863,7 @@ function operationsDashboard(from = QUARTER.fromDate, to = QUARTER.toDate) {
     mortalityData: trendData.map((p) => ({ date: p.date, mortality: p.mortality })),
     recentTrips,
     pendingCollectionsByShop: pendingByShop,
+    collectionPerformanceByShop,
     activeVehicles: ACTIVE_VEHICLES.length,
     activeDrivers: DRIVERS.length,
     activeHelpers: HELPERS.length,

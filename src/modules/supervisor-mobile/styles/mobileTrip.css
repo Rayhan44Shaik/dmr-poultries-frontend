@@ -14,7 +14,7 @@
 .mobile-trip-app input,
 .mobile-trip-app select,
 .mobile-trip-app textarea {
-  font-size: 16px;
+  font-size: 1rem;
 }
 
 .mobile-step-surface > * {
