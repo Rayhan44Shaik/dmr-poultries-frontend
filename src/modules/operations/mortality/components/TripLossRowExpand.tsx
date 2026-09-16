@@ -15,6 +15,7 @@
 // Rows are one line tall and the two cards sit 10px apart — nothing is padded
 // out, nothing is repeated.
 
+import { Fragment } from "react";
 import { HeartPulse, Scale, Truck } from "lucide-react";
 import type { TripLossAnalysis } from "../hooks/useTripLossAnalysis";
 import { formatNumber, formatWeight } from "../../../../utils/format";
@@ -82,28 +83,41 @@ type DetailField = {
 };
 
 /**
- * One label/value cell. The label owns a fixed width and the value follows it
- * immediately, so the two always read together — a value pushed to the far edge
- * of a half-width cell is what left the wide empty band between an entry and
- * the next one.
+ * Label and value widths.
+ *
+ * Both are pinned in pixels and the table is content-width rather than
+ * `w-full`, exactly like the weights table: the entry, its rule and the next
+ * entry sit together, and whatever width is left over stays as whitespace on
+ * the right instead of being stretched into the gaps between the columns.
  */
-function Cell({ field }: { field: DetailField }) {
+const LABEL_WIDTH = "w-[78px]";
+const VALUE_WIDTH = "w-[196px]";
+
+/** One field row: bright-black name │ data. */
+function FieldRow({ fields }: { fields: DetailField[] }) {
   return (
-    <div className="flex items-baseline gap-1.5 px-2.5 py-2.5">
-      {/* Bright-black field name … */}
-      <span className="w-[78px] shrink-0 text-[10.5px] font-bold uppercase tracking-wide text-slate-900">
-        {field.label}
-      </span>
-      {/* … a neat hairline … then the data, hard against the name. */}
-      <span
-        className={`min-w-0 flex-1 border-l border-slate-200 pl-2 text-[12.5px] font-semibold tabular-nums ${
-          field.tone ?? "text-slate-700"
-        } ${field.wrap ? "" : "truncate"}`}
-        title={field.title}
-      >
-        {field.value}
-      </span>
-    </div>
+    <tr>
+      {fields.map((field, index) => (
+        <Fragment key={index}>
+          <th
+            scope="row"
+            className={`${LABEL_WIDTH} px-2.5 py-2.5 text-left align-middle text-[10.5px] font-bold uppercase leading-tight tracking-wide text-slate-900 ${
+              index === 2 ? "border-l border-slate-100" : ""
+            }`}
+          >
+            {field.label}
+          </th>
+          <td
+            className={`${VALUE_WIDTH} border-l border-slate-200 px-2.5 py-2.5 align-middle text-[12.5px] font-semibold tabular-nums ${
+              field.tone ?? "text-slate-700"
+            } ${field.wrap ? "" : "truncate"}`}
+            title={field.title}
+          >
+            {field.value}
+          </td>
+        </Fragment>
+      ))}
+    </tr>
   );
 }
 
@@ -181,18 +195,13 @@ export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
             </span>
           }
         >
-          <div className="divide-y divide-slate-100">
-            {detailRows.map((row, rowIndex) => (
-              <div
-                key={rowIndex}
-                className="grid grid-cols-1 divide-y divide-slate-100 sm:grid-cols-2 sm:divide-x sm:divide-y-0"
-              >
-                {row.map((field, cellIndex) => (
-                  <Cell key={cellIndex} field={field} />
-                ))}
-              </div>
-            ))}
-          </div>
+          <table className="table-fixed border-collapse">
+            <tbody className="divide-y divide-slate-100">
+              {detailRows.map((row, rowIndex) => (
+                <FieldRow key={rowIndex} fields={row} />
+              ))}
+            </tbody>
+          </table>
         </Card>
 
         {/* ── 2. WEIGHTS + RATES ──────────────────────────────────────── */}
@@ -200,7 +209,7 @@ export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
             holds the quantities, the box beside it holds the rates. Rows are
             one line tall and the columns are sized to their content, so each
             box is only as big as what it prints. */}
-        <div className="grid gap-1.5 lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]">
+        <div className="grid items-start gap-1.5 lg:grid-cols-[max-content_max-content]">
           <Card icon={Scale} tone="rose" title={t("ops.mortality.detail.weight_summary")}>
             {/* Content-width table: the columns are pinned in pixels so they
                 stay packed together, and the card simply keeps the whitespace
@@ -242,32 +251,44 @@ export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
 
           {/* The rates the trip is judged on, as one small box. */}
           <Card icon={HeartPulse} tone="emerald" title={t("ops.mortality.detail.rates")}>
-            <div className="flex items-center justify-between gap-3 border-b border-emerald-100 bg-emerald-50/70 px-2.5 py-2.5">
-              <span className="text-[10.5px] font-bold uppercase tracking-wide text-emerald-700">
-                {t("ops.mortality.field.survival_rate")}
-              </span>
-              <span className="text-[16px] font-extrabold leading-none tabular-nums text-emerald-700">
-                {(record.survivalRate * 100).toFixed(2)}%
-              </span>
-            </div>
-            <div className="divide-y divide-slate-100">
-              <div className="flex items-center gap-1.5 px-2.5 py-2.5">
-                <span className="w-[78px] shrink-0 text-[10.5px] font-bold uppercase tracking-wide text-slate-900">
-                  {t("ops.mortality.field.mortality_pct")}
-                </span>
-                <span className="flex-1 border-l border-slate-200 pl-2 text-right text-[12.5px] font-bold tabular-nums text-orange-600">
-                  {record.mortalityPercentage.toFixed(2)}%
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 px-2.5 py-2.5">
-                <span className="w-[78px] shrink-0 text-[10.5px] font-bold uppercase tracking-wide text-slate-900">
-                  {t("ops.mortality.field.weight_loss_pct")}
-                </span>
-                <span className="flex-1 border-l border-slate-200 pl-2 text-right text-[12.5px] font-bold tabular-nums text-rose-600">
-                  {record.weightLossPercentage.toFixed(2)}%
-                </span>
-              </div>
-            </div>
+            {/* The same compact label │ value table as the cards above. */}
+            <table className="table-fixed border-collapse">
+              <tbody className="divide-y divide-slate-100">
+                <tr className="border-b border-emerald-100 bg-emerald-50/70">
+                  <th
+                    scope="row"
+                    className={`${LABEL_WIDTH} px-2.5 py-2.5 text-left align-middle text-[10.5px] font-bold uppercase leading-tight tracking-wide text-emerald-700`}
+                  >
+                    {t("ops.mortality.field.survival_rate")}
+                  </th>
+                  <td className="w-[104px] px-2.5 py-2.5 align-middle text-right text-[15px] font-extrabold leading-none tabular-nums text-emerald-700">
+                    {(record.survivalRate * 100).toFixed(2)}%
+                  </td>
+                </tr>
+                <tr>
+                  <th
+                    scope="row"
+                    className={`${LABEL_WIDTH} px-2.5 py-2.5 text-left align-middle text-[10.5px] font-bold uppercase leading-tight tracking-wide text-slate-900`}
+                  >
+                    {t("ops.mortality.field.mortality_pct")}
+                  </th>
+                  <td className="border-l border-slate-200 px-2.5 py-2.5 text-right text-[12.5px] font-bold tabular-nums text-orange-600">
+                    {record.mortalityPercentage.toFixed(2)}%
+                  </td>
+                </tr>
+                <tr>
+                  <th
+                    scope="row"
+                    className={`${LABEL_WIDTH} px-2.5 py-2.5 text-left align-middle text-[10.5px] font-bold uppercase leading-tight tracking-wide text-slate-900`}
+                  >
+                    {t("ops.mortality.field.weight_loss_pct")}
+                  </th>
+                  <td className="border-l border-slate-200 px-2.5 py-2.5 text-right text-[12.5px] font-bold tabular-nums text-rose-600">
+                    {record.weightLossPercentage.toFixed(2)}%
+                  </td>
+                </tr>
+              </tbody>
+            </table>
           </Card>
         </div>
       </div>

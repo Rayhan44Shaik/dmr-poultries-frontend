@@ -191,7 +191,8 @@ ok("table: expand affordance kept", tableHtml.includes("Expand trip") && tableHt
   ok("panel: trip facts use the shared labels", expandHtml.includes("Vehicle") && expandHtml.includes("Supervisor") && expandHtml.includes("Source Farm") && expandHtml.includes("Driver") && expandHtml.includes("Loaders") && expandHtml.includes("Helpers"));
   // The reference idiom: label left, value RIGHT — nothing is left dangling.
   ok("panel: value follows its label (nothing stretched to the cell edge)", (expandHtml.match(/w-\[78px\]/g) || []).length >= 8, `cells=${(expandHtml.match(/w-\[78px\]/g) || []).length}`);
-  ok("panel: trip details are TWO columns, not four", (expandHtml.match(/sm:grid-cols-2/g) || []).length === 4 && !expandHtml.includes("lg:grid-cols-4"));
+  ok("panel: trip details is a compact label/value table, not stretched halves", (expandHtml.match(/<table/g) || []).length === 3 && !expandHtml.includes("sm:grid-cols-2") && !expandHtml.includes("flex-1"), `tables=${(expandHtml.match(/<table/g) || []).length}`);
+  ok("panel: every field row is label │ value in four pinned cells", (expandHtml.match(/w-\[196px\]/g) || []).length === 8, `value cells=${(expandHtml.match(/w-\[196px\]/g) || []).length}`);
   ok("panel: each card title carries its own mark in a tinted tile", (expandHtml.match(/h-5 w-5 shrink-0 items-center justify-center rounded-md border/g) || []).length === 3, `tiles=${(expandHtml.match(/h-5 w-5 shrink-0/g) || []).length}`);
   ok("panel: card colours are one family each (indigo / rose / emerald)", expandHtml.includes("border-indigo-100 bg-indigo-50/70") && expandHtml.includes("border-rose-100 bg-rose-50/70") && expandHtml.includes("border-emerald-100 bg-emerald-50/70"));
   ok("panel: columns are tighter again (78px labels, px-2.5 cells)", (expandHtml.match(/w-\[78px\]/g) || []).length >= 8, `labels=${(expandHtml.match(/w-\[78px\]/g) || []).length}`);
@@ -200,7 +201,7 @@ ok("table: expand affordance kept", tableHtml.includes("Expand trip") && tableHt
   ok("panel: a neat rule sits between each field name and its data", (expandHtml.match(/border-l border-slate-200/g) || []).length >= 10, `rules=${(expandHtml.match(/border-l border-slate-200/g) || []).length}`);
   ok("panel: weights columns are ruled apart too", (expandHtml.match(/border-l border-slate-100/g) || []).length >= 6, `column rules=${(expandHtml.match(/border-l border-slate-100/g) || []).length}`);
   ok("panel: weights box is small — three content-sized columns, no % column", expandHtml.includes("table-fixed border-collapse") && !expandHtml.includes(">%<"), "weights table not content-sized");
-  ok("panel: weights and rates are two small boxes side by side (no 42% filler card)", expandHtml.includes("lg:grid-cols-[minmax(0,3fr)_minmax(0,2fr)]") && !expandHtml.includes("w-[42%]"));
+  ok("panel: weights and rates are two content-width boxes side by side", expandHtml.includes("lg:grid-cols-[max-content_max-content]") && expandHtml.includes("items-start") && !expandHtml.includes("w-[42%]"));
   ok("panel: rates box carries survival + mortality % + loss %", expandHtml.includes("Survival Rate") && expandHtml.includes("Mortality %") && expandHtml.includes("Loss %"));
   ok("panel: table rows use the same rhythm as the grid (py-2.5)", (expandHtml.match(/py-2\.5/g) || []).length >= 12, `rows=${(expandHtml.match(/py-2\.5/g) || []).length}`);
   ok("panel: rows are one line tall", expandHtml.includes("py-2.5") && !expandHtml.includes("py-4"));
