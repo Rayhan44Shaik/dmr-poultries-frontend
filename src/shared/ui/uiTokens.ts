@@ -507,6 +507,24 @@ export const uiTableTdNumericClass =
 
 export const uiTableRowClass = "transition-colors duration-100 hover:bg-slate-50/80";
 
+/**
+ * The row a pointer rests on, in the emerald analysis band.
+ *
+ * One token for the three surfaces of the mortality analysis: the trips grid,
+ * the lines inside an open trip, and the cumulative summary below the grid. A
+ * data line marks itself — and the values beside its label — wherever it is
+ * read, and the three can never drift apart because there is one class string.
+ * Colour only, 150ms, no layout property (see the rules at the top of the file).
+ */
+export const uiAnalysisRowHoverClass = `${uiTransition} hover:bg-emerald-50/60`;
+
+/**
+ * The same band, one step deeper, for a data row that already sits on a tint
+ * (the survival strip closing a trip panel or the summary). A flat band would
+ * be invisible on an already-tinted row.
+ */
+export const uiAnalysisRowHoverOnTintClass = `${uiTransition} hover:bg-emerald-100/70`;
+
 /** Selected row — visually distinct from the focused row. */
 export const uiTableRowSelectedClass = "bg-emerald-50/70 hover:bg-emerald-50";
 

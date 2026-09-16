@@ -340,6 +340,9 @@ export default {
   'fleet.emi_schedule.unknown': 'Unknown',
 
   // ----- Analytics -----
+  'fleet.maintenance_form.invalid_km': 'Enter a valid odometer reading (KM).',
+  'fleet.analytics.from_date': 'From date',
+  'fleet.analytics.to_date': 'To date',
   'fleet.analytics.all_clear': 'All clear',
   'fleet.analytics.all_vehicles': 'All vehicles',
   'fleet.analytics.avg_mileage': 'Avg Mileage',

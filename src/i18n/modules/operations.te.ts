@@ -915,9 +915,11 @@ export default {
   'ops.mortality.filter.all_farms': 'అన్ని ఫారాలు',
   'ops.mortality.filter.all_supervisors': 'అన్ని సూపర్వైజర్లు',
   'ops.mortality.filter.search_placeholder': 'ట్రిప్, ఫారం, సూపర్వైజర్...',
+  'ops.mortality.filter.pending_changes': '{count} ఫిల్టర్ మార్పులు — వర్తించడానికి Search నొక్కండి',
 
   // Section heading
   'ops.mortality.section.completed_trips': 'పూర్తయిన ట్రిప్పులు',
+  'ops.mortality.section.count': '{count} ట్రిప్పులు',
 
   // KPI cards
   'ops.mortality.kpi.completed_trips': 'పూర్తయిన ట్రిప్పులు',
@@ -932,14 +934,17 @@ export default {
   'ops.mortality.kpi.weight_loss': 'బరువు నష్టం',
   'ops.mortality.kpi.weight_loss_pct': 'బరువు నష్టం %',
   'ops.mortality.kpi.filtered_summary': 'వర్తింపజేసిన ఫిల్టర్ కోసం సారాంశం',
+  'ops.mortality.cumulative.title': 'మొత్తం సారాంశం',
+  'ops.mortality.cumulative.scope': '{trips} ట్రిప్పులు · {shops} షాపులు',
+  'ops.mortality.cumulative.hint': 'ఈ మొత్తాలు ఫిల్టర్ చేసిన అన్ని పేజీలకూ వర్తిస్తాయి — తెరపై ఉన్న {rows} వరుసలకు మాత్రమే కాదు.',
 
   // Table columns
   'ops.mortality.col.source_farm': 'ఫారం',
   'ops.mortality.col.farm_birds': 'ఫారం పక్షులు',
   'ops.mortality.col.farm_weight': 'ఫారం బరు',
-  'ops.mortality.col.delivery_shops': 'డెలి షాపులు',
-  'ops.mortality.col.delivered_birds': 'డెలి పక్షులు',
-  'ops.mortality.col.delivery_weight': 'డెలి బరు',
+  'ops.mortality.col.delivery_shops': 'షాపులు',
+  'ops.mortality.col.delivered_birds': 'డెలి. పక్షులు',
+  'ops.mortality.col.delivery_weight': 'డెలి. బరు',
   'ops.mortality.col.mortality': 'మరణాలు',
   'ops.mortality.col.mortality_weight': 'మరణాల బరు',
   'ops.mortality.col.weight_loss': 'బరు నష్టం',
@@ -963,16 +968,19 @@ export default {
   'ops.mortality.applied_filters.search': 'శోధన',
 
   // Expanded detail
-  'ops.mortality.detail.trip_overview': 'ట్రిప్ అవలోకనం',
+  'ops.mortality.detail.trip_overview': 'ట్రిప్ వివరాలు',
+  'ops.mortality.detail.farm': 'ఫారం',
+  // Weight unit printed beside every figure on this page. Telugu in either
+  // language on purpose — the floor reads కేజీ, not the Latin 'Kg'.
+  'ops.mortality.weight_unit': 'కేజీ',
+
+  'ops.mortality.detail.delivered': 'డెలివరీ',
+  'ops.mortality.detail.weight_summary': 'బరువులు',
+  'ops.mortality.detail.rates': 'రేట్లు',
   'ops.mortality.detail.farm_input': 'ఫారం ఇన్‌పుట్',
-  'ops.mortality.detail.delivery_output': 'డెలివరీ అవుట్‌పుట్',
-  'ops.mortality.detail.total_delivery': 'మొత్తం డెలివరీ',
   'ops.mortality.detail.mortality': 'మరణాలు',
   'ops.mortality.detail.weight_loss': 'బరువు నష్టం',
   'ops.mortality.detail.delivery_reconciliation': 'డెలివరీ సరిపోలిక',
-  'ops.mortality.detail.no_deliveries': 'డెలివరీ రికార్డులు లేవు.',
-  'ops.mortality.detail.shop_count': '({count} షాపులు)',
-  'ops.mortality.detail.shop_count_one': '({count} షాపు)',
   'ops.mortality.field.trip_no': 'ట్రిప్ నంబర్',
   'ops.mortality.field.vehicle': 'వాహనం',
   'ops.mortality.field.source_farm': 'మూల ఫారం',
@@ -997,6 +1005,7 @@ export default {
   'ops.mortality.toast.reset': 'ఫిల్టర్లు రీసెట్ చేయబడ్డాయి.',
   'ops.mortality.error.title': 'పూర్తయిన ట్రిప్పులను లోడ్ చేయలేకపోయాము',
   'ops.mortality.loading': 'పూర్తయిన ట్రిప్పులు లోడ్ అవుతున్నాయి…',
+  'ops.mortality.updating': 'నవీకరిస్తోంది…',
   'ops.mortality.aria.expand': 'ట్రిప్‌ను విస్తరించండి',
   'ops.mortality.aria.collapse': 'ట్రిప్‌ను కుదించండి',
 

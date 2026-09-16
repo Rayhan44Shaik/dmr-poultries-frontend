@@ -875,9 +875,12 @@ export default {
   'ops.mortality.filter.all_farms': 'All Farms',
   'ops.mortality.filter.all_supervisors': 'All Supervisors',
   'ops.mortality.filter.search_placeholder': 'Trip, farm, supervisor...',
+  'ops.mortality.filter.pending_changes': '{count} filter change(s) — press Search to apply',
 
   // Section heading
   'ops.mortality.section.completed_trips': 'Completed Trips',
+  'ops.mortality.section.count': '{count} trips',
+  // Header affordance: the chevron column opens the trip panel.
 
   // KPI cards
   'ops.mortality.kpi.completed_trips': 'Completed Trips',
@@ -892,16 +895,20 @@ export default {
   'ops.mortality.kpi.weight_loss': 'Weight Loss',
   'ops.mortality.kpi.weight_loss_pct': 'Weight Loss %',
   'ops.mortality.kpi.filtered_summary': 'Summary for the applied filter',
+  // Cumulative summary — below the table, totals for EVERY page
+  'ops.mortality.cumulative.title': 'Cumulative Summary',
+  'ops.mortality.cumulative.scope': '{trips} trips · {shops} shops',
+  'ops.mortality.cumulative.hint': 'Totals cover every page of the filtered set, not just the {rows} rows on screen.',
 
   // Table columns
   'ops.mortality.col.source_farm': 'Farm',
-  'ops.mortality.col.farm_birds': 'Farm Brds',
+  'ops.mortality.col.farm_birds': 'Farm Birds',
   'ops.mortality.col.farm_weight': 'Farm Wt',
-  'ops.mortality.col.delivery_shops': 'Del Shops',
-  'ops.mortality.col.delivered_birds': 'Del Brds',
-  'ops.mortality.col.delivery_weight': 'Del Wt',
-  'ops.mortality.col.mortality': 'Mort',
-  'ops.mortality.col.mortality_weight': 'Mort Wt',
+  'ops.mortality.col.delivery_shops': 'Shops',
+  'ops.mortality.col.delivered_birds': 'Del. Birds',
+  'ops.mortality.col.delivery_weight': 'Del. Wt',
+  'ops.mortality.col.mortality': 'Mortality',
+  'ops.mortality.col.mortality_weight': 'Mort. Wt',
   'ops.mortality.col.weight_loss': 'Wt Loss',
   'ops.mortality.col.loss_pct': 'Loss %',
 
@@ -915,16 +922,19 @@ export default {
   'ops.mortality.pagination.rows_per_page': 'Rows per page',
 
   // Expanded detail
-  'ops.mortality.detail.trip_overview': 'Trip Overview',
+  'ops.mortality.detail.trip_overview': 'Trip Details',
+  'ops.mortality.detail.farm': 'Farm',
+  // Weight unit printed beside every figure on this page. Telugu in either
+  // language on purpose — the floor reads కేజీ, not the Latin 'Kg'.
+  'ops.mortality.weight_unit': 'కేజీ',
+
+  'ops.mortality.detail.delivered': 'Delivered',
+  'ops.mortality.detail.weight_summary': 'Weights',
+  'ops.mortality.detail.rates': 'Rates',
   'ops.mortality.detail.farm_input': 'Farm Input',
-  'ops.mortality.detail.delivery_output': 'Delivery Output',
-  'ops.mortality.detail.total_delivery': 'Total Delivery',
   'ops.mortality.detail.mortality': 'Mortality',
   'ops.mortality.detail.weight_loss': 'Weight Loss',
   'ops.mortality.detail.delivery_reconciliation': 'Delivery Reconciliation',
-  'ops.mortality.detail.no_deliveries': 'No delivery records.',
-  'ops.mortality.detail.shop_count': '({count} shops)',
-  'ops.mortality.detail.shop_count_one': '({count} shop)',
   'ops.mortality.field.trip_no': 'Trip No',
   'ops.mortality.field.vehicle': 'Vehicle',
   'ops.mortality.field.source_farm': 'Source Farm',
@@ -949,6 +959,8 @@ export default {
   'ops.mortality.toast.reset': 'Filters reset.',
   'ops.mortality.error.title': 'Unable to load completed trips',
   'ops.mortality.loading': 'Loading completed trips…',
+  // A background re-read: the rows stay on screen while this is up.
+  'ops.mortality.updating': 'Updating…',
   'ops.mortality.aria.expand': 'Expand trip',
   'ops.mortality.aria.collapse': 'Collapse trip',
 

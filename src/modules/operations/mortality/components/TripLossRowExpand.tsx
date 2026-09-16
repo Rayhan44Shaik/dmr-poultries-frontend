@@ -1,297 +1,308 @@
 // src/modules/operations/mortality/components/TripLossRowExpand.tsx
-// Expandable detail for ONE completed trip.
+// Expandable detail for ONE completed trip — the panel behind the row chevron.
 //
-// Trip Overview -> Farm Input -> Delivery Output (per shop + TOTAL DELIVERY)
-// -> Mortality -> Weight Loss -> Delivery Reconciliation.
-// Shop names and per-shop delivered birds/weights live here only.
+// ONE card, ONE table, full width. The three groups are sections stacked inside
+// that single table, separated by full-width section rows:
+//
+//   ┌ TRIP DETAILS ────────────────────────────── [ Completed ] ┐
+//   │ TRIP NO      TRP-…-001  │ DAY         Wed, 16 Sep 2026    │
+//   │ VEHICLE      TS09UB1074 │ SUPERVISOR  Ravi Rao           │
+//   │ DRIVER       Yesu Kumar │ SOURCE FARM Sai Sreenivasa…    │
+//   │ LOADERS      Jagadish…  │ HELPERS     Jagadish Rao, …    │
+//   ├ WEIGHTS ──────────────────────────────────────────────────┤
+//   │ NAME                            BIRDS   WEIGHT        %   │
+//   │ Farm                              319  636.09 kg  100.00% │
+//   │ …                                                          │
+//   ├ RATES ────────────────────────────────────────────────────┤
+//   │ SURVIVAL RATE                       97.49%                 │
+//   │ MORTALITY %      2.51%   │ LOSS %  2.13%                   │
+//   └───────────────────────────────────────────────────────────┘
+//
+// Four equal columns carry every section: the first column of each half is the
+// field name, the next is its data — every cell reads from its own LEFT edge,
+// so a value starts right where its name ends instead of being pushed to the
+// far side of the cell. Section rows span all four columns, so the card reads
+// as one table rather than three boxes with gaps between them.
+//
+// No shop-wise delivery list here: the shop COUNT already sits on the trip row,
+// and shop-level detail lives in the Delivery module where it is actionable.
 
-import { Bird, Scale, Store, Truck, UserCheck, Warehouse } from "lucide-react";
+import { HeartPulse, Scale, Truck } from "lucide-react";
 import type { TripLossAnalysis } from "../hooks/useTripLossAnalysis";
-import { useTripDeliveries } from "../hooks/useTripLossAnalysis";
-import { formatNumber, formatWeight, formatDateShort } from "../../../../utils/format";
+import { formatNumber, formatWeight } from "../../../../utils/format";
+import { formatTripListDay } from "../../vehicle-trips/utils/formatTripListDay";
+import { localizeTripViewText } from "../../vehicle-trips/utils/tripViewLocalization";
 import { useI18n } from "../../../../i18n";
+import { uiAnalysisRowHoverClass, uiAnalysisRowHoverOnTintClass } from "../../../../shared/ui/uiTokens";
+
+/**
+ * The line the pointer is on. Every data line in the panel carries it — trip
+ * details, weights and rates — so hovering marks exactly the row being read and
+ * the label stays with its value.
+ */
+// Every data line marks itself under the pointer. The band is not defined here:
+// it is the shared analysis-row token, the same one the grid and the summary use.
 
 interface TripLossRowExpandProps {
   record: TripLossAnalysis;
+  /** Localised weight unit, read from the translation table — never hard-coded. */
+  weightUnit?: string;
 }
 
-type IconComponent = React.ComponentType<{ size?: number; className?: string }>;
+/**
+ * Section marks. Each group owns one colour family, so the three blocks stay
+ * distinguishable inside the single table:
+ *   indigo = the trip · rose = the weights · emerald = the rates.
+ */
+const SECTION_TILES = {
+  indigo: "border-indigo-100 bg-indigo-50/70 text-indigo-500",
+  rose: "border-rose-100 bg-rose-50/70 text-rose-500",
+  emerald: "border-emerald-100 bg-emerald-50/70 text-emerald-600",
+} as const;
 
-function Section({
-  titleKey,
+type SectionTone = keyof typeof SECTION_TILES;
+
+/** A full-width band that opens a section of the table. */
+function SectionRow({
   icon: Icon,
-  children,
+  tone,
+  title,
+  colSpan,
+  action,
 }: {
-  titleKey: string;
-  icon?: IconComponent;
-  children: React.ReactNode;
+  icon: typeof Truck;
+  tone: SectionTone;
+  title: string;
+  colSpan: number;
+  action?: React.ReactNode;
 }) {
-  const { t } = useI18n();
   return (
-    <section className="rounded-xl border border-slate-200/80 bg-white p-3.5 shadow-sm">
-      <h4 className="mb-2.5 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400">
-        {Icon && <Icon size={12} className="text-slate-400" />}
-        {t(titleKey)}
-      </h4>
-      {children}
-    </section>
+    <tr className="bg-slate-50/80">
+      <th colSpan={colSpan} scope="colgroup" className="px-3 py-1.5 text-left">
+        <span className="flex items-center justify-between gap-2">
+          <span className="flex items-center gap-2 text-[10.5px] font-bold uppercase tracking-wider text-slate-900">
+            <span
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border shadow-inner ${SECTION_TILES[tone]}`}
+            >
+              <Icon size={12} strokeWidth={2.4} aria-hidden="true" />
+            </span>
+            {title}
+          </span>
+          {action}
+        </span>
+      </th>
+    </tr>
   );
 }
 
-function Field({
-  labelKey,
-  value,
-  valueClass = "text-slate-800",
-}: {
-  labelKey: string;
+/** One label │ value pair, filling two of the four columns. */
+function Pair({ label, value, tone, rule = true }: {
+  label: string;
   value: React.ReactNode;
-  valueClass?: string;
+  tone?: string;
+  /** Draw the hairline between this pair's name and its data. */
+  rule?: boolean;
 }) {
-  const { t } = useI18n();
   return (
-    <div className="flex items-center justify-between gap-4 py-1">
-      <span className="text-xs text-slate-500">{t(labelKey)}</span>
-      <span className={`text-[13px] font-semibold tabular-nums ${valueClass}`}>{value}</span>
-    </div>
+    <>
+      <th
+        scope="row"
+        className={`w-1/4 px-3 py-2.5 text-left align-middle text-[10.5px] font-bold uppercase leading-tight tracking-wide text-slate-900 ${
+          rule ? "border-l border-slate-100" : ""
+        }`}
+      >
+        {label}
+      </th>
+      <td
+        className={`w-1/4 border-l border-slate-200 px-3 py-2.5 text-left align-middle text-[12.5px] font-semibold tabular-nums ${
+          tone ?? "text-slate-700"
+        }`}
+      >
+        {value}
+      </td>
+    </>
   );
 }
 
-/** Simple horizontal bar scaled to a reference max. */
-function Bar({ value, max, className }: { value: number; max: number; className: string }) {
-  const width = max > 0 ? Math.max(2, Math.min(100, (value / max) * 100)) : 0;
+export default function TripLossRowExpand({ record, weightUnit = "kg" }: TripLossRowExpandProps) {
+  const { t, language } = useI18n();
+  // Trip data is localised the way the Trip List rows are: names read in Telugu
+  // script and the figures stay numeric.
+  const view = (value?: string | null) => localizeTripViewText(value, language);
+  const crew = (names?: string[]) =>
+    names && names.length > 0 ? names.map((name) => view(name)).join(", ") : "—";
+
+  /** Trip facts, two pairs per row — trip no + day, vehicle + supervisor, … */
+  const detailRows: Array<Array<{ label: string; value: React.ReactNode; tone?: string }>> = [
+    [
+      { label: t("ops.mortality.field.trip_no"), value: view(record.tripNo), tone: "text-indigo-600" },
+      { label: t("ops.trip.day"), value: formatTripListDay(record.tripDate, language) },
+    ],
+    [
+      { label: t("common.vehicle"), value: view(record.vehicleNo) || "—" },
+      { label: t("common.supervisor"), value: view(record.supervisorName) || "—" },
+    ],
+    [
+      { label: t("common.driver"), value: view(record.driverName) || "—" },
+      { label: t("ops.mortality.field.source_farm"), value: view(record.sourceFarm) || "—" },
+    ],
+    [
+      { label: t("ops.trip.field.loaders"), value: crew(record.loaders) },
+      { label: t("ops.trip.field.helpers"), value: crew(record.helpers) },
+    ],
+  ];
+
+  /** Quantities, one row per measure, with that measure's own percentage. */
+  const weightRows: Array<{ label: string; birds: React.ReactNode; weight: string; pct: string; tone: string }> = [
+    {
+      label: t("ops.mortality.detail.farm"),
+      birds: formatNumber(record.farmBirds),
+      weight: formatWeight(record.farmWeight, weightUnit),
+      pct: "100.00%",
+      tone: "text-amber-700",
+    },
+    {
+      label: t("ops.mortality.detail.delivered"),
+      birds: formatNumber(record.deliveredBirds),
+      weight: formatWeight(record.deliveredWeight, weightUnit),
+      pct: `${((record.deliveredWeight / Math.max(record.farmWeight, 1)) * 100).toFixed(2)}%`,
+      tone: "text-sky-700",
+    },
+    {
+      label: t("ops.mortality.detail.mortality"),
+      birds: formatNumber(record.mortalityCount),
+      weight: formatWeight(record.mortalityWeight, weightUnit),
+      pct: `${record.mortalityPercentage.toFixed(2)}%`,
+      tone: "text-orange-600",
+    },
+    {
+      label: t("ops.mortality.detail.weight_loss"),
+      // Loss is a weight figure; it has no bird count of its own.
+      birds: <span className="text-slate-300">—</span>,
+      weight: formatWeight(record.weightLoss, weightUnit),
+      pct: `${record.weightLossPercentage.toFixed(2)}%`,
+      tone: "text-rose-600",
+    },
+  ];
+
+  const numericHead =
+    "w-1/4 border-l border-slate-200 px-3 py-2 text-left text-[10.5px] font-bold uppercase tracking-wide text-slate-900";
+
   return (
-    <div className="h-2 w-full overflow-hidden rounded-full bg-slate-100">
-      <div className={`h-full rounded-full ${className}`} style={{ width: `${width}%` }} />
-    </div>
-  );
-}
+    <div className="border-t border-slate-200/80 bg-slate-100/60 px-2 py-2.5">
+      <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+        {/* ── Card header — the trip section, so the table opens straight into
+            its first rows. ────────────────────────────────────────────── */}
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/80 px-3 py-1.5">
+          <h4 className="flex items-center gap-2 text-[10.5px] font-bold uppercase tracking-wider text-slate-900">
+            <span
+              className={`flex h-5 w-5 shrink-0 items-center justify-center rounded-md border shadow-inner ${SECTION_TILES.indigo}`}
+            >
+              <Truck size={12} strokeWidth={2.4} aria-hidden="true" />
+            </span>
+            {t("ops.mortality.detail.trip_overview")}
+          </h4>
+          <span className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-[1px] text-[10px] font-bold uppercase tracking-wide text-emerald-700">
+            {view(record.status)}
+          </span>
+        </div>
 
-function MetricRow({
-  labelKey,
-  value,
-  bar,
-  max,
-  barClass,
-  valueClass,
-}: {
-  labelKey: string;
-  value: string;
-  bar: number;
-  max: number;
-  barClass: string;
-  valueClass: string;
-}) {
-  const { t } = useI18n();
-  return (
-    <div>
-      <div className="mb-1 flex items-center justify-between text-[11px]">
-        <span className="text-slate-500">{t(labelKey)}</span>
-        <span className={`font-semibold tabular-nums ${valueClass}`}>{value}</span>
-      </div>
-      <Bar value={bar} max={max} className={barClass} />
-    </div>
-  );
-}
+        <table className="w-full table-fixed border-collapse text-[12.5px]">
+          <tbody className="divide-y divide-slate-100">
+            {/* ── TRIP DETAILS ─────────────────────────────────────── */}
+            {detailRows.map((row, rowIndex) => (
+              // The pointer marks the line it is on, so a name and the value it
+              // belongs to are read together — the same band the grid uses.
+              <tr key={rowIndex} className={uiAnalysisRowHoverClass}>
+                {row.map((field, fieldIndex) => (
+                  <Pair
+                    key={fieldIndex}
+                    label={field.label}
+                    value={field.value}
+                    tone={field.tone}
+                    rule={fieldIndex === 1}
+                  />
+                ))}
+              </tr>
+            ))}
 
-export default function TripLossRowExpand({ record }: TripLossRowExpandProps) {
-  const { t } = useI18n();
-  const maxWeight = Math.max(record.farmWeight, record.deliveredWeight, 1);
-  // Shop lines are fetched on demand — the table row already carries the shop
-  // COUNT, so loading every trip's deliveries up front would be wasted payload.
-  const { deliveries, loading: deliveriesLoading } = useTripDeliveries(record.tripId);
-  const deliveryBirdsTotal = deliveries.reduce((s, d) => s + (d.birds || 0), 0);
-  const deliveryWeightTotal = deliveries.reduce((s, d) => s + (d.weight || 0), 0);
-
-  return (
-    <div className="border-t border-slate-200 bg-slate-50/70 px-4 py-4">
-      <div className="grid grid-cols-1 gap-3.5 lg:grid-cols-2">
-        {/* ── TRIP OVERVIEW ───────────────────────────────────────── */}
-        <Section titleKey="ops.mortality.detail.trip_overview" icon={Truck}>
-          <Field labelKey="ops.mortality.field.trip_no" value={record.tripNo} />
-          <Field labelKey="common.date" value={formatDateShort(record.tripDate)} />
-          <Field labelKey="ops.mortality.field.vehicle" value={record.vehicleNo || "—"} />
-          <Field labelKey="common.driver" value={record.driverName || "—"} />
-          <Field labelKey="common.supervisor" value={record.supervisorName || "—"} />
-          <Field
-            labelKey="common.status"
-            value={
-              <span className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-                {record.status}
-              </span>
-            }
-          />
-        </Section>
-
-        {/* ── FARM INPUT ──────────────────────────────────────────── */}
-        <Section titleKey="ops.mortality.detail.farm_input" icon={Warehouse}>
-          <Field labelKey="ops.mortality.field.source_farm" value={record.sourceFarm || "—"} />
-          <Field
-            labelKey="ops.mortality.field.farm_birds"
-            value={formatNumber(record.farmBirds)}
-          />
-          <Field
-            labelKey="ops.mortality.field.farm_weight"
-            value={formatWeight(record.farmWeight)}
-          />
-        </Section>
-
-        {/* ── DELIVERY OUTPUT ─────────────────────────────────────── */}
-        <Section titleKey="ops.mortality.detail.delivery_output" icon={Store}>
-          {deliveriesLoading ? (
-            <p className="text-xs text-slate-400">{t("ops.mortality.loading")}</p>
-          ) : deliveries.length === 0 ? (
-            <p className="text-xs text-slate-400">{t("ops.mortality.detail.no_deliveries")}</p>
-          ) : (
-            <div className="space-y-1.5">
-              {deliveries.map((d) => (
-                <div
-                  key={d.id}
-                  className="flex items-center justify-between gap-3 rounded-lg border border-sky-100 bg-sky-50/40 px-3 py-1.5"
+            {/* ── WEIGHTS ──────────────────────────────────────────── */}
+            <SectionRow
+              icon={Scale}
+              tone="rose"
+              title={t("ops.mortality.detail.weight_summary")}
+              colSpan={4}
+            />
+            <tr>
+              <th scope="col" className="w-1/4 px-3 py-2 text-left text-[10.5px] font-bold uppercase tracking-wide text-slate-900">
+                {t("common.name")}
+              </th>
+              <th scope="col" className={numericHead}>
+                {t("common.birds")}
+              </th>
+              <th scope="col" className={numericHead}>
+                {t("common.weight")}
+              </th>
+              <th scope="col" className={numericHead}>
+                %
+              </th>
+            </tr>
+            {weightRows.map((row) => (
+              <tr key={row.label} className={uiAnalysisRowHoverClass}>
+                <th
+                  scope="row"
+                  className="w-1/4 px-3 py-2.5 text-left align-middle text-[12.5px] font-medium text-slate-700"
                 >
-                  <span className="truncate text-[13px] font-medium text-slate-700">{d.shopName}</span>
-                  <span className="flex shrink-0 items-center gap-3 text-[13px] tabular-nums">
-                    <span className="inline-flex items-center gap-1 text-sky-700">
-                      <Bird size={11} />
-                      {formatNumber(d.birds || 0)}
-                    </span>
-                    <span className="font-semibold text-slate-800">{formatWeight(d.weight)}</span>
-                  </span>
-                </div>
-              ))}
+                  {row.label}
+                </th>
+                <td className={`w-1/4 border-l border-slate-100 px-3 py-2.5 text-left align-middle font-semibold tabular-nums ${row.tone}`}>
+                  {row.birds}
+                </td>
+                <td className={`w-1/4 border-l border-slate-100 px-3 py-2.5 text-left align-middle font-semibold tabular-nums ${row.tone}`}>
+                  {row.weight}
+                </td>
+                <td className={`w-1/4 border-l border-slate-100 px-3 py-2.5 text-left align-middle font-semibold tabular-nums ${row.tone}`}>
+                  {row.pct}
+                </td>
+              </tr>
+            ))}
 
-              {/* TOTAL DELIVERY — shops · birds · weight */}
-              <div className="space-y-1 rounded-lg border border-sky-200 bg-sky-50/70 px-3 py-2">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-sky-700">
-                  {t("ops.mortality.detail.total_delivery")}
-                </p>
-                <div className="flex items-center justify-between gap-4 py-0.5">
-                  <span className="text-xs text-slate-500">
-                    {t("ops.mortality.field.shops")}
-                  </span>
-                  <span className="text-[13px] font-semibold tabular-nums text-sky-700">
-                    {formatNumber(deliveries.length)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-4 py-0.5">
-                  <span className="text-xs text-slate-500">
-                    {t("ops.mortality.field.delivered_birds")}
-                  </span>
-                  <span className="text-[13px] font-semibold tabular-nums text-sky-700">
-                    {formatNumber(deliveryBirdsTotal)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between gap-4 py-0.5">
-                  <span className="text-xs text-slate-500">
-                    {t("ops.mortality.field.delivery_weight")}
-                  </span>
-                  <span className="text-[13px] font-semibold tabular-nums text-sky-700">
-                    {formatWeight(deliveryWeightTotal)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )}
-        </Section>
-
-        {/* ── MORTALITY ───────────────────────────────────────────── */}
-        <Section titleKey="ops.mortality.detail.mortality" icon={Bird}>
-          <div className="rounded-lg border border-orange-100 bg-orange-50/40 p-3">
-            <Field
-              labelKey="ops.mortality.field.mortality_birds"
-              value={formatNumber(record.mortalityCount)}
-              valueClass="text-orange-700"
+            {/* ── RATES ────────────────────────────────────────────── */}
+            <SectionRow
+              icon={HeartPulse}
+              tone="emerald"
+              title={t("ops.mortality.detail.rates")}
+              colSpan={4}
             />
-            <Field
-              labelKey="ops.mortality.field.mortality_weight"
-              value={formatWeight(record.mortalityWeight)}
-              valueClass="text-orange-700"
-            />
-            <div className="mt-2">
-              <div className="mb-1 flex items-center justify-between text-[11px]">
-                <span className="text-slate-500">{t("ops.mortality.field.mortality_pct")}</span>
-                <span className="font-bold tabular-nums text-orange-700">
-                  {record.mortalityPercentage.toFixed(2)}%
-                </span>
-              </div>
-              <Bar
-                value={record.mortalityCount}
-                max={Math.max(record.farmBirds, 1)}
-                className="bg-orange-400"
+            <tr className={`bg-emerald-50/70 ${uiAnalysisRowHoverOnTintClass}`}>
+              <th
+                scope="row"
+                className="w-1/4 px-3 py-2.5 text-left align-middle text-[10.5px] font-bold uppercase leading-tight tracking-wide text-emerald-700"
+              >
+                {t("ops.mortality.field.survival_rate")}
+              </th>
+              <td
+                colSpan={3}
+                className="px-3 py-2.5 text-left align-middle text-[15px] font-extrabold tabular-nums text-emerald-700"
+              >
+                {(record.survivalRate * 100).toFixed(2)}%
+              </td>
+            </tr>
+            <tr className={uiAnalysisRowHoverClass}>
+              <Pair
+                label={t("ops.mortality.field.mortality_pct")}
+                value={`${record.mortalityPercentage.toFixed(2)}%`}
+                tone="text-orange-600"
+                rule={false}
               />
-            </div>
-          </div>
-        </Section>
-
-        {/* ── WEIGHT LOSS ─────────────────────────────────────────── */}
-        <Section titleKey="ops.mortality.detail.weight_loss" icon={Scale}>
-          <div className="space-y-2 rounded-lg border border-rose-100 bg-rose-50/40 p-3">
-            <MetricRow
-              labelKey="ops.mortality.field.farm_weight"
-              value={formatWeight(record.farmWeight)}
-              bar={record.farmWeight}
-              max={maxWeight}
-              barClass="bg-amber-400"
-              valueClass="text-amber-700"
-            />
-            <MetricRow
-              labelKey="ops.mortality.field.delivery_weight"
-              value={formatWeight(record.deliveredWeight)}
-              bar={record.deliveredWeight}
-              max={maxWeight}
-              barClass="bg-sky-400"
-              valueClass="text-sky-700"
-            />
-            <MetricRow
-              labelKey="ops.mortality.field.mortality_weight"
-              value={formatWeight(record.mortalityWeight)}
-              bar={record.mortalityWeight}
-              max={maxWeight}
-              barClass="bg-orange-400"
-              valueClass="text-orange-700"
-            />
-            <div className="border-t border-rose-100 pt-2">
-              <MetricRow
-                labelKey="ops.mortality.field.weight_loss"
-                value={`${formatWeight(record.weightLoss)} (${record.weightLossPercentage.toFixed(2)}%)`}
-                bar={record.weightLoss}
-                max={maxWeight}
-                barClass="bg-rose-400"
-                valueClass="text-rose-700"
+              <Pair
+                label={t("ops.mortality.field.weight_loss_pct")}
+                value={`${record.weightLossPercentage.toFixed(2)}%`}
+                tone="text-rose-600"
               />
-            </div>
-            <p className="pt-1 text-[10px] leading-snug text-slate-400">
-              farmWeight − deliveredWeight − mortalityWeight = weightLoss
-            </p>
-          </div>
-        </Section>
-
-        {/* ── DELIVERY RECONCILIATION ─────────────────────────────── */}
-        <Section
-          titleKey="ops.mortality.detail.delivery_reconciliation"
-          icon={UserCheck}
-        >
-          <Field
-            labelKey="ops.mortality.field.shops"
-            value={formatNumber(record.deliveryShops)}
-          />
-          <Field
-            labelKey="ops.mortality.field.delivered_birds"
-            value={formatNumber(record.deliveredBirds)}
-            valueClass="text-sky-700"
-          />
-          <Field
-            labelKey="ops.mortality.field.delivery_weight"
-            value={formatWeight(record.deliveredWeight)}
-            valueClass="text-sky-700"
-          />
-          <Field
-            labelKey="ops.mortality.field.survival_rate"
-            // The backend stores survival_rate as a 0–1 fraction (single
-            // source of truth), so no scale guessing is needed here.
-            value={`${(record.survivalRate * 100).toFixed(2)}%`}
-            valueClass="text-emerald-700"
-          />
-        </Section>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   );

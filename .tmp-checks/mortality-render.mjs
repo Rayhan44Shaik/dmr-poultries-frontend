@@ -1,0 +1,814 @@
+// TEMP audit harness: server-renders the Weight Loss / Mortality page (and the
+// table + KPI strip with fixture data) through the real Vite module graph, then
+// asserts the Trip List parity surface is actually in the markup.
+// Run: cd /home/user/dmr-poultries-frontend && npx tsx .tmp-checks/mortality-render.mjs
+import { createServer } from "vite";
+
+/* ── Minimal browser shims (node has none) ─────────────────────────────── */
+const store = new Map();
+globalThis.localStorage = {
+  getItem: (k) => (store.has(k) ? store.get(k) : null),
+  setItem: (k, v) => void store.set(k, String(v)),
+  removeItem: (k) => void store.delete(k),
+  clear: () => void store.clear(),
+};
+globalThis.sessionStorage = { ...globalThis.localStorage };
+globalThis.window = globalThis;
+globalThis.location = { pathname: "/operations", search: "?tab=mortality", hash: "", origin: "http://localhost:5173", href: "http://localhost:5173/operations?tab=mortality", protocol: "http:", host: "localhost:5173" };
+globalThis.history = { state: null, pushState() {}, replaceState() {}, go() {}, back() {}, forward() {} };
+globalThis.document = {
+  defaultView: globalThis,
+  documentElement: { lang: "en", classList: { toggle() {}, add() {}, remove() {} }, style: {} },
+  createElement: () => ({ style: {}, classList: { add() {}, remove() {} }, setAttribute() {}, appendChild() {} }),
+  head: { appendChild() {} }, body: { appendChild() {} },
+  addEventListener() {}, removeEventListener() {},
+  getElementById: () => null, querySelector: () => null, querySelectorAll: () => [],
+  createTextNode: (t) => ({ textContent: t }),
+};
+globalThis.matchMedia = () => ({ matches: false, addEventListener() {}, removeEventListener() {}, addListener() {}, removeListener() {} });
+globalThis.requestAnimationFrame = (fn) => setTimeout(fn, 0);
+globalThis.cancelAnimationFrame = (id) => clearTimeout(id);
+globalThis.ResizeObserver = class { observe() {} unobserve() {} disconnect() {} };
+globalThis.IntersectionObserver = class { observe() {} unobserve() {} disconnect() {} };
+globalThis.HTMLElement = class {};
+globalThis.SVGElement = class {};
+globalThis.HTMLAnchorElement = class HTMLAnchorElement {};
+globalThis.MutationObserver = class { observe() {} disconnect() {} takeRecords() { return []; } };
+globalThis.Audio = class { play() { return Promise.resolve(); } };
+
+const failures = [];
+const passes = [];
+const ok = (name, cond, detail = "") => (cond ? passes.push(`PASS ${name}`) : failures.push(`FAIL ${name} ${detail}`));
+
+const server = await createServer({
+  appType: "custom",
+  logLevel: "error",
+  server: { middlewareMode: true },
+  optimizeDeps: { noDiscovery: true },
+  ssr: { external: ["react", "react-dom", "react-router-dom", "lucide-react"] },
+  resolve: {
+    alias: [{ find: /^file-saver$/, replacement: new URL("../scripts/ssr-stubs/file-saver.mjs", import.meta.url).pathname }],
+  },
+});
+
+const React = (await import("react")).default;
+const { renderToStaticMarkup } = await import("react-dom/server");
+
+const { I18nProvider } = await server.ssrLoadModule("/src/i18n/index.tsx");
+const pageModule = await server.ssrLoadModule("/src/modules/operations/mortality/pages/MortalityEntryPage.tsx");
+const tableModule = await server.ssrLoadModule("/src/modules/operations/mortality/components/TripLossTable.tsx");
+const summaryModule = await server.ssrLoadModule("/src/modules/operations/mortality/components/CumulativeSummary.tsx");
+// The KPI strip is gone from this page: the component must not exist at all.
+{
+  const { existsSync } = await import("node:fs");
+  ok("no-KPI: LossKpiCards.tsx is deleted", !existsSync("src/modules/operations/mortality/components/LossKpiCards.tsx"), "component still on disk");
+}
+const pageSource = (await import("node:fs")).readFileSync("src/modules/operations/mortality/pages/MortalityEntryPage.tsx", "utf8");
+// The unit every weight figure prints. Read from the page, so the harness proves
+// what the page does rather than a copy of it.
+// The unit is not the page's private copy: it is one entry in the translation
+// tables, so the harness reads it from the same place the page does.
+const dictSource = (await import("node:fs")).readFileSync;
+const unitIn = (file) => (dictSource(file, "utf8").match(/'ops\.mortality\.weight_unit': '([^']+)'/) || [])[1];
+const WEIGHT_UNIT = unitIn("src/i18n/modules/operations.en.ts");
+// A weight figure prints the number and the Telugu unit — never the Latin "Kg".
+const LATIN_KG = /\d[\d.,]*\s*(kg|Kg|KG)\b/;
+const checkNoLatinKg = (label, html) => ok(`weights: ${label} prints no Latin 'Kg'`, !LATIN_KG.test(html), (html.match(LATIN_KG) || [""])[0]);
+const hookSource = (await import("node:fs")).readFileSync("src/modules/operations/mortality/hooks/useTripLossAnalysis.ts", "utf8");
+{
+  // ONE request per screen: no second "totals" call, no unfiltered peek, no
+  // duplicate fetch on Reset — the payload already carries rows + totals + masters.
+  ok("instant: exactly one fetch call site", (hookSource.match(/fetchMortalityAnalysis\(/g) || []).length === 1, `calls=${(hookSource.match(/fetchMortalityAnalysis\(/g) || []).length}`);
+  ok("instant: the cache is painted before the fetch", hookSource.indexOf("if (cached)") > 0 && hookSource.indexOf("if (cached)") < hookSource.indexOf("fetchMortalityAnalysis("), "cache read is not first");
+  ok("instant: a fresh screen skips the network", hookSource.includes("shouldRevalidate(cached.at, forced)") && hookSource.includes("return;"), "fresh-cache short circuit missing");
+  ok("instant: rows on screen are never replaced by the skeleton", hookSource.includes("if (hasRows) setReloading(true);") && hookSource.includes("else setLoading(true);"), "loading/reloading split missing");
+  ok("instant: a background failure keeps the rows", hookSource.includes("if (!screenRef.current || forced) setError(messageOf(err));"), "background failure would blank the grid");
+  ok("instant: Reset is one state update", hookSource.includes("setFilters(defaults);") && hookSource.includes("setAppliedFilters(defaults);") && hookSource.includes("setSummaryVisible(false);"), "reset does not clear everything together");
+  ok("instant: Refresh drops the cache and forces a read", hookSource.includes("cacheRef.current.clear();") && hookSource.includes("forceRef.current = true;"), "refresh would serve the cache");
+  ok("instant: the summary waits for its own totals", hookSource.includes("summaryReady: summaryVisible && totalsReady"), "stale totals could show");
+  ok("dupes: the response path de-duplicates by trip", hookSource.includes("data: uniqueTrips(res.data),"), "no de-duplication");
+  ok("instant: Search and Reset skip the coalescing delay", (hookSource.match(/immediateRef\.current = true;/g) || []).length === 2 && hookSource.includes("immediate ? 0 : COALESCE_MS"), "committed actions still wait on a timer");
+  ok("instant: no cascading page-sync render", hookSource.includes("const effectivePage = Math.min(Math.max(1, page), totalPages);") && !hookSource.includes("setPage((p) => Math.min"), "page is still synced from an effect");
+  ok("instant: the query runs on the clamped page", hookSource.includes("page: effectivePage,") && hookSource.includes("${effectivePage}"), "query does not use the shown page");
+  {
+  const { readFileSync: read } = await import("node:fs");
+  const surface = ["pages/MortalityEntryPage.tsx", "components/LossFilters.tsx", "components/TripLossTable.tsx", "components/CumulativeSummary.tsx"]
+    .map((file) => read(`src/modules/operations/mortality/${file}`, "utf8"))
+    .join("\n");
+  ok("instant: no page reload anywhere in the mortality surface", !/location\s*\.\s*(reload|replace|assign)|window\s*\.\s*location\s*=/.test(surface), "a page reload survives in the mortality surface");
+}
+}
+
+/* ── 4b. The query rules, exercised directly ──────────────────────────── */
+{
+  const { shouldRevalidate, uniqueTrips } = await server.ssrLoadModule("/src/modules/operations/mortality/hooks/useTripLossAnalysis.ts");
+  const now = 1_000_000;
+  ok("reset: a fresh screen is served without a request", shouldRevalidate(now - 1_000, false, now) === false, "fresh entry revalidated");
+  ok("reset: a stale screen revalidates behind the rows", shouldRevalidate(now - 60_000, false, now) === true, "stale entry trusted");
+  ok("reset: Refresh always re-reads the server", shouldRevalidate(now - 1_000, true, now) === true, "forced read skipped");
+  ok("reset: an unknown screen is fetched", shouldRevalidate(undefined, false, now) === true, "missing entry trusted");
+
+  const rows = [
+    { tripId: 7, tripNo: "TRP-7" },
+    { tripId: 9, tripNo: "TRP-9" },
+    { tripId: 7, tripNo: "TRP-7" },
+    { tripId: 7, tripNo: "TRP-7" },
+    { tripId: 11, tripNo: "TRP-11" },
+  ];
+  const deduped = uniqueTrips(rows);
+  ok("dupes: a repeated trip renders once", deduped.length === 3 && deduped.every((row, i) => row.tripId === [7, 9, 11][i]), JSON.stringify(deduped.map((r) => r.tripId)));
+  ok("dupes: every surviving row is unique", new Set(deduped.map((r) => r.tripId)).size === deduped.length, "duplicate survived");
+}
+ok("no-KPI: the page never references the KPI cards", !pageSource.includes("LossKpiCards"), "KPI import/render still present");
+ok("no-KPI: the page has no KPI section", !pageSource.includes("ops.mortality.kpi.filtered_summary"), "KPI section still rendered");
+{
+  const tableAt = pageSource.indexOf("<TripLossTable");
+  const tableSectionEnd = pageSource.indexOf("</section>", tableAt);
+  const summaryAt = pageSource.indexOf("<CumulativeSummary");
+  ok("cumulative: rendered below the table", tableAt > 0 && summaryAt > tableSectionEnd, `table@${tableAt} sectionEnd@${tableSectionEnd} summary@${summaryAt}`);
+  ok("cumulative: only after a Search", pageSource.includes("analysis.summaryReady &&"), "gate missing");
+  ok("instant: the grid is told when a background query runs", pageSource.includes("reloading={analysis.reloading}"), "no background flag");
+  ok("cumulative: fed the whole filtered set", pageSource.includes("totalRecords={analysis.totalRecords}"), "whole-set props missing");
+}
+const filtersModule = await server.ssrLoadModule("/src/modules/operations/mortality/components/LossFilters.tsx");
+const indicatorModule = await server.ssrLoadModule("/src/modules/operations/mortality/components/AppliedFiltersIndicator.tsx");
+
+const formatNumberEn = (value) => Number(value).toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+const shell = (node) => React.createElement(I18nProvider, null, node);
+const render = (node) => renderToStaticMarkup(shell(node));
+/// Render once in Telugu: the provider reads the stored language at mount.
+const renderTe = (node) => {
+  const saved = store.get("dmr-language");
+  store.set("dmr-language", "te");
+  const html = renderToStaticMarkup(shell(node));
+  if (saved === undefined) store.delete("dmr-language");
+  else store.set("dmr-language", saved);
+  return html;
+};
+/// Text cells of a rendered block, tags stripped.
+const cellsOf = (html) => html.replace(/<[^>]+>/g, "|").split("|").map((part) => part.trim()).filter(Boolean);
+/// A Telugu page carries Telugu words and figures — never English words.
+const SYMBOLS = new Set(["—", "#", "%", "…", "•", "·"]);
+const englishLeft = (html) => cellsOf(html).filter((cell) => !/[\u0C00-\u0C7F]/.test(cell) && !/^[0-9][0-9,.\s%·’'\/\-]*$/.test(cell) && !SYMBOLS.has(cell));
+
+/* ── 1. The page shell (no data yet: first paint) ──────────────────────── */
+const pageHtml = render(React.createElement(pageModule.default));
+ok("page renders", pageHtml.length > 2000, `len=${pageHtml.length}`);
+for (const [label, needle] of [
+  ["filter card", "rounded-xl border border-slate-200"],
+  ["search placeholder", "Trip, farm, supervisor..."],
+  ["label: Search", "Search"],
+  ["label: Reset", "Reset"],
+  ["page has no duplicate heading section", "Completed Trips"],
+]) {
+  ok(`page: ${label}`, pageHtml.includes(needle), `missing ${needle}`);
+}
+ok("page: no leftover section <h3> above the card", !/<h3[^>]*>\s*Completed Trips\s*<\/h3>/.test(pageHtml) || (pageHtml.match(/Completed Trips/g) || []).length === 1, `occurrences=${(pageHtml.match(/Completed Trips/g) || []).length}`);
+
+/* ── 2. The filter bar (Trip List controls) ───────────────────────────── */
+const noop = () => {};
+const filtersHtml = render(
+  React.createElement(filtersModule.default, {
+    filters: { fromDate: "", toDate: "", sourceFarm: "", supervisor: "", search: "" },
+    setFilters: noop,
+    appliedFilters: { fromDate: "", toDate: "", sourceFarm: "", supervisor: "", search: "" },
+    farmOptions: ["Anand Agro Farms", "Sai Sreenivasa Farms"],
+    supervisorOptions: ["Ravi Rao", "Yesu Rao"],
+    sort: { key: "tripDate", dir: "desc" },
+    setSort: noop,
+    onApply: noop,
+    onReset: noop,
+    onRefresh: noop,
+    refreshing: false,
+  }),
+);
+ok("filters: From label", filtersHtml.includes("From"));
+ok("filters: To label", filtersHtml.includes("To"));
+ok("filters: Farm label uses the Trip List key", filtersHtml.includes("Farm"));
+ok("filters: Supervisor label", filtersHtml.includes("Supervisor"));
+ok("filters: Sort By label (Trip List key)", filtersHtml.includes("Sort By"));
+ok("filters: no native select for reference lists", !filtersHtml.includes("<select"), "a <select> is present");
+ok("filters: farm placeholder", filtersHtml.includes("All Farms"));
+ok("filters: supervisor placeholder", filtersHtml.includes("All Supervisors"));
+ok("filters: searchable dropdown inputs exist", (filtersHtml.match(/type="text"/g) || []).length >= 2, `text inputs=${(filtersHtml.match(/type="text"/g) || []).length}`);
+ok("filters: hen refresh button (brand logo)", filtersHtml.includes("dmr-hen") || filtersHtml.includes("Refresh"), "no brand refresh control");
+ok("filters: search animation hook", filtersHtml.includes("--animate-action-search"), "search animation class missing");
+ok("filters: reset animation hook", filtersHtml.includes("--animate-action-reset"), "reset animation class missing");
+ok("filters: current sort is reflected", filtersHtml.includes("Day") && filtersHtml.includes("Latest first"), "sort label missing");
+ok("filters: pristine controls do not flag Search", !filtersHtml.includes("ring-2 ring-emerald-300"), "Search is flagged without changes");
+
+/* ── 3. The table with fixture rows (Trip List parity) ────────────────── */
+const rows = [
+  { tripId: 1, tripNo: "TRP-20260916-001", tripDate: "2026-09-16", sourceFarm: "Sai Sreenivasa Farms", supervisorName: "Ravi Rao", vehicleNo: "TS09UB1074", driverName: "Yesu Kumar", status: "Completed", farmBirds: 319, farmWeight: 636.09, deliveryShops: 9, deliveredBirds: 311, deliveredWeight: 608.97, mortalityCount: 8, mortalityWeight: 13.55, weightLoss: 13.57, weightLossPercentage: 2.13, mortalityPercentage: 2.51, survivalRate: 0.9749 },
+  { tripId: 2, tripNo: "TRP-20260916-002", tripDate: "2026-09-16", sourceFarm: "Anand Agro Farms", supervisorName: "Yesu Rao", vehicleNo: "TS07UB1222", driverName: "Feroz Kumar", status: "Completed", farmBirds: 2005, farmWeight: 4560.47, deliveryShops: 58, deliveredBirds: 1990, deliveredWeight: 4516.61, mortalityCount: 15, mortalityWeight: 27.73, weightLoss: 16.13, weightLossPercentage: 0.35, mortalityPercentage: 0.75, survivalRate: 0.9925 },
+];
+
+const tableHtml = render(
+  React.createElement(tableModule.default, {
+    records: rows,
+    sort: { key: "tripDate", dir: "desc" },
+    setSort: noop,
+    page: 2,
+    totalPages: 53,
+    totalRecords: 525,
+    pageSize: 10,
+    onPageChange: noop,
+    onPageSizeChange: noop,
+    loading: false,
+    emptyAll: false,
+    filtersApplied: false,
+    onReset: noop,
+    weightUnit: WEIGHT_UNIT,
+  }),
+);
+
+ok("table: card header bar title", tableHtml.includes("Completed Trips"));
+// ONE SOURCE OF TRUTH for the band: declared once in the design system, imported
+// by every data surface — no surface may paste the class string itself.
+{
+  const { readFileSync } = await import("node:fs");
+  const tokens = readFileSync("src/shared/ui/uiTokens.ts", "utf8");
+  const surfaces = ["TripLossTable.tsx", "TripLossRowExpand.tsx", "CumulativeSummary.tsx"]
+    .map((file) => readFileSync(`src/modules/operations/mortality/components/${file}`, "utf8"));
+  ok("hover: the band is declared exactly once", (tokens.match(/uiAnalysisRowHoverClass =/g) || []).length === 1 && (tokens.match(/uiAnalysisRowHoverOnTintClass =/g) || []).length === 1, "more than one definition");
+  ok("hover: grid, panel and summary import the same band", surfaces.every((file) => file.includes("uiAnalysisRowHoverClass")), "a surface missed the shared band");
+  ok("hover: no surface pastes the band by hand", surfaces.every((file) => !file.includes("hover:bg-emerald-50/60") && !file.includes("hover:bg-emerald-100/70")), "a surface hand-wrote the band");
+  ok("hover: the grid row keeps its pointer and its ring", tableHtml.includes("cursor-pointer") && tableHtml.includes("focus-visible:ring-emerald-400"), "the grid row lost click or keyboard affordance");
+}
+// THE WHOLE APP'S TELUGU, not just this page: the one header control is only a
+// single source of truth if every string it can reach is actually translated.
+{
+  const { readFileSync, readdirSync, statSync } = await import("node:fs");
+  const walk = (dir, out = []) => {
+    for (const entry of readdirSync(dir)) {
+      const full = `${dir}/${entry}`;
+      if (statSync(full).isDirectory()) walk(full, out);
+      else if (/\.(ts|tsx)$/.test(entry) && !entry.includes(".test.")) out.push(full);
+    }
+    return out;
+  };
+  const files = walk("src");
+  const used = new Map();
+  for (const file of files) {
+    if (file.includes("/i18n/")) continue;
+    for (const match of readFileSync(file, "utf8").matchAll(/(?<![.\w])t\(\s*["'`]([A-Za-z0-9_.]+)["'`]/g)) {
+      if (!used.has(match[1])) used.set(match[1], file);
+    }
+  }
+  const defined = new Set();
+  for (const file of files) {
+    if (!file.includes("/i18n/") && !/i18n[^/]*\.ts$/.test(file) && !/Copy\.ts$/.test(file)) continue;
+    // Keys may be quoted, bare, or several to a line (the module copy files pack
+    // them), so any `key:` that opens a string counts as defined.
+    for (const match of readFileSync(file, "utf8").matchAll(/(?:^|[,{\s])(?:'([^']+)'|"([^"]+)"|([A-Za-z_$][\w$]*))\s*:\s*["'`]/gm)) {
+      defined.add(match[1] ?? match[2] ?? match[3]);
+    }
+  }
+  const unresolvable = [...used.keys()].filter((key) => !defined.has(key));
+  ok("i18n: every string on screen resolves to a translation", unresolvable.length === 0, `no entry for ${unresolvable.slice(0, 5).join(", ")}`);
+
+  // The Telugu column of the global tables must cover the English one: a key that
+  // exists only in English reads English in a Telugu session.
+  const table = (file) => {
+    const out = new Map();
+    for (const match of readFileSync(file, "utf8").matchAll(/^\s*(?:'([^']+)'|"([^"]+)")\s*:\s*(['"`])([\s\S]*?)\3,?\s*$/gm)) {
+      out.set(match[1] ?? match[2], match[4]);
+    }
+    return out;
+  };
+  const enTable = table("src/i18n/en.ts");
+  const teTable = table("src/i18n/te.ts");
+  const englishOnly = [...enTable.keys()].filter((key) => !teTable.has(key));
+  ok("i18n: nothing on the page is English-only", englishOnly.length === 0, `${englishOnly.length} keys, e.g. ${englishOnly.slice(0, 5).join(", ")}`);
+
+  // Telugu that came out of a bad pass: another script, or Latin letters welded
+  // onto a Telugu word. Both are unreadable to the operator.
+  const foreign = /[\u0900-\u097F\u0980-\u09FF\u0A80-\u0AFF\u0B80-\u0BFF\u0C80-\u0CFF\u0D00-\u0D7F\u0400-\u04FF\u0600-\u06FF\u4E00-\u9FFF\u3040-\u30FF\uAC00-\uD7AF]/;
+  const glued = /[A-Za-z]{3,}[\u0C00-\u0C7F]|[\u0C00-\u0C7F][A-Za-z]{3,}/;
+  const allowed = /(PDF|EMI|FASTag|GST|IFSC|Excel|WhatsApp|DMR|POULTRIES|ID|KPI|A4|Google|Maps|SHOP|kg|Kg|API|OTP|URL|GPS|UPI|CSV|JSON|HTML|km|MB|GB)/;
+  const broken = [];
+  for (const file of files.filter((name) => name.includes(".te.ts") || name.endsWith("/i18n/te.ts"))) {
+    for (const match of readFileSync(file, "utf8").matchAll(/^\s*(?:'([^']+)'|"([^"]+)")\s*:\s*(['"`])([\s\S]*?)\3,?\s*$/gm)) {
+      const value = match[4];
+      if (!/[\u0C00-\u0C7F]/.test(value)) continue;
+      if (foreign.test(value) || (glued.test(value) && !allowed.test(value))) broken.push(`${match[1] ?? match[2]} => ${value.slice(0, 40)}`);
+    }
+  }
+  ok("telugu: no value in any module carries another script or welded letters", broken.length === 0, broken.slice(0, 4).join(" · "));
+}
+// ONE HEADER CONTROL: this page holds no language state of its own — the app
+// provider is the single source, so switching in the header moves every module.
+{
+  const { readFileSync } = await import("node:fs");
+  const surface = [
+    "pages/MortalityEntryPage.tsx",
+    "components/LossFilters.tsx",
+    "components/TripLossTable.tsx",
+    "components/TripLossRowExpand.tsx",
+    "components/CumulativeSummary.tsx",
+    "components/AppliedFiltersIndicator.tsx",
+  ].map((file) => readFileSync(`src/modules/operations/mortality/${file}`, "utf8")).join("\n");
+  const switcher = readFileSync("src/ui/Header/LanguageSwitcher.tsx", "utf8");
+  ok("language: the page keeps no language state of its own", !surface.includes("useState<Language>") && !surface.includes("setLanguage") && !surface.includes("toggleLanguage"), "the page stores a language");
+  // The switch may keep its own open/closed menu state; what it must NOT keep is
+  // a language of its own — it writes to the one provider every module reads.
+  ok("language: the header switch is the single control", switcher.includes("useI18n") && switcher.includes("setLanguage") && !switcher.includes("useState<Language>") && !switcher.includes("localStorage"), "the header switch keeps its own language");
+  ok("language: the page never branches on the language by hand", !surface.includes('language === "te"'), "a page-level language branch appeared");
+}
+// ── THE WEIGHT UNIT ─────────────────────────────────────────────────────────
+// "Kg need not to display here, only the number required — we want it in Telugu".
+ok("weights: the unit reads in Telugu", WEIGHT_UNIT === "కేజీ" && unitIn("src/i18n/modules/operations.te.ts") === "కేజీ", `en=${WEIGHT_UNIT} te=${unitIn("src/i18n/modules/operations.te.ts")}`);
+checkNoLatinKg("the grid", tableHtml);
+ok("weights: the figures keep every digit", tableHtml.includes("4,560.47") && tableHtml.includes("16.13"), "a number lost its digits");
+// ONE SOURCE OF TRUTH: the unit lives in the translation tables. No page, and no
+// component, carries its own copy of the word.
+{
+  const { readFileSync } = await import("node:fs");
+  const surface = [
+    "pages/MortalityEntryPage.tsx",
+    "components/LossFilters.tsx",
+    "components/TripLossTable.tsx",
+    "components/TripLossRowExpand.tsx",
+    "components/CumulativeSummary.tsx",
+    "components/AppliedFiltersIndicator.tsx",
+  ].map((file) => readFileSync(`src/modules/operations/mortality/${file}`, "utf8")).join("\n");
+  ok("weights: no page or component owns a copy of the unit", !surface.includes("కేజీ"), "a source file hard-codes the unit");
+  ok("weights: the page reads the unit from the dictionary", (pageSource.match(/t\("ops\.mortality\.weight_unit"\)/g) || []).length === 2, "the page does not translate the unit");
+}
+ok("table: count pill uses the trip total", tableHtml.includes("525"), "count pill missing");
+ok("table: count sits in the title block right after the title", /Completed Trips<\/h3>\s*<span[^>]*>[\s\S]{0,220}525 trips/.test(tableHtml), "count pill is not beside the title");
+ok("table: broken-heart mortality mark in a flat rose tile", tableHtml.includes("heart-crack") && tableHtml.includes("border-rose-100 bg-rose-50/70") && !tableHtml.includes("from-rose-500 to-orange-400"), "mortality mark missing or still glossy");
+ok("table: the header bar is the title, the count and nothing else", !tableHtml.includes("move rows") && !tableHtml.includes("opens the trip panel") && !tableHtml.includes("hint.keys"), "a keyboard hint is still printed beside the title");
+// Every metric glyph must live in the HEADER only — never repeated per row.
+{
+  const headerEnd = tableHtml.indexOf("</thead>");
+  const head = tableHtml.slice(0, headerEnd);
+  const body = tableHtml.slice(headerEnd);
+  const headerGlyphs = (head.match(/lucide-(bird|scale|shopping-bag|feather|percent|trending-down)/g) || []).length;
+  const bodyGlyphs = (body.match(/lucide-(bird|scale|shopping-bag|feather|percent|trending-down)/g) || []).length;
+  ok("table: metric glyphs are header-only (none repeated per row)", headerGlyphs >= 8 && bodyGlyphs === 0, `header=${headerGlyphs} body=${bodyGlyphs}`);
+}
+ok("table: rows use the Trip List rhythm (px-3 py-3.5, not py-5)", tableHtml.includes("py-3.5") && !tableHtml.includes(" py-5"), `py-3.5=${(tableHtml.match(/py-3\.5/g) || []).length}`);
+ok("table: serial column header", tableHtml.includes(">#<"), "no # header");
+for (const header of ["Trip No", "Day", "Farm", "Supervisor", "Farm Birds", "Farm Wt", "Shops", "Del. Birds", "Del. Wt", "Mortality", "Mort. Wt", "Wt Loss", "Loss %"]) {
+  ok(`table: header "${header}"`, tableHtml.includes(header), `missing ${header}`);
+}
+ok("table: Day renders weekday + date", tableHtml.includes("Wed, 16 Sep 2026"), "day formatting missing");
+ok("table: serial continues from the page offset", tableHtml.includes(">11<") && tableHtml.includes(">12<"), "page-2 serials missing");
+ok("table: paired sort arrows present", (tableHtml.match(/lucide-arrow-(up|down)/g) || []).length >= 20, `arrows=${(tableHtml.match(/lucide-arrow-(up|down)/g) || []).length}`);
+ok("table: global pagination renders", tableHtml.includes("Showing") && tableHtml.includes("of 525"), "global pagination missing");
+ok("table: rows-per-page control from the global pager", tableHtml.includes("Rows per page"), "rows per page missing");
+ok("table: header glyphs are coloured lucide icons", (tableHtml.match(/text-(indigo|violet|amber|emerald|sky|orange|rose)-500/g) || []).length >= 10, "icon tones missing");
+{
+  const { readFileSync } = await import("node:fs");
+  const source = readFileSync("src/modules/operations/mortality/components/TripLossTable.tsx", "utf8");
+  ok("keys: rows are focusable", (tableHtml.match(/tabindex="0"/g) || []).length === rows.length, `focusable=${(tableHtml.match(/tabindex="0"/g) || []).length}`);
+  ok("keys: arrow up/down move between rows", source.includes('event.key !== "ArrowDown" && event.key !== "ArrowUp"') && source.includes("rowRefs.current.get(next.tripId)?.focus()"), "arrow navigation missing");
+  ok("keys: Enter/Space opens and Escape closes the panel", source.includes('event.key === "Enter" || event.key === " "') && source.includes('event.key === "Escape"') && source.includes("toggle(row.tripId)"), "open/close keys missing");
+  ok("keys: focused row is visible (focus ring)", tableHtml.includes("focus-visible:ring-inset focus-visible:ring-emerald-400"), "no focus ring");
+
+  // ── THE ROW HIGHLIGHT: one band, all fourteen columns, nothing else ─────
+  ok("highlight: the row carries the band on hover", tableHtml.includes("hover:bg-emerald-50/60"), "no row highlight on hover");
+  ok("highlight: the band stays on the row that was clicked", tableHtml.includes("focus:bg-emerald-50/60"), "highlight lost as soon as the pointer leaves");
+  {
+    // The open trip's band only exists once a row is opened, so it is asserted
+    // against the source that renders it.
+    const { readFileSync: readRows } = await import("node:fs");
+    const rowSource = readRows("src/modules/operations/mortality/components/TripLossTable.tsx", "utf8");
+    ok("highlight: the open trip's band deepens", rowSource.includes('isOpen ? "bg-emerald-50/70"'), "the open row is not marked");
+  }
+  ok("highlight: the row is still the click target", tableHtml.includes("cursor-pointer") && tableHtml.includes("select-none"), "row affordances missing");
+  ok("highlight: nothing else rides on the row", !tableHtml.includes("Previous trip") && !tableHtml.includes("Next trip") && !tableHtml.includes("border-l-2"), "extra per-row chrome came back");
+  ok("highlight: a click leaves no box on the chevron", tableHtml.includes("focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-300"), "the chevron parks a focus box");
+
+  // ── MOUSE: the row is the click target, and a click arms the keyboard ────
+  ok("mouse: the trip row shows a pointer", tableHtml.includes("cursor-pointer"), "row does not look clickable");
+  ok("mouse: grid text is not drag-selected into a toggle", tableHtml.includes("select-none"), "row would toggle on a text drag");
+  ok("mouse: clicking a row opens its detail", source.includes("onClick={(event) => {") && source.includes("event.currentTarget.focus();\n                        toggle(r.tripId);"), "row has no click handler");
+  ok("mouse: the chevron does not toggle twice", source.includes("event.stopPropagation();\n                              toggle(r.tripId);"), "chevron click would fight the row click");
+
+  // ── THE PANEL IS SELECTABLE, AND KEEPS THE KEYBOARD ALIVE ───────────────
+  ok("panel: its text takes the selection cursor", source.includes("cursor-text select-text"), "panel is not selectable");
+  ok("panel: a click on its text hand the keyboard over", source.includes("selection.isCollapsed") && source.includes("event.currentTarget.focus();") && source.includes("tabIndex={-1}"), "panel cannot keep the keyboard");
+  ok("panel: ↑/↓ inside it walks the trips", source.includes("handlePanelKeyDown") && source.includes("moveTo(records[rowIndex + (event.key === \"ArrowDown\" ? 1 : -1)], true)"), "no arrow handling inside the panel");
+
+  // ── ONE TRIP AT A TIME ─────────────────────────────────────────────────
+  ok("browse: one panel at a time", source.includes("useState<number | null>(null)") && !source.includes("useState<Set<number>>(new Set())"), "several panels can pile up");
+  ok("browse: the panel follows the arrows", source.includes("moveTo(next, openTripId !== null)"), "arrows leave the panel behind");
+  ok("browse: arrows work from inside the row too", source.includes('if (event.key === "Enter" || event.key === " " || event.key === "Escape") {') && source.includes("// ↑/↓ always step one trip, wherever the focus sits inside the row."), "arrows are still gated to the row element");
+}
+
+ok("table: expand affordance kept", tableHtml.includes("Expand trip") && tableHtml.includes("aria-expanded"), "expand control missing");
+// The expanded cell belongs to a table that can be wider than its scroller, so
+// the panel must be pinned to the scroller's edge — otherwise its right half
+// (and the last table columns) render outside the visible card. The panel only
+// exists once a row is expanded, so this one is asserted against the source.
+{
+  const { readFileSync } = await import("node:fs");
+  const source = readFileSync("src/modules/operations/mortality/components/TripLossTable.tsx", "utf8");
+  ok("table: expanded row is pinned to the visible area", source.includes('className="sticky left-0 cursor-text select-text"') && source.includes("width: `${panelWidth}px`"), "panel is not pinned; it will overflow the card");
+  ok("table: the scroller is measured for the panel width", source.includes("new ResizeObserver") && source.includes("clientWidth") && tableHtml.includes("overflow-x-auto"), "scroll container is not measured");
+}
+
+/* ── 3b. The expanded row panel — ONE card, ONE table, full width ─────── */
+{
+  const expandModule = await server.ssrLoadModule("/src/modules/operations/mortality/components/TripLossRowExpand.tsx");
+  const expandHtml = render(React.createElement(expandModule.default, { record: { ...rows[0], loaders: ["Jagadish Reddy", "Mohan Naidu"], helpers: ["Jagadish Rao", "Yesu Reddy"] }, weightUnit: WEIGHT_UNIT }));
+  checkNoLatinKg("the trip panel", expandHtml);
+  ok("weights: the panel's figures keep every digit", expandHtml.includes("636.09") && expandHtml.includes("13.55") && expandHtml.includes("2.13%"), "a panel number lost its digits");
+
+  ok("panel: ONE card", (expandHtml.match(/rounded-xl border border-slate-200 bg-white/g) || []).length === 1, `cards=${(expandHtml.match(/rounded-xl border border-slate-200 bg-white/g) || []).length}`);
+  ok("panel: ONE table", (expandHtml.match(/<table/g) || []).length === 1, `tables=${(expandHtml.match(/<table/g) || []).length}`);
+  ok("panel: the table fills the card", expandHtml.includes("w-full table-fixed"));
+  ok("panel: sections are stacked as full-width bands inside it", (expandHtml.match(/colSpan="4"/g) || []).length === 2, `bands=${(expandHtml.match(/colSpan="4"/g) || []).length}`);
+  ok("panel: four equal columns carry every row", (expandHtml.match(/w-1\/4/g) || []).length >= 20, `quarter cells=${(expandHtml.match(/w-1\/4/g) || []).length}`);
+  ok("panel: trip + weights + rates titles present", ["Trip Details", "Weights", "Rates"].every((title) => expandHtml.includes(title)));
+  ok("panel: card title carries the trip mark", expandHtml.includes("border-indigo-100 bg-indigo-50/70") && expandHtml.includes("border-rose-100 bg-rose-50/70") && expandHtml.includes("border-emerald-100 bg-emerald-50/70"));
+  ok("panel: every value starts from the left", (expandHtml.match(/text-left align-middle/g) || []).length >= 12 && !expandHtml.includes("text-right align-middle"), `left=${(expandHtml.match(/text-left align-middle/g) || []).length} right=${(expandHtml.match(/text-right align-middle/g) || []).length}`);
+  ok("panel: no cell in the panel is right-aligned at all", !expandHtml.includes("text-right"), "a cell is still right-aligned");
+  ok("panel: name │ data hairline inside every pair", (expandHtml.match(/border-l border-slate-200 px-3/g) || []).length >= 10, `rules=${(expandHtml.match(/border-l border-slate-200 px-3/g) || []).length}`);
+  // HOVER INSIDE THE PANEL: every data line marks itself, so a name and the value
+  // it belongs to are read together — trip details, weights and rates alike.
+  ok("panel: every data line highlights on hover", (expandHtml.match(/hover:bg-emerald-50\/60/g) || []).length >= 8, `hover lines=${(expandHtml.match(/hover:bg-emerald-50\/60/g) || []).length}`);
+  ok("panel: the hover is the grid's own tint", tableHtml.includes("hover:bg-emerald-50/60") && !expandHtml.includes("hover:bg-emerald-50/50"), "the panel and the grid hover differently");
+  ok("panel: the survival strip deepens on hover", expandHtml.includes("bg-emerald-50/70 transition-colors duration-150 hover:bg-emerald-100/70"), "survival strip does not react");
+  ok("panel: one hover mechanism, no group tricks", !expandHtml.includes("group-hover") && !/<tr class="group"/.test(expandHtml), "the strip still uses a second mechanism");
+  ok("panel: the section bands do not pretend to be data", !/<tr[^>]*bg-slate-50\/80[^>]*hover:/.test(expandHtml), "a section band highlights");
+  {
+    const { readFileSync: readPanel } = await import("node:fs");
+    const panelSource = readPanel("src/modules/operations/mortality/components/TripLossRowExpand.tsx", "utf8");
+    ok("panel: the band comes from the shared token, not a local copy", panelSource.includes("uiAnalysisRowHoverClass") && !panelSource.includes("hover:bg-emerald-50/60") && !panelSource.includes("LINE_HOVER"), "the panel defines its own hover");
+    ok("panel: the tinted strip uses the deeper shared token", panelSource.includes("uiAnalysisRowHoverOnTintClass"), "the survival strip hovers on its own rules");
+  }
+
+  const detailRow = expandHtml.slice(expandHtml.indexOf("Trip No"), expandHtml.indexOf("Weights"));
+  ok("panel: every trip field is on the card", ["Trip No", "Day", "Vehicle", "Supervisor", "Driver", "Source Farm", "Loaders", "Helpers"].every((label) => detailRow.includes(label)));
+  ok("panel: loaders and helpers print their names", expandHtml.includes("Jagadish Reddy, Mohan Naidu") && expandHtml.includes("Jagadish Rao, Yesu Reddy"));
+
+  const weightsRow = expandHtml.slice(expandHtml.indexOf("Weights"), expandHtml.indexOf("Rates"));
+  ok("panel: weights section has its own column headings", ["Name", "Birds", "Weight"].every((head) => weightsRow.includes(head)) && weightsRow.includes(">%<"));
+  ok("panel: weights rows carry birds, weight and percentage", (weightsRow.match(/100.00%|2.13%/g) || []).length >= 2 && weightsRow.includes(`636.09 ${WEIGHT_UNIT}`) && weightsRow.includes(`13.55 ${WEIGHT_UNIT}`));
+
+  const ratesRow = expandHtml.slice(expandHtml.indexOf("Rates"));
+  ok("panel: rates close the table", ratesRow.includes("Survival Rate") && ratesRow.includes("97.49%") && ratesRow.includes("Mortality %") && ratesRow.includes("Loss %"));
+  ok("panel: nothing is printed twice inside the panel", expandHtml.includes("Delivery Output") === false && expandHtml.includes("Total Delivery") === false);
+}
+
+/* ── 3c. Delivery data — the shop endpoint still backs the numbers ─────── */
+{
+  const API = process.env.API ?? "http://127.0.0.1:4000/api";
+  const firstTrip = await (await fetch(`${API}/operations/mortality-analysis?limit=1`)).json();
+  const record = firstTrip.data[0];
+  const tripId = record.tripId;
+  const shopsRaw = await (await fetch(`${API}/operations/mortality-analysis/${tripId}/deliveries`)).json();
+  const shops = Array.isArray(shopsRaw) ? shopsRaw : shopsRaw.data;
+  ok("data: the trip really has delivery rows", Array.isArray(shops) && shops.length > 0, `rows=${shops?.length}`);
+
+  // SYNC: the shop-wise lines must add up to the counters the page prints —
+  // same trip, same numbers, whether read from the row or from the shops.
+  const birdsTotal = shops.reduce((n, row) => n + row.birds, 0);
+  const weightTotal = Number(shops.reduce((n, row) => n + row.weight, 0).toFixed(2));
+  ok("sync: shop count on the row equals the shop rows fetched", record.deliveryShops === shops.length, `row=${record.deliveryShops} fetched=${shops.length}`);
+  ok("sync: shop birds add up to the row's delivered birds", birdsTotal === record.deliveredBirds, `${birdsTotal} vs ${record.deliveredBirds}`);
+  ok("sync: shop weights add up to the row's delivered weight", Math.abs(weightTotal - record.deliveredWeight) < 0.05, `${weightTotal} vs ${record.deliveredWeight}`);
+
+  // The trip panel itself: facts, crew and the weights table.
+  const expandModule = await server.ssrLoadModule("/src/modules/operations/mortality/components/TripLossRowExpand.tsx");
+  const panelHtml = render(React.createElement(expandModule.default, { record, weightUnit: WEIGHT_UNIT }));
+  ok("panel: trip + vehicle facts from the API", panelHtml.includes(record.tripNo) && panelHtml.includes(record.vehicleNo) && panelHtml.includes(record.driverName));
+  ok("panel: loaders named on the trip table", (record.loaders || []).length > 0 && (record.loaders || []).every((name) => panelHtml.includes(name)), `loaders=${(record.loaders || []).join("/")}`);
+  ok("panel: helpers named on the trip table", (record.helpers || []).length > 0 && (record.helpers || []).every((name) => panelHtml.includes(name)), `helpers=${(record.helpers || []).join("/")}`);
+  ok("panel: survival rate printed", panelHtml.includes(`${(record.survivalRate * 100).toFixed(2)}%`));
+  checkNoLatinKg("the live trip panel", panelHtml);
+  ok("weights: the live panel prints the Telugu unit", panelHtml.includes(` ${WEIGHT_UNIT}`), "no unit on a live figure");
+  ok("panel: every i18n key resolved (no raw key leaked)", panelHtml.includes("ops.mortality") === false);
+}
+
+/* ── 4. Cumulative summary through the global grid ────────────────────── */
+const quarterKpis = { totalTrips: 525, farmBirds: 202769, farmWeight: 473557.27, deliveryShops: 6852, deliveredBirds: 196900, deliveredWeight: 454133.18, mortalityCount: 5869, mortalityWeight: 11667.65, mortalityPercentage: 2.89, weightLoss: 7769.05, weightLossPercentage: 1.64 };
+const summaryHtml = render(
+  React.createElement(summaryModule.default, { kpis: quarterKpis, totalRecords: 525, pageSize: 10, weightUnit: WEIGHT_UNIT }),
+);
+// The cumulative summary reads like the panel below the grid, so it marks the
+// line under the pointer with the same band.
+ok("summary: every data row marks itself", (summaryHtml.match(/transition-colors duration-150 hover:bg-emerald-50\/60/g) || []).length === 4, `hover rows=${(summaryHtml.match(/transition-colors duration-150 hover:bg-emerald-50\/60/g) || []).length}`);
+ok("summary: the survival strip still deepens", summaryHtml.includes("bg-emerald-50/70 transition-colors duration-150 hover:bg-emerald-100/70"), "the strip lost its deeper band");
+checkNoLatinKg("the cumulative summary", summaryHtml);
+// PRODUCTION CHECKS: the page must stay quick, keep long Telugu names inside
+// their columns, and never ship a control without a name.
+{
+  const speedProps = {
+    records: rows, sort: { key: "tripDate", dir: "desc" }, setSort: noop, page: 1,
+    totalPages: 53, totalRecords: 525, pageSize: 10, onPageChange: noop, onPageSizeChange: noop,
+    loading: false, emptyAll: false, filtersApplied: false, onReset: noop, weightUnit: WEIGHT_UNIT,
+  };
+  const started = performance.now();
+  for (let i = 0; i < 30; i += 1) {
+    render(React.createElement(tableModule.default, speedProps));
+    render(React.createElement(summaryModule.default, { kpis: quarterKpis, totalRecords: 525, pageSize: 10, weightUnit: WEIGHT_UNIT }));
+  }
+  const perRender = (performance.now() - started) / 60;
+  ok("speed: a full grid + summary renders in a few milliseconds", perRender < 25, `${perRender.toFixed(2)}ms per render`);
+  ok("clipping: farm and supervisor cells truncate instead of pushing the row", (tableHtml.match(/max-w-\[\d+px\] truncate/g) || []).length >= 2, "a name column can stretch the table");
+}
+
+ok("weights: the summary keeps every digit", summaryHtml.includes("4,73,557.27") && summaryHtml.includes("11,667.65"), "a summary total lost its digits");
+ok("cumulative: ONE card", (summaryHtml.match(/rounded-2xl/g) || []).length === 1, `cards=${(summaryHtml.match(/rounded-2xl/g) || []).length}`);
+ok("cumulative: ONE table", (summaryHtml.match(/<table/g) || []).length === 1, `tables=${(summaryHtml.match(/<table/g) || []).length}`);
+ok("cumulative: full-width fixed table", summaryHtml.includes("w-full table-fixed"), "table class missing");
+ok("cumulative: four equal columns", (summaryHtml.match(/w-1\/4/g) || []).length >= 16, `w-1/4=${(summaryHtml.match(/w-1\/4/g) || []).length}`);
+ok("cumulative: every cell starts from the left", (summaryHtml.match(/text-left/g) || []).length >= 16 && !summaryHtml.includes("text-right"), "alignment wrong");
+ok("cumulative: no KPI cards", !summaryHtml.includes("tooltip") && (summaryHtml.match(/<section/g) || []).length === 1 && !summaryHtml.includes("grid-cols"), "card grid leaked in");
+ok("cumulative: says every page, not this page", summaryHtml.includes("not just the 10 rows on screen"), "scope wording missing");
+ok("cumulative: scope repeats trips and shops", summaryHtml.includes("525 trips") && summaryHtml.includes("6,852 shops"), "scope chip missing");
+ok("cumulative: whole-set totals printed", summaryHtml.includes(`4,73,557.27 ${WEIGHT_UNIT}`) && summaryHtml.includes(`4,54,133.18 ${WEIGHT_UNIT}`) && summaryHtml.includes(`11,667.65 ${WEIGHT_UNIT}`), "totals missing");
+ok("cumulative: weight-loss row has no bird count", summaryHtml.includes(`7,769.05 ${WEIGHT_UNIT}`) && summaryHtml.includes("—"), "loss row wrong");
+ok("cumulative: survival closes the summary", summaryHtml.includes("97.11%"), "survival row missing");
+ok("cumulative: weights read like the panel", summaryHtml.includes("100.00%") && summaryHtml.includes("95.90%") && summaryHtml.includes("2.89%") && summaryHtml.includes("1.64%"), "percent row missing");
+
+/* ── 4c. A background query keeps the grid, a first load may not ────────── */
+{
+  const visible = { key: "tripDate", dir: "desc" };
+  const rows = [{ id: 1 }];
+  const tableProps = {
+    records: [{ tripId: 1, tripNo: "TRP-20260101-001", tripDate: "2026-01-01", sourceFarm: "A Farms", supervisorName: "S", vehicleNo: "V", driverName: "D", loaders: [], helpers: [], status: "Completed", farmBirds: 1, farmWeight: 1, deliveryShops: 1, deliveredBirds: 1, deliveredWeight: 1, mortalityCount: 0, mortalityWeight: 0, weightLoss: 0, weightLossPercentage: 0, mortalityPercentage: 0, survivalRate: 1 }],
+    sort: visible, setSort: noop, page: 1, totalPages: 1, totalRecords: 1, pageSize: 10,
+    onPageChange: noop, onPageSizeChange: noop, emptyAll: false, filtersApplied: false,
+  };
+  const background = render(React.createElement(tableModule.default, { ...tableProps, loading: false, reloading: true }));
+  ok("reset: a background query keeps every row", background.includes("TRP-20260101-001"), "rows disappeared behind a reloading flag");
+  ok("reset: a background query shows no skeleton", !background.includes("animate-pulse rounded-md bg-slate-100"), "skeleton rendered over live rows");
+  ok("reset: a background query is announced, not faked", background.includes('aria-busy="true"') && background.includes('role="progressbar"') && background.includes("Updating…"), "no quiet activity line");
+  const firstLoad = render(React.createElement(tableModule.default, { ...tableProps, loading: true, reloading: false }));
+  ok("reset: only a first load shows the skeleton", firstLoad.includes("animate-pulse rounded-md bg-slate-100") && !firstLoad.includes("TRP-20260101-001"), "first load has no skeleton");
+  ok("reset: an idle grid claims nothing", !render(React.createElement(tableModule.default, { ...tableProps, loading: false, reloading: false })).includes("progressbar"), "idle grid announces activity");
+  void rows;
+}
+
+/* ── 5. Applied-filters indicator ─────────────────────────────────────── */
+const indicatorHtml = render(
+  React.createElement(indicatorModule.default, {
+    appliedFilters: { fromDate: "2026-09-01", toDate: "2026-09-16", sourceFarm: "Anand Agro Farms", supervisor: "Ravi Rao", search: "oil" },
+    onClear: noop,
+  }),
+);
+ok("indicator: one pill per applied filter", (indicatorHtml.match(/rounded-full/g) || []).length >= 5, "pills missing");
+ok("indicator: values shown", indicatorHtml.includes("2026-09-01") && indicatorHtml.includes("Ravi Rao"));
+
+/* ── 6. LIVE DATA SYNC — render the real first page of the sample API ─── */
+try {
+  const API = process.env.API ?? "http://127.0.0.1:4000/api";
+  const payload = await (await fetch(`${API}/operations/mortality-analysis?page=1&limit=10&sortBy=tripDate&sortDir=desc`)).json();
+  ok("live: rows returned", Array.isArray(payload.data) && payload.data.length === 10, `rows=${payload.data?.length}`);
+  ok("live: meta total present", payload.meta.total > 0, `total=${payload.meta.total}`);
+
+  const liveTableHtml = render(
+    React.createElement(tableModule.default, {
+      records: payload.data,
+      sort: { key: "tripDate", dir: "desc" },
+      setSort: noop,
+      page: 1,
+      totalPages: payload.meta.totalPages,
+      totalRecords: payload.meta.total,
+      pageSize: 10,
+      onPageChange: noop,
+      onPageSizeChange: noop,
+      loading: false,
+      emptyAll: false,
+      filtersApplied: false,
+    }),
+  );
+  const first = payload.data[0];
+  ok("live: first trip number rendered", liveTableHtml.includes(first.tripNo), first.tripNo);
+  ok("live: first trip farm rendered", liveTableHtml.includes(first.sourceFarm), first.sourceFarm);
+  ok("live: first trip supervisor rendered", liveTableHtml.includes(first.supervisorName), first.supervisorName);
+  const { formatTripListDay } = await server.ssrLoadModule("/src/modules/operations/vehicle-trips/utils/formatTripListDay.ts");
+  const expectedDay = formatTripListDay(first.tripDate, "en");
+  ok("live: first trip day rendered (weekday + date)", liveTableHtml.includes(expectedDay), `${expectedDay} missing`);
+  ok("live: first trip farm-bird count rendered", liveTableHtml.includes(first.farmBirds.toLocaleString("en-IN")), String(first.farmBirds));
+  ok("live: first trip weight-loss % rendered", liveTableHtml.includes(`${first.weightLossPercentage.toFixed(2)}%`), String(first.weightLossPercentage));
+  ok("live: every row of the page rendered", payload.data.every((row) => liveTableHtml.includes(row.tripNo)), "a row is missing");
+  ok("live: pagination reflects the full filtered set", liveTableHtml.includes(`of ${payload.meta.total}`), `total=${payload.meta.total}`);
+
+  const expandModule = await server.ssrLoadModule("/src/modules/operations/mortality/components/TripLossRowExpand.tsx");
+
+  // CUMULATIVE, NOT PAGE BY PAGE: the totals describe the whole filtered set, so
+  // they are identical on every page while the rows change.
+  const { formatWeight } = await server.ssrLoadModule("/src/utils/format.ts");
+  const pageOne = await (await fetch(`${API}/operations/mortality-analysis?limit=10&page=1&sortBy=tripDate&sortDir=desc`)).json();
+  const pageTwo = await (await fetch(`${API}/operations/mortality-analysis?limit=10&page=2&sortBy=tripDate&sortDir=desc`)).json();
+  const whole = await (await fetch(`${API}/operations/mortality-analysis?limit=500&page=1&sortBy=tripDate&sortDir=desc`)).json();
+  const allRows = await (await fetch(`${API}/operations/mortality-analysis?limit=1000&page=1&sortBy=tripDate&sortDir=desc`)).json();
+  ok("live: paging really changes the rows", pageOne.data[0].tripNo !== pageTwo.data[0].tripNo, "same first row on both pages");
+  ok("live: totals identical on page 1 and page 2", pageOne.kpis.farmWeight === pageTwo.kpis.farmWeight && pageOne.kpis.mortalityCount === pageTwo.kpis.mortalityCount, "page-scoped totals");
+  ok("live: totals identical however wide the page", pageOne.kpis.farmWeight === whole.kpis.farmWeight && pageOne.kpis.totalTrips === whole.kpis.totalTrips, `10-row=${pageOne.kpis.farmWeight} 500-row=${whole.kpis.farmWeight}`);
+  const summed = allRows.data.reduce((total, row) => total + row.farmWeight, 0);
+  ok("live: the reported total is the sum over the whole set", Math.abs(summed - allRows.kpis.farmWeight) < 0.5, `sum=${summed.toFixed(2)} reported=${allRows.kpis.farmWeight}`);
+  // A 500-row page is short of the 525-trip set, yet the totals still cover the
+  // whole set — which is exactly what "cumulative, not page by page" must mean.
+  const shortPageSum = whole.data.reduce((total, row) => total + row.farmWeight, 0);
+  ok("live: a short page does not shrink the totals", whole.data.length < whole.meta.total && whole.kpis.farmWeight === allRows.kpis.farmWeight, `${whole.data.length} of ${whole.meta.total}`);
+  ok("live: totals are not the visible rows' subtotal", Math.abs(shortPageSum - whole.kpis.farmWeight) > 0.5, `visible sum=${shortPageSum.toFixed(2)} total=${whole.kpis.farmWeight}`);
+  const pageSubtotal = pageOne.data.reduce((total, row) => total + row.farmWeight, 0);
+  const liveSummaryHtml = render(
+    React.createElement(summaryModule.default, { kpis: pageOne.kpis, totalRecords: pageOne.meta.total, pageSize: 10, weightUnit: WEIGHT_UNIT }),
+  );
+  ok("live: summary prints the whole-set total", liveSummaryHtml.includes(formatWeight(allRows.kpis.farmWeight, WEIGHT_UNIT)), formatWeight(allRows.kpis.farmWeight, WEIGHT_UNIT));
+  ok("live: summary is NOT the visible page's subtotal", !liveSummaryHtml.includes(formatWeight(pageSubtotal, WEIGHT_UNIT)), `page subtotal ${formatWeight(pageSubtotal, WEIGHT_UNIT)} leaked`);
+  ok("live: summary counts every matching trip", liveSummaryHtml.includes(`${formatNumberEn(pageOne.meta.total)} trips`), `${pageOne.meta.total} trips`);
+  ok("live: summary survival closes with the server's figure", liveSummaryHtml.includes(`${(100 - pageOne.kpis.mortalityPercentage).toFixed(2)}%`), String(pageOne.kpis.mortalityPercentage));
+
+  // Dropdown options come from the same unfiltered peek the table does.
+  const options = payload.filterOptions;
+  ok("live: farm dropdown options", Array.isArray(options.farms) && options.farms.length === 10, `farms=${options.farms?.length}`);
+  ok("live: supervisor dropdown options", Array.isArray(options.supervisors) && options.supervisors.length > 0, `supervisors=${options.supervisors?.length}`);
+  const liveFiltersHtml = render(
+    React.createElement(filtersModule.default, {
+      filters: { fromDate: "", toDate: "", sourceFarm: "", supervisor: "", search: "" },
+      setFilters: noop,
+      appliedFilters: { fromDate: "", toDate: "", sourceFarm: "", supervisor: "", search: "" },
+      farmOptions: options.farms,
+      supervisorOptions: options.supervisors,
+      sort: { key: "tripDate", dir: "desc" },
+      setSort: noop,
+      onApply: noop,
+      onReset: noop,
+      onRefresh: noop,
+      refreshing: false,
+    }),
+  );
+  ok("live: filter bar renders the farm placeholder", liveFiltersHtml.includes("All Farms"), "placeholder missing");
+  // NO BROKEN BUTTONS: every control on the bar carries a name — an aria-label or
+  // its own text — so screen readers and the keyboard are never left guessing.
+  {
+    const buttons = liveFiltersHtml.match(/<button[\s\S]*?<\/button>/g) || [];
+    const unnamed = buttons.filter((button) => {
+      const aria = /aria-label="[^"]+"/.test(button);
+      const text = button.replace(/<[^>]+>/g, "").trim();
+      return !aria && !text;
+    });
+    ok("buttons: every control on the filter bar is named", buttons.length >= 4 && unnamed.length === 0, `buttons=${buttons.length} unnamed=${unnamed.length}`);
+  }
+  ok("live: filter bar renders the supervisor placeholder", liveFiltersHtml.includes("All Supervisors"), "placeholder missing");
+
+  // MasterDropdown only portals its option list while open, so prove the live
+  // reference lists travel through the control by selecting one: the trigger
+  // must then read the live value back.
+  const selectedFiltersHtml = render(
+    React.createElement(filtersModule.default, {
+      filters: { fromDate: "", toDate: "", sourceFarm: options.farms[0], supervisor: options.supervisors[0], search: "" },
+      setFilters: noop,
+      appliedFilters: { fromDate: "", toDate: "", sourceFarm: "", supervisor: "", search: "" },
+      farmOptions: options.farms,
+      supervisorOptions: options.supervisors,
+      sort: { key: "tripDate", dir: "desc" },
+      setSort: noop,
+      onApply: noop,
+      onReset: noop,
+      onRefresh: noop,
+      refreshing: false,
+    }),
+  );
+  ok("live: selected farm is shown in its dropdown", selectedFiltersHtml.includes(options.farms[0]), options.farms[0]);
+  ok("live: selected supervisor is shown in its dropdown", selectedFiltersHtml.includes(options.supervisors[0]), options.supervisors[0]);
+  ok("live: edited-but-unapplied filters are announced on Search", selectedFiltersHtml.includes("filter change(s)") && selectedFiltersHtml.includes("ring-2 ring-emerald-300"), "no pending-changes hint");
+
+  // The applied filters really narrow the server result set (each independently,
+  // then a farm+supervisor pair that exists in the data).
+  const byFarm = await (await fetch(`${API}/operations/mortality-analysis?limit=1&farm=${encodeURIComponent(first.sourceFarm)}`)).json();
+  ok("live: farm filter narrows the set", byFarm.meta.total > 0 && byFarm.meta.total < payload.meta.total, `${byFarm.meta.total} of ${payload.meta.total}`);
+  ok("live: farm-scoped KPIs match the scoped total", byFarm.kpis.totalTrips === byFarm.meta.total, `${byFarm.kpis.totalTrips} vs ${byFarm.meta.total}`);
+  const bySupervisor = await (await fetch(`${API}/operations/mortality-analysis?limit=1&supervisor=${encodeURIComponent(first.supervisorName)}`)).json();
+  ok("live: supervisor filter narrows the set", bySupervisor.meta.total > 0 && bySupervisor.meta.total < payload.meta.total, `${bySupervisor.meta.total} of ${payload.meta.total}`);
+  const byPair = await (await fetch(`${API}/operations/mortality-analysis?limit=1&farm=${encodeURIComponent(first.sourceFarm)}&supervisor=${encodeURIComponent(first.supervisorName)}`)).json();
+  ok("live: farm + supervisor pair narrows the set", byPair.meta.total > 0 && byPair.meta.total <= byFarm.meta.total, `${byPair.meta.total} of ${byFarm.meta.total}`);
+  // COMPLETED ONLY, NEVER DUPLICATED — asserted over the whole quarter set.
+  ok("live: every row is a completed trip", allRows.data.every((row) => row.status === "Completed"), [...new Set(allRows.data.map((row) => row.status))].join(","));
+  ok("live: no trip appears twice in the set", new Set(allRows.data.map((row) => row.tripId)).size === allRows.data.length, `${new Set(allRows.data.map((row) => row.tripId)).size} of ${allRows.data.length}`);
+  ok("live: no trip number appears twice", new Set(allRows.data.map((row) => row.tripNo)).size === allRows.data.length, "duplicate trip number");
+  {
+    // Pages must not overlap either — a duplicated row would be the same trip
+    // rendered twice to the operator.
+    const pages = [];
+    for (let p = 1; p <= 4; p += 1) pages.push((await (await fetch(`${API}/operations/mortality-analysis?limit=10&page=${p}&sortBy=tripDate&sortDir=desc`)).json()).data);
+    const ids = pages.flat().map((row) => row.tripId);
+    ok("live: consecutive pages share no trip", new Set(ids).size === ids.length, `${new Set(ids).size} of ${ids.length}`);
+  }
+
+  const searched = await (await fetch(`${API}/operations/mortality-analysis?limit=1&search=${encodeURIComponent(first.tripNo)}`)).json();
+  ok("live: search by trip number finds it", searched.meta.total >= 1 && searched.data[0].tripNo === first.tripNo, `${searched.meta.total} rows`);
+
+  // ── TELUGU: the whole page reads in Telugu — every label, hint and data value —
+  //    while every figure stays numeric.
+  {
+    const viewModule = await server.ssrLoadModule("/src/modules/operations/vehicle-trips/utils/tripViewLocalization.ts");
+    const row = pageOne.data[0];
+    const englishAttributes = (html) =>
+      (html.match(/(?:aria-label|placeholder)="[^"]*[A-Za-z][^"]*"/g) || []).filter((attr) => !dividerClass(attr));
+    /// Class strings are not user-visible text; only the labels themselves matter.
+    const dividerClass = (attr) => attr.includes("aria-label") === false && attr.includes("placeholder") === false;
+    const noEnglish = (label, html) => {
+      ok(`telugu: ${label} has no English left`, englishLeft(html).length === 0, englishLeft(html).join(" · "));
+      const attrs = englishAttributes(html);
+      ok(`telugu: ${label} has no English labels`, attrs.length === 0, attrs.join(" · "));
+    };
+    const teRender = (label, node, assert) => {
+      try {
+        assert(renderTe(node));
+      } catch (error) {
+        failures.push(`FAIL telugu: ${label} — ${error.message}`);
+      }
+    };
+
+    const teTableHtml = renderTe(
+      React.createElement(tableModule.default, {
+        records: pageOne.data, sort: { key: "tripDate", dir: "desc" }, setSort: noop, page: 1,
+        totalPages: pageOne.meta.totalPages, totalRecords: pageOne.meta.total, pageSize: 10,
+        onPageChange: noop, onPageSizeChange: noop, loading: false, emptyAll: false, filtersApplied: true,
+        weightUnit: WEIGHT_UNIT,
+      }),
+    );
+    const tePanelHtml = renderTe(
+      React.createElement(expandModule.default, { record: row, weightUnit: WEIGHT_UNIT }),
+    );
+    const teSummaryHtml = renderTe(
+      React.createElement(summaryModule.default, { kpis: pageOne.kpis, totalRecords: pageOne.meta.total, pageSize: 10, weightUnit: WEIGHT_UNIT }),
+    );
+    noEnglish("the table", teTableHtml);
+    noEnglish("the trip panel", tePanelHtml);
+    noEnglish("the cumulative summary", teSummaryHtml);
+    ok("telugu: no stray keyboard hint survives in either language", !teTableHtml.includes("వరుసలు కదలడానికి") && !teTableHtml.includes("Enter లేదా క్లిక్") && !teTableHtml.includes("Enter or a click"), "the hint is still on the page");
+    ok("telugu: section titles translated", tePanelHtml.includes("ట్రిప్ వివరాలు") && tePanelHtml.includes("బరువులు") && tePanelHtml.includes("రేట్లు"), "panel titles still English");
+    ok("telugu: column names translated", teSummaryHtml.includes("పేరు") && teTableHtml.includes("ట్రిప్ నం.") && teTableHtml.includes("రోజు") && teTableHtml.includes("ఫారం"), "column names still English");
+    ok("telugu: status chip translated", tePanelHtml.includes("పూర్తయింది"), "status chip still English");
+    ok("telugu: trip number reads in Telugu", tePanelHtml.includes(viewModule.localizeTripViewText(row.tripNo, "te")) && viewModule.localizeTripViewText(row.tripNo, "te") !== row.tripNo, row.tripNo);
+    ok("telugu: farm and crew read in Telugu", tePanelHtml.includes(viewModule.localizeTripViewText(row.sourceFarm, "te")) && tePanelHtml.includes(viewModule.localizeTripViewText(row.supervisorName, "te")), "names not localised");
+    ok("telugu: figures stay numeric", tePanelHtml.includes(formatNumberEn(row.farmBirds)) && tePanelHtml.includes(row.farmWeight.toFixed(2)) && teTableHtml.includes(formatNumberEn(row.farmBirds)), "figures changed");
+    ok("telugu: weights use the Telugu unit", tePanelHtml.includes(WEIGHT_UNIT) && teSummaryHtml.includes(WEIGHT_UNIT) && teTableHtml.includes(WEIGHT_UNIT) && !tePanelHtml.includes(" kg"), "unit not localised");
+    ok("weights: one unit for the whole page, both languages", WEIGHT_UNIT === "కేజీ" && tableHtml.includes(WEIGHT_UNIT) && teTableHtml.includes(WEIGHT_UNIT), "English and Telugu print different units");
+    ok("telugu: cumulative labels translated", teSummaryHtml.includes("మొత్తం సారాంశం") && teSummaryHtml.includes("పేరు") && teSummaryHtml.includes("పక్షులు"), "summary labels still English");
+
+    // The background-query line is part of the page: it must read Telugu as well.
+    const teBusyHtml = renderTe(
+      React.createElement(tableModule.default, {
+        records: pageOne.data, sort: { key: "tripDate", dir: "desc" }, setSort: noop, page: 1,
+        totalPages: pageOne.meta.totalPages, totalRecords: pageOne.meta.total, pageSize: 10,
+        onPageChange: noop, onPageSizeChange: noop, loading: false, reloading: true,
+        emptyAll: false, filtersApplied: true, weightUnit: WEIGHT_UNIT,
+      }),
+    );
+    ok("telugu: the activity line is translated", teBusyHtml.includes("నవీకరిస్తోంది") && !teBusyHtml.includes("Updating"), "activity label still English");
+    noEnglish("the table while it updates", teBusyHtml);
+
+    teRender("the page shell", React.createElement(pageModule.default), (html) => noEnglish("the page shell", html));
+    teRender(
+      "the filter bar",
+      React.createElement(filtersModule.default, {
+        filters: { fromDate: "", toDate: "", sourceFarm: "", supervisor: "", search: "" },
+        setFilters: noop, appliedFilters: {}, farmOptions: [], supervisorOptions: [],
+        sort: { key: "tripDate", dir: "desc" }, setSort: noop,
+        onApply: noop, onReset: noop, onRefresh: noop, refreshing: false,
+      }),
+      (html) => noEnglish("the filter bar", html),
+    );
+    // A chosen farm / supervisor reads in Telugu on the trigger, while the stored
+    // English spelling stays in the option's search text so typing "anand" finds it.
+    const teFarm = viewModule.localizeTripViewText(options.farms[0], "te");
+    const teSupervisor = viewModule.localizeTripViewText(options.supervisors[0], "te");
+    const teFiltersSelected = renderTe(
+      React.createElement(filtersModule.default, {
+        filters: { fromDate: "", toDate: "", sourceFarm: options.farms[0], supervisor: options.supervisors[0], search: "" },
+        setFilters: noop,
+        appliedFilters: { fromDate: "", toDate: "", sourceFarm: "", supervisor: "", search: "" },
+        farmOptions: options.farms, supervisorOptions: options.supervisors,
+        sort: { key: "tripDate", dir: "desc" }, setSort: noop,
+        onApply: noop, onReset: noop, onRefresh: noop, refreshing: false,
+      }),
+    );
+    ok("telugu: the chosen farm reads in Telugu", teFarm !== options.farms[0] && teFiltersSelected.includes(teFarm), `expected ${teFarm}`);
+    ok("telugu: the chosen supervisor reads in Telugu", teSupervisor !== options.supervisors[0] && teFiltersSelected.includes(teSupervisor), `expected ${teSupervisor}`);
+    {
+      const { readFileSync } = await import("node:fs");
+      const filtersSource = readFileSync("src/modules/operations/mortality/components/LossFilters.tsx", "utf8");
+      const dropdown = readFileSync("src/modules/masters/components/MasterDropdown.tsx", "utf8");
+      ok("search: the stored English spelling stays searchable", filtersSource.includes("label: localizeTripViewText(farm, language)") && filtersSource.includes("label: localizeTripViewText(name, language)") && filtersSource.includes("searchText: farm") && filtersSource.includes("searchText: name"), "the search text was dropped");
+      ok("speed: the reference lists are transliterated once, not per keystroke", (filtersSource.match(/useMemo\(/g) || []).length === 2 && filtersSource.includes("[farmOptions, language]") && filtersSource.includes("[supervisorOptions, language]"), "the dropdown lists rebuild on every render");
+      ok("search: the menu matches the search text as well as the label", dropdown.includes("option.searchText?.toLocaleLowerCase().includes(keyword)") && dropdown.includes("option.label.toLocaleLowerCase().includes(keyword)"), "the menu cannot match both spellings");
+    }
+    teRender(
+      "the applied-filters indicator",
+      React.createElement(indicatorModule.default, {
+        appliedFilters: { fromDate: "2026-09-01", toDate: "2026-09-16", sourceFarm: "Anand Agro Farms", supervisor: "Ravi Rao", search: "" },
+        onClear: noop,
+      }),
+      (html) => noEnglish("the applied-filters indicator", html),
+    );
+  }
+} catch (error) {
+  failures.push(`FAIL live data sync: ${error.message} (is the sample API on :4000 running?)`);
+}
+
+await server.close();
+console.log(passes.join("\n"));
+console.log(`\n${passes.length} passed, ${failures.length} failed`);
+if (failures.length) console.log(failures.join("\n"));
