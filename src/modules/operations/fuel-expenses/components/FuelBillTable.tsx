@@ -41,7 +41,6 @@ interface Props {
   onEdit?: (bill: FuelExpense) => void;
   onDelete?: (bill: FuelExpense) => void;
   onApprove?: (bill: FuelExpense) => void;
-  canEditDelete?: (bill: FuelExpense) => boolean;
   startIndex?: number;
   sortBy?: FuelSortKey | null;
   sortDir?: "asc" | "desc";
@@ -78,7 +77,6 @@ export function FuelBillTable({
   onEdit,
   onDelete,
   onApprove,
-  canEditDelete,
   startIndex = 0,
   sortBy = null,
   sortDir = "asc",
@@ -94,8 +92,9 @@ export function FuelBillTable({
 
   const handleRowSelect = useCallback(
     (bill: FuelExpense) => {
+      const nextId = selectedId === bill.id ? null : bill.id;
+      onSelect(nextId);
       if (onRowClick) onRowClick(bill);
-      onSelect(selectedId === bill.id ? null : bill.id);
     },
     [onRowClick, onSelect, selectedId]
   );
@@ -155,13 +154,14 @@ export function FuelBillTable({
   ];
 
   const isSelectedDeleted = selectedBill?.deleted === true || selectedBill?.status === "Deleted";
-  const isTripSelected = selectedBill?.sourceType === "TRIP" || !!selectedBill?.tripNo;
+  const isTripSelected = selectedBill?.sourceType === "TRIP" || !!selectedBill?.tripNo || !!selectedBill?.tripId;
+  const isSelectedApproved = !isSelectedDeleted && (selectedBill?.status === "Approved" || isTripSelected);
   const isSelectedPending = !!(
     selectedBill &&
     !isSelectedDeleted &&
     !isTripSelected &&
-    (selectedBill.status === "Pending" || (selectedBill.status as string)?.toLowerCase() === "pending") &&
-    (canEditDelete ? canEditDelete(selectedBill) : true)
+    !isSelectedApproved &&
+    (selectedBill.status === "Pending" || (selectedBill.status as string)?.toLowerCase() === "pending" || activeTab === "PENDING")
   );
 
   return (

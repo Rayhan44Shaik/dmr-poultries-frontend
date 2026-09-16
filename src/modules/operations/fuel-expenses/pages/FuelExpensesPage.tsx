@@ -233,17 +233,6 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     showNotification(t("ops.fuel.filters_reset"), "info");
   }, [showNotification, t]);
 
-  // ── Check if bill is editable/deletable (Pending manual bill within 10 days) ──
-  const canEditDelete = useCallback((bill: FuelExpense): boolean => {
-    if (bill.sourceType === "TRIP" || !!bill.tripNo) return false;
-    if (bill.status !== "Pending") return false;
-    if (!bill.createdDate && !bill.date) return true;
-    const created = new Date(bill.createdDate || bill.date);
-    const now = new Date();
-    const diffDays = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
-    return diffDays <= 10;
-  }, []);
-
   // ── Row Actions Handlers ──
   const handleView = useCallback((bill?: FuelExpense) => {
     const target = bill || selectedBill;
@@ -258,7 +247,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
   const handleEdit = useCallback((bill?: FuelExpense) => {
     const target = bill || selectedBill;
     if (!target) return;
-    if (target.sourceType === "TRIP" || !!target.tripNo) {
+    if (target.sourceType === "TRIP" || !!target.tripNo || !!target.tripId) {
       showNotification(t("ops.fuel.cant_delete_trip_diesel"), "info");
       return;
     }
@@ -266,14 +255,10 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
       showNotification(language === "te" ? "ఆమోదించిన ఇంధన బిల్లులను సవరించలేము." : "Approved fuel bills cannot be edited.", "info");
       return;
     }
-    if (!canEditDelete(target)) {
-      showNotification(language === "te" ? "సవరణ అనుమతించబడదు – బిల్లు 10 రోజుల కంటే పాతది." : "Edit not allowed – bill is older than 10 days.", "error");
-      return;
-    }
     setEditingId(target.id);
     setEditingData(target);
     setShowForm(true);
-  }, [selectedBill, canEditDelete, showNotification, language, t]);
+  }, [selectedBill, showNotification, language, t]);
 
   // ── Delayed 10-Second Pending Delete with Undo ──
   const { requestDelete, cancel, pendingItems } = usePendingDelete<string>(async (id) => {
@@ -284,7 +269,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
   const handleDelete = useCallback((bill?: FuelExpense) => {
     const target = bill || selectedBill;
     if (!target) return;
-    if (target.sourceType === "TRIP" || !!target.tripNo) {
+    if (target.sourceType === "TRIP" || !!target.tripNo || !!target.tripId) {
       showNotification(t("ops.fuel.cant_delete_trip_diesel"), "info");
       return;
     }
@@ -292,19 +277,15 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
       showNotification(t("ops.fuel.cant_delete_approved"), "info");
       return;
     }
-    if (!canEditDelete(target)) {
-      showNotification(t("ops.fuel.cant_delete_old"), "error");
-      return;
-    }
     requestDelete(target.id, {
       label: language === "te" ? `ఇంధన బిల్లును తొలగిస్తోంది ${target.billNo}` : `Deleting fuel bill ${target.billNo}`,
     });
-  }, [selectedBill, canEditDelete, requestDelete, showNotification, language, t]);
+  }, [selectedBill, requestDelete, showNotification, language, t]);
 
   const handleApprove = useCallback((bill?: FuelExpense) => {
     const target = bill || selectedBill;
     if (!target) return;
-    if (target.sourceType === "TRIP" || !!target.tripNo) {
+    if (target.sourceType === "TRIP" || !!target.tripNo || !!target.tripId) {
       showNotification(t("ops.fuel.trip_diesel_auto_approved"), "info");
       return;
     }
@@ -522,12 +503,10 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
           isLoading={loading}
           selectedId={selectedId}
           onSelect={setSelectedId}
-          onRowClick={(bill) => setSelectedId(selectedId === bill.id ? null : bill.id)}
           onView={handleView}
           onEdit={handleEdit}
           onDelete={handleDelete}
           onApprove={handleApprove}
-          canEditDelete={canEditDelete}
           startIndex={(currentPage - 1) * pageSize}
           sortBy={sortBy}
           sortDir={sortDir}
