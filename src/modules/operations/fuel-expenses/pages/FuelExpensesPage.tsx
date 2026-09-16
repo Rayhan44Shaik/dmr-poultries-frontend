@@ -18,6 +18,7 @@ import type { FuelExpense, FuelSortKey } from "../types/fuelExpense";
 import {
   filterFuelExpenses,
   sortFuelExpenses,
+  uniqueFuelExpenses,
   type FuelQuickTab,
 } from "../utils/filterFuelExpenses";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
@@ -46,13 +47,17 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     rejectExpense,
   } = useFuelExpenses(showNotification);
 
-  // ── Filter & Search State ──
+  // ── Ensure unique expenses (no duplicate trip records) ──
+  const deduplicatedExpenses = useMemo(() => {
+    return uniqueFuelExpenses(expenses);
+  }, [expenses]);
+
+  // ── Filter & Search State (Status dropdown removed; controlled via toggle) ──
   const [fromDate, setFromDate] = useState("");
   const [toDate, setToDate] = useState("");
   const [vehicle, setVehicle] = useState(ALL_VEHICLES);
   const [driver, setDriver] = useState(ALL_DRIVERS);
   const [sourceType, setSourceType] = useState("All");
-  const [statusFilter, setStatusFilter] = useState("All");
   const [quickTab, setQuickTab] = useState<FuelQuickTab>("ALL");
   const [search, setSearch] = useState("");
   const [sortBy, setSortBy] = useState<FuelSortKey | null>(null);
@@ -122,25 +127,22 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
 
   // ── Base Filter Matching (before Quick Tab) for Live Tab Counters ──
   const baseFilteredBills = useMemo(() => {
-    return filterFuelExpenses(expenses, {
+    return filterFuelExpenses(deduplicatedExpenses, {
       fromDate,
       toDate,
       vehicleNo: vehicle === ALL_VEHICLES ? "" : vehicle,
       driverName: driver === ALL_DRIVERS ? "" : driver,
       sourceType: sourceType === "All" ? "" : sourceType,
-      status: statusFilter === "All" ? "" : statusFilter,
       search,
     });
-  }, [expenses, fromDate, toDate, vehicle, driver, sourceType, statusFilter, search]);
+  }, [deduplicatedExpenses, fromDate, toDate, vehicle, driver, sourceType, search]);
 
-  // ── Live Tab Counts (Trip is ALWAYS Approved; ONLY manual can be Pending) ──
+  // ── Live Tab Counts (All, Pending, Approved) ──
   const tabCounts = useMemo(() => {
     return {
       all: baseFilteredBills.length,
-      pending: baseFilteredBills.filter((b) => b.sourceType === "MANUAL" && b.status === "Pending").length,
-      approved: baseFilteredBills.filter((b) => b.status === "Approved" || b.sourceType === "TRIP").length,
-      trip: baseFilteredBills.filter((b) => b.sourceType === "TRIP").length,
-      manual: baseFilteredBills.filter((b) => b.sourceType === "MANUAL").length,
+      pending: baseFilteredBills.filter((b) => b.sourceType !== "TRIP" && !b.tripNo && b.status === "Pending").length,
+      approved: baseFilteredBills.filter((b) => b.status === "Approved" || b.sourceType === "TRIP" || !!b.tripNo).length,
     };
   }, [baseFilteredBills]);
 
@@ -166,22 +168,21 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     return allFilteredBills.find((b) => b.id === selectedId) || null;
   }, [allFilteredBills, selectedId]);
 
-  // ── Active Filters: KPI cards & PDF/Excel are enabled ONLY when filters applied ──
+  // ── Active Filters Check ──
   const hasFilters =
     fromDate !== "" ||
     toDate !== "" ||
     vehicle !== ALL_VEHICLES ||
     driver !== ALL_DRIVERS ||
     sourceType !== "All" ||
-    statusFilter !== "All" ||
     search.trim() !== "";
 
-  // ── Summary Totals for KPI Cards (computed over filtered results) ──
+  // ── Summary Totals for KPI Cards ──
   const summaryTotals = useMemo(() => {
     const totalLitres = allFilteredBills.reduce((sum, b) => sum + (b.litres || 0), 0);
     const totalAmount = allFilteredBills.reduce((sum, b) => sum + (b.amount || 0), 0);
-    const pendingCount = allFilteredBills.filter((b) => b.sourceType === "MANUAL" && b.status === "Pending").length;
-    const approvedCount = allFilteredBills.filter((b) => b.status === "Approved" || b.sourceType === "TRIP").length;
+    const pendingCount = allFilteredBills.filter((b) => b.sourceType !== "TRIP" && !b.tripNo && b.status === "Pending").length;
+    const approvedCount = allFilteredBills.filter((b) => b.status === "Approved" || b.sourceType === "TRIP" || !!b.tripNo).length;
 
     const billsWithMeter = allFilteredBills.filter((b) => b.meterReading > 0 && b.litres > 0);
     const avgMileage =
@@ -225,7 +226,6 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     setVehicle(ALL_VEHICLES);
     setDriver(ALL_DRIVERS);
     setSourceType("All");
-    setStatusFilter("All");
     setQuickTab("ALL");
     setSearch("");
     setSortBy(null);
@@ -237,7 +237,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
 
   // ── Check if bill is editable (within 10 days) ──
   const canEditDelete = useCallback((bill: FuelExpense): boolean => {
-    if (bill.sourceType === "TRIP") return false;
+    if (bill.sourceType === "TRIP" || !!bill.tripNo) return false;
     if (!bill.createdDate && !bill.date) return true;
     const created = new Date(bill.createdDate || bill.date);
     const now = new Date();
@@ -259,7 +259,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
   const handleEdit = useCallback((bill?: FuelExpense) => {
     const target = bill || selectedBill;
     if (!target) return;
-    if (target.sourceType === "TRIP") {
+    if (target.sourceType === "TRIP" || !!target.tripNo) {
       showNotification("Trip diesel bills are linked to trips and auto-approved on trip completion.", "info");
       return;
     }
@@ -280,7 +280,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
   const handleDelete = useCallback((bill?: FuelExpense) => {
     const target = bill || selectedBill;
     if (!target) return;
-    if (target.sourceType === "TRIP") {
+    if (target.sourceType === "TRIP" || !!target.tripNo) {
       showNotification("Trip diesel bills are part of completed trips and cannot be deleted here.", "info");
       return;
     }
@@ -294,7 +294,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
   const handleApprove = useCallback((bill?: FuelExpense) => {
     const target = bill || selectedBill;
     if (!target) return;
-    if (target.sourceType === "TRIP") {
+    if (target.sourceType === "TRIP" || !!target.tripNo) {
       showNotification("Trip diesel bills are auto-approved upon trip completion.", "info");
       return;
     }
@@ -309,7 +309,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
   const handleReject = useCallback((bill?: FuelExpense) => {
     const target = bill || selectedBill;
     if (!target) return;
-    if (target.sourceType === "TRIP") {
+    if (target.sourceType === "TRIP" || !!target.tripNo) {
       showNotification("Trip diesel bills cannot be rejected from Fuel Expenses.", "info");
       return;
     }
@@ -331,8 +331,8 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
       const headers = [
         "Bill No",
         "Date",
-        "Source",
         "Trip No",
+        "Source",
         "Vehicle",
         "Driver",
         "Meter (KM)",
@@ -345,8 +345,8 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
       const rows = allFilteredBills.map((b) => [
         b.billNo,
         b.date,
-        b.sourceType || "MANUAL",
         b.tripNo || "—",
+        b.sourceType === "TRIP" || !!b.tripNo ? "Trip" : "Manual",
         b.vehicleNo,
         b.driverName || "—",
         b.meterReading > 0 ? b.meterReading.toString() : "—",
@@ -354,7 +354,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
         b.rate.toFixed(2),
         b.amount.toFixed(2),
         b.petrolBunk || "—",
-        b.sourceType === "TRIP" ? "Approved" : b.status,
+        b.sourceType === "TRIP" || !!b.tripNo ? "Approved" : b.status,
       ]);
       const filename = `Fuel_Expenses_${new Date().toISOString().split("T")[0]}`;
 
@@ -365,8 +365,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
         vehicle !== ALL_VEHICLES ? { label: "Vehicle", value: vehicle } : null,
         driver !== ALL_DRIVERS ? { label: "Driver", value: driver } : null,
         sourceType !== "All" ? { label: "Source", value: sourceType } : null,
-        statusFilter !== "All" ? { label: "Status", value: statusFilter } : null,
-        quickTab !== "ALL" ? { label: "Tab", value: quickTab } : null,
+        quickTab !== "ALL" ? { label: "Status Tab", value: quickTab } : null,
       ].filter((f): f is { label: string; value: string } => f !== null);
 
       exportToPDF("Fuel Expenses Register", headers, rows, filename, {
@@ -386,7 +385,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
     } finally {
       exportBusyRef.current = null;
     }
-  }, [allFilteredBills, fromDate, toDate, vehicle, driver, sourceType, statusFilter, quickTab, summaryTotals, showNotification]);
+  }, [allFilteredBills, fromDate, toDate, vehicle, driver, sourceType, quickTab, summaryTotals, showNotification]);
 
   const handleExportExcel = useCallback(async () => {
     if (exportBusyRef.current) return;
@@ -399,8 +398,8 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
       const headers = [
         "Bill No",
         "Date",
-        "Source",
         "Trip No",
+        "Source",
         "Vehicle",
         "Driver",
         "Meter Reading (KM)",
@@ -413,8 +412,8 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
       const rows = allFilteredBills.map((b) => [
         b.billNo,
         b.date,
-        b.sourceType || "MANUAL",
         b.tripNo || "—",
+        b.sourceType === "TRIP" || !!b.tripNo ? "Trip" : "Manual",
         b.vehicleNo,
         b.driverName || "—",
         b.meterReading,
@@ -422,7 +421,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
         b.rate,
         b.amount,
         b.petrolBunk || "—",
-        b.sourceType === "TRIP" ? "Approved" : b.status,
+        b.sourceType === "TRIP" || !!b.tripNo ? "Approved" : b.status,
       ]);
       const filename = `Fuel_Expenses_${new Date().toISOString().split("T")[0]}`;
       exportToExcel("Fuel Expenses Register", headers, rows, filename);
@@ -446,14 +445,13 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
         embedded ? "" : "px-3 md:px-6 py-4 bg-slate-50/50 min-h-screen text-slate-800"
       }`}
     >
-      {/* ── Filters Card with Unified 1-Line Action Toolbar ── */}
+      {/* ── Filters Card with Unified Action Toolbar (Status dropdown removed) ── */}
       <FuelFilters
         fromDate={fromDate}
         toDate={toDate}
         vehicle={vehicle}
         driver={driver}
         sourceType={sourceType}
-        status={statusFilter}
         sortBy={sortBy}
         sortDir={sortDir}
         search={search}
@@ -462,7 +460,6 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
         setVehicle={(v) => { setVehicle(v); setCurrentPage(1); }}
         setDriver={(v) => { setDriver(v); setCurrentPage(1); }}
         setSourceType={(v) => { setSourceType(v); setCurrentPage(1); }}
-        setStatus={(v) => { setStatusFilter(v); setCurrentPage(1); }}
         setSort={handleExplicitSort}
         setSearch={(v) => { setSearch(v); setCurrentPage(1); }}
         onReset={handleResetFilters}
@@ -521,7 +518,7 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
         </div>
       )}
 
-      {/* ── Fuel Bill Table Card with Logo, Status Pills, and Pagination ── */}
+      {/* ── Fuel Bill Table Card matching Trip List Header, Tabs, Count, and Typography ── */}
       <div
         ref={tableContainerRef}
         className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden text-xs md:text-sm"

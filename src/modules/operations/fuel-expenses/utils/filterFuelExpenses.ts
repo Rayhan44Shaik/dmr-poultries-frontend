@@ -1,6 +1,6 @@
 import type { FuelExpense, FuelSortKey, FuelUiStatus } from "../types/fuelExpense";
 
-export type FuelQuickTab = "ALL" | "PENDING" | "APPROVED" | "TRIP" | "MANUAL";
+export type FuelQuickTab = "ALL" | "PENDING" | "APPROVED";
 
 export interface FuelClientFilters {
   fromDate?: string;
@@ -10,7 +10,6 @@ export interface FuelClientFilters {
   driverId?: number;
   driverName?: string;
   sourceType?: string;
-  status?: string;
   quickTab?: FuelQuickTab;
   search?: string;
 }
@@ -42,6 +41,23 @@ function matchesGlobalSearch(bill: FuelExpense, search: string): boolean {
   return haystack.includes(query) || compact(haystack).includes(compact(query));
 }
 
+/**
+ * Ensures unique fuel expense records (no duplicates on trip diesel records).
+ */
+export function uniqueFuelExpenses(expenses: readonly FuelExpense[]): FuelExpense[] {
+  const seenIds = new Set<string>();
+  const seenTripNos = new Set<string>();
+  return expenses.filter((item) => {
+    if (!item || !item.id || seenIds.has(String(item.id))) return false;
+    seenIds.add(String(item.id));
+    if (item.tripNo && item.sourceType === "TRIP") {
+      if (seenTripNos.has(item.tripNo)) return false;
+      seenTripNos.add(item.tripNo);
+    }
+    return true;
+  });
+}
+
 export function filterFuelExpenses(
   bills: readonly FuelExpense[],
   {
@@ -52,7 +68,6 @@ export function filterFuelExpenses(
     driverId,
     driverName,
     sourceType,
-    status,
     quickTab = "ALL",
     search = "",
   }: FuelClientFilters
@@ -76,12 +91,9 @@ export function filterFuelExpenses(
     // Quick tab filtering: ONLY manual bills can ever be pending!
     if (quickTab === "PENDING" && (isTrip || effectiveStatus !== "Pending")) return false;
     if (quickTab === "APPROVED" && effectiveStatus !== "Approved") return false;
-    if (quickTab === "TRIP" && !isTrip) return false;
-    if (quickTab === "MANUAL" && isTrip) return false;
 
     // Dropdown filters (if explicit)
     if (sourceType && sourceType !== "All" && (isTrip ? "TRIP" : "MANUAL") !== sourceType) return false;
-    if (status && status !== "All" && effectiveStatus !== status) return false;
 
     return matchesGlobalSearch(bill, search);
   });

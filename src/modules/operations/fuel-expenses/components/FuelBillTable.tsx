@@ -17,16 +17,17 @@ import {
   Pencil,
   Trash2,
   CheckCircle,
-  XCircle,
-  Route,
+  AlertCircle,
   Clock,
-  Sparkles,
   Fuel,
 } from "lucide-react";
 import type { FuelExpense, FuelSortKey } from "../types/fuelExpense";
 import type { FuelQuickTab } from "../utils/filterFuelExpenses";
 import { formatVehicleNumber } from "../../../../utils/format";
+import { formatTripListDay } from "../../vehicle-trips/utils/formatTripListDay";
+import { localizeTripViewText } from "../../vehicle-trips/utils/tripViewLocalization";
 import { useI18n } from "../../../../i18n";
+import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 
 interface Props {
   bills: FuelExpense[];
@@ -50,8 +51,6 @@ interface Props {
     all: number;
     pending: number;
     approved: number;
-    trip: number;
-    manual: number;
   };
 }
 
@@ -85,9 +84,9 @@ export function FuelBillTable({
   onSortChange,
   activeTab = "ALL",
   onTabChange,
-  tabCounts = { all: 0, pending: 0, approved: 0, trip: 0, manual: 0 },
+  tabCounts = { all: 0, pending: 0, approved: 0 },
 }: Props) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const rowRefs = useRef(new Map<string, HTMLTableRowElement>());
 
   const selectedBill = bills.find((b) => b.id === selectedId) || null;
@@ -128,7 +127,7 @@ export function FuelBillTable({
         type="button"
         onClick={() => onSortChange(key)}
         aria-sort={active ? (sortDir === "asc" ? "ascending" : "descending") : "none"}
-        className={`group/sort flex items-center gap-1.5 w-full uppercase tracking-wider font-bold text-[11.5px] transition-colors hover:text-emerald-700 ${
+        className={`group/sort flex items-center gap-1.5 w-full uppercase tracking-wider font-bold text-[12px] transition-colors hover:text-emerald-700 ${
           center ? "justify-center" : right ? "justify-end" : "justify-start"
         } ${active ? "text-emerald-700" : "text-slate-600"}`}
       >
@@ -138,29 +137,26 @@ export function FuelBillTable({
     );
   };
 
-  const formatDate = (d: string) => {
-    if (!d) return "—";
-    const date = new Date(d);
-    return date.toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" });
-  };
+  const selectedTabCount =
+    activeTab === "ALL"
+      ? tabCounts.all
+      : activeTab === "PENDING"
+      ? tabCounts.pending
+      : tabCounts.approved;
 
-  const tabs: { id: FuelQuickTab; label: string; count: number; tone: "slate" | "amber" | "emerald" | "indigo" | "violet" }[] = [
-    { id: "ALL", label: "All Bills", count: tabCounts.all, tone: "slate" },
-    { id: "PENDING", label: "Pending Approval", count: tabCounts.pending, tone: "amber" },
-    { id: "APPROVED", label: "Approved", count: tabCounts.approved, tone: "emerald" },
-    { id: "TRIP", label: "Trip Diesel", count: tabCounts.trip, tone: "indigo" },
-    { id: "MANUAL", label: "Manual Bills", count: tabCounts.manual, tone: "violet" },
+  const tabs = [
+    { id: "ALL" as const, label: "All" },
+    { id: "PENDING" as const, label: "Pending" },
+    { id: "APPROVED" as const, label: "Approved" },
   ];
 
   return (
     <div className="w-full">
-      {/* ── Table Card Top Bar with Respective Fuel Logo & Status Pills ── */}
-      <div className="border-b border-slate-200/80 bg-gradient-to-r from-emerald-50/60 via-white to-blue-50/40 px-4 py-3 sm:px-6">
-        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-          
-          {/* Respective Fuel Logo & Title (without extra description) */}
+      {/* ── Table Header matching Trip List Header with Fuel Logo & Active Tab Count beside Title ── */}
+      <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-emerald-50/60 via-white to-emerald-50/40">
+        <div className="flex flex-wrap items-center gap-3">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-emerald-50/80 border border-emerald-200 flex items-center justify-center text-emerald-600 shadow-inner">
+            <div className="h-9 w-9 rounded-xl bg-emerald-50/70 border border-emerald-100 flex items-center justify-center text-emerald-500 shadow-inner">
               <Fuel className="w-5 h-5" />
             </div>
             <h3 className="text-base font-bold text-slate-800 tracking-tight">
@@ -168,47 +164,36 @@ export function FuelBillTable({
             </h3>
           </div>
 
-          {/* Quick Status & Source Filter Toggle Pills */}
+          {/* Selected-tab count beside the title */}
+          <span className="inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 rounded-full shadow-sm tabular-nums">
+            {selectedTabCount}
+          </span>
+
+          {/* Segmented status toggle — labels only (no per-tab counts inside toggle) with respective colors */}
           {onTabChange && (
-            <div className="flex items-center gap-1.5 overflow-x-auto rounded-xl bg-slate-100/90 p-1 ring-1 ring-slate-200/60 max-w-full">
+            <div className="flex items-center p-0.5 ml-2 border border-slate-200/80 rounded-lg overflow-hidden bg-slate-50 shadow-sm">
               {tabs.map((tab) => {
                 const isActive = activeTab === tab.id;
+                const activeClass =
+                  tab.id === "ALL"
+                    ? "bg-slate-200/80 text-slate-800 shadow-sm font-bold"
+                    : tab.id === "PENDING"
+                    ? "bg-orange-50/80 text-orange-500 shadow-sm font-bold"
+                    : "bg-emerald-50/80 text-emerald-600 shadow-sm font-bold";
+
                 return (
                   <button
                     key={tab.id}
                     type="button"
                     onClick={() => onTabChange(tab.id)}
-                    className={`flex items-center gap-1.5 whitespace-nowrap rounded-lg px-2.5 py-1.5 text-xs font-semibold transition-all duration-150 ${
+                    aria-pressed={isActive}
+                    className={`inline-flex items-center px-5 py-1.5 text-xs font-semibold rounded-md transition-all ${
                       isActive
-                        ? "bg-white text-slate-800 shadow-sm ring-1 ring-slate-200/80"
-                        : "text-slate-600 hover:text-slate-900 hover:bg-slate-200/50"
+                        ? activeClass
+                        : "bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-200/50"
                     }`}
                   >
-                    {tab.id === "PENDING" && (
-                      <span className="relative flex h-2 w-2">
-                        <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-75" />
-                        <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
-                      </span>
-                    )}
-                    {tab.id === "APPROVED" && (
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                    )}
-                    {tab.id === "TRIP" && (
-                      <Route size={13} className="text-indigo-500" />
-                    )}
-                    {tab.id === "MANUAL" && (
-                      <Sparkles size={13} className="text-violet-500" />
-                    )}
-                    <span>{tab.label}</span>
-                    <span
-                      className={`ml-0.5 rounded-full px-1.5 py-0.2 text-[10px] font-bold tabular-nums ${
-                        isActive
-                          ? "bg-slate-100 text-slate-800"
-                          : "bg-white/80 text-slate-500"
-                      }`}
-                    >
-                      {tab.count}
-                    </span>
+                    {tab.label}
                   </button>
                 );
               })}
@@ -216,216 +201,221 @@ export function FuelBillTable({
           )}
         </div>
 
-        {/* Selected Row Actions Toolbar (Floating bar if row selected) */}
+        {/* Selected Row Actions Bar if a row is selected */}
         {selectedBill && (
-          <div className="mt-3 flex items-center justify-between gap-3 rounded-xl bg-blue-50/90 border border-blue-200/80 px-3.5 py-2 text-xs animate-in fade-in slide-in-from-top-1 duration-150">
-            <div className="flex items-center gap-2 font-semibold text-blue-900">
-              <span className="flex h-2 w-2 rounded-full bg-blue-600" />
-              <span>Selected Bill:</span>
-              <span className="font-bold text-blue-950 font-mono">{selectedBill.billNo}</span>
-              <span className="text-slate-400">|</span>
-              <span className="text-blue-800">{formatVehicleNumber(selectedBill.vehicleNo)}</span>
-              <span className="text-slate-400">|</span>
-              <span className="text-emerald-700 font-bold">₹ {selectedBill.amount.toFixed(2)}</span>
-            </div>
-
-            <div className="flex items-center gap-1.5 flex-wrap">
-              {onView && (
-                <button
-                  type="button"
-                  onClick={() => onView(selectedBill)}
-                  className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 font-semibold text-blue-700 shadow-sm border border-blue-200 hover:bg-blue-50 transition"
-                  title="View Bill Details"
-                >
-                  <Eye size={14} />
-                  <span>View</span>
-                </button>
-              )}
-
-              {selectedBill.sourceType !== "TRIP" && onEdit && (
-                <button
-                  type="button"
-                  onClick={() => onEdit(selectedBill)}
-                  disabled={canEditDelete ? !canEditDelete(selectedBill) : false}
-                  className={`inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 font-semibold shadow-sm border transition ${
-                    !canEditDelete || canEditDelete(selectedBill)
-                      ? "text-emerald-700 border-emerald-200 hover:bg-emerald-50 cursor-pointer"
-                      : "text-slate-400 border-slate-200 opacity-60 cursor-not-allowed"
-                  }`}
-                  title={
-                    canEditDelete && !canEditDelete(selectedBill)
-                      ? "Cannot edit bills older than 10 days"
-                      : "Edit Fuel Bill"
-                  }
-                >
-                  <Pencil size={14} />
-                  <span>Edit</span>
-                </button>
-              )}
-
-              {selectedBill.sourceType !== "TRIP" && onDelete && (
-                <button
-                  type="button"
-                  onClick={() => onDelete(selectedBill)}
-                  disabled={canEditDelete ? !canEditDelete(selectedBill) : false}
-                  className={`inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 font-semibold shadow-sm border transition ${
-                    !canEditDelete || canEditDelete(selectedBill)
-                      ? "text-rose-700 border-rose-200 hover:bg-rose-50 cursor-pointer"
-                      : "text-slate-400 border-slate-200 opacity-60 cursor-not-allowed"
-                  }`}
-                  title={
-                    canEditDelete && !canEditDelete(selectedBill)
-                      ? "Cannot delete bills older than 10 days"
-                      : "Delete Fuel Bill"
-                  }
-                >
-                  <Trash2 size={14} />
-                  <span>Delete</span>
-                </button>
-              )}
-
-              {selectedBill.sourceType === "TRIP" && (
-                <span className="inline-flex items-center gap-1 rounded-lg bg-emerald-50 px-2.5 py-1 text-[11px] font-bold text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
-                  <CheckCircle size={13} className="text-emerald-600" />
-                  Auto Approved with Trip
+          <div className="flex items-center gap-2 animate-in fade-in duration-150">
+            {onView && (
+              <button
+                type="button"
+                onClick={() => onView(selectedBill)}
+                className="group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm bg-blue-50/70 hover:bg-blue-50/90 text-blue-600 border border-blue-200/60 active:scale-95"
+                title="View Bill Details"
+              >
+                <span className={`inline-flex ${uiActionIconMotionClass.view}`}>
+                  <Eye size={13} />
                 </span>
-              )}
+                <span>{t("common.view")}</span>
+              </button>
+            )}
 
-              {selectedBill.sourceType === "MANUAL" && selectedBill.status === "Pending" && (
-                <>
-                  {onApprove && (
-                    <button
-                      type="button"
-                      onClick={() => onApprove(selectedBill)}
-                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 font-semibold text-white shadow-sm hover:bg-emerald-700 transition"
-                      title="Approve Fuel Bill"
-                    >
-                      <CheckCircle size={14} />
-                      <span>Approve</span>
-                    </button>
-                  )}
-                  {onReject && (
-                    <button
-                      type="button"
-                      onClick={() => onReject(selectedBill)}
-                      className="inline-flex items-center gap-1 rounded-lg bg-rose-600 px-2.5 py-1 font-semibold text-white shadow-sm hover:bg-rose-700 transition"
-                      title="Reject Fuel Bill"
-                    >
-                      <XCircle size={14} />
-                      <span>Reject</span>
-                    </button>
-                  )}
-                </>
-              )}
-            </div>
+            {selectedBill.sourceType !== "TRIP" && onEdit && (
+              <button
+                type="button"
+                onClick={() => onEdit(selectedBill)}
+                disabled={canEditDelete ? !canEditDelete(selectedBill) : false}
+                className={`group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${
+                  !canEditDelete || canEditDelete(selectedBill)
+                    ? "bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-500 border border-emerald-200/60 active:scale-95"
+                    : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"
+                }`}
+                title="Edit Fuel Bill"
+              >
+                <span className={`inline-flex ${uiActionIconMotionClass.edit}`}>
+                  <Pencil size={13} />
+                </span>
+                <span>{t("common.edit")}</span>
+              </button>
+            )}
+
+            {selectedBill.sourceType !== "TRIP" && onDelete && (
+              <button
+                type="button"
+                onClick={() => onDelete(selectedBill)}
+                disabled={canEditDelete ? !canEditDelete(selectedBill) : false}
+                className={`group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${
+                  !canEditDelete || canEditDelete(selectedBill)
+                    ? "bg-rose-50/70 hover:bg-rose-50/80 text-rose-500 border border-rose-200/60 active:scale-95"
+                    : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"
+                }`}
+                title="Delete Fuel Bill"
+              >
+                <span className={`inline-flex ${uiActionIconMotionClass.delete}`}>
+                  <Trash2 size={13} />
+                </span>
+                <span>{t("common.delete")}</span>
+              </button>
+            )}
+
+            {selectedBill.sourceType !== "TRIP" && selectedBill.status === "Pending" && onApprove && (
+              <button
+                type="button"
+                onClick={() => onApprove(selectedBill)}
+                className="group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm bg-emerald-600 hover:bg-emerald-700 text-white active:scale-95"
+                title="Approve Fuel Bill"
+              >
+                <span className={`inline-flex ${uiActionIconMotionClass.approve}`}>
+                  <CheckCircle size={13} />
+                </span>
+                <span>Approve</span>
+              </button>
+            )}
+
+            {selectedBill.sourceType !== "TRIP" && selectedBill.status === "Pending" && onReject && (
+              <button
+                type="button"
+                onClick={() => onReject(selectedBill)}
+                className="group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200/60 active:scale-95"
+                title="Reject Fuel Bill"
+              >
+                <span className={`inline-flex ${uiActionIconMotionClass.delete}`}>
+                  <AlertCircle size={13} />
+                </span>
+                <span>Reject</span>
+              </button>
+            )}
           </div>
         )}
       </div>
 
-      {/* ── Responsive Table ── */}
-      <div className="w-full overflow-x-auto">
-        <table className="min-w-full text-[13px] text-left border-collapse">
-          <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-600">
+      {/* ── Table Body matching Trip Master Table styling and typography ── */}
+      <div className="overflow-x-auto">
+        <table className="min-w-full text-sm text-left border-collapse">
+          <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-600">
             <tr className="whitespace-nowrap">
-              <th className="px-3.5 py-3.5 text-center text-[11.5px] font-bold uppercase tracking-wider w-10">
-                #
-              </th>
-              <th className="px-3.5 py-3.5 text-left text-[11.5px] font-bold uppercase tracking-wider">
+              <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider w-10">#</th>
+
+              {/* Bill No */}
+              <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
                 {sortable("billNo", (
                   <div className="flex items-center gap-1.5">
-                    <Hash size={13} className="text-slate-400 flex-shrink-0" />
+                    <Hash size={14} className="text-slate-400 flex-shrink-0" />
                     <span>Bill No</span>
                   </div>
                 ))}
               </th>
-              <th className="px-3.5 py-3.5 text-left text-[11.5px] font-bold uppercase tracking-wider">
+
+              {/* Date */}
+              <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
                 {sortable("date", (
                   <div className="flex items-center gap-1.5">
-                    <Calendar size={13} className="text-blue-500 flex-shrink-0" />
-                    <span>Date</span>
+                    <Calendar size={14} className="text-blue-500 flex-shrink-0" />
+                    <span>{t("table.date")}</span>
                   </div>
                 ))}
               </th>
-              <th className="px-3.5 py-3.5 text-left text-[11.5px] font-bold uppercase tracking-wider">
+
+              {/* Trip No (Trip list matching styling) */}
+              <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
+                {sortable("tripNo", (
+                  <div className="flex items-center gap-1.5">
+                    <Hash size={14} className="text-emerald-500 flex-shrink-0" />
+                    <span>{t("operations.trip_no")}</span>
+                  </div>
+                ))}
+              </th>
+
+              {/* Source */}
+              <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
                 {sortable("sourceType", (
                   <div className="flex items-center gap-1.5">
-                    <Layers size={13} className="text-indigo-500 flex-shrink-0" />
+                    <Layers size={14} className="text-indigo-500 flex-shrink-0" />
                     <span>Source</span>
                   </div>
                 ))}
               </th>
-              <th className="px-3.5 py-3.5 text-left text-[11.5px] font-bold uppercase tracking-wider">
-                {sortable("tripNo", (
-                  <div className="flex items-center gap-1.5">
-                    <Route size={13} className="text-violet-500 flex-shrink-0" />
-                    <span>Trip No</span>
-                  </div>
-                ))}
-              </th>
-              <th className="px-3.5 py-3.5 text-left text-[11.5px] font-bold uppercase tracking-wider">
+
+              {/* Vehicle */}
+              <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
                 {sortable("vehicleNo", (
                   <div className="flex items-center gap-1.5">
-                    <Truck size={13} className="text-emerald-500 flex-shrink-0" />
+                    <Truck size={14} className="text-indigo-500 flex-shrink-0" />
                     <span>{t("common.vehicle")}</span>
                   </div>
                 ))}
               </th>
-              <th className="px-3.5 py-3.5 text-left text-[11.5px] font-bold uppercase tracking-wider">
+
+              {/* Driver */}
+              <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
                 {sortable("driverName", (
                   <div className="flex items-center gap-1.5">
-                    <User size={13} className="text-slate-500 flex-shrink-0" />
+                    <User size={14} className="text-amber-500 flex-shrink-0" />
                     <span>{t("common.driver")}</span>
                   </div>
                 ))}
               </th>
-              <th className="px-3.5 py-3.5 text-right text-[11.5px] font-bold uppercase tracking-wider">
+
+              {/* Meter Reading (KM) */}
+              <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider">
                 {sortable("meterReading", (
                   <div className="flex items-center justify-end gap-1.5">
-                    <Gauge size={13} className="text-cyan-500 flex-shrink-0" />
+                    <Gauge size={14} className="text-teal-500 flex-shrink-0" />
                     <span>Meter (KM)</span>
                   </div>
                 ), false, true)}
               </th>
-              <th className="px-3.5 py-3.5 text-right text-[11.5px] font-bold uppercase tracking-wider">
+
+              {/* Litres */}
+              <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider">
                 {sortable("litres", (
                   <div className="flex items-center justify-end gap-1.5">
-                    <Droplets size={13} className="text-blue-500 flex-shrink-0" />
+                    <Droplets size={14} className="text-blue-500 flex-shrink-0" />
                     <span>Litres</span>
                   </div>
                 ), false, true)}
               </th>
-              <th className="px-3.5 py-3.5 text-right text-[11.5px] font-bold uppercase tracking-wider">
+
+              {/* Rate */}
+              <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider">
                 {sortable("rate", (
                   <div className="flex items-center justify-end gap-1.5">
-                    <IndianRupee size={13} className="text-amber-500 flex-shrink-0" />
+                    <IndianRupee size={14} className="text-slate-500 flex-shrink-0" />
                     <span>Rate (₹/L)</span>
                   </div>
                 ), false, true)}
               </th>
-              <th className="px-3.5 py-3.5 text-right text-[11.5px] font-bold uppercase tracking-wider">
+
+              {/* Amount */}
+              <th className="px-4 py-3 text-right text-xs font-bold uppercase tracking-wider">
                 {sortable("amount", (
                   <div className="flex items-center justify-end gap-1.5">
-                    <IndianRupee size={13} className="text-emerald-500 flex-shrink-0" />
+                    <IndianRupee size={14} className="text-emerald-500 flex-shrink-0" />
                     <span>Amount (₹)</span>
                   </div>
                 ), false, true)}
               </th>
-              <th className="px-3.5 py-3.5 text-left text-[11.5px] font-bold uppercase tracking-wider">
-                {sortable("petrolBunk", (
-                  <div className="flex items-center gap-1.5">
-                    <MapPin size={13} className="text-rose-500 flex-shrink-0" />
-                    <span>Petrol Bunk</span>
-                  </div>
-                ))}
+
+              {/* Petrol Bunk */}
+              <th className="px-4 py-3 text-left text-xs font-bold uppercase tracking-wider">
+                <div className="flex items-center gap-1.5">
+                  <MapPin size={14} className="text-rose-500 flex-shrink-0" />
+                  <span>Petrol Bunk</span>
+                </div>
               </th>
-              <th className="px-3.5 py-3.5 text-center text-[11.5px] font-bold uppercase tracking-wider">
-                <span>Receipt</span>
+
+              {/* Receipt */}
+              <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
+                <div className="flex items-center justify-center gap-1.5">
+                  <FileImage size={14} className="text-indigo-500 flex-shrink-0" />
+                  <span>Receipt</span>
+                </div>
               </th>
-              <th className="px-3.5 py-3.5 text-center text-[11.5px] font-bold uppercase tracking-wider">
+
+              {/* Status */}
+              <th className="px-4 py-3 text-center text-xs font-bold uppercase tracking-wider">
                 {sortable("status", (
                   <div className="flex items-center justify-center gap-1.5">
-                    <Clock size={13} className="text-slate-400 flex-shrink-0" />
-                    <span>Status</span>
+                    <CheckCircle size={14} className="text-emerald-500 flex-shrink-0" />
+                    <span>{t("common.status")}</span>
                   </div>
                 ), true)}
               </th>
@@ -446,7 +436,8 @@ export function FuelBillTable({
               </tr>
             ) : bills.length === 0 ? (
               <tr>
-                <td colSpan={14} className="py-14 text-center text-slate-400 text-sm font-medium">
+                <td colSpan={14} className="py-16 text-center text-slate-400 text-sm font-medium">
+                  <Fuel size={24} className="mx-auto mb-2 text-slate-300" />
                   No fuel bills found matching the selected filters.
                 </td>
               </tr>
@@ -454,8 +445,11 @@ export function FuelBillTable({
               bills.map((bill, index) => {
                 const isSelected = bill.id === selectedId;
                 const serialNo = startIndex + index + 1;
-                const isPending = bill.status === "Pending";
-                const isTrip = bill.sourceType === "TRIP";
+                const isTrip = bill.sourceType === "TRIP" || !!bill.tripNo;
+                const isApproved = isTrip || bill.status === "Approved";
+                const isPending = !isTrip && bill.status === "Pending";
+                const isRejected = !isTrip && bill.status === "Rejected";
+
                 const gpsText =
                   bill.gpsLat != null && bill.gpsLon != null
                     ? `GPS: ${bill.gpsLat.toFixed(4)}, ${bill.gpsLon.toFixed(4)}`
@@ -474,14 +468,12 @@ export function FuelBillTable({
                     aria-selected={isSelected}
                     className={`cursor-pointer outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
                       isSelected
-                        ? "bg-blue-50/80 border-l-4 border-l-blue-400 ring-1 ring-inset ring-blue-200"
-                        : isPending
-                        ? `bg-amber-50/25 hover:bg-amber-50/50 ${index % 2 === 0 ? "" : "bg-opacity-40"}`
-                        : `hover:bg-slate-50/70 ${index % 2 === 0 ? "bg-white" : "bg-slate-50/30"}`
+                        ? "bg-blue-50/70 border-l-4 border-l-blue-300 ring-1 ring-inset ring-blue-200"
+                        : "hover:bg-slate-50/80"
                     }`}
                   >
                     {/* Index / Checkbox */}
-                    <td className="px-3.5 py-3.5 text-center text-xs font-semibold text-slate-500 w-10">
+                    <td className="px-4 py-3 text-center text-xs font-semibold text-slate-500 w-10">
                       {isSelected ? (
                         <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-blue-600 text-white shadow-sm">
                           <Check size={12} strokeWidth={3} />
@@ -492,20 +484,26 @@ export function FuelBillTable({
                     </td>
 
                     {/* Bill No */}
-                    <td className="px-3.5 py-3.5 font-bold text-emerald-700 text-xs whitespace-nowrap font-mono">
-                      <div className="flex items-center gap-1.5">
-                        <span className={`h-1.5 w-1.5 rounded-full ${isPending ? "bg-amber-500" : "bg-emerald-500"}`} />
-                        <span>{bill.billNo}</span>
-                      </div>
+                    <td className="px-4 py-3 font-bold text-slate-700 text-xs whitespace-nowrap">
+                      {bill.billNo}
                     </td>
 
                     {/* Date */}
-                    <td className="px-3.5 py-3.5 text-xs font-medium text-slate-700 whitespace-nowrap">
-                      {formatDate(bill.date)}
+                    <td className="px-4 py-3 text-xs font-medium text-slate-600 whitespace-nowrap">
+                      {formatTripListDay(bill.date, language)}
                     </td>
 
-                    {/* Source (TRIP vs MANUAL) */}
-                    <td className="px-3.5 py-3.5 whitespace-nowrap">
+                    {/* Trip No (Trip list matching typography and emerald styling) */}
+                    <td className="px-4 py-3 font-bold text-emerald-500 text-xs whitespace-nowrap">
+                      {bill.tripNo ? (
+                        localizeTripViewText(bill.tripNo, language)
+                      ) : (
+                        <span className="text-slate-400 font-normal">—</span>
+                      )}
+                    </td>
+
+                    {/* Source */}
+                    <td className="px-4 py-3 text-xs font-medium text-slate-700 whitespace-nowrap">
                       <span
                         className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-wider ${
                           isTrip
@@ -513,61 +511,43 @@ export function FuelBillTable({
                             : "bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-400/20"
                         }`}
                       >
-                        {isTrip ? <Route size={11} className="text-indigo-500" /> : <Sparkles size={11} className="text-violet-500" />}
-                        {bill.sourceType || "MANUAL"}
+                        {isTrip ? "Trip" : "Manual"}
                       </span>
-                    </td>
-
-                    {/* Trip No */}
-                    <td className="px-3.5 py-3.5 text-xs font-medium text-slate-600 whitespace-nowrap">
-                      {bill.tripNo ? (
-                        <span className="font-mono text-indigo-700 bg-indigo-50/60 px-1.5 py-0.5 rounded border border-indigo-100">
-                          {bill.tripNo}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400">—</span>
-                      )}
                     </td>
 
                     {/* Vehicle */}
-                    <td className="px-3.5 py-3.5 font-semibold text-slate-800 text-xs whitespace-nowrap">
-                      <span className="rounded-md bg-slate-100 px-2 py-1 text-slate-700 ring-1 ring-inset ring-slate-200">
-                        {formatVehicleNumber(bill.vehicleNo)}
-                      </span>
+                    <td className="px-4 py-3 text-xs font-medium text-slate-700 whitespace-nowrap">
+                      {localizeTripViewText(formatVehicleNumber(bill.vehicleNo), language)}
                     </td>
 
                     {/* Driver */}
-                    <td className="px-3.5 py-3.5 text-xs text-slate-700 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5">
-                        <User size={13} className="text-slate-400" />
-                        <span>{bill.driverName || "—"}</span>
-                      </div>
+                    <td className="px-4 py-3 text-xs text-slate-600 whitespace-nowrap">
+                      {localizeTripViewText(bill.driverName || "—", language)}
                     </td>
 
                     {/* Meter (KM) */}
-                    <td className="px-3.5 py-3.5 text-right text-xs font-medium text-slate-700 tabular-nums whitespace-nowrap">
-                      {bill.meterReading > 0 ? `${bill.meterReading.toLocaleString()} km` : "—"}
+                    <td className="px-4 py-3 text-right text-xs font-medium text-slate-700 tabular-nums whitespace-nowrap">
+                      {bill.meterReading > 0 ? bill.meterReading.toLocaleString() : "—"}
                     </td>
 
                     {/* Litres */}
-                    <td className="px-3.5 py-3.5 text-right text-xs font-bold text-blue-700 tabular-nums whitespace-nowrap">
-                      {bill.litres.toFixed(2)} L
+                    <td className="px-4 py-3 text-right text-xs font-bold text-blue-500 tabular-nums whitespace-nowrap">
+                      {bill.litres.toFixed(2)}
                     </td>
 
                     {/* Rate */}
-                    <td className="px-3.5 py-3.5 text-right text-xs font-medium text-slate-700 tabular-nums whitespace-nowrap">
-                      ₹ {bill.rate.toFixed(2)}
+                    <td className="px-4 py-3 text-right text-xs font-medium text-slate-700 tabular-nums whitespace-nowrap">
+                      {bill.rate.toFixed(2)}
                     </td>
 
                     {/* Total Amount */}
-                    <td className="px-3.5 py-3.5 text-right text-xs font-extrabold text-emerald-600 tabular-nums whitespace-nowrap">
-                      ₹ {bill.amount.toFixed(2)}
+                    <td className="px-4 py-3 text-right text-xs font-bold text-emerald-600 tabular-nums whitespace-nowrap">
+                      {bill.amount.toFixed(2)}
                     </td>
 
                     {/* Petrol Bunk & GPS */}
-                    <td className="px-3.5 py-3.5 text-xs text-slate-700 max-w-[160px] truncate" title={bill.petrolBunk}>
+                    <td className="px-4 py-3 text-xs text-slate-600 max-w-[160px] truncate" title={bill.petrolBunk}>
                       <div className="flex items-center gap-1">
-                        <MapPin size={13} className="text-rose-500 shrink-0" />
                         <span className="truncate">{bill.petrolBunk || "—"}</span>
                         {gpsText && (
                           <span className="text-[10px] text-emerald-600 font-medium" title={gpsText}>
@@ -578,7 +558,7 @@ export function FuelBillTable({
                     </td>
 
                     {/* Receipt Image */}
-                    <td className="px-3.5 py-3.5 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
+                    <td className="px-4 py-3 text-center whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
                       {bill.image ? (
                         <a
                           href={bill.image}
@@ -596,28 +576,28 @@ export function FuelBillTable({
                       )}
                     </td>
 
-                    {/* Status */}
-                    <td className="px-3.5 py-3.5 text-center whitespace-nowrap">
-                      <span
-                        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-bold ${
-                          isTrip || bill.status === "Approved"
-                            ? "bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20"
-                            : bill.status === "Rejected"
-                            ? "bg-rose-50 text-rose-700 ring-1 ring-inset ring-rose-600/20"
-                            : "bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20"
-                        }`}
-                      >
-                        <span
-                          className={`h-1.5 w-1.5 rounded-full ${
-                            isTrip || bill.status === "Approved"
-                              ? "bg-emerald-500"
-                              : bill.status === "Rejected"
-                              ? "bg-rose-500"
-                              : "bg-amber-500 animate-pulse"
-                          }`}
-                        />
-                        <span>{isTrip ? "Approved" : bill.status}</span>
-                      </span>
+                    {/* Status with respective colors matching Trip List */}
+                    <td className="px-4 py-3 text-center whitespace-nowrap">
+                      {isApproved ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm bg-emerald-50 text-emerald-700 border border-emerald-200">
+                          <CheckCircle size={12} />
+                          <span>Approved</span>
+                        </span>
+                      ) : isPending ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm bg-orange-50 text-orange-700 border border-orange-200">
+                          <Clock size={12} />
+                          <span>Pending</span>
+                        </span>
+                      ) : isRejected ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm bg-rose-50 text-rose-700 border border-rose-200">
+                          <AlertCircle size={12} />
+                          <span>Rejected</span>
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-[11px] font-semibold tracking-wide shadow-sm bg-slate-100 text-slate-700 border border-slate-200">
+                          <span>{bill.status}</span>
+                        </span>
+                      )}
                     </td>
                   </tr>
                 );
@@ -631,4 +611,3 @@ export function FuelBillTable({
 }
 
 export default React.memo(FuelBillTable);
-

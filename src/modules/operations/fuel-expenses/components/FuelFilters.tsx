@@ -11,7 +11,6 @@ import {
   RotateCcw,
   ArrowUpDown,
   Plus,
-  CheckCircle2,
 } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import {
@@ -35,7 +34,6 @@ interface Props {
   vehicle: string;
   driver: string;
   sourceType: string;
-  status: string;
   sortBy: FuelSortKey | null;
   sortDir: "asc" | "desc";
   search: string;
@@ -44,7 +42,6 @@ interface Props {
   setVehicle: (v: string) => void;
   setDriver: (v: string) => void;
   setSourceType: (v: string) => void;
-  setStatus: (v: string) => void;
   setSort: (sortBy: FuelSortKey | null, sortDir: "asc" | "desc") => void;
   setSearch: (v: string) => void;
   onReset: () => void;
@@ -67,7 +64,6 @@ function FuelFilters({
   vehicle,
   driver,
   sourceType,
-  status,
   sortBy,
   sortDir,
   search,
@@ -76,7 +72,6 @@ function FuelFilters({
   setVehicle,
   setDriver,
   setSourceType,
-  setStatus,
   setSort,
   setSearch,
   onReset,
@@ -103,14 +98,8 @@ function FuelFilters({
   const driverOptions = withoutSentinel(drivers, "All Drivers");
 
   const sourceOptions: MasterDropdownOption[] = [
-    { value: "TRIP", label: "TRIP (Trip Diesel)" },
-    { value: "MANUAL", label: "MANUAL (Direct Entry)" },
-  ];
-
-  const statusOptions: MasterDropdownOption[] = [
-    { value: "Pending", label: "Pending Approval (Manual)" },
-    { value: "Approved", label: "Approved" },
-    { value: "Rejected", label: "Rejected" },
+    { value: "TRIP", label: "Trip Diesel" },
+    { value: "MANUAL", label: "Manual Bill" },
   ];
 
   const sortOptions: MasterDropdownOption[] = [
@@ -148,7 +137,7 @@ function FuelFilters({
 
   return (
     <div className={opsFilterCardClass}>
-      {/* ── Top Filters Row: 4 Essential Columns ── */}
+      {/* ── Top Filters Row: 4 Primary Filters ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
         <div>
           <label className={opsFilterLabelClass}>
@@ -213,9 +202,9 @@ function FuelFilters({
         </div>
       </div>
 
-      {/* ── Secondary Row: Source, Status, Sort, Search ── */}
+      {/* ── Secondary Row: Source, Sort, Search ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3.5 items-end pt-1">
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-3">
           <label className={opsFilterLabelClass}>
             <Layers size={17} className="text-indigo-500 flex-shrink-0" />
             <span>Source</span>
@@ -227,24 +216,6 @@ function FuelFilters({
             options={sourceOptions}
             onChange={(next) => setSourceType(next || "All")}
             placeholder="All Sources"
-            searchable
-            allowClear
-            className="w-full"
-          />
-        </div>
-
-        <div className="lg:col-span-2">
-          <label className={opsFilterLabelClass}>
-            <CheckCircle2 size={17} className="text-amber-500 flex-shrink-0" />
-            <span>Status</span>
-          </label>
-          <MasterDropdown
-            hideLabel
-            label="Status"
-            value={status === "All" ? "" : status}
-            options={statusOptions}
-            onChange={(next) => setStatus(next || "All")}
-            placeholder="All Statuses"
             searchable
             allowClear
             className="w-full"
@@ -269,7 +240,7 @@ function FuelFilters({
           />
         </div>
 
-        <div className="lg:col-span-5">
+        <div className="lg:col-span-6">
           <label className={opsFilterLabelClass}>
             <Search size={17} className="text-slate-400 flex-shrink-0" />
             <span>Search Fuel Bills</span>
