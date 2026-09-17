@@ -14,7 +14,6 @@ import {
   PackageOpen,
   PackageCheck,
   History,
-  ClipboardList,
   BarChart3,
   ReceiptIndianRupee,
   IndianRupee,
@@ -167,7 +166,10 @@ export interface NavChild {
 }
 
 /** Headings for `NavChild.group` runs, keyed by group id. */
-export const NAV_CHILD_GROUPS: Record<string, { label: string; labelKey: string; icon: LucideIcon }> = {
+export const NAV_CHILD_GROUPS: Record<
+  string,
+  { label: string; labelKey: string; icon: LucideIcon }
+> = {
   orders: { label: "Orders", labelKey: "nav.orders", icon: ReceiptText },
 };
 
@@ -285,15 +287,6 @@ export const NAV_SECTIONS: NavSection[] = [
     icon: PackageOpen,
     children: [
       {
-        label: "Operation Dashboard",
-        labelKey: "nav.dailyOperationReport",
-        path: "/operations?tab=overview",
-        icon: ClipboardList,
-        tone: "sky",
-        keywords: "daily report operations overview",
-      },
-
-      {
         label: "Trip Entry",
         labelKey: "nav.vehicleDeliveryEntry",
         path: "/operations?tab=trip-entry",
@@ -364,7 +357,6 @@ export const NAV_SECTIONS: NavSection[] = [
       // so these rows are generated from it — the sidebar and the app routes can
       // never disagree. Inside Operations they read as one grouped block.
       ...ORDERS_NAV_CHILDREN,
-
     ],
   },
   {
@@ -481,7 +473,8 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Accounts",
     labelKey: "nav.accounts",
     icon: ReceiptIndianRupee,
-    children: [      {
+    children: [
+      {
         label: "Analysis",
         labelKey: "nav.analysis",
         path: "/accounts?tab=summary",
@@ -589,7 +582,7 @@ export const FLAT_NAV: FlatNavEntry[] = NAV_SECTIONS.flatMap((section) =>
     icon: child.icon ?? section.icon,
     soon: child.soon,
     keywords: child.keywords,
-  }))
+  })),
 );
 
 /** Quick actions surfaced in the header and command palette. */
@@ -638,16 +631,23 @@ export const QUICK_ACTIONS: QuickAction[] = [
 ];
 
 /** Resolve the section + page labels for the current pathname (breadcrumbs). */
-export function resolveRoute(pathname: string): { section?: NavSection; page?: NavChild } {
+export function resolveRoute(pathname: string): {
+  section?: NavSection;
+  page?: NavChild;
+} {
   // Normalize: drop query string
   const path = pathname.split("?")[0];
-  const query = pathname.includes("?") ? pathname.slice(pathname.indexOf("?")) : "";
+  const query = pathname.includes("?")
+    ? pathname.slice(pathname.indexOf("?"))
+    : "";
 
   // Pass 1 — exact path + query match.
   for (const section of NAV_SECTIONS) {
     for (const child of section.children) {
       const childPath = child.path.split("?")[0];
-      const childQuery = child.path.includes("?") ? child.path.slice(child.path.indexOf("?")) : "";
+      const childQuery = child.path.includes("?")
+        ? child.path.slice(child.path.indexOf("?"))
+        : "";
       if (path === childPath && childQuery && query === childQuery) {
         return { section, page: child };
       }
@@ -658,7 +658,9 @@ export function resolveRoute(pathname: string): { section?: NavSection; page?: N
   for (const section of NAV_SECTIONS) {
     for (const child of section.children) {
       const childPath = child.path.split("?")[0];
-      const childQuery = child.path.includes("?") ? child.path.slice(child.path.indexOf("?")) : "";
+      const childQuery = child.path.includes("?")
+        ? child.path.slice(child.path.indexOf("?"))
+        : "";
       if (path === childPath && !childQuery) {
         return { section, page: child };
       }
@@ -686,7 +688,10 @@ export function resolveRoute(pathname: string): { section?: NavSection; page?: N
   // Fall back to section-level match (e.g. "/masters", "/operations").
   for (const section of NAV_SECTIONS) {
     const paths = section.children.map((c) => c.path.split("?")[0]);
-    if (paths.includes(path) || (path.length > 1 && paths.some((p) => path.startsWith(p + "/")))) {
+    if (
+      paths.includes(path) ||
+      (path.length > 1 && paths.some((p) => path.startsWith(p + "/")))
+    ) {
       return { section };
     }
     // Also match section hubs by prefix conventions (e.g. /staff, /fleet).

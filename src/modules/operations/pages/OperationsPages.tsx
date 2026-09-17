@@ -8,22 +8,43 @@ import { useI18n } from "../../../i18n";
 import { History, IndianRupee } from "lucide-react";
 import { ORDERS_ROUTE_BASE } from "../../orders/routes/ordersRoutes";
 
-const OperationsDashboardPage = React.lazy(retryableImport(() => import("../dashboard/pages/OperationsDashboardPage")));
-const TripEntryPage = React.lazy(retryableImport(() => import("../vehicle-trips/pages/TripEntryPage")));
-const TripListPage = React.lazy(retryableImport(() => import("../vehicle-trips/pages/TripListPage")));
-const ShopSalesPage = React.lazy(retryableImport(() => import("../shop-sales/pages/ShopSalesPage")));
-const RatesEntryPage = React.lazy(retryableImport(() => import("../shop-sales/pages/RatesEntryPage")));
-const CollectionEntryPage = React.lazy(retryableImport(() => import("../collections/pages/CollectionEntryPage")));
-const PendingCollectionsPage = React.lazy(retryableImport(() => import("../collections/pages/PendingCollectionsPage")));
-const CollectionReportPage = React.lazy(retryableImport(() => import("../collections/pages/CollectionReportPage")));
-const FuelExpensesPage = React.lazy(retryableImport(() => import("../fuel-expenses/pages/FuelExpensesPage")));
-const MortalityEntryPage = React.lazy(retryableImport(() => import("../mortality/pages/MortalityEntryPage")));
-const OrdersPage = React.lazy(retryableImport(() => import("../../orders/pages/OrdersPage")));
+const TripEntryPage = React.lazy(
+  retryableImport(() => import("../vehicle-trips/pages/TripEntryPage")),
+);
+const TripListPage = React.lazy(
+  retryableImport(() => import("../vehicle-trips/pages/TripListPage")),
+);
+const ShopSalesPage = React.lazy(
+  retryableImport(() => import("../shop-sales/pages/ShopSalesPage")),
+);
+const RatesEntryPage = React.lazy(
+  retryableImport(() => import("../shop-sales/pages/RatesEntryPage")),
+);
+const CollectionEntryPage = React.lazy(
+  retryableImport(() => import("../collections/pages/CollectionEntryPage")),
+);
+const PendingCollectionsPage = React.lazy(
+  retryableImport(() => import("../collections/pages/PendingCollectionsPage")),
+);
+const CollectionReportPage = React.lazy(
+  retryableImport(() => import("../collections/pages/CollectionReportPage")),
+);
+const FuelExpensesPage = React.lazy(
+  retryableImport(() => import("../fuel-expenses/pages/FuelExpensesPage")),
+);
+const MortalityEntryPage = React.lazy(
+  retryableImport(() => import("../mortality/pages/MortalityEntryPage")),
+);
+const OrdersPage = React.lazy(
+  retryableImport(() => import("../../orders/pages/OrdersPage")),
+);
 
 // Map tab keys (resolved from ?tab= sidebar deep-links / path aliases)
 // to their child page components.
-const tabComponents: Record<string, React.ComponentType<{ embedded?: boolean }>> = {
-  overview: OperationsDashboardPage,
+const tabComponents: Record<
+  string,
+  React.ComponentType<{ embedded?: boolean }>
+> = {
   "trip-entry": TripEntryPage,
   "trip-list": TripListPage,
   "rate-entry": RatesEntryPage,
@@ -87,12 +108,18 @@ function FilterTableShell({
         </div>
       </div>
       <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-        <div className={`flex items-center border-b border-slate-100 bg-gradient-to-r px-6 py-3 ${bar}`}>
+        <div
+          className={`flex items-center border-b border-slate-100 bg-gradient-to-r px-6 py-3 ${bar}`}
+        >
           <div className="flex items-center gap-3">
-            <div className={`flex h-9 w-9 items-center justify-center rounded-xl border shadow-inner ${tile}`}>
+            <div
+              className={`flex h-9 w-9 items-center justify-center rounded-xl border shadow-inner ${tile}`}
+            >
               {icon}
             </div>
-            <h3 className="text-base font-bold tracking-tight text-slate-800">{title}</h3>
+            <h3 className="text-base font-bold tracking-tight text-slate-800">
+              {title}
+            </h3>
           </div>
         </div>
         <div className="py-16 text-center text-sm font-medium text-slate-400">
@@ -114,7 +141,10 @@ function OperationsPages() {
   const location = useLocation();
   const navigate = useNavigate();
 
-  const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const searchParams = useMemo(
+    () => new URLSearchParams(location.search),
+    [location.search],
+  );
 
   // Read active tab from ?tab= query string
   const activeTab = useMemo(() => {
@@ -137,46 +167,68 @@ function OperationsPages() {
     // so moving between its sidebar rows is instant and never refetches.
     if (pathname.startsWith(ORDERS_ROUTE_BASE)) return "orders";
 
-    return "overview"; // Default tab
+    return "trip-entry"; // Default tab (the dashboard lives at /dashboard)
   }, [location.pathname, searchParams]);
 
-  // Redirect to ?tab=overview when visiting /operations without parameters
+  // /operations without a tab → Trip Entry; the old ?tab=overview deep link
+  // (Operation Dashboard) now lives on the Overview dashboard at /dashboard.
   useEffect(() => {
     if (location.pathname === "/operations" && !searchParams.get("tab")) {
-      navigate("/operations?tab=overview", { replace: true });
+      navigate("/operations?tab=trip-entry", { replace: true });
+    } else if (searchParams.get("tab") === "overview") {
+      navigate("/dashboard", { replace: true });
     }
   }, [location.pathname, searchParams, navigate]);
 
   const ActiveComponent = useMemo(() => {
-    return tabComponents[activeTab] ?? OperationsDashboardPage;
+    return tabComponents[activeTab] ?? TripEntryPage;
   }, [activeTab]);
 
   return (
-    <div className={activeTab === "orders" ? "w-full" : "w-full px-4 pb-8 pt-6 sm:px-5 lg:px-6"}>
-      <div key={activeTab} className={activeTab === "orders" ? "w-full" : "mx-auto w-full max-w-[1600px] animate-page-pop"}>
-        <Suspense fallback={
-          activeTab === "trip-list" ? (
-            <FilterTableShell
-              title={t("ops.trip.trip_list")}
-              loadingLabel={t("ops.trip.loading_trip_list")}
-              icon={<History className="h-5 w-5" />}
-              tone="blue"
-              filterColumns={5}
-            />
-          ) : activeTab === "rate-entry" ? (
-            <FilterTableShell
-              title={t("ops.rate.title")}
-              loadingLabel={t("ops.rate.loading_table")}
-              icon={<IndianRupee className="h-5 w-5" />}
-              tone="emerald"
-              filterColumns={5}
-            />
-          ) : (
-            <div role="status" aria-busy="true" className="animate-pulse rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500">
-              {t("common.loading")}
-            </div>
-          )
-        }>
+    <div
+      className={
+        activeTab === "orders"
+          ? "w-full"
+          : "w-full px-4 pb-8 pt-6 sm:px-5 lg:px-6"
+      }
+    >
+      <div
+        key={activeTab}
+        className={
+          activeTab === "orders"
+            ? "w-full"
+            : "mx-auto w-full max-w-[1600px] animate-page-pop"
+        }
+      >
+        <Suspense
+          fallback={
+            activeTab === "trip-list" ? (
+              <FilterTableShell
+                title={t("ops.trip.trip_list")}
+                loadingLabel={t("ops.trip.loading_trip_list")}
+                icon={<History className="h-5 w-5" />}
+                tone="blue"
+                filterColumns={5}
+              />
+            ) : activeTab === "rate-entry" ? (
+              <FilterTableShell
+                title={t("ops.rate.title")}
+                loadingLabel={t("ops.rate.loading_table")}
+                icon={<IndianRupee className="h-5 w-5" />}
+                tone="emerald"
+                filterColumns={5}
+              />
+            ) : (
+              <div
+                role="status"
+                aria-busy="true"
+                className="animate-pulse rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-500"
+              >
+                {t("common.loading")}
+              </div>
+            )
+          }
+        >
           <ActiveComponent embedded={true} />
         </Suspense>
       </div>

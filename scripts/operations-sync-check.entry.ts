@@ -361,7 +361,7 @@ export async function runOperationsSyncCheck(): Promise<void> {
     const { MemoryRouter } = await import("react-router-dom");
     const { I18nProvider } = await import("../src/i18n");
     const { default: QuarterOperationsMap } = await import(
-      "../src/modules/operations/dashboard/components/QuarterOperationsMap"
+      "../src/modules/dashboard/components/QuarterOperationsMap"
     );
 
     const html = renderToString(
