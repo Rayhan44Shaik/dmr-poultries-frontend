@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback, useId } from 'react';
-import { Plus, History, RotateCcw, Search, Pencil, CheckCircle2, Trash2, Calendar, Wallet, CreditCard } from 'lucide-react';
+import { Plus, History, RotateCcw, Pencil, CheckCircle2, Trash2, Calendar, Wallet, CreditCard } from 'lucide-react';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import { PaymentTable } from '../components/payment-book/PaymentTable';
 import { PaymentViewModal } from '../components/payment-book/PaymentViewModal';
@@ -21,14 +21,13 @@ import { Button } from '../../../ui/Button';
 import {
   opsFilterCardClass,
   opsFilterLabelClass,
-  opsInputClass,
   opsPrimaryButtonClass,
   opsSecondaryButtonClass,
 } from '../../../shared/ui/operationsStyles';
 import { useI18n } from '../../../i18n';
 import { EmptyState } from '../../../ui/EmptyState';
 import { BrandRefreshButton, Pagination } from '../../../ui';
-import { filterPayments, PAYMENT_TYPES, PAYMENT_MODES, paymentCurrency, paymentNoDisplay } from '../utils/paymentRegister';
+import { filterPayments, localizePaymentType, PAYMENT_TYPES, PAYMENT_MODES, paymentCurrency, paymentNoDisplay } from '../utils/paymentRegister';
 
 type PaymentView = 'pending' | 'approved' | 'deleted';
 const PAYMENT_VIEWS: { value: PaymentView; labelKey: string; selectedClass: string }[] = [
@@ -53,15 +52,15 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   const [error, setError] = useState(false);
   const inFlight = useRef(false);
   const reloadAfterSave = useRef(false);
-  const [filters, setFilters] = useState(() => ({ ...weekRange(), type: '', mode: '', search: '' }));
-  const [appliedFilters, setAppliedFilters] = useState(filters);
+  // The register filters reactively: picking a date, type or mode updates the
+  // rows and the count beside the heading immediately — no Search step.
+  const [filters, setFilters] = useState(() => ({ ...weekRange(), type: '', mode: '' }));
   const [status, setStatus] = useState<PaymentView>('pending');
   const dateId = useId();
   // Filter control ids — the visible icon labels name these through htmlFor,
   // exactly like the Trip List's filter card.
   const typeFilterId = useId();
   const modeFilterId = useId();
-  const searchId = useId();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
@@ -127,9 +126,9 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   /* Filter feedback: the Search / Reset glyphs beat once per click (700 ms).
      The refresh button follows the trip list's contract instead — plain hen,
      success toast when the load finishes. */
-  const [filterAction, setFilterAction] = useState<'search' | 'clear' | null>(null);
+  const [filterAction, setFilterAction] = useState<'clear' | null>(null);
   const spinTimer = useRef<number | null>(null);
-  const animateFilterAction = (action: 'search' | 'clear') => {
+  const animateFilterAction = (action: 'clear') => {
     setFilterAction(action);
     if (spinTimer.current !== null) window.clearTimeout(spinTimer.current);
     spinTimer.current = window.setTimeout(() => setFilterAction(null), 700);
@@ -148,28 +147,24 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   const clearFilters = () => {
     animateFilterAction('clear');
     setSelectedId(null);
-    const cleared = { ...weekRange(), type: '', mode: '', search: '' };
-    setFilters(cleared);
-    setAppliedFilters(cleared);
+    setFilters({ ...weekRange(), type: '', mode: '' });
     setStatus('pending');
     setPage(1);
     showNotification(t('accounts.payment.notif_filters_cleared'), 'info');
   };
   const invalidRange = Boolean(filters.from && filters.to && filters.from > filters.to);
-  const applyFilters = () => {
-    if (invalidRange) return;
-    animateFilterAction('search');
-    setSelectedId(null);
-    setAppliedFilters({ ...filters });
-    setPage(1);
-  };
-  const matched = useMemo(() => filterPayments(payments, appliedFilters), [payments, appliedFilters]);
+  // No search field: the three date/type/mode filters ARE the whole query,
+  // applied the moment any of them changes.
+  const matched = useMemo(() => filterPayments(payments, { ...filters, search: '' }), [payments, filters]);
   const filtered = useMemo(() => {
     // UI views only: do not reclassify Paid/Cancelled as Approved/Deleted.
     if (status === 'deleted') return [];
     return matched.filter(payment => payment.status === (status === 'pending' ? 'Draft' : 'Approved'));
   }, [matched, status]);
-  const types = useMemo(() => [...new Set([...PAYMENT_TYPES, ...payments.map(p => p.paymentType)])].filter(Boolean), [payments]);
+  // Type options read in the active language; the raw value stays the filter
+  // value so the API data is never touched. Modes stay in their stored form.
+  const types = useMemo(() => [...new Set([...PAYMENT_TYPES, ...payments.map(p => p.paymentType)])].filter(Boolean)
+    .map(value => ({ value, label: localizePaymentType(value, t) })), [payments, t]);
   const modes = useMemo(() => [...new Set([...PAYMENT_MODES, ...payments.map(p => p.paymentMode)])].filter(Boolean), [payments]);
   const safePage = Math.min(page, Math.max(1, Math.ceil(filtered.length / pageSize)));
   const rows = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
@@ -304,39 +299,19 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-end pt-1">
-          <div className="lg:col-span-5">
-            <label htmlFor={searchId} className={opsFilterLabelClass}>
-              <Search size={17} className="text-slate-400 flex-shrink-0" />
-              <span>{t('common.search')}</span>
-            </label>
-            <div className="relative">
-              <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
-              <input
-                id={searchId}
-                value={filters.search}
-                onChange={event => changeFilter('search', event.target.value)}
-                onKeyDown={event => { if (event.key === 'Enter') applyFilters(); }}
-                placeholder={t('accounts.payment.search_placeholder')}
-                className={`${opsInputClass} pl-10`}
-              />
-            </div>
-          </div>
-          <div className="lg:col-span-7 flex items-center gap-2 justify-end flex-wrap">
-            <button type="button" onClick={() => setIsNewModalOpen(true)} className={`group relative ${opsPrimaryButtonClass}`} aria-label={t('accounts.payment.new')}>
-              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-add)]"><Plus size={15} /></span>
-              {t('accounts.payment.new')}
-            </button>
-            <button type="button" onClick={applyFilters} disabled={invalidRange} className={`group relative ${opsSecondaryButtonClass}`} aria-label={t('common.search')}>
-              <span className={`inline-flex motion-safe:group-hover:animate-[var(--animate-action-search)] ${filterAction === 'search' ? 'motion-safe:animate-[var(--animate-action-search)]' : ''}`}><Search size={15} /></span>
-              {t('common.search')}
-            </button>
-            <button type="button" onClick={clearFilters} className={`group relative ${opsSecondaryButtonClass}`} aria-label={t('common.reset')}>
-              <span className={`inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)] ${filterAction === 'clear' ? 'motion-safe:animate-[var(--animate-action-reset)]' : ''}`}><RotateCcw size={14} /></span>
-              {t('common.reset')}
-            </button>
-            <BrandRefreshButton onClick={handleRefresh} />
-          </div>
+        {/* No search field in this register: the date / type / mode filters
+            apply themselves, so the actions row holds exactly New Payment,
+            Reset and the brand Refresh. */}
+        <div className="flex items-center gap-2 justify-end flex-wrap pt-1">
+          <button type="button" onClick={() => setIsNewModalOpen(true)} className={`group relative ${opsPrimaryButtonClass}`} aria-label={t('accounts.payment.new')}>
+            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-add)]"><Plus size={15} /></span>
+            {t('accounts.payment.new')}
+          </button>
+          <button type="button" onClick={clearFilters} className={`group relative ${opsSecondaryButtonClass}`} aria-label={t('common.reset')}>
+            <span className={`inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)] ${filterAction === 'clear' ? 'motion-safe:animate-[var(--animate-action-reset)]' : ''}`}><RotateCcw size={14} /></span>
+            {t('common.reset')}
+          </button>
+          <BrandRefreshButton onClick={handleRefresh} />
         </div>
         {invalidRange && <p role="alert" className="mt-2 text-xs text-red-600">{t('accounts.payment.invalid_range')}</p>}
       </section>
@@ -372,13 +347,19 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
             {/* Row actions appear only once a row is selected — the same
                 pattern as the trip entry table's Edit/Delete beside search. */}
+            {/* Row actions appear only once a row is selected — the same
+                pattern as the trip entry table's Edit/Delete beside search.
+                Each icon plays its canonical action motion on hover. */}
             {selectedPayment && (
               <div role="group" aria-label={t('accounts.payment.selected_actions')} className="flex flex-wrap items-center gap-2">
-                <Button variant="secondary" size="sm" icon={<Pencil size={14} />} disabled={!canEditSelected}
+                <Button variant="secondary" size="sm" className="group" disabled={!canEditSelected}
+                  icon={<span className={`inline-flex ${canEditSelected ? 'motion-safe:group-hover:animate-[var(--animate-action-edit)]' : ''}`}><Pencil size={14} /></span>}
                   onClick={() => { if (canEditSelected) setEditingPayment(selectedPayment); }}>{t('common.edit')}</Button>
-                <Button variant="success" size="sm" icon={<CheckCircle2 size={14} />} disabled={!canApproveSelected}
+                <Button variant="success" size="sm" className="group" disabled={!canApproveSelected}
+                  icon={<span className={`inline-flex ${canApproveSelected ? 'motion-safe:group-hover:animate-[var(--animate-action-approve)]' : ''}`}><CheckCircle2 size={14} /></span>}
                   onClick={() => { if (canApproveSelected) { setApprovalError(''); setApprovalPayment(selectedPayment); } }}>{t('common.approve')}</Button>
-                <Button variant="destructiveOutline" size="sm" icon={<Trash2 size={14} />} disabled={!canDeleteSelected}
+                <Button variant="destructiveOutline" size="sm" className="group" disabled={!canDeleteSelected}
+                  icon={<span className={`inline-flex ${canDeleteSelected ? 'motion-safe:group-hover:animate-[var(--animate-action-delete)]' : ''}`}><Trash2 size={14} /></span>}
                   onClick={() => { if (canDeleteSelected) requestDelete(selectedPayment.id, { label: t('accounts.payment.deleting_to', { name: selectedPayment.paidTo }) }); }}>{t('common.delete')}</Button>
               </div>
             )}
@@ -388,7 +369,8 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
         {status === 'deleted' ? <EmptyState title={t('accounts.payment.deleted_title')} description={t('accounts.payment.deleted_desc')} />
           : (<>
           <PaymentTable selectedId={selectedPayment?.id ?? null} onSelect={setSelectedId}
-            emptyVariant={error ? 'error' : !payments.length ? 'no-data' : appliedFilters.search.trim() ? 'no-search' : 'no-filters'}
+            startIndex={(safePage - 1) * pageSize}
+            emptyVariant={error ? 'error' : !payments.length ? 'no-data' : 'no-filters'}
             payments={rows} loading={loading && !payments.length} error={error && !payments.length} onView={setViewingPayment} />
           {/* Global pagination, exactly as the Trip List renders it: the same
               shared component, shown only when there is more than one page,

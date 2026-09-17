@@ -3,6 +3,28 @@ import type { Payment } from '../types/payment.types';
 export const PAYMENT_TYPES = ['Farmer Payment', 'Fuel Payment', 'Vehicle Maintenance', 'Salary Payment', 'EMI Payment', 'FASTag Recharge', 'Office Expense', 'Tax Payment', 'Other Expense'];
 export const PAYMENT_MODES = ['Cash', 'Bank Transfer', 'UPI', 'NEFT', 'RTGS', 'IMPS', 'Cheque'];
 
+/**
+ * The fixed payment-type list has dictionary keys, so a Telugu session reads
+ * "రైతు చెల్లింపు" instead of "Farmer Payment". Payment numbers, modes and
+ * reference values are identifiers — they stay in their native form.
+ */
+export const PAYMENT_TYPE_I18N_KEYS: Record<string, string> = {
+  'Farmer Payment': 'accounts.payment.pt_farmer',
+  'Fuel Payment': 'accounts.payment.pt_fuel',
+  'Vehicle Maintenance': 'accounts.payment.pt_maintenance',
+  'Salary Payment': 'accounts.payment.pt_salary',
+  'EMI Payment': 'accounts.payment.pt_emi',
+  'FASTag Recharge': 'accounts.payment.pt_fastag',
+  'Office Expense': 'accounts.payment.pt_office',
+  'Tax Payment': 'accounts.payment.pt_tax',
+  'Other Expense': 'accounts.payment.pt_other',
+};
+
+export const localizePaymentType = (value: string, t: (key: string) => string): string => {
+  const key = PAYMENT_TYPE_I18N_KEYS[value];
+  return key ? t(key) : value;
+};
+
 /** Canonical expense sectors shared by Payment Register and Accounts Summary. */
 export type PaymentExpenseSector = 'farm' | 'fuel' | 'trip' | 'salary' | 'maintenance' | 'office';
 

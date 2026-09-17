@@ -17,7 +17,7 @@ import { MasterSectionHeading } from '../../../masters/components/MasterForm';
 import { masterIconClass, masterInputClass, masterLabelClass } from '../../../masters/components/masterFormStyles';
 import '../../../masters/styles/masters.css';
 import { parseBusinessDate } from '../../../../utils/businessDate';
-import { PAYMENT_TYPES } from '../../utils/paymentRegister';
+import { localizePaymentType, PAYMENT_TYPES } from '../../utils/paymentRegister';
 import { inrInWords } from '../../utils/inrInWords';
 import { PaymentGlyphChip } from './PaymentGlyphMarks';
 import { paymentModeGlyph, paymentTypeGlyph } from '../../utils/paymentRegisterGlyphs';
@@ -71,9 +71,11 @@ function PaymentForm({ isOpen, onClose, onSave, persist }: NewPaymentModalProps)
 
   // Every option carries the same chip the register rows use, so the list and
   // the table speak one visual language.
+  // Option labels read in the active language; the value stays the raw stored
+  // type so the write path is untouched.
   const typeOptions = useMemo(
-    () => PAYMENT_TYPES.map((value) => ({ value, label: value, icon: <PaymentGlyphChip glyph={paymentTypeGlyph(value)} size={16} icon={10} /> })),
-    [],
+    () => PAYMENT_TYPES.map((value) => ({ value, label: localizePaymentType(value, t), icon: <PaymentGlyphChip glyph={paymentTypeGlyph(value)} size={16} icon={10} /> })),
+    [t],
   );
   const modeOptions = useMemo(
     () => paymentModeOptions.map((value) => ({ value, label: value, icon: <PaymentGlyphChip glyph={paymentModeGlyph(value)} size={16} icon={10} /> })),

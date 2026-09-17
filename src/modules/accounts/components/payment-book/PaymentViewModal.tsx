@@ -13,7 +13,7 @@ import { Button } from '../../../../ui/Button';
 import { StatusBadge } from '../../../../ui/StatusBadge';
 import { MasterSectionHeading } from '../../../masters/components/MasterForm';
 import { useI18n } from '../../../../i18n';
-import { paymentCurrency, paymentNoDisplay } from '../../utils/paymentRegister';
+import { localizePaymentType, paymentCurrency, paymentNoDisplay } from '../../utils/paymentRegister';
 import { inrInWords } from '../../utils/inrInWords';
 import { PaymentModeMark, PaymentTypeMark } from './PaymentGlyphMarks';
 
@@ -120,7 +120,7 @@ export function PaymentViewModal({ isOpen, payment, onClose, onEdit, canEdit = f
           <MasterSectionHeading>{t('accounts.payment.section_payment')}</MasterSectionHeading>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
             <DetailField label={t('accounts.payment.col_date')} icon={<CalendarDays size={14} />}><span className="tabular-nums">{dateShown}</span></DetailField>
-            <DetailField label={t('accounts.payment.type')}><PaymentTypeMark type={payment.paymentType} /></DetailField>
+            <DetailField label={t('accounts.payment.type')}><PaymentTypeMark type={payment.paymentType} label={localizePaymentType(payment.paymentType, t)} /></DetailField>
             <DetailField label={t('accounts.payment.mode')}>{payment.paymentMode ? <PaymentModeMark mode={payment.paymentMode} /> : EMPTY}</DetailField>
             <DetailField label={t('accounts.payment.field_category')} icon={<IndianRupee size={14} />}>{payment.category || EMPTY}</DetailField>
           </div>

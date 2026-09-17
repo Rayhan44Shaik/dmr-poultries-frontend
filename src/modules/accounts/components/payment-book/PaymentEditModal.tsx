@@ -12,7 +12,7 @@ import { MasterSectionHeading } from '../../../masters/components/MasterForm';
 import { masterIconClass, masterInputClass, masterLabelClass } from '../../../masters/components/masterFormStyles';
 import '../../../masters/styles/masters.css';
 import { DatePicker } from '../../../../components/common/DatePicker';
-import { PAYMENT_TYPES, PAYMENT_MODES, paymentNoDisplay } from '../../utils/paymentRegister';
+import { localizePaymentType, PAYMENT_TYPES, PAYMENT_MODES, paymentNoDisplay } from '../../utils/paymentRegister';
 import { PaymentGlyphChip } from './PaymentGlyphMarks';
 import { paymentModeGlyph, paymentTypeGlyph } from '../../utils/paymentRegisterGlyphs';
 import { cn } from '../../../../utils/cn';
@@ -101,7 +101,9 @@ function EditForm({ isOpen, payment, onClose, onSave, persist }: PaymentEditModa
   }
 
   const valid = Boolean(parseBusinessDate(form.paymentDate) && form.paymentType && form.paymentMode && form.paidTo.trim() && form.referenceNo.trim() && Number.isFinite(form.amount) && form.amount > 0);
-  const typeOptions = PAYMENT_TYPES.map(value => ({ value, label: value, icon: <PaymentGlyphChip glyph={paymentTypeGlyph(value)} size={16} icon={10} /> }));
+  // Option labels read in the active language; the value stays the raw stored
+  // type so the write path is untouched.
+  const typeOptions = PAYMENT_TYPES.map(value => ({ value, label: localizePaymentType(value, t), icon: <PaymentGlyphChip glyph={paymentTypeGlyph(value)} size={16} icon={10} /> }));
   const modeOptions = PAYMENT_MODES.map(value => ({ value, label: value, icon: <PaymentGlyphChip glyph={paymentModeGlyph(value)} size={16} icon={10} /> }));
   const statusOptions = STATUSES.map(entry => ({ value: entry.value, label: t(entry.labelKey) }));
   const fieldId = (name: string) => `edit-payment-${name.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`;
