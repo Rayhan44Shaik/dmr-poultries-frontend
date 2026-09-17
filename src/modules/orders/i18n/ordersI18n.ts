@@ -193,6 +193,7 @@ const EN: Record<string, string> = {
   "orders.vehicle_list_assigned": "Shops assigned",
   "orders.vehicles_count": "{pending} pending · {saved} saved",
   "orders.boxes_short": "boxes",
+  "orders.birds_short": "birds",
   "orders.vehicle_shops_assigned": "{n} shops assigned",
   "orders.vehicle_shops_none": "No shops yet",
   "orders.sequence_empty_hint":
@@ -637,6 +638,7 @@ const TE: Record<string, string> = {
   "orders.vehicle_list_assigned": "షాప్‌లు కేటాయించబడ్డాయి",
   "orders.vehicles_count": "{pending} పెండింగ్ · {saved} సేవ్",
   "orders.boxes_short": "బాక్స్‌లు",
+  "orders.birds_short": "పక్షులు",
   "orders.vehicle_shops_assigned": "{n} షాప్‌లు కేటాయించబడ్డాయి",
   "orders.vehicle_shops_none": "ఇంకా షాప్‌లు లేవు",
   "orders.sequence_empty_hint":
