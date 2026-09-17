@@ -2276,13 +2276,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               type="button"
               onClick={() => void handleExportPDF()}
               disabled={pdfGenerating}
-              title={
-                appliedSelectedShop === "All Shops"
-                  ? t("shop_ledger.pdf_hint_all")
-                  : t("shop_ledger.pdf_hint_shop", {
-                      shop: appliedSelectedShop,
-                    })
-              }
+
               className={`group relative ${opsPdfButtonClass} disabled:opacity-60`}
               aria-label="PDF"
             >
@@ -2299,7 +2293,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               type="button"
               onClick={handleExportExcel}
               disabled={sortedBody.length === 0}
-              title={t("shop_ledger.excel_hint")}
               className={`group relative ${opsExcelButtonClass} disabled:opacity-60`}
               aria-label="Excel"
             >
@@ -2313,7 +2306,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             <button
               type="button"
               onClick={openWhatsApp}
-              title="WhatsApp"
               aria-label="WhatsApp"
               disabled={waSending}
               className="group inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[#25D366]/50 bg-[#25D366] text-white shadow-sm transition hover:bg-[#1DA851] focus:outline-none focus:ring-2 focus:ring-[#25D366]/35 disabled:cursor-not-allowed disabled:opacity-60"
@@ -2657,12 +2649,12 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                           event.currentTarget.focus();
                         }}
                         onKeyDown={(event) => handleLedgerRowKeyDown(event, idx)}
-                        className={`cursor-pointer outline-none transition-[background-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
+                        className={`group/ledger-row cursor-pointer outline-none transition-[background-color,box-shadow] duration-150 ease-out focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
                           isSelected
-                            ? "bg-emerald-50/90 shadow-[inset_4px_0_0_#10b981]"
+                            ? "bg-emerald-50 shadow-[inset_4px_0_0_#10b981] hover:bg-emerald-100/80"
                             : isOpening
-                              ? "bg-amber-50/50 font-semibold hover:bg-amber-100/60"
-                              : "hover:bg-emerald-50/45"
+                              ? "bg-amber-50/50 font-semibold hover:bg-amber-100 hover:shadow-[inset_3px_0_0_#fbbf24]"
+                              : "hover:bg-emerald-50 hover:shadow-[inset_3px_0_0_#6ee7b7]"
                         }`}
                       >
                         <td className="px-4 py-3 text-xs font-medium text-slate-600 tabular-nums">
@@ -2779,7 +2771,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                 <h3
                   id="shop-ledger-pdf-title"
                   className="truncate text-sm font-bold uppercase tracking-wide text-slate-800"
-                  title={activePdfFile.filename}
                 >
                   {pdfT("shop_ledger.pdf_weekly_statement")}
                 </h3>
@@ -2956,7 +2947,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                             onClick={() =>
                               setActivePdfShop(fileIndex, file.shop)
                             }
-                            title={file.shop}
                             className="flex min-w-0 flex-1 items-center gap-2 text-left"
                           >
                             <span
@@ -3249,7 +3239,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                           setWaPreviewShop(shop);
                           resetWaAttachment();
                         }}
-                        title={shop}
                         className="flex min-w-0 flex-1 items-center gap-2 text-left"
                       >
                         <span
@@ -3386,7 +3375,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                         <div className="min-w-0 flex-1">
                           <p
                             className="truncate text-xs font-semibold text-slate-700"
-                            title={waPreviewFileName}
                           >
                             {waPreviewFileName}
                           </p>
