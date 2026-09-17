@@ -1,6 +1,6 @@
 // src/modules/collections/pages/CollectionReportPage.tsx
 
-import { useState, useEffect, useMemo, useCallback, useLayoutEffect, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { collectionService } from "../services/collectionService";
 import type { CollectionApiEntry, CollectionReportSummary } from "../types/collection";
 import { useShops } from "../../../masters/shops/hooks/useShops";
@@ -187,8 +187,6 @@ export default function CollectionReportPage({ embedded = false }: Props) {
   const [paymentMode, setPaymentMode] = useState("");
   const requestSequenceRef = useRef(0);
   const initialLoadStartedRef = useRef(false);
-  const paymentSummaryCardRef = useRef<HTMLDivElement>(null);
-  const modeShareCardRef = useRef<HTMLDivElement>(null);
   const appliedFiltersRef = useRef({
     fromDate: "",
     toDate: "",
@@ -612,24 +610,6 @@ export default function CollectionReportPage({ embedded = false }: Props) {
     });
   }, [loading, loadReport, showNotification, t]);
 
-  // The payment table is the height authority for this row. Keep the compact
-  // mode-share card pixel-aligned with it at every viewport and font scale,
-  // so both cards finish immediately after the Total row.
-  useLayoutEffect(() => {
-    const paymentCard = paymentSummaryCardRef.current;
-    const shareCard = modeShareCardRef.current;
-    if (!paymentCard || !shareCard) return;
-
-    const matchHeight = () => {
-      shareCard.style.height = `${paymentCard.getBoundingClientRect().height}px`;
-    };
-    matchHeight();
-
-    const observer = new ResizeObserver(matchHeight);
-    observer.observe(paymentCard);
-    return () => observer.disconnect();
-  }, [report?.totalCount]);
-
   // Content matching the precise structural layout and spacing of RatesEntryPage
   const content = (
     <div className="w-full space-y-5" data-embedded={embedded || undefined}>
@@ -800,36 +780,56 @@ export default function CollectionReportPage({ embedded = false }: Props) {
           <p className="text-xs text-slate-400">{t("ops.collection.empty.hint")}</p>
         </div>
       ) : (
-      <>
-        {/* Row 1 — Payment Mode Summary: table with its mode-share chart */}
-        <div className={`grid grid-cols-1 items-start gap-6 lg:grid-cols-2 transition-opacity duration-200 ${loading ? "pointer-events-none opacity-50" : ""}`}>
-          <div
-            ref={paymentSummaryCardRef}
-            className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
-              <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                <span className="rounded-lg bg-blue-50 p-1.5 text-blue-600">
-                  <Wallet size={14} />
-                </span>
-                {t("ops.collection.payment_mode_summary")}
-              </h4>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                {t("ops.collection.no_of_collections")}: {report?.totalCount ?? 0}
+      <div className={`space-y-6 transition-opacity duration-200 ${loading ? "pointer-events-none opacity-50" : ""}`}>
+        {/* Section 1 — Mode-wise Share chart on top, Payment Mode Summary below */}
+        <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
+            <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+              <span className="rounded-lg bg-sky-50 p-1.5 text-sky-600">
+                <BarChart3 size={14} />
               </span>
+              {t("ops.collection.mode_share")}
+            </h4>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              {t("common.total")}: {formatCurrency(totalCollections)}
+            </span>
+          </div>
+          <div className="flex items-center justify-center px-5 py-6">
+            <div className="w-full max-w-lg">
+              <CollectionsPie
+                data={modeChartData.map((row) => ({ name: row.name, value: row.value }))}
+                animationKey={report?.totalCount ?? 0}
+                hideStats
+              />
             </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-100">
-                <thead className="bg-slate-50/80">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">{t("ops.collection.mode")}</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("ops.collection.collectors")}</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("ops.collection.no_short")}</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("table.amount")}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 bg-white">
-                  {paymentModeSummary.map((row) => (
+          </div>
+
+          <div className="border-t border-slate-100 bg-slate-50/60 px-5 py-3">
+            <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+              <span className="rounded-lg bg-blue-50 p-1.5 text-blue-600">
+                <Wallet size={14} />
+              </span>
+              {t("ops.collection.payment_mode_summary")}
+              <span className="ml-1 text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+                · {t("ops.collection.no_of_collections")}: {report?.totalCount ?? 0}
+              </span>
+            </h4>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-100">
+              <thead className="bg-slate-50/80">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">{t("ops.collection.mode")}</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("ops.collection.collectors")}</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("ops.collection.no_short")}</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("table.amount")}</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("ops.collection.share")}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {paymentModeSummary.map((row) => {
+                  const share = totalCollections > 0 ? (row.amount / totalCollections) * 100 : 0;
+                  return (
                     <tr
                       key={row.mode}
                       className={row.mode === "Total" ? "bg-amber-50/60 font-semibold" : "hover:bg-slate-50/50"}
@@ -851,135 +851,107 @@ export default function CollectionReportPage({ embedded = false }: Props) {
                       </td>
                       <td className="px-4 py-3 text-right text-xs text-slate-600">{row.count}</td>
                       <td className="px-4 py-3 text-right text-xs text-slate-600">{formatCurrency(row.amount)}</td>
+                      <td className="px-4 py-3 text-right text-xs text-slate-600">{share.toFixed(1)}%</td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-
-          <div
-            ref={modeShareCardRef}
-            className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm"
-          >
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
-              <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                <span className="rounded-lg bg-sky-50 p-1.5 text-sky-600">
-                  <BarChart3 size={14} />
-                </span>
-                {t("ops.collection.mode_share")}
-              </h4>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                {t("common.total")}: {formatCurrency(totalCollections)}
-              </span>
-            </div>
-            <div className="flex h-full items-center justify-center px-5 py-4">
-              <CollectionsPie
-                data={modeChartData.map((row) => ({ name: row.name, value: row.value }))}
-                animationKey={report?.totalCount ?? 0}
-                compact
-              />
-            </div>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
         </div>
 
-        {/* Row 2 — Collector Summary: table with its collector split chart */}
-        <div className={`grid grid-cols-1 gap-6 lg:grid-cols-2 transition-opacity duration-200 ${loading ? "pointer-events-none opacity-50" : ""}`}>
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
-              <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                <span className="rounded-lg bg-indigo-50 p-1.5 text-indigo-600">
-                  <Users size={14} />
-                </span>
-                {t("ops.collection.collector_summary")}
-              </h4>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                {t("ops.collection.total_collectors")}: {totalCollectorsCount}
+        {/* Section 2 — Collector Summary table on top, Collector-wise Split chart below */}
+        <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
+            <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+              <span className="rounded-lg bg-indigo-50 p-1.5 text-indigo-600">
+                <Users size={14} />
               </span>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-slate-100">
-                <thead className="bg-slate-50/80">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">{t("common.collector")}</th>
-                    {collectorSummary.paymentModes.map((mode: string) => (
-                      <th key={mode} className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">
-{modeDisplay(mode)}
-                      </th>
-                    ))}
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("common.total")}</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("ops.collection.share")}</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100 bg-white">
-                  {collectorSummary.rows.map((row, idx) => {
-                    const isTotal = row.collector === "Total";
-                    const share = totalCollections > 0 ? (row.total / totalCollections) * 100 : 0;
-                    return (
-                      <tr
-                        key={idx}
-                        className={isTotal ? "bg-amber-50/60 font-semibold" : "hover:bg-slate-50/50"}
-                      >
-                        <td className="px-4 py-3 text-xs font-medium text-slate-800">
-                          {row.collector === "Total" ? t("common.total") : row.collector}
+              {t("ops.collection.collector_summary")}
+            </h4>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              {t("ops.collection.total_collectors")}: {totalCollectorsCount}
+            </span>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-slate-100">
+              <thead className="bg-slate-50/80">
+                <tr>
+                  <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-slate-600">{t("common.collector")}</th>
+                  {collectorSummary.paymentModes.map((mode: string) => (
+                    <th key={mode} className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">
+                      {modeDisplay(mode)}
+                    </th>
+                  ))}
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("common.total")}</th>
+                  <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("ops.collection.share")}</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100 bg-white">
+                {collectorSummary.rows.map((row, idx) => {
+                  const isTotal = row.collector === "Total";
+                  const share = totalCollections > 0 ? (row.total / totalCollections) * 100 : 0;
+                  return (
+                    <tr
+                      key={idx}
+                      className={isTotal ? "bg-amber-50/60 font-semibold" : "hover:bg-slate-50/50"}
+                    >
+                      <td className="px-4 py-3 text-xs font-medium text-slate-800">
+                        {row.collector === "Total" ? t("common.total") : row.collector}
+                      </td>
+                      {collectorSummary.paymentModes.map((mode: string) => (
+                        <td key={mode} className="px-4 py-3 text-right text-xs text-slate-600">
+                          {formatCurrency(Number(row[mode]) || 0)}
                         </td>
-                        {collectorSummary.paymentModes.map((mode: string) => (
-                          <td key={mode} className="px-4 py-3 text-right text-xs text-slate-600">
-                            {formatCurrency(Number(row[mode]) || 0)}
-                          </td>
-                        ))}
-                        <td className="px-4 py-3 text-right text-xs font-semibold text-slate-800">
-                          {formatCurrency(row.total)}
-                        </td>
-                        <td className="px-4 py-3 text-right text-xs text-slate-600">{share.toFixed(1)}%</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
+                      ))}
+                      <td className="px-4 py-3 text-right text-xs font-semibold text-slate-800">
+                        {formatCurrency(row.total)}
+                      </td>
+                      <td className="px-4 py-3 text-right text-xs text-slate-600">{share.toFixed(1)}%</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
           </div>
 
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
-              <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
-                <span className="rounded-lg bg-sky-50 p-1.5 text-sky-600">
-                  <BarChart3 size={14} />
-                </span>
-                {t("ops.collection.collector_split")}
-              </h4>
-              <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-                {t("ops.collection.collectors")}: {collectorChartData.length}
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 bg-slate-50/60 px-5 py-3">
+            <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
+              <span className="rounded-lg bg-sky-50 p-1.5 text-sky-600">
+                <BarChart3 size={14} />
               </span>
-            </div>
-            <div className="h-72 p-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={collectorChartData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                  <XAxis dataKey="collector" tick={{ fontSize: 10, fill: "#64748b" }} tickLine={false} axisLine={{ stroke: "#e2e8f0" }} interval={0} />
-                  <YAxis tick={{ fontSize: 10, fill: "#64748b" }} tickLine={false} axisLine={false} tickFormatter={(v: number) => compactINR(v)} />
-                  <ChartTooltip
-                    cursor={{ fill: "rgba(148,163,184,0.08)" }}
-                    content={<ChartTipBox totalLabel={t("common.total")} />}
+              {t("ops.collection.collector_split")}
+            </h4>
+            <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-400">
+              {t("ops.collection.collectors")}: {collectorChartData.length}
+            </span>
+          </div>
+          <div className="h-72 px-4 py-5">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={collectorChartData} margin={{ top: 8, right: 8, left: -12, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
+                <XAxis dataKey="collector" tick={{ fontSize: 10, fill: "#64748b" }} tickLine={false} axisLine={{ stroke: "#e2e8f0" }} interval={0} />
+                <YAxis tick={{ fontSize: 10, fill: "#64748b" }} tickLine={false} axisLine={false} tickFormatter={(v: number) => compactINR(v)} />
+                <ChartTooltip
+                  cursor={{ fill: "rgba(148,163,184,0.08)" }}
+                  content={<ChartTipBox totalLabel={t("common.total")} />}
+                />
+                <ChartLegend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
+                {collectorSummary.paymentModes.map((mode: string, idx: number) => (
+                  <Bar
+                    key={mode}
+                    dataKey={mode}
+                    name={modeDisplay(mode)}
+                    stackId="amount"
+                    fill={modeColor(mode)}
+                    radius={idx === collectorSummary.paymentModes.length - 1 ? [4, 4, 0, 0] : undefined}
                   />
-                  <ChartLegend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
-                  {collectorSummary.paymentModes.map((mode: string, idx: number) => (
-                    <Bar
-                      key={mode}
-                      dataKey={mode}
-                      name={modeDisplay(mode)}
-                      stackId="amount"
-                      fill={modeColor(mode)}
-                      radius={idx === collectorSummary.paymentModes.length - 1 ? [4, 4, 0, 0] : undefined}
-                    />
-                  ))}
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
-
-      </>
+      </div>
       )}
     </div>
   );

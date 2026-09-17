@@ -32,6 +32,8 @@ interface CollectionsPieProps {
   animationKey?: number;
   /** Compact report-card layout; the dashboard keeps the full-size default. */
   compact?: boolean;
+  /** Hide the KPI stat footer beneath the donut (the table serves as legend). */
+  hideStats?: boolean;
 }
 
 interface EnrichedMode {
@@ -109,6 +111,7 @@ export default function CollectionsPie({
   data,
   animationKey = 0,
   compact = false,
+  hideStats = false,
 }: CollectionsPieProps) {
   const { t } = useI18n();
   const chartData = useMemo(() => data ?? [], [data]);
@@ -224,11 +227,13 @@ export default function CollectionsPie({
           </div>
           </div>
         </div>
-        <div className="mt-3 grid w-full shrink-0 grid-cols-2 gap-2 border-t border-slate-100 pt-3 sm:grid-cols-3">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="h-[3.25rem] animate-pulse rounded-xl bg-slate-100/80" />
-          ))}
-        </div>
+        {!hideStats && (
+          <div className="mt-3 grid w-full shrink-0 grid-cols-2 gap-2 border-t border-slate-100 pt-3 sm:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-[3.25rem] animate-pulse rounded-xl bg-slate-100/80" />
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -334,7 +339,7 @@ export default function CollectionsPie({
           );
         })}
       </div>
-      {modeKpis}
+      {!hideStats && modeKpis}
     </div>
   );
 }
