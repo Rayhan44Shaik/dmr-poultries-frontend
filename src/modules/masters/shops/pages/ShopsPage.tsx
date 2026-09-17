@@ -1,8 +1,25 @@
-import MasterListToolbar from "../../components/MasterListToolbar";
-import MasterListSummary from "../../components/MasterListSummary";
-import MasterPagination from "../../components/MasterPagination";
 import "../../styles/masters.css";
 import MasterDropdown from "../../components/MasterDropdown";
+import {
+  Store,
+  Search,
+  MapPin,
+  ToggleLeft,
+  ArrowUpDown,
+  Plus,
+  Upload,
+  FileText,
+  FileSpreadsheet,
+} from "lucide-react";
+import {
+  opsFilterCardClass,
+  opsFilterLabelClass,
+  opsInputClass,
+  opsPrimaryButtonClass,
+  opsPdfButtonClass,
+  opsExcelButtonClass,
+} from "../../../../shared/ui/operationsStyles";
+import { uiImportButtonClass } from "../../../../shared/ui/uiTokens";
 // D:\Development\DMR-Poultries-ERP\frontend\dmr-poultries-web\src\modules\masters\shops\pages\ShopsPage.tsx
 
 import React, { useState, useMemo } from "react";
@@ -22,7 +39,12 @@ import autoTable from "jspdf-autotable";
 import BulkImportDialog from "../../components/bulk-import/BulkImportDialog";
 import { buildShopBulkImportConfig } from "../bulkImportConfig";
 import { useI18n } from "../../../../i18n";
-import { FilterResetButton, countActiveFilters } from "../../../../ui";
+import {
+  FilterResetButton,
+  countActiveFilters,
+  BrandRefreshButton,
+  Pagination,
+} from "../../../../ui";
 
 type ShopsPageProps = { embedded?: boolean };
 
@@ -50,8 +72,18 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     addShop,
     addShopsBulk,
     editShop,
-    total, page: serverPage, exportRows, facets,
-  } = useShops({ page: currentPage, pageSize: pageSize, search, status: statusFilter, sort: sortOrder, city: cityFilter });
+    total,
+    page: serverPage,
+    exportRows,
+    facets,
+  } = useShops({
+    page: currentPage,
+    pageSize: pageSize,
+    search,
+    status: statusFilter,
+    sort: sortOrder,
+    city: cityFilter,
+  });
 
   const shopBulkImportConfig = useMemo(
     () => buildShopBulkImportConfig({ addShopsBulk, reload }),
@@ -73,6 +105,8 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
   const handleResetFilters = () => {
     setSearch("");
     setCityFilter("");
+    setStatusFilter("");
+    setSortOrder("number");
     setCurrentPage(1);
   };
 
@@ -87,7 +121,6 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
   // to a single option (first spelling seen wins for display).
   const cityOptions = facets.city ?? [];
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const safePage = serverPage;
   const paginatedShops = shops;
   const pageStartIndex = (safePage - 1) * pageSize;
@@ -96,166 +129,170 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     try {
       const filteredShops = await exportRows();
 
-    if (filteredShops.length === 0) {
-      showNotification(t("masters.shops.toast.no_data_export"), "error");
-      return;
+      if (filteredShops.length === 0) {
+        showNotification(t("masters.shops.toast.no_data_export"), "error");
+        return;
+      }
+
+      const doc = new jsPDF("l", "mm", "a4");
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 14;
+      const usableWidth = pageWidth - margin * 2;
+
+      // Nine columns: S.No, shop, owner, mobile, city, association, paper rate,
+      // opening balance, current balance.
+      const relativeWeights = [
+        0.05, 0.19, 0.14, 0.12, 0.1, 0.11, 0.08, 0.1, 0.11,
+      ];
+      const columnStylesConfig: {
+        [key: number]: {
+          cellWidth: number;
+          halign?: "center" | "left" | "right";
+        };
+      } = {};
+
+      const headers = [
+        t("masters.shops.table.s_no"),
+        t("masters.shops.table.shop_name"),
+        t("masters.shops.table.owner"),
+        t("masters.shops.table.mobile_no"),
+        t("masters.shops.table.city"),
+        t("masters.shops.table.association_type"),
+        t("masters.shops.table.paper_rate"),
+        t("masters.shops.table.opening_balance"),
+        t("masters.shops.table.current_balance"),
+      ];
+      headers.forEach((_, index) => {
+        const computedWidth = usableWidth * relativeWeights[index];
+        const isCentered = index === 0 || index === 6;
+        columnStylesConfig[index] = {
+          cellWidth: computedWidth,
+          halign: isCentered ? "center" : "left",
+        };
+      });
+
+      doc.setFontSize(16);
+      doc.setTextColor(30, 41, 59);
+      doc.text(
+        t("masters.shops.title") + " - " + t("common.master_list"),
+        margin,
+        15,
+      );
+
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139);
+      doc.text(
+        `${t("common.generated_on")}: ${new Date().toLocaleDateString()}`,
+        margin,
+        21,
+      );
+
+      const rows = filteredShops.map((shop, index) => [
+        (index + 1).toString(),
+        shop.shopName,
+        shop.ownerName,
+        shop.phoneNumber,
+        shop.city,
+        shop.associationType || "—",
+        shop.paperRate.toString(),
+        `₹${Number(shop.openingBalance || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        `₹${Number(shop.currentBalance || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      ]);
+
+      autoTable(doc, {
+        startY: 26,
+        head: [headers],
+        body: rows,
+        theme: "grid",
+        tableWidth: usableWidth,
+        margin: { left: margin, right: margin, bottom: 18 },
+        styles: {
+          fontSize: 8.5,
+          cellPadding: 3.5,
+          valign: "middle",
+          overflow: "linebreak",
+        },
+        headStyles: {
+          fillColor: [37, 99, 235],
+          textColor: 255,
+          fontStyle: "bold",
+          halign: "center",
+        },
+        bodyStyles: {
+          textColor: [51, 65, 85],
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252],
+        },
+        columnStyles: columnStylesConfig,
+        didDrawPage: (data) => {
+          const pageCount = doc.getNumberOfPages();
+          doc.setFontSize(8);
+          doc.setTextColor(148, 163, 184);
+          doc.text(
+            `${t("common.confidential_report")} • ${t("common.page")} ${data.pageNumber} ${t("common.of")} ${pageCount}`,
+            margin,
+            doc.internal.pageSize.height - 10,
+          );
+        },
+      });
+
+      const filename = `${t("masters.shops.title")}_${new Date().toISOString().split("T")[0]}`;
+      doc.save(`${filename}.pdf`);
+      logAuditEvent("EXPORT_PDF", "Shops", undefined, {
+        count: filteredShops.length,
+      });
+      showNotification(t("masters.shops.toast.pdf_exported"), "success");
+    } catch (err) {
+      showNotification(handleApiError(err), "error");
     }
-
-    const doc = new jsPDF("l", "mm", "a4");
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 14;
-    const usableWidth = pageWidth - margin * 2;
-
-    // Nine columns: S.No, shop, owner, mobile, city, association, paper rate,
-    // opening balance, current balance.
-    const relativeWeights = [0.05, 0.19, 0.14, 0.12, 0.1, 0.11, 0.08, 0.1, 0.11];
-    const columnStylesConfig: {
-      [key: number]: {
-        cellWidth: number;
-        halign?: "center" | "left" | "right";
-      };
-    } = {};
-
-    const headers = [
-      t("masters.shops.table.s_no"),
-      t("masters.shops.table.shop_name"),
-      t("masters.shops.table.owner"),
-      t("masters.shops.table.mobile_no"),
-      t("masters.shops.table.city"),
-      t("masters.shops.table.association_type"),
-      t("masters.shops.table.paper_rate"),
-      t("masters.shops.table.opening_balance"),
-      t("masters.shops.table.current_balance"),
-    ];
-    headers.forEach((_, index) => {
-      const computedWidth = usableWidth * relativeWeights[index];
-      const isCentered = index === 0 || index === 6;
-      columnStylesConfig[index] = {
-        cellWidth: computedWidth,
-        halign: isCentered ? "center" : "left",
-      };
-    });
-
-    doc.setFontSize(16);
-    doc.setTextColor(30, 41, 59);
-    doc.text(
-      t("masters.shops.title") + " - " + t("common.master_list"),
-      margin,
-      15,
-    );
-
-    doc.setFontSize(9);
-    doc.setTextColor(100, 116, 139);
-    doc.text(
-      `${t("common.generated_on")}: ${new Date().toLocaleDateString()}`,
-      margin,
-      21,
-    );
-
-    const rows = filteredShops.map((shop, index) => [
-      (index + 1).toString(),
-      shop.shopName,
-      shop.ownerName,
-      shop.phoneNumber,
-      shop.city,
-      shop.associationType || "—",
-      shop.paperRate.toString(),
-      `₹${Number(shop.openingBalance || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      `₹${Number(shop.currentBalance || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-    ]);
-
-    autoTable(doc, {
-      startY: 26,
-      head: [headers],
-      body: rows,
-      theme: "grid",
-      tableWidth: usableWidth,
-      margin: { left: margin, right: margin, bottom: 18 },
-      styles: {
-        fontSize: 8.5,
-        cellPadding: 3.5,
-        valign: "middle",
-        overflow: "linebreak",
-      },
-      headStyles: {
-        fillColor: [37, 99, 235],
-        textColor: 255,
-        fontStyle: "bold",
-        halign: "center",
-      },
-      bodyStyles: {
-        textColor: [51, 65, 85],
-      },
-      alternateRowStyles: {
-        fillColor: [248, 250, 252],
-      },
-      columnStyles: columnStylesConfig,
-      didDrawPage: (data) => {
-        const pageCount = doc.getNumberOfPages();
-        doc.setFontSize(8);
-        doc.setTextColor(148, 163, 184);
-        doc.text(
-          `${t("common.confidential_report")} • ${t("common.page")} ${data.pageNumber} ${t("common.of")} ${pageCount}`,
-          margin,
-          doc.internal.pageSize.height - 10,
-        );
-      },
-    });
-
-    const filename = `${t("masters.shops.title")}_${new Date().toISOString().split("T")[0]}`;
-    doc.save(`${filename}.pdf`);
-    logAuditEvent("EXPORT_PDF", "Shops", undefined, {
-      count: filteredShops.length,
-    });
-    showNotification(t("masters.shops.toast.pdf_exported"), "success");
-  
-    } catch (err) { showNotification(handleApiError(err), "error"); }
   };
 
   const handleExportExcel = async () => {
     try {
       const filteredShops = await exportRows();
 
-    if (filteredShops.length === 0) {
-      showNotification(t("masters.shops.toast.no_data_export"), "error");
-      return;
-    }
-    const headers = [
-      t("masters.shops.table.s_no"),
-      t("masters.shops.table.shop_name"),
-      t("masters.shops.table.owner"),
-      t("masters.shops.table.mobile_no"),
-      t("masters.shops.table.city"),
-      t("masters.shops.table.association_type"),
-      t("masters.shops.table.paper_rate"),
-      t("masters.shops.table.opening_balance"),
-      t("masters.shops.table.current_balance"),
-    ];
-    const rows = filteredShops.map((shop, index) => [
-      (index + 1).toString(),
-      shop.shopName,
-      shop.ownerName,
-      shop.phoneNumber,
-      shop.city,
-      shop.associationType || "—",
-      shop.paperRate.toString(),
-      Number(shop.openingBalance || 0),
-      Number(shop.currentBalance || 0),
-    ]);
-    const filename = `${t("masters.shops.title")}_${new Date().toISOString().split("T")[0]}`;
+      if (filteredShops.length === 0) {
+        showNotification(t("masters.shops.toast.no_data_export"), "error");
+        return;
+      }
+      const headers = [
+        t("masters.shops.table.s_no"),
+        t("masters.shops.table.shop_name"),
+        t("masters.shops.table.owner"),
+        t("masters.shops.table.mobile_no"),
+        t("masters.shops.table.city"),
+        t("masters.shops.table.association_type"),
+        t("masters.shops.table.paper_rate"),
+        t("masters.shops.table.opening_balance"),
+        t("masters.shops.table.current_balance"),
+      ];
+      const rows = filteredShops.map((shop, index) => [
+        (index + 1).toString(),
+        shop.shopName,
+        shop.ownerName,
+        shop.phoneNumber,
+        shop.city,
+        shop.associationType || "—",
+        shop.paperRate.toString(),
+        Number(shop.openingBalance || 0),
+        Number(shop.currentBalance || 0),
+      ]);
+      const filename = `${t("masters.shops.title")}_${new Date().toISOString().split("T")[0]}`;
 
-    exportToExcel(
-      `${t("masters.shops.title")} - ${t("common.master_list")}`,
-      headers,
-      rows,
-      filename,
-    );
-    logAuditEvent("EXPORT_EXCEL", "Shops", undefined, {
-      count: filteredShops.length,
-    });
-    showNotification(t("masters.shops.toast.excel_exported"), "success");
-  
-    } catch (err) { showNotification(handleApiError(err), "error"); }
+      exportToExcel(
+        `${t("masters.shops.title")} - ${t("common.master_list")}`,
+        headers,
+        rows,
+        filename,
+      );
+      logAuditEvent("EXPORT_EXCEL", "Shops", undefined, {
+        count: filteredShops.length,
+      });
+      showNotification(t("masters.shops.toast.excel_exported"), "success");
+    } catch (err) {
+      showNotification(handleApiError(err), "error");
+    }
   };
 
   const validateShop = (shop: Partial<Shop>): string | null => {
@@ -356,61 +393,198 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     setShowDialog(true);
   };
 
+  const activeFilterCount = countActiveFilters(
+    search.trim() !== "",
+    cityFilter !== "",
+    statusFilter !== "",
+    sortOrder !== "number",
+  );
+  const hasRows = paginatedShops.length > 0;
+  const searchId = "shops-search";
+
   const content = (
-    <div className="master-page w-full min-w-0 space-y-3 font-sans text-slate-700">
-      {/* Main Container */}
-      <div className="w-full bg-white rounded-xl border border-slate-200/90 shadow-sm">
-        {/* Toolbar - Search on LEFT, Buttons on RIGHT in same line */}
-        <MasterListToolbar
-          onRefresh={() => { void reload().catch(() => {}); }}
-          status={statusFilter}
-          onStatusChange={(value) => { setStatusFilter(value); setCurrentPage(1); }}
-          sort={sortOrder}
-          onSortChange={(value) => { setSortOrder(value); setCurrentPage(1); }}
-          search={search}
-          onSearchChange={handleSearchChange}
-          searchPlaceholder={t("masters.shops.search_placeholder")}
-          addLabel={t("masters.shops.add_shop")}
-          onAdd={() => {
-            setEditingShop(null);
-            setShowDialog(true);
-          }}
-          onExportPDF={handleExportPDF}
-          onExportExcel={handleExportExcel}
-          loading={loading}
-          saving={saving}
-          onImport={() => setShowBulkImport(true)}
-        >
-          <MasterDropdown
-            label={t("masters.shops.filter.city")}
-            value={cityFilter}
-            placeholder={t("masters.shops.filter.all_cities")}
-            options={cityOptions}
-            onChange={handleCityChange}
-            allowClear
-            searchable
-            disabled={loading}
-            className="w-full sm:w-56"
-          />
+    <div className="master-page w-full min-w-0 space-y-4 font-sans text-slate-700">
+      {/* ── Filter card — same anatomy as Trip List: glyph labels on row 1,
+          actions right-aligned on row 2. Never unmounts while the table
+          loads, so a refresh or filter change never blanks the page. ── */}
+      <section
+        className={`${opsFilterCardClass} motion-safe:animate-[var(--animate-fade-in-up)]`}
+        aria-label={t("masters.shops.outlets_directory")}
+      >
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <label htmlFor={searchId} className={opsFilterLabelClass}>
+              <Search size={17} className="text-slate-400 flex-shrink-0" />
+              <span>{t("common.search")}</span>
+            </label>
+            <div className="relative">
+              <Search
+                size={18}
+                className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400"
+              />
+              <input
+                id={searchId}
+                type="text"
+                value={search}
+                onChange={(e) => handleSearchChange(e.target.value)}
+                placeholder={t("masters.shops.search_placeholder")}
+                className={`${opsInputClass} pl-10`}
+                autoComplete="off"
+              />
+            </div>
+          </div>
+          <div>
+            <label className={opsFilterLabelClass}>
+              <MapPin size={17} className="text-emerald-500 flex-shrink-0" />
+              <span>{t("masters.shops.filter.city")}</span>
+            </label>
+            <MasterDropdown
+              label={t("masters.shops.filter.city")}
+              hideLabel
+              value={cityFilter}
+              placeholder={t("masters.shops.filter.all_cities")}
+              options={cityOptions}
+              onChange={handleCityChange}
+              allowClear
+              searchable
+              className="w-full"
+            />
+          </div>
+          <div>
+            <label className={opsFilterLabelClass}>
+              <ToggleLeft size={17} className="text-amber-500 flex-shrink-0" />
+              <span>{t("common.status")}</span>
+            </label>
+            <MasterDropdown
+              label={t("common.status")}
+              hideLabel
+              value={statusFilter}
+              options={[
+                { value: "", label: t("common.all_statuses") },
+                { value: "Active", label: t("common.active") },
+                { value: "Inactive", label: t("common.inactive") },
+              ]}
+              onChange={(value) => {
+                setStatusFilter(value);
+                setCurrentPage(1);
+              }}
+              className="w-full"
+            />
+          </div>
+          <div>
+            <label className={opsFilterLabelClass}>
+              <ArrowUpDown
+                size={17}
+                className="text-violet-500 flex-shrink-0"
+              />
+              <span>{t("common.sort_by")}</span>
+            </label>
+            <MasterDropdown
+              label={t("common.sort_by")}
+              hideLabel
+              value={sortOrder}
+              options={[
+                { value: "number", label: t("common.number") },
+                { value: "name", label: t("common.name") },
+                { value: "status", label: t("common.status") },
+              ]}
+              onChange={(value) => {
+                setSortOrder(value);
+                setCurrentPage(1);
+              }}
+              className="w-full"
+            />
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+          <button
+            type="button"
+            onClick={() => {
+              setEditingShop(null);
+              setShowDialog(true);
+            }}
+            disabled={saving}
+            className={`group relative ${opsPrimaryButtonClass}`}
+          >
+            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-add)]">
+              <Plus size={15} />
+            </span>
+            {t("masters.shops.add_shop")}
+          </button>
           <FilterResetButton
-            count={countActiveFilters(search.trim() !== "", cityFilter !== "")}
+            count={activeFilterCount}
             onClick={handleResetFilters}
             disabled={loading}
+          />
+          <BrandRefreshButton
+            onClick={() => {
+              void reload().catch(() => {});
+            }}
+            loading={loading}
+            disabled={saving}
+          />
+          <button
+            type="button"
+            onClick={() => setShowBulkImport(true)}
+            disabled={loading || saving}
+            className={`group relative ${uiImportButtonClass}`}
+            aria-label={t("common.import")}
           >
-            {t("masters.shops.filter.reset")}
-          </FilterResetButton>
-        </MasterListToolbar>
+            <span className="inline-flex motion-safe:group-hover:-translate-y-0.5 transition-transform">
+              <Upload size={15} />
+            </span>
+            {t("common.import")}
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleExportPDF()}
+            disabled={!hasRows || loading}
+            className={`group relative ${opsPdfButtonClass}`}
+            aria-label="PDF"
+          >
+            <span
+              className={`inline-flex ${hasRows ? "motion-safe:group-hover:animate-[var(--animate-action-pdf)]" : ""}`}
+            >
+              <FileText size={15} />
+            </span>
+            PDF
+          </button>
+          <button
+            type="button"
+            onClick={() => void handleExportExcel()}
+            disabled={!hasRows || loading}
+            className={`group relative ${opsExcelButtonClass}`}
+            aria-label="Excel"
+          >
+            <span
+              className={`inline-flex ${hasRows ? "motion-safe:group-hover:animate-[var(--animate-action-excel)]" : ""}`}
+            >
+              <FileSpreadsheet size={15} />
+            </span>
+            Excel
+          </button>
+        </div>
+      </section>
 
-        {/* Status Counter Bar */}
-        <MasterListSummary
-          title={t("masters.shops.outlets_directory")}
-          total={total}
-          shown={paginatedShops.length}
-          page={safePage}
-          totalPages={totalPages}
-          loading={loading}
-          saving={saving}
-        />
+      {/* ── Table card — Trip List header: glyph tile + title + count ── */}
+      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden text-xs md:text-sm">
+        <div className="flex items-center justify-between gap-3 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-emerald-50/60 via-white to-emerald-50/40">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-9 w-9 rounded-xl bg-emerald-50/70 border border-emerald-100 flex items-center justify-center text-emerald-600 shadow-inner shrink-0">
+              <Store className="w-5 h-5" />
+            </div>
+            <h3 className="text-base font-bold text-slate-800 tracking-tight truncate">
+              {t("masters.shops.outlets_directory")}
+            </h3>
+          </div>
+          <span
+            className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-bold tabular-nums text-slate-600"
+            aria-live="polite"
+          >
+            {total.toLocaleString("en-IN")}
+          </span>
+        </div>
 
         {error && !loading && (
           <div className="mx-4 mt-3 px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between gap-3">
@@ -427,65 +601,26 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
           </div>
         )}
 
-        {/* Table Content */}
-        <div className="p-0 relative min-h-[120px]">
-          {loading && shops.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-3">
-              <svg
-                className="animate-spin h-8 w-8 text-blue-600"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 0 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-              <p className="text-sm font-medium">
-                {t("masters.shops.loading")}
-              </p>
-            </div>
-          ) : !loading && shops.length === 0 && !error ? (
-            <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-2">
-              <p className="text-sm font-medium text-slate-700">
-                {t("masters.shops.no_shops_found")}
-              </p>
-              <p className="text-xs text-slate-500">
-                {t("masters.shops.add_first")}
-              </p>
-            </div>
-          ) : (
-            <ShopTable
-              shops={paginatedShops}
-              onEdit={handleEditShop}
-              startIndex={pageStartIndex}
-              emptyMessage={
-                search.trim() || cityFilter
-                  ? "No shops matching your search or city filter."
-                  : undefined
-              }
-            />
-          )}
-        </div>
+        <ShopTable
+          shops={paginatedShops}
+          onEdit={handleEditShop}
+          startIndex={pageStartIndex}
+          loading={loading}
+          emptyMessage={
+            activeFilterCount > 0
+              ? t("masters.shops.no_shops_found")
+              : t("masters.shops.add_first")
+          }
+        />
 
         {shouldShowPagination(total) && (
-          <MasterPagination
+          <Pagination
             page={safePage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-            disabled={loading}
             pageSize={pageSize}
+            totalItems={total}
+            onPageChange={setCurrentPage}
             onPageSizeChange={handlePageSizeChange}
+            disabled={loading}
           />
         )}
       </div>
