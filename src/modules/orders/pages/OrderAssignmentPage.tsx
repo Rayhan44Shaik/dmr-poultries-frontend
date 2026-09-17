@@ -44,13 +44,21 @@ import {
   ArrowUpDown,
   MapPin,
   Save,
+  Search,
+  SlidersHorizontal,
   Truck,
+  UserCog,
   X,
   type LucideIcon,
 } from "lucide-react";
+import MasterDropdown, {
+  type MasterDropdownOption,
+} from "../../masters/components/MasterDropdown";
 import type { Trip } from "../../../shared/trip";
 import {
   opsFilterCardClass,
+  opsFilterLabelClass,
+  opsInputClass,
   opsSecondaryButtonClass,
   opsSectionTitleClass,
   opsTableCardClass,
@@ -107,7 +115,6 @@ import {
   ORDERS_NO_SPINNER,
   OrdersEmptyState,
   OrdersMultiSelect,
-  OrdersSearchInput,
   OrdersTableSkeleton,
   OrdersDateControl,
   OrdersDropdown,
@@ -194,6 +201,9 @@ function selectionSnapshot(
   ]);
 }
 
+/** Status facet of the filter card — same vocabulary as the pool toggle. */
+type AssignmentStatusFilter = "all" | "pending" | "assigned";
+
 type Props = {
   loading: boolean;
   /** Selected operational day (YYYY-MM-DD). */
@@ -227,6 +237,9 @@ function AssignmentHistory({
   sortMode,
   refreshing,
   cityFilters,
+  vehicleFilter,
+  supervisorFilter,
+  statusFilter,
   shopDirectory,
   resetVersion,
 }: {
@@ -235,6 +248,9 @@ function AssignmentHistory({
   sortMode: AssignmentSort;
   refreshing: boolean;
   cityFilters: string[];
+  vehicleFilter: string;
+  supervisorFilter: string;
+  statusFilter: AssignmentStatusFilter;
   shopDirectory: ShopDirectory;
   resetVersion: number;
 }) {
@@ -246,9 +262,27 @@ function AssignmentHistory({
       .flatMap((view) => view.rows.map((row) => ({ ...row, trip: view.trip })))
       .filter((row) => {
         const city = villageOf(row.shopId, row.shopName, shopDirectory);
+        if (vehicleFilter && String(row.trip.id) !== vehicleFilter)
+          return false;
+        if (
+          supervisorFilter &&
+          (row.trip.supervisorName ?? "").trim().toLowerCase() !==
+            supervisorFilter
+        )
+          return false;
+        // History rows are all assigned; "pending" here = not yet delivered.
+        if (statusFilter === "pending" && row.delivered) return false;
+        if (statusFilter === "assigned" && !row.delivered) return false;
         return (
           (!cityFilters.length || cityFilters.includes(city)) &&
-          [row.shopName, city, row.trip.tripNo, row.trip.vehicleNo]
+          [
+            row.shopName,
+            city,
+            row.trip.tripNo,
+            row.trip.vehicleNo,
+            row.trip.supervisorName,
+            row.trip.driverName,
+          ]
             .join(" ")
             .toLowerCase()
             .includes(query)
@@ -268,8 +302,17 @@ function AssignmentHistory({
     return result.sort((a, b) =>
       compareAssignmentRows(sortable(a), sortable(b), sortMode),
     );
-  }, [views, query, sortMode, cityFilters, shopDirectory]);
-  const resetKey = `${query}|${sortMode}|${pageSize}|${cityFilters.join(",")}|${resetVersion}`;
+  }, [
+    views,
+    query,
+    sortMode,
+    cityFilters,
+    vehicleFilter,
+    supervisorFilter,
+    statusFilter,
+    shopDirectory,
+  ]);
+  const resetKey = `${query}|${sortMode}|${pageSize}|${cityFilters.join(",")}|${vehicleFilter}|${supervisorFilter}|${statusFilter}|${resetVersion}`;
   const [lastKey, setLastKey] = useState(resetKey);
   if (lastKey !== resetKey) {
     setLastKey(resetKey);
@@ -316,7 +359,8 @@ function AssignmentHistory({
                 .map((row, index) => (
                   <tr
                     key={`${row.trip.id}-${row.shopId}`}
-                    className={ordersTableZebraRow(index)}
+                    className={`${ordersTableZebraRow(index)} motion-safe:animate-[var(--animate-fade-in-up)]`}
+                    style={{ animationDelay: `${Math.min(index, 12) * 28}ms` }}
                   >
                     <td className={opsTableTdClass}>
                       {(safePage - 1) * pageSize + index + 1}
@@ -374,6 +418,11 @@ function OrderAssignmentPage({
   // Sorting applies to the full matching pool before pagination.
   const [sortMode, setSortMode] = useState<AssignmentSort>("pending");
   const [cityFilters, setCityFilters] = useState<string[]>([]);
+  // Trip-List-style facets: one vehicle trip, one supervisor, one status.
+  const [vehicleFilterState, setVehicleFilter] = useState("");
+  const [supervisorFilterState, setSupervisorFilter] = useState("");
+  const [statusFilter, setStatusFilter] =
+    useState<AssignmentStatusFilter>("all");
   const [resetVersion, setResetVersion] = useState(0);
   const cityOptions = useMemo(() => {
     const rows =
@@ -392,6 +441,65 @@ function OrderAssignmentPage({
       .sort((a, b) => a.localeCompare(b))
       .map((city) => ({ value: city, label: city }));
   }, [day, today, dayVehicleViews, collection, shopDirectory]);
+
+  // Vehicle facet — today: the trucks ready for assignment; past days: the
+  // trucks that carried that day's orders. Value = trip id (stable), label =
+  // vehicle no · trip no so two trips of one truck stay distinguishable.
+  const vehicleOptions = useMemo<MasterDropdownOption[]>(() => {
+    const trips =
+      day < today
+        ? dayVehicleViews.map((view) => view.trip)
+        : eligibleVehicles.map((v) => v.trip);
+    const seen = new Set<number>();
+    return trips
+      .filter((trip) => (seen.has(trip.id) ? false : (seen.add(trip.id), true)))
+      .sort(
+        (a, b) =>
+          (a.vehicleNo ?? "").localeCompare(b.vehicleNo ?? "") || a.id - b.id,
+      )
+      .map((trip) => ({
+        value: String(trip.id),
+        label: `${trip.vehicleNo || "—"} · ${trip.tripNo}`,
+        searchText: `${trip.vehicleNo} ${trip.tripNo} ${trip.supervisorName} ${trip.driverName}`,
+      }));
+  }, [day, today, dayVehicleViews, eligibleVehicles]);
+  const supervisorOptions = useMemo<MasterDropdownOption[]>(() => {
+    const trips =
+      day < today
+        ? dayVehicleViews.map((view) => view.trip)
+        : eligibleVehicles.map((v) => v.trip);
+    const names = new Map<string, string>();
+    for (const trip of trips) {
+      const name = (trip.supervisorName ?? "").trim();
+      if (name) names.set(name.toLowerCase(), name);
+    }
+    return [...names.entries()]
+      .sort((a, b) => a[1].localeCompare(b[1]))
+      .map(([value, label]) => ({ value, label }));
+  }, [day, today, dayVehicleViews, eligibleVehicles]);
+  const statusOptions = useMemo<MasterDropdownOption[]>(
+    () => [
+      { value: "pending", label: to("orders.pool_filter_pending") },
+      { value: "assigned", label: to("orders.pool_filter_assigned") },
+    ],
+    [to],
+  );
+  // A pick that left the option list (truck finished / day changed) is
+  // treated as cleared, so a stale id can never hide every row. Derived, not
+  // an effect: the raw state is kept and simply ignored while invalid.
+  const [rawVehicleFilter, rawSupervisorFilter] = [
+    vehicleFilterState,
+    supervisorFilterState,
+  ];
+  const vehicleFilter = vehicleOptions.some((o) => o.value === rawVehicleFilter)
+    ? rawVehicleFilter
+    : "";
+  const supervisorFilter = supervisorOptions.some(
+    (o) => o.value === rawSupervisorFilter,
+  )
+    ? rawSupervisorFilter
+    : "";
+
   const sortOptions = useMemo(() => {
     const modes: AssignmentSort[] = [
       "pending",
@@ -424,20 +532,91 @@ function OrderAssignmentPage({
     setQuery("");
     setSortMode("pending");
     setCityFilters([]);
+    setVehicleFilter("");
+    setSupervisorFilter("");
+    setStatusFilter("all");
     setResetVersion((value) => value + 1);
     // Reset to today. Today's mounted editor is not remounted, so picks survive.
     if (day !== today) onDaySelect(today);
   };
+
+  // Active-filter chips (Trip-List style summary strip). Each chip clears
+  // exactly one facet; the count reads how many facets narrow the view.
+  const activeChips = useMemo(() => {
+    const chips: Array<{ key: string; label: string; clear: () => void }> = [];
+    if (day !== today)
+      chips.push({ key: "day", label: day, clear: () => onDaySelect(today) });
+    const vehicleLabel = vehicleOptions.find(
+      (o) => o.value === vehicleFilter,
+    )?.label;
+    if (vehicleFilter && vehicleLabel)
+      chips.push({
+        key: "vehicle",
+        label: vehicleLabel,
+        clear: () => setVehicleFilter(""),
+      });
+    const supLabel = supervisorOptions.find(
+      (o) => o.value === supervisorFilter,
+    )?.label;
+    if (supervisorFilter && supLabel)
+      chips.push({
+        key: "supervisor",
+        label: supLabel,
+        clear: () => setSupervisorFilter(""),
+      });
+    if (statusFilter !== "all")
+      chips.push({
+        key: "status",
+        label: to(`orders.pool_filter_${statusFilter}`),
+        clear: () => setStatusFilter("all"),
+      });
+    for (const city of cityFilters)
+      chips.push({
+        key: `city:${city}`,
+        label: city,
+        clear: () => setCityFilters(cityFilters.filter((c) => c !== city)),
+      });
+    if (q)
+      chips.push({
+        key: "q",
+        label: `“${query.trim()}”`,
+        clear: () => setQuery(""),
+      });
+    if (sortMode !== "pending")
+      chips.push({
+        key: "sort",
+        label: sortOptions.find((o) => o.value === sortMode)?.label ?? sortMode,
+        clear: () => setSortMode("pending"),
+      });
+    return chips;
+  }, [
+    day,
+    today,
+    onDaySelect,
+    vehicleFilter,
+    vehicleOptions,
+    supervisorFilter,
+    supervisorOptions,
+    statusFilter,
+    cityFilters,
+    q,
+    query,
+    sortMode,
+    sortOptions,
+    to,
+  ]);
+  const hasFilters = activeChips.length > 0;
 
   if (loading) return <OrdersTableSkeleton rows={4} />;
 
   return (
     <div className="space-y-5">
       <section
-        className={opsFilterCardClass}
+        className={`${opsFilterCardClass} motion-safe:animate-[var(--animate-fade-in-up)]`}
         aria-label={to("orders.assignment_filters")}
       >
-        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
+        {/* Row 1 — Date · Vehicle · Supervisor · Status · City (Trip List grid) */}
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-5">
           <div>
             {/* No Calendar glyph on the label: the date field carries its own, and that one is the button you click. */}
             <div className={ORDERS_FILTER_LABEL_CLASS}>
@@ -454,31 +633,57 @@ function OrderAssignmentPage({
             />
           </div>
           <div>
-            <div className={ORDERS_FILTER_LABEL_CLASS}>
-              <ArrowUpDown
-                size={17}
-                className="text-violet-500 flex-shrink-0"
-              />
-              <span>{to("orders.sort")}</span>
-            </div>
-            <OrdersDropdown
-              value={sortMode}
-              onChange={(value) => setSortMode(value as AssignmentSort)}
-              ariaLabel={to("orders.sort")}
-              options={sortOptions}
+            <label className={opsFilterLabelClass}>
+              <Truck size={17} className="text-emerald-500 flex-shrink-0" />
+              <span>{to("orders.col_vehicle_no")}</span>
+            </label>
+            <MasterDropdown
+              hideLabel
+              label={to("orders.col_vehicle_no")}
+              value={vehicleFilter}
+              options={vehicleOptions}
+              onChange={setVehicleFilter}
+              placeholder={to("orders.all")}
+              searchable
+              allowClear
               className="w-full"
-              widthClass="w-full"
             />
           </div>
           <div>
-            {/* No Search glyph on the label — the field already carries one. */}
-            <div className={ORDERS_FILTER_LABEL_CLASS}>
-              <span>{to("orders.search_label")}</span>
-            </div>
-            <OrdersSearchInput
-              value={query}
-              onChange={setQuery}
-              placeholder={to("orders.search_assignment")}
+            <label className={opsFilterLabelClass}>
+              <UserCog size={17} className="text-emerald-500 flex-shrink-0" />
+              <span>{to("orders.supervisor")}</span>
+            </label>
+            <MasterDropdown
+              hideLabel
+              label={to("orders.supervisor")}
+              value={supervisorFilter}
+              options={supervisorOptions}
+              onChange={setSupervisorFilter}
+              placeholder={to("orders.all")}
+              searchable
+              allowClear
+              className="w-full"
+            />
+          </div>
+          <div>
+            <label className={opsFilterLabelClass}>
+              <SlidersHorizontal
+                size={17}
+                className="text-sky-500 flex-shrink-0"
+              />
+              <span>{to("orders.filter_status")}</span>
+            </label>
+            <MasterDropdown
+              hideLabel
+              label={to("orders.filter_status")}
+              value={statusFilter === "all" ? "" : statusFilter}
+              options={statusOptions}
+              onChange={(next) =>
+                setStatusFilter((next as AssignmentStatusFilter) || "all")
+              }
+              placeholder={to("orders.all")}
+              allowClear
               className="w-full"
             />
           </div>
@@ -497,25 +702,109 @@ function OrderAssignmentPage({
               widthClass="w-full"
             />
           </div>
-          <div className="flex items-end justify-end gap-2 sm:col-span-2 xl:col-span-4">
+        </div>
+
+        {/* Row 2 — Sort · Search · actions (Trip List 3 / 5 / 4 split) */}
+        <div className="grid grid-cols-1 gap-3.5 items-end pt-1 lg:grid-cols-12">
+          <div className="lg:col-span-3">
+            <div className={ORDERS_FILTER_LABEL_CLASS}>
+              <ArrowUpDown
+                size={17}
+                className="text-violet-500 flex-shrink-0"
+              />
+              <span>{to("orders.sort")}</span>
+            </div>
+            <OrdersDropdown
+              value={sortMode}
+              onChange={(value) => setSortMode(value as AssignmentSort)}
+              ariaLabel={to("orders.sort")}
+              options={sortOptions}
+              className="w-full"
+              widthClass="w-full"
+            />
+          </div>
+          <div className="lg:col-span-5">
+            <label className={opsFilterLabelClass}>
+              <Search size={17} className="text-slate-400 flex-shrink-0" />
+              <span>{to("orders.search_label")}</span>
+            </label>
+            <div className="group relative">
+              <Search
+                size={18}
+                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-emerald-500"
+              />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder={to("orders.search_assignment")}
+                aria-label={to("orders.search_label")}
+                className={`${opsInputClass} pl-10 pr-9`}
+              />
+              {query && (
+                <button
+                  type="button"
+                  onClick={() => setQuery("")}
+                  aria-label={to("common.reset")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-600 motion-safe:animate-[var(--animate-scale-in)]"
+                >
+                  <X size={14} />
+                </button>
+              )}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2 lg:col-span-4">
             <button
               type="button"
               onClick={resetFilters}
-              className={`group ${opsSecondaryButtonClass}`}
+              className={`group relative ${opsSecondaryButtonClass}`}
               aria-label={to("common.reset")}
             >
               <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]">
                 <RotateCcw size={14} />
               </span>
               {to("common.reset")}
+              {hasFilters && (
+                <span className="ml-1 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-600 px-1.5 text-[10px] font-bold tabular-nums text-white motion-safe:animate-[var(--animate-pop-in)]">
+                  {activeChips.length}
+                </span>
+              )}
             </button>
             <BrandRefreshButton onClick={onRefresh} loading={refreshing} />
           </div>
         </div>
+
+        {/* Active-filter chips — each one clears its own facet. */}
+        {hasFilters && (
+          <div
+            className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-3 motion-safe:animate-[var(--animate-slide-down)]"
+            aria-live="polite"
+          >
+            <SlidersHorizontal
+              size={13}
+              className="text-slate-400"
+              aria-hidden
+            />
+            {activeChips.map((chip, index) => (
+              <button
+                key={chip.key}
+                type="button"
+                onClick={chip.clear}
+                className="group inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2.5 py-1 text-[11px] font-semibold text-emerald-800 transition-all hover:border-rose-200 hover:bg-rose-50 hover:text-rose-700 motion-safe:animate-[var(--animate-pop-in)]"
+                style={{ animationDelay: `${index * 35}ms` }}
+              >
+                {chip.label}
+                <X
+                  size={12}
+                  className="text-emerald-500 transition-transform group-hover:rotate-90 group-hover:text-rose-500"
+                />
+              </button>
+            ))}
+          </div>
+        )}
       </section>
 
       <section
-        className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm"
+        className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm motion-safe:animate-[var(--animate-fade-in-up)] [animation-delay:60ms]"
         aria-label={to("orders.tab_assignment")}
       >
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-emerald-50/60 via-white to-emerald-50/40 px-6 py-3">
@@ -527,7 +816,10 @@ function OrderAssignmentPage({
               {to("orders.tab_assignment")}
             </h2>
           </div>
-          <span className="text-xs font-medium text-slate-500">
+          <span
+            key={`${collection?.assignedShops ?? 0}/${collection?.totalShops ?? 0}`}
+            className="text-xs font-medium text-slate-500 motion-safe:animate-[var(--animate-fade-in)]"
+          >
             {to("orders.pool_summary", {
               collected: collection?.totalShops ?? 0,
               assigned: collection?.assignedShops ?? 0,
@@ -546,6 +838,9 @@ function OrderAssignmentPage({
             sortMode={sortMode}
             refreshing={refreshing}
             cityFilters={cityFilters}
+            vehicleFilter={vehicleFilter}
+            supervisorFilter={supervisorFilter}
+            statusFilter={statusFilter}
             shopDirectory={shopDirectory}
             resetVersion={resetVersion}
           />
@@ -572,6 +867,9 @@ function OrderAssignmentPage({
                 q={q}
                 sortMode={sortMode}
                 cityFilters={cityFilters}
+                vehicleFilter={vehicleFilter}
+                supervisorFilter={supervisorFilter}
+                statusFilter={statusFilter}
                 resetVersion={resetVersion}
                 onChanged={onChanged}
                 onFinished={onFinished}
@@ -595,6 +893,9 @@ function AssignmentEditor({
   q,
   sortMode,
   cityFilters,
+  vehicleFilter,
+  supervisorFilter,
+  statusFilter,
   resetVersion,
   onChanged,
   onFinished,
@@ -607,6 +908,9 @@ function AssignmentEditor({
   q: string;
   sortMode: AssignmentSort;
   cityFilters: string[];
+  vehicleFilter: string;
+  supervisorFilter: string;
+  statusFilter: AssignmentStatusFilter;
   resetVersion: number;
   onChanged: () => void;
   /** Assignment finished — page moves to Tab 3. */
@@ -815,6 +1119,12 @@ function AssignmentEditor({
   // trucks are still WAITING for shops and which ones already carry them.
   const vehicleMatches = useCallback(
     (v: OrdersEligibleVehicle): boolean => {
+      if (vehicleFilter && String(v.trip.id) !== vehicleFilter) return false;
+      if (
+        supervisorFilter &&
+        (v.trip.supervisorName ?? "").trim().toLowerCase() !== supervisorFilter
+      )
+        return false;
       if (!q) return true;
       const hay = [
         v.trip.vehicleNo,
@@ -827,7 +1137,7 @@ function AssignmentEditor({
         .toLowerCase();
       return hay.includes(q);
     },
-    [q],
+    [q, vehicleFilter, supervisorFilter],
   );
 
   const pendingVehicles = useMemo(
@@ -1208,6 +1518,25 @@ function AssignmentEditor({
   >("pending");
   const thisTripNo = vehicle?.trip.tripNo ?? "";
   const cityFilterSet = useMemo(() => new Set(cityFilters), [cityFilters]);
+  const filterTripNo = useMemo(
+    () =>
+      eligibleVehicles.find((v) => String(v.trip.id) === vehicleFilter)?.trip
+        .tripNo ?? "",
+    [eligibleVehicles, vehicleFilter],
+  );
+  const supervisorByTripNo = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const v of eligibleVehicles)
+      map.set(
+        v.trip.tripNo,
+        (v.trip.supervisorName ?? "").trim().toLowerCase(),
+      );
+    return map;
+  }, [eligibleVehicles]);
+  const supervisorOfTrip = useCallback(
+    (tripNo: string) => supervisorByTripNo.get(tripNo) ?? "",
+    [supervisorByTripNo],
+  );
   // ── Status counts for the segmented filter (same kind rules as
   //     filteredPool below: "pending" = still needs a vehicle, i.e. pending
   //     + partial-balance rows; "assigned" = fully placed).
@@ -1276,6 +1605,21 @@ function AssignmentEditor({
       if (poolFilter === "pending" && item.kind === "assigned") return;
       if (poolFilter === "assigned" && item.kind !== "assigned") return;
       if (poolFilter === "this_vehicle" && !item.onThisVehicle) return;
+      // Filter-card facets (status / vehicle / supervisor) narrow further.
+      if (statusFilter === "pending" && item.kind === "assigned") return;
+      if (statusFilter === "assigned" && item.kind !== "assigned") return;
+      if (
+        vehicleFilter &&
+        !parts.some((p) => p.tripNo === filterTripNo) &&
+        // A pending shop still shows while the filtered truck is the chosen one.
+        !(filterTripNo === thisTripNo && item.kind !== "assigned")
+      )
+        return;
+      if (
+        supervisorFilter &&
+        !parts.some((p) => supervisorOfTrip(p.tripNo) === supervisorFilter)
+      )
+        return;
       const city = villageOf(row.shopId, row.shopName, shopDirectory);
       if (cityFilterSet.size > 0 && !cityFilterSet.has(city)) return;
       if (q) {
@@ -1308,6 +1652,11 @@ function AssignmentEditor({
     poolFilter,
     cityFilterSet,
     thisTripNo,
+    filterTripNo,
+    vehicleFilter,
+    supervisorFilter,
+    supervisorOfTrip,
+    statusFilter,
     shopDirectory,
     sortMode,
     orderWeightBasis,
@@ -1322,7 +1671,7 @@ function AssignmentEditor({
   }
 
   const [availablePageSize, setAvailablePageSize] = useState(10);
-  const availableKey = `${q}|${poolFilter}|${cityFilters.join(",")}|${sortMode}|${availablePageSize}`;
+  const availableKey = `${q}|${poolFilter}|${cityFilters.join(",")}|${vehicleFilter}|${supervisorFilter}|${statusFilter}|${sortMode}|${availablePageSize}`;
   const [lastAvailableKey, setLastAvailableKey] = useState(availableKey);
   if (lastAvailableKey !== availableKey) {
     setLastAvailableKey(availableKey);
