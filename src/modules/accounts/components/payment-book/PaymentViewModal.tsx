@@ -12,7 +12,8 @@ import { Modal } from '../../../../ui/Modal';
 import { Button } from '../../../../ui/Button';
 import { StatusBadge } from '../../../../ui/StatusBadge';
 import { MasterSectionHeading } from '../../../masters/components/MasterForm';
-import { paymentCurrency, paymentNoDisplay, paymentStatusLabel } from '../../utils/paymentRegister';
+import { useI18n } from '../../../../i18n';
+import { paymentCurrency, paymentNoDisplay } from '../../utils/paymentRegister';
 import { inrInWords } from '../../utils/inrInWords';
 import { PaymentModeMark, PaymentTypeMark } from './PaymentGlyphMarks';
 
@@ -30,6 +31,10 @@ interface PaymentViewModalProps {
   /** Why editing is unavailable — shown as text beside the disabled control. */
   editHint?: string;
 }
+
+// Stored statuses read through the shared status dictionary.
+const statusLabelKey = (status: Payment['status']) =>
+  status === 'Approved' ? 'status.approved' : status === 'Cancelled' ? 'status.cancelled' : 'status.pending';
 
 const getTripDetails = (payment: Payment): { tripNo: string; amount: number }[] => {
   if (!payment.paymentIds || payment.paymentIds.length === 0) {
@@ -74,6 +79,7 @@ function DetailField({ label, icon, children }: { label: string; icon?: ReactNod
 const EMPTY = <span className="font-normal text-slate-400">—</span>;
 
 export function PaymentViewModal({ isOpen, payment, onClose, onEdit, canEdit = false, editHint }: PaymentViewModalProps) {
+  const { t } = useI18n();
   if (!isOpen || !payment) return null;
   const tripDetails = getTripDetails(payment);
   const inWords = inrInWords(Number(payment.amount) || 0);
@@ -84,18 +90,18 @@ export function PaymentViewModal({ isOpen, payment, onClose, onEdit, canEdit = f
   const showEdit = pending && Boolean(onEdit);
 
   return (
-    <Modal isOpen onClose={onClose} title="Payment Details" description={paymentNoDisplay(payment.paymentNo) || 'Payment number not assigned'} size="xl"
+    <Modal isOpen onClose={onClose} title={t('accounts.payment.view_title')} description={paymentNoDisplay(payment.paymentNo) || t('accounts.payment.no_payment_no')} size="xl"
       footer={<>
         {/* A disabled button alone reads as a bug, so the reason is stated next
             to it: the row simply is not in an editable state. */}
         {showEdit && !canEdit && <p className="mr-auto text-[11px] leading-4 text-slate-500">{editHint}</p>}
-        <Button variant="secondary" onClick={onClose}>Close</Button>
+        <Button variant="secondary" onClick={onClose}>{t('common.close')}</Button>
         {showEdit && (
-          <Button icon={<Pencil size={14} />} disabled={!canEdit} onClick={onEdit}>Edit payment</Button>
+          <Button icon={<Pencil size={14} />} disabled={!canEdit} onClick={onEdit}>{t('accounts.payment.edit_payment')}</Button>
         )}
       </>}>
       <div className="space-y-4">
-        {payment.id.startsWith('demo-payment-') && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">Sample payment · preview data. Edits stay in this browser and are never sent to the server.</p>}
+        {payment.id.startsWith('demo-payment-') && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{t('accounts.payment.sample_banner')}</p>}
 
         {/* FIGURE — accent bar, the amount, and the state it is in. Editing lives
             in the footer, next to Close, so there is exactly one edit control. */}
@@ -103,70 +109,70 @@ export function PaymentViewModal({ isOpen, payment, onClose, onEdit, canEdit = f
           <span aria-hidden="true" className="absolute inset-y-0 left-0 w-[3px] bg-emerald-400/80" />
           <div className="flex flex-wrap items-start justify-between gap-3 pl-2">
             <div className="min-w-0">
-              <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-800/60">Amount paid</p>
+              <p className="text-[11px] font-semibold uppercase tracking-wider text-emerald-800/60">{t('accounts.payment.amount_paid')}</p>
               <p className="mt-0.5 text-[26px] font-semibold leading-tight tabular-nums text-slate-900">{paymentCurrency.format(payment.amount)}</p>
               {inWords && <p className="mt-1 text-[11px] italic leading-snug text-emerald-900/70">{inWords}</p>}
             </div>
-            <StatusBadge status={payment.status} label={paymentStatusLabel(payment.status)} tone={pending ? 'warning' : undefined} size="md" className="shrink-0" />
+            <StatusBadge status={payment.status} label={t(statusLabelKey(payment.status))} tone={pending ? 'warning' : undefined} size="md" className="shrink-0" />
           </div>
         </div>
 
         {/* PAYMENT — type and mode bring their own mark, so no field icon. */}
         <section className="space-y-2.5">
-          <MasterSectionHeading>Payment</MasterSectionHeading>
+          <MasterSectionHeading>{t('accounts.payment.section_payment')}</MasterSectionHeading>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
-            <DetailField label="Date" icon={<CalendarDays size={14} />}><span className="tabular-nums">{dateShown}</span></DetailField>
-            <DetailField label="Payment Type"><PaymentTypeMark type={payment.paymentType} /></DetailField>
-            <DetailField label="Mode">{payment.paymentMode ? <PaymentModeMark mode={payment.paymentMode} /> : EMPTY}</DetailField>
-            <DetailField label="Category" icon={<IndianRupee size={14} />}>{payment.category || EMPTY}</DetailField>
+            <DetailField label={t('accounts.payment.col_date')} icon={<CalendarDays size={14} />}><span className="tabular-nums">{dateShown}</span></DetailField>
+            <DetailField label={t('accounts.payment.type')}><PaymentTypeMark type={payment.paymentType} /></DetailField>
+            <DetailField label={t('accounts.payment.mode')}>{payment.paymentMode ? <PaymentModeMark mode={payment.paymentMode} /> : EMPTY}</DetailField>
+            <DetailField label={t('accounts.payment.field_category')} icon={<IndianRupee size={14} />}>{payment.category || EMPTY}</DetailField>
           </div>
         </section>
 
         {/* PAYEE & PAPER TRAIL */}
         <section className="space-y-2.5">
-          <MasterSectionHeading>Payee &amp; reference</MasterSectionHeading>
+          <MasterSectionHeading>{t('accounts.payment.payee_heading')}</MasterSectionHeading>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
             <div className="md:col-span-5">
-              <DetailField label="Paid To" icon={<UserRound size={14} />}>{payment.paidTo || EMPTY}</DetailField>
+              <DetailField label={t('accounts.payment.col_paid_to')} icon={<UserRound size={14} />}>{payment.paidTo || EMPTY}</DetailField>
             </div>
             <div className="md:col-span-4">
-              <DetailField label="Reference / Bill No" icon={<ScrollText size={14} />}>
+              <DetailField label={t('accounts.payment.col_reference')} icon={<ScrollText size={14} />}>
                 <span className="uppercase tracking-tight">{payment.referenceNo || '—'}</span>
               </DetailField>
             </div>
             <div className="md:col-span-3">
-              <DetailField label="Recorded By" icon={<BadgeCheck size={14} />}>{payment.createdBy || EMPTY}</DetailField>
+              <DetailField label={t('accounts.payment.field_recorded_by')} icon={<BadgeCheck size={14} />}>{payment.createdBy || EMPTY}</DetailField>
             </div>
           </div>
         </section>
 
         {tripDetails.length > 0 && <section className="space-y-2.5">
-          <MasterSectionHeading>{`Trips settled · ${tripDetails.length}`}</MasterSectionHeading>
+          <MasterSectionHeading>{t('accounts.payment.trips_settled', { n: tripDetails.length })}</MasterSectionHeading>
           <div className="divide-y divide-slate-100 overflow-hidden rounded-xl border border-slate-200">
             {tripDetails.map((trip, index) => <div key={`${trip.tripNo}-${index}`} className="flex flex-wrap items-center justify-between gap-2 bg-white px-3 py-2 text-sm">
               <span className="font-medium text-slate-700">{trip.tripNo}</span>
               <span className="tabular-nums text-slate-600">{paymentCurrency.format(trip.amount)}</span>
             </div>)}
             <div className="flex flex-wrap items-center justify-between gap-2 bg-slate-50/70 px-3 py-2 text-sm font-semibold text-slate-800">
-              <span>Total trip amount</span>
-              <span className="tabular-nums">{paymentCurrency.format(tripDetails.reduce((sum, trip) => sum + trip.amount, 0))}</span>
+              <span>{t('accounts.payment.total_trip_amount')}</span>
+              <span className="tabular-nums text-slate-600">{paymentCurrency.format(tripDetails.reduce((sum, trip) => sum + trip.amount, 0))}</span>
             </div>
           </div>
         </section>}
 
         {/* NOTE + FILES */}
         <section className="space-y-2.5">
-          <MasterSectionHeading>Note &amp; files</MasterSectionHeading>
+          <MasterSectionHeading>{t('accounts.payment.note_files_heading')}</MasterSectionHeading>
           <div className="grid grid-cols-1 gap-3 md:grid-cols-12">
             <div className="md:col-span-8">
-              <DetailField label="Remarks / Notes" icon={<FileText size={14} />}>
-                {payment.remarks ? <span className="block whitespace-pre-wrap break-words text-sm font-normal text-slate-700">{payment.remarks}</span> : <span className="text-sm font-normal text-slate-400">No note recorded.</span>}
+              <DetailField label={t('accounts.payment.field_remarks')} icon={<FileText size={14} />}>
+                {payment.remarks ? <span className="block whitespace-pre-wrap break-words text-sm font-normal text-slate-700">{payment.remarks}</span> : <span className="text-sm font-normal text-slate-400">{t('accounts.payment.no_note')}</span>}
               </DetailField>
             </div>
             <div className="md:col-span-4">
-              <DetailField label="Attachments" icon={<Paperclip size={14} />}>
+              <DetailField label={t('accounts.payment.field_attachments')} icon={<Paperclip size={14} />}>
                 {payment.attachments.length === 0
-                  ? <span className="text-sm font-normal text-slate-400">No files attached.</span>
+                  ? <span className="text-sm font-normal text-slate-400">{t('accounts.payment.no_files')}</span>
                   : (
                     <ul className="space-y-0.5 text-sm font-normal">
                       {payment.attachments.map(file => <li key={file.id}>
@@ -180,8 +186,8 @@ export function PaymentViewModal({ isOpen, payment, onClose, onEdit, canEdit = f
         </section>
 
         <div className="flex flex-wrap justify-between gap-2 border-t border-slate-100 pt-3 text-[11px] text-slate-500">
-          <span>Created: {timestamp(payment.createdAt)}</span>
-          <span>Updated: {timestamp(payment.updatedAt)}</span>
+          <span>{t('accounts.payment.created')} {timestamp(payment.createdAt)}</span>
+          <span>{t('accounts.payment.updated')} {timestamp(payment.updatedAt)}</span>
         </div>
       </div>
     </Modal>

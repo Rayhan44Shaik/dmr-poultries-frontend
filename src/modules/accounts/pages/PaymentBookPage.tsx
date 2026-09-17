@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback, useId } from 'react';
-import { Plus, RotateCcw, Search, Pencil, CheckCircle2, Trash2, Calendar, Wallet, CreditCard } from 'lucide-react';
+import { Plus, History, RotateCcw, Search, Pencil, CheckCircle2, Trash2, Calendar, Wallet, CreditCard } from 'lucide-react';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import { PaymentTable } from '../components/payment-book/PaymentTable';
 import { PaymentViewModal } from '../components/payment-book/PaymentViewModal';
@@ -29,15 +29,14 @@ import {
 import { useI18n } from '../../../i18n';
 import { applyDemoWrite, createDemoPayments, resetDemoPayments } from '../utils/paymentRegisterDemo';
 import { EmptyState } from '../../../ui/EmptyState';
-import HenIcon from '../../../ui/icons/HenIcon';
 import { BrandRefreshButton, Pagination } from '../../../ui';
 import { filterPayments, PAYMENT_TYPES, PAYMENT_MODES, paymentCurrency, paymentNoDisplay } from '../utils/paymentRegister';
 
 type PaymentView = 'pending' | 'approved' | 'deleted';
-const PAYMENT_VIEWS: { value: PaymentView; label: string; selectedClass: string }[] = [
-  { value: 'pending', label: 'Pending', selectedClass: 'bg-orange-50/80 text-orange-500 shadow-sm' },
-  { value: 'approved', label: 'Approved', selectedClass: 'bg-emerald-50/80 text-emerald-500 shadow-sm' },
-  { value: 'deleted', label: 'Deleted', selectedClass: 'bg-rose-50/80 text-rose-500 shadow-sm' },
+const PAYMENT_VIEWS: { value: PaymentView; labelKey: string; selectedClass: string }[] = [
+  { value: 'pending', labelKey: 'status.pending', selectedClass: 'bg-orange-50/80 text-orange-500 shadow-sm' },
+  { value: 'approved', labelKey: 'status.approved', selectedClass: 'bg-emerald-50/80 text-emerald-500 shadow-sm' },
+  { value: 'deleted', labelKey: 'accounts.payment.status_deleted', selectedClass: 'bg-rose-50/80 text-rose-500 shadow-sm' },
 ];
 
 export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
@@ -111,12 +110,12 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
     } catch {
       if (!mounted.current) return;
       setError(true);
-      if (!demoRef.current) showNotification('Unable to load payments. Please try refreshing.', 'error');
+      if (!demoRef.current) showNotification(t('accounts.payment.notif_load_error'), 'error');
     } finally {
       inFlight.current = false;
       if (mounted.current) setLoading(false);
     }
-  }, [showNotification]);
+  }, [showNotification, t]);
 
   useEffect(() => {
     mounted.current = true;
@@ -158,9 +157,9 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   };
   const handleRefresh = useCallback(() => {
     animateFilterAction('refresh');
-    if (demoRef.current) showNotification('Sample data is up to date. No server request was made.', 'info');
+    if (demoRef.current) showNotification(t('accounts.payment.notif_demo_fresh'), 'info');
     else void loadPayments();
-  }, [loadPayments, showNotification]);
+  }, [loadPayments, showNotification, t]);
   useEffect(() => () => { if (spinTimer.current !== null) window.clearTimeout(spinTimer.current); }, []);
 
   const toggleDemo = () => {
@@ -182,7 +181,7 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
     setAppliedFilters(cleared);
     setStatus('pending');
     setPage(1);
-    showNotification('Filters cleared. Showing the current week.', 'info');
+    showNotification(t('accounts.payment.notif_filters_cleared'), 'info');
   };
   const invalidRange = Boolean(filters.from && filters.to && filters.from > filters.to);
   const applyFilters = () => {
@@ -224,13 +223,13 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   const resetDemo = () => {
     setSelectedId(null);
     writeDemoRows(resetDemoPayments());
-    showNotification('Sample rows rebuilt. Nothing was sent to the server.', 'info');
+    showNotification(t('accounts.payment.notif_rows_rebuilt'), 'info');
   };
 
   const handleSave = (saved: Payment) => {
     setSelectedId(null);
     const sample = saved.id.startsWith('demo-payment-');
-    showNotification(sample ? 'Sample row updated — saved in this preview only.' : 'Payment saved successfully', sample ? 'info' : 'success');
+    showNotification(sample ? t('accounts.payment.notif_sample_updated') : t('accounts.payment.notif_saved'), sample ? 'info' : 'success');
     // Real rows reload from the server; there is nothing to reload for a sample.
     if (!sample) void loadPayments(true);
   };
@@ -238,15 +237,15 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
     if (id.startsWith('demo-payment-')) {
       // The countdown committed on a preview row: remove it locally, no request.
       writeDemoRows(demoRows.current.filter(row => row.id !== id));
-      showNotification('Sample row removed — this preview only.', 'info');
+      showNotification(t('accounts.payment.notif_sample_removed'), 'info');
       return;
     }
     try {
       await deletePayment(id);
-      showNotification('Payment deleted successfully', 'success');
+      showNotification(t('accounts.payment.notif_deleted'), 'success');
       void loadPayments(true);
     } catch {
-      showNotification('Failed to delete payment', 'error');
+      showNotification(t('accounts.payment.notif_delete_failed'), 'error');
     }
   });
 
@@ -265,7 +264,7 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
     const sample = isSample(payment);
     const current = (sample ? demoRows.current : realPayments).find(item => item.id === payment.id);
     if (!current || current.status !== 'Draft' || (!sample && (!canEditItem(current.createdAt) || isPending(payment.id)))) {
-      setApprovalError('This payment is no longer eligible for approval. Refresh the register and try again.');
+      setApprovalError(t('accounts.payment.approve_error_stale'));
       return;
     }
     approvingRef.current = true;
@@ -280,7 +279,7 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
         if (!mounted.current) return;
         setSelectedId(null);
         setApprovalPayment(null);
-        showNotification('Sample row approved — this preview only.', 'info');
+        showNotification(t('accounts.payment.notif_sample_approved'), 'info');
         return;
       }
       // Reuse the existing partial-update contract; never synthesize success.
@@ -292,11 +291,11 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
       setPayments(previous => previous.map(item => item.id === saved.id ? saved : item));
       setSelectedId(null);
       setApprovalPayment(null);
-      showNotification('Payment approved successfully', 'success');
+      showNotification(t('accounts.payment.notif_approved'), 'success');
       void loadPayments(true);
       requestAnimationFrame(() => statusGroupRef.current?.querySelector<HTMLButtonElement>('[aria-pressed="true"]')?.focus({ preventScroll: true }));
     } catch (error) {
-      if (mounted.current) setApprovalError(error instanceof Error ? error.message : 'Unable to approve payment. Please try again.');
+      if (mounted.current) setApprovalError(error instanceof Error ? error.message : t('accounts.payment.approve_failed_default'));
     } finally {
       approvingRef.current = false;
       if (mounted.current) setApproving(false);
@@ -305,19 +304,21 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
 
   return (
     <div className={`w-full space-y-5 animate-in fade-in duration-200 ${embedded ? '' : 'px-3 md:px-6 py-4 bg-slate-50/50 min-h-screen text-slate-800'}`}>
-      {/* Sample-data preview toggle — this register's own demo affordance.
-          The application header owns the Accounts > Payment Register title. */}
+      {/* Sample-data preview — this register's own demo affordance. The
+          application header owns the Accounts > Payment Register title. */}
       <div className="flex flex-wrap items-center justify-end gap-2">
-        {demo && <span className={uiBadgeClass('warning')}>Sample data</span>}
-        <Button variant="secondary" aria-pressed={demo} disabled={!!pendingItems.length || approving} onClick={toggleDemo}>{demo ? 'Back to real payments' : 'Preview sample data'}</Button>
-        {demo && <Button variant="ghost" size="sm" icon={<RotateCcw size={14} />} onClick={resetDemo}>Reset sample rows</Button>}
+        {demo && <span className={uiBadgeClass('warning')}>{t('accounts.payment.sample_badge')}</span>}
+        <Button variant="secondary" aria-pressed={demo} disabled={!!pendingItems.length || approving} onClick={toggleDemo}>
+          {demo ? t('accounts.payment.back_real') : t('accounts.payment.preview_sample')}
+        </Button>
+        {demo && <Button variant="ghost" size="sm" icon={<RotateCcw size={14} />} onClick={resetDemo}>{t('accounts.payment.reset_rows')}</Button>}
       </div>
 
       {/* The same filter card the Trip List uses (opsFilterCardClass): one
           labelled grid — icon + name per field — with the search row and every
           register action beneath it. Glyph motions come from the global
           tokens: search sways, reset spins, refresh is the brand hen. */}
-      <section aria-label="Payment filters" className={opsFilterCardClass}>
+      <section aria-label={t('accounts.payment.filters_aria')} className={opsFilterCardClass}>
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
           <div>
             <label htmlFor={`${dateId}-from`} className={opsFilterLabelClass}>
@@ -427,28 +428,28 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
       {/* The table card — the exact shell the Trip List uses: white rounded-2xl
           card, gradient header bar with icon tile + title, table, global
           pagination at the foot. */}
-      <section ref={tableRef} aria-label="Payment records" aria-busy={loading} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden text-xs md:text-sm">
+      <section ref={tableRef} aria-label={t('accounts.payment.records_aria')} aria-busy={loading} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden text-xs md:text-sm">
         {/* Header — the Trip Entry (Recent Trip Activity) header: the logo tile
             + heading, the count beside them, and the status toggle immediately
             beside the heading and count — then the toggle, in that order. */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-slate-50">
           <div className="flex flex-wrap items-center gap-3">
             <div className="flex items-center gap-3">
-              <div className="h-9 w-9 rounded-xl bg-blue-50/70 border border-blue-100 flex items-center justify-center shadow-inner">
-                <HenIcon size={22} />
+              <div className="h-9 w-9 rounded-xl bg-blue-50/70 border border-blue-100 flex items-center justify-center text-blue-500 shadow-inner">
+                <History className="w-5 h-5" />
               </div>
               <h3 className="text-base font-bold text-slate-800 tracking-tight">{t('accounts.payment.register_title')}</h3>
             </div>
             <span aria-live="polite" className="inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 rounded-full shadow-sm tabular-nums">
-              {loading ? 'Updating…' : status === 'deleted' ? '—' : filtered.length}
+              {loading ? t('accounts.payment.updating') : status === 'deleted' ? '—' : filtered.length}
             </span>
             {/* Status toggle — exactly beside the heading and count, then the
                 toggle: the same order and spacing (ml-2) as trip entry. */}
-            <div ref={statusGroupRef} role="group" aria-label="Payment status" className="flex items-center p-0.5 ml-2 border border-slate-200/80 rounded-lg overflow-hidden bg-slate-50 shadow-sm">
+            <div ref={statusGroupRef} role="group" aria-label={t('accounts.payment.status_aria')} className="flex items-center p-0.5 ml-2 border border-slate-200/80 rounded-lg overflow-hidden bg-slate-50 shadow-sm">
               {PAYMENT_VIEWS.map(item => <Button key={item.value} variant="custom" size="sm" aria-pressed={status === item.value}
                 className={`h-auto rounded-md px-5 py-1.5 text-xs font-semibold ${status === item.value ? item.selectedClass : 'bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'}`}
                 onClick={() => { setSelectedId(null); setStatus(item.value); setPage(1); }}>
-                {item.label}
+                {t(item.labelKey)}
               </Button>)}
             </div>
           </div>
@@ -456,19 +457,19 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
             {/* Row actions appear only once a row is selected — the same
                 pattern as the trip entry table's Edit/Delete beside search. */}
             {selectedPayment && (
-              <div role="group" aria-label="Selected payment actions" className="flex flex-wrap items-center gap-2">
-                <Button variant="secondary" size="sm" icon={<Pencil size={14} />} aria-label="Edit selected payment" disabled={!canEditSelected}
-                  onClick={() => { if (canEditSelected) setEditingPayment(selectedPayment); }}>Edit</Button>
-                <Button variant="success" size="sm" icon={<CheckCircle2 size={14} />} aria-label="Approve selected payment" disabled={!canApproveSelected}
-                  onClick={() => { if (canApproveSelected) { setApprovalError(''); setApprovalPayment(selectedPayment); } }}>Approve</Button>
-                <Button variant="destructiveOutline" size="sm" icon={<Trash2 size={14} />} aria-label="Delete selected payment" disabled={!canDeleteSelected}
-                  onClick={() => { if (canDeleteSelected) requestDelete(selectedPayment.id, { label: `Deleting payment to ${selectedPayment.paidTo}` }); }}>Delete</Button>
+              <div role="group" aria-label={t('accounts.payment.selected_actions')} className="flex flex-wrap items-center gap-2">
+                <Button variant="secondary" size="sm" icon={<Pencil size={14} />} disabled={!canEditSelected}
+                  onClick={() => { if (canEditSelected) setEditingPayment(selectedPayment); }}>{t('common.edit')}</Button>
+                <Button variant="success" size="sm" icon={<CheckCircle2 size={14} />} disabled={!canApproveSelected}
+                  onClick={() => { if (canApproveSelected) { setApprovalError(''); setApprovalPayment(selectedPayment); } }}>{t('common.approve')}</Button>
+                <Button variant="destructiveOutline" size="sm" icon={<Trash2 size={14} />} disabled={!canDeleteSelected}
+                  onClick={() => { if (canDeleteSelected) requestDelete(selectedPayment.id, { label: t('accounts.payment.deleting_to', { name: selectedPayment.paidTo }) }); }}>{t('common.delete')}</Button>
               </div>
             )}
           </div>
         </div>
-        {error && <p role="alert" className="border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">Unable to refresh records. {payments.length ? 'Previously loaded records are still shown. ' : ''}Use Refresh to try again.</p>}
-        {status === 'deleted' ? <EmptyState title="Deleted payments are unavailable" description="The current payment API does not provide deleted records. Cancelled payments are not treated as deleted." />
+        {error && <p role="alert" className="border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">{t('accounts.payment.error_alert')}</p>}
+        {status === 'deleted' ? <EmptyState title={t('accounts.payment.deleted_title')} description={t('accounts.payment.deleted_desc')} />
           : (<>
           <PaymentTable selectedId={selectedPayment?.id ?? null} onSelect={setSelectedId}
             emptyVariant={error ? 'error' : !payments.length ? 'no-data' : appliedFilters.search.trim() ? 'no-search' : 'no-filters'}
@@ -490,18 +491,21 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
         </>
           )}
       </section>
-      <Modal isOpen={pendingItems.length > 0} title="Payment deletion pending" size="md"
+      <Modal isOpen={pendingItems.length > 0} title={t('accounts.payment.delete_pending_title')} size="md"
         closeOnOverlay={false} showCloseButton={false} closeOnEscape={!pendingItems.some(item => item.committing)}
         onClose={() => pendingItems.filter(item => !item.committing).forEach(item => cancel(item.id))}
-        footer={<Button variant="secondary" disabled={pendingItems.some(item => item.committing)} onClick={() => pendingItems.forEach(item => cancel(item.id))}>Cancel deletion</Button>}>
+        footer={<Button variant="secondary" disabled={pendingItems.some(item => item.committing)} onClick={() => pendingItems.forEach(item => cancel(item.id))}>{t('accounts.payment.cancel_deletion')}</Button>}>
         <div className="space-y-3">{pendingItems.map(item => <div key={item.id}>
           <p className="text-sm font-medium text-slate-800">{item.label}</p>
-          <p className="mt-2 text-sm text-slate-500" role="status">{item.committing ? 'Deleting payment…' : `${pendingDeleteCountdownLabel(item.secondsLeft)}. Cancel to keep this payment.`}</p>
+          <p className="mt-2 text-sm text-slate-500" role="status">{item.committing ? t('accounts.payment.deleting') : `${pendingDeleteCountdownLabel(item.secondsLeft)}. ${t('accounts.payment.keep_payment')}`}</p>
         </div>)}</div>
       </Modal>
-      <ConfirmDialog isOpen={!!approvalPayment} title="Approve Payment" tone="primary" confirmLabel="Approve Payment" loading={approving}
+      <ConfirmDialog isOpen={!!approvalPayment} title={t('accounts.payment.approve_title')} tone="primary" confirmLabel={t('accounts.payment.approve_title')} loading={approving}
         record={approvalPayment ? `${paymentNoDisplay(approvalPayment.paymentNo)} · ${approvalPayment.paidTo} · ${paymentCurrency.format(approvalPayment.amount)}` : undefined}
-        message={<>Mark this pending payment as approved?{approvalError && <span role="alert" className="mt-2 block text-rose-700">{approvalError}</span>}</>}
+        message={<>
+          {t('accounts.payment.approve_message')}
+          {approvalError && <span role="alert" className="mt-2 block text-rose-700">{approvalError}</span>}
+        </>}
         onConfirm={() => void confirmApproval()} onCancel={() => { if (!approvingRef.current) { setApprovalPayment(null); setApprovalError(''); } }} />
       <NewPaymentModal isOpen={isNewModalOpen} onClose={() => setIsNewModalOpen(false)} onSave={handleSave} persist={demo ? persistSample : undefined} />
       {/* The write path follows the ROW, not the toggle: flipping to sample data
@@ -514,7 +518,7 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
       <PaymentViewModal isOpen={!!viewingPayment} payment={viewingPayment} onClose={() => setViewingPayment(null)}
         onEdit={viewingPayment ? () => { const next = viewingPayment; setViewingPayment(null); setEditingPayment(next); } : undefined}
         canEdit={Boolean(viewingPayment && !isPending(viewingPayment.id) && !approving && (isSample(viewingPayment) || canEditItem(viewingPayment.createdAt)))}
-        editHint={viewingPayment && !isSample(viewingPayment) ? 'Payments older than 10 days cannot be edited.' : 'Another action on this payment is still running.'} />
+        editHint={viewingPayment && !isSample(viewingPayment) ? t('accounts.payment.edit_hint') : t('accounts.payment.edit_hint_busy')} />
     </div>
   );
 }
