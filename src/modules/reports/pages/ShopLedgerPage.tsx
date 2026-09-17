@@ -784,6 +784,21 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       ? selectedLedgerRowIndex
       : -1;
 
+  // A row selection is temporary UI state. Touching/clicking anywhere that is
+  // not another ledger row clears it without interfering with the control the
+  // user actually clicked.
+  useEffect(() => {
+    if (activeSelectedLedgerRowIndex < 0) return;
+    const clearOutsideRow = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Element) || !target.closest("[data-shop-ledger-row]")) {
+        setSelectedLedgerRowIndex(-1);
+      }
+    };
+    document.addEventListener("pointerdown", clearOutsideRow);
+    return () => document.removeEventListener("pointerdown", clearOutsideRow);
+  }, [activeSelectedLedgerRowIndex]);
+
   const summary = useMemo(() => {
     const tx = filteredLedger.slice(1);
     const totalDebit = tx.reduce((sum, t) => sum + t.debit, 0);
@@ -2619,13 +2634,25 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     return (
                       <tr
                         key={`${isOpening ? "opening" : tx.collectionNo || tx.particulars}-${idx}`}
+                        data-shop-ledger-row
                         ref={(element) => {
                           ledgerRowRefs.current[idx] = element;
                         }}
                         tabIndex={isSelected || (activeSelectedLedgerRowIndex < 0 && idx === 0) ? 0 : -1}
                         aria-selected={isSelected}
                         onFocus={() => setSelectedLedgerRowIndex(idx)}
+                        onBlur={(event) => {
+                          const next = event.relatedTarget;
+                          if (!(next instanceof Element) || !next.closest("[data-shop-ledger-row]")) {
+                            setSelectedLedgerRowIndex(-1);
+                          }
+                        }}
                         onClick={(event) => {
+                          if (isSelected) {
+                            setSelectedLedgerRowIndex(-1);
+                            event.currentTarget.blur();
+                            return;
+                          }
                           setSelectedLedgerRowIndex(idx);
                           event.currentTarget.focus();
                         }}
