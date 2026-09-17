@@ -32,7 +32,7 @@ import { opsFilterCardClass, opsSecondaryButtonClass } from '../../../shared/ui/
 import { DatePicker } from '../../../components/common/DatePicker';
 import { exportPDF, exportExcel } from '../components/Summary';
 import SummaryTripViewer from '../components/Summary/SummaryTripViewer';
-import SummaryFarmViewer, { SummaryFarmAmount, SummaryFarmCard } from '../components/Summary/SummaryFarmViewer';
+import SummaryFarmViewer, { SummaryFarmAmount } from '../components/Summary/SummaryFarmViewer';
 import { FarmPaymentTripViewModal } from '../components/farm-payment/FarmPaymentTripViewModal';
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
 import type { WeeklyMetrics, ExpenseBreakdown } from '../types/summary.types';
@@ -841,14 +841,10 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
      total subtracts it exactly once — never zero times, never twice.
      How much of it has been settled is the Farm Payment page's business — this
      analysis charges the cost, not the cash. */
-  /* The per-trip farm payment view: exactly the trips in the selected span, each
-     with its own pickup (DC) weight × farm rate. Newest first. The rows total to
-     the same figure the expense table's Farm Payment row is built from, so this
-     breakdown can never disagree with the row it explains. */
-  const farmRows = useMemo(() => buildFarmRows(trips, summaryService), [trips, summaryService]);
-
-  /* Rows for whichever figure opened the pop-up. Same mapping as `farmRows`, so
-     a column's amount and the trips it opens can never disagree. */
+  /* The rows behind whichever farm figure opened the pop-up: those trips, each
+     with its own pickup (DC) weight × farm rate, newest first. Built by the same
+     mapping the expense table's Farm Payment figures come from, so a column's
+     amount and the trips it opens can never disagree. */
   const farmScopeRows = useMemo(
     () => buildFarmRows(farmScope?.trips ?? [], summaryService),
     [farmScope, summaryService]
@@ -1900,8 +1896,8 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                 const total = weeklyExpenses.reduce((a, b) => a + ((b[item.key as keyof ExpenseBreakdown] as number) || 0), 0);
                 /* Farm Payment is the one expense that is not a Payment Register
                    total: it is the farm bill of exactly these trips (pickup
-                   weight × farm rate). It gets its own highlight and carries the
-                   cumulative of the per-trip rows below it. */
+                   weight × farm rate). Only its amount behaves differently — it
+                   opens those trips. The row itself looks like every other. */
                 const isFarm = item.key === 'farm';
                 /* The farm amount is the trigger: press it and the farm payment
                    view opens for exactly the trips behind that figure — the
@@ -1919,17 +1915,9 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                 return (
                   <tr
                   key={item.key}
-                  className={`group/row border-b transition-colors duration-150 ${
-                    isFarm
-                      ? 'border-lime-100 bg-lime-50/70 hover:bg-lime-100/70 dark:border-lime-900 dark:bg-lime-500/10 dark:hover:bg-lime-500/15'
-                      : 'border-slate-100 hover:bg-emerald-50/70 dark:border-slate-800 dark:hover:bg-emerald-500/10'
-                  }`}
+                  className="group/row border-b border-slate-100 transition-colors duration-150 hover:bg-emerald-50/70 dark:border-slate-800 dark:hover:bg-emerald-500/10"
                 >
-                    <td className={`relative w-56 px-4 py-2.5 before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:transition-opacity before:content-[''] ${
-                      isFarm
-                        ? 'before:bg-lime-500 before:opacity-100'
-                        : "before:bg-emerald-500 before:opacity-0 group-hover/row:before:opacity-100"
-                    }`}>
+                    <td className="relative w-56 px-4 py-2.5 before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-emerald-500 before:opacity-0 before:transition-opacity before:content-[''] group-hover/row:before:opacity-100">
                       <SummaryRowLabel color={EXPENSE_ROW_DOT[item.key]} label={item.label} />
                     </td>
                     {comparePrevious && period === 'week' ? (
@@ -2237,13 +2225,6 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
           </table>
         </div>
       </div>
-
-      {/* Farm payment per trip — the breakdown behind the Farm Payment row. The
-          card carries the span's cumulative figures; "View farm payment" opens
-          the pop-up that lists every trip of the span with the pickup weight
-          and farm rate its bill was calculated from, so the row above can be
-          audited trip by trip. */}
-      <SummaryFarmCard rows={farmRows} spanLabel={rangeLabel} onOpen={() => setFarmScope({ label: rangeLabel, trips })} />
 
       </div>
       </div>

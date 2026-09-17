@@ -299,7 +299,7 @@ try {
 //    with the running cumulative and the grand total, and no paid/balance.
 try {
   const { loadAnalysisSnapshot, createAnalysisService } = await server.ssrLoadModule("/src/modules/accounts/services/analysisService.ts");
-  const { SummaryFarmTable, SummaryFarmCard, SummaryFarmAmount } = await server.ssrLoadModule("/src/modules/accounts/components/Summary/SummaryFarmViewer.tsx");
+  const { SummaryFarmTable, SummaryFarmAmount } = await server.ssrLoadModule("/src/modules/accounts/components/Summary/SummaryFarmViewer.tsx");
   const { weekRange } = await server.ssrLoadModule("/src/modules/accounts/utils/periodRanges.ts");
   const { I18nProvider } = await server.ssrLoadModule("/src/i18n/index.tsx");
   const snapshot = await loadAnalysisSnapshot();
@@ -320,7 +320,6 @@ try {
     // The Farm Payment figure in the expense table is itself the trigger, and it
     // carries the label of the column whose trips it will open.
     const amountHtml = withProvider(React.createElement(SummaryFarmAmount, { value: payable, scopeLabel: "Week 15 - 21 Sep", onOpen: () => {} }));
-    const cardHtml = withProvider(React.createElement(SummaryFarmCard, { rows, spanLabel: "2026-09-14 - 2026-09-20", onOpen: () => {} }));
     const html = withProvider(React.createElement(SummaryFarmTable, { rows, spanLabel: "2026-09-14 - 2026-09-20", onOpenTrip: () => {} }));
     const shown = rows.filter(({ trip }) => html.includes(trip.tripNo)).length;
     const weight = rows[0].farm.dcWeight ?? rows[0].trip.dcWeight ?? 0;
@@ -340,11 +339,8 @@ try {
       amountShowsFigure: amountHtml.includes(`>${formatINR(payable)}</span>`),
       amountExactTip: amountHtml.includes(formatINRExact(payable)),
       amountNamesScope: amountHtml.includes("Week 15 - 21 Sep"),
-      // The card itself is the trigger: the farm payment figure sits inside a
-      // <button>, so pressing the number opens the pop-up.
-      cardIsButton: /^<button[^>]*type="button"/.test(cardHtml),
-      cardFigureOpens: cardHtml.includes(`>${formatINR(payable)}</span>`) && cardHtml.includes(formatINRExact(payable)),
-      cardNoNestedButton: (cardHtml.match(/<button/g) ?? []).length === 1,
+      // No chip, pill or card of its own — the figure reads like any other cell.
+      amountNoChip: !/rounded-full|bg-white|shadow-sm|border-lime/.test(amountHtml),
     };
     // The trip picked in that view opens the Farm Payment page's own detail
     // (Step 2 Farm Details + Step 3 Pickup Details) — render it for a real

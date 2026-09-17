@@ -7,7 +7,7 @@
 // Payment expense row charges). How much of it has been settled lives on the
 // Farm Payment page, not here.
 import React, { useMemo } from 'react';
-import { ChevronRight, Sprout, X } from 'lucide-react';
+import { Sprout, X } from 'lucide-react';
 import type { Trip } from '../../../operations/vehicle-trips/types/trip';
 import { useI18n } from '../../../../i18n';
 import { formatCount, formatINR, formatINRExact } from '../farm-payment/farmPaymentFormat';
@@ -237,7 +237,9 @@ export function SummaryFarmTable({ rows, spanLabel, onOpenTrip }: TableProps) {
  * The Farm Payment figure in the expense table, as a trigger. Farm Payment is
  * the one expense that is not a Payment Register total — it is the farm bill of
  * the trips behind that very figure — so the amount itself is what you press to
- * see those trips. `formatINR` matches the page's own compact ₹L/₹Cr notation.
+ * see those trips. It carries no chip or row highlight of its own: the number
+ * reads like every other cell and only its underline says "press me".
+ * `formatINR` matches the page's own compact ₹L/₹Cr notation.
  */
 export function SummaryFarmAmount({
   value,
@@ -255,7 +257,7 @@ export function SummaryFarmAmount({
       onClick={onOpen}
       title={`${t('accounts.summary.farm_row.open')} — ${scopeLabel}`}
       aria-label={`${t('accounts.summary.farm_row.open')} — ${scopeLabel}: ${formatINRExact(value)}`}
-      className="inline-flex min-w-16 items-center justify-center rounded-full border border-lime-300 bg-white px-2.5 py-1 text-[13px] font-bold tabular-nums text-lime-800 shadow-sm outline-none transition hover:border-lime-400 hover:bg-lime-100 hover:text-lime-900 focus-visible:ring-2 focus-visible:ring-emerald-500 active:scale-95 dark:border-lime-700 dark:bg-slate-800 dark:text-lime-300 dark:hover:bg-lime-500/15"
+      className="cursor-pointer rounded bg-transparent p-0 font-bold tabular-nums text-lime-700 underline decoration-lime-300 decoration-dotted underline-offset-[3px] outline-none transition hover:text-lime-900 hover:decoration-lime-600 hover:decoration-solid focus-visible:ring-2 focus-visible:ring-emerald-500 dark:text-lime-300 dark:decoration-lime-700 dark:hover:text-lime-200 dark:hover:decoration-lime-400"
     >
       <span title={formatINRExact(value)}>{formatINR(value)}</span>
     </button>
@@ -308,71 +310,3 @@ function SummaryFarmViewer({ open, rows, spanLabel, onClose, onOpenTrip }: Viewe
 }
 
 export default React.memo(SummaryFarmViewer);
-
-/**
- * Trigger card for the page. The whole card is the button — press the farm
- * payment figure (or the trips / pickup weight beside it) and the pop-up opens,
- * exactly like the "No. of Trips" figure on this page opens the trip view.
- */
-export function SummaryFarmCard({
-  rows,
-  spanLabel,
-  onOpen,
-}: TableProps & { onOpen: () => void }) {
-  const { t } = useI18n();
-  const { weightKg, payable } = useMemo(() => {
-    let weight = 0;
-    let total = 0;
-    for (const row of rows) {
-      weight += row.farm.dcWeight ?? row.trip.dcWeight ?? 0;
-      total += row.farm.amount;
-    }
-    return { weightKg: weight, payable: total };
-  }, [rows]);
-  const label = t('accounts.summary.farm_table.open');
-
-  return (
-    <button
-      type="button"
-      onClick={onOpen}
-      title={label}
-      aria-label={`${label} — ${formatCount(rows.length)} ${t('accounts.summary.farm_table.trips').toLowerCase()}, ${formatINRExact(payable)}`}
-      className="group/farm flex w-full flex-wrap items-center gap-x-6 gap-y-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left shadow-sm outline-none transition hover:border-lime-300 hover:shadow-md focus-visible:ring-2 focus-visible:ring-emerald-500 active:scale-[0.995] dark:border-slate-700 dark:bg-slate-900 dark:hover:border-lime-700"
-    >
-      <span className="inline-flex items-center gap-2.5">
-        <span
-          aria-hidden="true"
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-lime-600 text-white shadow-sm transition group-hover/farm:bg-lime-500"
-        >
-          <Sprout size={16} strokeWidth={2.2} />
-        </span>
-        <span className="flex min-w-0 flex-col">
-          <span className="text-[13px] font-bold tracking-wide text-slate-700 dark:text-slate-200">
-            {t('accounts.summary.farm_table.title')}
-          </span>
-          <span className="truncate text-[11px] text-slate-500 dark:text-slate-400" title={spanLabel}>
-            {t('accounts.summary.farm_table.subtitle')}
-          </span>
-        </span>
-      </span>
-      <Figure label={t('accounts.summary.farm_table.trips')} value={formatCount(rows.length)} pill />
-      <Figure
-        label={t('accounts.summary.farm_table.weight')}
-        value={`${formatQuantity(weightKg)} kg`}
-        exact={`${formatQuantity(weightKg)} kg`}
-        pill
-      />
-      <Figure
-        label={t('accounts.summary.farm_table.cumulative')}
-        value={formatINR(payable)}
-        exact={formatINRExact(payable)}
-        pill
-        tone="border-emerald-200 text-emerald-700 group-hover/farm:border-emerald-300 group-hover/farm:bg-emerald-50 dark:border-emerald-800 dark:bg-slate-800 dark:text-emerald-300 dark:group-hover/farm:border-emerald-600 dark:group-hover/farm:bg-emerald-500/10"
-      />
-      <span className="ml-auto inline-flex items-center gap-1 text-[12px] font-semibold text-emerald-700 dark:text-emerald-300">
-        {label}
-        <ChevronRight size={15} className="transition-transform group-hover/farm:translate-x-0.5" />
-      </span>
-    </button>
-  );
-}
