@@ -59,12 +59,16 @@ interface KpiDef {
 }
 
 const SkeletonKpis = () => (
-  <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 lg:grid-cols-9">
+  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
     {Array.from({ length: 9 }).map((_, index) => (
-      <div key={index} className="animate-pulse rounded-xl border border-slate-200 bg-white p-3">
-        <div className="h-5 w-5 rounded-lg bg-slate-100" />
-        <div className="mt-1.5 h-3 w-2/3 rounded bg-slate-100" />
-        <div className="mt-0.5 h-5 w-1/2 rounded bg-slate-100" />
+      <div key={index} className="min-h-[6.75rem] animate-pulse rounded-2xl border border-slate-200 bg-white p-4">
+        <div className="flex items-start justify-between">
+          <div className="w-2/3">
+            <div className="h-3 w-3/4 rounded bg-slate-100" />
+            <div className="mt-3 h-6 w-1/2 rounded bg-slate-100" />
+          </div>
+          <div className="h-11 w-11 rounded-xl bg-slate-100" />
+        </div>
       </div>
     ))}
   </div>
@@ -99,7 +103,6 @@ const VehicleAnalyticsPage = ({ embedded = false, active = true }: VehicleAnalyt
   const { t } = useI18n();
   const {
     stats,
-    sampleRange,
     weeklyData,
     expenseBreakdown,
     vehicleStats,
@@ -399,18 +402,11 @@ const VehicleAnalyticsPage = ({ embedded = false, active = true }: VehicleAnalyt
           </div>
         )}
 
-        {sampleRange && (
-          <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
-            Sample quarter: {sampleRange.fromDate} – {sampleRange.toDate}. Figures use the existing
-            Fleet records and the selected date / vehicle filters. Reset restores the full quarter.
-          </p>
-        )}
-
         {/* Filter / toolbar — mirrors the Trip List filter bar exactly:
             same card, same 5-col + 12-col grid, same searchable dropdowns and
             the same animated Reset / Refresh / PDF / Excel action buttons. */}
         <div className={opsFilterCardClass}>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
             <div>
               <label className={opsFilterLabelClass}>
                 <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
@@ -439,7 +435,7 @@ const VehicleAnalyticsPage = ({ embedded = false, active = true }: VehicleAnalyt
               />
             </div>
 
-            <div className="lg:col-span-3">
+            <div>
               <label className={opsFilterLabelClass}>
                 <Truck size={17} className="text-emerald-500 flex-shrink-0" />
                 <span>{t('common.vehicle')}</span>
@@ -536,12 +532,13 @@ const VehicleAnalyticsPage = ({ embedded = false, active = true }: VehicleAnalyt
         ) : (
           <div className="space-y-5">
             {/* KPI summary — rendered through the shared KPI surface, the same
-                component the Trip List uses, so both pages read identically. */}
+                component the Trip List uses, so both pages read identically.
+                Nine metrics laid out on a balanced 3×3 (lg) / 4-up (xl) grid so
+                every card keeps a readable value instead of being squeezed. */}
             <KpiCardGrid
               items={kpiCards}
-              gridClassName="lg:grid-cols-3 xl:grid-cols-9"
+              gridClassName="lg:grid-cols-3 xl:grid-cols-3"
               ariaLabel={t('fleet.analytics.vehicle_performance')}
-              density="compact"
             />
 
             {/* Analytics Section */}
