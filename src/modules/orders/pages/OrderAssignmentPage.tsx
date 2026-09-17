@@ -2313,7 +2313,7 @@ function AssignmentEditor({
                         onClick={() => setSequenceOpen((v) => !v)}
                         aria-expanded={sequenceOpen}
                         aria-controls="orders-selected-shops"
-                        className="group inline-flex items-center gap-2 rounded-lg px-1.5 py-1 -ml-1.5 text-[11px] font-bold uppercase tracking-wider text-emerald-700 transition-colors hover:bg-emerald-100/70"
+                        className="group inline-flex cursor-pointer items-center gap-2 rounded-lg px-1.5 py-1 -ml-1.5 text-[11px] font-bold uppercase tracking-wider text-emerald-700 transition-colors hover:bg-emerald-100/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400/50"
                       >
                         <ChevronDown
                           size={14}
@@ -2337,13 +2337,14 @@ function AssignmentEditor({
                       </span>
                     </div>
 
-                    <div
-                      id="orders-selected-shops"
-                      className={`grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
-                        sequenceOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-                      }`}
-                    >
-                      <div className="min-h-0 overflow-hidden">
+                    {/* Plain mount/unmount — no grid-row animation trick, so the
+                        panel opens and closes reliably in every browser and
+                        at every font scale. */}
+                    {sequenceOpen && (
+                      <div
+                        id="orders-selected-shops"
+                        className="motion-safe:animate-[var(--animate-fade-in-up)]"
+                      >
                         {vehicle && (
                           <>
                             {/* Live capacity only — the truck's static facts already sit in
@@ -2688,7 +2689,7 @@ function AssignmentEditor({
                           </>
                         )}
                       </div>
-                    </div>
+                    )}
                   </>
                 )}
               </div>
