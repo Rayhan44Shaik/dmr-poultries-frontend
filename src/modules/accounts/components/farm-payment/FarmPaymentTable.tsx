@@ -1,39 +1,67 @@
 // src/modules/accounts/components/farm-payment/FarmPaymentTable.tsx
+//
+// The Farm Payment register table — the Trip List's exact table language:
+// a leading S.No column, an icon glyph on every column header, the
+// Day column rendered as `Fri, 11 Sep 2026` via formatTripListDay, and the
+// animated "Loading Farm Payment records…" state while rows are in flight.
 
 import React from 'react';
 import type { Trip } from '../../../operations/vehicle-trips/types/trip';
 import type { FarmPayment } from '../../types/farmPayment.types';
-import { Lock, Eye } from 'lucide-react';
+import {
+  Lock,
+  Eye,
+  Hash,
+  Calendar,
+  Warehouse,
+  Truck,
+  Bird,
+  Scale,
+  IndianRupee,
+  Wallet,
+  Loader2,
+} from 'lucide-react';
 import { formatINR, formatINRExact, formatCount } from './farmPaymentFormat';
+import { formatTripListDay } from '../../../operations/vehicle-trips/utils/formatTripListDay';
+import { localizeTripViewText } from '../../../operations/vehicle-trips/utils/tripViewLocalization';
+import { formatVehicleNumber } from '../../../../utils/format';
+import { useI18n } from '../../../../i18n';
 
 interface FarmPaymentTableProps {
   trips: Trip[];
   paymentData: Record<string, Partial<FarmPayment>>;
   onPaymentUpdate: (tripId: string, updates: Partial<FarmPayment>) => void;
-  onPaymentSaved: () => void;
-  onRefresh: () => void;
-  showNotification: (message: string, type?: 'success' | 'error' | 'info') => void;
+  /** Rows are loading — show the animated register loading state. */
+  loading?: boolean;
   /** Open the read-only trip view modal (full trip history) for a trip. */
   onViewTrip: (trip: Trip) => void;
   /** Empty-state message (the page distinguishes "no data" from "no match"). */
   emptyMessage?: string;
+  /** Zero-based index of the first row, so S.No survives paging like the Trip List. */
+  startIndex?: number;
+}
+
+/** Animated "loading the register" state — same treatment as the Trip List. */
+function LoadingState() {
+  const { t } = useI18n();
+  return (
+    <div className="flex flex-col items-center justify-center gap-3 px-4 py-14" role="status">
+      <Loader2 size={22} className="animate-spin text-emerald-500" aria-hidden="true" />
+      <p className="text-sm font-medium text-slate-500">{t('accounts.farmpay.loading')}</p>
+    </div>
+  );
 }
 
 const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
   trips,
   paymentData,
   onPaymentUpdate,
+  loading = false,
   onViewTrip,
-  emptyMessage = 'No completed trips found',
+  emptyMessage,
+  startIndex = 0,
 }) => {
-  const formatDate = (dateString: string) => {
-    if (!dateString) return '\u2014';
-    return new Date(dateString).toLocaleDateString('en-IN', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
-  };
+  const { t, language } = useI18n();
 
   const isPaymentLocked = (tripId: string): boolean => {
     const payment = paymentData[String(tripId)];
@@ -51,13 +79,21 @@ const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
     </div>
   );
 
-  if (trips.length === 0) {
-    return (
-      <div className="p-8 text-center" role="status">
-        <p className="text-slate-500 text-sm">{emptyMessage}</p>
-      </div>
-    );
-  }
+  // Each column header carries its own glyph — the same icon-label language
+  // as the Trip List's master table. S.No is plain and centred, like the
+  // Trip List's leading serial column.
+  const columns: { key: string; label: string; icon?: React.ReactNode; align?: 'right' | 'center' }[] = [
+    { key: 'sno', label: t('table.s_no'), align: 'center' },
+    { key: 'tripNo', label: t('operations.trip_no'), icon: <Hash size={14} className="text-slate-400 flex-shrink-0" /> },
+    { key: 'day', label: t('ops.trip.day'), icon: <Calendar size={14} className="text-blue-500 flex-shrink-0" /> },
+    { key: 'farm', label: t('ops.trip.source_farm'), icon: <Warehouse size={14} className="text-amber-500 flex-shrink-0" /> },
+    { key: 'vehicle', label: t('common.vehicle'), icon: <Truck size={14} className="text-indigo-500 flex-shrink-0" /> },
+    { key: 'birds', label: t('common.birds'), icon: <Bird size={14} className="text-blue-500 flex-shrink-0" />, align: 'right' },
+    { key: 'dcWeight', label: t('accounts.farmpay.col_dc_weight'), icon: <Scale size={14} className="text-orange-500 flex-shrink-0" />, align: 'right' },
+    { key: 'rate', label: t('accounts.farmpay.col_rate'), icon: <IndianRupee size={14} className="text-emerald-500 flex-shrink-0" />, align: 'right' },
+    { key: 'amount', label: t('accounts.farmpay.col_amount'), icon: <Wallet size={14} className="text-emerald-600 flex-shrink-0" />, align: 'right' },
+    { key: 'trip', label: t('accounts.farmpay.col_trip'), icon: <Eye size={14} className="text-slate-400 flex-shrink-0" />, align: 'center' },
+  ];
 
   return (
     <>
@@ -73,111 +109,143 @@ const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
         }
       `}</style>
       <div className="overflow-x-auto overflow-y-visible">
-        <table className="w-full">
-          <thead>
-            <tr className="bg-gradient-to-r from-slate-50 to-slate-100 border-b border-slate-200">
-              <th scope="col" className="px-3 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Trip No</th>
-              <th scope="col" className="px-3 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Date</th>
-              <th scope="col" className="px-3 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Farm</th>
-              <th scope="col" className="px-3 py-2.5 text-left text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Vehicle</th>
-              <th scope="col" className="px-3 py-2.5 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Total Birds</th>
-              <th scope="col" className="px-3 py-2.5 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">DC Wt (Kg)</th>
-              <th scope="col" className="px-3 py-2.5 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Rate/Kg (₹)</th>
-              <th scope="col" className="px-3 py-2.5 text-right text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Total Amount</th>
-              <th scope="col" className="px-3 py-2.5 text-center text-xs font-semibold text-slate-600 uppercase tracking-wider whitespace-nowrap">Trip</th>
+        <table className="w-full min-w-full border-collapse text-left">
+          <caption className="sr-only">{t('accounts.farmpay.table_caption')}</caption>
+          <thead className="bg-slate-50/80 border-b border-slate-200 text-slate-600">
+            <tr className="whitespace-nowrap">
+              {columns.map((col) => (
+                <th
+                  key={col.key}
+                  scope="col"
+                  className={`px-4 py-4 text-[12px] font-bold uppercase tracking-wider ${
+                    col.align === 'right' ? 'text-right' : col.align === 'center' ? 'text-center' : 'text-left'
+                  } ${col.key === 'sno' ? 'w-12' : ''}`}
+                >
+                  {col.icon ? (
+                    <div
+                      className={`flex items-center gap-1.5 ${
+                        col.align === 'right' ? 'justify-end' : col.align === 'center' ? 'justify-center' : ''
+                      }`}
+                    >
+                      {col.icon}
+                      <span>{col.label}</span>
+                    </div>
+                  ) : (
+                    <span>{col.label}</span>
+                  )}
+                </th>
+              ))}
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
-            {trips.map((trip, index) => {
-              const payment = paymentData[String(trip.id)] || {};
-              
-              const totalBirdsLoaded = trip.totalBirds || 0;
-              const dcWeight = trip.dcWeight || 0;
-              const ratePerKg = payment.ratePerKg || 0;
-              // Weight-based pricing: Rate/Kg × DC weight.
-              const totalAmount = payment.totalAmount || dcWeight * ratePerKg;
-              // Rows whose settlement is already recorded stay read-only. The
-              // page shows no paid/unpaid status: this table is about the rate
-              // and the amount, nothing else.
-              const locked = isPaymentLocked(String(trip.id));
-              // One background per row: locked rows keep their tint, otherwise the
-              // rows alternate — so hover and the stripe never fight over the same
-              // utility and resolve by CSS source order.
-              const rowTone = locked ? 'bg-slate-50/60' : index % 2 ? 'bg-slate-50/25' : '';
+            {loading ? (
+              <tr>
+                <td colSpan={columns.length}>
+                  <LoadingState />
+                </td>
+              </tr>
+            ) : trips.length === 0 ? (
+              <tr>
+                <td colSpan={columns.length} className="py-12 text-center text-slate-400 text-[13px] font-medium" role="status">
+                  {emptyMessage ?? t('accounts.farmpay.empty_no_data')}
+                </td>
+              </tr>
+            ) : (
+              trips.map((trip, index) => {
+                const payment = paymentData[String(trip.id)] || {};
 
-              return (
-                <tr
-                  key={trip.id}
-                  className={`transition-colors duration-150 hover:bg-indigo-50/60 ${rowTone}`}
-                >
-                  <td className="px-3 py-2.5 text-sm font-medium text-slate-800 whitespace-nowrap">
-                    {trip.tripNo}
-                  </td>
-                  <td className="px-3 py-2.5 text-sm text-slate-600 whitespace-nowrap">
-                    {formatDate(trip.tripDate)}
-                  </td>
-                  <td className="px-3 py-2.5 text-sm text-slate-600 whitespace-nowrap">
-                    {trip.sourceFarm}
-                  </td>
-                  <td className="px-3 py-2.5 text-sm text-slate-600 whitespace-nowrap">
-                    {trip.vehicleNo}
-                  </td>
-                  <td className="px-3 py-2.5 text-sm text-right text-slate-800 font-bold whitespace-nowrap">
-                    {formatCount(totalBirdsLoaded)}
-                  </td>
-                  <td className="px-3 py-2.5 text-sm text-right text-slate-700 font-medium whitespace-nowrap">
-                    {dcWeight > 0 ? dcWeight.toFixed(2) : '—'}
-                  </td>
-                  <td className="px-3 py-2.5">
-                    <div className="flex justify-end">
-                      {locked ? (
-                        lockedRate(ratePerKg)
-                      ) : (
-                        <input
-                          type="number"
-                          value={ratePerKg || ''}
-                          min={0}
-                          step="0.01"
-                          inputMode="decimal"
-                          aria-label={`Rate per kg for trip ${trip.tripNo}`}
-                          onChange={(e) => {
-                            // A rate is never negative: clamp pasted/typed
-                            // negative values to 0 so the live total can never
-                            // disagree with what Save will persist (the save
-                            // filter already ignores non-positive rates).
-                            const rate = Math.max(0, parseFloat(e.target.value) || 0);
-                            const newTotal = dcWeight * rate;
-                            onPaymentUpdate(String(trip.id), {
-                              ratePerKg: rate,
-                              ratePerBird: 0,
-                              totalAmount: newTotal,
-                              totalBirds: totalBirdsLoaded,
-                              dcWeight: dcWeight,
-                            });
-                          }}
-                          placeholder="0.00"
-                          className="hide-spinner w-20 px-2 py-1 text-sm text-right border border-slate-200 rounded focus:ring-2 focus:ring-blue-400 focus:border-transparent outline-none bg-white"
-                        />
-                      )}
-                    </div>
-                  </td>
-                  <td className="px-3 py-2.5 text-sm text-right font-bold whitespace-nowrap text-slate-800" title={formatINRExact(totalAmount)}>
-                    {formatINR(totalAmount)}
-                  </td>
-                  <td className="px-3 py-2.5 text-center">
-                    <button
-                      type="button"
-                      onClick={() => onViewTrip(trip)}
-                      className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-indigo-300 hover:text-indigo-600 hover:shadow focus:outline-none focus:ring-2 focus:ring-indigo-400"
-                      title={`View trip history — ${trip.tripNo}`}
-                      aria-label={`View trip history for ${trip.tripNo}`}
+                const totalBirdsLoaded = trip.totalBirds || 0;
+                const dcWeight = trip.dcWeight || 0;
+                const ratePerKg = payment.ratePerKg || 0;
+                // Weight-based pricing: Rate/Kg × DC weight.
+                const totalAmount = payment.totalAmount || dcWeight * ratePerKg;
+                // Rows whose settlement is already recorded stay read-only. The
+                // page shows no paid/unpaid status: this table is about the rate
+                // and the amount, nothing else.
+                const locked = isPaymentLocked(String(trip.id));
+                // One background per row: locked rows keep their tint, otherwise
+                // the rows alternate — the Trip List's zebra striping.
+                const rowTone = locked ? 'bg-slate-50/60' : index % 2 === 0 ? 'bg-white' : 'bg-slate-50/20';
+                const serialNo = startIndex + index + 1;
+
+                return (
+                  <tr key={trip.id} className={`transition-colors duration-150 hover:bg-slate-50/60 ${rowTone}`}>
+                    <td className="px-4 py-4 text-center text-[13px] text-slate-500 font-medium w-12 tabular-nums">
+                      {serialNo}
+                    </td>
+                    <td className="px-4 py-4 text-[13px] font-bold text-emerald-600 whitespace-nowrap">
+                      {localizeTripViewText(trip.tripNo, language)}
+                    </td>
+                    <td className="px-4 py-4 text-[13px] font-medium text-slate-600 whitespace-nowrap">
+                      {formatTripListDay(trip.tripDate, language)}
+                    </td>
+                    <td className="px-4 py-4 text-[13px] font-medium text-slate-700 whitespace-nowrap">
+                      {localizeTripViewText(trip.sourceFarm, language)}
+                    </td>
+                    <td className="px-4 py-4 text-[13px] text-slate-600 whitespace-nowrap">
+                      {localizeTripViewText(formatVehicleNumber(trip.vehicleNo), language)}
+                    </td>
+                    <td className="px-4 py-4 text-[13px] text-right font-bold text-blue-600 whitespace-nowrap tabular-nums">
+                      {formatCount(totalBirdsLoaded)}
+                    </td>
+                    <td className="px-4 py-4 text-[13px] text-right font-medium text-slate-700 whitespace-nowrap tabular-nums">
+                      {dcWeight > 0 ? dcWeight.toFixed(2) : '—'}
+                    </td>
+                    <td className="px-4 py-4">
+                      <div className="flex justify-end">
+                        {locked ? (
+                          lockedRate(ratePerKg)
+                        ) : (
+                          <input
+                            type="number"
+                            value={ratePerKg || ''}
+                            min={0}
+                            step="0.01"
+                            inputMode="decimal"
+                            aria-label={t('accounts.farmpay.rate_aria', { no: trip.tripNo })}
+                            onChange={(e) => {
+                              // A rate is never negative: clamp pasted/typed
+                              // negative values to 0 so the live total can never
+                              // disagree with what Save will persist (the save
+                              // filter already ignores non-positive rates).
+                              const rate = Math.max(0, parseFloat(e.target.value) || 0);
+                              const newTotal = dcWeight * rate;
+                              onPaymentUpdate(String(trip.id), {
+                                ratePerKg: rate,
+                                ratePerBird: 0,
+                                totalAmount: newTotal,
+                                totalBirds: totalBirdsLoaded,
+                                dcWeight: dcWeight,
+                              });
+                            }}
+                            placeholder="0.00"
+                            className="hide-spinner w-20 px-2 py-1 text-sm text-right border border-slate-200 rounded focus:ring-2 focus:ring-emerald-400 focus:border-transparent outline-none bg-white transition-shadow"
+                          />
+                        )}
+                      </div>
+                    </td>
+                    <td
+                      className="px-4 py-4 text-[13px] text-right font-bold whitespace-nowrap text-slate-800 tabular-nums"
+                      title={formatINRExact(totalAmount)}
                     >
-                      <Eye size={14} />
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
+                      {formatINR(totalAmount)}
+                    </td>
+                    <td className="px-4 py-4 text-center">
+                      <button
+                        type="button"
+                        onClick={() => onViewTrip(trip)}
+                        className="group inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:border-emerald-300 hover:text-emerald-600 hover:shadow focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                        aria-label={t('accounts.farmpay.view_trip_aria', { no: trip.tripNo })}
+                      >
+                        <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]">
+                          <Eye size={14} />
+                        </span>
+                      </button>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
           </tbody>
         </table>
       </div>
