@@ -40,6 +40,7 @@ import {
   Loader2,
   RotateCcw,
   ArrowUpDown,
+  Calendar,
   MapPin,
   Save,
   Search,
@@ -67,6 +68,8 @@ import {
   opsTableRowClass,
 } from "../../../shared/ui/operationsStyles";
 import { BrandRefreshButton, Pagination } from "../../../ui";
+import { formatVehicleNumber } from "../../../utils/format";
+import { uiActionIconMotionClass } from "../../../shared/ui/uiTokens";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
 import {
   collectionTotals,
@@ -103,7 +106,6 @@ import type {
   OrdersEligibleVehicle,
 } from "../types";
 import {
-  ORDERS_FILTER_LABEL_CLASS,
   ORDERS_TABLE_FONT_CLASS,
   ordersZebraTone,
   ordersTableZebraRow,
@@ -227,6 +229,27 @@ type Props = {
   refreshing: boolean;
 };
 
+/** Trip-List-style in-table loading row: the filter card and the table
+ *  header stay put, only the record surface says it is fetching. */
+function AssignmentLoadingRows() {
+  const { to } = useOrdersI18n();
+  return (
+    <div
+      role="status"
+      aria-busy="true"
+      className="py-16 text-center text-sm font-medium text-slate-400 motion-safe:animate-[var(--animate-fade-in)]"
+    >
+      <span className="inline-flex items-center gap-2">
+        <span
+          className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600"
+          aria-hidden="true"
+        />
+        {to("orders.loading")}
+      </span>
+    </div>
+  );
+}
+
 /** Historical days are inspection-only; never mount a writable editor. */
 function AssignmentHistory({
   views,
@@ -337,7 +360,14 @@ function AssignmentHistory({
                 "orders.col_boxes",
                 "orders.col_birds",
               ].map((key) => (
-                <th key={key} className={opsTableThClass}>
+                <th
+                  key={key}
+                  className={`${opsTableThClass} ${
+                    key === "orders.col_boxes" || key === "orders.col_birds"
+                      ? "text-right"
+                      : "text-left"
+                  }`}
+                >
                   {to(key)}
                 </th>
               ))}
@@ -367,9 +397,21 @@ function AssignmentHistory({
                       {villageOf(row.shopId, row.shopName, shopDirectory)}
                     </td>
                     <td className={opsTableTdClass}>{row.trip.tripNo}</td>
-                    <td className={opsTableTdClass}>{row.trip.vehicleNo}</td>
-                    <td className={opsTableTdClass}>{row.boxes}</td>
-                    <td className={opsTableTdClass}>{row.birds}</td>
+                    <td
+                      className={`${opsTableTdClass} whitespace-nowrap tracking-wide`}
+                    >
+                      {formatVehicleNumber(row.trip.vehicleNo)}
+                    </td>
+                    <td
+                      className={`${opsTableTdClass} text-right tabular-nums`}
+                    >
+                      {row.boxes}
+                    </td>
+                    <td
+                      className={`${opsTableTdClass} text-right tabular-nums`}
+                    >
+                      {row.birds}
+                    </td>
                   </tr>
                 ))
             )}
@@ -456,7 +498,7 @@ function OrderAssignmentPage({
       )
       .map((trip) => ({
         value: String(trip.id),
-        label: `${trip.vehicleNo || "—"} · ${trip.tripNo}`,
+        label: `${formatVehicleNumber(trip.vehicleNo)} · ${trip.tripNo}`,
         searchText: `${trip.vehicleNo} ${trip.tripNo} ${trip.supervisorName} ${trip.driverName}`,
       }));
   }, [day, today, dayVehicleViews, eligibleVehicles]);
@@ -604,8 +646,6 @@ function OrderAssignmentPage({
   ]);
   const hasFilters = activeChips.length > 0;
 
-  if (loading) return <OrdersTableSkeleton rows={4} />;
-
   return (
     <div className="space-y-5">
       <section
@@ -616,9 +656,10 @@ function OrderAssignmentPage({
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-5">
           <div>
             {/* No Calendar glyph on the label: the date field carries its own, and that one is the button you click. */}
-            <div className={ORDERS_FILTER_LABEL_CLASS}>
+            <label className={opsFilterLabelClass}>
+              <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
               <span>{to("orders.col_date")}</span>
-            </div>
+            </label>
             <OrdersDateControl
               day={day}
               today={today}
@@ -644,6 +685,7 @@ function OrderAssignmentPage({
               searchable
               allowClear
               className="w-full"
+              triggerClassName="h-10 rounded-lg text-[13px]"
             />
           </div>
           <div>
@@ -661,6 +703,7 @@ function OrderAssignmentPage({
               searchable
               allowClear
               className="w-full"
+              triggerClassName="h-10 rounded-lg text-[13px]"
             />
           </div>
           <div>
@@ -682,13 +725,14 @@ function OrderAssignmentPage({
               placeholder={to("orders.all")}
               allowClear
               className="w-full"
+              triggerClassName="h-10 rounded-lg text-[13px]"
             />
           </div>
           <div>
-            <div className={ORDERS_FILTER_LABEL_CLASS}>
+            <label className={opsFilterLabelClass}>
               <MapPin size={17} className="text-amber-500 flex-shrink-0" />
               <span>{to("orders.city")}</span>
-            </div>
+            </label>
             <OrdersMultiSelect
               values={cityFilters}
               onChange={setCityFilters}
@@ -704,13 +748,13 @@ function OrderAssignmentPage({
         {/* Row 2 — Sort · Search · actions (Trip List 3 / 5 / 4 split) */}
         <div className="grid grid-cols-1 gap-3.5 items-end pt-1 lg:grid-cols-12">
           <div className="lg:col-span-3">
-            <div className={ORDERS_FILTER_LABEL_CLASS}>
+            <label className={opsFilterLabelClass}>
               <ArrowUpDown
                 size={17}
                 className="text-violet-500 flex-shrink-0"
               />
               <span>{to("orders.sort")}</span>
-            </div>
+            </label>
             <OrdersDropdown
               value={sortMode}
               onChange={(value) => setSortMode(value as AssignmentSort)}
@@ -756,9 +800,7 @@ function OrderAssignmentPage({
               className={`group relative ${opsSecondaryButtonClass}`}
               aria-label={to("common.reset")}
             >
-              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]">
-                <RotateCcw size={14} />
-              </span>
+              <RotateCcw size={14} className={uiActionIconMotionClass.reset} />
               {to("common.reset")}
               {hasFilters && (
                 <span className="ml-1 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-600 px-1.5 text-[10px] font-bold tabular-nums text-white motion-safe:animate-[var(--animate-pop-in)]">
@@ -813,21 +855,27 @@ function OrderAssignmentPage({
               {to("orders.tab_assignment")}
             </h2>
           </div>
-          <span
-            key={`${collection?.assignedShops ?? 0}/${collection?.totalShops ?? 0}`}
-            className="text-xs font-medium text-slate-500 motion-safe:animate-[var(--animate-fade-in)]"
-          >
-            {to("orders.pool_summary", {
-              collected: collection?.totalShops ?? 0,
-              assigned: collection?.assignedShops ?? 0,
-              available:
-                (collection?.totalShops ?? 0) -
-                (collection?.assignedShops ?? 0),
-            })}
-          </span>
+          {loading ? (
+            <span className="h-4 w-48 animate-pulse rounded bg-slate-100" />
+          ) : (
+            <span
+              key={`${collection?.assignedShops ?? 0}/${collection?.totalShops ?? 0}`}
+              className="text-xs font-medium text-slate-500 motion-safe:animate-[var(--animate-fade-in)]"
+            >
+              {to("orders.pool_summary", {
+                collected: collection?.totalShops ?? 0,
+                assigned: collection?.assignedShops ?? 0,
+                available:
+                  (collection?.totalShops ?? 0) -
+                  (collection?.assignedShops ?? 0),
+              })}
+            </span>
+          )}
         </div>
 
-        {day < today ? (
+        {loading ? (
+          <AssignmentLoadingRows />
+        ) : day < today ? (
           <AssignmentHistory
             key={day}
             views={dayVehicleViews}
@@ -1683,12 +1731,18 @@ function AssignmentEditor({
           ) : (
             <div className="max-h-[calc(100vh-190px)] overflow-y-auto">
               <ul className="divide-y divide-slate-100">
-                {pendingVehicles.map((v) => {
+                {pendingVehicles.map((v, index) => {
                   const city = farmCityOf(v.trip);
                   const shops = savedShopsOn(v.trip.tripNo);
                   const selectedCard = vehicleTripId === v.trip.id;
                   return (
-                    <li key={v.trip.id}>
+                    <li
+                      key={v.trip.id}
+                      className="motion-safe:animate-[var(--animate-fade-in-up)]"
+                      style={{
+                        animationDelay: `${Math.min(index, 10) * 30}ms`,
+                      }}
+                    >
                       <button
                         type="button"
                         onClick={() => setVehicleTripId(v.trip.id)}
@@ -1701,8 +1755,8 @@ function AssignmentEditor({
                         }`}
                       >
                         <span className="flex items-center justify-between gap-2">
-                          <span className="truncate text-xs font-semibold text-slate-800">
-                            {v.trip.vehicleNo || "—"}
+                          <span className="truncate text-xs font-semibold tracking-wide text-slate-800">
+                            {formatVehicleNumber(v.trip.vehicleNo)}
                           </span>
                           <span className="shrink-0 text-[11px] font-semibold text-slate-400">
                             {v.trip.tripNo || "—"}
@@ -1841,9 +1895,9 @@ function AssignmentEditor({
                   type="button"
                   onClick={() => setVehicleTripId(null)}
                   aria-label={to("orders.close")}
-                  className="self-end rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 lg:self-auto"
+                  className="group self-end rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 lg:self-auto"
                 >
-                  <X size={17} />
+                  <X size={17} className={uiActionIconMotionClass.close} />
                 </button>
               </div>
 
@@ -1896,16 +1950,20 @@ function AssignmentEditor({
                       >
                         <thead>
                           <tr className={opsTableHeadRowClass}>
-                            <th className={`${opsTableThClass} w-14`}>
+                            <th
+                              className={`${opsTableThClass} w-14 text-center`}
+                            >
                               {to("orders.select_col")}
                             </th>
-                            <th className={`${opsTableThClass} w-14`}>
+                            <th
+                              className={`${opsTableThClass} w-14 text-center`}
+                            >
                               {to("orders.col_sno")}
                             </th>
-                            <th className={opsTableThClass}>
+                            <th className={`${opsTableThClass} text-left`}>
                               {to("orders.col_shop_name")}
                             </th>
-                            <th className={opsTableThClass}>
+                            <th className={`${opsTableThClass} text-left`}>
                               {to("orders.col_village")}
                             </th>
                             <th
@@ -1937,11 +1995,14 @@ function AssignmentEditor({
                             return (
                               <tr
                                 key={row.shopId}
-                                className={`${opsTableRowClass} ${tone} ${
+                                className={`${opsTableRowClass} ${tone} motion-safe:animate-[var(--animate-fade-in-up)] ${
                                   isLockedRow
                                     ? "cursor-default opacity-60"
                                     : "cursor-pointer"
                                 }`}
+                                style={{
+                                  animationDelay: `${Math.min(index, 12) * 24}ms`,
+                                }}
                                 onClick={() => {
                                   if (!isLockedRow)
                                     toggleShop(
@@ -1952,7 +2013,7 @@ function AssignmentEditor({
                                 }}
                               >
                                 <td
-                                  className={opsTableTdClass}
+                                  className={`${opsTableTdClass} text-center`}
                                   onClick={(e) => e.stopPropagation()}
                                 >
                                   <input
@@ -1974,8 +2035,10 @@ function AssignmentEditor({
                                     }`}
                                   />
                                 </td>
-                                <td className={opsTableTdClass}>
-                                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 text-[12px] font-semibold text-slate-600">
+                                <td
+                                  className={`${opsTableTdClass} text-center`}
+                                >
+                                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 text-[12px] font-semibold tabular-nums text-slate-600">
                                     {availableStartIndex + index + 1}
                                   </span>
                                 </td>
@@ -1992,19 +2055,19 @@ function AssignmentEditor({
                                   ) || "—"}
                                 </td>
                                 <td
-                                  className={`${opsTableTdClass} text-right font-medium`}
+                                  className={`${opsTableTdClass} text-right tabular-nums font-medium`}
                                 >
                                   {formatCount(Number(row.birds) || 0)}
                                 </td>
                                 <td
-                                  className={`${opsTableTdClass} text-right font-semibold text-emerald-800`}
+                                  className={`${opsTableTdClass} text-right tabular-nums font-semibold text-emerald-800`}
                                 >
                                   {formatCount(
                                     Math.max(1, Number(row.boxNo) || 0),
                                   )}
                                 </td>
                                 <td
-                                  className={`${opsTableTdClass} text-right text-slate-500`}
+                                  className={`${opsTableTdClass} text-right tabular-nums text-slate-500`}
                                 >
                                   {orderWeightBasis
                                     ? formatKg(
@@ -2080,7 +2143,7 @@ function AssignmentEditor({
                       {/* The vehicle comes from the › row above — no second selector. */}
                       <span className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-[11px] font-bold text-emerald-700">
                         {vehicle
-                          ? `${vehicle.trip.tripNo} · ${vehicle.trip.vehicleNo || "—"}`
+                          ? `${vehicle.trip.tripNo} · ${formatVehicleNumber(vehicle.trip.vehicleNo)}`
                           : "—"}
                       </span>
                     </div>
@@ -2140,13 +2203,15 @@ function AssignmentEditor({
                           >
                             <thead>
                               <tr className={opsTableHeadRowClass}>
-                                <th className={`${opsTableThClass} w-20`}>
+                                <th
+                                  className={`${opsTableThClass} w-20 text-left`}
+                                >
                                   {to("orders.col_sequence")}
                                 </th>
-                                <th className={opsTableThClass}>
+                                <th className={`${opsTableThClass} text-left`}>
                                   {to("orders.col_shop_name")}
                                 </th>
-                                <th className={opsTableThClass}>
+                                <th className={`${opsTableThClass} text-left`}>
                                   {to("orders.col_village")}
                                 </th>
                                 <th
@@ -2160,7 +2225,7 @@ function AssignmentEditor({
                                   {to("orders.ordered_boxes")}
                                 </th>
                                 <th
-                                  className={`${opsTableThClass} w-28 text-right`}
+                                  className={`${opsTableThClass} w-40 text-left`}
                                 >
                                   {to("orders.assigned_boxes")}
                                 </th>
@@ -2304,12 +2369,12 @@ function AssignmentEditor({
                                       {row.village || "—"}
                                     </td>
                                     <td
-                                      className={`${opsTableTdClass} text-right font-medium`}
+                                      className={`${opsTableTdClass} text-right tabular-nums font-medium`}
                                     >
                                       {formatCount(row.orderedBirds)}
                                     </td>
                                     <td
-                                      className={`${opsTableTdClass} text-right font-semibold text-emerald-800`}
+                                      className={`${opsTableTdClass} text-right tabular-nums font-semibold text-emerald-800`}
                                     >
                                       {formatCount(row.orderedBoxes)}
                                     </td>
@@ -2379,7 +2444,7 @@ function AssignmentEditor({
                                       </div>
                                     </td>
                                     <td
-                                      className={`${opsTableTdClass} text-right text-slate-500`}
+                                      className={`${opsTableTdClass} text-right tabular-nums text-slate-500`}
                                     >
                                       {orderWeightBasis
                                         ? formatKg(

@@ -54,6 +54,7 @@ import {
 import { useToast } from "../../../components/common/ToastProvider";
 import {
   buildShopBreakdown,
+  localToday,
   rowsInSequence,
   type ShopDeliveryBreakdown,
 } from "../utils/ordersUtils";
@@ -631,7 +632,7 @@ const OrdersPage: React.FC = () => {
                   </React.Suspense>
                 </section>
               )}
-              {visited.includes("assignment") && !dataPending && (
+              {visited.includes("assignment") && (
                 <section
                   id="orders-panel-assignment"
                   hidden={activeTab !== "assignment"}
@@ -643,16 +644,16 @@ const OrdersPage: React.FC = () => {
                 >
                   <React.Suspense fallback={<OrdersTableSkeleton rows={5} />}>
                     <OrderAssignmentPage
-                      loading={false}
-                      day={assignmentDay}
-                      today={today}
+                      loading={dataPending}
+                      day={assignmentDay || localToday()}
+                      today={today || localToday()}
                       onDaySelect={(value) =>
                         selectDay("assignmentDate", value)
                       }
-                      collection={data.collectionsByDay[assignmentDay] ?? null}
-                      eligibleVehicles={data.eligibleVehicles}
+                      collection={data?.collectionsByDay[assignmentDay] ?? null}
+                      eligibleVehicles={data?.eligibleVehicles ?? []}
                       dayVehicleViews={
-                        data.dayVehicleViews[assignmentDay] ?? []
+                        data?.dayVehicleViews[assignmentDay] ?? []
                       }
                       shopDirectory={shopDirectory}
                       supervisorDirectory={supervisorDirectory}
@@ -692,7 +693,9 @@ const OrdersPage: React.FC = () => {
               )}
               {/* Assignment and Delivery Tracking read their whole shape from the
                 Orders payload, so they keep the placeholder until it lands. */}
-              {dataPending && activeTab !== "collection" ? (
+              {dataPending &&
+              activeTab !== "collection" &&
+              activeTab !== "assignment" ? (
                 <OrdersLoadingPanel tab={activeTab} />
               ) : null}
             </>
