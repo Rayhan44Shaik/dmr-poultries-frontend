@@ -3016,7 +3016,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           <div className="grid grid-cols-1 gap-3 border-b border-slate-100 px-5 py-3 sm:grid-cols-3">
             <div>
               <label className={opsFilterLabelClass}>
-                {waT("shop_ledger.report_type")}
+                <Layers size={15} className="shrink-0 text-emerald-500" />
+                <span>{waT("shop_ledger.report_type")}</span>
               </label>
               <MasterDropdown
                 hideLabel
@@ -3040,7 +3041,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             </div>
             <div>
               <label className={opsFilterLabelClass}>
-                {waT("shop_ledger.wa.date_from")}
+                <CalendarRange size={15} className="shrink-0 text-emerald-500" />
+                <span>{waT("shop_ledger.wa.date_from")}</span>
               </label>
               <DatePicker
                 value={waDateFrom}
@@ -3055,7 +3057,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             </div>
             <div>
               <label className={opsFilterLabelClass}>
-                {waT("shop_ledger.wa.date_to")}
+                <CalendarDays size={15} className="shrink-0 text-emerald-500" />
+                <span>{waT("shop_ledger.wa.date_to")}</span>
               </label>
               <DatePicker
                 value={waDateTo}
@@ -3074,31 +3077,62 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           <div className="flex min-h-0 flex-1">
             {/* Left: shop selector */}
             <aside className="flex w-72 shrink-0 flex-col border-r border-slate-100 bg-slate-50/60">
-              <div className="space-y-2 border-b border-slate-100 px-3.5 py-3">
+              <div className="space-y-2.5 border-b border-slate-100 bg-white/70 px-3.5 py-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] font-bold uppercase tracking-wide text-slate-500">
+                  <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-600">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-md bg-gradient-to-br from-[#25D366] to-[#1DA851] text-white shadow-sm">
+                      <ListChecks size={12} />
+                    </span>
                     {waT("shop_ledger.select_shops")}
                   </span>
-                  <span className="rounded-full bg-[#25D366]/10 px-2 py-0.5 text-[10px] font-bold text-[#1DA851]">
-                    {waSelectedShops.length} selected
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold transition ${
+                      waSelectedShops.length === waAllShopNames.length
+                        ? "bg-[#25D366] text-white shadow-sm"
+                        : "bg-[#25D366]/10 text-[#168a43]"
+                    }`}
+                  >
+                    {waSelectedShops.length} / {waAllShopNames.length}
                   </span>
                 </div>
-                <div className="flex items-center gap-1.5">
+
+                <div
+                  className="h-1 w-full overflow-hidden rounded-full bg-slate-100"
+                  role="progressbar"
+                  aria-valuemin={0}
+                  aria-valuemax={waAllShopNames.length}
+                  aria-valuenow={waSelectedShops.length}
+                >
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-[#25D366] to-[#1DA851] transition-all duration-200"
+                    style={{
+                      width: `${waAllShopNames.length === 0 ? 0 : Math.round((waSelectedShops.length / waAllShopNames.length) * 100)}%`,
+                    }}
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-1.5">
                   <button
                     type="button"
                     onClick={() => setWaSelectedShops(waAllShopNames)}
-                    className="h-7 flex-1 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50"
+                    className={`flex h-7 items-center justify-center gap-1 rounded-lg border text-[11px] font-semibold transition ${
+                      waSelectedShops.length === waAllShopNames.length
+                        ? "border-emerald-300 bg-emerald-50 text-emerald-700"
+                        : "border-slate-200 bg-white text-slate-600 hover:bg-slate-50"
+                    }`}
                   >
-                    All
+                    <CheckSquare size={11} /> {waT("common.all")}
                   </button>
                   <button
                     type="button"
                     onClick={() => setWaSelectedShops([])}
-                    className="h-7 flex-1 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50"
+                    disabled={waSelectedShops.length === 0}
+                    className="flex h-7 items-center justify-center gap-1 rounded-lg border border-slate-200 bg-white text-[11px] font-semibold text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
                   >
-                    None
+                    <Square size={11} /> {waT("common.none")}
                   </button>
                 </div>
+
                 <div className="relative">
                   <Search
                     size={13}
@@ -3110,16 +3144,25 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     onChange={(e) => setWaShopSearch(e.target.value)}
                     placeholder={waT("shop_ledger.wa.search_shops")}
                     aria-label={waT("shop_ledger.wa.search_shops_aria")}
-                    className="h-8 w-full rounded-lg border border-slate-200 bg-white pl-7 pr-2 text-xs text-slate-700 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-[#25D366]/25 focus:border-[#25D366]/50"
+                    className="h-8 w-full rounded-lg border border-slate-200 bg-white pl-7 pr-7 text-xs font-medium text-slate-700 placeholder:font-normal placeholder:text-slate-400 focus:border-[#25D366]/50 focus:outline-none focus:ring-2 focus:ring-[#25D366]/25"
                   />
+                  {waShopSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setWaShopSearch("")}
+                      aria-label={waT("shop_ledger.pdf_clear_search")}
+                      className="absolute right-1.5 top-1/2 -translate-y-1/2 rounded p-0.5 text-slate-400 transition hover:text-slate-600"
+                    >
+                      <X size={12} />
+                    </button>
+                  )}
                 </div>
-                <p className="text-[11px] font-medium text-slate-500">
-                  This week from {formatDisplayDate(currentWeekKey)} · total{" "}
-                  {waWeekTotal} send(s)
+                <p className="text-[10px] font-medium leading-4 text-slate-500">
+                  {waT("shop_ledger.wa.sent_this_week")} {waWeekTotal} · {formatDisplayDate(currentWeekKey)}
                 </p>
               </div>
 
-              <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+              <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2.5 py-2.5">
                 {waVisibleShops.map((shop) => {
                   const recipient = resolveWaRecipient(shop);
                   const weekCount = weeklySendCount(
@@ -3130,21 +3173,24 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   const isSending = waSendingShop === shop;
                   const shopSucceeded = waSucceededShops.includes(shop);
                   const isPreview = waPreviewShop === shop;
+                  const isSelected = waSelectedShops.includes(shop);
                   return (
                     <div
                       key={shop}
-                      className={`flex items-start gap-2 rounded-lg px-2 py-1.5 transition ${
+                      className={`flex items-center gap-2 rounded-xl border px-2 py-1.5 transition ${
                         isPreview
-                          ? "bg-[#25D366]/10 ring-1 ring-[#25D366]/30"
-                          : "hover:bg-white"
+                          ? "border-emerald-200 bg-emerald-50/80 ring-1 ring-emerald-300"
+                          : isSelected
+                            ? "border-emerald-100 bg-emerald-50/40"
+                            : "border-transparent hover:border-slate-200/70 hover:bg-white"
                       }`}
                     >
                       <input
                         type="checkbox"
-                        checked={waSelectedShops.includes(shop)}
+                        checked={isSelected}
                         onChange={() => toggleWaShop(shop)}
                         aria-label={waT("shop_ledger.wa.send_to", { shop })}
-                        className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer accent-[#25D366]"
+                        className="h-4 w-4 shrink-0 cursor-pointer accent-[#25D366]"
                       />
                       <button
                         type="button"
@@ -3153,17 +3199,24 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                           resetWaAttachment();
                         }}
                         title={shop}
-                        className="min-w-0 flex-1 text-left"
+                        className="flex min-w-0 flex-1 items-center gap-2 text-left"
                       >
-                        <span className="block truncate text-xs font-semibold text-slate-700">
-                          {shop}
+                        <span
+                          className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-[10px] font-bold ${
+                            isSelected
+                              ? "bg-emerald-100 text-emerald-700"
+                              : "bg-slate-100 text-slate-500"
+                          }`}
+                        >
+                          {shop.charAt(0).toUpperCase()}
                         </span>
-                        <span className="block truncate text-[10px] text-slate-400">
-                          {recipient.ownerName ||
-                            waT("shop_ledger.wa.shop_owner")}{" "}
-                          ·{" "}
-                          {recipient.whatsappNumber ||
-                            waT("shop_ledger.wa.no_number")}
+                        <span className="min-w-0 flex-1">
+                          <span className={`block truncate text-xs ${isPreview ? "font-bold text-emerald-700" : "font-semibold text-slate-700"}`}>
+                            {shop}
+                          </span>
+                          <span className="block truncate text-[10px] font-medium text-slate-400">
+                            {recipient.ownerName || waT("shop_ledger.wa.shop_owner")} · {recipient.whatsappNumber || waT("shop_ledger.wa.no_number")}
+                          </span>
                         </span>
                       </button>
                       {isSending ? (
