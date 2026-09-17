@@ -1,15 +1,11 @@
 // src/modules/collections/pages/CollectionReportPage.tsx
 
-import { useState, useEffect, useMemo, useCallback } from "react";
+import { useState, useEffect, useMemo, useCallback, useLayoutEffect, useRef } from "react";
 import { collectionService } from "../services/collectionService";
 import type { CollectionApiEntry, CollectionReportSummary } from "../types/collection";
 import { useShops } from "../../../masters/shops/hooks/useShops";
 import { useEmployees } from "../../../masters/employees/hooks/useEmployees";
-import Select from "react-select";
 import {
-  PieChart,
-  Pie,
-  Cell,
   Tooltip as ChartTooltip,
   Legend as ChartLegend,
   ResponsiveContainer,
@@ -25,11 +21,12 @@ import {
   RotateCcw,
   Wallet,
   Users,
-  ChevronDown,
   Search,
   Loader2,
-  Download,
   Inbox,
+  Calendar,
+  Store,
+  CreditCard,
   AlertTriangle,
   BarChart3,
 } from "lucide-react";
@@ -41,12 +38,18 @@ import { DatePicker } from "../../../../components/common/DatePicker";
 import {
   opsFilterCardClass,
   opsFilterLabelClass,
-  opsInputClass,
-  opsReactSelectStyles,
   opsEmptyStateClass,
+  opsPrimaryButtonClass,
+  opsSecondaryButtonClass,
+  opsPdfButtonClass,
+  opsExcelButtonClass,
 } from "../../../../shared/ui/operationsStyles";
+import { BrandRefreshButton } from "../../../../ui";
+import MasterDropdown, {
+  type MasterDropdownOption,
+} from "../../../masters/components/MasterDropdown";
+import CollectionsPie from "../../dashboard/components/CollectionsPie";
 import { useI18n } from "../../../../i18n";
-import { getQuarterSampleInfo } from "../../../../sample/quarterSample";
 
 const formatCurrency = (amount: number) =>
   new Intl.NumberFormat("en-IN", {
@@ -54,15 +57,6 @@ const formatCurrency = (amount: number) =>
     currency: "INR",
     minimumFractionDigits: 2,
   }).format(amount);
-
-// Soft-toned toolbar buttons: Search (light green), Export (light blue),
-// Reset (light red) — consistent shell, tone differs per action.
-const searchButtonClass =
-  "inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-100 px-3.5 py-2.5 text-xs font-semibold text-emerald-700 transition-all hover:bg-emerald-200 active:scale-95 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed";
-const exportButtonClass =
-  "inline-flex items-center justify-center gap-1.5 rounded-xl border border-sky-200 bg-sky-100 px-3.5 py-2.5 text-xs font-semibold text-sky-700 transition-all hover:bg-sky-200 active:scale-95 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed";
-const resetButtonClass =
-  "inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-100 px-3.5 py-2.5 text-xs font-semibold text-rose-700 transition-all hover:bg-rose-200 active:scale-95 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed";
 
 // Chart palette: stable brand colors for the known modes, hashed fallback
 // for any other mode the backend returns.
@@ -90,9 +84,15 @@ const modeDisplay = (mode: string) => MODE_DISPLAY[mode] ?? mode;
 const compactINR = (value: number) =>
   new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 1 }).format(value);
 
-// ── Chart tooltip — polished card shared by the donut and stacked bars ──────
+// ── Chart tooltip — polished card used by the stacked collector chart ──────
 // White rounded card, color-coded dots, ₹ amounts and each row's share of
 // the tooltip total, plus a total footer.
+type CollectorDisplayRow = {
+  collector: string;
+  total: number;
+  [paymentMode: string]: string | number;
+};
+
 type ChartTipEntry = {
   name?: string | number;
   value?: string | number;
@@ -158,9 +158,13 @@ type Props = {
   embedded?: boolean;
 };
 
-export default function CollectionReportPage({ embedded: _embedded = false }: Props) {
+export default function CollectionReportPage({ embedded = false }: Props) {
   const { t } = useI18n();
   const { showNotification } = useSafeNotification();
+  const reportTRef = useRef(t);
+  useEffect(() => {
+    reportTRef.current = t;
+  }, [t]);
 
   const [loading, setLoading] = useState(true);
   const { shops } = useShops();
@@ -181,20 +185,42 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
   const [shopName, setShopName] = useState("");
   const [collector, setCollector] = useState("");
   const [paymentMode, setPaymentMode] = useState("");
-  const [exportOpen, setExportOpen] = useState(false);
+  const requestSequenceRef = useRef(0);
+  const initialLoadStartedRef = useRef(false);
+  const paymentSummaryCardRef = useRef<HTMLDivElement>(null);
+  const modeShareCardRef = useRef<HTMLDivElement>(null);
+  const appliedFiltersRef = useRef({
+    fromDate: "",
+    toDate: "",
+    shopName: "",
+    collector: "",
+    paymentMode: "",
+  });
 
-  // Shop picker: same master shop list + searchable select used across the app
-  // (Pending Collections filters, Shop Ledger) — options come from
-  // GET /api/masters/shops via useShops.
-  const selectStyles = useMemo(() => opsReactSelectStyles(), []);
-  const shopOptions = useMemo(
-    () => [
-      { value: "", label: t("ops.collection.all_shops") },
-      ...shops
-        .map((s) => ({ value: s.shopName, label: s.shopName }))
+  // Every selector uses the same searchable MasterDropdown as Trip List.
+  const shopOptions = useMemo<MasterDropdownOption[]>(
+    () =>
+      shops
+        .map((shop) => ({
+          value: shop.shopName,
+          label: shop.shopName,
+          searchText: shop.shopName,
+        }))
         .sort((a, b) => a.label.localeCompare(b.label)),
+    [shops],
+  );
+  const collectorOptions = useMemo<MasterDropdownOption[]>(
+    () => collectors.map((name) => ({ value: name, label: name, searchText: name })),
+    [collectors],
+  );
+  const paymentModeOptions = useMemo<MasterDropdownOption[]>(
+    () => [
+      { value: "Cash", label: t("accounts.cash") },
+      { value: "Union Bank", label: "Union Bank" },
+      { value: "HDFC Bank", label: "HDFC Bank" },
+      { value: "Others", label: t("common.other") },
     ],
-    [shops, t]
+    [t],
   );
 
   // Backend-authoritative report: totals/percentages/breakdowns come from
@@ -203,61 +229,71 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
   const [report, setReport] = useState<CollectionReportSummary | null>(null);
   const [reportError, setReportError] = useState<string | null>(null);
 
-  const loadWeekBounds = useCallback(() => {
-    return Promise.all([
-      collectionService.fetchWeekBounds(),
-      getQuarterSampleInfo(),
-    ])
-      .then(([bounds, sampleInfo]) => {
-        // Production keeps the established Monday–Sunday report. The sample
-        // preview opens on its complete rolling quarter so the Collection
-        // Report and Operations Overview describe the same dataset by default.
-        const defaults = sampleInfo
-          ? { from: sampleInfo.quarter.fromDate, to: sampleInfo.quarter.toDate }
-          : { from: bounds.weekStart, to: bounds.weekEnd };
-        setDefaultBounds(defaults);
-        setFromDate((prev) => prev || defaults.from);
-        setToDate((prev) => prev || defaults.to);
-      })
-      .catch(() => {
-        // Backend unreachable: resolve the initial loading state and surface
-        // the error/retry UI below instead of spinning forever.
-        setLoading(false);
-        setReportError(t("ops.collection.report_load_failed"));
+  const loadReport = useCallback(
+    async (filters: {
+      fromDate: string;
+      toDate: string;
+      shopName: string;
+      collector: string;
+      paymentMode: string;
+    }): Promise<boolean> => {
+      if (!filters.fromDate || !filters.toDate) return false;
+      const request = ++requestSequenceRef.current;
+      setLoading(true);
+      setReportError(null);
+      try {
+        const shopId = filters.shopName
+          ? collectionService.getShopIdForName(filters.shopName) ?? undefined
+          : undefined;
+        const data = await collectionService.fetchCollectionReport({
+          fromDate: filters.fromDate,
+          toDate: filters.toDate,
+          shopId,
+          collector: filters.collector || undefined,
+          paymentMode: filters.paymentMode || undefined,
+        });
+        if (request !== requestSequenceRef.current) return false;
+        appliedFiltersRef.current = filters;
+        setReport(data);
+        return true;
+      } catch (error) {
+        if (request !== requestSequenceRef.current) return false;
+        console.error("Failed to load collection report:", error);
+        setReportError(reportTRef.current("ops.collection.report_load_failed"));
+        setReport(null);
+        return false;
+      } finally {
+        if (request === requestSequenceRef.current) setLoading(false);
+      }
+    },
+    [],
+  );
+
+  const loadWeekBounds = useCallback(async () => {
+    try {
+      const bounds = await collectionService.fetchWeekBounds();
+      const defaults = { from: bounds.weekStart, to: bounds.weekEnd };
+      setDefaultBounds(defaults);
+      setFromDate(defaults.from);
+      setToDate(defaults.to);
+      await loadReport({
+        fromDate: defaults.from,
+        toDate: defaults.to,
+        shopName: "",
+        collector: "",
+        paymentMode: "",
       });
-  }, [t]);
+    } catch {
+      setLoading(false);
+      setReportError(reportTRef.current("ops.collection.report_load_failed"));
+    }
+  }, [loadReport]);
 
   useEffect(() => {
+    if (initialLoadStartedRef.current) return;
+    initialLoadStartedRef.current = true;
     void loadWeekBounds();
   }, [loadWeekBounds]);
-
-  const loadReport = async () => {
-    if (!fromDate || !toDate) return;
-    setLoading(true);
-    setReportError(null);
-    try {
-      const shopId = shopName ? collectionService.getShopIdForName(shopName) ?? undefined : undefined;
-      const data = await collectionService.fetchCollectionReport({
-        fromDate,
-        toDate,
-        shopId,
-        collector: collector || undefined,
-        paymentMode: paymentMode || undefined,
-      });
-      setReport(data);
-    } catch (error) {
-      console.error("Failed to load collection report:", error);
-      setReportError(t("ops.collection.report_load_failed"));
-      setReport(null);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    void loadReport();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [fromDate, toDate, shopName, collector, paymentMode]);
 
   const totalCollections = report?.totalAmount ?? 0;
   const totalCollectorsCount = report?.totalCollectors ?? 0;
@@ -276,11 +312,11 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
     const othersCount = rows
       .filter((r) => !knownSet.has(r.paymentMode))
       .reduce((sum, r) => sum + r.collectorCount, 0);
-    if (othersCount > 0 || paymentMode === "Others") {
+    if (othersCount > 0) {
       result.push({ mode: "Others", count: othersCount });
     }
     return result;
-  }, [report, paymentMode]);
+  }, [report]);
 
   // Backend-authoritative payment-mode totals, with a display-only "Total" row appended.
   const paymentModeSummary = useMemo(() => {
@@ -305,44 +341,31 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
   const collectorSummary = useMemo(() => {
     const source = report?.collectorSummary ?? [];
     const paymentModes = Array.from(
-      new Set(source.flatMap((r) => Object.keys(r.amounts)))
+      new Set(source.flatMap((row) => Object.keys(row.amounts))),
     ).sort();
 
-    const sorted = [...source].sort((a, b) => b.total - a.total);
-    const top4 = sorted.slice(0, 4);
-    const rest = sorted.slice(4);
-
-    const rows: any[] = top4.map((r) => {
-      const row: any = { collector: r.collector, total: r.total };
+    // Preserve every backend collector row in the on-screen table and exports.
+    // Only the final Total row is presentation-only.
+    const rows: CollectorDisplayRow[] = source.map((sourceRow) => {
+      const row: CollectorDisplayRow = {
+        collector: sourceRow.collector,
+        total: sourceRow.total,
+      };
       paymentModes.forEach((mode) => {
-        row[mode] = r.amounts[mode] || 0;
+        row[mode] = sourceRow.amounts[mode] || 0;
       });
       return row;
     });
 
-    if (rest.length > 0) {
-      const othersRow: any = { collector: `${t("common.other")} (${rest.length})`, total: 0 };
-      paymentModes.forEach((mode) => {
-        othersRow[mode] = 0;
-      });
-      rest.forEach((r) => {
-        paymentModes.forEach((mode) => {
-          othersRow[mode] += r.amounts[mode] || 0;
-        });
-        othersRow.total += r.total;
-      });
-      rows.push(othersRow);
-    }
-
-    const totalRow: any = { collector: "Total", total: 0 };
+    const totalRow: CollectorDisplayRow = {
+      collector: "Total",
+      total: report?.totalAmount ?? 0,
+    };
     paymentModes.forEach((mode) => {
-      totalRow[mode] = 0;
-    });
-    rows.forEach((row) => {
-      paymentModes.forEach((mode) => {
-        totalRow[mode] += row[mode] || 0;
-      });
-      totalRow.total += row.total;
+      totalRow[mode] = rows.reduce(
+        (sum, row) => sum + Number(row[mode] || 0),
+        0,
+      );
     });
     rows.push(totalRow);
 
@@ -366,10 +389,12 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
     [collectorSummary]
   );
 
-  const getExportFileName = (ext: "xlsx" | "pdf") => {
-    const dateStr = fromDate && toDate ? `${fromDate}_to_${toDate}` : "report";
+  const getExportFileName = useCallback((ext: "xlsx" | "pdf") => {
+    const dateStr = report?.fromDate && report?.toDate
+      ? `${report.fromDate}_to_${report.toDate}`
+      : "report";
     return `Collection_Report_${dateStr}.${ext}`;
-  };
+  }, [report]);
 
   const exportExcel = useCallback(() => {
     if (!report || report.totalCount === 0) {
@@ -388,8 +413,8 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
       const ws1 = XLSX.utils.json_to_sheet(pmData);
       XLSX.utils.book_append_sheet(wb, ws1, t("ops.collection.payment_mode_summary"));
 
-      const collectorRows = collectorSummary.rows.map((row: any) => {
-        const obj: any = { [t("common.collector")]: row.collector };
+      const collectorRows = collectorSummary.rows.map((row) => {
+        const obj: Record<string, string | number> = { [t("common.collector")]: row.collector };
         collectorSummary.paymentModes.forEach((mode: string) => {
           obj[mode] = row[mode] || 0;
         });
@@ -401,10 +426,10 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
 
       XLSX.writeFile(wb, getExportFileName("xlsx"));
       showNotification(t("notification.export_success"), "success");
-    } catch (error) {
+    } catch {
       showNotification(t("ops.collection.excel_failed"), "error");
     }
-  }, [report, paymentModeSummary, collectorSummary, showNotification, fromDate, toDate, t]);
+  }, [report, paymentModeSummary, collectorSummary, showNotification, t, getExportFileName]);
 
   const exportPDF = useCallback(async () => {
     if (!report || report.totalCount === 0) {
@@ -412,6 +437,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
       return;
     }
     try {
+      const applied = appliedFiltersRef.current;
       const doc = new jsPDF("p", "mm", "a4");
       const margin = 14;
       let y = 20;
@@ -422,7 +448,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
       y += 10;
       doc.setFontSize(10);
       doc.setTextColor(0, 0, 0);
-      doc.text(`${t("common.from")}: ${fromDate || "N/A"} ${t("common.to")}: ${toDate || "N/A"}`, margin, y);
+      doc.text(`${t("common.from")}: ${applied.fromDate || "N/A"} ${t("common.to")}: ${applied.toDate || "N/A"}`, margin, y);
       y += 10;
 
       doc.setFontSize(12);
@@ -443,17 +469,17 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
         headStyles: { fillColor: [30, 58, 138], textColor: 255, fontStyle: "bold" },
         styles: { fontSize: 8 },
       });
-      y = (doc as any).lastAutoTable.finalY + 10;
+      y = (doc as typeof doc & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
 
       doc.setFontSize(12);
       doc.setTextColor(30, 58, 138);
       doc.text(t("ops.collection.collector_summary"), margin, y);
       y += 5;
       const header = [t("common.collector"), ...collectorSummary.paymentModes, t("common.total")];
-      const body = collectorSummary.rows.map((row: any) => {
-        const rowData: any[] = [row.collector];
+      const body = collectorSummary.rows.map((row) => {
+        const rowData: (string | number)[] = [row.collector];
         collectorSummary.paymentModes.forEach((mode: string) => {
-          rowData.push(row[mode] ? row[mode].toFixed(2) : "0.00");
+          rowData.push(Number(row[mode] || 0).toFixed(2));
         });
         rowData.push(row.total.toFixed(2));
         return rowData;
@@ -472,8 +498,8 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
       // (contract endpoint; per shop). Date-range filtering and ordering here
       // are presentation-only — summary totals above remain authoritative.
       try {
-        const selectedShopId = shopName
-          ? collectionService.getShopIdForName(shopName) ?? null
+        const selectedShopId = applied.shopName
+          ? collectionService.getShopIdForName(applied.shopName) ?? null
           : null;
         let detailRows: CollectionApiEntry[] = [];
         if (selectedShopId) {
@@ -492,7 +518,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
           .filter(
             (row) =>
               (!row.collectionDate ||
-                (row.collectionDate >= fromDate && row.collectionDate <= toDate))
+                (row.collectionDate >= applied.fromDate && row.collectionDate <= applied.toDate))
           )
           .sort(
             (a, b) =>
@@ -547,34 +573,62 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
 
       doc.save(getExportFileName("pdf"));
       showNotification(t("notification.export_success"), "success");
-    } catch (error) {
+    } catch {
       showNotification(t("ops.collection.pdf_failed"), "error");
     }
-  }, [report, paymentModeSummary, collectorSummary, showNotification, fromDate, toDate, t, shopName, shops]);
+  }, [report, paymentModeSummary, collectorSummary, showNotification, t, shops, getExportFileName]);
 
   const resetFilters = useCallback(() => {
-    setFromDate(defaultBounds.from);
-    setToDate(defaultBounds.to);
+    const defaults = {
+      fromDate: defaultBounds.from,
+      toDate: defaultBounds.to,
+      shopName: "",
+      collector: "",
+      paymentMode: "",
+    };
+    setFromDate(defaults.fromDate);
+    setToDate(defaults.toDate);
     setShopName("");
     setCollector("");
     setPaymentMode("");
-    setExportOpen(false);
-    showNotification(t("ops.collection.filters_reset_default"), "info");
-  }, [defaultBounds, showNotification, t]);
+    void loadReport(defaults).then((ok) => {
+      if (ok) showNotification(t("ops.collection.filters_reset_default"), "info");
+    });
+  }, [defaultBounds, loadReport, showNotification, t]);
 
-  // Manual Search: re-run the report for the current filters. If the date
-  // range is not set yet (week bounds never loaded), re-fetch bounds first —
-  // the date-change effect then loads the report automatically.
-  const handleSearch = () => {
+  const handleSearch = useCallback(() => {
     if (loading) return;
-    setReportError(null);
-    if (fromDate && toDate) {
-      void loadReport();
-    } else {
-      setLoading(true);
+    if (!fromDate || !toDate) {
       void loadWeekBounds();
+      return;
     }
-  };
+    void loadReport({ fromDate, toDate, shopName, collector, paymentMode });
+  }, [loading, fromDate, toDate, shopName, collector, paymentMode, loadReport, loadWeekBounds]);
+
+  const handleRefresh = useCallback(() => {
+    if (loading) return;
+    void loadReport(appliedFiltersRef.current).then((ok) => {
+      if (ok) showNotification(t("notification.data_refreshed"), "success");
+    });
+  }, [loading, loadReport, showNotification, t]);
+
+  // The payment table is the height authority for this row. Keep the compact
+  // mode-share card pixel-aligned with it at every viewport and font scale,
+  // so both cards finish immediately after the Total row.
+  useLayoutEffect(() => {
+    const paymentCard = paymentSummaryCardRef.current;
+    const shareCard = modeShareCardRef.current;
+    if (!paymentCard || !shareCard) return;
+
+    const matchHeight = () => {
+      shareCard.style.height = `${paymentCard.getBoundingClientRect().height}px`;
+    };
+    matchHeight();
+
+    const observer = new ResizeObserver(matchHeight);
+    observer.observe(paymentCard);
+    return () => observer.disconnect();
+  }, [report?.totalCount]);
 
   if (loading && !report)
     return (
@@ -596,14 +650,14 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
           <button
             onClick={() => {
               setReportError(null);
-              if (fromDate && toDate) {
-                void loadReport();
+              if (appliedFiltersRef.current.fromDate && appliedFiltersRef.current.toDate) {
+                void loadReport(appliedFiltersRef.current);
               } else {
                 setLoading(true);
                 void loadWeekBounds();
               }
             }}
-            className={resetButtonClass}
+            className={opsSecondaryButtonClass}
           >
             <RotateCcw size={14} /> {t("common.retry")}
           </button>
@@ -614,135 +668,127 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
 
   // Content matching the precise structural layout and spacing of RatesEntryPage
   const content = (
-    <div className="w-full space-y-5">
+    <div className="w-full space-y-5" data-embedded={embedded || undefined}>
       {/* Filter Bar Card — Excel / PDF / Reset / Search sit in the last grid
           cell, right after the Pay Mode filter */}
       <div className={opsFilterCardClass}>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-          <DatePicker
-            value={fromDate}
-            onChange={setFromDate}
-            label={t("common.from")}
-            className="w-full"
-            placeholder={t("placeholder.enter_date")}
-            required
-          />
-          <DatePicker
-            value={toDate}
-            onChange={setToDate}
-            label={t("common.to")}
-            className="w-full"
-            placeholder={t("placeholder.enter_date")}
-            required
-          />
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-5">
           <div>
-            <label className={opsFilterLabelClass}>{t("operations.shop_name")}</label>
-            <Select
-              options={shopOptions}
-              value={shopOptions.find((o) => o.value === shopName) ?? shopOptions[0]}
-              onChange={(selected) => setShopName(selected?.value || "")}
-              isSearchable
-              isClearable={false}
-              placeholder={t("ops.collection.all_shops")}
-              styles={selectStyles}
-              menuPortalTarget={document.body}
+            <label className={opsFilterLabelClass}>
+              <Calendar size={17} className="shrink-0 text-emerald-500" />
+              <span>{t("common.from")}</span>
+            </label>
+            <DatePicker
+              value={fromDate}
+              onChange={setFromDate}
+              placeholder={t("placeholder.enter_date")}
+              className="w-full text-xs font-medium"
             />
           </div>
           <div>
-            <label className={opsFilterLabelClass}>{t("common.collector")}</label>
-            <select
-              value={collector}
-              onChange={(e) => setCollector(e.target.value)}
-              className={opsInputClass}
-            >
-              <option value="">{t("ops.collection.all_collectors")}</option>
-              {collectors.map((name) => (
-                <option key={name} value={name}>{name}</option>
-              ))}
-            </select>
+            <label className={opsFilterLabelClass}>
+              <Calendar size={17} className="shrink-0 text-emerald-500" />
+              <span>{t("common.to")}</span>
+            </label>
+            <DatePicker
+              value={toDate}
+              onChange={setToDate}
+              placeholder={t("placeholder.enter_date")}
+              className="w-full text-xs font-medium"
+            />
           </div>
           <div>
-            <label className={opsFilterLabelClass}>{t("operations.payment_mode")}</label>
-            <select
+            <label className={opsFilterLabelClass}>
+              <Store size={17} className="shrink-0 text-emerald-500" />
+              <span>{t("operations.shop_name")}</span>
+            </label>
+            <MasterDropdown
+              hideLabel
+              label={t("operations.shop_name")}
+              value={shopName}
+              options={shopOptions}
+              onChange={setShopName}
+              placeholder={t("ops.collection.all_shops")}
+              searchable
+              allowClear
+              className="w-full"
+            />
+          </div>
+          <div>
+            <label className={opsFilterLabelClass}>
+              <Users size={17} className="shrink-0 text-blue-500" />
+              <span>{t("common.collector")}</span>
+            </label>
+            <MasterDropdown
+              hideLabel
+              label={t("common.collector")}
+              value={collector}
+              options={collectorOptions}
+              onChange={setCollector}
+              placeholder={t("ops.collection.all_collectors")}
+              searchable
+              allowClear
+              className="w-full"
+            />
+          </div>
+          <div>
+            <label className={opsFilterLabelClass}>
+              <CreditCard size={17} className="shrink-0 text-violet-500" />
+              <span>{t("operations.payment_mode")}</span>
+            </label>
+            <MasterDropdown
+              hideLabel
+              label={t("operations.payment_mode")}
               value={paymentMode}
-              onChange={(e) => setPaymentMode(e.target.value)}
-              className={opsInputClass}
-            >
-              <option value="">{t("ops.collection.all_modes")}</option>
-              <option value="Cash">{t("accounts.cash")}</option>
-              <option value="Union Bank">Union Bank</option>
-              <option value="HDFC Bank">HDFC Bank</option>
-              <option value="Others">{t("common.other")}</option>
-            </select>
+              options={paymentModeOptions}
+              onChange={setPaymentMode}
+              placeholder={t("ops.collection.all_modes")}
+              searchable
+              allowClear
+              className="w-full"
+            />
           </div>
+        </div>
 
-          {/* Actions — after Pay Mode, bottom-aligned with the inputs.
-              Search = light green, Export = light blue (Excel & PDF inside),
-              Reset = light red. */}
-          <div className="flex flex-wrap items-end justify-start gap-2 lg:justify-end">
-            <button
-              type="button"
-              onClick={handleSearch}
-              disabled={loading}
-              className={searchButtonClass}
-              title={t("common.search")}
-            >
-              {loading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
-              {t("common.search")}
-            </button>
-
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setExportOpen((open) => !open)}
-                onBlur={() => setTimeout(() => setExportOpen(false), 150)}
-                disabled={!report || report.totalCount === 0}
-                className={exportButtonClass}
-                title={t("common.export")}
-              >
-                <Download size={15} />
-                {t("common.export")}
-                <ChevronDown size={14} />
-              </button>
-              {exportOpen && (
-                <div className="absolute right-0 z-20 mt-1 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
-                  <button
-                    type="button"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      setExportOpen(false);
-                      exportExcel();
-                    }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-emerald-50"
-                  >
-                    <FileSpreadsheet size={14} className="text-emerald-600" />
-                    Excel
-                  </button>
-                  <button
-                    type="button"
-                    onMouseDown={(e) => {
-                      e.preventDefault();
-                      setExportOpen(false);
-                      exportPDF();
-                    }}
-                    className="flex w-full items-center gap-2 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-rose-50"
-                  >
-                    <FileText size={14} className="text-rose-600" />
-                    PDF
-                  </button>
-                </div>
-              )}
-            </div>
-
-            <button
-              type="button"
-              onClick={resetFilters}
-              disabled={loading}
-              className={resetButtonClass}
-            >
-              <RotateCcw size={14} /> {t("common.reset")}
-            </button>
-          </div>
+        <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
+          <button
+            type="button"
+            onClick={handleSearch}
+            disabled={loading}
+            className={`group relative ${opsPrimaryButtonClass}`}
+            aria-label={t("common.search")}
+          >
+            {loading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
+            {t("common.search")}
+          </button>
+          <button
+            type="button"
+            onClick={resetFilters}
+            disabled={loading}
+            className={`group relative ${opsSecondaryButtonClass}`}
+            aria-label={t("common.reset")}
+          >
+            <RotateCcw size={14} /> {t("common.reset")}
+          </button>
+          <BrandRefreshButton onClick={handleRefresh} loading={loading} />
+          <button
+            type="button"
+            onClick={exportPDF}
+            disabled={!report || report.totalCount === 0 || loading}
+            className={`group relative ${opsPdfButtonClass}`}
+            aria-label="PDF"
+          >
+            <FileText size={15} /> PDF
+          </button>
+          <button
+            type="button"
+            onClick={exportExcel}
+            disabled={!report || report.totalCount === 0 || loading}
+            className={`group relative ${opsExcelButtonClass}`}
+            aria-label="Excel"
+          >
+            <FileSpreadsheet size={15} /> Excel
+          </button>
         </div>
       </div>
 
@@ -759,8 +805,11 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
       ) : (
       <>
         {/* Row 1 — Payment Mode Summary: table with its mode-share chart */}
-        <div className={`grid grid-cols-1 gap-6 lg:grid-cols-2 transition-opacity duration-200 ${loading ? "pointer-events-none opacity-50" : ""}`}>
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+        <div className={`grid grid-cols-1 items-start gap-6 lg:grid-cols-2 transition-opacity duration-200 ${loading ? "pointer-events-none opacity-50" : ""}`}>
+          <div
+            ref={paymentSummaryCardRef}
+            className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm"
+          >
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
               <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
                 <span className="rounded-lg bg-blue-50 p-1.5 text-blue-600">
@@ -788,7 +837,16 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                       key={row.mode}
                       className={row.mode === "Total" ? "bg-amber-50/60 font-semibold" : "hover:bg-slate-50/50"}
                     >
-                      <td className="px-4 py-3 text-xs font-medium text-slate-800">{row.mode === "Total" ? t("common.total") : modeDisplay(row.mode)}</td>
+                      <td className="px-4 py-3 text-xs font-medium text-slate-800">
+                        <span className="inline-flex items-center gap-2">
+                          <span
+                            aria-hidden="true"
+                            className="h-2.5 w-2.5 rounded-full ring-2 ring-white"
+                            style={{ backgroundColor: row.mode === "Total" ? "#64748b" : modeColor(row.mode) }}
+                          />
+                          {row.mode === "Total" ? t("common.total") : modeDisplay(row.mode)}
+                        </span>
+                      </td>
                       <td className="px-4 py-3 text-right text-xs text-slate-600">
                         {row.mode === "Total"
                           ? totalCollectorsCount
@@ -796,7 +854,6 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                       </td>
                       <td className="px-4 py-3 text-right text-xs text-slate-600">{row.count}</td>
                       <td className="px-4 py-3 text-right text-xs text-slate-600">{formatCurrency(row.amount)}</td>
-
                     </tr>
                   ))}
                 </tbody>
@@ -804,7 +861,10 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <div
+            ref={modeShareCardRef}
+            className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm"
+          >
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
               <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
                 <span className="rounded-lg bg-sky-50 p-1.5 text-sky-600">
@@ -816,35 +876,12 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                 {t("common.total")}: {formatCurrency(totalCollections)}
               </span>
             </div>
-            <div className="relative h-72 p-4">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={modeChartData}
-                    dataKey="value"
-                    nameKey="name"
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={62}
-                    outerRadius={95}
-                    paddingAngle={2}
-                    cornerRadius={4}
-                    stroke="none"
-                  >
-                    {modeChartData.map((row) => (
-                      <Cell key={row.mode} fill={modeColor(row.mode)} />
-                    ))}
-                  </Pie>
-                  <ChartTooltip content={<ChartTipBox totalLabel={t("common.total")} />} />
-                  <ChartLegend iconType="circle" wrapperStyle={{ fontSize: 11 }} />
-                </PieChart>
-              </ResponsiveContainer>
-              <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
-                <div className="text-center">
-                  <div className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t("common.total")}</div>
-                  <div className="text-sm font-bold text-slate-800">{compactINR(totalCollections)}</div>
-                </div>
-              </div>
+            <div className="flex p-4">
+              <CollectionsPie
+                data={modeChartData.map((row) => ({ name: row.name, value: row.value }))}
+                animationKey={report?.totalCount ?? 0}
+                compact
+              />
             </div>
           </div>
         </div>
@@ -878,7 +915,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
-                  {collectorSummary.rows.map((row: any, idx: number) => {
+                  {collectorSummary.rows.map((row, idx) => {
                     const isTotal = row.collector === "Total";
                     const share = totalCollections > 0 ? (row.total / totalCollections) * 100 : 0;
                     return (
@@ -891,7 +928,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                         </td>
                         {collectorSummary.paymentModes.map((mode: string) => (
                           <td key={mode} className="px-4 py-3 text-right text-xs text-slate-600">
-                            {formatCurrency(row[mode] || 0)}
+                            {formatCurrency(Number(row[mode]) || 0)}
                           </td>
                         ))}
                         <td className="px-4 py-3 text-right text-xs font-semibold text-slate-800">
