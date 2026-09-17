@@ -1263,22 +1263,43 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   };
 
   const handleSearch = useCallback(() => {
-    // Commit the draft filter controls. Until Search is clicked the table,
-    // KPIs and exports keep using the previously applied filters.
-    setLedgerLoading(true); // Rate-Entry style spinner while records reload
+    // Report Type and text search are client-side views of the ledger already
+    // in memory. Never show a network loader for those changes: no request is
+    // needed, and previously this left the table spinner waiting forever.
+    const needsLedgerRead =
+      dateFrom !== appliedDateFrom ||
+      dateTo !== appliedDateTo ||
+      selectedShop !== appliedSelectedShop;
+    if (needsLedgerRead) setLedgerLoading(true);
+
     setAppliedDateFrom(dateFrom);
     setAppliedDateTo(dateTo);
     setAppliedSelectedShop(selectedShop);
     setAppliedReportType(reportType);
     setAppliedSearchTerm(searchValue);
     resetPage();
-  }, [dateFrom, dateTo, selectedShop, reportType, searchValue, resetPage]);
+  }, [
+    dateFrom,
+    dateTo,
+    selectedShop,
+    reportType,
+    searchValue,
+    appliedDateFrom,
+    appliedDateTo,
+    appliedSelectedShop,
+    resetPage,
+  ]);
 
   const handleReset = useCallback(() => {
     const defaultFrom = toWeekAgoDefault();
     const defaultTo = toDateDefault();
 
-    setLedgerLoading(true); // Rate-Entry style spinner while records reload
+    const needsLedgerRead =
+      appliedDateFrom !== defaultFrom ||
+      appliedDateTo !== defaultTo ||
+      appliedSelectedShop !== "All Shops";
+    if (needsLedgerRead) setLedgerLoading(true);
+
     setDateFrom(defaultFrom);
     setDateTo(defaultTo);
     setSelectedShop("All Shops");
@@ -1295,7 +1316,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     setSortBy("date");
     setSortDir("desc");
     setCurrentPage(1);
-  }, []);
+  }, [appliedDateFrom, appliedDateTo, appliedSelectedShop]);
 
   /** First click sorts ascending; second flips to descending; a third click
    *  on the active column clears the sort (Trip List contract, same here). */
@@ -1333,8 +1354,10 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
    *  and its applied value, so the ledger refetches immediately. */
   const clearAppliedFilter = useCallback(
     (which: "dates" | "shop" | "type" | "search") => {
-      setLedgerLoading(true); // Rate-Entry style spinner while records reload
+      // Dates and Shop change the server query. Type and text search filter the
+      // in-memory rows immediately and must never enter the network loader.
       if (which === "dates") {
+        setLedgerLoading(true);
         const defaultFrom = toWeekAgoDefault();
         const defaultTo = toDateDefault();
         setDateFrom(defaultFrom);
@@ -1342,6 +1365,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         setAppliedDateFrom(defaultFrom);
         setAppliedDateTo(defaultTo);
       } else if (which === "shop") {
+        setLedgerLoading(true);
         setSelectedShop("All Shops");
         setAppliedSelectedShop("All Shops");
       } else if (which === "type") {
