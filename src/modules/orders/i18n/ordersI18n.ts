@@ -50,15 +50,22 @@ const EN: Record<string, string> = {
   "orders.clear_entry": "Clear entry",
   "orders.clear_entry_label": "Clear {shop}",
   "orders.undo_clear_label": "Undo clearing {shop}",
+  // The shared 10-second undo window is delete-flavoured by default; this action
+  // zeroes the day's numbers, so the dialog says that instead.
+  "orders.pending_clear_note":
+    "This shop will be set to 0 birds and 0 boxes in {seconds} seconds — the order line stays on the sheet.",
+  "orders.clearing_entry": "Clearing…",
+  "orders.clear_in_seconds": "Clearing in {seconds} seconds…",
+  "orders.pending_clear_aria": "Clear collection entry pending",
   // Pending counts beside a status badge (never inside it — the columns are
   // equal width and a long pill would push past its cell).
   "orders.boxes_to_deliver": "{boxes} to deliver",
   "orders.boxes_to_assign": "{boxes} to assign",
   "orders.collection_summary": "{shops} shops · {boxes} boxes · {birds} birds",
   // Collection's cumulative line under the table: shops lead, rest is muted.
-  "orders.collection_summary_shops":
-    "Orders taken in {shops} shops",
-  "orders.add_at_least_one_shop": "Enter at least one shop order (birds + boxes)",
+  "orders.collection_summary_shops": "Orders taken in {shops} shops",
+  "orders.add_at_least_one_shop":
+    "Enter at least one shop order (birds + boxes)",
   "orders.save_progress": "Save Progress",
   "orders.saving": "Saving…",
   "orders.submitting": "Submitting…",
@@ -124,7 +131,8 @@ const EN: Record<string, string> = {
   "orders.finish_assignment_invalid":
     "Assign at least 1 box to every shop before finishing the assignment",
   "orders.assignment_saved": "Assignment progress saved",
-  "orders.assignment_finished": "Order assigned — now visible in Delivery Tracking",
+  "orders.assignment_finished":
+    "Order assigned — now visible in Delivery Tracking",
   "orders.finish_assignment": "Finish Assignment",
 
   // ── Tab 3 · Delivery Tracking ─────────────────────────────────────────
@@ -184,7 +192,8 @@ const EN: Record<string, string> = {
   "orders.boxes_short": "boxes",
   "orders.vehicle_shops_assigned": "{n} shops assigned",
   "orders.vehicle_shops_none": "No shops yet",
-  "orders.sequence_empty_hint": "Tick the shops above to build this vehicle's delivery sequence — drag the rows to set the order, then Save Progress or Review & Submit.",
+  "orders.sequence_empty_hint":
+    "Tick the shops above to build this vehicle's delivery sequence — drag the rows to set the order, then Save Progress or Review & Submit.",
   "orders.col_available": "Available",
   "orders.hdr_mobile": "Mobile",
   "orders.hdr_ord_birds": "Ord. Birds",
@@ -259,7 +268,8 @@ const EN: Record<string, string> = {
   "orders.record_delivery": "Delivery Entry",
   "orders.deliver": "Deliver",
   "orders.balance": "Balance",
-  "orders.delivery_balance_hint": "Enter up to {remaining} boxes (the shop's balance)",
+  "orders.delivery_balance_hint":
+    "Enter up to {remaining} boxes (the shop's balance)",
   "orders.delivery_complete": "Complete",
   "orders.delivery_saved_partial": "{boxes} boxes delivered — {shop}",
   "orders.status_not_listed": "NOT LISTED",
@@ -280,7 +290,8 @@ const EN: Record<string, string> = {
     "Tick shops in Available Shops to build this vehicle's delivery order",
   "orders.assigned_elsewhere": "Assigned — {trip} ({vehicle})",
   "orders.day_assignments": "Assignments for {day}",
-  "orders.vehicles_assigned": "{vehicles} vehicle(s) · {shops} shop(s) assigned",
+  "orders.vehicles_assigned":
+    "{vehicles} vehicle(s) · {shops} shop(s) assigned",
   "orders.conflict_message":
     "{shops} already assigned to another vehicle for this day. Selection refreshed.",
   // Split-order (partial assignment across vehicles) — hard balance cap.
@@ -303,7 +314,8 @@ const EN: Record<string, string> = {
   "orders.wa_confirm_send": "Confirm & Send",
   "orders.wa_retry": "Retry",
   "orders.submit_order_assignment": "Submit Order Assignment",
-  "orders.wa_sent_to": "WhatsApp message sent successfully to {name} ({mobile}).",
+  "orders.wa_sent_to":
+    "WhatsApp message sent successfully to {name} ({mobile}).",
   "orders.wa_sent_ok_title": "WhatsApp notification sent successfully",
   "orders.wa_sent_ok_body":
     "The assignment message was sent. Order assignment will be submitted and this window will close in {time} unless you cancel.",
@@ -327,25 +339,26 @@ const EN: Record<string, string> = {
   "orders.word_birds": "birds",
 
   // Delivery tracking: two-table layout
-    "orders.tracking_active_title": "PENDING & IN PROGRESS",
-    "orders.tracking_completed_title": "COMPLETED",
-    "orders.col_progress": "Progress",
-    "orders.col_completed_at": "Completed At",
-    "orders.status_complete": "COMPLETE",
-    "orders.no_pending_deliveries": "No pending deliveries",
-    "orders.no_completed_window": "No completed trips in the selected range",
-    "orders.no_search_results": "No shops match your search",
-    "orders.no_filter_results": "No shops match this filter",
-    "orders.search_collection": "Search shop, city, status…",
-    "orders.search_assignment": "Search shop, city, trip, vehicle, supervisor…",
-    "orders.search_tracking": "Search trip, vehicle, supervisor, mobile, driver, shop no, shop, city…",
-    "orders.filter_status": "Status",
-    "orders.filter_difference": "Difference",
-    "orders.all": "All",
-    "orders.delivered_with_difference": "Delivered With Difference",
-    "orders.no_difference": "No Difference",
-    "orders.short_delivery": "Short Delivery",
-    "orders.extra_delivery": "Extra Delivery",
+  "orders.tracking_active_title": "PENDING & IN PROGRESS",
+  "orders.tracking_completed_title": "COMPLETED",
+  "orders.col_progress": "Progress",
+  "orders.col_completed_at": "Completed At",
+  "orders.status_complete": "COMPLETE",
+  "orders.no_pending_deliveries": "No pending deliveries",
+  "orders.no_completed_window": "No completed trips in the selected range",
+  "orders.no_search_results": "No shops match your search",
+  "orders.no_filter_results": "No shops match this filter",
+  "orders.search_collection": "Search shop, city, status…",
+  "orders.search_assignment": "Search shop, city, trip, vehicle, supervisor…",
+  "orders.search_tracking":
+    "Search trip, vehicle, supervisor, mobile, driver, shop no, shop, city…",
+  "orders.filter_status": "Status",
+  "orders.filter_difference": "Difference",
+  "orders.all": "All",
+  "orders.delivered_with_difference": "Delivered With Difference",
+  "orders.no_difference": "No Difference",
+  "orders.short_delivery": "Short Delivery",
+  "orders.extra_delivery": "Extra Delivery",
 
   // Global date selector
   "orders.today_chip": "TODAY",
@@ -386,8 +399,10 @@ const EN: Record<string, string> = {
   "orders.weight": "Weight",
   "orders.requested": "Requested",
   "orders.already_assigned": "Already Assigned",
-  "orders.capacity_exceeded_line": "Capacity exceeded. Please reduce the assigned boxes.",
-  "orders.not_listed_note": "This shop was delivered during Step 4 but was not present in the original collected order.",
+  "orders.capacity_exceeded_line":
+    "Capacity exceeded. Please reduce the assigned boxes.",
+  "orders.not_listed_note":
+    "This shop was delivered during Step 4 but was not present in the original collected order.",
   "orders.shop_mobile": "Shop Mobile",
   "orders.from_date": "From",
   "orders.to_date": "To",
@@ -476,11 +491,18 @@ const TE: Record<string, string> = {
   "orders.clear_entry": "నమోదును క్లియర్ చేయండి",
   "orders.clear_entry_label": "{shop} క్లియర్ చేయండి",
   "orders.undo_clear_label": "{shop} క్లియర్‌ను వెనక్కి తీసుకోండి",
+  "orders.pending_clear_note":
+    "ఈ షాప్ {seconds} సెకన్లలో 0 పక్షులు, 0 బాక్స్‌లకు సర్దుబాటవుతుంది — ఆర్డర్ లైన్ షీట్‌లోనే ఉంటుంది.",
+  "orders.clearing_entry": "క్లియర్ అవుతోంది…",
+  "orders.clear_in_seconds": "క్లియర్ అవుతుంది… {seconds} సెకన్లలో",
+  "orders.pending_clear_aria": "కలెక్షన్ ఎంట్రీ క్లియర్ పెండింగ్",
   "orders.boxes_to_deliver": "{boxes} డెలివరీ చేయాలి",
   "orders.boxes_to_assign": "{boxes} అసైన్ చేయాలి",
-  "orders.collection_summary": "{shops} షాప్‌లు · {boxes} బాక్స్‌లు · {birds} పక్షులు",
+  "orders.collection_summary":
+    "{shops} షాప్‌లు · {boxes} బాక్స్‌లు · {birds} పక్షులు",
   "orders.collection_summary_shops": "{shops} షాప్‌లకు ఆర్డర్ నమోదు అయింది",
-  "orders.add_at_least_one_shop": "కనీసం ఒక షాప్ ఆర్డర్ నమోదు చేయండి (పక్షులు + బాక్స్‌లు)",
+  "orders.add_at_least_one_shop":
+    "కనీసం ఒక షాప్ ఆర్డర్ నమోదు చేయండి (పక్షులు + బాక్స్‌లు)",
   "orders.save_progress": "ప్రగతి సేవ్ చేయండి",
   "orders.saving": "సేవ్ అవుతోంది…",
   "orders.submitting": "సబ్మిట్ అవుతోంది…",
@@ -500,7 +522,8 @@ const TE: Record<string, string> = {
   "orders.col_shops": "షాప్‌లు",
   "orders.col_assigned": "అసైన్",
   "orders.awaiting_assignment": "అసైన్‌మెంట్‌కు ప్రతిక్షిస్తోంది",
-  "orders.partial_assigned": "{vehicle} పై పాక్షికంగా ({assigned}/{total} షాప్‌లు)",
+  "orders.partial_assigned":
+    "{vehicle} పై పాక్షికంగా ({assigned}/{total} షాప్‌లు)",
   "orders.select_order": "వాహనానికి అసైన్ చేయడానికి సేకరించిన ఆర్డర్ ఎంచుకోండి",
   "orders.select_vehicle": "వాహనం ఎంచుకోండి",
   "orders.vehicles_ready": "అసైన్‌మెంట్‌కు సిద్ధంగా ఉన్న వాహనాలు",
@@ -544,7 +567,8 @@ const TE: Record<string, string> = {
   "orders.finish_assignment_invalid":
     "అసైన్‌మెంట్ పూర్తి చేయడానికి ముందు ప్రతి షాప్‌కు కనీసం 1 బాక్స్ అసైన్ చేయండి",
   "orders.assignment_saved": "అసైన్‌మెంట్ ప్రగతి సేవ్ చేయబడింది",
-  "orders.assignment_finished": "ఆర్డర్ అసైన్ చేయబడింది — డెలివరీ ట్రాకింగ్‌లో కనిపిస్తోంది",
+  "orders.assignment_finished":
+    "ఆర్డర్ అసైన్ చేయబడింది — డెలివరీ ట్రాకింగ్‌లో కనిపిస్తోంది",
   "orders.finish_assignment": "అసైన్‌మెంట్ పూర్తి చేయండి",
 
   // Tab 3
@@ -562,7 +586,8 @@ const TE: Record<string, string> = {
   "orders.status_assigned": "అసైన్",
   "orders.status_in_progress": "ప్రాసెస్‌లో",
   "orders.status_completed": "పూర్తి",
-  "orders.week_window_note": "పూర్తి చేసిన ఆర్డర్లు ప్రస్తుత 7-రోజుల కాలానికి మాత్రమే కనిపిస్తాయి.",
+  "orders.week_window_note":
+    "పూర్తి చేసిన ఆర్డర్లు ప్రస్తుత 7-రోజుల కాలానికి మాత్రమే కనిపిస్తాయి.",
 
   // Detail
   "orders.trip_details": "ట్రిప్ వివరాలు",
@@ -603,7 +628,8 @@ const TE: Record<string, string> = {
   "orders.boxes_short": "బాక్స్‌లు",
   "orders.vehicle_shops_assigned": "{n} షాప్‌లు కేటాయించబడ్డాయి",
   "orders.vehicle_shops_none": "ఇంకా షాప్‌లు లేవు",
-  "orders.sequence_empty_hint": "ఈ వాహనానికి డెలివరీ క్రమం సిద్ధం చేయడానికి పైన షాప్‌లను ఎంచుకోండి — వరుస కోసం వరుసలను లాగండి, ఆపై Save Progress లేదా Review & Submit నొక్కండి.",
+  "orders.sequence_empty_hint":
+    "ఈ వాహనానికి డెలివరీ క్రమం సిద్ధం చేయడానికి పైన షాప్‌లను ఎంచుకోండి — వరుస కోసం వరుసలను లాగండి, ఆపై Save Progress లేదా Review & Submit నొక్కండి.",
   "orders.col_available": "అందుబాటులో",
   "orders.hdr_mobile": "మొబైల్",
   "orders.hdr_ord_birds": "ఆర్డర్ పక్షులు",
@@ -622,8 +648,10 @@ const TE: Record<string, string> = {
   "orders.pdf_save_progress": "పురోగతి సేవ్ చేయండి",
   "orders.pdf_submit": "సబ్మిట్",
   "orders.pdf_saved_ok": "పురోగతి సేవ్ అయింది",
-  "orders.pdf_submitted_ok": "డెలివరీ సబ్మిట్ అయింది — ట్రిప్ ఇప్పుడు Completed",
-  "orders.pdf_submit_blocked": "సబ్మిట్ చేసే ముందు కనీసం ఒక షాప్‌కు డెలివరీ ఇవ్వండి",
+  "orders.pdf_submitted_ok":
+    "డెలివరీ సబ్మిట్ అయింది — ట్రిప్ ఇప్పుడు Completed",
+  "orders.pdf_submit_blocked":
+    "సబ్మిట్ చేసే ముందు కనీసం ఒక షాప్‌కు డెలివరీ ఇవ్వండి",
   "orders.pdf_building": "రిపోర్ట్ తయారవుతోంది…",
   "orders.pdf_pages": "{pages} పేజీ(లు)",
   "orders.pdf_download": "PDF డౌన్‌లోడ్",
@@ -634,16 +662,20 @@ const TE: Record<string, string> = {
   "orders.pdf_sent_partial": "{sent} షాప్‌లకు పంపబడింది — {failed} విఫలమయ్యాయి",
   "orders.whatsapp_sending": "{shop}కు పంపబడుతోంది…",
   "orders.whatsapp_done": "WhatsApp {total} షాప్‌లలో {sent}కు పంపబడింది",
-  "orders.whatsapp_partial": "WhatsApp {sent} షాప్‌లకు పంపబడింది, {failed} విఫలమైంది",
+  "orders.whatsapp_partial":
+    "WhatsApp {sent} షాప్‌లకు పంపబడింది, {failed} విఫలమైంది",
   "orders.whatsapp_failed": "WhatsApp విఫలం: {message}",
-  "orders.whatsapp_not_configured": "WhatsApp బ్యాకెండ్ సక్రిమం చేయబడలేదు (VITE_WHATSAPP_BACKEND_ENABLED)",
-  "orders.whatsapp_no_rows": "ఇంకా పంపాల్సిన షాప్‌లు లేవు — ముందు షాప్‌లు జోడించండి",
+  "orders.whatsapp_not_configured":
+    "WhatsApp బ్యాకెండ్ సక్రిమం చేయబడలేదు (VITE_WHATSAPP_BACKEND_ENABLED)",
+  "orders.whatsapp_no_rows":
+    "ఇంకా పంపాల్సిన షాప్‌లు లేవు — ముందు షాప్‌లు జోడించండి",
   "orders.loading": "ఆర్డర్లు లోడ్ అవుతున్నాయి…",
   "orders.sample_badge": "నమూనా డేటా",
   "orders.sample_hint":
     "నమూనా డేటా చూపబడుతోంది — బ్యాకెండ్ కనెక్ట్ కాలేదు. సేవ్, అసైన్‌మెంట్ మెమరీలో పని చేస్తాయి; రిఫ్రెష్ చేస్తే మళ్లీ మొదటి స్థితికి వస్తాయి.",
   "orders.error_title": "ఆర్డర్లను లోడ్ చేయలేకపోయాను",
-  "orders.error_message": "బ్యాకెండ్ సమాధానం ఇవ్వలేదు. కనెక్షన్ తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
+  "orders.error_message":
+    "బ్యాకెండ్ సమాధానం ఇవ్వలేదు. కనెక్షన్ తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
   "orders.retry": "మళ్లీ ప్రయత్నించండి",
   "orders.refresh_failed": "ఆర్డర్ల డేటాను రిఫ్రెష్ చేయలేకపోయాను",
   "orders.unsaved_changes": "సేవ్ చేయப்படని మార్పులు",
@@ -676,7 +708,8 @@ const TE: Record<string, string> = {
   "orders.record_delivery": "డెలివరీ ఎంట్రీ",
   "orders.deliver": "డెలివర్",
   "orders.balance": "మిగిలినవి",
-  "orders.delivery_balance_hint": "{remaining} బాక్స్‌ల వరకు నమోదు చేయండి (షాప్ బ్యాలెన్స్)",
+  "orders.delivery_balance_hint":
+    "{remaining} బాక్స్‌ల వరకు నమోదు చేయండి (షాప్ బ్యాలెన్స్)",
   "orders.delivery_complete": "పూర్తయింది",
   "orders.delivery_saved_partial": "{boxes} బాక్స్‌లు డెలివర్ అయ్యాయి — {shop}",
   "orders.status_not_listed": "పట్టికలో లేదు",
@@ -697,7 +730,8 @@ const TE: Record<string, string> = {
     "ఈ వాహనం డెలివరీ క్రమాన్ని రూపొందించడానికి షాపులను ఎంచుకోండి",
   "orders.assigned_elsewhere": "కేటాయించబడింది — {trip} ({vehicle})",
   "orders.day_assignments": "{day} కేటాయింపులు",
-  "orders.vehicles_assigned": "{vehicles} వాహనాలు · {shops} షాపులు కేటాయించబడ్డాయి",
+  "orders.vehicles_assigned":
+    "{vehicles} వాహనాలు · {shops} షాపులు కేటాయించబడ్డాయి",
   "orders.conflict_message":
     "{shops} ఇప్పటికే ఈ రోజుకి వేరే వాహనానికి కేటాయించబడ్డాయి. ఎంపిక పునరుద్ధరించబడింది.",
   // స్ప్లిట్ ఆర్డర్ (వాహనాల మధ్య పాక్షిక కేటాయింపు) — హార్డ్ బ్యాలెన్స్ క్యాప్.
@@ -720,11 +754,13 @@ const TE: Record<string, string> = {
   "orders.wa_confirm_send": "నిర్ధారించి పంపండి",
   "orders.wa_retry": "మళ్లీ ప్రయత్నించండి",
   "orders.submit_order_assignment": "ఆర్డర్ అసైన్‌మెంట్ సబ్మిట్ చేయండి",
-  "orders.wa_sent_to": "WhatsApp సందేశం {name} ({mobile})కు విజయవంతంగా పంపబడింది.",
+  "orders.wa_sent_to":
+    "WhatsApp సందేశం {name} ({mobile})కు విజయవంతంగా పంపబడింది.",
   "orders.wa_sent_ok_title": "WhatsApp నోటిఫికేషన్ విజయవంతంగా పంపబడింది",
   "orders.wa_sent_ok_body":
     "అసైన్‌మెంట్ సందేశం పంపబడింది. మీరు రద్దు చేయకపోతే {time}లో ఆర్డర్ అసైన్‌మెంట్ సబ్మిట్ అవుతుంది మరియు ఈ విండో మూసివేయబడుతుంది.",
-  "orders.wa_auto_submit_in": "అసైన్‌మెంట్ సబ్మిట్ అయి {time}లో మూసివేయబడుతుంది",
+  "orders.wa_auto_submit_in":
+    "అసైన్‌మెంట్ సబ్మిట్ అయి {time}లో మూసివేయబడుతుంది",
   "orders.wa_auto_submitting": "అసైన్‌మెంట్ సబ్మిట్ అవుతోంది…",
   "orders.wa_cancel_auto": "రద్దు చేయండి",
   "orders.wa_send_to": "పంపాల్సిన నంబర్",
@@ -755,7 +791,8 @@ const TE: Record<string, string> = {
   "orders.no_filter_results": "ఈ ఫిల్టర్‌కు సరిపోయే షాప్‌లు లేవు",
   "orders.search_collection": "షాప్, సిటీ, స్థితి వెతకండి…",
   "orders.search_assignment": "షాప్, సిటీ, ట్రిప్, వాహనం, సూపర్‌వైజర్ వెతకండి…",
-  "orders.search_tracking": "ట్రిప్, వాహనం, సూపర్‌వైజర్, మొబైల్, డ్రైవర్, షాప్ నంబర్, షాప్, సిటీ వెతకండి…",
+  "orders.search_tracking":
+    "ట్రిప్, వాహనం, సూపర్‌వైజర్, మొబైల్, డ్రైవర్, షాప్ నంబర్, షాప్, సిటీ వెతకండి…",
   "orders.filter_status": "స్థితి",
   "orders.filter_difference": "వ్యత్యాసం",
   "orders.all": "అన్నీ",
@@ -803,8 +840,10 @@ const TE: Record<string, string> = {
   "orders.weight": "బరువు",
   "orders.requested": "రిక్వెస్టెడ్",
   "orders.already_assigned": "ఇప్పటికే అసైన్ చేసినవి",
-  "orders.capacity_exceeded_line": "కెపాసిటీ మించింది. అసైన్ చేసిన బాక్స్‌లను తగ్గించండి.",
-  "orders.not_listed_note": "ఈ షాప్ స్టెప్ 4 సమయంలో డెలివర్ అయింది కానీ అసలు సేకరించిన ఆర్డర్‌లో లేదు.",
+  "orders.capacity_exceeded_line":
+    "కెపాసిటీ మించింది. అసైన్ చేసిన బాక్స్‌లను తగ్గించండి.",
+  "orders.not_listed_note":
+    "ఈ షాప్ స్టెప్ 4 సమయంలో డెలివర్ అయింది కానీ అసలు సేకరించిన ఆర్డర్‌లో లేదు.",
   "orders.shop_mobile": "షాప్ మొబైల్",
   "orders.from_date": "మొదలు",
   "orders.to_date": "వరకు",
@@ -819,7 +858,8 @@ const TE: Record<string, string> = {
   "orders.pool_filter_pending": "పెండింగ్ (కేటాయించలేదు)",
   "orders.pool_filter_assigned": "కేటాయించినవి (ఏ వాహనమైనా)",
   "orders.pool_filter_this_vehicle": "ఈ వాహనంపై",
-  "orders.pool_showing": "{total} షాప్‌లలో {shown} · {selected} ఎంపిక చేయబడ్డాయి",
+  "orders.pool_showing":
+    "{total} షాప్‌లలో {shown} · {selected} ఎంపిక చేయబడ్డాయి",
   "orders.vehicle_trip": "వాహనం / ట్రిప్",
   "orders.sort_pending_first": "పెండింగ్ ముందు",
   "orders.sort_vehicle_trip": "వాహనం / ట్రిప్",
@@ -830,7 +870,8 @@ const TE: Record<string, string> = {
   "orders.pdf_order_no": "ఆర్డర్ నంబర్",
   "orders.pdf_totals": "మొత్తాలు",
   "orders.assignment_incomplete": "అసైన్‌మెంట్ అసంపూర్ణం",
-  "orders.assignment_details_unavailable": "అసైన్‌మెంట్ వివరాలు అందుబాటులో లేవు",
+  "orders.assignment_details_unavailable":
+    "అసైన్‌మెంట్ వివరాలు అందుబాటులో లేవు",
   "orders.assignment_incomplete_warning": "అసైన్‌మెంట్ వివరాలు అందుబాటులో లేవు",
   "orders.collected_boxes": "సేకరించిన బాక్స్‌లు",
   "orders.delivery_summary": "డెలివరీ సారాంశం",
@@ -849,9 +890,15 @@ const TE: Record<string, string> = {
   "orders.summary_part": "పాక్షిక డెలివరీ",
 };
 
-export type OrdersT = (key: string, params?: Record<string, string | number>) => string;
+export type OrdersT = (
+  key: string,
+  params?: Record<string, string | number>,
+) => string;
 
-function interpolate(text: string, params?: Record<string, string | number>): string {
+function interpolate(
+  text: string,
+  params?: Record<string, string | number>,
+): string {
   if (!params) return text;
   let out = text;
   for (const [k, v] of Object.entries(params)) {
@@ -870,7 +917,7 @@ export function useOrdersI18n() {
       const translated = raw === key ? t(key) : raw;
       return interpolate(translated, params);
     },
-    [language, t]
+    [language, t],
   );
   return { to, language, t };
 }
@@ -879,7 +926,7 @@ export function useOrdersI18n() {
 export function ordersTranslate(
   key: string,
   language: Language = "en",
-  params?: Record<string, string | number>
+  params?: Record<string, string | number>,
 ): string {
   const dict: Record<string, string> = language === "te" ? TE : EN;
   return interpolate(dict[key] ?? EN[key] ?? key, params);

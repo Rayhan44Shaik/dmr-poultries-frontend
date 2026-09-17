@@ -74,6 +74,9 @@ This is approximately **89% less processing time**, not a measurement of total b
   while it counts, the button turns into the countdown and cancels on click, and `Undo` in the
   notification puts the numbers back. Nothing reaches the server until the window runs out, and the save
   keeps the row at zero (`toOrderShopRows(rows, keepZeroFor)`) instead of dropping it.
+  The shared dialog keeps its countdown chrome but not its delete wording — `description`, `busyLabel`,
+  `countdownLabel`, `icon` and `ariaLabel` are optional overrides (the trip delete in the Recent table
+  still gets "will be deleted automatically" with the trash glyph, which is what it actually does).
 - Collection has one action: **Save Progress**. There is no Cancel (the saved record is the draft, so
   there is nothing to discard) and no Finish button — the day's own deadline files it: 48h from the
   start of the day (the 16th submits at 18/09 12:00 AM). The deadline is stated **once**, in the day's

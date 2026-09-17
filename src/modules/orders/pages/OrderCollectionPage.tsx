@@ -33,8 +33,33 @@
 //   deadline      → same call + startStepSubmitted (the clock submits the day)
 // Refreshing the page always reproduces the saved collection.
 
-import React, { type ComponentType, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Activity, ArrowUpDown, Bird, Boxes, Calendar, ClipboardList, Clock, Eraser, Hash, Loader2, Lock, MapPin, RotateCcw, Save, Scale, Store, Undo2 } from "lucide-react";
+import React, {
+  type ComponentType,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
+import {
+  Activity,
+  ArrowUpDown,
+  Bird,
+  Boxes,
+  Calendar,
+  ClipboardList,
+  Clock,
+  Eraser,
+  Hash,
+  Loader2,
+  Lock,
+  MapPin,
+  RotateCcw,
+  Save,
+  Scale,
+  Store,
+  Undo2,
+} from "lucide-react";
 import type { Shop } from "../../masters/shops/types/shop";
 import type { Trip } from "../../../shared/trip";
 import {
@@ -47,6 +72,7 @@ import { BrandRefreshButton, Pagination } from "../../../ui";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
 import { usePendingDelete } from "../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../components/common/PendingDeleteNotification";
+import { PENDING_DELETE_SECONDS } from "../../../shared/ui/pendingDelete";
 import {
   COLLECTION_GRACE_DAYS,
   collectionAutoSubmitDelay,
@@ -68,7 +94,10 @@ import {
   type ShopDirectory,
 } from "../services/ordersService";
 import { useOrdersI18n } from "../i18n/ordersI18n";
-import { compareAssignmentRows, type AssignmentSort } from "../utils/assignmentSort";
+import {
+  compareAssignmentRows,
+  type AssignmentSort,
+} from "../utils/assignmentSort";
 import type { OrderShopRow, OrdersDayCollection } from "../types";
 import {
   ORDERS_FILTER_LABEL_CLASS,
@@ -108,14 +137,20 @@ function StatusWithNote({
   return (
     <span className="inline-flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-0.5">
       <OrdersStatusBadge status={status} label={label} />
-      <span className="text-[10.5px] font-bold tabular-nums text-amber-600">{note}</span>
+      <span className="text-[10.5px] font-bold tabular-nums text-amber-600">
+        {note}
+      </span>
     </span>
   );
 }
 
 const ORDER_REMARKS = "[ORDER]";
 
-type ColIcon = ComponentType<{ size?: number | string; className?: string; "aria-hidden"?: boolean }>;
+type ColIcon = ComponentType<{
+  size?: number | string;
+  className?: string;
+  "aria-hidden"?: boolean;
+}>;
 
 /**
  * Column header with its icon — the exact Trip List pattern (14px glyph, 6px
@@ -137,7 +172,11 @@ function ColHead({
   return (
     <span
       className={`flex items-center gap-2${
-        align === "right" ? " justify-end" : align === "center" ? " justify-center" : ""
+        align === "right"
+          ? " justify-end"
+          : align === "center"
+            ? " justify-center"
+            : ""
       }`}
     >
       <Icon size={15} className={`${tone} flex-shrink-0`} aria-hidden />
@@ -174,14 +213,14 @@ function entrySnapshot(rows: EntryRow[]): string {
     rows
       .filter((r) => r.birds > 0 || r.boxes > 0)
       .map((r) => [r.shopId, r.birds, r.boxes])
-      .sort((a, b) => a[0] - b[0])
+      .sort((a, b) => a[0] - b[0]),
   );
 }
 
 /** Build the initial entries map + snapshot from the day's collection. */
 function buildInitial(
   shops: Shop[],
-  dayCollection: OrdersDayCollection | null
+  dayCollection: OrdersDayCollection | null,
 ): { map: Map<number, EntryRow>; snapshot: string } {
   const map = new Map<number, EntryRow>();
   for (const shop of shops) {
@@ -209,31 +248,36 @@ function buildInitial(
   return { map, snapshot: entrySnapshot(Array.from(map.values())) };
 }
 
-function toOrderShopRows(rows: EntryRow[], keepZeroFor: number | null = null): OrderShopRow[] {
-  return rows
-    // A row normally rides along only when it holds something. `keepZeroFor` is
-    // how "clear" persists a shop at zero instead of deleting its line.
-    .filter((r) => r.birds > 0 || r.boxes > 0 || r.shopId === keepZeroFor)
-    .map((r, i) => ({
-      id: r.id,
-      clientKey: r.clientKey,
-      serialNo: i + 1,
-      boxNo: r.boxes,
-      shopId: r.shopId,
-      shopName: r.shopName,
-      birdTypeId: 0,
-      birdType: "",
-      birds: r.birds,
-      weight: 0,
-      mortality: 0,
-      mortKg: 0,
-      rate: null,
-      amount: 0,
-      remarks: ORDER_REMARKS,
-      deliveryMode: "box" as const,
-      selectedBoxIds: [],
-      village: r.village,
-    }));
+function toOrderShopRows(
+  rows: EntryRow[],
+  keepZeroFor: number | null = null,
+): OrderShopRow[] {
+  return (
+    rows
+      // A row normally rides along only when it holds something. `keepZeroFor` is
+      // how "clear" persists a shop at zero instead of deleting its line.
+      .filter((r) => r.birds > 0 || r.boxes > 0 || r.shopId === keepZeroFor)
+      .map((r, i) => ({
+        id: r.id,
+        clientKey: r.clientKey,
+        serialNo: i + 1,
+        boxNo: r.boxes,
+        shopId: r.shopId,
+        shopName: r.shopName,
+        birdTypeId: 0,
+        birdType: "",
+        birds: r.birds,
+        weight: 0,
+        mortality: 0,
+        mortKg: 0,
+        rate: null,
+        amount: 0,
+        remarks: ORDER_REMARKS,
+        deliveryMode: "box" as const,
+        selectedBoxIds: [],
+        village: r.village,
+      }))
+  );
 }
 
 type Props = {
@@ -261,7 +305,8 @@ type Props = {
   refreshing: boolean;
 };
 
-type CollectionSort = "collected" | "status" | Exclude<AssignmentSort, "pending" | "sequence">;
+type CollectionSort =
+  "collected" | "status" | Exclude<AssignmentSort, "pending" | "sequence">;
 
 type CollectionFilters = {
   cityFilters: string[];
@@ -295,7 +340,20 @@ function OrderCollectionPage(props: Props) {
       </div>
     );
   }
-  return <CollectionEntries key={props.day} {...props} query={query} setQuery={setQuery} cityFilters={cityFilters} setCityFilters={setCityFilters} sortMode={sortMode} setSortMode={setSortMode} pageSize={pageSize} setPageSize={setPageSize} />;
+  return (
+    <CollectionEntries
+      key={props.day}
+      {...props}
+      query={query}
+      setQuery={setQuery}
+      cityFilters={cityFilters}
+      setCityFilters={setCityFilters}
+      sortMode={sortMode}
+      setSortMode={setSortMode}
+      pageSize={pageSize}
+      setPageSize={setPageSize}
+    />
+  );
 }
 
 function CollectionEntries({
@@ -310,7 +368,14 @@ function CollectionEntries({
   onFinished,
   onRefresh,
   refreshing,
-  cityFilters, setCityFilters, query, setQuery, sortMode, setSortMode, pageSize, setPageSize,
+  cityFilters,
+  setCityFilters,
+  query,
+  setQuery,
+  sortMode,
+  setSortMode,
+  pageSize,
+  setPageSize,
 }: Omit<Props, "shopsLoading"> & CollectionFilters) {
   const { to } = useOrdersI18n();
   const { showNotification } = useSafeNotification();
@@ -330,23 +395,29 @@ function CollectionEntries({
     return () => window.clearInterval(id);
   }, [isAutoClosed]);
   const autoSubmitDeadline = formatCollectionDeadline(day);
-  const autoSubmitRemainingMs = collectionAutoSubmitDelay(day, new Date(nowMs)) ?? 0;
+  const autoSubmitRemainingMs =
+    collectionAutoSubmitDelay(day, new Date(nowMs)) ?? 0;
   const autoSubmitRemaining = formatCountdown(autoSubmitRemainingMs);
   const autoSubmitProgressPct = Math.min(
     100,
     Math.max(
       0,
-      Math.round(100 - (autoSubmitRemainingMs / (COLLECTION_GRACE_DAYS * 86_400_000)) * 100)
-    )
+      Math.round(
+        100 -
+          (autoSubmitRemainingMs / (COLLECTION_GRACE_DAYS * 86_400_000)) * 100,
+      ),
+    ),
   );
   const isLocked =
-    isAutoClosed || Boolean(collection?.finished) || Boolean(collection?.fullyAssigned);
+    isAutoClosed ||
+    Boolean(collection?.finished) ||
+    Boolean(collection?.fullyAssigned);
   const isEditable = !isLocked;
 
   // ── Entries (local editing state, seeded from the day's collection) ──
   const initial = useMemo(
     () => buildInitial(shops, collection),
-    [shops, collection]
+    [shops, collection],
   );
   const [entries, setEntries] = useState<Map<number, EntryRow>>(initial.map);
   // The auto-submit timer reads the rows through this ref, so typing never
@@ -358,11 +429,15 @@ function CollectionEntries({
   const [savedSnapshot, setSavedSnapshot] = useState<string>(initial.snapshot);
 
   const isDirty = useMemo(
-    () => !isLocked && entrySnapshot(Array.from(entries.values())) !== savedSnapshot,
-    [entries, savedSnapshot, isLocked]
+    () =>
+      !isLocked &&
+      entrySnapshot(Array.from(entries.values())) !== savedSnapshot,
+    [entries, savedSnapshot, isLocked],
   );
 
-  const [lastServerSnapshot, setLastServerSnapshot] = useState(initial.snapshot);
+  const [lastServerSnapshot, setLastServerSnapshot] = useState(
+    initial.snapshot,
+  );
   if (lastServerSnapshot !== initial.snapshot) {
     setLastServerSnapshot(initial.snapshot);
     if (!isDirty) {
@@ -374,7 +449,9 @@ function CollectionEntries({
   // ── Container identity (one container per day — reuse or create today) ──
   const containerRef = useRef<{ id: number | null; tripNo: string | null }>({
     id: collection?.trip.id ?? null,
-    tripNo: collection?.trip.tripNo ?? (day === today && nextTripNo ? nextTripNo : null),
+    tripNo:
+      collection?.trip.tripNo ??
+      (day === today && nextTripNo ? nextTripNo : null),
   });
 
   // ── Busy flags (double-submit protection) ────────────────────────────────
@@ -384,12 +461,13 @@ function CollectionEntries({
   const busy = saving || finishing || refreshing;
 
   const entered = useMemo(
-    () => Array.from(entries.values()).filter((r) => r.birds > 0 || r.boxes > 0),
-    [entries]
+    () =>
+      Array.from(entries.values()).filter((r) => r.birds > 0 || r.boxes > 0),
+    [entries],
   );
   const totals = useMemo(
     () => collectionTotals(toOrderShopRows(entered)),
-    [entered]
+    [entered],
   );
 
   // The day's own average bird weight comes from the collection container, so
@@ -409,7 +487,7 @@ function CollectionEntries({
         return next;
       });
     },
-    []
+    [],
   );
 
   // ── Clear a row: zero the order, never remove the shop ───────────────────
@@ -428,7 +506,10 @@ function CollectionEntries({
       if (row.id === 0) {
         // Nothing on the server yet — zero locally and let Save Progress carry it.
         setEntries(next);
-        showNotification(to("orders.entry_cleared", { shop: row.shopName }), "success");
+        showNotification(
+          to("orders.entry_cleared", { shop: row.shopName }),
+          "success",
+        );
         return;
       }
       persistLockRef.current = true;
@@ -436,20 +517,23 @@ function CollectionEntries({
         const updated = await saveCollection(
           containerRef.current.id,
           containerRef.current.tripNo,
-          toOrderShopRows(Array.from(next.values()), shopId)
+          toOrderShopRows(Array.from(next.values()), shopId),
         );
         containerRef.current = { id: updated.id, tripNo: updated.tripNo };
         setEntries(next);
         setSavedSnapshot(entrySnapshot(Array.from(next.values())));
         onSaved(updated);
-        showNotification(to("orders.entry_cleared", { shop: row.shopName }), "success");
+        showNotification(
+          to("orders.entry_cleared", { shop: row.shopName }),
+          "success",
+        );
       } catch (error) {
         showNotification(handleApiError(error), "error");
       } finally {
         persistLockRef.current = false;
       }
     },
-    [entries, onSaved, showNotification, to]
+    [entries, onSaved, showNotification, to],
   );
 
   const {
@@ -466,7 +550,9 @@ function CollectionEntries({
     if (!row || (row.birds === 0 && row.boxes === 0)) return;
     // Every clear gets the undo window — a draft row included, so a mis-click
     // never costs typed numbers.
-    requestDelete(shopId, { label: to("orders.clear_entry_label", { shop: row.shopName }) });
+    requestDelete(shopId, {
+      label: to("orders.clear_entry_label", { shop: row.shopName }),
+    });
   };
 
   // ── Save Progress (no final validation) ───────────────────────────────────
@@ -483,7 +569,7 @@ function CollectionEntries({
       const updated = await saveCollection(
         containerRef.current.id,
         containerRef.current.tripNo,
-        rows
+        rows,
       );
       containerRef.current = { id: updated.id, tripNo: updated.tripNo };
       // Authoritative values come from the API response — never a stale
@@ -531,15 +617,17 @@ function CollectionEntries({
       const updated = await finishCollection(
         containerRef.current.id,
         containerRef.current.tripNo,
-        toOrderShopRows(all)
+        toOrderShopRows(all),
       );
       containerRef.current = { id: updated.id, tripNo: updated.tripNo };
       const missingBoxes = enteredRows.filter((r) => !(r.boxes > 0)).length;
       showNotification(
         missingBoxes > 0
-          ? to("orders.collection_auto_submitted_partial", { shops: missingBoxes })
+          ? to("orders.collection_auto_submitted_partial", {
+              shops: missingBoxes,
+            })
           : to("orders.collection_auto_submitted"),
-        "success"
+        "success",
       );
       onFinished(updated);
       return true;
@@ -609,12 +697,15 @@ function CollectionEntries({
       if (!assignment) return to("orders.status_collected");
       if (!assignment.delivered) return to("orders.status_assigned");
       // PART DELIVERY: some boxes are in, the rest are still pending.
-      if (assignment.deliveredBoxes > 0 && assignment.deliveredBoxes < assignment.boxes) {
+      if (
+        assignment.deliveredBoxes > 0 &&
+        assignment.deliveredBoxes < assignment.boxes
+      ) {
         return to("orders.status_part_delivered");
       }
       return to("orders.status_delivered");
     },
-    [collection, to]
+    [collection, to],
   );
 
   // ── Compact table-level sort (works with search + pagination + date) ────
@@ -627,9 +718,19 @@ function CollectionEntries({
       { value: "za", label: to("orders.sort_name_za") },
       // Only what this table actually shows: a shop's vehicle / trip is not a
       // Collection column, so it is not a Collection sort either.
-      ...["city_az", "city_za", "birds_asc", "birds_desc", "boxes_asc", "boxes_desc", "weight_asc", "weight_desc", "status"].map(value => ({ value, label: to(`orders.sort_${value}`) })),
+      ...[
+        "city_az",
+        "city_za",
+        "birds_asc",
+        "birds_desc",
+        "boxes_asc",
+        "boxes_desc",
+        "weight_asc",
+        "weight_desc",
+        "status",
+      ].map((value) => ({ value, label: to(`orders.sort_${value}`) })),
     ],
-    [to]
+    [to],
   );
 
   const collectedOf = useCallback(
@@ -642,16 +743,33 @@ function CollectionEntries({
         (isEditable && ((live?.birds ?? 0) > 0 || (live?.boxes ?? 0) > 0))
       );
     },
-    [readOnlyEntries, entries, isEditable]
+    [readOnlyEntries, entries, isEditable],
   );
 
-  const cityOptions = useMemo(() => [...new Set(shops.map(shop => villageOf(shop.id, shop.shopName, shopDirectory).trim()).filter(Boolean))]
-    .sort((a, b) => a.localeCompare(b)).map(city => ({ value: city, label: city })), [shops, shopDirectory]);
+  const cityOptions = useMemo(
+    () =>
+      [
+        ...new Set(
+          shops
+            .map((shop) =>
+              villageOf(shop.id, shop.shopName, shopDirectory).trim(),
+            )
+            .filter(Boolean),
+        ),
+      ]
+        .sort((a, b) => a.localeCompare(b))
+        .map((city) => ({ value: city, label: city })),
+    [shops, shopDirectory],
+  );
   const citySet = useMemo(() => new Set(cityFilters), [cityFilters]);
 
   const filteredShopList = useMemo(() => {
     const list = shops.filter((shop) => {
-      if (citySet.size && !citySet.has(villageOf(shop.id, shop.shopName, shopDirectory).trim())) return false;
+      if (
+        citySet.size &&
+        !citySet.has(villageOf(shop.id, shop.shopName, shopDirectory).trim())
+      )
+        return false;
       if (!q) return true;
       const assignment = collection?.shops.get(shop.id) ?? null;
       const ro = readOnlyEntries.get(shop.id);
@@ -675,20 +793,55 @@ function CollectionEntries({
       return haystack.includes(q);
     });
     const sortRow = (shop: Shop) => {
-      const entry = isEditable ? entries.get(shop.id) : readOnlyEntries.get(shop.id);
+      const entry = isEditable
+        ? entries.get(shop.id)
+        : readOnlyEntries.get(shop.id);
       const birds = entry?.birds ?? 0;
       const assignment = collection?.shops.get(shop.id);
-      return { name: shop.shopName, city: villageOf(shop.id, shop.shopName, shopDirectory), birds,
-        boxes: entry?.boxes ?? 0, weight: weightForBirds(birds, assignment?.avgBirdWeight ?? dayAvgBirdWeight),
-        sequence: shop.id, vehicle: assignment?.vehicleNo ?? '', trip: assignment?.tripNo ?? '', assigned: collectedOf(shop.id) };
+      return {
+        name: shop.shopName,
+        city: villageOf(shop.id, shop.shopName, shopDirectory),
+        birds,
+        boxes: entry?.boxes ?? 0,
+        weight: weightForBirds(
+          birds,
+          assignment?.avgBirdWeight ?? dayAvgBirdWeight,
+        ),
+        sequence: shop.id,
+        vehicle: assignment?.vehicleNo ?? "",
+        trip: assignment?.tripNo ?? "",
+        assigned: collectedOf(shop.id),
+      };
     };
     list.sort((a, b) => {
-      if (sortMode === 'collected') return Number(collectedOf(b.id)) - Number(collectedOf(a.id)) || a.shopName.localeCompare(b.shopName);
-      if (sortMode === 'status') return statusLabelOf(a.id, collectedOf(a.id)).localeCompare(statusLabelOf(b.id, collectedOf(b.id))) || a.shopName.localeCompare(b.shopName);
+      if (sortMode === "collected")
+        return (
+          Number(collectedOf(b.id)) - Number(collectedOf(a.id)) ||
+          a.shopName.localeCompare(b.shopName)
+        );
+      if (sortMode === "status")
+        return (
+          statusLabelOf(a.id, collectedOf(a.id)).localeCompare(
+            statusLabelOf(b.id, collectedOf(b.id)),
+          ) || a.shopName.localeCompare(b.shopName)
+        );
       return compareAssignmentRows(sortRow(a), sortRow(b), sortMode);
     });
     return list;
-  }, [shops, q, collection, readOnlyEntries, entries, isEditable, shopDirectory, statusLabelOf, sortMode, collectedOf, citySet, dayAvgBirdWeight]);
+  }, [
+    shops,
+    q,
+    collection,
+    readOnlyEntries,
+    entries,
+    isEditable,
+    shopDirectory,
+    statusLabelOf,
+    sortMode,
+    collectedOf,
+    citySet,
+    dayAvgBirdWeight,
+  ]);
 
   // ── Pagination (existing global component; reset to page 1 when the
   //     filtered result or the day changes) ─────────────────────────────────
@@ -703,60 +856,109 @@ function CollectionEntries({
   const safePage = Math.min(page, totalPages);
   const pageShops = filteredShopList.slice(
     (safePage - 1) * pageSize,
-    safePage * pageSize
+    safePage * pageSize,
   );
-  const startIndex = filteredShopList.length === 0 ? 0 : (safePage - 1) * pageSize;
+  const startIndex =
+    filteredShopList.length === 0 ? 0 : (safePage - 1) * pageSize;
 
   // One 12-column grid, two rows, every control filling its cell: day · city ·
   // sort on the first line, the search and the day's actions under it, all
   // bottom-aligned on one baseline with the same 40px controls the Trip List
   // uses. Labels are one size up; the search keeps only its own magnifier.
   const filterCard = (
-    <section className={opsFilterCardClass} aria-label={to('orders.collection_filters')}>
+    <section
+      className={opsFilterCardClass}
+      aria-label={to("orders.collection_filters")}
+    >
       <div className="grid grid-cols-1 gap-x-3.5 gap-y-4 sm:grid-cols-2 lg:grid-cols-12 lg:items-end">
         <div className="lg:col-span-4">
           <div className={ORDERS_FILTER_LABEL_CLASS}>
             <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
-            <span>{to('orders.col_date')}</span>
+            <span>{to("orders.col_date")}</span>
           </div>
-          <OrdersDateControl day={day} today={today} onDaySelect={onDaySelect} t={to} hideDayChip className="w-full" fieldClassName="w-full" />
+          <OrdersDateControl
+            day={day}
+            today={today}
+            onDaySelect={onDaySelect}
+            t={to}
+            hideDayChip
+            className="w-full"
+            fieldClassName="w-full"
+          />
         </div>
         <div className="lg:col-span-4">
           <div className={ORDERS_FILTER_LABEL_CLASS}>
             <MapPin size={17} className="text-amber-500 flex-shrink-0" />
-            <span>{to('orders.city')}</span>
+            <span>{to("orders.city")}</span>
           </div>
-          <OrdersMultiSelect values={cityFilters} onChange={setCityFilters} options={cityOptions} ariaLabel={to('orders.filter_city')} placeholder={to('orders.filter_city_all')} className="w-full" widthClass="w-full" />
+          <OrdersMultiSelect
+            values={cityFilters}
+            onChange={setCityFilters}
+            options={cityOptions}
+            ariaLabel={to("orders.filter_city")}
+            placeholder={to("orders.filter_city_all")}
+            className="w-full"
+            widthClass="w-full"
+          />
         </div>
         <div className="lg:col-span-4">
           <div className={ORDERS_FILTER_LABEL_CLASS}>
             <ArrowUpDown size={17} className="text-violet-500 flex-shrink-0" />
-            <span>{to('orders.sort')}</span>
+            <span>{to("orders.sort")}</span>
           </div>
-          <OrdersDropdown value={sortMode} onChange={value => setSortMode(value as CollectionSort)} options={sortOptions} ariaLabel={to('orders.sort')} className="w-full" widthClass="w-full" />
+          <OrdersDropdown
+            value={sortMode}
+            onChange={(value) => setSortMode(value as CollectionSort)}
+            options={sortOptions}
+            ariaLabel={to("orders.sort")}
+            className="w-full"
+            widthClass="w-full"
+          />
         </div>
         <div className="sm:col-span-2 lg:col-span-8">
           <div className={ORDERS_FILTER_LABEL_CLASS}>
-            <span>{to('orders.search_label')}</span>
+            <span>{to("orders.search_label")}</span>
           </div>
-          <OrdersSearchInput value={query} onChange={setQuery} placeholder={to('orders.search_collection')} className="w-full" />
+          <OrdersSearchInput
+            value={query}
+            onChange={setQuery}
+            placeholder={to("orders.search_collection")}
+            className="w-full"
+          />
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:justify-end lg:col-span-4">
-          <button type="button" className={`group relative ${opsSecondaryButtonClass}`} onClick={() => {
-            setQuery(''); setSortMode('collected'); setCityFilters([]); setPage(1);
-            if (day !== today) onDaySelect(today);
-          }} aria-label={to('common.reset')}>
-            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>{to('common.reset')}
+          <button
+            type="button"
+            className={`group relative ${opsSecondaryButtonClass}`}
+            onClick={() => {
+              setQuery("");
+              setSortMode("collected");
+              setCityFilters([]);
+              setPage(1);
+              if (day !== today) onDaySelect(today);
+            }}
+            aria-label={to("common.reset")}
+          >
+            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]">
+              <RotateCcw size={14} />
+            </span>
+            {to("common.reset")}
           </button>
           <BrandRefreshButton onClick={onRefresh} loading={refreshing} />
         </div>
       </div>
     </section>
   );
-  const tableTitle = <div className="flex items-center gap-3">
-    <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-sky-100 bg-sky-50 text-sky-600 shadow-inner"><ClipboardList size={20} aria-hidden /></span>
-    <h2 className="text-base font-bold tracking-tight text-slate-800">{to('orders.tab_collection')}</h2>
-  </div>;
+  const tableTitle = (
+    <div className="flex items-center gap-3">
+      <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-sky-100 bg-sky-50 text-sky-600 shadow-inner">
+        <ClipboardList size={20} aria-hidden />
+      </span>
+      <h2 className="text-base font-bold tracking-tight text-slate-800">
+        {to("orders.tab_collection")}
+      </h2>
+    </div>
+  );
 
   // ── Render ────────────────────────────────────────────────────────────────
   // Closed day with nothing collected: clean empty state (read-only by nature).
@@ -765,11 +967,13 @@ function CollectionEntries({
       <div className="space-y-5">
         {filterCard}
         <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-          <div className="border-b border-slate-100 bg-sky-50/40 px-6 py-3">{tableTitle}</div>
-        <OrdersEmptyState
-          title={to("orders.no_orders_for_day", { date: formatDayFull(day) })}
-        />
-      </div>
+          <div className="border-b border-slate-100 bg-sky-50/40 px-6 py-3">
+            {tableTitle}
+          </div>
+          <OrdersEmptyState
+            title={to("orders.no_orders_for_day", { date: formatDayFull(day) })}
+          />
+        </div>
       </div>
     );
   }
@@ -805,19 +1009,34 @@ function CollectionEntries({
                  counts down to it, with a bar across the bottom showing how much
                  of the 48h window is behind us. */
               <span className="relative inline-flex items-center gap-2 overflow-hidden rounded-full border border-sky-200 bg-sky-50 py-1 pl-2.5 pr-3 text-[11.5px] font-bold whitespace-nowrap text-sky-800">
-                <span className="relative flex h-1.5 w-1.5 flex-shrink-0" aria-hidden>
+                <span
+                  className="relative flex h-1.5 w-1.5 flex-shrink-0"
+                  aria-hidden
+                >
                   <span className="absolute inset-0 rounded-full bg-sky-500/60 motion-safe:animate-ping" />
                   <span className="relative h-1.5 w-1.5 rounded-full bg-sky-500" />
                 </span>
-                <Clock size={12} className="flex-shrink-0 text-sky-600" aria-hidden />
-                <span>{to("orders.auto_submits_at", { deadline: autoSubmitDeadline })}</span>
+                <Clock
+                  size={12}
+                  className="flex-shrink-0 text-sky-600"
+                  aria-hidden
+                />
+                <span>
+                  {to("orders.auto_submits_at", {
+                    deadline: autoSubmitDeadline,
+                  })}
+                </span>
                 <span
                   className="font-semibold tabular-nums text-sky-600 motion-safe:transition-opacity motion-safe:duration-500"
                   aria-live="off"
                 >
-                  · {to("orders.auto_submits_in", { time: autoSubmitRemaining })}
+                  ·{" "}
+                  {to("orders.auto_submits_in", { time: autoSubmitRemaining })}
                 </span>
-                <span className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-sky-500/15" aria-hidden>
+                <span
+                  className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-sky-500/15"
+                  aria-hidden
+                >
                   <span
                     className="block h-full rounded-r-full bg-sky-500/70 motion-safe:transition-[width] motion-safe:duration-700 motion-safe:ease-out"
                     style={{ width: `${autoSubmitProgressPct}%` }}
@@ -826,14 +1045,15 @@ function CollectionEntries({
               </span>
             ) : null}
           </div>
-
         </div>
 
         <div className="overflow-x-auto" aria-busy={refreshing}>
           {/* table-fixed with one measured column: S.No keeps its 96px and every other
               column takes an equal share of what is left, so the eight headings sit
               on one rhythm instead of chasing their content. */}
-          <table className={`w-full min-w-[900px] table-fixed ${ORDERS_TABLE_FONT_CLASS}`}>
+          <table
+            className={`w-full min-w-[900px] table-fixed ${ORDERS_TABLE_FONT_CLASS}`}
+          >
             <thead>
               <tr className={opsTableHeadRowClass}>
                 {/* Collection-only columns. Trip / vehicle are deliberately not
@@ -841,196 +1061,291 @@ function CollectionEntries({
                 {/* The only measured column: it has to hold its glyph plus the
                     word "S.No", and everything else shares what is left. */}
                 <th className={`${opsTableThClass} w-[96px] text-center`}>
-                  <ColHead icon={Hash} label={to("orders.col_sno")} align="center" tone="text-slate-400" />
+                  <ColHead
+                    icon={Hash}
+                    label={to("orders.col_sno")}
+                    align="center"
+                    tone="text-slate-400"
+                  />
                 </th>
                 <th className={opsTableThClass}>
-                  <ColHead icon={Store} label={to("orders.col_shop_name")} tone="text-sky-600" />
+                  <ColHead
+                    icon={Store}
+                    label={to("orders.col_shop_name")}
+                    tone="text-sky-600"
+                  />
                 </th>
                 <th className={opsTableThClass}>
-                  <ColHead icon={MapPin} label={to("orders.col_village")} tone="text-amber-600" />
+                  <ColHead
+                    icon={MapPin}
+                    label={to("orders.col_village")}
+                    tone="text-amber-600"
+                  />
                 </th>
                 <th className={opsTableThClass}>
-                  <ColHead icon={Bird} label={to("orders.col_birds")} tone="text-emerald-600" />
+                  <ColHead
+                    icon={Bird}
+                    label={to("orders.col_birds")}
+                    tone="text-emerald-600"
+                  />
                 </th>
                 <th className={opsTableThClass}>
-                  <ColHead icon={Boxes} label={`${to("orders.col_boxes")} *`} tone="text-violet-600" />
+                  <ColHead
+                    icon={Boxes}
+                    label={`${to("orders.col_boxes")} *`}
+                    tone="text-violet-600"
+                  />
                 </th>
                 <th className={`${opsTableThClass} text-right`}>
-                  <ColHead icon={Scale} label={to("orders.col_weight")} align="right" tone="text-teal-600" />
+                  <ColHead
+                    icon={Scale}
+                    label={to("orders.col_weight")}
+                    align="right"
+                    tone="text-teal-600"
+                  />
                 </th>
                 <th className={opsTableThClass}>
-                  <ColHead icon={Activity} label={to("orders.col_status")} tone="text-indigo-600" />
+                  <ColHead
+                    icon={Activity}
+                    label={to("orders.col_status")}
+                    tone="text-indigo-600"
+                  />
                 </th>
                 <th className={`${opsTableThClass} text-right`}>
-                  <ColHead icon={Eraser} label={to("orders.col_action")} align="right" tone="text-rose-500" />
+                  <ColHead
+                    icon={Eraser}
+                    label={to("orders.col_action")}
+                    align="right"
+                    tone="text-rose-500"
+                  />
                 </th>
               </tr>
             </thead>
-            <tbody key={`${safePage}|${q}|${sortMode}|${pageSize}`} className={`${opsTableDivideClass} motion-safe:animate-page-pop`}>
-              {refreshing ? <tr><td colSpan={8}><OrdersTableSkeleton rows={Math.min(pageSize, 6)} /></td></tr> : pageShops.map((shop, index) => {
-                const live = entries.get(shop.id);
-                const ro = readOnlyEntries.get(shop.id);
-                const birds = isEditable ? live?.birds ?? 0 : ro?.birds ?? 0;
-                const boxes = isEditable ? live?.boxes ?? 0 : ro?.boxes ?? 0;
-                const hasEntry = birds > 0 || boxes > 0;
-                const assignment = collection?.shops.get(shop.id) ?? null;
-                // Inside the undo window: the row is marked, nothing has changed.
-                const clearing = isPending(shop.id);
+            <tbody
+              key={`${safePage}|${q}|${sortMode}|${pageSize}`}
+              className={`${opsTableDivideClass} motion-safe:animate-page-pop`}
+            >
+              {refreshing ? (
+                <tr>
+                  <td colSpan={8}>
+                    <OrdersTableSkeleton rows={Math.min(pageSize, 6)} />
+                  </td>
+                </tr>
+              ) : (
+                pageShops.map((shop, index) => {
+                  const live = entries.get(shop.id);
+                  const ro = readOnlyEntries.get(shop.id);
+                  const birds = isEditable
+                    ? (live?.birds ?? 0)
+                    : (ro?.birds ?? 0);
+                  const boxes = isEditable
+                    ? (live?.boxes ?? 0)
+                    : (ro?.boxes ?? 0);
+                  const hasEntry = birds > 0 || boxes > 0;
+                  const assignment = collection?.shops.get(shop.id) ?? null;
+                  // Inside the undo window: the row is marked, nothing has changed.
+                  const clearing = isPending(shop.id);
 
-                let statusNode: React.ReactNode = (
-                  <OrdersStatusBadge status="Not Collected" label={to("orders.status_not_collected")} />
-                );
-                if (hasEntry) {
-                  if (!assignment) {
-                    // Order collected but not yet on any vehicle.
-                    statusNode = (
-                      <OrdersStatusBadge status="Collected" label={to("orders.status_collected")} />
-                    );
-                  } else if (
-                    assignment.delivered &&
-                    assignment.deliveredBoxes > 0 &&
-                    assignment.deliveredBoxes < assignment.boxes
-                  ) {
-                    // PART DELIVERY — the balance stays visible (25 ordered,
-                    // 10 in → 15 still to deliver), never a green "Delivered".
-                    // The count rides beside the badge instead of inside it: the
-                    // columns are equal width, and a long pill would push past
-                    // its cell.
-                    const remaining = assignment.boxes - assignment.deliveredBoxes;
-                    statusNode = (
-                      <StatusWithNote
-                        status="Part Delivered"
-                        label={to("orders.status_part_delivered")}
-                        note={to("orders.boxes_to_deliver", { boxes: remaining })}
-                      />
-                    );
-                  } else if (assignment.delivered) {
-                    // Step 4 confirmed this shop was delivered → GREEN.
-                    statusNode = (
-                      <OrdersStatusBadge status="Delivered" label={to("orders.status_delivered")} />
-                    );
-                  } else if (
-                    // SPLIT still open: part of the order is on vehicles, the
-                    // balance is still waiting for another truck.
-                    assignment.assignedBoxesTotal < assignment.boxes
-                  ) {
-                    const pendingAssign = assignment.boxes - assignment.assignedBoxesTotal;
-                    statusNode = (
-                      <StatusWithNote
-                        status="Part Assigned"
-                        label={to("orders.status_part_assigned")}
-                        note={to("orders.boxes_to_assign", { boxes: pendingAssign })}
-                      />
-                    );
-                  } else {
-                    // Fully placed on vehicles — this is the ONLY case that
-                    // reads "Assigned"; everything else reads pending/part.
-                    statusNode = (
-                      <OrdersStatusBadge status="Assigned" label={to("orders.status_assigned")} />
-                    );
+                  let statusNode: React.ReactNode = (
+                    <OrdersStatusBadge
+                      status="Not Collected"
+                      label={to("orders.status_not_collected")}
+                    />
+                  );
+                  if (hasEntry) {
+                    if (!assignment) {
+                      // Order collected but not yet on any vehicle.
+                      statusNode = (
+                        <OrdersStatusBadge
+                          status="Collected"
+                          label={to("orders.status_collected")}
+                        />
+                      );
+                    } else if (
+                      assignment.delivered &&
+                      assignment.deliveredBoxes > 0 &&
+                      assignment.deliveredBoxes < assignment.boxes
+                    ) {
+                      // PART DELIVERY — the balance stays visible (25 ordered,
+                      // 10 in → 15 still to deliver), never a green "Delivered".
+                      // The count rides beside the badge instead of inside it: the
+                      // columns are equal width, and a long pill would push past
+                      // its cell.
+                      const remaining =
+                        assignment.boxes - assignment.deliveredBoxes;
+                      statusNode = (
+                        <StatusWithNote
+                          status="Part Delivered"
+                          label={to("orders.status_part_delivered")}
+                          note={to("orders.boxes_to_deliver", {
+                            boxes: remaining,
+                          })}
+                        />
+                      );
+                    } else if (assignment.delivered) {
+                      // Step 4 confirmed this shop was delivered → GREEN.
+                      statusNode = (
+                        <OrdersStatusBadge
+                          status="Delivered"
+                          label={to("orders.status_delivered")}
+                        />
+                      );
+                    } else if (
+                      // SPLIT still open: part of the order is on vehicles, the
+                      // balance is still waiting for another truck.
+                      assignment.assignedBoxesTotal < assignment.boxes
+                    ) {
+                      const pendingAssign =
+                        assignment.boxes - assignment.assignedBoxesTotal;
+                      statusNode = (
+                        <StatusWithNote
+                          status="Part Assigned"
+                          label={to("orders.status_part_assigned")}
+                          note={to("orders.boxes_to_assign", {
+                            boxes: pendingAssign,
+                          })}
+                        />
+                      );
+                    } else {
+                      // Fully placed on vehicles — this is the ONLY case that
+                      // reads "Assigned"; everything else reads pending/part.
+                      statusNode = (
+                        <OrdersStatusBadge
+                          status="Assigned"
+                          label={to("orders.status_assigned")}
+                        />
+                      );
+                    }
                   }
-                }
 
-                return (
-                  <tr
-                    key={shop.id}
-                    className={ordersTableZebraRow(
-                      index,
-                      clearing ? "align-middle bg-amber-50/70" : "align-middle"
-                    )}
-                  >
-                    <td className={`${opsTableTdClass} text-center`}>
-                      <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 text-[12px] font-semibold text-slate-600">
-                        {startIndex + index + 1}
-                      </span>
-                    </td>
-                    <td className={`${opsTableTdClass} font-semibold text-slate-800`}>
-                      {shop.shopName}
-                    </td>
-                    <td className={opsTableTdClass}>
-                      {villageOf(shop.id, shop.shopName, shopDirectory) || "—"}
-                    </td>
-                    <td className={opsTableTdClass}>
-                      {isEditable ? (
-                        <input
-                          type="number"
-                          min={0}
-                          value={birds || ""}
-                          placeholder="0"
-                          aria-label={`${to("orders.col_birds")} — ${shop.shopName}`}
-                          onChange={(e) => updateEntry(shop.id, "birds", e.target.value)}
-                          onWheel={onOrdersNumberWheel}
-                          className={`${ORDERS_NO_SPINNER} h-8 w-full rounded-lg border border-emerald-300/70 bg-emerald-50/50 px-2 text-xs font-medium text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500`}
-                        />
-                      ) : (
-                        <span className="font-medium text-slate-700">{hasEntry ? birds : "—"}</span>
+                  return (
+                    <tr
+                      key={shop.id}
+                      className={ordersTableZebraRow(
+                        index,
+                        clearing
+                          ? "align-middle bg-amber-50/70"
+                          : "align-middle",
                       )}
-                    </td>
-                    <td className={opsTableTdClass}>
-                      {isEditable ? (
-                        <input
-                          type="number"
-                          min={0}
-                          value={boxes || ""}
-                          placeholder="0"
-                          aria-label={`${to("orders.col_boxes")} — ${shop.shopName}`}
-                          onChange={(e) => updateEntry(shop.id, "boxes", e.target.value)}
-                          onWheel={onOrdersNumberWheel}
-                          className={`${ORDERS_NO_SPINNER} h-8 w-full rounded-lg border border-emerald-300/70 bg-emerald-50/50 px-2 text-xs font-medium text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500`}
-                        />
-                      ) : (
-                        <span className="font-medium text-slate-700">{hasEntry ? boxes : "—"}</span>
-                      )}
-                    </td>
-                    <td className={`${opsTableTdClass} text-right`}>
-                      {/* The ORDERED weight of the row: the shop's birds against
+                    >
+                      <td className={`${opsTableTdClass} text-center`}>
+                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 text-[12px] font-semibold text-slate-600">
+                          {startIndex + index + 1}
+                        </span>
+                      </td>
+                      <td
+                        className={`${opsTableTdClass} font-semibold text-slate-800`}
+                      >
+                        {shop.shopName}
+                      </td>
+                      <td className={opsTableTdClass}>
+                        {villageOf(shop.id, shop.shopName, shopDirectory) ||
+                          "—"}
+                      </td>
+                      <td className={opsTableTdClass}>
+                        {isEditable ? (
+                          <input
+                            type="number"
+                            min={0}
+                            value={birds || ""}
+                            placeholder="0"
+                            aria-label={`${to("orders.col_birds")} — ${shop.shopName}`}
+                            onChange={(e) =>
+                              updateEntry(shop.id, "birds", e.target.value)
+                            }
+                            onWheel={onOrdersNumberWheel}
+                            className={`${ORDERS_NO_SPINNER} h-8 w-full rounded-lg border border-emerald-300/70 bg-emerald-50/50 px-2 text-xs font-medium text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500`}
+                          />
+                        ) : (
+                          <span className="font-medium text-slate-700">
+                            {hasEntry ? birds : "—"}
+                          </span>
+                        )}
+                      </td>
+                      <td className={opsTableTdClass}>
+                        {isEditable ? (
+                          <input
+                            type="number"
+                            min={0}
+                            value={boxes || ""}
+                            placeholder="0"
+                            aria-label={`${to("orders.col_boxes")} — ${shop.shopName}`}
+                            onChange={(e) =>
+                              updateEntry(shop.id, "boxes", e.target.value)
+                            }
+                            onWheel={onOrdersNumberWheel}
+                            className={`${ORDERS_NO_SPINNER} h-8 w-full rounded-lg border border-emerald-300/70 bg-emerald-50/50 px-2 text-xs font-medium text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500`}
+                          />
+                        ) : (
+                          <span className="font-medium text-slate-700">
+                            {hasEntry ? boxes : "—"}
+                          </span>
+                        )}
+                      </td>
+                      <td className={`${opsTableTdClass} text-right`}>
+                        {/* The ORDERED weight of the row: the shop's birds against
                           the vehicle's average bird weight once it is assigned,
                           and the day's own average before that — so a collected
                           row never shows a dash when its birds are known. */}
-                      {birds > 0 && (assignment?.avgBirdWeight ?? dayAvgBirdWeight) > 0 ? (
-                        <span className="font-medium text-slate-600">
-                          {formatKg(
-                            weightForBirds(birds, assignment?.avgBirdWeight ?? dayAvgBirdWeight)
-                          )}
-                        </span>
-                      ) : (
-                        <span className="text-slate-400">—</span>
-                      )}
-                    </td>
-                    <td className={`${opsTableTdClass} min-w-0 break-words`}>{statusNode}</td>
-                    <td className={`${opsTableTdClass} text-right`}>
-                      {isEditable ? (
-                        <button
-                          type="button"
-                          onClick={() => (clearing ? cancelDelete(shop.id) : onClearClick(shop.id))}
-                          disabled={(!hasEntry && !clearing) || busy}
-                          aria-label={
-                            clearing
-                              ? to("orders.undo_clear_label", { shop: shop.shopName })
-                              : `${to("orders.clear_entry")} — ${shop.shopName}`
-                          }
-                          className={`inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-lg border px-1.5 text-[11px] font-bold transition-colors ${
-                            clearing
-                              ? "border-amber-300 bg-amber-100/70 text-amber-700 motion-safe:animate-pulse"
-                              : "border-slate-200/80 bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 disabled:opacity-30"
-                          }`}
-                        >
-                          {clearing ? (
-                            <>
-                              <Undo2 size={13} aria-hidden />
-                              <span className="tabular-nums">{secondsLeft(shop.id)}</span>
-                            </>
-                          ) : (
-                            <Eraser size={14} />
-                          )}
-                        </button>
-                      ) : (
-                        <span className="text-slate-300 text-xs">—</span>
-                      )}
-                    </td>
-                  </tr>
-                );
-              })}
+                        {birds > 0 &&
+                        (assignment?.avgBirdWeight ?? dayAvgBirdWeight) > 0 ? (
+                          <span className="font-medium text-slate-600">
+                            {formatKg(
+                              weightForBirds(
+                                birds,
+                                assignment?.avgBirdWeight ?? dayAvgBirdWeight,
+                              ),
+                            )}
+                          </span>
+                        ) : (
+                          <span className="text-slate-400">—</span>
+                        )}
+                      </td>
+                      <td className={`${opsTableTdClass} min-w-0 break-words`}>
+                        {statusNode}
+                      </td>
+                      <td className={`${opsTableTdClass} text-right`}>
+                        {isEditable ? (
+                          <button
+                            type="button"
+                            onClick={() =>
+                              clearing
+                                ? cancelDelete(shop.id)
+                                : onClearClick(shop.id)
+                            }
+                            disabled={(!hasEntry && !clearing) || busy}
+                            aria-label={
+                              clearing
+                                ? to("orders.undo_clear_label", {
+                                    shop: shop.shopName,
+                                  })
+                                : `${to("orders.clear_entry")} — ${shop.shopName}`
+                            }
+                            className={`inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-lg border px-1.5 text-[11px] font-bold transition-colors ${
+                              clearing
+                                ? "border-amber-300 bg-amber-100/70 text-amber-700 motion-safe:animate-pulse"
+                                : "border-slate-200/80 bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 disabled:opacity-30"
+                            }`}
+                          >
+                            {clearing ? (
+                              <>
+                                <Undo2 size={13} aria-hidden />
+                                <span className="tabular-nums">
+                                  {secondsLeft(shop.id)}
+                                </span>
+                              </>
+                            ) : (
+                              <Eraser size={14} />
+                            )}
+                          </button>
+                        ) : (
+                          <span className="text-slate-300 text-xs">—</span>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
               {!refreshing && pageShops.length === 0 && (
                 <tr>
                   <td colSpan={8} className="px-4 py-12">
@@ -1039,7 +1354,9 @@ function CollectionEntries({
                         q
                           ? to("orders.no_search_results")
                           : isPast
-                            ? to("orders.no_orders_for_day", { date: formatDayFull(day) })
+                            ? to("orders.no_orders_for_day", {
+                                date: formatDayFull(day),
+                              })
                             : to("orders.no_active_shops")
                       }
                     />
@@ -1058,19 +1375,25 @@ function CollectionEntries({
             <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-sky-100 bg-sky-50 text-sky-600">
               <Store size={14} aria-hidden />
             </span>
-            {to("orders.collection_summary_shops", { shops: totals.totalShops })}
+            {to("orders.collection_summary_shops", {
+              shops: totals.totalShops,
+            })}
           </span>
           <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-slate-400">
             <span className="inline-flex items-center gap-1">
               <Bird size={13} className="flex-shrink-0" aria-hidden />
               {totals.totalBirds} {to("orders.word_birds")}
             </span>
-            <span className="text-slate-200" aria-hidden>·</span>
+            <span className="text-slate-200" aria-hidden>
+              ·
+            </span>
             <span className="inline-flex items-center gap-1">
               <Boxes size={13} className="flex-shrink-0" aria-hidden />
               {totals.totalBoxes} {to("orders.word_boxes")}
             </span>
-            <span className="text-slate-200" aria-hidden>·</span>
+            <span className="text-slate-200" aria-hidden>
+              ·
+            </span>
             <span className="inline-flex items-center gap-1">
               <Scale size={13} className="flex-shrink-0" aria-hidden />
               {formatKg(totals.totalWeight)}
@@ -1084,7 +1407,10 @@ function CollectionEntries({
           pageSize={pageSize}
           totalItems={filteredShopList.length}
           onPageChange={setPage}
-          onPageSizeChange={(size) => { setPageSize(size); setPage(1); }}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setPage(1);
+          }}
           disabled={refreshing}
         />
 
@@ -1113,7 +1439,11 @@ function CollectionEntries({
                 disabled={busy || entered.length === 0}
                 className={`${opsSecondaryButtonClass} border-emerald-300 text-emerald-700 hover:bg-emerald-50`}
               >
-                {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
+                {saving ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : (
+                  <Save size={14} />
+                )}
                 {saving ? to("orders.saving") : to("orders.save_progress")}
               </button>
             </div>
@@ -1123,7 +1453,9 @@ function CollectionEntries({
             <Lock size={13} />
             {isAutoClosed
               ? collection?.finished
-                ? to("orders.auto_closed_note", { deadline: formatCollectionDeadline(day) })
+                ? to("orders.auto_closed_note", {
+                    deadline: formatCollectionDeadline(day),
+                  })
                 : to("orders.auto_closed_empty_note", {
                     deadline: formatCollectionDeadline(day),
                   })
@@ -1132,9 +1464,21 @@ function CollectionEntries({
         )}
       </div>
 
-      {/* 10-second clear undo (existing global pattern) */}
-      <PendingDeleteNotification items={pendingItems} onCancel={cancelDelete} />
-
+      {/* 10-second clear undo — the same countdown the Recent table gives a pending
+          trip, worded for a zero-out because this action never removes the shop. */}
+      <PendingDeleteNotification
+        items={pendingItems.map((item) => ({
+          ...item,
+          description: to("orders.pending_clear_note", {
+            seconds: PENDING_DELETE_SECONDS,
+          }),
+          busyLabel: to("orders.clearing_entry"),
+        }))}
+        onCancel={cancelDelete}
+        icon={<Eraser size={22} />}
+        ariaLabel={to("orders.pending_clear_aria")}
+        countdownLabel={(seconds) => to("orders.clear_in_seconds", { seconds })}
+      />
     </div>
   );
 }
