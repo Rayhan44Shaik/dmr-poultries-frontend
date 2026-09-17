@@ -36,9 +36,7 @@ import {
   PackageCheck,
   ChevronsDown,
   ChevronsUp,
-  Clock,
   GripVertical,
-  LayoutGrid,
   Loader2,
   RotateCcw,
   ArrowUpDown,
@@ -49,7 +47,6 @@ import {
   Truck,
   UserCog,
   X,
-  type LucideIcon,
 } from "lucide-react";
 import MasterDropdown, {
   type MasterDropdownOption,
@@ -1792,7 +1789,7 @@ function AssignmentEditor({
             <div className="flex w-full flex-col overflow-hidden">
               {/* ── Header ── */}
               <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-3">
-                <div className="flex min-w-0 items-center gap-2.5">
+                <div className="flex min-w-0 flex-wrap items-center gap-2.5">
                   <span className="rounded-lg bg-emerald-100 p-1.5 text-emerald-600">
                     <PackageCheck size={17} />
                   </span>
@@ -1800,6 +1797,81 @@ function AssignmentEditor({
                     <h3 className="truncate text-sm font-bold text-slate-800">
                       {to("orders.assign_shops")}
                     </h3>
+                  </div>
+                  {/* Count follows the selected toggle — same as the Recent table. */}
+                  <span
+                    key={filteredPool.length}
+                    className="inline-flex items-center justify-center rounded-full border border-slate-200/80 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-slate-600 shadow-sm motion-safe:animate-[var(--animate-pop-in)]"
+                  >
+                    {filteredPool.length}
+                  </span>
+                  <div
+                    role="group"
+                    aria-label={to("orders.filter_status")}
+                    className="ml-1 flex items-center overflow-hidden rounded-lg border border-slate-200/80 bg-slate-50 p-0.5 shadow-sm"
+                  >
+                    {(
+                      [
+                        {
+                          value: "all",
+                          labelKey: "orders.pool_filter_all",
+                          count: poolCounts.all,
+                          tone: "bg-slate-200/70 text-slate-700 shadow-sm",
+                        },
+                        {
+                          value: "pending",
+                          labelKey: "orders.pool_filter_pending",
+                          count: poolCounts.pending,
+                          tone: "bg-orange-50/80 text-orange-500 shadow-sm",
+                        },
+                        {
+                          value: "assigned",
+                          labelKey: "orders.pool_filter_assigned",
+                          count: poolCounts.assigned,
+                          tone: "bg-emerald-50/80 text-emerald-500 shadow-sm",
+                        },
+                        {
+                          value: "this_vehicle",
+                          labelKey: "orders.pool_filter_this_vehicle",
+                          count: poolCounts.thisVehicle,
+                          tone: "bg-sky-50/80 text-sky-500 shadow-sm",
+                          needsVehicle: true,
+                        },
+                      ] as Array<{
+                        value: "all" | "pending" | "assigned" | "this_vehicle";
+                        labelKey: string;
+                        count: number;
+                        tone: string;
+                        needsVehicle?: boolean;
+                      }>
+                    ).map((opt) => {
+                      const active = poolFilter === opt.value;
+                      const disabled = opt.needsVehicle === true && !vehicle;
+                      return (
+                        <button
+                          key={opt.value}
+                          type="button"
+                          onClick={() => setPoolFilter(opt.value)}
+                          disabled={disabled}
+                          aria-pressed={active}
+                          title={
+                            disabled
+                              ? to("orders.select_vehicle")
+                              : to(opt.labelKey)
+                          }
+                          className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-4 py-1.5 text-xs font-semibold transition-all ${
+                            active
+                              ? opt.tone
+                              : "bg-transparent text-slate-500 hover:bg-slate-200/50 hover:text-slate-800"
+                          } disabled:cursor-not-allowed disabled:opacity-40`}
+                        >
+                          {to(opt.labelKey)}
+                          <span className="text-[10px] font-bold tabular-nums opacity-70">
+                            {opt.count}
+                          </span>
+                        </button>
+                      );
+                    })}
                   </div>
                 </div>
                 <button
@@ -1818,93 +1890,9 @@ function AssignmentEditor({
           pending shops one by one; assigned rows are visible, locked).
           Sticky toolbar so search + filters stay in reach on ~100-shop days. */}
                 <div className="sticky top-0 z-20 border-b border-slate-200/80 bg-slate-50/95 backdrop-blur">
-                  {/* Filter controls: search + status + city, with live summary pills.
-            Narrows the table only — ticked shops stay selected. */}
-                  <div className="flex items-center gap-2 px-4 py-3 flex-wrap">
-                    <div
-                      role="group"
-                      aria-label={to("orders.filter_status")}
-                      className="inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-xl border border-slate-200 bg-slate-100/90 p-1"
-                    >
-                      {(
-                        [
-                          {
-                            value: "all",
-                            labelKey: "orders.pool_filter_all",
-                            count: poolCounts.all,
-                            icon: LayoutGrid,
-                          },
-                          {
-                            value: "pending",
-                            labelKey: "orders.pool_filter_pending",
-                            count: poolCounts.pending,
-                            icon: Clock,
-                          },
-                          {
-                            value: "assigned",
-                            labelKey: "orders.pool_filter_assigned",
-                            count: poolCounts.assigned,
-                            icon: CheckCheck,
-                          },
-                          {
-                            value: "this_vehicle",
-                            labelKey: "orders.pool_filter_this_vehicle",
-                            count: poolCounts.thisVehicle,
-                            icon: Truck,
-                            needsVehicle: true,
-                          },
-                        ] as Array<{
-                          value:
-                            "all" | "pending" | "assigned" | "this_vehicle";
-                          labelKey: string;
-                          count: number;
-                          icon: LucideIcon;
-                          needsVehicle?: boolean;
-                        }>
-                      ).map((opt) => {
-                        const active = poolFilter === opt.value;
-                        const disabled = opt.needsVehicle === true && !vehicle;
-                        const Icon = opt.icon;
-                        return (
-                          <button
-                            key={opt.value}
-                            type="button"
-                            onClick={() => setPoolFilter(opt.value)}
-                            disabled={disabled}
-                            aria-pressed={active}
-                            title={
-                              disabled
-                                ? to("orders.select_vehicle")
-                                : to(opt.labelKey)
-                            }
-                            className={`inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-bold whitespace-nowrap transition-all ${
-                              active
-                                ? "bg-white text-emerald-700 shadow-sm ring-1 ring-slate-900/5"
-                                : "text-slate-500 hover:bg-white/70 hover:text-slate-700"
-                            } disabled:cursor-not-allowed disabled:opacity-40`}
-                          >
-                            <Icon
-                              size={13}
-                              aria-hidden
-                              className={
-                                active ? "text-emerald-600" : "text-slate-400"
-                              }
-                            />
-                            {to(opt.labelKey)}
-                            <span
-                              className={`rounded-md px-1.5 py-px text-[10px] font-bold tabular-nums ${
-                                active
-                                  ? "bg-emerald-100 text-emerald-700"
-                                  : "bg-slate-200/70 text-slate-500"
-                              }`}
-                            >
-                              {opt.count}
-                            </span>
-                          </button>
-                        );
-                      })}
-                    </div>
-                    <div className="ml-auto flex items-center gap-2 flex-wrap">
+                  {/* Live summary pills — status toggle now lives in the header. */}
+                  <div className="flex flex-wrap items-center gap-2 px-4 py-2.5">
+                    <div className="flex items-center gap-2 flex-wrap">
                       {selected.length > 0 && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm">
                           <CheckCheck size={12} aria-hidden />
