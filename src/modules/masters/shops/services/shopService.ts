@@ -50,7 +50,9 @@ export function mapShop(raw: Record<string, unknown>): Shop {
     shopName: String(raw.shopName ?? raw.shop_name ?? ""),
     ownerName: String(raw.ownerName ?? raw.owner_name ?? ""),
     phoneNumber: String(raw.phoneNumber ?? raw.phone_number ?? ""),
-    secondaryPhoneNumber: String(raw.secondaryPhoneNumber ?? raw.secondary_phone_number ?? ""),
+    secondaryPhoneNumber: String(
+      raw.secondaryPhoneNumber ?? raw.secondary_phone_number ?? "",
+    ),
     whatsappNumber: String(raw.whatsappNumber ?? raw.whatsapp_number ?? ""),
     email: String(raw.email ?? "").trim(),
     city: String(raw.city ?? ""),
@@ -65,8 +67,8 @@ export function mapShop(raw: Record<string, unknown>): Shop {
       raw.currentBalance != null
         ? Number(raw.currentBalance)
         : raw.current_balance != null
-        ? Number(raw.current_balance)
-        : 0,
+          ? Number(raw.current_balance)
+          : 0,
   };
 }
 
@@ -91,7 +93,9 @@ function toPayload(input: ShopInput | Partial<Shop>): Record<string, unknown> {
   };
 }
 
-function setCacheFromApi(rows: Record<string, unknown>[] | null | undefined): Shop[] {
+function setCacheFromApi(
+  rows: Record<string, unknown>[] | null | undefined,
+): Shop[] {
   shopsCache = Array.isArray(rows) ? rows.map(mapShop) : [];
   return shopsCache;
 }
@@ -118,7 +122,7 @@ export async function createShop(input: ShopInput): Promise<Shop> {
   clearLegacyShopStorage();
   const { data } = await apiPost<Record<string, unknown>>(
     SHOPS_PATH,
-    toPayload(input)
+    toPayload(input),
   );
   return mapShop(data);
 }
@@ -128,7 +132,7 @@ export async function createShopsBulk(inputs: ShopInput[]): Promise<Shop[]> {
   clearLegacyShopStorage();
   const { data } = await apiPost<{ created: Record<string, unknown>[] }>(
     `${SHOPS_PATH}/bulk`,
-    inputs.map(toPayload)
+    inputs.map(toPayload),
   );
   return data.created.map(mapShop);
 }
@@ -136,12 +140,12 @@ export async function createShopsBulk(inputs: ShopInput[]): Promise<Shop[]> {
 /** PUT /api/masters/shops/:id */
 export async function updateShop(
   id: number,
-  input: ShopInput | Partial<Shop>
+  input: ShopInput | Partial<Shop>,
 ): Promise<Shop> {
   clearLegacyShopStorage();
   const { data } = await apiPut<Record<string, unknown>>(
     `${SHOPS_PATH}/${id}`,
-    toPayload({ ...(input as ShopInput), shopNo: input.shopNo })
+    toPayload({ ...(input as ShopInput), shopNo: input.shopNo }),
   );
   return mapShop(data);
 }
@@ -158,12 +162,24 @@ export async function refreshShops(): Promise<Shop[]> {
 }
 
 /** POST /api/masters/resolve-location — resolve URL/address to coordinates. */
+export type ResolvedLocation = {
+  latitude: number;
+  longitude: number;
+  /** Full line to store on the shop: "<place>, <address>". */
+  address: string | null;
+  placeName?: string | null;
+  fullAddress?: string | null;
+  plusCode?: string | null;
+  precision?: "pin" | "viewport" | "geocoded";
+  mapsUrl?: string | null;
+};
+
 export async function resolveLocation(
-  input: string
-): Promise<{ latitude: number; longitude: number; address: string | null }> {
-  const { data } = await apiPost<{ latitude: number; longitude: number; address: string | null }>(
+  input: string,
+): Promise<ResolvedLocation> {
+  const { data } = await apiPost<ResolvedLocation>(
     "/masters/resolve-location",
-    { input }
+    { input },
   );
   return data;
 }

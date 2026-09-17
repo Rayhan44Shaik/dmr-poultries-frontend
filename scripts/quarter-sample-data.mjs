@@ -4938,6 +4938,27 @@ function sortLeaves(rows, sortBy, sortDir) {
   });
 }
 
+// Lazily import the production geo resolver (TypeScript) via tsx's ESM loader.
+let geoResolverPromise = null;
+function loadGeoResolver() {
+  if (!geoResolverPromise) {
+    geoResolverPromise = (async () => {
+      const { register } = await import("node:module");
+      const { pathToFileURL } = await import("node:url");
+      try {
+        register("tsx/esm", pathToFileURL("./"));
+      } catch {
+        /* already registered */
+      }
+      return import(pathToFileURL(new URL("../backend/src/utils/geoResolve.ts", import.meta.url).pathname).href);
+    })();
+    geoResolverPromise.catch(() => {
+      geoResolverPromise = null;
+    });
+  }
+  return geoResolverPromise;
+}
+
 function readBody(req) {
   return new Promise((resolve) => {
     let raw = "";
@@ -5103,12 +5124,19 @@ const server = http.createServer(async (req, res) => {
     if (p === "/api/masters/market-rates/batch" && method === "PUT")
       return send(200, MARKET_RATES.slice(-7));
     if (p === "/api/masters/resolve-location" && method === "POST") {
+      // Same resolver as production (backend/src/utils/geoResolve.ts): follows
+      // the Google Maps share link, reads the exact place pin, the place name
+      // and Google's own address line. Works offline for long links too —
+      // the name + pin are in the URL itself; only the postal line needs net.
       const body = await readBody(req);
-      return send(200, {
-        latitude: 17.385,
-        longitude: 78.4867,
-        address: `Sample resolved: ${body.input ?? ""}`,
-      });
+      try {
+        const geo = await loadGeoResolver();
+        const result = await geo.resolveLocationInput(String(body.input ?? ""));
+        return send(200, result);
+      } catch (err) {
+        const status = err && typeof err.status === "number" ? err.status : 422;
+        return send(status, { error: err?.message || "Unable to determine this location." });
+      }
     }
 
     // ── Trips / Trip Entry wizard (interactive sample) ─────────────────────
