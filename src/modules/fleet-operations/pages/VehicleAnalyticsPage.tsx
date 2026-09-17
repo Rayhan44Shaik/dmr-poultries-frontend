@@ -12,19 +12,16 @@ import VehiclePerformanceTable from '../components/analytics/VehiclePerformanceT
 import AttentionSection from '../components/analytics/AttentionSection';
 import { DatePicker } from '../../../components/common/DatePicker';
 import {
-  Activity,
   Banknote,
   Calendar,
   FileSpreadsheet,
   FileText,
   Fuel,
   Gauge,
-  IndianRupee,
   RotateCcw,
   Search,
   TrendingUp,
   Truck,
-  Wrench,
 } from 'lucide-react';
 import { formatCurrencyCompact, formatNumberCompact } from '../utils/formatters';
 import {
@@ -59,8 +56,8 @@ interface KpiDef {
 }
 
 const SkeletonKpis = () => (
-  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-    {Array.from({ length: 9 }).map((_, index) => (
+  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+    {Array.from({ length: 5 }).map((_, index) => (
       <div key={index} className="min-h-[6.75rem] animate-pulse rounded-2xl border border-slate-200 bg-white p-4">
         <div className="flex items-start justify-between">
           <div className="w-2/3">
@@ -130,27 +127,19 @@ const VehicleAnalyticsPage = ({ embedded = false, active = true }: VehicleAnalyt
 
   const showSkeleton = loading && !lastRefreshed;
 
-  const utilization = useMemo(() => {
-    const total = vehicleStats.length;
-    if (total === 0) return 0;
-    const active = vehicleStats.filter((row) => row.trips > 0 || row.distance > 0).length;
-    return Math.round((active / total) * 100);
-  }, [vehicleStats]);
-
+  // A deliberately small, focused KPI set — the five figures operators actually
+  // read at a glance: trips run, distance covered, fuel burnt, what that fuel
+  // cost, and the resulting mileage. Everything else lives in the charts and the
+  // Vehicle Details table below, so the summary stays clean.
   const kpis = useMemo<KpiDef[]>(() => {
-    const costPerKm = stats.costPerKm > 0 ? `₹${stats.costPerKm.toFixed(2)}` : '—';
     return [
       { label: t('fleet.analytics.total_trips'), value: formatNumberCompact(stats.totalTrips), icon: Truck, tone: 'blue' },
       { label: t('fleet.analytics.total_distance'), value: `${formatNumberCompact(stats.totalDistance)} km`, icon: TrendingUp, tone: 'cyan' },
       { label: t('fleet.analytics.fuel_used'), value: `${formatNumberCompact(stats.totalFuelLitres)} L`, icon: Fuel, tone: 'amber' },
+      { label: t('fleet.analytics.fuel_cost'), value: formatCurrencyCompact(stats.fuelCost), icon: Banknote, tone: 'rose' },
       { label: t('fleet.analytics.avg_mileage'), value: stats.averageMileage > 0 ? `${stats.averageMileage.toFixed(2)} km/l` : '—', icon: Gauge, tone: 'emerald' },
-      { label: t('fleet.analytics.vehicle_utilization'), value: `${utilization}%`, icon: Activity, tone: 'cyan' },
-      { label: t('fleet.analytics.fuel_cost'), value: formatCurrencyCompact(stats.fuelCost), icon: Banknote, tone: 'blue' },
-      { label: t('fleet.analytics.maint_cost'), value: formatCurrencyCompact(stats.maintenanceCost), icon: Wrench, tone: 'violet' },
-      { label: t('fleet.analytics.total_fleet_cost'), value: formatCurrencyCompact(stats.totalExpense), icon: IndianRupee, tone: 'rose' },
-      { label: t('fleet.analytics.cost_per_km'), value: costPerKm, icon: Activity, tone: 'amber' },
     ];
-  }, [stats, utilization, t]);
+  }, [stats, t]);
 
   const kpiCards = useMemo<KpiCardItem[]>(
     () =>
@@ -533,11 +522,11 @@ const VehicleAnalyticsPage = ({ embedded = false, active = true }: VehicleAnalyt
           <div className="space-y-5">
             {/* KPI summary — rendered through the shared KPI surface, the same
                 component the Trip List uses, so both pages read identically.
-                Nine metrics laid out on a balanced 3×3 (lg) / 4-up (xl) grid so
-                every card keeps a readable value instead of being squeezed. */}
+                Five focused metrics on a single clean row, exactly like the
+                Trip List KPI strip. */}
             <KpiCardGrid
               items={kpiCards}
-              gridClassName="lg:grid-cols-3 xl:grid-cols-3"
+              gridClassName="lg:grid-cols-5"
               ariaLabel={t('fleet.analytics.vehicle_performance')}
             />
 
