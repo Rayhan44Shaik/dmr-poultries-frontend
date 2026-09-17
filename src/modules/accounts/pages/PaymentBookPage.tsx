@@ -88,12 +88,13 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
 
   // The existing list endpoint returns the dataset. Filter locally so search
   // covers all displayed fields and paging/filter changes make no requests.
-  const loadPayments = useCallback(async (afterMutation = false) => {
-    if (demoRef.current || !mounted.current) return;
+  // Resolves true only when the dataset actually came back.
+  const loadPayments = useCallback(async (afterMutation = false): Promise<boolean> => {
+    if (demoRef.current || !mounted.current) return false;
     if (inFlight.current) {
       // A save/delete completing during refresh must not leave stale rows.
       if (afterMutation) reloadAfterSave.current = true;
-      return;
+      return false;
     }
     inFlight.current = true;
     setLoading(true);
@@ -107,10 +108,12 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
         }
       } while (reloadAfterSave.current);
       if (mounted.current) setError(false);
+      return true;
     } catch {
-      if (!mounted.current) return;
+      if (!mounted.current) return false;
       setError(true);
       if (!demoRef.current) showNotification(t('accounts.payment.notif_load_error'), 'error');
+      return false;
     } finally {
       inFlight.current = false;
       if (mounted.current) setLoading(false);
@@ -139,26 +142,25 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
     return () => document.removeEventListener('pointerdown', clearOutsideSelection);
   }, []);
 
-  /* Refresh feedback. The arrows keep turning for as long as a real load runs,
-     and for one short beat on sample data, which makes no request at all — so
-     the click is never silently swallowed. */
-  const [spinBeat, setSpinBeat] = useState(false);
+  /* Filter feedback: the Search / Reset glyphs beat once per click (700 ms).
+     The refresh button follows the trip list's contract instead — plain hen,
+     success toast when the load finishes. */
   const [filterAction, setFilterAction] = useState<'search' | 'clear' | 'refresh' | null>(null);
   const spinTimer = useRef<number | null>(null);
-  const spinning = spinBeat || loading;
   const animateFilterAction = (action: 'search' | 'clear' | 'refresh') => {
     setFilterAction(action);
-    setSpinBeat(true);
     if (spinTimer.current !== null) window.clearTimeout(spinTimer.current);
-    spinTimer.current = window.setTimeout(() => {
-      setSpinBeat(false);
-      setFilterAction(null);
-    }, 700);
+    spinTimer.current = window.setTimeout(() => setFilterAction(null), 700);
   };
+  // The trip list's refresh contract, kept identical: the hen button stays
+  // plain (no loading prop, so it never pre-dances), and a finished refresh
+  // confirms with the shared "Data refreshed" success notification.
   const handleRefresh = useCallback(() => {
-    animateFilterAction('refresh');
-    if (demoRef.current) showNotification(t('accounts.payment.notif_demo_fresh'), 'info');
-    else void loadPayments();
+    if (demoRef.current) {
+      showNotification(t('accounts.payment.notif_demo_fresh'), 'info');
+      return;
+    }
+    void loadPayments().then(ok => { if (ok) showNotification(t('notification.data_refreshed'), 'success'); });
   }, [loadPayments, showNotification, t]);
   useEffect(() => () => { if (spinTimer.current !== null) window.clearTimeout(spinTimer.current); }, []);
 
@@ -419,7 +421,7 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
               <span className={`inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)] ${filterAction === 'clear' ? 'motion-safe:animate-[var(--animate-action-reset)]' : ''}`}><RotateCcw size={14} /></span>
               {t('common.reset')}
             </button>
-            <BrandRefreshButton loading={spinning} onClick={handleRefresh} />
+            <BrandRefreshButton onClick={handleRefresh} />
           </div>
         </div>
         {invalidRange && <p role="alert" className="mt-2 text-xs text-red-600">{t('accounts.payment.invalid_range')}</p>}
