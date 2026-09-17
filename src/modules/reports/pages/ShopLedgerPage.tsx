@@ -14,6 +14,7 @@ import {
   ArrowUpRight,
   BarChart3,
   Bird,
+  BookOpen,
   Calendar,
   CalendarDays,
   CalendarRange,
@@ -534,6 +535,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   const [refreshNonce, setRefreshNonce] = useState(0);
   const [pageSize, setPageSize] = useState<number>(DEFAULT_PAGE_SIZE);
   const [currentPage, setCurrentPage] = useState(1);
+  const [selectedLedgerRowIndex, setSelectedLedgerRowIndex] = useState(-1);
+  const ledgerRowRefs = useRef<Array<HTMLTableRowElement | null>>([]);
   /** Trip-List style explicit sort — null means natural ledger order.
    *  Default view is LATEST FIRST (newest transactions on top). */
   const [sortBy, setSortBy] = useState<LedgerSortKey | null>("date");
@@ -746,6 +749,40 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     const start = (safePage - 1) * pageSize;
     return [...opening, ...sortedBody.slice(start, start + pageSize)];
   }, [filteredLedger, sortedBody, safePage, pageSize]);
+
+  const selectLedgerRow = useCallback(
+    (index: number) => {
+      if (visibleRows.length === 0) return;
+      const next = Math.max(0, Math.min(index, visibleRows.length - 1));
+      setSelectedLedgerRowIndex(next);
+      window.requestAnimationFrame(() => ledgerRowRefs.current[next]?.focus());
+    },
+    [visibleRows.length],
+  );
+
+  const handleLedgerRowKeyDown = useCallback(
+    (event: React.KeyboardEvent<HTMLTableRowElement>, index: number) => {
+      if (event.key === "ArrowDown") {
+        event.preventDefault();
+        selectLedgerRow(index + 1);
+      } else if (event.key === "ArrowUp") {
+        event.preventDefault();
+        selectLedgerRow(index - 1);
+      } else if (event.key === "Home") {
+        event.preventDefault();
+        selectLedgerRow(0);
+      } else if (event.key === "End") {
+        event.preventDefault();
+        selectLedgerRow(visibleRows.length - 1);
+      }
+    },
+    [selectLedgerRow, visibleRows.length],
+  );
+
+  const activeSelectedLedgerRowIndex =
+    selectedLedgerRowIndex >= 0 && selectedLedgerRowIndex < visibleRows.length
+      ? selectedLedgerRowIndex
+      : -1;
 
   const summary = useMemo(() => {
     const tx = filteredLedger.slice(1);
@@ -2417,8 +2454,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden text-xs md:text-sm">
         <div className="flex items-center justify-between gap-3 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-blue-50/60 via-white to-blue-50/40">
           <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-blue-50/70 border border-blue-100 flex items-center justify-center text-blue-500 shadow-inner">
-              <Store className="w-5 h-5" />
+            <div className="h-9 w-9 rounded-xl bg-teal-50/80 border border-teal-100 flex items-center justify-center text-teal-600 shadow-inner">
+              <BookOpen className="w-5 h-5" aria-hidden="true" />
             </div>
             <h3 className="text-base font-bold text-slate-800 tracking-tight">
               {t("shop_ledger.title")}
@@ -2578,10 +2615,28 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                               text: t("shop_ledger.tx_type.correction"),
                               color: "text-rose-600",
                             };
+                    const isSelected = activeSelectedLedgerRowIndex === idx;
                     return (
                       <tr
                         key={`${isOpening ? "opening" : tx.collectionNo || tx.particulars}-${idx}`}
-                        className={`transition-colors ${isOpening ? "bg-amber-50/50 font-semibold" : "hover:bg-slate-50/80"}`}
+                        ref={(element) => {
+                          ledgerRowRefs.current[idx] = element;
+                        }}
+                        tabIndex={isSelected || (activeSelectedLedgerRowIndex < 0 && idx === 0) ? 0 : -1}
+                        aria-selected={isSelected}
+                        onFocus={() => setSelectedLedgerRowIndex(idx)}
+                        onClick={(event) => {
+                          setSelectedLedgerRowIndex(idx);
+                          event.currentTarget.focus();
+                        }}
+                        onKeyDown={(event) => handleLedgerRowKeyDown(event, idx)}
+                        className={`cursor-pointer outline-none transition-[background-color,box-shadow] duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 ${
+                          isSelected
+                            ? "bg-emerald-50/90 shadow-[inset_4px_0_0_#10b981]"
+                            : isOpening
+                              ? "bg-amber-50/50 font-semibold hover:bg-amber-100/60"
+                              : "hover:bg-emerald-50/45"
+                        }`}
                       >
                         <td className="px-4 py-3 text-xs font-medium text-slate-600 tabular-nums">
                           {formatDisplayDate(tx.date)}
