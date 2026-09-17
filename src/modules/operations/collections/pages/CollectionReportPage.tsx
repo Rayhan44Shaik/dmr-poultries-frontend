@@ -806,7 +806,6 @@ export default function CollectionReportPage({ embedded = false }: Props) {
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("ops.collection.collectors")}</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("ops.collection.no_short")}</th>
                     <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("table.amount")}</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider text-slate-600">{t("ops.collection.percentage")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 bg-white">
@@ -832,7 +831,6 @@ export default function CollectionReportPage({ embedded = false }: Props) {
                       </td>
                       <td className="px-4 py-3 text-right text-xs text-slate-600">{row.count}</td>
                       <td className="px-4 py-3 text-right text-xs text-slate-600">{formatCurrency(row.amount)}</td>
-                      <td className="px-4 py-3 text-right text-xs text-slate-600">{row.percentage.toFixed(1)}%</td>
                     </tr>
                   ))}
                 </tbody>
@@ -852,10 +850,11 @@ export default function CollectionReportPage({ embedded = false }: Props) {
                 {t("common.total")}: {formatCurrency(totalCollections)}
               </span>
             </div>
-            <div className="flex min-h-[28rem] p-4">
+            <div className="flex p-4">
               <CollectionsPie
                 data={modeChartData.map((row) => ({ name: row.name, value: row.value }))}
                 animationKey={report?.totalCount ?? 0}
+                compact
               />
             </div>
           </div>
