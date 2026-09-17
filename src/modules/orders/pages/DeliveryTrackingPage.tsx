@@ -47,6 +47,7 @@ import {
   opsFilterLabelClass,
   opsInputClass,
   opsPdfButtonClass,
+  opsPrimaryButtonClass,
   opsViewButtonClass,
 } from "../../../shared/ui/operationsStyles";
 import { uiActionIconMotionClass } from "../../../shared/ui/uiTokens";
@@ -78,6 +79,14 @@ import {
 } from "../services/ordersService";
 import { useOrdersI18n } from "../i18n/ordersI18n";
 import type { OrdersDeliveryState, OrdersTrip } from "../types";
+import type { Trip } from "../../../shared/trip";
+import { useShops } from "../../masters/shops/hooks/useShops";
+import { useBirdTypes } from "../../masters/bird-types/hooks/useBirdTypes";
+const TripHistoryViewModal = React.lazy(() =>
+  import("../../operations/vehicle-trips/components/TripViewModal").then(
+    (m) => ({ default: m.TripHistoryViewModal }),
+  ),
+);
 import { DatePicker } from "../../../components/common/DatePicker";
 
 const PAGE_SIZE = 10;
@@ -337,24 +346,24 @@ function TrackingTable({
               icon={
                 <ShoppingBag size={14} className="shrink-0 text-cyan-500" />
               }
-              label={to("orders.col_total_shops")}
+              label={to("orders.th_shops")}
             />
             <Th
               align="center"
               icon={<Box size={14} className="shrink-0 text-emerald-600" />}
-              label={to("orders.total_boxes")}
+              label={to("orders.th_boxes")}
             />
             <Th
               align="center"
               icon={
                 <PackageCheck size={14} className="shrink-0 text-teal-500" />
               }
-              label={to("orders.col_delivered_boxes")}
+              label={to("orders.th_del_boxes")}
             />
             <Th
               align="center"
               icon={<Bird size={14} className="shrink-0 text-blue-500" />}
-              label={to("orders.delivered_birds")}
+              label={to("orders.th_del_birds")}
             />
           </tr>
         </thead>
@@ -400,7 +409,7 @@ function TrackingTable({
                       serialNo
                     )}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-5 pl-9 text-[13px] font-bold text-emerald-600">
+                  <td className="whitespace-nowrap px-4 py-5 pl-9 text-[13px] font-extrabold text-emerald-600">
                     <span className="inline-flex flex-col leading-tight">
                       {lt(trip.tripNo)}
                       {ot.assignmentIncomplete && (
@@ -413,24 +422,26 @@ function TrackingTable({
                       )}
                     </span>
                   </td>
-                  <td className="whitespace-nowrap px-4 py-5 pl-9 text-[13px] font-medium text-slate-600">
+                  <td className="whitespace-nowrap px-4 py-5 pl-9 text-[13px] font-semibold text-slate-900">
                     {formatTripListDay(trip.tripDate, language)}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-5 pl-9 text-[13px] font-medium text-slate-700">
+                  <td className="whitespace-nowrap px-4 py-5 pl-9 text-[13px] font-bold tabular-nums text-slate-900">
                     {trip.vehicleNo
                       ? lt(formatVehicleNumber(trip.vehicleNo))
                       : "—"}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-5 pl-9 text-[13px] text-slate-600">
+                  <td className="whitespace-nowrap px-4 py-5 pl-9 text-[13px] font-semibold text-slate-900">
                     {lt(trip.supervisorName)}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-5 pl-9 text-[13px] text-slate-600">
+                  <td className="whitespace-nowrap px-4 py-5 pl-9 text-[13px] font-semibold text-slate-900">
                     {lt(trip.driverName)}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold text-slate-700">
+                  <td className="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold text-slate-900">
                     {progress ? (
                       <span className="inline-flex flex-col items-center leading-tight">
-                        <span>{formatCount(progress.totalShops)}</span>
+                        <span className="text-[14px]">
+                          {formatCount(progress.totalShops)}
+                        </span>
                         <span className="text-[10px] font-semibold text-slate-400">
                           {formatCount(progress.deliveredShops)}{" "}
                           {to("orders.status_delivered")}
@@ -440,13 +451,13 @@ function TrackingTable({
                       "—"
                     )}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold text-emerald-600">
+                  <td className="whitespace-nowrap px-4 py-5 text-center text-[14px] font-extrabold text-emerald-600">
                     {progress ? formatCount(progress.totalBoxes) : "—"}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold text-teal-600">
+                  <td className="whitespace-nowrap px-4 py-5 text-center text-[14px] font-extrabold text-teal-600">
                     {progress ? formatCount(progress.deliveredBoxes) : "—"}
                   </td>
-                  <td className="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold text-blue-600">
+                  <td className="whitespace-nowrap px-4 py-5 text-center text-[14px] font-extrabold text-blue-600">
                     {progress && progress.deliveredBirds > 0 ? (
                       formatCount(progress.deliveredBirds)
                     ) : (
@@ -479,12 +490,14 @@ function SelectedActions({
   pdfBusyId,
   onPdf,
   onView,
+  onTripView,
   buttonRef,
 }: {
   ot: OrdersTrip;
   pdfBusyId: number | null;
   onPdf: (ot: OrdersTrip) => void;
   onView: (ot: OrdersTrip) => void;
+  onTripView: (ot: OrdersTrip) => void;
   buttonRef: React.Ref<HTMLDivElement>;
 }) {
   const { to } = useOrdersI18n();
@@ -494,16 +507,29 @@ function SelectedActions({
       ref={buttonRef}
       className="flex items-center gap-2 motion-safe:animate-[var(--animate-pop-in)]"
     >
+      {/* Trip View — the SAME modal as the Trip List (all steps, Telugu toggle). */}
       <button
         type="button"
-        onClick={() => onView(ot)}
+        onClick={() => onTripView(ot)}
         className={`group relative ${opsViewButtonClass}`}
-        aria-label={`${to("orders.view")} — ${ot.trip.tripNo}`}
+        aria-label={`${to("orders.trip_view")} — ${ot.trip.tripNo}`}
       >
         <span className={`inline-flex ${uiActionIconMotionClass.view}`}>
           <Eye size={15} />
         </span>
-        {to("orders.view")}
+        {to("orders.trip_view")}
+      </button>
+      {/* Delivery Entry — record / review shop deliveries for this trip. */}
+      <button
+        type="button"
+        onClick={() => onView(ot)}
+        className={`group relative ${opsPrimaryButtonClass}`}
+        aria-label={`${to("orders.record_delivery")} — ${ot.trip.tripNo}`}
+      >
+        <span className={`inline-flex ${uiActionIconMotionClass.edit}`}>
+          <PackageCheck size={15} />
+        </span>
+        {to("orders.record_delivery")}
       </button>
       <button
         type="button"
@@ -581,6 +607,13 @@ function DeliveryTrackingPage({
   // clicking the same row again clears it, clicking outside the tables or
   // their action buttons clears it too.
   const [selectedId, setSelectedId] = useState<number | null>(null);
+  // Trip View — the Trip List's own modal, so Pending and Completed trips read
+  // exactly as they do there (same size, steps, language toggle).
+  const [tripViewId, setTripViewId] = useState<number | null>(null);
+  const tripViewTrip = useMemo(
+    () => trips.find((t) => t.trip.id === tripViewId)?.trip ?? null,
+    [trips, tripViewId],
+  );
   const tablesRef = useRef<HTMLDivElement>(null);
   const actionsRef = useRef<HTMLDivElement>(null);
   const handleSelect = useCallback((ot: OrdersTrip, toggle: boolean) => {
@@ -928,6 +961,7 @@ function DeliveryTrackingPage({
               pdfBusyId={pdfBusyId}
               onPdf={onPdf}
               onView={onView}
+              onTripView={(t) => setTripViewId(t.trip.id)}
               buttonRef={actionsRef}
             />
           )}
@@ -970,6 +1004,7 @@ function DeliveryTrackingPage({
               pdfBusyId={pdfBusyId}
               onPdf={onPdf}
               onView={onView}
+              onTripView={(t) => setTripViewId(t.trip.id)}
               buttonRef={actionsRef}
             />
           )}
@@ -1023,7 +1058,36 @@ function DeliveryTrackingPage({
           ))}
         </div>
       )}
+      {tripViewTrip && (
+        <React.Suspense fallback={null}>
+          <TripViewWithMasters
+            trip={tripViewTrip}
+            onClose={() => setTripViewId(null)}
+          />
+        </React.Suspense>
+      )}
     </div>
+  );
+}
+
+/** Loads the shop / bird-type masters only once a Trip View is opened. */
+function TripViewWithMasters({
+  trip,
+  onClose,
+}: {
+  trip: Trip;
+  onClose: () => void;
+}) {
+  const { shops } = useShops();
+  const { birdTypes } = useBirdTypes();
+  return (
+    <TripHistoryViewModal
+      open
+      trip={trip}
+      shops={shops}
+      birdTypes={birdTypes}
+      onClose={onClose}
+    />
   );
 }
 
