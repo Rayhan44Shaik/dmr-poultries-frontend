@@ -42,10 +42,25 @@ export function loadEmiSnapshot(scope: unknown = null): Promise<EmiSnapshot> {
         throw error;
       }
       if (invalidated()) continue;
+      // Identical duplicate rows collapse; conflicting duplicates fail closed
+      // rather than arbitrarily picking one financial record (same contract
+      // the master-driven pipeline enforced).
+      const byVehicle = new Map<number, (typeof records)[number]>();
+      for (const record of records) {
+        const existing = byVehicle.get(record.vehicleId);
+        if (existing) {
+          if (JSON.stringify(existing) !== JSON.stringify(record)) {
+            throw new Error('Conflicting duplicate EMI records.');
+          }
+          continue;
+        }
+        byVehicle.set(record.vehicleId, record);
+      }
+      const distinct = [...byVehicle.values()];
       const now = new Date();
       const asOfDate = getEmiToday(now);
       return Object.freeze({
-        rows: Object.freeze(records.map((record) => Object.freeze({
+        rows: Object.freeze(distinct.map((record) => Object.freeze({
           vehicleId: record.vehicleId,
           vehicleNo: record.vehicleNo,
           vehicleNumber: record.vehicleNo,

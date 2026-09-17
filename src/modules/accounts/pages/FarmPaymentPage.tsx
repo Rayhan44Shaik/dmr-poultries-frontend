@@ -9,9 +9,11 @@ import { FarmPaymentService } from '../services/FarmPaymentService';
 import { loadTripFarmPayments } from '../services/farmPaymentApiService';
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
 import type { FarmPayment, TripFarmPayment } from '../types/farmPayment.types';
-import { Save, RotateCcw } from 'lucide-react';
+import { Save, RotateCcw, HandCoins } from 'lucide-react';
 import { formatINR, formatINRExact, formatCount, formatKg } from '../components/farm-payment/farmPaymentFormat';
 import Pagination from '../../../ui/Pagination';
+import { shouldShowPagination } from '../../../shared/ui/paginationStyles';
+import { useI18n } from '../../../i18n';
 
 type FarmerPaymentPageProps = { embedded?: boolean };
 
@@ -47,6 +49,7 @@ function TotalStat({ label, value, exact, dot }: { label: string; value: string;
 }
 
 export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) {
+  const { t } = useI18n();
   const { showNotification } = useSafeNotification();
 
   // ----- state -----
@@ -59,6 +62,9 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   // user intent, so a second click within 500ms is ignored instead of firing
   // a duplicate fetch (fast responses already reset `loading` between clicks).
   const lastRefreshAtRef = useRef(0);
+  // True while a user-initiated refresh is in flight — the finished load
+  // confirms with the shared "Data refreshed" toast (the Trip List contract).
+  const refreshToastPendingRef = useRef(false);
 
   // Payment state management
   const [paymentData, setPaymentData] = useState<Record<string, Partial<FarmPayment>>>({});
@@ -196,14 +202,23 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
         // paymentData now mirrors persisted storage — nothing is unsaved.
         clearDirty();
       })
+      .then(() => {
+        // The Trip List's refresh contract: a user-initiated refresh confirms
+        // with the shared "Data refreshed" success toast once it lands.
+        if (!cancelled && refreshToastPendingRef.current) {
+          refreshToastPendingRef.current = false;
+          showNotification(t('notification.data_refreshed'), 'success');
+        }
+      })
       .catch((error) => {
         if (cancelled) return; // superseded — ignore
         console.error('Failed to load trips:', error);
+        refreshToastPendingRef.current = false;
         // Keep any previously loaded rows visible; surface the failure both
         // as a toast and as an inline state (the table alone would otherwise
         // read as "no completed trips", misleading on a fetch error).
-        setLoadError('Failed to load trips. Please try refreshing.');
-        showNotification('Failed to load trips', 'error');
+        setLoadError(t('accounts.farmpay.load_error'));
+        showNotification(t('accounts.farmpay.notif_load_error'), 'error');
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -310,7 +325,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
     });
 
     if (paymentsToSave.length === 0) {
-      showNotification('No payment changes to save. Please fill in payment details first.', 'info');
+      showNotification(t('accounts.farmpay.notif_no_changes'), 'info');
       return;
     }
 
@@ -363,12 +378,16 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
       syncPaymentData(allTrips);
       clearDirty();
 
-      const paymentWord = savedCount === 1 ? 'payment' : 'payments';
-      showNotification(`${savedCount} ${paymentWord} saved successfully`, 'success');
+      showNotification(
+        savedCount === 1
+          ? t('accounts.farmpay.notif_saved_one')
+          : t('accounts.farmpay.notif_saved_many', { count: savedCount }),
+        'success'
+      );
 
     } catch (error) {
       console.error('Failed to save payments:', error);
-      showNotification('Failed to save payments. Please try again.', 'error');
+      showNotification(t('accounts.farmpay.notif_save_failed'), 'error');
     } finally {
       setSavingPayments(false);
     }
@@ -378,13 +397,13 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
     // "Nothing to reset" means nothing was edited this session — paymentData is
     // never empty now that rows open pre-filled from the backend.
     if (dirtyTripIds.size === 0) {
-      showNotification('No changes to reset', 'info');
+      showNotification(t('accounts.farmpay.notif_nothing_reset'), 'info');
       return;
     }
     clearDirty();
     // Instant local sync from persisted payments — no reload.
     syncPaymentData(allTrips);
-    showNotification('All changes reset', 'info');
+    showNotification(t('accounts.farmpay.notif_reset'), 'info');
   };
 
   const handleRefresh = () => {
@@ -396,10 +415,10 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
     const now = Date.now();
     if (now - lastRefreshAtRef.current < 500) return;
     lastRefreshAtRef.current = now;
+    refreshToastPendingRef.current = true;
     setLoading(true);
     setLoadError(null);
     setRefreshKey(prev => prev + 1);
-    showNotification('Refreshed', 'info');
   };
 
   const handleClearFilters = () => {
@@ -409,7 +428,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
     setSelectedFarm('All');
     setSearchQuery('');
     setCurrentPage(1);
-    showNotification('Filters cleared', 'info');
+    showNotification(t('accounts.farmpay.notif_filters_cleared'), 'info');
   };
 
   // Unsaved rows = edited since the last load/save (same set Save Payments
@@ -433,10 +452,12 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
 
   // ----- render -----
   const content = (
-    <div className={`w-full space-y-5 animate-in fade-in duration-500 ${
-      embedded ? '' : 'px-4 md:px-8 py-6 md:py-8 bg-slate-50 min-h-screen'
+    <div className={`w-full space-y-5 animate-in fade-in duration-200 ${
+      embedded ? '' : 'px-3 md:px-6 py-4 bg-slate-50/50 min-h-screen text-slate-800'
     }`}>
-      {/* Filters */}
+      {/* The same filter card the Trip List uses: icon-labelled fields, the
+          search row, Reset (spins) and the brand hen Refresh. Filters apply
+          reactively — no Apply step. */}
       <FarmerPaymentFilters
         dateFrom={dateFrom}
         dateTo={dateTo}
@@ -449,56 +470,71 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
         onSearchChange={setSearchQuery}
         loading={loading}
         onRefresh={handleRefresh}
-        onApply={() => setCurrentPage(1)}
         onClear={handleClearFilters}
       />
 
-      {/* Table Card */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        {/* Header with Save button */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 bg-gradient-to-r from-slate-50/80 to-white border-b border-slate-200/60">
-          <div className="flex items-center gap-2">
-            <h2 className="text-sm font-bold text-slate-800">Farm Payments</h2>
-            <span className="rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-500">
-              {filteredTrips.length} {filteredTrips.length === 1 ? 'trip' : 'trips'}
+      {/* The table card — the exact shell the Trip List uses: white rounded-2xl
+          card, gradient header bar with the logo tile + title + live count,
+          register actions on the right, table, global pagination at the foot. */}
+      <section
+        aria-label={t('accounts.farmpay.records_aria')}
+        aria-busy={loading}
+        className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden text-xs md:text-sm"
+      >
+        {/* Header — the Trip List header: logo tile + heading + count badge,
+            with the register's Save / Reset actions on the right. */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-blue-50/60 via-white to-blue-50/40">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-xl bg-emerald-50/70 border border-emerald-100 flex items-center justify-center text-emerald-500 shadow-inner">
+                <HandCoins className="w-5 h-5" />
+              </div>
+              <h3 className="text-base font-bold text-slate-800 tracking-tight">{t('accounts.farmpay.title')}</h3>
+            </div>
+            <span
+              aria-live="polite"
+              className="inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 rounded-full shadow-sm tabular-nums"
+            >
+              {loading ? t('accounts.farmpay.updating') : filteredTrips.length}
             </span>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto lg:justify-end">
             <button
               onClick={handleResetPayments}
               disabled={modifiedCount === 0}
-              className="px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-1.5"
+              className="group px-3 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition flex items-center gap-1.5"
             >
-              <RotateCcw size={14} /> Reset
+              <span className={`inline-flex ${modifiedCount > 0 ? 'motion-safe:group-hover:animate-[var(--animate-action-reset)]' : ''}`}>
+                <RotateCcw size={14} />
+              </span>
+              {t('common.reset')}
             </button>
             <button
               onClick={handleSaveAll}
               disabled={savingPayments || loading || modifiedCount === 0}
-              className="px-4 py-1.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-lg text-xs font-semibold transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="group px-4 py-1.5 bg-gradient-to-r from-emerald-600 to-emerald-500 hover:from-emerald-700 hover:to-emerald-600 text-white rounded-lg text-xs font-semibold transition-all shadow-sm flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {savingPayments ? (
                 <>
                   <div className="animate-spin rounded-full h-3.5 w-3.5 border-2 border-white border-t-transparent"></div>
-                  Saving...
+                  {t('accounts.payment.saving')}
                 </>
               ) : (
                 <>
-                  <Save size={14} /> Save
+                  <span className={`inline-flex ${modifiedCount > 0 ? 'motion-safe:group-hover:animate-[var(--animate-action-approve)]' : ''}`}>
+                    <Save size={14} />
+                  </span>
+                  {t('common.save')}
                 </>
               )}
             </button>
           </div>
         </div>
 
-        {/* Table — the full spinner shows only on the FIRST load (no data yet).
-            A refresh keeps the current rows on screen (no flicker / no input
-            loss); the spinning Refresh icon signals activity. */}
-        {loading && allTrips.length === 0 && !loadError ? (
-          <div className="p-8 text-center">
-            <div className="inline-block animate-spin rounded-full h-8 w-8 border-4 border-blue-500 border-t-transparent"></div>
-            <p className="mt-3 text-slate-500 text-sm">Loading trips...</p>
-          </div>
-        ) : loadError && allTrips.length === 0 ? (
+        {/* Table — the animated "Loading Farm Payment records…" state renders
+            through the table itself (the Trip List's contract) whenever a load
+            is in flight; a refresh with rows on screen keeps them visible. */}
+        {loadError && allTrips.length === 0 && !loading ? (
           <div className="p-8 text-center">
             <p className="text-sm font-semibold text-red-600">{loadError}</p>
             <button
@@ -510,7 +546,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
               }}
               className="mt-3 px-4 py-1.5 border border-slate-300 rounded-lg text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 transition"
             >
-              Try Again
+              {t('accounts.farmpay.try_again')}
             </button>
           </div>
         ) : (
@@ -519,14 +555,13 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
               trips={paginatedTrips}
               paymentData={paymentData}
               onPaymentUpdate={handlePaymentUpdate}
-              onPaymentSaved={handleSaveAll}
-              onRefresh={handleRefresh}
-              showNotification={showNotification}
+              loading={loading && allTrips.length === 0}
               onViewTrip={setViewingTrip}
+              startIndex={(currentPage - 1) * pageSize}
               emptyMessage={
                 isFilterActive
-                  ? 'No trips match the current filters.'
-                  : 'No completed trips found'
+                  ? t('accounts.farmpay.empty_no_filters')
+                  : t('accounts.farmpay.empty_no_data')
               }
             />
 
@@ -535,13 +570,13 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
             {isFilterActive && filteredTrips.length > 0 && (
               <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 border-t border-slate-200/70 bg-slate-50/80 px-4 py-2">
                 <p className="text-[11px] font-semibold text-slate-500">
-                  Totals for all {filteredTrips.length} filtered {filteredTrips.length === 1 ? 'trip' : 'trips'}
+                  {t('accounts.farmpay.totals_for', { count: filteredTrips.length })}
                 </p>
                 <div className="flex flex-wrap items-center gap-x-5 gap-y-1">
-                  <TotalStat label="Total Birds" value={formatCount(totalBirdsKPI)} dot="bg-indigo-500" />
-                  <TotalStat label="Total Weight" value={`${formatKg(totalWeightKPI)} kg`} dot="bg-lime-500" />
+                  <TotalStat label={t('accounts.farmpay.total_birds')} value={formatCount(totalBirdsKPI)} dot="bg-indigo-500" />
+                  <TotalStat label={t('accounts.farmpay.total_weight')} value={`${formatKg(totalWeightKPI)} kg`} dot="bg-lime-500" />
                   <TotalStat
-                    label="Total Amount"
+                    label={t('accounts.farmpay.total_amount')}
                     value={formatINR(totalAmountKPI)}
                     exact={formatINRExact(totalAmountKPI)}
                     dot="bg-emerald-500"
@@ -550,22 +585,26 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
               </div>
             )}
 
-            {/* Global pagination bar — identical appearance/behaviour app-wide */}
-            <Pagination
-              page={currentPage}
-              pageSize={pageSize}
-              totalItems={filteredTrips.length}
-              onPageChange={setCurrentPage}
-              onPageSizeChange={(size) => {
-                setPageSize(size);
-                setCurrentPage(1);
-              }}
-              disabled={loading}
-              ariaLabel="Farm payment pagination"
-            />
+            {/* Global pagination, exactly as the Trip List renders it: the
+                shared component, shown only when there is more than one page,
+                blocked while a refresh is in flight. */}
+            {shouldShowPagination(filteredTrips.length) && (
+              <Pagination
+                page={currentPage}
+                pageSize={pageSize}
+                totalItems={filteredTrips.length}
+                onPageChange={setCurrentPage}
+                onPageSizeChange={(size) => {
+                  setPageSize(size);
+                  setCurrentPage(1);
+                }}
+                disabled={loading}
+                ariaLabel={t('accounts.farmpay.records_aria')}
+              />
+            )}
           </>
         )}
-      </div>
+      </section>
 
       {/* Separate read-only trip view — Step 2 (Farm) + Step 3 (Pickup) only,
           same step detail as the Trip List view. */}

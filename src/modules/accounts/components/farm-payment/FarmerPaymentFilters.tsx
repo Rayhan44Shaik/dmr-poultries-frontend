@@ -1,9 +1,24 @@
-// D:\Development\DMR-Poultries-ERP\frontend\dmr-poultries-web\src\modules\accounts\components\farm-payment\FarmerPaymentFilters.tsx
+// src/modules/accounts/components/farm-payment/FarmerPaymentFilters.tsx
+//
+// The Farm Payment filter card — the SAME card the Trip List uses
+// (opsFilterCardClass): one labelled grid of icon + name fields, then the
+// search row with every register action beside it. Glyph motions come from
+// the global tokens: search sways, reset spins, refresh is the brand hen.
 
 import React from 'react';
-import { uiInputClass } from '../../../../shared/ui/uiTokens';
+import { Search, Calendar, Warehouse, RotateCcw } from 'lucide-react';
 import { DatePicker } from '../../../../components/common/DatePicker';
-import { Search, X, Filter, RefreshCw } from 'lucide-react';
+import {
+  opsFilterCardClass,
+  opsFilterLabelClass,
+  opsInputClass,
+  opsSecondaryButtonClass,
+} from '../../../../shared/ui/operationsStyles';
+import { BrandRefreshButton } from '../../../../ui';
+import MasterDropdown from '../../../masters/components/MasterDropdown';
+import '../../../masters/styles/masters.css';
+import { useI18n } from '../../../../i18n';
+import { localizeTripViewText } from '../../../operations/vehicle-trips/utils/tripViewLocalization';
 
 interface FarmerPaymentFiltersProps {
   dateFrom: string;
@@ -11,14 +26,13 @@ interface FarmerPaymentFiltersProps {
   selectedFarm: string;
   searchQuery: string;
   farms: string[];
-  /** A trips reload is in flight — the Refresh button shows its spinner. */
+  /** A trips reload is in flight — the hen dances while it runs. */
   loading?: boolean;
   onRefresh: () => void;
   onDateFromChange: (val: string) => void;
   onDateToChange: (val: string) => void;
   onFarmChange: (farm: string) => void;
   onSearchChange: (val: string) => void;
-  onApply: () => void;
   onClear: () => void;
 }
 
@@ -34,201 +48,139 @@ export function FarmerPaymentFilters({
   onDateToChange,
   onFarmChange,
   onSearchChange,
-  onApply,
   onClear,
 }: FarmerPaymentFiltersProps) {
-  const [farmSearch, setFarmSearch] = React.useState('');
-  const [showFarmDropdown, setShowFarmDropdown] = React.useState(false);
-  const farmDropdownRef = React.useRef<HTMLDivElement>(null);
-  const farmTriggerRef = React.useRef<HTMLButtonElement>(null);
-  const farmSearchRef = React.useRef<HTMLInputElement>(null);
-  const farmOptionRefs = React.useRef<Array<HTMLButtonElement | null>>([]);
-  const farmLabelId = React.useId();
-  const farmListboxId = React.useId();
+  const { t, language } = useI18n();
+  const fromId = React.useId();
+  const toId = React.useId();
+  const farmId = React.useId();
 
-  const filteredFarms = React.useMemo(() => {
-    if (!farmSearch.trim()) return farms;
-    return farms.filter((f) => f.toLowerCase().includes(farmSearch.toLowerCase()));
-  }, [farms, farmSearch]);
-
-  React.useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (farmDropdownRef.current && !farmDropdownRef.current.contains(e.target as Node)) {
-        setShowFarmDropdown(false);
-        setFarmSearch('');
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
-  // Focus the farm search box whenever the dropdown opens.
-  React.useEffect(() => {
-    if (showFarmDropdown) farmSearchRef.current?.focus();
-  }, [showFarmDropdown]);
-
-  const closeFarmDropdown = (restoreFocus = true) => {
-    setShowFarmDropdown(false);
-    setFarmSearch('');
-    if (restoreFocus) farmTriggerRef.current?.focus();
+  /* Reset feedback: the glyph spins once per click (700 ms), exactly the
+     Trip List / Payment Register contract. */
+  const [resetting, setResetting] = React.useState(false);
+  const spinTimer = React.useRef<number | null>(null);
+  const handleClear = () => {
+    setResetting(true);
+    if (spinTimer.current !== null) window.clearTimeout(spinTimer.current);
+    spinTimer.current = window.setTimeout(() => setResetting(false), 700);
+    onClear();
   };
+  React.useEffect(
+    () => () => {
+      if (spinTimer.current !== null) window.clearTimeout(spinTimer.current);
+    },
+    [],
+  );
 
-  /** Keyboard navigation inside the farm listbox: Escape closes, arrows move. */
-  const handleFarmListKeydown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    if (e.key === 'Escape') {
-      e.preventDefault();
-      closeFarmDropdown();
-      return;
-    }
-    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-    e.preventDefault();
-    const buttons = farmOptionRefs.current.filter((b): b is HTMLButtonElement => Boolean(b));
-    if (buttons.length === 0) return;
-    const current = buttons.indexOf(document.activeElement as HTMLButtonElement);
-    const next =
-      e.key === 'ArrowDown'
-        ? (current + 1) % buttons.length
-        : (current - 1 + buttons.length) % buttons.length;
-    buttons[next].focus();
-  };
+  // "All" is the sentinel — represented as an empty dropdown value so the
+  // placeholder shows and the clear affordance behaves correctly. Labels read
+  // in the active language while the value keeps its stored form (filtering
+  // compares against trip.sourceFarm, which never changes), and searchText
+  // keeps the Latin name so typing either script finds the farm.
+  const farmOptions = React.useMemo(
+    () =>
+      farms
+        .filter((farm) => farm !== 'All')
+        .map((farm) => ({
+          value: farm,
+          label: localizeTripViewText(farm, language),
+          searchText: farm,
+        })),
+    [farms, language],
+  );
 
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm space-y-4">
-      {/* Row 1: Date From, Date To, Farm */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <DatePicker
-          label="Date From"
-          value={dateFrom}
-          onChange={onDateFromChange}
-          placeholder="From"
-          className="w-full"
-        />
-        <DatePicker
-          label="Date To"
-          value={dateTo}
-          onChange={onDateToChange}
-          placeholder="To"
-          className="w-full"
-        />
-
-        {/* Farm dropdown – searchable, fully keyboard operable */}
+    <div className={opsFilterCardClass} role="search" aria-label={t('accounts.farmpay.filters_aria')}>
+      {/* Row 1 — labelled fields, each icon + name like the Trip List. */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
         <div>
-          <label id={farmLabelId} className="block text-xs font-medium text-slate-600 mb-1">Farm</label>
-          <div className="relative" ref={farmDropdownRef}>
-            <button
-              type="button"
-              ref={farmTriggerRef}
-              aria-labelledby={farmLabelId}
-              aria-haspopup="listbox"
-              aria-expanded={showFarmDropdown}
-              onClick={() => (showFarmDropdown ? closeFarmDropdown(false) : setShowFarmDropdown(true))}
-              onKeyDown={(e) => {
-                if (e.key === 'ArrowDown') {
-                  e.preventDefault();
-                  setShowFarmDropdown(true);
-                }
-              }}
-              className="w-full h-10 px-3 rounded-lg border border-slate-300 bg-white flex items-center justify-between cursor-pointer text-sm focus:ring-2 focus:ring-blue-400 outline-none"
-            >
-              <span className="truncate">{selectedFarm}</span>
-              <Search size={16} className="text-slate-400" />
-            </button>
-            {showFarmDropdown && (
-              <div
-                role="listbox"
-                id={farmListboxId}
-                aria-labelledby={farmLabelId}
-                onKeyDown={handleFarmListKeydown}
-                className="absolute z-50 mt-1 w-full bg-white border border-slate-200 rounded-lg shadow-xl max-h-56 overflow-y-auto p-1"
-              >
-                <input
-                  type="text"
-                  ref={farmSearchRef}
-                  value={farmSearch}
-                  onChange={(e) => setFarmSearch(e.target.value)}
-                  placeholder="Search farm..."
-                  aria-label="Search farm"
-                  className={`${uiInputClass} mb-1`}
-                  onClick={(e) => e.stopPropagation()}
-                />
-                {filteredFarms.map((farm, index) => (
-                  <button
-                    type="button"
-                    key={farm}
-                    role="option"
-                    aria-selected={selectedFarm === farm}
-                    ref={(el) => {
-                      farmOptionRefs.current[index] = el;
-                    }}
-                    onClick={() => {
-                      onFarmChange(farm);
-                      closeFarmDropdown(false);
-                    }}
-                    className={`w-full text-left px-3 py-1.5 rounded-lg text-sm cursor-pointer hover:bg-blue-50 transition focus:outline-none focus:ring-2 focus:ring-blue-400 ${
-                      selectedFarm === farm ? 'bg-blue-100 font-semibold text-blue-700' : ''
-                    }`}
-                  >
-                    {farm}
-                  </button>
-                ))}
-                {filteredFarms.length === 0 && (
-                  <div className="px-3 py-2 text-sm text-slate-400" role="status">
-                    No farms found
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
+          <label htmlFor={fromId} className={opsFilterLabelClass}>
+            <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
+            <span>{t('common.from')}</span>
+          </label>
+          <DatePicker
+            id={fromId}
+            value={dateFrom}
+            onChange={onDateFromChange}
+            placeholder={t('placeholder.enter_date')}
+            className="w-full text-xs font-medium"
+            language={language}
+          />
         </div>
 
+        <div>
+          <label htmlFor={toId} className={opsFilterLabelClass}>
+            <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
+            <span>{t('common.to')}</span>
+          </label>
+          <DatePicker
+            id={toId}
+            value={dateTo}
+            onChange={onDateToChange}
+            placeholder={t('placeholder.enter_date')}
+            className="w-full text-xs font-medium"
+            language={language}
+          />
+        </div>
+
+        <div>
+          <label htmlFor={farmId} className={opsFilterLabelClass}>
+            <Warehouse size={17} className="text-amber-500 flex-shrink-0" />
+            <span>{t('ops.trip.source_farm')}</span>
+          </label>
+          <MasterDropdown
+            hideLabel
+            label={t('ops.trip.source_farm')}
+            triggerId={farmId}
+            value={selectedFarm === 'All' ? '' : selectedFarm}
+            options={farmOptions}
+            onChange={(next) => onFarmChange(next || 'All')}
+            placeholder={t('accounts.farmpay.all_farms')}
+            searchable
+            allowClear
+            className="w-full"
+          />
+        </div>
       </div>
 
-      {/* Row 2: Global Search + Apply + Clear */}
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="flex-1 min-w-[200px]">
+      {/* Row 2 — the search field with its icon label, then Reset and the
+          brand hen Refresh, right-aligned exactly like the Trip List. */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-end pt-1">
+        <div className="lg:col-span-7">
+          <label className={opsFilterLabelClass}>
+            <Search size={17} className="text-slate-400 flex-shrink-0" />
+            <span>{t('common.search')}</span>
+          </label>
           <div className="relative">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
-              type="text"
               value={searchQuery}
-              onChange={(e) => onSearchChange(e.target.value)}
-              placeholder="Search by Trip No, Vehicle, Farm, Driver, Supervisor..."
-              aria-label="Search trips"
-              className="w-full h-10 pl-9 pr-3 rounded-lg border border-slate-300 text-sm focus:ring-2 focus:ring-blue-400 outline-none bg-white"
+              onChange={(event) => onSearchChange(event.target.value)}
+              placeholder={t('accounts.farmpay.search_placeholder')}
+              aria-label={t('common.search')}
+              className={`${opsInputClass} pl-10`}
             />
-            {searchQuery && (
-              <button
-                type="button"
-                onClick={() => onSearchChange('')}
-                aria-label="Clear search"
-                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
-              >
-                <X size={16} />
-              </button>
-            )}
           </div>
         </div>
-        <button
-          onClick={onApply}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-medium transition flex items-center gap-2 shadow-sm whitespace-nowrap"
-        >
-          <Filter size={14} /> Apply
-        </button>
-        <button
-          onClick={onClear}
-          className="px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition bg-white whitespace-nowrap"
-        >
-          Clear
-        </button>
-        <button
-          onClick={onRefresh}
-          disabled={loading}
-          title="Reload completed trips from the backend"
-          className="inline-flex items-center gap-1.5 px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 disabled:opacity-50 disabled:cursor-not-allowed transition whitespace-nowrap"
-        >
-          <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
-          {loading ? 'Refreshing…' : 'Refresh'}
-        </button>
+
+        <div className="lg:col-span-5 flex items-center gap-2 justify-end flex-wrap">
+          <button
+            type="button"
+            onClick={handleClear}
+            className={`group relative ${opsSecondaryButtonClass}`}
+            aria-label={t('common.reset')}
+          >
+            <span
+              className={`inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)] ${
+                resetting ? 'motion-safe:animate-[var(--animate-action-reset)]' : ''
+              }`}
+            >
+              <RotateCcw size={14} />
+            </span>
+            {t('common.reset')}
+          </button>
+          <BrandRefreshButton loading={loading} onClick={onRefresh} />
+        </div>
       </div>
     </div>
   );

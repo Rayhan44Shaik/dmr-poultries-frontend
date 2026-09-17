@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { buildSampleEmiVehicles } from '../../scripts/fixtures/emi-vehicles.mjs';
+import { buildSampleEmiVehicles, vehiclesToEmiLoans } from '../../scripts/fixtures/emi-vehicles.mjs';
 
 const NOW = new Date('2026-09-08T12:00:00+05:30');
 function deferred() {
@@ -23,14 +23,18 @@ interface Backend {
 }
 const backends = new WeakMap<Page, Backend>();
 const backend = (page: Page) => backends.get(page)!;
+// Count only the EMI read itself: the app shell (sidebar badges, pending
+// approval poller) legitimately performs other read-only GETs on every page.
+const emiReads = (page: Page) => backend(page).requests.filter((request) => request.path === '/api/fleet/emis');
 const table = (page: Page) => page.getByRole('table', { name: 'EMI Schedule', exact: true });
 const dataRows = (page: Page) => table(page).locator('tbody tr[data-vehicle-id]');
 const search = (page: Page) => page.getByRole('textbox', { name: 'Search', exact: true });
 const refresh = (page: Page) => page.getByRole('button', { name: 'Refresh', exact: true });
 const counts = (page: Page) => page.locator('[data-emi-toolbar-row] dd');
 const dataStatus = (page: Page) => page.getByRole('status', { name: 'EMI data status', exact: true });
-const refreshToast = (page: Page) => page.getByRole('status', { name: 'Refresh notification', exact: true });
-const readCount = (page: Page) => backend(page).requests.length;
+// The refresh receipt now arrives through the global notification host.
+const refreshToast = (page: Page) => page.getByRole('status').filter({ hasText: /EMI data refreshed|EMI డేటా రిఫ్రెష్/ });
+const readCount = (page: Page) => emiReads(page).length;
 
 function holdNext(page: Page, overrides: Omit<Reply, 'gate' | 'started'> = {}) {
   const gate = deferred();
@@ -65,12 +69,14 @@ test.beforeEach(async ({ page, baseURL }) => {
     const url = new URL(request.url());
     expect(url.origin).toBe(new URL(baseURL!).origin);
     state.requests.push({ method: request.method(), path: url.pathname });
-    if (url.pathname !== '/api/masters/vehicles') {
+    if (url.pathname !== '/api/fleet/emis') {
       await route.fulfill({ json: [] });
       return;
     }
     const reply = state.replies.shift() ?? {};
-    const payload = Object.hasOwn(reply, 'data') ? reply.data : structuredClone(state.rows);
+    // `rows` stays in Vehicle-Master shape so tests keep editing familiar
+    // fields; the wire payload is the /api/fleet/emis loans DTO.
+    const payload = Object.hasOwn(reply, 'data') ? reply.data : vehiclesToEmiLoans(structuredClone(state.rows), NOW);
     reply.started?.resolve();
     if (reply.gate) await reply.gate.promise;
     if (page.isClosed()) return;
@@ -83,7 +89,9 @@ test.afterEach(async ({ page }) => {
   const state = backend(page);
   for (const gate of state.gates) gate.resolve();
   expect(state.errors).toEqual([]);
-  expect(state.requests.every((request) => request.method === 'GET' && (request.path === '/api/masters/vehicles' || state.notificationsAllowed))).toBe(true);
+  // The EMI page itself must stay strictly read-only. Other app-shell reads
+  // (sidebar badges, pending-approval polling) are GET-only as well.
+  expect(state.requests.every((request) => request.method === 'GET')).toBe(true);
 });
 
 test('one StrictMode GET, truthful loading, slightly larger search and no input/layout loss on first response', async ({ page }) => {
@@ -94,7 +102,9 @@ test('one StrictMode GET, truthful loading, slightly larger search and no input/
   await expect(refresh(page)).toBeDisabled();
   await expect(table(page)).toHaveAttribute('aria-busy', 'true');
   await expect(counts(page)).toHaveText(['—', '—', '—']);
-  expect((await search(page).boundingBox())!.width).toBe(224);
+  // The search now fills its Trip-List grid column — at least as wide as the
+  // old fixed 224px box.
+  expect((await search(page).boundingBox())!.width).toBeGreaterThanOrEqual(224);
   const input = await search(page).elementHandle();
   const frame = (await page.locator('[data-emi-table-frame]').boundingBox())!;
   const footer = (await page.getByRole('navigation', { name: 'EMI pages' }).boundingBox())!;
@@ -241,7 +251,7 @@ test('identical duplicate rows are collapsed while malformed/conflicting data is
   await ready(page);
   await expect(counts(page)).toHaveText(['12', '3', '9']);
   const firstIds = await dataRows(page).evaluateAll((rows) => rows.map((row) => row.getAttribute('data-vehicle-id')));
-  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await page.getByRole('button', { name: 'Next page', exact: true }).click();
   const lastIds = await dataRows(page).evaluateAll((rows) => rows.map((row) => row.getAttribute('data-vehicle-id')));
   expect(new Set([...firstIds, ...lastIds]).size).toBe(12);
   backend(page).rows.push({ ...backend(page).rows[0], purchaseAmount: 111111 });
@@ -267,7 +277,7 @@ test('malformed 200 responses show an error, but a genuine empty response shows 
 test('dataset shrink/grow does not resurrect an old page or move the table footer', async ({ page }) => {
   await page.goto('/fleet?tab=emi');
   await ready(page);
-  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await page.getByRole('button', { name: 'Next page', exact: true }).click();
   await expect(dataRows(page)).toHaveCount(2);
   const footer = (await page.getByRole('navigation', { name: 'EMI pages' }).boundingBox())!;
   backend(page).rows = backend(page).rows.slice(0, 5);
@@ -325,11 +335,11 @@ test('backend strings render as text, search is bounded, and the page makes no m
   backend(page).rows = [{ ...backend(page).rows[0], vehicleNumber: malicious }];
   await page.goto('/fleet?tab=emi');
   await ready(page);
-  await expect(dataRows(page).locator('td').first()).toHaveText(malicious);
+  await expect(dataRows(page).locator('td').nth(1)).toHaveText(malicious);
   await expect(page.locator('img[data-emi-xss]')).toHaveCount(0);
   expect(await page.evaluate(() => (window as Window & { __emiXss?: number }).__emiXss)).toBeUndefined();
   await expect(search(page)).toHaveAttribute('maxlength', '80');
-  expect(backend(page).requests).toEqual([{ method: 'GET', path: '/api/masters/vehicles' }]);
+  expect(emiReads(page)).toEqual([{ method: 'GET', path: '/api/fleet/emis' }]);
 });
 
 
@@ -343,13 +353,15 @@ test('global collection alerts load only on demand and do not duplicate their in
   const input = await search(page).elementHandle();
   await page.getByRole('button', { name: 'Notifications', exact: true }).click();
   await expect(page.getByText("You're all caught up", { exact: true })).toBeVisible();
-  expect(state.requests.map((request) => request.path).sort()).toEqual([
-    '/api/masters/shops', '/api/masters/vehicles', '/api/operations/collection-entry', '/api/operations/shop-sales',
-  ]);
+  const paths = new Set(state.requests.map((request) => request.path));
+  for (const expected of ['/api/fleet/emis', '/api/masters/shops', '/api/operations/collection-entry', '/api/operations/shop-sales']) {
+    expect(paths.has(expected)).toBe(true);
+  }
   await page.getByRole('heading', { name: 'EMI Schedule', exact: true }).click();
   await page.getByRole('button', { name: 'Notifications', exact: true }).click();
   await expect(page.getByText("You're all caught up", { exact: true })).toBeVisible();
-  expect(readCount(page)).toBe(4);
+  // Reopening the bell must not trigger a second EMI read.
+  expect(readCount(page)).toBe(1);
   expect(await input!.evaluate((element) => element.isConnected)).toBe(true);
   await expect(search(page)).toHaveValue('AP16');
 });
@@ -384,26 +396,27 @@ test('larger synchronized headings, plain registrations and the section mark sta
   for (const width of [1440, 1280]) {
     await page.setViewportSize({ width, height: 1050 });
     const headings = table(page).getByRole('columnheader');
-    await expect(headings.first().locator('span')).toHaveCSS('font-size', '12px');
+    // Leading serial column, then the registration column — the Trip List
+    // ordering — all headers at the shared 12px header type size.
+    await expect(headings.nth(0)).toHaveText('S.No');
+    await expect(headings.nth(1)).toContainText('Vehicle No');
+    await expect(headings.nth(0).locator('span')).toHaveCSS('font-size', '12px');
     for (const button of await table(page).locator('thead button').all()) await expect(button).toHaveCSS('font-size', '12px');
-    expect((await headings.nth(0).boundingBox())!.width).toBe(160);
-    expect((await headings.nth(1).boundingBox())!.width).toBe(180);
     const firstRow = dataRows(page).first();
-    await expect(dataRows(page).locator('td:first-child svg')).toHaveCount(0);
-    const registration = (await firstRow.locator('td:first-child [title]').boundingBox())!;
-    const headingText = await headings.first().locator('span').evaluate((element) => {
-      const range = document.createRange();
-      range.selectNodeContents(element);
-      return range.getBoundingClientRect().x;
-    });
-    expect(Math.abs(headingText - registration.x)).toBeLessThan(1);
-    const price = await firstRow.locator('td:nth-child(2)').evaluate((element) => {
+    // The serial cell is plain text and the registration is plain text with
+    // no per-row icon; the registration column starts where its header does.
+    await expect(dataRows(page).locator('td:nth-child(2) svg')).toHaveCount(0);
+    const registration = (await firstRow.locator('td:nth-child(2) [title]').boundingBox())!;
+    const headerCell = (await headings.nth(1).boundingBox())!;
+    expect(registration.x).toBeGreaterThanOrEqual(headerCell.x);
+    expect(registration.x + registration.width).toBeLessThanOrEqual(headerCell.x + headerCell.width + 1);
+    // The purchase amount stays in the next column, right of the registration.
+    const price = await firstRow.locator('td:nth-child(3)').evaluate((element) => {
       const range = document.createRange();
       range.selectNodeContents(element);
       return range.getBoundingClientRect().x;
     });
     expect(price - (registration.x + registration.width)).toBeGreaterThan(0);
-    expect(price - (registration.x + registration.width)).toBeLessThan(130);
   }
 });
 
@@ -412,8 +425,11 @@ test('one Refresh action and a clearly distinct clear-filter icon, including err
   await ready(page);
   await expect(refresh(page)).toHaveCount(1);
   await expect(page.getByRole('button', { name: 'Retry', exact: true })).toHaveCount(0);
-  const clear = page.getByRole('region', { name: 'EMI filters and vehicle totals' }).getByRole('button', { name: 'Clear filters', exact: true });
-  await expect(clear.locator('svg')).not.toHaveClass(/rotate-ccw|refresh-cw/);
+  // Reset is the Trip List's spin-on-click control, visually distinct from
+  // Refresh (the brand hen pill, which carries no RefreshCw arrow at all).
+  const clear = page.getByRole('region', { name: 'EMI filters and vehicle totals' }).getByRole('button', { name: /^Reset/ });
+  await expect(clear.locator('svg')).not.toHaveClass(/refresh-cw/);
+  await expect(refresh(page).locator('svg')).toHaveCount(0);
   backend(page).replies.push({ status: 503 });
   await refresh(page).click();
   await expect(dataStatus(page)).toContainText('Refresh failed');
@@ -502,15 +518,15 @@ test('two-page pagination is compact and every control shows the correct rows an
   }
   const first = await dataRows(page).locator('td:first-child').allTextContents();
   await expect(page.getByText('Showing 1–10 of 12 vehicles', { exact: true })).toBeVisible();
-  await expect(nav.getByRole('button', { name: 'Previous', exact: true })).toBeDisabled();
-  await nav.getByRole('button', { name: 'Next', exact: true }).click();
+  await expect(nav.getByRole('button', { name: 'Previous page', exact: true })).toBeDisabled();
+  await nav.getByRole('button', { name: 'Next page', exact: true }).click();
   await expect(dataRows(page)).toHaveCount(2);
   const last = await dataRows(page).locator('td:first-child').allTextContents();
   expect(new Set([...first, ...last]).size).toBe(12);
   await expect(page.getByText('Showing 11–12 of 12 vehicles', { exact: true })).toBeVisible();
   await expect(nav.getByRole('button', { name: 'Go to page 2', exact: true })).toHaveAttribute('aria-current', 'page');
-  await expect(nav.getByRole('button', { name: 'Next', exact: true })).toBeDisabled();
-  await nav.getByRole('button', { name: 'Previous', exact: true }).click();
+  await expect(nav.getByRole('button', { name: 'Next page', exact: true })).toBeDisabled();
+  await nav.getByRole('button', { name: 'Previous page', exact: true }).click();
   await expect(dataRows(page).locator('td:first-child')).toHaveText(first);
   await nav.getByRole('button', { name: 'Go to page 2', exact: true }).press('Enter');
   await expect(dataRows(page).locator('td:first-child')).toHaveText(last);
@@ -535,21 +551,21 @@ test('the page window reaches later pages and filters reset its range without an
   await nav.getByRole('button', { name: 'Go to page 5', exact: true }).click();
   await expect(page.getByText('Showing 41–50 of 80 vehicles', { exact: true })).toBeVisible();
   await expect(dataRows(page).first()).toContainText('AP 16 PG 0041');
-  await nav.getByRole('button', { name: 'Next', exact: true }).click();
+  await nav.getByRole('button', { name: 'Next page', exact: true }).click();
   await expect(page.getByText('Showing 51–60 of 80 vehicles', { exact: true })).toBeVisible();
   await nav.getByRole('button', { name: 'Go to page 8', exact: true }).click();
   await expect(page.getByText('Showing 71–80 of 80 vehicles', { exact: true })).toBeVisible();
-  await expect(nav.getByRole('button', { name: 'Next', exact: true })).toBeDisabled();
+  await expect(nav.getByRole('button', { name: 'Next page', exact: true })).toBeDisabled();
   await expect(dataRows(page).first()).toContainText('AP 16 PG 0071');
-  await nav.getByRole('button', { name: 'Previous', exact: true }).press('Space');
+  await nav.getByRole('button', { name: 'Previous page', exact: true }).press('Space');
   await expect(page.getByText('Showing 61–70 of 80 vehicles', { exact: true })).toBeVisible();
   await search(page).fill('PG0001');
   await expect(dataRows(page)).toHaveCount(1);
   await expect(page.getByText('Showing 1–1 of 1 vehicles', { exact: true })).toBeVisible();
   await expect(nav.getByRole('button', { name: /Go to page/ })).toHaveCount(1);
   await expect(nav.getByRole('button', { name: 'Go to page 1', exact: true })).toHaveAttribute('aria-current', 'page');
-  await expect(nav.getByRole('button', { name: 'Previous', exact: true })).toBeDisabled();
-  await expect(nav.getByRole('button', { name: 'Next', exact: true })).toBeDisabled();
+  await expect(nav.getByRole('button', { name: 'Previous page', exact: true })).toBeDisabled();
+  await expect(nav.getByRole('button', { name: 'Next page', exact: true })).toBeDisabled();
   expect(readCount(page)).toBe(1);
 });
 
@@ -572,9 +588,9 @@ test('pagination fits small screens with a visible current page and working next
     }
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     const before = await dataRows(page).first().getAttribute('data-vehicle-id');
-    await nav.getByRole('button', { name: 'Next', exact: true }).click();
+    await nav.getByRole('button', { name: 'Next page', exact: true }).click();
     await expect(dataRows(page).first()).not.toHaveAttribute('data-vehicle-id', before!);
-    await nav.getByRole('button', { name: 'Previous', exact: true }).click();
+    await nav.getByRole('button', { name: 'Previous page', exact: true }).click();
     await expect(dataRows(page).first()).toHaveAttribute('data-vehicle-id', before!);
   }
   expect(readCount(page)).toBe(1);

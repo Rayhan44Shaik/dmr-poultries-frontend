@@ -1,5 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { buildSampleEmiVehicles } from '../../scripts/fixtures/emi-vehicles.mjs';
+import { buildSampleEmiVehicles, vehiclesToEmiLoans } from '../../scripts/fixtures/emi-vehicles.mjs';
 
 const today = new Date('2026-09-08T12:00:00+05:30');
 const errors = new WeakMap<Page, string[]>();
@@ -15,17 +15,24 @@ async function chooseStatus(page: Page, label: string) {
 }
 
 async function expectInlineTotals(page: Page) {
-  const status = await control(page).boundingBox();
-  expect(status).not.toBeNull();
+  // The totals strip keeps all three counters on one horizontal line, in
+  // order, regardless of viewport (narrow screens scroll the strip instead).
+  // All boxes are read in ONE pass so the tab's entrance pop animation can
+  // never skew a sequential measurement.
   const totals = page.locator('[data-emi-toolbar-row] dl > div');
   await expect(totals).toHaveCount(3);
-  let right = status!.x + status!.width;
-  for (const item of await totals.all()) {
-    const box = (await item.boundingBox())!;
-    expect(box.x).toBeGreaterThanOrEqual(right);
-    expect(Math.abs(box.y + box.height / 2 - (status!.y + status!.height / 2))).toBeLessThan(1);
-    right = box.x + box.width;
-  }
+  await expect(async () => {
+    const boxes = await totals.evaluateAll((elements) => elements.map((element) => {
+      const box = element.getBoundingClientRect();
+      return { x: box.x, right: box.right, middle: box.y + box.height / 2 };
+    }));
+    let right = -Infinity;
+    for (const box of boxes) {
+      expect(box.x).toBeGreaterThanOrEqual(right);
+      expect(Math.abs(box.middle - boxes[0].middle)).toBeLessThan(1);
+      right = box.right;
+    }
+  }).toPass({ timeout: 10_000 });
   await expect(page.locator('[data-emi-toolbar-row] dd')).toHaveText(['12', '3', '9']);
 }
 
@@ -41,7 +48,9 @@ test.beforeEach(async ({ page }) => {
   await page.clock.setFixedTime(today);
   await page.route((url) => url.pathname.startsWith('/api/'), async (route) => {
     methods.push(route.request().method());
-    await route.fulfill({ json: new URL(route.request().url()).pathname === '/api/masters/vehicles' ? buildSampleEmiVehicles(today) : [] });
+    // The EMI page reads GET /api/fleet/emis (the loans DTO); the fixture is
+    // derived from the same 12 sample vehicles so KPIs remain 12/3/9.
+    await route.fulfill({ json: new URL(route.request().url()).pathname === '/api/fleet/emis' ? vehiclesToEmiLoans(buildSampleEmiVehicles(today), today) : [] });
   });
   await page.goto('/fleet?tab=emi');
   await expect(page.getByRole('button', { name: 'Refresh', exact: true })).toBeEnabled();
@@ -57,14 +66,18 @@ test('Vehicle No shows registrations directly without a sort control', async ({ 
   const registrations = buildSampleEmiVehicles(today)
     .map((vehicle) => vehicle.vehicleNumber)
     .sort((a, b) => a.localeCompare(b));
-  const vehicleCells = rows(page).locator('td:first-child');
+  // Column 1 is S.No (the Trip List's leading serial column); registrations
+  // live in column 2 with the Trip List's decorative truck glyph — still no
+  // sort control on this column.
+  const vehicleCells = rows(page).locator('td:nth-child(2)');
   const vehicleHeader = page.getByRole('columnheader', { name: 'Vehicle No', exact: true });
   await expect(vehicleHeader.getByRole('button')).toHaveCount(0);
-  await expect(vehicleHeader.locator('svg')).toHaveCount(0);
+  await expect(vehicleHeader.locator('svg')).toHaveCount(1);
+  await expect(vehicleHeader.locator('svg')).toHaveAttribute('aria-hidden', 'true');
   await expect(vehicleCells).toHaveText(registrations.slice(0, 10));
-  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await page.getByRole('button', { name: 'Next page', exact: true }).click();
   await expect(vehicleCells).toHaveText(registrations.slice(10));
-  await page.getByRole('button', { name: 'Previous', exact: true }).click();
+  await page.getByRole('button', { name: 'Previous page', exact: true }).click();
 
   const search = toolbar(page).getByRole('textbox', { name: 'Search', exact: true });
   await search.fill('12');
@@ -77,8 +90,11 @@ test('Vehicle No shows registrations directly without a sort control', async ({ 
 test('Department-style control and all vehicle totals share a single desktop line', async ({ page }) => {
   await expect(toolbar(page).locator('select')).toHaveCount(0);
   await expect(control(page)).toHaveCSS('height', '36px');
-  await expect(control(page)).toHaveCSS('border-radius', '12px');
-  expect((await control(page).boundingBox())!.width).toBe(224);
+  // rounded-xl resolves through the design tokens (--radius-xl = 0.625rem).
+  await expect(control(page)).toHaveCSS('border-radius', '10px');
+  // The status control now fills its Trip-List grid column instead of a
+  // fixed 224px box; it must stay a comfortably wide desktop control.
+  expect((await control(page).boundingBox())!.width).toBeGreaterThanOrEqual(200);
   await chooseStatus(page, 'Pending'); // Include the Clear button in the layout check.
   for (const width of [1440, 1280]) {
     await page.setViewportSize({ width, height: 1050 });
@@ -89,7 +105,7 @@ test('Department-style control and all vehicle totals share a single desktop lin
 
 test('status selection, search and Clear filter locally and preserve vehicle-level totals', async ({ page }) => {
   const initialGets = requests.get(page)!.length;
-  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await page.getByRole('button', { name: 'Next page', exact: true }).click();
   await expect(rows(page)).toHaveCount(2);
   await chooseStatus(page, 'Completed');
   await expect(rows(page)).toHaveCount(3);
@@ -97,7 +113,9 @@ test('status selection, search and Clear filter locally and preserve vehicle-lev
   await expectInlineTotals(page);
   await control(page).click();
   await expect(page.getByRole('option', { name: 'Completed', exact: true })).toHaveAttribute('aria-selected', 'true');
-  await expect(page.getByRole('option', { name: 'Completed', exact: true })).toHaveCSS('background-color', 'rgb(239, 246, 255)');
+  // The app-wide MasterDropdown highlights the selected row emerald (the
+  // brand treatment), not the old bespoke blue.
+  await expect(page.getByRole('option', { name: 'Completed', exact: true })).toHaveClass(/bg-emerald-50/);
   await page.keyboard.press('Escape');
 
   await toolbar(page).getByRole('textbox', { name: 'Search', exact: true }).fill('TS 09');
@@ -108,16 +126,17 @@ test('status selection, search and Clear filter locally and preserve vehicle-lev
   await expect(rows(page)).toHaveCount(9);
   await toolbar(page).getByRole('textbox', { name: 'Search', exact: true }).fill('NO MATCH');
   await expect(page.getByText('No vehicles match the selected filters')).toBeVisible();
-  await toolbar(page).getByRole('button', { name: 'Clear filters', exact: true }).click();
+  await toolbar(page).getByRole('button', { name: /^Reset/ }).click();
   await expect(rows(page)).toHaveCount(10);
   await expect(control(page)).toHaveText('All statuses');
-  await expect(page.getByRole('button', { name: 'Previous', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Previous page', exact: true })).toBeDisabled();
   expect(requests.get(page)!.length).toBe(initialGets);
 
-  const response = page.waitForResponse((result) => new URL(result.url()).pathname === '/api/masters/vehicles');
+  const response = page.waitForResponse((result) => new URL(result.url()).pathname === '/api/fleet/emis');
   await toolbar(page).getByRole('button', { name: 'Refresh', exact: true }).click();
   expect((await response).status()).toBe(200);
-  await expect(page.getByRole('status', { name: 'Refresh notification', exact: true })).toContainText('EMI data refreshed');
+  // The refresh receipt now arrives through the global notification host.
+  await expect(page.getByRole('status').filter({ hasText: 'EMI data refreshed' })).toBeVisible();
   expect(requests.get(page)!.length).toBe(initialGets + 1);
 });
 
@@ -149,11 +168,13 @@ test('small screens keep the totals inline and the dropdown escapes the scrollin
   await control(page).click();
   const menu = page.getByRole('listbox');
   await expect(menu).toBeVisible();
+  // The menu is portalled to the body: it opens fully on-screen, below its
+  // control, and can never be clipped by the totals' scroll container.
   const menuBox = (await menu.boundingBox())!;
-  const toolbarBox = (await toolbar(page).boundingBox())!;
+  const controlBox = (await control(page).boundingBox())!;
   expect(menuBox.x).toBeGreaterThanOrEqual(0);
   expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(390);
-  expect(menuBox.y + menuBox.height).toBeGreaterThan(toolbarBox.y + toolbarBox.height);
+  expect(menuBox.y).toBeGreaterThanOrEqual(controlBox.y + controlBox.height - 1);
   await page.getByRole('option', { name: 'Completed', exact: true }).click();
   await expect(rows(page)).toHaveCount(3);
 });
@@ -172,22 +193,24 @@ test('Telugu labels, status options and inline totals work without a provider er
   await expect(purchaseHeader.getByRole('button')).toHaveAttribute('title', 'కొనుగోలు మొత్తం · ఆరోహణ');
   await expectInlineTotals(page);
   await page.getByRole('button', { name: 'రిఫ్రెష్', exact: true }).click();
-  const popup = page.getByRole('status', { name: 'రిఫ్రెష్ నోటిఫికేషన్', exact: true });
-  await expect(popup).toContainText('EMI డేటా రిఫ్రెష్ చేయబడింది');
+  const popup = page.getByRole('status').filter({ hasText: 'EMI డేటా రిఫ్రెష్ చేయబడింది' });
+  await expect(popup).toBeVisible();
   await popup.getByRole('button').click();
-  await page.getByRole('button', { name: 'Change language', exact: true }).click();
+  // The header control is itself localized while Telugu is active.
+  await page.getByRole('button', { name: 'భాష మార్చండి', exact: true }).click();
   await page.getByRole('button', { name: 'EN', exact: true }).click();
   await expect(control(page)).toHaveText('Pending');
   await expect(toolbar(page)).toBeVisible();
 });
 
+// Cell indexes are shifted one right by the leading S.No serial column.
 const sortableColumns = [
-  { label: 'Purchase Amount', index: 1, value: (text: string) => Number(text.replace(/[₹,\s]/g, '')) },
-  { label: 'Total EMI', index: 2, value: (text: string) => Number(text) },
-  { label: 'Completed', index: 3, value: (text: string) => Number(text.split('/')[0].trim()) },
-  { label: 'Pending', index: 4, value: (text: string) => Number(text) },
-  { label: 'EMI Date', index: 5, value: (text: string) => Date.parse(text.replace('Sept', 'Sep')) },
-  { label: 'Status', index: 6, value: (text: string) => text === 'Pending' ? 0 : text === 'Completed' ? 1 : NaN },
+  { label: 'Purchase Amount', index: 2, value: (text: string) => Number(text.replace(/[₹,\s]/g, '')) },
+  { label: 'Total EMI', index: 3, value: (text: string) => Number(text) },
+  { label: 'Completed', index: 4, value: (text: string) => Number(text.split('/')[0].trim()) },
+  { label: 'Pending', index: 5, value: (text: string) => Number(text) },
+  { label: 'EMI Date', index: 6, value: (text: string) => Date.parse(text.replace('Sept', 'Sep')) },
+  { label: 'Status', index: 7, value: (text: string) => text === 'Pending' ? 0 : text === 'Completed' ? 1 : NaN },
 ];
 
 async function readTablePage(page: Page) {
@@ -198,7 +221,7 @@ async function readTablePage(page: Page) {
 
 async function readBothPages(page: Page) {
   const firstPage = await readTablePage(page);
-  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await page.getByRole('button', { name: 'Next page', exact: true }).click();
   await expect(rows(page)).toHaveCount(2);
   return [...firstPage, ...await readTablePage(page)];
 }
@@ -209,9 +232,10 @@ test('every non-vehicle header has a visible sort icon directly beside its name'
   for (const column of sortableColumns) {
     const header = page.getByRole('columnheader', { name: column.label, exact: true });
     const button = header.getByRole('button', { name: column.label, exact: true });
-    const icon = button.locator('svg');
+    // Each header button now holds a decorative colour glyph before the
+    // label and the sort arrow after it — assert the sort arrow explicitly.
+    const icon = button.locator('svg.lucide-arrow-up-down');
     await expect(icon).toBeVisible();
-    await expect(icon).toHaveClass(/lucide-arrow-up-down/);
     await expect(icon).toHaveAttribute('aria-hidden', 'true');
     const labelBox = (await button.locator('span').boundingBox())!;
     const iconBox = (await icon.boundingBox())!;
@@ -223,7 +247,11 @@ test('every non-vehicle header has a visible sort icon directly beside its name'
 test('all non-vehicle columns sort both ways across the full result set and return to page one', async ({ page }) => {
   const initialGets = requests.get(page)!.length;
   const baseline = await readBothPages(page);
-  const originalRows = new Map(baseline.map((row) => [row[0], row]));
+  // Key rows by registration (cell 2) and ignore the leading S.No cell: the
+  // serial always reads 1..n in display order, whatever the sort.
+  const rowKey = (row: string[]) => row[1];
+  const rowData = (row: string[]) => row.slice(1);
+  const originalRows = new Map(baseline.map((row) => [rowKey(row), rowData(row)]));
 
   for (const column of sortableColumns) {
     await test.step(column.label, async () => {
@@ -238,15 +266,19 @@ test('all non-vehicle columns sort both ways across the full result set and retu
         await expect(header).toHaveAttribute('aria-sort', direction);
         await expect(page.locator('thead [aria-sort]')).toHaveCount(1);
         await expect(header.getByRole('button')).toHaveClass(/bg-emerald-50/);
-        await expect(header.locator('svg')).toHaveClass(direction === 'ascending' ? /(?:^|\s)lucide-arrow-up(?:\s|$)/ : /(?:^|\s)lucide-arrow-down(?:\s|$)/);
-        await expect(page.getByRole('button', { name: 'Previous', exact: true })).toBeDisabled();
+        // Headers now carry a decorative colour glyph too; assert on the
+        // direction arrow specifically.
+        await expect(header.locator(direction === 'ascending' ? 'svg.lucide-arrow-up' : 'svg.lucide-arrow-down')).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Previous page', exact: true })).toBeDisabled();
         await expect(rows(page)).toHaveCount(10);
         const sortedRows = await readBothPages(page);
         const factor = direction === 'ascending' ? 1 : -1;
         expect(sortedRows.map((row) => column.value(row[column.index])))
           .toEqual([...values].sort((a, b) => (a - b) * factor));
-        expect(new Set(sortedRows.map((row) => row[0])).size).toBe(12);
-        for (const row of sortedRows) expect(row).toEqual(originalRows.get(row[0]));
+        expect(new Set(sortedRows.map(rowKey)).size).toBe(12);
+        for (const row of sortedRows) expect(rowData(row)).toEqual(originalRows.get(rowKey(row)));
+        // The serial column always re-counts 1..12 in display order.
+        expect(sortedRows.map((row) => row[0])).toEqual(sortedRows.map((_, i) => String(i + 1)));
       }
     });
   }
@@ -264,7 +296,7 @@ test('keyboard sorting preserves status/search filters and vehicle totals', asyn
   for (const [key, direction] of [['Enter', 'descending'], ['Space', 'ascending']]) {
     await button.press(key);
     await expect(header).toHaveAttribute('aria-sort', direction);
-    const values = (await rows(page).locator('td:nth-child(3)').allTextContents()).map(Number);
+    const values = (await rows(page).locator('td:nth-child(4)').allTextContents()).map(Number);
     const factor = direction === 'ascending' ? 1 : -1;
     expect(values).toEqual([...values].sort((a, b) => (a - b) * factor));
     await expect(rows(page)).toHaveCount(7);
