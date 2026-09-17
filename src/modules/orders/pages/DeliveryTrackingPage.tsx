@@ -14,12 +14,19 @@
 // filters + refresh. Filters stay when the View modal closes (local state).
 // Each table paginates 10 rows (existing TripPagination) with "Showing X–Y of Z".
 
-import React, { useMemo, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   ArrowUpDown,
   Bird,
   Box,
   Calendar,
+  Check,
   CheckCircle2,
   ClipboardCheck,
   Eye,
@@ -28,9 +35,7 @@ import {
   Hourglass,
   PackageCheck,
   Route,
-  Scale,
   Search,
-  Settings2,
   ShoppingBag,
   SlidersHorizontal,
   Truck,
@@ -41,11 +46,12 @@ import {
   opsFilterCardClass,
   opsFilterLabelClass,
   opsInputClass,
-  opsTableDivideClass,
-  opsTableHeadRowClass,
-  opsTableTdClass,
-  opsTableThClass,
+  opsPdfButtonClass,
+  opsViewButtonClass,
 } from "../../../shared/ui/operationsStyles";
+import { uiActionIconMotionClass } from "../../../shared/ui/uiTokens";
+import { localizeTripViewText } from "../../operations/vehicle-trips/utils/tripViewLocalization";
+import { formatTripListDay } from "../../operations/vehicle-trips/utils/formatTripListDay";
 
 import {
   BrandRefreshButton,
@@ -55,7 +61,6 @@ import {
 } from "../../../ui";
 import MasterDropdown from "../../masters/components/MasterDropdown";
 import {
-  deliveryProgressPct,
   formatCount,
   formatDayShort,
   partitionTrackingTrips,
@@ -74,15 +79,6 @@ import {
 import { useOrdersI18n } from "../i18n/ordersI18n";
 import type { OrdersDeliveryState, OrdersTrip } from "../types";
 import { DatePicker } from "../../../components/common/DatePicker";
-import {
-  ORDERS_TABLE_FONT_CLASS,
-  ordersTableZebraRow,
-} from "../utils/ordersTableStyles";
-import {
-  OrdersIconButton,
-  OrdersLabelButton,
-  OrdersStatusBadge,
-} from "../components/OrdersCommon";
 
 const PAGE_SIZE = 10;
 
@@ -151,105 +147,6 @@ function differenceMatches(ot: OrdersTrip, f: DifferenceFilter): boolean {
   }
 }
 
-function DeliveryStateBadge({
-  state,
-}: {
-  state: OrdersDeliveryState | undefined;
-}) {
-  const { to } = useOrdersI18n();
-  const s = state ?? "pending";
-  if (s === "complete") {
-    return (
-      <OrdersStatusBadge
-        status="Delivered"
-        label={to("orders.status_delivered")}
-      />
-    );
-  }
-  if (s === "partial") {
-    return (
-      <OrdersStatusBadge
-        status="Part Delivered"
-        label={to("orders.delivery_partial")}
-      />
-    );
-  }
-  if (s === "in_progress") {
-    return (
-      <OrdersStatusBadge
-        status="In Progress"
-        label={to("orders.delivery_in_progress")}
-      />
-    );
-  }
-  return (
-    <OrdersStatusBadge status="Pending" label={to("orders.delivery_pending")} />
-  );
-}
-
-function ActionButtons({
-  ot,
-  pdfBusyId,
-  onPdf,
-  onView,
-}: {
-  ot: OrdersTrip;
-  pdfBusyId: number | null;
-  onPdf: (ot: OrdersTrip) => void;
-  onView: (ot: OrdersTrip) => void;
-}) {
-  const { to } = useOrdersI18n();
-  const { trip } = ot;
-  return (
-    <div className="flex items-center gap-1.5">
-      <OrdersLabelButton
-        label={to("orders.view")}
-        onClick={() => onView(ot)}
-        tone="emerald"
-      >
-        <Eye size={13} />
-      </OrdersLabelButton>
-      <OrdersIconButton
-        label={to("orders.view_pdf")}
-        onClick={() => onPdf(ot)}
-        busy={pdfBusyId === trip.id}
-      >
-        <FileText size={14} />
-      </OrdersIconButton>
-    </div>
-  );
-}
-
-/** Progress bar from ACTUAL Step 4 records: fully-delivered shops / total shops. */
-function ProgressBar({ ot }: { ot: OrdersTrip }) {
-  const { to } = useOrdersI18n();
-  const p = ot.progress;
-  if (!p) return <span className="text-slate-300 text-xs">—</span>;
-  const pct = deliveryProgressPct(p);
-  const bar =
-    p.deliveryState === "complete"
-      ? "bg-emerald-500"
-      : p.deliveryState === "partial"
-        ? "bg-amber-400"
-        : "bg-sky-400";
-  return (
-    <div className="min-w-[6.875rem]">
-      <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500 mb-1">
-        <span>
-          {to("orders.delivered_of", { x: p.deliveredShops, y: p.totalShops })}
-        </span>
-        <span className="text-slate-400">{pct}%</span>
-      </div>
-      <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all ${bar}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
-    </div>
-  );
-}
-
 /** Table heading — icon tile + title + count, the Collection / Assignment anatomy. */
 function SectionTitle({
   label,
@@ -294,7 +191,7 @@ function SectionTitle({
   );
 }
 
-/** Column head with the Trip List's coloured glyph. */
+/** Column head — the Trip List's 12px bold uppercase word beside a coloured glyph. */
 function Th({
   icon,
   label,
@@ -304,17 +201,17 @@ function Th({
   icon?: React.ReactNode;
   label: string;
   className?: string;
-  align?: "left" | "right" | "center";
+  align?: "left" | "center";
 }) {
-  const just =
-    align === "right"
-      ? "justify-end text-right"
-      : align === "center"
-        ? "justify-center text-center"
-        : "";
   return (
-    <th className={`${opsTableThClass} ${className}`}>
-      <span className={`inline-flex items-center gap-1.5 ${just}`}>
+    <th
+      className={`px-4 py-4 text-[12px] font-bold uppercase tracking-wider whitespace-nowrap ${
+        align === "center" ? "text-center" : "text-left"
+      } ${className}`}
+    >
+      <span
+        className={`inline-flex items-center gap-1.5 ${align === "center" ? "justify-center" : ""}`}
+      >
         {icon}
         <span>{label}</span>
       </span>
@@ -346,7 +243,13 @@ function TableLoadingRow({
   );
 }
 
-/** ONE table with the unified tracking column set. */
+const TRACKING_COLS = 10;
+
+/**
+ * ONE table with the Trip List's anatomy: click a row to select it (✓ replaces
+ * the S.No, the row tints blue), ↑/↓ + Enter move the selection by keyboard,
+ * and View / PDF for the selected trip sit at the table top.
+ */
 function TrackingTable({
   trips,
   pageSlice,
@@ -358,8 +261,8 @@ function TrackingTable({
   onPageChange,
   pageSize,
   onPageSizeChange,
-  supervisorOf,
-  actionProps,
+  selectedId,
+  onSelect,
 }: {
   trips: OrdersTrip[];
   pageSlice: OrdersTrip[];
@@ -375,26 +278,45 @@ function TrackingTable({
   onPageChange: (p: number) => void;
   pageSize: number;
   onPageSizeChange?: (pageSize: number) => void;
-  supervisorOf: (ot: OrdersTrip) => string;
-  actionProps: {
-    pdfBusyId: number | null;
-    onPdf: (ot: OrdersTrip) => void;
-    onView: (ot: OrdersTrip) => void;
-  };
+  selectedId: number | null;
+  onSelect: (ot: OrdersTrip, toggle: boolean) => void;
 }) {
-  const { to } = useOrdersI18n();
+  const { to, language } = useOrdersI18n();
+  const rowRefs = useRef(new Map<number, HTMLTableRowElement>());
+  const lt = (value: string | null | undefined) =>
+    localizeTripViewText(value ?? "", language) || "—";
+
+  const handleRowKeyDown = (
+    event: React.KeyboardEvent<HTMLTableRowElement>,
+    rowIndex: number,
+  ) => {
+    if (event.target !== event.currentTarget) return;
+    const current = pageSlice[rowIndex];
+    if (!current) return;
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onSelect(current, true);
+      return;
+    }
+    if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
+    event.preventDefault();
+    const next = pageSlice[rowIndex + (event.key === "ArrowDown" ? 1 : -1)];
+    if (!next) return;
+    onSelect(next, false);
+    requestAnimationFrame(() => rowRefs.current.get(next.trip.id)?.focus());
+  };
+
   return (
-    <div className="overflow-x-auto">
-      <table className={`w-full min-w-[92.5rem] ${ORDERS_TABLE_FONT_CLASS}`}>
-        <thead>
-          <tr className={opsTableHeadRowClass}>
-            <Th className="w-14" label={to("orders.col_sno")} />
+    <div className="w-full overflow-x-auto">
+      <table className="min-w-full border-collapse text-left text-[13px]">
+        <thead className="border-b border-slate-200 bg-slate-50/80 text-slate-600">
+          <tr className="whitespace-nowrap">
+            <Th className="w-10" align="center" label="#" />
             <Th
               icon={<Hash size={14} className="shrink-0 text-slate-400" />}
               label={to("orders.col_trip_no")}
             />
             <Th
-              className="w-24"
               icon={<Calendar size={14} className="shrink-0 text-blue-500" />}
               label={to("orders.col_date")}
             />
@@ -411,88 +333,76 @@ function TrackingTable({
               label={to("orders.driver")}
             />
             <Th
-              className="w-32"
+              align="center"
               icon={
                 <ShoppingBag size={14} className="shrink-0 text-cyan-500" />
               }
               label={to("orders.col_total_shops")}
             />
             <Th
-              className="w-24"
-              align="right"
+              align="center"
               icon={<Box size={14} className="shrink-0 text-emerald-600" />}
               label={to("orders.total_boxes")}
             />
             <Th
-              className="w-24"
-              align="right"
+              align="center"
               icon={
                 <PackageCheck size={14} className="shrink-0 text-teal-500" />
               }
               label={to("orders.col_delivered_boxes")}
             />
             <Th
-              className="w-24"
-              align="right"
+              align="center"
               icon={<Bird size={14} className="shrink-0 text-blue-500" />}
               label={to("orders.delivered_birds")}
             />
-            <Th
-              className="w-28"
-              align="right"
-              icon={<Scale size={14} className="shrink-0 text-orange-500" />}
-              label={to("orders.delivered_weight")}
-            />
-            <Th
-              className="w-24"
-              align="right"
-              icon={<Hourglass size={14} className="shrink-0 text-amber-500" />}
-              label={to("orders.pending_boxes")}
-            />
-            <Th
-              className="w-28"
-              icon={
-                <ClipboardCheck size={14} className="shrink-0 text-rose-500" />
-              }
-              label={to("orders.col_delivery_status")}
-            />
-            <Th
-              className="w-36"
-              icon={<Settings2 size={14} className="shrink-0 text-slate-400" />}
-              label={to("orders.col_action")}
-            />
           </tr>
         </thead>
-        <tbody className={opsTableDivideClass}>
+        <tbody className="divide-y divide-slate-100">
           {loading || refreshing ? (
-            <TableLoadingRow label={label} colSpan={14} />
+            <TableLoadingRow label={label} colSpan={TRACKING_COLS} />
           ) : pageSlice.length === 0 ? (
             <tr>
-              <td colSpan={14} className="px-4 py-10 text-center">
-                <span className="text-[13px] font-medium text-slate-400">
-                  {emptyTitle}
-                </span>
+              <td
+                colSpan={TRACKING_COLS}
+                className="py-12 text-center text-[13px] font-medium text-slate-400"
+              >
+                {emptyTitle}
               </td>
             </tr>
           ) : (
             pageSlice.map((ot, index) => {
               const { trip, progress } = ot;
-              const mobile = supervisorOf(ot);
+              const isSelected = trip.id === selectedId;
+              const serialNo = (safePage - 1) * pageSize + index + 1;
               return (
                 <tr
                   key={trip.id}
-                  className={ordersTableZebraRow(index, "align-middle")}
+                  ref={(el) => {
+                    if (el) rowRefs.current.set(trip.id, el);
+                    else rowRefs.current.delete(trip.id);
+                  }}
+                  tabIndex={0}
+                  onClick={() => onSelect(ot, true)}
+                  onKeyDown={(event) => handleRowKeyDown(event, index)}
+                  aria-selected={isSelected}
+                  style={{ animationDelay: `${Math.min(index, 10) * 30}ms` }}
+                  className={`cursor-pointer outline-none transition-colors duration-150 focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-emerald-400 motion-safe:animate-[var(--animate-fade-in-up)] ${
+                    isSelected
+                      ? "border-l-4 border-l-blue-300 bg-blue-50/70 ring-1 ring-inset ring-blue-200"
+                      : `hover:bg-slate-50/60 ${index % 2 === 0 ? "bg-white" : "bg-slate-50/20"}`
+                  }`}
                 >
-                  <td className={opsTableTdClass}>
-                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 text-[12px] font-semibold text-slate-600">
-                      {(safePage - 1) * pageSize + index + 1}
-                    </span>
+                  <td className="w-10 px-4 py-5 text-center text-[13px] font-medium text-slate-500">
+                    {isSelected ? (
+                      <Check size={16} className="inline text-blue-500" />
+                    ) : (
+                      serialNo
+                    )}
                   </td>
-                  <td
-                    className={`${opsTableTdClass} font-semibold text-emerald-700`}
-                  >
+                  <td className="whitespace-nowrap px-4 py-5 pl-9 text-[13px] font-bold text-emerald-600">
                     <span className="inline-flex flex-col leading-tight">
-                      {trip.tripNo}
+                      {lt(trip.tripNo)}
                       {ot.assignmentIncomplete && (
                         <span
                           className="mt-0.5 inline-flex w-fit items-center rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-orange-700"
@@ -503,89 +413,45 @@ function TrackingTable({
                       )}
                     </span>
                   </td>
-                  <td
-                    className={`${opsTableTdClass} text-slate-500 whitespace-nowrap`}
-                  >
-                    {formatDayShort(trip.tripDate)}
+                  <td className="whitespace-nowrap px-4 py-5 pl-9 text-[13px] font-medium text-slate-600">
+                    {formatTripListDay(trip.tripDate, language)}
                   </td>
-                  <td
-                    className={`${opsTableTdClass} font-semibold tabular-nums text-slate-800 whitespace-nowrap`}
-                  >
-                    {trip.vehicleNo ? formatVehicleNumber(trip.vehicleNo) : "—"}
+                  <td className="whitespace-nowrap px-4 py-5 pl-9 text-[13px] font-medium text-slate-700">
+                    {trip.vehicleNo
+                      ? lt(formatVehicleNumber(trip.vehicleNo))
+                      : "—"}
                   </td>
-                  <td className={opsTableTdClass}>
-                    <span className="inline-flex flex-col leading-tight">
-                      <span>{trip.supervisorName || "—"}</span>
-                      {mobile ? (
+                  <td className="whitespace-nowrap px-4 py-5 pl-9 text-[13px] text-slate-600">
+                    {lt(trip.supervisorName)}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-5 pl-9 text-[13px] text-slate-600">
+                    {lt(trip.driverName)}
+                  </td>
+                  <td className="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold text-slate-700">
+                    {progress ? (
+                      <span className="inline-flex flex-col items-center leading-tight">
+                        <span>{formatCount(progress.totalShops)}</span>
                         <span className="text-[10px] font-semibold text-slate-400">
-                          {mobile}
+                          {formatCount(progress.deliveredShops)}{" "}
+                          {to("orders.status_delivered")}
                         </span>
-                      ) : null}
-                    </span>
+                      </span>
+                    ) : (
+                      "—"
+                    )}
                   </td>
-                  <td className={opsTableTdClass}>{trip.driverName || "—"}</td>
-                  <td className={opsTableTdClass}>
-                    <ProgressBar ot={ot} />
-                  </td>
-                  <td
-                    className={`${opsTableTdClass} text-right font-semibold text-emerald-800`}
-                  >
+                  <td className="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold text-emerald-600">
                     {progress ? formatCount(progress.totalBoxes) : "—"}
                   </td>
-                  <td className={`${opsTableTdClass} text-right font-medium`}>
+                  <td className="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold text-teal-600">
                     {progress ? formatCount(progress.deliveredBoxes) : "—"}
                   </td>
-                  <td className={`${opsTableTdClass} text-right font-medium`}>
+                  <td className="whitespace-nowrap px-4 py-5 text-center text-[13px] font-bold text-blue-600">
                     {progress && progress.deliveredBirds > 0 ? (
                       formatCount(progress.deliveredBirds)
                     ) : (
                       <span className="text-slate-300">—</span>
                     )}
-                  </td>
-                  <td className={`${opsTableTdClass} text-right font-medium`}>
-                    {progress && progress.deliveredWeight > 0 ? (
-                      progress.deliveredWeight.toFixed(2)
-                    ) : (
-                      <span className="text-slate-300">—</span>
-                    )}
-                  </td>
-                  <td className={`${opsTableTdClass} text-right`}>
-                    {progress ? (
-                      progress.pendingBoxes > 0 ? (
-                        <span className="inline-flex flex-col items-end leading-tight">
-                          <span className="font-semibold text-amber-600">
-                            {formatCount(progress.pendingBoxes)}{" "}
-                            {to("orders.word_boxes")}
-                          </span>
-                          {progress.pendingShops > 0 && (
-                            <span className="text-[10px] font-semibold text-slate-400">
-                              {progress.pendingShops} {to("orders.col_shops")}
-                              {progress.partDeliveredShops > 0
-                                ? ` · ${progress.partDeliveredShops} ${to("orders.status_part_delivered")}`
-                                : ""}
-                            </span>
-                          )}
-                        </span>
-                      ) : (
-                        <span className="text-slate-300">0</span>
-                      )
-                    ) : (
-                      <span className="text-slate-300">—</span>
-                    )}
-                  </td>
-                  <td className={opsTableTdClass}>
-                    <DeliveryStateBadge state={progress?.deliveryState} />
-                    {progress && progress.additionalShopCount > 0 && (
-                      <span
-                        className="ml-1.5 inline-flex items-center rounded-full bg-rose-50 border border-rose-200 px-2 py-0.5 text-[10px] font-semibold text-rose-600"
-                        title={to("orders.additional_legend")}
-                      >
-                        +{progress.additionalShopCount}
-                      </span>
-                    )}
-                  </td>
-                  <td className={opsTableTdClass}>
-                    <ActionButtons ot={ot} {...actionProps} />
                   </td>
                 </tr>
               );
@@ -603,6 +469,57 @@ function TrackingTable({
           disabled={refreshing || loading}
         />
       )}
+    </div>
+  );
+}
+
+/** View / PDF for the selected row — shown at the table top, Trip List style. */
+function SelectedActions({
+  ot,
+  pdfBusyId,
+  onPdf,
+  onView,
+  buttonRef,
+}: {
+  ot: OrdersTrip;
+  pdfBusyId: number | null;
+  onPdf: (ot: OrdersTrip) => void;
+  onView: (ot: OrdersTrip) => void;
+  buttonRef: React.Ref<HTMLDivElement>;
+}) {
+  const { to } = useOrdersI18n();
+  const pdfBusy = pdfBusyId === ot.trip.id;
+  return (
+    <div
+      ref={buttonRef}
+      className="flex items-center gap-2 motion-safe:animate-[var(--animate-pop-in)]"
+    >
+      <button
+        type="button"
+        onClick={() => onView(ot)}
+        className={`group relative ${opsViewButtonClass}`}
+        aria-label={`${to("orders.view")} — ${ot.trip.tripNo}`}
+      >
+        <span className={`inline-flex ${uiActionIconMotionClass.view}`}>
+          <Eye size={15} />
+        </span>
+        {to("orders.view")}
+      </button>
+      <button
+        type="button"
+        onClick={() => onPdf(ot)}
+        disabled={pdfBusy}
+        aria-busy={pdfBusy}
+        className={`group relative ${opsPdfButtonClass}`}
+        aria-label={`${to("orders.view_pdf")} — ${ot.trip.tripNo}`}
+      >
+        <span
+          className={`inline-flex ${pdfBusy ? "animate-pulse" : uiActionIconMotionClass.pdf}`}
+        >
+          <FileText size={15} />
+        </span>
+        PDF
+      </button>
     </div>
   );
 }
@@ -659,6 +576,31 @@ function DeliveryTrackingPage({
     useState<DifferenceFilter>("all");
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const q = query.trim().toLowerCase();
+
+  // Row selection (Trip List behaviour): one selected trip across both tables;
+  // clicking the same row again clears it, clicking outside the tables or
+  // their action buttons clears it too.
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const tablesRef = useRef<HTMLDivElement>(null);
+  const actionsRef = useRef<HTMLDivElement>(null);
+  const handleSelect = useCallback((ot: OrdersTrip, toggle: boolean) => {
+    setSelectedId((prev) =>
+      toggle && prev === ot.trip.id ? null : ot.trip.id,
+    );
+  }, []);
+  useEffect(() => {
+    const onDown = (event: MouseEvent) => {
+      const target = event.target as Node;
+      if (
+        tablesRef.current?.contains(target) ||
+        actionsRef.current?.contains(target)
+      )
+        return;
+      setSelectedId(null);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, []);
 
   const deliveryOptions = useMemo(
     () => [
@@ -799,7 +741,6 @@ function DeliveryTrackingPage({
     setCompletedPage,
   ] = usePaged(completedFiltered, pageSize, filterKey);
 
-  const actionProps = { pdfBusyId, onPdf, onView };
   const defaultFrom = today ? addLocalDays(today, -6) : "";
   const rangeChanged =
     Boolean(today) &&
@@ -820,11 +761,13 @@ function DeliveryTrackingPage({
     setCompletedFrom(defaultFrom);
     setCompletedTo(today);
   };
-  const supervisorOf = (ot: OrdersTrip) =>
-    supervisorMobileOf(ot.trip, supervisorDirectory);
+  const selectedActive = activeFiltered.find((t) => t.trip.id === selectedId);
+  const selectedCompleted = completedFiltered.find(
+    (t) => t.trip.id === selectedId,
+  );
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" ref={tablesRef}>
       {/* Filter card — the Trip List / Order Assignment anatomy: From · To ·
           Delivery Status · Difference on row 1; Sort · Search · Reset · Refresh
           on row 2. It never unmounts while the tables load. */}
@@ -978,7 +921,17 @@ function DeliveryTrackingPage({
           tone="amber"
           label={to("orders.tracking_active_title")}
           note={to("orders.trips_count", { x: activeFiltered.length })}
-        />
+        >
+          {selectedActive && (
+            <SelectedActions
+              ot={selectedActive}
+              pdfBusyId={pdfBusyId}
+              onPdf={onPdf}
+              onView={onView}
+              buttonRef={actionsRef}
+            />
+          )}
+        </SectionTitle>
         <TrackingTable
           loading={loading}
           refreshing={refreshing}
@@ -999,8 +952,8 @@ function DeliveryTrackingPage({
             setActivePage(1);
             setCompletedPage(1);
           }}
-          supervisorOf={supervisorOf}
-          actionProps={actionProps}
+          selectedId={selectedId}
+          onSelect={handleSelect}
         />
       </div>
 
@@ -1011,6 +964,15 @@ function DeliveryTrackingPage({
           label={to("orders.tracking_completed_title")}
           note={to("orders.trips_count", { x: completedFiltered.length })}
         >
+          {selectedCompleted && (
+            <SelectedActions
+              ot={selectedCompleted}
+              pdfBusyId={pdfBusyId}
+              onPdf={onPdf}
+              onView={onView}
+              buttonRef={actionsRef}
+            />
+          )}
           <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-[11px] font-bold text-emerald-700">
             <Route size={13} aria-hidden />
             {formatDayShort(completedFrom || defaultFrom)} →{" "}
@@ -1037,8 +999,8 @@ function DeliveryTrackingPage({
             setActivePage(1);
             setCompletedPage(1);
           }}
-          supervisorOf={supervisorOf}
-          actionProps={actionProps}
+          selectedId={selectedId}
+          onSelect={handleSelect}
         />
       </div>
 
