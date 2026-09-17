@@ -33,6 +33,7 @@ import { DatePicker } from '../../../components/common/DatePicker';
 import { exportPDF, exportExcel } from '../components/Summary';
 import SummaryTripViewer from '../components/Summary/SummaryTripViewer';
 import SummaryFarmViewer, { SummaryFarmCard } from '../components/Summary/SummaryFarmViewer';
+import { FarmPaymentTripViewModal } from '../components/farm-payment/FarmPaymentTripViewModal';
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
 import type { WeeklyMetrics, ExpenseBreakdown } from '../types/summary.types';
 import type { TripFarmPayment } from '../types/farmPayment.types';
@@ -340,6 +341,9 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
   const [tripViewerLabel, setTripViewerLabel] = useState('');
   // The farm payment pop-up: every trip of the span with its own bill.
   const [farmViewerOpen, setFarmViewerOpen] = useState(false);
+  // The trip picked in that pop-up — opens the Farm Payment page's own trip
+  // detail (Step 2 Farm Details + Step 3 Pickup Details).
+  const [farmTripView, setFarmTripView] = useState<Trip | null>(null);
   const { t, language } = useI18n();
 
   useEffect(() => {
@@ -2205,7 +2209,8 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
       </div>
 
       {/* Farm payment pop-up: every trip of the span with its own bill. Picking
-          a trip hands over to the trip view, so only one pop-up is ever open. */}
+          a trip closes this list and opens that trip's farm payment detail, so
+          only one pop-up is ever open. */}
       {farmViewerOpen && (
         <SummaryFarmViewer
           open
@@ -2214,10 +2219,18 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
           onClose={() => setFarmViewerOpen(false)}
           onOpenTrip={(trip) => {
             setFarmViewerOpen(false);
-            openTripViewer([trip], trip.tripNo);
+            setFarmTripView(trip);
           }}
         />
       )}
+
+      {/* Same read-only detail the Farm Payment page shows for a trip: Step 2
+          (Farm Details) + Step 3 (Pickup Details), nothing else. */}
+      <FarmPaymentTripViewModal
+        open={Boolean(farmTripView)}
+        trip={farmTripView}
+        onClose={() => setFarmTripView(null)}
+      />
 
       {tripViewerOpen && <SummaryTripViewer open trips={tripViewerTrips} groupLabel={tripViewerLabel} farmPayments={snapshot.farmPayments} onClose={closeTripViewer} />}
 

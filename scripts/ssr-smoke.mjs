@@ -332,12 +332,27 @@ try {
       headers: /Trip No/.test(html) && /Pickup Weight/.test(html) && /Cumulative/.test(html) && /Bird Type/.test(html),
       noPaidOrBalance: !/Paid \(₹\)/.test(html) && !/Balance \(₹\)/.test(html),
       tripLinkIsButton: /<button[^>]*>\s*<!-- -->TRP-|<button[^>]*>TRP-/.test(html),
+      tripLinkOpensFarmDetail: /title="View farm &amp; pickup details"/.test(html),
       // The card itself is the trigger: the farm payment figure sits inside a
       // <button>, so pressing the number opens the pop-up.
       cardIsButton: /^<button[^>]*type="button"/.test(cardHtml),
       cardFigureOpens: cardHtml.includes(`>${formatINR(payable)}</span>`) && cardHtml.includes(formatINRExact(payable)),
       cardNoNestedButton: (cardHtml.match(/<button/g) ?? []).length === 1,
     };
+    // The trip picked in that view opens the Farm Payment page's own detail
+    // (Step 2 Farm Details + Step 3 Pickup Details) — render it for a real
+    // analysis trip to prove the wiring has something to show.
+    let farmDetail = "not-rendered";
+    try {
+      const { FarmPaymentTripViewModal } = await server.ssrLoadModule("/src/modules/accounts/components/farm-payment/FarmPaymentTripViewModal.tsx");
+      const detailHtml = withProvider(React.createElement(FarmPaymentTripViewModal, { open: true, trip: rows[0].trip, onClose: () => {} }));
+      farmDetail = `${detailHtml.length} chars · trip=${detailHtml.includes(rows[0].trip.tripNo)}`;
+      checks.farmDetailRenders = detailHtml.length > 500;
+    } catch (detailErr) {
+      farmDetail = `FAILED: ${String(detailErr).slice(0, 90)}`;
+      checks.farmDetailRenders = false;
+    }
+    console.log(`     farm trip detail  ${farmDetail}`);
     console.log(`OK   accounts-farm-table  rows ${shown}/${rows.length}  cumulative=${formatINR(payable)}  html length=${html.length}  ${JSON.stringify(checks)}`);
     const bad = Object.entries(checks).filter(([, ok]) => !ok).map(([name]) => name);
     if (bad.length) failed.push({ name: "accounts-farm-table", err: new Error(`failed: ${bad.join(", ")}`) });

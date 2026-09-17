@@ -148,7 +148,9 @@ export function SummaryFarmTable({ rows, spanLabel, onOpenTrip }: TableProps) {
                         <button
                           type="button"
                           onClick={() => onOpenTrip(trip)}
-                          className="text-emerald-700 hover:underline dark:text-emerald-300"
+                          title={t('accounts.summary.farm_table.view_trip')}
+                          aria-label={`${t('accounts.summary.farm_table.view_trip')} — ${trip.tripNo}`}
+                          className="rounded text-emerald-700 underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-emerald-500 dark:text-emerald-300"
                         >
                           {trip.tripNo}
                         </button>

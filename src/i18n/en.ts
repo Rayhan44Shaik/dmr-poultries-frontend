@@ -1220,6 +1220,7 @@ export default {
   'accounts.summary.farm_table.title': 'Farm Payment — per trip',
   'accounts.summary.farm_table.subtitle': 'Only the trips in this span · pickup weight × farm rate',
   'accounts.summary.farm_table.open': 'View farm payment',
+  'accounts.summary.farm_table.view_trip': 'View farm & pickup details',
   'accounts.summary.farm_table.trips': 'Trips',
   'accounts.summary.farm_table.weight': 'Pickup weight',
   'accounts.summary.farm_table.cumulative': 'Cumulative',
