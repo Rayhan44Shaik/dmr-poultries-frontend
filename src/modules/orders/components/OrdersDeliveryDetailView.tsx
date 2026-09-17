@@ -63,7 +63,6 @@ import {
   OrdersDropdown,
   OrdersIconButton,
   OrdersSearchInput,
-  OrdersStatusBadge,
   onOrdersNumberWheel,
 } from "./OrdersCommon";
 
@@ -131,7 +130,39 @@ function WeightDiffCell({ value, show }: { value: number; show: boolean }) {
   );
 }
 
-/** Delivery Status cell for the report. */
+/** Report table geometry — same anatomy as the Trip List table. */
+const reportThClass =
+  "px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap";
+const reportTdClass =
+  "px-4 py-3.5 text-[13px] text-slate-700 align-middle border-b border-slate-100";
+
+/** Bold tabular count; keyed on the value so a change pops in. */
+function CountCell({
+  value,
+  tone,
+  zero = "—",
+}: {
+  value: number;
+  tone: string;
+  zero?: string;
+}) {
+  if (!(value > 0)) {
+    return <span className="text-slate-300 tabular-nums">{zero}</span>;
+  }
+  return (
+    <span
+      key={value}
+      className={`inline-block text-[14px] font-extrabold tabular-nums animate-pop-in ${tone}`}
+    >
+      {formatCount(value)}
+    </span>
+  );
+}
+
+const statusPillBase =
+  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-transform duration-200 animate-pop-in";
+
+/** Delivery Status cell for the report — animated pill with a state dot. */
 function DeliveryStatusCell({
   row,
   to,
@@ -143,21 +174,48 @@ function DeliveryStatusCell({
   switch (row.status) {
     case "delivered":
     case "delivered_with_diff":
-      return <OrdersStatusBadge status="Delivered" label={label} />;
+      return (
+        <span
+          key={row.status}
+          className={`${statusPillBase} border-emerald-200 bg-emerald-50 text-emerald-700`}
+        >
+          <Check size={11} strokeWidth={3} />
+          {label}
+        </span>
+      );
     case "part_delivered":
       return (
-        <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-300 px-2 py-0.5 text-[10px] font-bold text-amber-700 whitespace-nowrap">
+        <span
+          key={row.status}
+          className={`${statusPillBase} border-amber-300 bg-amber-50 text-amber-700`}
+        >
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-60" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+          </span>
           {label}
         </span>
       );
     case "not_listed":
       return (
-        <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-700 whitespace-nowrap">
+        <span
+          key={row.status}
+          className={`${statusPillBase} border-orange-200 bg-orange-50 text-orange-700`}
+        >
+          <span className="h-2 w-2 rounded-full bg-orange-400" />
           {label}
         </span>
       );
     default:
-      return <OrdersStatusBadge status="Pending" label={label} />;
+      return (
+        <span
+          key={row.status}
+          className={`${statusPillBase} border-slate-200 bg-slate-50 text-slate-600`}
+        >
+          <span className="h-2 w-2 rounded-full bg-slate-400" />
+          {label}
+        </span>
+      );
   }
 }
 
@@ -630,56 +688,93 @@ function OrdersDeliveryDetailView({
                 </div>
               </div>
               <div className={`${opsTableCardClass} overflow-x-auto`}>
-                <table className="w-full min-w-[80rem] text-xs md:text-sm">
+                <table className="w-full min-w-[76rem] table-fixed text-xs md:text-sm">
+                  <colgroup>
+                    <col className="w-[3.5rem]" />
+                    <col className="w-[5.5rem]" />
+                    <col className="w-[14rem]" />
+                    <col className="w-[9rem]" />
+                    <col className="w-[6.25rem]" />
+                    <col className="w-[6.25rem]" />
+                    <col className="w-[6.25rem]" />
+                    <col className="w-[6.25rem]" />
+                    <col className="w-[6.25rem]" />
+                    <col className="w-[6.75rem]" />
+                    <col className="w-[7.5rem]" />
+                    <col className="w-[8.5rem]" />
+                    <col className="w-[15rem]" />
+                  </colgroup>
                   <thead>
-                    <tr className={opsTableHeadRowClass}>
-                      <th className={`${opsTableThClass} w-14`}>
-                        {to("orders.col_sno")}
-                      </th>
-                      <th className={`${opsTableThClass} w-24`}>
+                    <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-600">
+                      <th className={reportThClass}>{to("orders.col_sno")}</th>
+                      <th className={reportThClass}>
                         {to("orders.col_shop_no")}
                       </th>
-                      <th className={opsTableThClass}>
+                      <th className={reportThClass}>
                         {to("orders.col_shop_name")}
                       </th>
-                      <th className={opsTableThClass}>
+                      <th className={reportThClass}>
                         {to("orders.col_village")}
                       </th>
-                      <th className={`${opsTableThClass} w-24 text-right`}>
-                        {to("orders.collected_boxes")}
+                      <th
+                        className={`${reportThClass} text-right`}
+                        title={to("orders.collected_boxes")}
+                      >
+                        {to("orders.th_coll_boxes")}
                       </th>
-                      <th className={`${opsTableThClass} w-24 text-right`}>
-                        {to("orders.col_assigned_boxes")}
+                      <th
+                        className={`${reportThClass} text-right`}
+                        title={to("orders.col_assigned_boxes")}
+                      >
+                        {to("orders.th_ass_boxes")}
                       </th>
-                      <th className={`${opsTableThClass} w-24 text-right`}>
-                        {to("orders.delivered_boxes")}
+                      <th
+                        className={`${reportThClass} text-right`}
+                        title={to("orders.delivered_boxes")}
+                      >
+                        {to("orders.th_del_boxes")}
                       </th>
-                      <th className={`${opsTableThClass} w-24 text-right`}>
-                        {to("orders.pending_boxes")}
+                      <th
+                        className={`${reportThClass} text-right`}
+                        title={to("orders.pending_boxes")}
+                      >
+                        {to("orders.th_pend_boxes")}
                       </th>
-                      <th className={`${opsTableThClass} w-24 text-right`}>
-                        {to("orders.delivered_birds")}
+                      <th
+                        className={`${reportThClass} text-right`}
+                        title={to("orders.delivered_birds")}
+                      >
+                        {to("orders.th_del_birds")}
                       </th>
-                      <th className={`${opsTableThClass} w-28 text-right`}>
-                        {to("orders.delivered_weight")}
+                      <th
+                        className={`${reportThClass} text-right`}
+                        title={to("orders.delivered_weight")}
+                      >
+                        {to("orders.th_del_wt")}
                       </th>
-                      <th className={`${opsTableThClass} w-40`}>
-                        {to("orders.delivery_time")}
+                      <th
+                        className={reportThClass}
+                        title={to("orders.delivery_time")}
+                      >
+                        {to("orders.th_time")}
                       </th>
-                      <th className={`${opsTableThClass} w-36`}>
+                      <th className={reportThClass}>
                         {to("orders.col_delivery_status")}
                       </th>
                       {/* Shop-level capture: the order is on this row, the
                           delivery is entered here (partial allowed). */}
-                      <th className={`${opsTableThClass} w-64`}>
-                        {to("orders.record_delivery")}
+                      <th
+                        className={reportThClass}
+                        title={to("orders.record_delivery")}
+                      >
+                        {to("orders.th_entry")}
                       </th>
                     </tr>
                   </thead>
                   <tbody className={opsTableDivideClass}>
                     {pageRows.length === 0 && (
                       <tr>
-                        <td className={opsTableTdClass} colSpan={13}>
+                        <td className={reportTdClass} colSpan={13}>
                           <span className="text-slate-400 text-sm py-4 block text-center">
                             {query || statusFilter !== "all"
                               ? to("orders.no_results")
@@ -690,80 +785,88 @@ function OrdersDeliveryDetailView({
                     )}
                     {pageRows.map((row, index) => {
                       const remaining = shopRemainingBoxes(row);
+                      const done =
+                        row.status === "delivered" ||
+                        row.status === "delivered_with_diff";
                       return (
                         <tr
                           key={row.shopId}
-                          className="align-middle transition-colors"
+                          className={`align-middle transition-colors animate-fade-in-up hover:bg-slate-50/70 ${
+                            done ? "bg-emerald-50/30" : ""
+                          }`}
+                          style={{
+                            animationDelay: `${Math.min(index, 12) * 28}ms`,
+                          }}
                         >
-                          <td className={opsTableTdClass}>
-                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[12px] font-bold bg-emerald-50 text-emerald-700">
+                          <td className={reportTdClass}>
+                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-[12px] font-bold text-emerald-700">
                               {row.serialNo || startIndex + index + 1}
                             </span>
                           </td>
-                          <td className={`${opsTableTdClass} text-slate-600`}>
+                          <td
+                            className={`${reportTdClass} font-semibold text-slate-700 tabular-nums`}
+                          >
                             {row.shopNumber || "—"}
                           </td>
                           <td
-                            className={`${opsTableTdClass} font-semibold text-slate-800`}
+                            className={`${reportTdClass} font-bold text-slate-900 truncate`}
+                            title={row.shopName || undefined}
                           >
                             {row.shopName || "—"}
                           </td>
-                          <td className={opsTableTdClass}>
+                          <td
+                            className={`${reportTdClass} font-medium text-slate-700 truncate`}
+                            title={row.village || undefined}
+                          >
                             {row.village || "—"}
                           </td>
-                          <td
-                            className={`${opsTableTdClass} text-right font-bold text-emerald-800`}
-                          >
-                            {row.collectedBoxes > 0
-                              ? formatCount(row.collectedBoxes)
-                              : "—"}
+                          <td className={`${reportTdClass} text-right`}>
+                            <CountCell
+                              value={row.collectedBoxes}
+                              tone="text-emerald-700"
+                            />
+                          </td>
+                          <td className={`${reportTdClass} text-right`}>
+                            <CountCell
+                              value={row.assignedBoxes}
+                              tone="text-slate-900"
+                            />
+                          </td>
+                          <td className={`${reportTdClass} text-right`}>
+                            <CountCell
+                              value={row.deliveredBoxes}
+                              tone="text-teal-700"
+                            />
+                          </td>
+                          <td className={`${reportTdClass} text-right`}>
+                            <CountCell
+                              value={row.pendingBoxes}
+                              tone="text-amber-600"
+                              zero="0"
+                            />
+                          </td>
+                          <td className={`${reportTdClass} text-right`}>
+                            <CountCell
+                              value={row.deliveredBirds}
+                              tone="text-blue-700"
+                            />
                           </td>
                           <td
-                            className={`${opsTableTdClass} text-right font-semibold text-slate-800`}
-                          >
-                            {row.assignedBoxes > 0
-                              ? formatCount(row.assignedBoxes)
-                              : "—"}
-                          </td>
-                          <td
-                            className={`${opsTableTdClass} text-right font-semibold`}
-                          >
-                            {row.deliveredBoxes > 0
-                              ? formatCount(row.deliveredBoxes)
-                              : "—"}
-                          </td>
-                          <td className={`${opsTableTdClass} text-right`}>
-                            {row.pendingBoxes > 0 ? (
-                              <span className="font-semibold text-amber-600">
-                                {formatCount(row.pendingBoxes)}
-                              </span>
-                            ) : (
-                              <span className="text-slate-300">0</span>
-                            )}
-                          </td>
-                          <td
-                            className={`${opsTableTdClass} text-right font-semibold`}
-                          >
-                            {row.deliveredBirds > 0
-                              ? formatCount(row.deliveredBirds)
-                              : "—"}
-                          </td>
-                          <td
-                            className={`${opsTableTdClass} text-right font-semibold`}
+                            className={`${reportTdClass} text-right font-bold text-slate-900 tabular-nums`}
                           >
                             {row.deliveredWeight > 0
                               ? row.deliveredWeight.toFixed(2)
                               : "—"}
                           </td>
                           <td
-                            className={`${opsTableTdClass} text-slate-500 whitespace-nowrap`}
+                            className={`${reportTdClass} whitespace-nowrap text-[12px] font-medium text-slate-500`}
                           >
                             {formatDeliveredAtLabel(row.deliveredAt)}
                           </td>
-                          <td className={opsTableTdClass}>
+                          <td className={reportTdClass}>
                             <DeliveryStatusCell row={row} to={to} />
                           </td>
-                          <td className={opsTableTdClass}>
+                          <td className={reportTdClass}>
                             {canDeliver && !row.additional ? (
                               <ShopDeliveryCapture
                                 row={row}
