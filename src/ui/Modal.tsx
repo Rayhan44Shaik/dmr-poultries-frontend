@@ -197,7 +197,6 @@ export function Modal({
                 onClick={onClose}
                 className={cn(`group ${uiDialogCloseClass}`, closeButtonClassName)}
                 aria-label="Close dialog"
-                title="Close dialog"
               >
                 {/* The X plays the shared dismiss twist on hover — the same
                     action-glyph language as the toolbar Reset / PDF buttons. */}
