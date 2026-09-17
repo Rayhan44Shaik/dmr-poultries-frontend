@@ -128,7 +128,11 @@ try {
     // calls its cumulative.
     const weeklyFarm = groups.reduce((sum, g) => {
       const weekTrips = service.getCompletedTripsByDateRange(g.start, g.end);
-      return sum + service.computeEffectiveExpenses(weekTrips, g.start, g.end).farm;
+      const weekFarm = service.computeEffectiveExpenses(weekTrips, g.start, g.end).farm;
+      // Pressing that column's amount opens exactly these trips, so their own
+      // farm bills must add up to the figure printed in the cell.
+      assert(Math.abs(service.farmTotalsForTrips(weekTrips).payable - weekFarm) < .01, `${name} ${g.label}: the column's trips total the amount it prints`);
+      return sum + weekFarm;
     }, 0);
     assert(Math.abs(weeklyFarm - expenses.farm) < .01, `${name}: weekly Farm Payment columns add up to the span's farm expense`);
     assert(Math.abs(weeklyFarm - rowPayable) < .01, `${name}: Farm Payment row = cumulative of the per-trip farm rows`);

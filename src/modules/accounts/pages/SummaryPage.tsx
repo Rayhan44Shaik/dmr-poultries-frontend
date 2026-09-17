@@ -32,7 +32,7 @@ import { opsFilterCardClass, opsSecondaryButtonClass } from '../../../shared/ui/
 import { DatePicker } from '../../../components/common/DatePicker';
 import { exportPDF, exportExcel } from '../components/Summary';
 import SummaryTripViewer from '../components/Summary/SummaryTripViewer';
-import SummaryFarmViewer, { SummaryFarmBadge, SummaryFarmCard } from '../components/Summary/SummaryFarmViewer';
+import SummaryFarmViewer, { SummaryFarmAmount, SummaryFarmCard } from '../components/Summary/SummaryFarmViewer';
 import { FarmPaymentTripViewModal } from '../components/farm-payment/FarmPaymentTripViewModal';
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
 import type { WeeklyMetrics, ExpenseBreakdown } from '../types/summary.types';
@@ -162,6 +162,22 @@ const sumExpenseBreakdown = (expense: ExpenseBreakdown): number =>
 /** Zero-valued breakdown: keeps net profit arithmetic total when a period has
  * no expense row of its own yet. */
 const EMPTY_EXPENSES: ExpenseBreakdown = { farm: 0, fuel: 0, trip: 0, salary: 0, maintenance: 0, office: 0 };
+
+/** The trips that carry a farm payment, newest first, each paired with its own
+ * farm bill. Used for the whole span and for a single expense-table column, so
+ * both are built the same way. */
+const buildFarmRows = (
+  trips: readonly Trip[],
+  summaryService: { getFarmPaymentForTrip: (tripId: number) => TripFarmPayment | undefined }
+): { trip: Trip; farm: TripFarmPayment }[] =>
+  trips
+    .map((trip) => ({ trip, farm: summaryService.getFarmPaymentForTrip(trip.id) }))
+    .filter((row): row is { trip: Trip; farm: TripFarmPayment } => Boolean(row.farm))
+    .sort(
+      (a, b) =>
+        String(b.trip.tripDate).localeCompare(String(a.trip.tripDate)) ||
+        (b.trip.id ?? 0) - (a.trip.id ?? 0)
+    );
 
 const netProfitOfPeriod = (
   metrics: WeeklyMetrics,
@@ -339,8 +355,10 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
   const [tripViewerOpen, setTripViewerOpen] = useState(false);
   const [tripViewerTrips, setTripViewerTrips] = useState<Trip[]>([]);
   const [tripViewerLabel, setTripViewerLabel] = useState('');
-  // The farm payment pop-up: every trip of the span with its own bill.
-  const [farmViewerOpen, setFarmViewerOpen] = useState(false);
+  /* The farm payment pop-up, scoped to the figure that opened it: a column's own
+     trips when an amount in the expense table is pressed, the whole span from
+     the card. `null` keeps it shut. */
+  const [farmScope, setFarmScope] = useState<{ label: string; trips: Trip[] } | null>(null);
   // The trip picked in that pop-up — opens the Farm Payment page's own trip
   // detail (Step 2 Farm Details + Step 3 Pickup Details).
   const [farmTripView, setFarmTripView] = useState<Trip | null>(null);
@@ -827,17 +845,13 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
      with its own pickup (DC) weight × farm rate. Newest first. The rows total to
      the same figure the expense table's Farm Payment row is built from, so this
      breakdown can never disagree with the row it explains. */
-  const farmRows = useMemo(
-    () =>
-      trips
-        .map((trip) => ({ trip, farm: summaryService.getFarmPaymentForTrip(trip.id) }))
-        .filter((row): row is { trip: Trip; farm: TripFarmPayment } => Boolean(row.farm))
-        .sort(
-          (a, b) =>
-            String(b.trip.tripDate).localeCompare(String(a.trip.tripDate)) ||
-            (b.trip.id ?? 0) - (a.trip.id ?? 0)
-        ),
-    [trips, summaryService]
+  const farmRows = useMemo(() => buildFarmRows(trips, summaryService), [trips, summaryService]);
+
+  /* Rows for whichever figure opened the pop-up. Same mapping as `farmRows`, so
+     a column's amount and the trips it opens can never disagree. */
+  const farmScopeRows = useMemo(
+    () => buildFarmRows(farmScope?.trips ?? [], summaryService),
+    [farmScope, summaryService]
   );
 
   const totalNetProfit = totalMetrics.sales - totalExpenseValue;
@@ -1889,6 +1903,19 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                    weight × farm rate). It gets its own highlight and carries the
                    cumulative of the per-trip rows below it. */
                 const isFarm = item.key === 'farm';
+                /* The farm amount is the trigger: press it and the farm payment
+                   view opens for exactly the trips behind that figure — the
+                   column's own trips, or the whole span on the Total column. */
+                const farmAmount = (value: number, scopeLabel: string, scopeTrips: Trip[]) =>
+                  isFarm ? (
+                    <SummaryFarmAmount
+                      value={value}
+                      scopeLabel={scopeLabel}
+                      onOpen={() => setFarmScope({ label: scopeLabel, trips: scopeTrips })}
+                    />
+                  ) : (
+                    formatCurrency(value)
+                  );
                 return (
                   <tr
                   key={item.key}
@@ -1904,20 +1931,13 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                         : "before:bg-emerald-500 before:opacity-0 group-hover/row:before:opacity-100"
                     }`}>
                       <SummaryRowLabel color={EXPENSE_ROW_DOT[item.key]} label={item.label} />
-                      {isFarm && (
-                        <SummaryFarmBadge
-                          payable={totalExpenses.farm}
-                          trips={farmRows.length}
-                          onClick={() => setFarmViewerOpen(true)}
-                        />
-                      )}
                     </td>
                     {comparePrevious && period === 'week' ? (
                       <>
                         {previousWeeklyExpenses.map((prevW, idx) => {
                           const prevVal = (prevW?.[item.key as keyof ExpenseBreakdown] as number) || 0;
                           return (
-                            <td key={`prev-${idx}`} className="w-24 px-3 py-2.5 text-center text-slate-800 dark:text-slate-200 bg-amber-50/30 border-l border-amber-100 group-hover/row:bg-amber-100/60 dark:group-hover/row:bg-amber-500/15">{formatCurrency(prevVal)}</td>
+                            <td key={`prev-${idx}`} className="w-24 px-3 py-2.5 text-center text-slate-800 dark:text-slate-200 bg-amber-50/30 border-l border-amber-100 group-hover/row:bg-amber-100/60 dark:group-hover/row:bg-amber-500/15">{farmAmount(prevVal, previousWeeklyGroups[idx]?.label ?? '', previousWeeklyGroups[idx]?.trips ?? [])}</td>
                           );
                         })}
                         {weeklyExpenses.map((currW, idx) => {
@@ -1927,7 +1947,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                           const expPct = prevValForDiff !== 0 ? (expDiff / Math.abs(prevValForDiff)) * 100 : null;
                           return (
                             <td key={`curr-${idx}`} className="w-24 px-3 py-2.5 text-center font-medium bg-emerald-50/20 border-l border-emerald-100 group-hover/row:bg-emerald-100/60 dark:group-hover/row:bg-emerald-500/15">
-                              <div className="text-slate-700 dark:text-slate-200">{formatCurrency(currVal)}</div>
+                              <div className="text-slate-700 dark:text-slate-200">{farmAmount(currVal, weeklyGroups[idx]?.label ?? '', weeklyGroups[idx]?.trips ?? [])}</div>
                               {(prevValForDiff !== 0 || currVal !== 0) ? (
                                 <div className={`text-[9px] font-semibold leading-none mt-0.5 ${expDiff <= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatSignedCurrency(expDiff)}{expPct == null ? '' : ` (${formatSignedPercent(expPct)})`}</div>
                               ) : null}
@@ -1942,7 +1962,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                           const val = (m.expenses[item.key as keyof ExpenseBreakdown] as number) || 0;
                           if (!isCurrent) {
                             return (
-                              <td key={idx} className="w-28 px-3 py-2.5 text-center text-slate-800 dark:text-slate-200 bg-amber-50/30 border-l border-amber-100 group-hover/row:bg-amber-100/60 dark:group-hover/row:bg-amber-500/15">{formatCurrency(val)}</td>
+                              <td key={idx} className="w-28 px-3 py-2.5 text-center text-slate-800 dark:text-slate-200 bg-amber-50/30 border-l border-amber-100 group-hover/row:bg-amber-100/60 dark:group-hover/row:bg-amber-500/15">{farmAmount(val, m.label, m.trips)}</td>
                             );
                           }
                           const prevVal = (monthComparisonData[monthComparisonData.length - 2]?.expenses[item.key as keyof ExpenseBreakdown] as number) || 0;
@@ -1950,7 +1970,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                           const expPct = prevVal !== 0 ? (expDiff / Math.abs(prevVal)) * 100 : null;
                           return (
                             <td key={idx} className="w-28 px-3 py-2.5 text-center font-medium bg-emerald-50/20 border-l border-emerald-100 group-hover/row:bg-emerald-100/60 dark:group-hover/row:bg-emerald-500/15">
-                              <div className="text-slate-700 dark:text-slate-200">{formatCurrency(val)}</div>
+                              <div className="text-slate-700 dark:text-slate-200">{farmAmount(val, m.label, m.trips)}</div>
                               {(prevVal !== 0 || val !== 0) ? (
                                 <div className={`text-[9px] font-semibold leading-none mt-0.5 ${expDiff <= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatSignedCurrency(expDiff)}{expPct == null ? '' : ` (${formatSignedPercent(expPct)})`}</div>
                               ) : null}
@@ -1965,7 +1985,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                           const val = (q.expenses[item.key as keyof ExpenseBreakdown] as number) || 0;
                           if (!isCurrent) {
                             return (
-                              <td key={idx} className="w-28 px-3 py-2.5 text-center text-slate-800 dark:text-slate-200 bg-amber-50/30 border-l border-amber-100 group-hover/row:bg-amber-100/60 dark:group-hover/row:bg-amber-500/15">{formatCurrency(val)}</td>
+                              <td key={idx} className="w-28 px-3 py-2.5 text-center text-slate-800 dark:text-slate-200 bg-amber-50/30 border-l border-amber-100 group-hover/row:bg-amber-100/60 dark:group-hover/row:bg-amber-500/15">{farmAmount(val, q.label, q.trips)}</td>
                             );
                           }
                           const prevVal = (quarterComparisonData[quarterComparisonData.length - 2]?.expenses[item.key as keyof ExpenseBreakdown] as number) || 0;
@@ -1973,7 +1993,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                           const expPct = prevVal !== 0 ? (expDiff / Math.abs(prevVal)) * 100 : null;
                           return (
                             <td key={idx} className="w-28 px-3 py-2.5 text-center font-medium bg-emerald-50/20 border-l border-emerald-100 group-hover/row:bg-emerald-100/60 dark:group-hover/row:bg-emerald-500/15">
-                              <div className="text-slate-700 dark:text-slate-200">{formatCurrency(val)}</div>
+                              <div className="text-slate-700 dark:text-slate-200">{farmAmount(val, q.label, q.trips)}</div>
                               {(prevVal !== 0 || val !== 0) ? (
                                 <div className={`text-[9px] font-semibold leading-none mt-0.5 ${expDiff <= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatSignedCurrency(expDiff)}{expPct == null ? '' : ` (${formatSignedPercent(expPct)})`}</div>
                               ) : null}
@@ -1988,7 +2008,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                           const val = (c.expenses[item.key as keyof ExpenseBreakdown] as number) || 0;
                           if (!isCurrent) {
                             return (
-                              <td key={idx} className="w-28 px-3 py-2.5 text-center text-slate-800 dark:text-slate-200 bg-amber-50/30 border-l border-amber-100 group-hover/row:bg-amber-100/60 dark:group-hover/row:bg-amber-500/15">{formatCurrency(val)}</td>
+                              <td key={idx} className="w-28 px-3 py-2.5 text-center text-slate-800 dark:text-slate-200 bg-amber-50/30 border-l border-amber-100 group-hover/row:bg-amber-100/60 dark:group-hover/row:bg-amber-500/15">{farmAmount(val, c.label, c.trips)}</td>
                             );
                           }
                           const prevVal = (customComparisonData[customComparisonData.length - 2]?.expenses[item.key as keyof ExpenseBreakdown] as number) || 0;
@@ -1996,7 +2016,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                           const expPct = prevVal !== 0 ? (expDiff / Math.abs(prevVal)) * 100 : null;
                           return (
                             <td key={idx} className="w-28 px-3 py-2.5 text-center font-medium bg-emerald-50/20 border-l border-emerald-100 group-hover/row:bg-emerald-100/60 dark:group-hover/row:bg-emerald-500/15">
-                              <div className="text-slate-700 dark:text-slate-200">{formatCurrency(val)}</div>
+                              <div className="text-slate-700 dark:text-slate-200">{farmAmount(val, c.label, c.trips)}</div>
                               {(prevVal !== 0 || val !== 0) ? (
                                 <div className={`text-[9px] font-semibold leading-none mt-0.5 ${expDiff <= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatSignedCurrency(expDiff)}{expPct == null ? '' : ` (${formatSignedPercent(expPct)})`}</div>
                               ) : null}
@@ -2008,7 +2028,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                       weeklyGroups.map((_, idx) => {
                         const currVal = (weeklyExpenses[idx]?.[item.key as keyof ExpenseBreakdown] as number) || 0;
                         return (
-                          <td key={idx} className="w-24 px-3 py-2.5 text-center text-slate-600" title={formatCurrencyExact(currVal)}>{formatCurrency(currVal)}</td>
+                          <td key={idx} className="w-24 px-3 py-2.5 text-center text-slate-600" title={formatCurrencyExact(currVal)}>{farmAmount(currVal, weeklyGroups[idx]?.label ?? '', weeklyGroups[idx]?.trips ?? [])}</td>
                         );
                       })
                     )}
@@ -2017,7 +2037,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                         className="w-20 px-3 py-2.5 text-center font-bold text-slate-800 bg-slate-50 dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 group-hover/row:bg-slate-200/70 dark:group-hover/row:bg-slate-700/60"
                         title={formatCurrencyExact(total)}
                       >
-                        {formatCurrency(total)}
+                        {farmAmount(total, rangeLabel, trips)}
                       </td>
                     )}
                   </tr>
@@ -2223,7 +2243,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
           the pop-up that lists every trip of the span with the pickup weight
           and farm rate its bill was calculated from, so the row above can be
           audited trip by trip. */}
-      <SummaryFarmCard rows={farmRows} spanLabel={rangeLabel} onOpen={() => setFarmViewerOpen(true)} />
+      <SummaryFarmCard rows={farmRows} spanLabel={rangeLabel} onOpen={() => setFarmScope({ label: rangeLabel, trips })} />
 
       </div>
       </div>
@@ -2231,14 +2251,14 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
       {/* Farm payment pop-up: every trip of the span with its own bill. Picking
           a trip closes this list and opens that trip's farm payment detail, so
           only one pop-up is ever open. */}
-      {farmViewerOpen && (
+      {farmScope && (
         <SummaryFarmViewer
           open
-          rows={farmRows}
-          spanLabel={rangeLabel}
-          onClose={() => setFarmViewerOpen(false)}
+          rows={farmScopeRows}
+          spanLabel={farmScope.label}
+          onClose={() => setFarmScope(null)}
           onOpenTrip={(trip) => {
-            setFarmViewerOpen(false);
+            setFarmScope(null);
             setFarmTripView(trip);
           }}
         />

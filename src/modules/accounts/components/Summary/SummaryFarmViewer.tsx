@@ -234,39 +234,30 @@ export function SummaryFarmTable({ rows, spanLabel, onOpenTrip }: TableProps) {
 }
 
 /**
- * The highlighted chip under the expense table's Farm Payment row. That row is
- * the only expense that is not a Payment Register total — it is the farm bill of
- * exactly the trips in the span — so the chip states the cumulative and opens
- * the per-trip view that proves it.
+ * The Farm Payment figure in the expense table, as a trigger. Farm Payment is
+ * the one expense that is not a Payment Register total — it is the farm bill of
+ * the trips behind that very figure — so the amount itself is what you press to
+ * see those trips. `formatINR` matches the page's own compact ₹L/₹Cr notation.
  */
-export function SummaryFarmBadge({
-  payable,
-  trips,
-  onClick,
+export function SummaryFarmAmount({
+  value,
+  scopeLabel,
+  onOpen,
 }: {
-  payable: number;
-  trips: number;
-  onClick: () => void;
+  value: number;
+  scopeLabel: string;
+  onOpen: () => void;
 }) {
   const { t } = useI18n();
   return (
     <button
       type="button"
-      onClick={onClick}
-      title={t('accounts.summary.farm_row.source')}
-      aria-label={`${t('accounts.summary.farm_row.source')} — ${formatINRExact(payable)}`}
-      className="mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded-full border border-lime-300 bg-white px-2 py-0.5 text-[10px] font-bold text-lime-800 shadow-sm outline-none transition hover:border-lime-400 hover:bg-lime-50 focus-visible:ring-2 focus-visible:ring-emerald-500 active:scale-[0.98] dark:border-lime-700 dark:bg-slate-800 dark:text-lime-300 dark:hover:bg-lime-500/10"
+      onClick={onOpen}
+      title={`${t('accounts.summary.farm_row.open')} — ${scopeLabel}`}
+      aria-label={`${t('accounts.summary.farm_row.open')} — ${scopeLabel}: ${formatINRExact(value)}`}
+      className="inline-flex min-w-16 items-center justify-center rounded-full border border-lime-300 bg-white px-2.5 py-1 text-[13px] font-bold tabular-nums text-lime-800 shadow-sm outline-none transition hover:border-lime-400 hover:bg-lime-100 hover:text-lime-900 focus-visible:ring-2 focus-visible:ring-emerald-500 active:scale-95 dark:border-lime-700 dark:bg-slate-800 dark:text-lime-300 dark:hover:bg-lime-500/15"
     >
-      <Sprout size={11} aria-hidden="true" />
-      <span className="truncate">
-        {t('accounts.summary.farm_table.cumulative')}{' '}
-        <span className="tabular-nums" title={formatINRExact(payable)}>
-          {formatINR(payable)}
-        </span>
-        {' · '}
-        <span className="tabular-nums">{formatCount(trips)}</span>{' '}
-        {t('accounts.summary.farm_table.trips').toLowerCase()}
-      </span>
+      <span title={formatINRExact(value)}>{formatINR(value)}</span>
     </button>
   );
 }

@@ -1221,7 +1221,7 @@ export default {
   'accounts.summary.farm_table.subtitle': 'Only the trips in this span · pickup weight × farm rate',
   'accounts.summary.farm_table.open': 'View farm payment',
   'accounts.summary.farm_table.view_trip': 'View farm & pickup details',
-  'accounts.summary.farm_row.source': 'Farm payment of the trips in this span — pickup weight × farm rate, not the Payment Register. Click for the trips.',
+  'accounts.summary.farm_row.open': 'View the farm payment behind this figure',
   'accounts.summary.farm_table.trips': 'Trips',
   'accounts.summary.farm_table.weight': 'Pickup weight',
   'accounts.summary.farm_table.cumulative': 'Cumulative',
