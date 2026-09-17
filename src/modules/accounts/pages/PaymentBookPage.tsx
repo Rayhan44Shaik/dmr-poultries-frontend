@@ -6,7 +6,7 @@ import { PaymentViewModal } from '../components/payment-book/PaymentViewModal';
 import { PaymentEditModal } from '../components/payment-book/PaymentEditModal';
 import { NewPaymentModal } from '../components/payment-book/NewPaymentModal';
 import { deletePayment, listPayments, updatePayment } from '../services/paymentApiService';
-import type { Payment, PaymentWritePayload } from '../types/payment.types';
+import type { Payment } from '../types/payment.types';
 import { DatePicker } from '../../../components/common/DatePicker';
 import { canEditItem, canDeleteItem } from '../../../utils/dateUtils';
 import { weekRange } from '../../../utils/businessDate';
@@ -18,7 +18,6 @@ import { shouldShowPagination } from '../../../shared/ui/paginationStyles';
 import MasterDropdown from '../../masters/components/MasterDropdown';
 import '../../masters/styles/masters.css';
 import { Button } from '../../../ui/Button';
-import { uiBadgeClass } from '../../../shared/ui/uiTokens';
 import {
   opsFilterCardClass,
   opsFilterLabelClass,
@@ -27,7 +26,6 @@ import {
   opsSecondaryButtonClass,
 } from '../../../shared/ui/operationsStyles';
 import { useI18n } from '../../../i18n';
-import { applyDemoWrite, createDemoPayments, resetDemoPayments } from '../utils/paymentRegisterDemo';
 import { EmptyState } from '../../../ui/EmptyState';
 import { BrandRefreshButton, Pagination } from '../../../ui';
 import { filterPayments, PAYMENT_TYPES, PAYMENT_MODES, paymentCurrency, paymentNoDisplay } from '../utils/paymentRegister';
@@ -42,8 +40,6 @@ const PAYMENT_VIEWS: { value: PaymentView; labelKey: string; selectedClass: stri
 export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   const { t } = useI18n();
   const { showNotification } = useSafeNotification();
-  // Show the isolated examples immediately in the development preview.
-  // Production continues to open with real API data; demo remains opt-in there.
   const tableRef = useRef<HTMLElement>(null);
   const statusGroupRef = useRef<HTMLDivElement>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -51,20 +47,10 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   const [approving, setApproving] = useState(false);
   const [approvalError, setApprovalError] = useState('');
   const approvingRef = useRef(false);
-  // Default to the live API in every environment so the page shows the same
-  // dataset as the rest of the app; the bundled examples remain available as
-  // an explicit fallback when the payments endpoint is unreachable.
-  const [demo, setDemo] = useState(false);
-  // Sample rows are state, not a one-shot constant: the preview is writable (see
-  // `persistSample`) so create/edit/approve/delete can be exercised without a
-  // server. Nothing written here ever reaches a payment endpoint.
-  const [demoPayments, setDemoPayments] = useState(() => createDemoPayments());
-  const demoRows = useRef(demoPayments);
-  const demoRef = useRef(demo);
   const mounted = useRef(false);
-  const [realPayments, setPayments] = useState<Payment[]>([]);
-  const [realLoading, setLoading] = useState(true);
-  const [realError, setError] = useState(false);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const inFlight = useRef(false);
   const reloadAfterSave = useRef(false);
   const [filters, setFilters] = useState(() => ({ ...weekRange(), type: '', mode: '', search: '' }));
@@ -82,15 +68,11 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   const [editingPayment, setEditingPayment] = useState<Payment | null>(null);
   const [viewingPayment, setViewingPayment] = useState<Payment | null>(null);
 
-  const payments = demo ? demoPayments : realPayments;
-  const loading = !demo && realLoading;
-  const error = !demo && realError;
-
   // The existing list endpoint returns the dataset. Filter locally so search
   // covers all displayed fields and paging/filter changes make no requests.
   // Resolves true only when the dataset actually came back.
   const loadPayments = useCallback(async (afterMutation = false): Promise<boolean> => {
-    if (demoRef.current || !mounted.current) return false;
+    if (!mounted.current) return false;
     if (inFlight.current) {
       // A save/delete completing during refresh must not leave stale rows.
       if (afterMutation) reloadAfterSave.current = true;
@@ -112,7 +94,7 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
     } catch {
       if (!mounted.current) return false;
       setError(true);
-      if (!demoRef.current) showNotification(t('accounts.payment.notif_load_error'), 'error');
+      showNotification(t('accounts.payment.notif_load_error'), 'error');
       return false;
     } finally {
       inFlight.current = false;
@@ -145,9 +127,9 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   /* Filter feedback: the Search / Reset glyphs beat once per click (700 ms).
      The refresh button follows the trip list's contract instead — plain hen,
      success toast when the load finishes. */
-  const [filterAction, setFilterAction] = useState<'search' | 'clear' | 'refresh' | null>(null);
+  const [filterAction, setFilterAction] = useState<'search' | 'clear' | null>(null);
   const spinTimer = useRef<number | null>(null);
-  const animateFilterAction = (action: 'search' | 'clear' | 'refresh') => {
+  const animateFilterAction = (action: 'search' | 'clear') => {
     setFilterAction(action);
     if (spinTimer.current !== null) window.clearTimeout(spinTimer.current);
     spinTimer.current = window.setTimeout(() => setFilterAction(null), 700);
@@ -156,21 +138,9 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   // plain (no loading prop, so it never pre-dances), and a finished refresh
   // confirms with the shared "Data refreshed" success notification.
   const handleRefresh = useCallback(() => {
-    if (demoRef.current) {
-      showNotification(t('accounts.payment.notif_demo_fresh'), 'info');
-      return;
-    }
     void loadPayments().then(ok => { if (ok) showNotification(t('notification.data_refreshed'), 'success'); });
   }, [loadPayments, showNotification, t]);
   useEffect(() => () => { if (spinTimer.current !== null) window.clearTimeout(spinTimer.current); }, []);
-
-  const toggleDemo = () => {
-    if (approvingRef.current) return;
-    setSelectedId(null);
-    demoRef.current = !demo;
-    setDemo(!demo);
-    if (demo) void loadPayments();
-  };
 
   const changeFilter = (key: keyof typeof filters, value: string) => {
     setFilters(previous => ({ ...previous, [key]: value }));
@@ -205,43 +175,13 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   const rows = filtered.slice((safePage - 1) * pageSize, safePage * pageSize);
   const selectedPayment = rows.find(payment => payment.id === selectedId) ?? null;
 
-  /* ---- sample preview: in-memory writes -----------------------------------
-     A sample row is real enough to work with and never real enough to save.
-     Writes patch this component's rows only; the `demo-payment-` prefix is what
-     every guard below (and the delete controller) checks, so rows created here
-     keep it and stay inside the sandbox. */
-  const isSample = (payment: Payment) => payment.id.startsWith('demo-payment-');
-  const writeDemoRows = useCallback((next: Payment[]) => {
-    demoRows.current = next;
-    setDemoPayments(next);
-  }, []);
-  const persistSample = useCallback(async (payload: PaymentWritePayload, target: Payment | null): Promise<Payment> => {
-    // One short beat so the sheet's saving state behaves like the network path.
-    await new Promise(resolve => setTimeout(resolve, 200));
-    const next = applyDemoWrite(demoRows.current, payload, target);
-    writeDemoRows(next.rows);
-    return next.saved;
-  }, [writeDemoRows]);
-  const resetDemo = () => {
+  const handleSave = () => {
     setSelectedId(null);
-    writeDemoRows(resetDemoPayments());
-    showNotification(t('accounts.payment.notif_rows_rebuilt'), 'info');
-  };
-
-  const handleSave = (saved: Payment) => {
-    setSelectedId(null);
-    const sample = saved.id.startsWith('demo-payment-');
-    showNotification(sample ? t('accounts.payment.notif_sample_updated') : t('accounts.payment.notif_saved'), sample ? 'info' : 'success');
-    // Real rows reload from the server; there is nothing to reload for a sample.
-    if (!sample) void loadPayments(true);
+    showNotification(t('accounts.payment.notif_saved'), 'success');
+    // Rows reload from the server so the list always reflects the write.
+    void loadPayments(true);
   };
   const { requestDelete, cancel, pendingItems, isPending } = usePendingDelete<string>(async id => {
-    if (id.startsWith('demo-payment-')) {
-      // The countdown committed on a preview row: remove it locally, no request.
-      writeDemoRows(demoRows.current.filter(row => row.id !== id));
-      showNotification(t('accounts.payment.notif_sample_removed'), 'info');
-      return;
-    }
     try {
       await deletePayment(id);
       showNotification(t('accounts.payment.notif_deleted'), 'success');
@@ -252,20 +192,15 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   });
 
   const selectedBusy = Boolean(selectedPayment && (isPending(selectedPayment.id) || approving));
-  // Eligibility follows the row, not the mode: sample rows are always inside the
-  // window (their stamps are synthetic and this week's), real rows keep the
-  // 10-day rule and the server path.
-  const inEditWindow = (payment: Payment) => isSample(payment) || canEditItem(payment.createdAt);
-  const canEditSelected = Boolean(selectedPayment && !selectedBusy && inEditWindow(selectedPayment));
-  const canDeleteSelected = Boolean(selectedPayment && !selectedBusy && (isSample(selectedPayment) || canDeleteItem(selectedPayment.createdAt)));
+  const canEditSelected = Boolean(selectedPayment && !selectedBusy && canEditItem(selectedPayment.createdAt));
+  const canDeleteSelected = Boolean(selectedPayment && !selectedBusy && canDeleteItem(selectedPayment.createdAt));
   const canApproveSelected = Boolean(canEditSelected && selectedPayment?.status === 'Draft');
 
   const confirmApproval = async () => {
     const payment = approvalPayment;
     if (!payment || approvingRef.current) return;
-    const sample = isSample(payment);
-    const current = (sample ? demoRows.current : realPayments).find(item => item.id === payment.id);
-    if (!current || current.status !== 'Draft' || (!sample && (!canEditItem(current.createdAt) || isPending(payment.id)))) {
+    const current = payments.find(item => item.id === payment.id);
+    if (!current || current.status !== 'Draft' || (!canEditItem(current.createdAt) || isPending(payment.id))) {
       setApprovalError(t('accounts.payment.approve_error_stale'));
       return;
     }
@@ -273,17 +208,6 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
     setApproving(true);
     setApprovalError('');
     try {
-      if (sample) {
-        // Preview only: flip the row in memory so the list can be seen to change.
-        await new Promise(resolve => setTimeout(resolve, 200));
-        const now = new Date().toISOString();
-        writeDemoRows(demoRows.current.map(row => row.id === payment.id ? { ...row, status: 'Approved' as const, updatedAt: now } : row));
-        if (!mounted.current) return;
-        setSelectedId(null);
-        setApprovalPayment(null);
-        showNotification(t('accounts.payment.notif_sample_approved'), 'info');
-        return;
-      }
       // Reuse the existing partial-update contract; never synthesize success.
       const saved = await updatePayment(payment.id, { status: 'Approved' });
       if (saved.id !== payment.id || saved.status !== 'Approved') {
@@ -306,16 +230,6 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
 
   return (
     <div className={`w-full space-y-5 animate-in fade-in duration-200 ${embedded ? '' : 'px-3 md:px-6 py-4 bg-slate-50/50 min-h-screen text-slate-800'}`}>
-      {/* Sample-data preview — this register's own demo affordance. The
-          application header owns the Accounts > Payment Register title. */}
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        {demo && <span className={uiBadgeClass('warning')}>{t('accounts.payment.sample_badge')}</span>}
-        <Button variant="secondary" aria-pressed={demo} disabled={!!pendingItems.length || approving} onClick={toggleDemo}>
-          {demo ? t('accounts.payment.back_real') : t('accounts.payment.preview_sample')}
-        </Button>
-        {demo && <Button variant="ghost" size="sm" icon={<RotateCcw size={14} />} onClick={resetDemo}>{t('accounts.payment.reset_rows')}</Button>}
-      </div>
-
       {/* The same filter card the Trip List uses (opsFilterCardClass): one
           labelled grid — icon + name per field — with the search row and every
           register action beneath it. Glyph motions come from the global
@@ -325,13 +239,13 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
           <div>
             <label htmlFor={`${dateId}-from`} className={opsFilterLabelClass}>
               <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
-              <span>{t('common.from')}</span>
+              <span>{t('accounts.payment.from')}</span>
             </label>
             <DatePicker
               id={`${dateId}-from`}
               value={filters.from}
               onChange={v => changeFilter('from', v)}
-              placeholder={t('accounts.payment.from')}
+              placeholder="dd/mm/yyyy"
               className="w-full text-xs font-medium"
               openOnFocus={false}
               hideClear
@@ -340,13 +254,13 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
           <div>
             <label htmlFor={`${dateId}-to`} className={opsFilterLabelClass}>
               <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
-              <span>{t('common.to')}</span>
+              <span>{t('accounts.payment.to')}</span>
             </label>
             <DatePicker
               id={`${dateId}-to`}
               value={filters.to}
               onChange={v => changeFilter('to', v)}
-              placeholder={t('accounts.payment.to')}
+              placeholder="dd/mm/yyyy"
               className="w-full text-xs font-medium"
               openOnFocus={false}
               hideClear
@@ -355,11 +269,11 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
           <div>
             <label htmlFor={typeFilterId} className={opsFilterLabelClass}>
               <Wallet size={17} className="text-emerald-500 flex-shrink-0" />
-              <span>{t('accounts.payment.type')}</span>
+              <span>{t('accounts.payment.all_types')}</span>
             </label>
             <MasterDropdown
               hideLabel
-              label={t('accounts.payment.type')}
+              label={t('accounts.payment.all_types')}
               triggerId={typeFilterId}
               value={filters.type}
               options={types}
@@ -373,11 +287,11 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
           <div>
             <label htmlFor={modeFilterId} className={opsFilterLabelClass}>
               <CreditCard size={17} className="text-sky-500 flex-shrink-0" />
-              <span>{t('accounts.payment.mode')}</span>
+              <span>{t('accounts.payment.all_modes')}</span>
             </label>
             <MasterDropdown
               hideLabel
-              label={t('accounts.payment.mode')}
+              label={t('accounts.payment.all_modes')}
               triggerId={modeFilterId}
               value={filters.mode}
               options={modes}
@@ -509,18 +423,14 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
           {approvalError && <span role="alert" className="mt-2 block text-rose-700">{approvalError}</span>}
         </>}
         onConfirm={() => void confirmApproval()} onCancel={() => { if (!approvingRef.current) { setApprovalPayment(null); setApprovalError(''); } }} />
-      <NewPaymentModal isOpen={isNewModalOpen} onClose={() => setIsNewModalOpen(false)} onSave={handleSave} persist={demo ? persistSample : undefined} />
-      {/* The write path follows the ROW, not the toggle: flipping to sample data
-          while a real payment is open must never downgrade its save to a local
-          patch (or vice versa). */}
-      <PaymentEditModal isOpen={!!editingPayment} payment={editingPayment} onClose={() => setEditingPayment(null)} onSave={handleSave}
-        persist={editingPayment && isSample(editingPayment) ? persistSample : undefined} />
+      <NewPaymentModal isOpen={isNewModalOpen} onClose={() => setIsNewModalOpen(false)} onSave={handleSave} />
+      <PaymentEditModal isOpen={!!editingPayment} payment={editingPayment} onClose={() => setEditingPayment(null)} onSave={handleSave} />
       {/* The sheet hands edit back to the register, which owns the row's
           eligibility rules; closing first keeps only one dialog mounted. */}
       <PaymentViewModal isOpen={!!viewingPayment} payment={viewingPayment} onClose={() => setViewingPayment(null)}
         onEdit={viewingPayment ? () => { const next = viewingPayment; setViewingPayment(null); setEditingPayment(next); } : undefined}
-        canEdit={Boolean(viewingPayment && !isPending(viewingPayment.id) && !approving && (isSample(viewingPayment) || canEditItem(viewingPayment.createdAt)))}
-        editHint={viewingPayment && !isSample(viewingPayment) ? t('accounts.payment.edit_hint') : t('accounts.payment.edit_hint_busy')} />
+        canEdit={Boolean(viewingPayment && !isPending(viewingPayment.id) && !approving && canEditItem(viewingPayment.createdAt))}
+        editHint={t('accounts.payment.edit_hint')} />
     </div>
   );
 }

@@ -10,12 +10,8 @@ export default {
   'accounts.payment.new': 'కొత్త చెల్లింపు',
   'accounts.payment.invalid_range': '"మొదటి" తేదీ "చివరి" తేదీకి తర్వాత ఉంది — శోధించే ముందు తేదీలు సరిదిద్దండి.',
   // Page shell, top preview row, header
-  'accounts.payment.loading': 'చెల్లింపు రిజిస్టర్ లోడ్ అవుతోంది…',
+  'accounts.payment.loading': 'చెల్లింపు రికార్డులు లోడ్ అవుతోంది…',
   'accounts.payment.updating': 'తాజా చేస్తున్నారు…',
-  'accounts.payment.sample_badge': 'నమూనా డేటా',
-  'accounts.payment.preview_sample': 'నమూనా డేటా చూడండి',
-  'accounts.payment.back_real': 'వాస్తవ చెల్లింపులకు తిరిగి వెళ్లండి',
-  'accounts.payment.reset_rows': 'నమూనా వరుసలు రీసెట్ చేయండి',
   'accounts.payment.filters_aria': 'చెల్లింపు ఫిల్టర్లు',
   'accounts.payment.records_aria': 'చెల్లింపు రికార్డులు',
   'accounts.payment.status_aria': 'చెల్లింపు స్థితి',
@@ -26,16 +22,11 @@ export default {
   'accounts.payment.deleted_desc': 'ప్రస్తుత చెల్లింపు API తొలగించిన రికార్డులు అందించదు. రద్దు చేసిన చెల్లింపులను తొలగించినవిగా పరిగణించరు.',
   // Notifications
   'accounts.payment.notif_load_error': 'చెల్లింపులను లోడ్ చేయలేకపోయాం. దయచేసి రిఫ్రెష్ చేసి ప్రయత్నించండి.',
-  'accounts.payment.notif_demo_fresh': 'నమూనా డేటా తాజాగా ఉంది. సర్వర్‌కు అభ్యర్థన పంపలేదు.',
   'accounts.payment.notif_filters_cleared': 'ఫిల్టర్లు తొలగించబడ్డాయి. ప్రస్తుత వారం చూపిస్తున్నారు.',
-  'accounts.payment.notif_sample_updated': 'నమూనా వరుస నవీకరించబడింది — ఈ ప్రీవ్యూలో మాత్రమే సేవ్ అయింది.',
   'accounts.payment.notif_saved': 'చెల్లింపు విజయవంతంగా సేవ్ అయింది',
-  'accounts.payment.notif_sample_removed': 'నమూనా వరుస తొలగించబడింది — ఈ ప్రీవ్యూ మాత్రమే.',
   'accounts.payment.notif_deleted': 'చెల్లింపు విజయవంతంగా తొలగించబడింది',
   'accounts.payment.notif_delete_failed': 'చెల్లింపును తొలగించడం విఫలమైంది',
-  'accounts.payment.notif_sample_approved': 'నమూనా వరుస ఆమోదించబడింది — ఈ ప్రీవ్యూ మాత్రమే.',
   'accounts.payment.notif_approved': 'చెల్లింపు విజయవంతంగా ఆమోదించబడింది',
-  'accounts.payment.notif_rows_rebuilt': 'నమూనా వరుసలు మళ్లీ తయారు చేయబడ్డాయి. సర్వర్‌కు ఏమీ పంపలేదు.',
   // Delete + approve dialogs
   'accounts.payment.delete_pending_title': 'చెల్లింపు తొలగింపు పెండింగ్‌లో',
   'accounts.payment.deleting': 'చెల్లింపును తొలగిస్తున్నారు…',
@@ -47,7 +38,6 @@ export default {
   'accounts.payment.approve_failed_default': 'చెల్లింపును ఆమోదించలేకపోయాం. దయచేసి మళ్లీ ప్రయత్నించండి.',
   'accounts.payment.approve_error_stale': 'ఈ చెల్లింపు ఇక ఆమోదానికి అర్హం కాదు. రిజిస్టర్‌ను రిఫ్రెష్ చేసి మళ్లీ ప్రయత్నించండి.',
   'accounts.payment.edit_hint': '10 రోజుల కంటే పాత చెల్లింపులను సవరించలేరు.',
-  'accounts.payment.edit_hint_busy': 'ఈ చెల్లింపై మరొక చర్య ఇంకా జరుగుతోంది.',
   // Table
   'accounts.payment.col_payment_no': 'చెల్లింపు నంబర్',
   'accounts.payment.col_date': 'తేదీ',
@@ -69,7 +59,6 @@ export default {
   // View modal
   'accounts.payment.view_title': 'చెల్లింపు వివరాలు',
   'accounts.payment.no_payment_no': 'చెల్లింపు నంబర్ ఇవ్వబడలేదు',
-  'accounts.payment.sample_banner': 'నమూనా చెల్లింపు · ప్రీవ్యూ డేటా. మార్పులు ఈ బ్రౌజర్‌లోనే ఉండి, ఎప్పుడూ సర్వర్‌కు పంపబడవు.',
   'accounts.payment.amount_paid': 'చెల్లించిన పరిమాణం',
   'accounts.payment.field_category': 'వర్గం',
   'accounts.payment.payee_heading': 'తరఫుదారు & రెఫరెన్స్',

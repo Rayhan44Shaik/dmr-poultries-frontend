@@ -101,8 +101,6 @@ export function PaymentViewModal({ isOpen, payment, onClose, onEdit, canEdit = f
         )}
       </>}>
       <div className="space-y-4">
-        {payment.id.startsWith('demo-payment-') && <p className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900">{t('accounts.payment.sample_banner')}</p>}
-
         {/* FIGURE — accent bar, the amount, and the state it is in. Editing lives
             in the footer, next to Close, so there is exactly one edit control. */}
         <div className="relative overflow-hidden rounded-xl border border-emerald-100 bg-gradient-to-br from-emerald-50/70 via-white to-white px-4 py-3.5">
