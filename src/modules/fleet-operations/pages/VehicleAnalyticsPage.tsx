@@ -13,18 +13,14 @@ import AttentionSection from '../components/analytics/AttentionSection';
 import { DatePicker } from '../../../components/common/DatePicker';
 import {
   Activity,
-  Banknote,
   Calendar,
   FileSpreadsheet,
   FileText,
   Fuel,
-  Gauge,
   IndianRupee,
   RotateCcw,
   Search,
-  TrendingUp,
   Truck,
-  Wrench,
 } from 'lucide-react';
 import { formatCurrencyCompact, formatNumberCompact } from '../utils/formatters';
 import {
@@ -37,8 +33,6 @@ import {
 } from '../../../shared/ui/operationsStyles';
 import {
   BrandRefreshButton,
-  KpiCardGrid,
-  type KpiCardItem,
   type KpiTone,
 } from '../../../ui';
 import MasterDropdown from '../../masters/components/MasterDropdown';
@@ -51,23 +45,78 @@ interface VehicleAnalyticsPageProps {
   active?: boolean;
 }
 
-interface KpiDef {
+interface KpiSubMetric {
   label: string;
   value: string;
+}
+
+interface KpiGroup {
+  id: string;
+  title: string;
+  headline: string;
   icon: typeof Truck;
   tone: KpiTone;
+  subs: KpiSubMetric[];
+}
+
+/** Per-tone chrome for the grouped KPI cards — matches the shared KPI palette. */
+const groupToneClasses: Record<KpiTone, { icon: string; value: string; glow: string; accent: string }> = {
+  blue: { icon: 'border-blue-100 bg-blue-50 text-blue-500', value: 'text-blue-600', glow: 'bg-blue-50', accent: 'bg-blue-300' },
+  amber: { icon: 'border-amber-100 bg-amber-50 text-amber-500', value: 'text-amber-600', glow: 'bg-amber-50', accent: 'bg-amber-300' },
+  emerald: { icon: 'border-emerald-100 bg-emerald-50 text-emerald-500', value: 'text-emerald-600', glow: 'bg-emerald-50', accent: 'bg-emerald-300' },
+  violet: { icon: 'border-violet-100 bg-violet-50 text-violet-500', value: 'text-violet-600', glow: 'bg-violet-50', accent: 'bg-violet-300' },
+  rose: { icon: 'border-rose-100 bg-rose-50 text-rose-500', value: 'text-rose-600', glow: 'bg-rose-50', accent: 'bg-rose-300' },
+  cyan: { icon: 'border-cyan-100 bg-cyan-50 text-cyan-500', value: 'text-cyan-600', glow: 'bg-cyan-50', accent: 'bg-cyan-300' },
+};
+
+/** A single grouped KPI card: headline metric on top, related figures nested. */
+function KpiGroupCard({ group }: { group: KpiGroup }) {
+  const tone = groupToneClasses[group.tone];
+  const Icon = group.icon;
+  return (
+    <div className="group relative isolate flex flex-col overflow-hidden rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
+      <span className={`pointer-events-none absolute -right-7 -top-7 h-24 w-24 rounded-full ${tone.glow}`} aria-hidden="true" />
+      <span className={`absolute inset-x-0 bottom-0 h-1 ${tone.accent}`} aria-hidden="true" />
+      <div className="relative flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <p className="text-[11px] font-bold uppercase tracking-wide text-slate-500">{group.title}</p>
+          <p className={`mt-1.5 text-2xl font-extrabold leading-none tracking-tight tabular-nums ${tone.value}`}>
+            {group.headline}
+          </p>
+        </div>
+        <span className={`inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border shadow-sm transition-transform duration-200 group-hover:scale-105 ${tone.icon}`} aria-hidden="true">
+          <Icon size={22} strokeWidth={2.25} />
+        </span>
+      </div>
+      {group.subs.length > 0 && (
+        <dl className="relative mt-3 space-y-1.5 border-t border-slate-100 pt-3">
+          {group.subs.map((sub) => (
+            <div key={sub.label} className="flex items-center justify-between gap-2 text-xs">
+              <dt className="truncate font-medium text-slate-500">{sub.label}</dt>
+              <dd className="shrink-0 font-bold tabular-nums text-slate-800">{sub.value}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+    </div>
+  );
 }
 
 const SkeletonKpis = () => (
-  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-    {Array.from({ length: 9 }).map((_, index) => (
-      <div key={index} className="min-h-[6.75rem] animate-pulse rounded-2xl border border-slate-200 bg-white p-4">
+  <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+    {Array.from({ length: 4 }).map((_, index) => (
+      <div key={index} className="animate-pulse rounded-2xl border border-slate-200 bg-white p-4">
         <div className="flex items-start justify-between">
           <div className="w-2/3">
             <div className="h-3 w-3/4 rounded bg-slate-100" />
-            <div className="mt-3 h-6 w-1/2 rounded bg-slate-100" />
+            <div className="mt-3 h-7 w-1/2 rounded bg-slate-100" />
           </div>
           <div className="h-11 w-11 rounded-xl bg-slate-100" />
+        </div>
+        <div className="mt-4 space-y-2 border-t border-slate-100 pt-3">
+          <div className="h-3 w-full rounded bg-slate-100" />
+          <div className="h-3 w-4/5 rounded bg-slate-100" />
+          <div className="h-3 w-3/5 rounded bg-slate-100" />
         </div>
       </div>
     ))}
@@ -132,37 +181,78 @@ const VehicleAnalyticsPage = ({ embedded = false, active = true }: VehicleAnalyt
 
   const utilization = useMemo(() => {
     const total = vehicleStats.length;
-    if (total === 0) return 0;
+    if (total === 0) return { pct: 0, active: 0, idle: 0, total: 0 };
     const active = vehicleStats.filter((row) => row.trips > 0 || row.distance > 0).length;
-    return Math.round((active / total) * 100);
+    return { pct: Math.round((active / total) * 100), active, idle: total - active, total };
   }, [vehicleStats]);
 
-  const kpis = useMemo<KpiDef[]>(() => {
+  // Grouped KPI summary: each card leads with a headline figure and nests the
+  // related metrics beneath it —
+  //   • Trips        → distance covered
+  //   • Fuel         → mileage + fuel cost
+  //   • Fleet Cost   → maintenance, fuel, FASTag/toll, EMI, other
+  //   • Utilization  → active vs idle vehicles + cost / km
+  const kpiGroups = useMemo<KpiGroup[]>(() => {
     const costPerKm = stats.costPerKm > 0 ? `₹${stats.costPerKm.toFixed(2)}` : '—';
     return [
-      { label: t('fleet.analytics.total_trips'), value: formatNumberCompact(stats.totalTrips), icon: Truck, tone: 'blue' },
-      { label: t('fleet.analytics.total_distance'), value: `${formatNumberCompact(stats.totalDistance)} km`, icon: TrendingUp, tone: 'cyan' },
-      { label: t('fleet.analytics.fuel_used'), value: `${formatNumberCompact(stats.totalFuelLitres)} L`, icon: Fuel, tone: 'amber' },
-      { label: t('fleet.analytics.avg_mileage'), value: stats.averageMileage > 0 ? `${stats.averageMileage.toFixed(2)} km/l` : '—', icon: Gauge, tone: 'emerald' },
-      { label: t('fleet.analytics.vehicle_utilization'), value: `${utilization}%`, icon: Activity, tone: 'cyan' },
-      { label: t('fleet.analytics.fuel_cost'), value: formatCurrencyCompact(stats.fuelCost), icon: Banknote, tone: 'blue' },
-      { label: t('fleet.analytics.maint_cost'), value: formatCurrencyCompact(stats.maintenanceCost), icon: Wrench, tone: 'violet' },
-      { label: t('fleet.analytics.total_fleet_cost'), value: formatCurrencyCompact(stats.totalExpense), icon: IndianRupee, tone: 'rose' },
-      { label: t('fleet.analytics.cost_per_km'), value: costPerKm, icon: Activity, tone: 'amber' },
+      {
+        id: 'trips',
+        title: t('fleet.analytics.group_operations'),
+        headline: formatNumberCompact(stats.totalTrips),
+        icon: Truck,
+        tone: 'blue',
+        subs: [
+          { label: t('fleet.analytics.total_distance'), value: `${formatNumberCompact(stats.totalDistance)} km` },
+        ],
+      },
+      {
+        id: 'fuel',
+        title: t('fleet.analytics.group_fuel'),
+        headline: `${formatNumberCompact(stats.totalFuelLitres)} L`,
+        icon: Fuel,
+        tone: 'amber',
+        subs: [
+          { label: t('fleet.analytics.avg_mileage'), value: stats.averageMileage > 0 ? `${stats.averageMileage.toFixed(2)} km/l` : '—' },
+          { label: t('fleet.analytics.fuel_cost'), value: formatCurrencyCompact(stats.fuelCost) },
+        ],
+      },
+      {
+        id: 'fleet-cost',
+        title: t('fleet.analytics.group_fleet_cost'),
+        headline: formatCurrencyCompact(stats.totalExpense),
+        icon: IndianRupee,
+        tone: 'rose',
+        subs: [
+          { label: t('fleet.analytics.maint_cost'), value: formatCurrencyCompact(stats.maintenanceCost) },
+          { label: t('fleet.analytics.fuel_cost'), value: formatCurrencyCompact(stats.fuelCost) },
+          { label: t('fleet.analytics.toll_cost'), value: formatCurrencyCompact(stats.tollCost) },
+          { label: t('fleet.analytics.emi_cost'), value: formatCurrencyCompact(stats.emiDue) },
+          { label: t('fleet.analytics.other_cost'), value: formatCurrencyCompact(stats.otherCost) },
+        ],
+      },
+      {
+        id: 'utilization',
+        title: t('fleet.analytics.vehicle_utilization'),
+        headline: `${utilization.pct}%`,
+        icon: Activity,
+        tone: 'cyan',
+        subs: [
+          { label: t('fleet.analytics.util_active'), value: `${utilization.active} / ${utilization.total}` },
+          { label: t('fleet.analytics.util_idle'), value: String(utilization.idle) },
+          { label: t('fleet.analytics.cost_per_km'), value: costPerKm },
+        ],
+      },
     ];
   }, [stats, utilization, t]);
 
-  const kpiCards = useMemo<KpiCardItem[]>(
+  // Flat list retained for the PDF/Excel exports (one row per metric).
+  const kpis = useMemo<{ label: string; value: string }[]>(
     () =>
-      kpis.map((kpi) => ({
-        id: kpi.label,
-        label: kpi.label,
-        value: kpi.value,
-        tooltip: `${kpi.label}: ${kpi.value}`,
-        Icon: kpi.icon,
-        tone: kpi.tone,
-      })),
-    [kpis]
+      kpiGroups.flatMap((group) => [
+        { label: group.title, value: group.headline },
+        ...group.subs.map((sub) => ({ label: sub.label, value: sub.value })),
+      ]),
+    [kpiGroups]
   );
 
   const hasAnyData = stats.totalTrips > 0 || stats.totalDistance > 0 || stats.totalExpense > 0;
@@ -531,13 +621,19 @@ const VehicleAnalyticsPage = ({ embedded = false, active = true }: VehicleAnalyt
           </div>
         ) : (
           <div className="space-y-5">
-            {/* KPI summary — rendered through the shared KPI surface, the same
-                component the Trip List uses, so both pages read identically. */}
-            <KpiCardGrid
-              items={kpiCards}
-              gridClassName="lg:grid-cols-3 xl:grid-cols-3"
-              ariaLabel={t('fleet.analytics.vehicle_performance')}
-            />
+            {/* Grouped KPI summary — each card leads with a headline figure and
+                nests the related metrics beneath it (Trips → distance; Fuel →
+                mileage + fuel cost; Fleet Cost → maintenance/fuel/FASTag/EMI/
+                other; Utilization → active vs idle + cost per km). */}
+            <section
+              className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
+              aria-label={t('fleet.analytics.vehicle_performance')}
+              aria-live="polite"
+            >
+              {kpiGroups.map((group) => (
+                <KpiGroupCard key={group.id} group={group} />
+              ))}
+            </section>
 
             {/* Analytics Section */}
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
