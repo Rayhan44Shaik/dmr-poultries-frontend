@@ -367,6 +367,22 @@ try {
       allRows.length > 100 && shownBig === 20 && bigHtml.includes(`of ${allRows.length}`) && bigHtml.includes("\u2026");
     checks.bigSetGrandTotal = bigHtml.includes(formatINR(allRows.reduce((sum, r) => sum + r.farm.amount, 0)));
 
+    // The shell (header) is not exported, so render the whole viewer with the
+    // portal disabled (no document) to prove the header carries the animated
+    // close button, the logo animation and the highlighted period chip.
+    let viewerHtml = "";
+    const savedDocument = globalThis.document;
+    try {
+      delete globalThis.document;
+      const { default: SummaryFarmViewer } = await server.ssrLoadModule("/src/modules/accounts/components/Summary/SummaryFarmViewer.tsx");
+      viewerHtml = renderToString(React.createElement(I18nProvider, null, React.createElement(SummaryFarmViewer, { open: true, rows, spanLabel: "Week 1 (14 – 20 Sep)", onClose: () => {}, onOpenTrip: () => {} })));
+    } finally {
+      globalThis.document = savedDocument;
+    }
+    checks.viewerCloseButton = /aria-label="Close"/.test(viewerHtml) && viewerHtml.includes("--animate-action-close");
+    checks.viewerLogoAnim = viewerHtml.includes("animate-farm-logo") && viewerHtml.includes("animate-farm-halo");
+    checks.viewerPeriodChip = viewerHtml.includes("Week 1 (14 – 20 Sep)");
+
     // The trip picked in that view opens the Farm Payment page's own detail
     // (Step 2 Farm Details + Step 3 Pickup Details) — render it for a real
     // analysis trip to prove the wiring has something to show.

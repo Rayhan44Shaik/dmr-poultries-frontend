@@ -7,7 +7,7 @@
 // Payment expense row charges). How much of it has been settled lives on the
 // Farm Payment page, not here.
 import React, { useMemo, useState } from 'react';
-import { CalendarDays, Sprout } from 'lucide-react';
+import { CalendarDays, Sprout, X } from 'lucide-react';
 import type { Trip } from '../../../operations/vehicle-trips/types/trip';
 import { useI18n } from '../../../../i18n';
 import { formatCount, formatINR, formatINRExact } from '../farm-payment/farmPaymentFormat';
@@ -330,13 +330,27 @@ function SummaryFarmViewer({ open, rows, spanLabel, onClose, onOpenTrip }: Viewe
             >
               {t('accounts.summary.farm_payment.title')}
             </h2>
-            {/* The span, as a highlighted chip on the right. */}
-            {spanLabel && (
-              <span className="ml-auto inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[12px] font-bold text-emerald-800 shadow-sm dark:border-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-200">
-                <CalendarDays size={13} aria-hidden="true" />
-                <span className="truncate" title={spanLabel}>{spanLabel}</span>
-              </span>
-            )}
+            <span className="ml-auto inline-flex min-w-0 items-center gap-2">
+              {/* The span, as a highlighted chip. */}
+              {spanLabel && (
+                <span className="inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[12px] font-bold text-emerald-800 shadow-sm dark:border-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-200">
+                  <CalendarDays size={13} aria-hidden="true" />
+                  <span className="truncate" title={spanLabel}>{spanLabel}</span>
+                </span>
+              )}
+              {/* Close — the app's animated X (action-close), same as every modal. */}
+              <button
+                type="button"
+                onClick={onClose}
+                aria-label={t('common.close')}
+                title={t('common.close')}
+                className="group/close grid h-9 w-9 shrink-0 place-items-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm outline-none transition-all hover:-translate-y-0.5 hover:border-red-100 hover:bg-red-50 hover:text-red-500 focus-visible:ring-2 focus-visible:ring-emerald-500 active:scale-95 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-300 dark:hover:border-red-900 dark:hover:bg-red-500/10 dark:hover:text-red-400"
+              >
+                <span className="inline-flex motion-safe:group-hover/close:animate-[var(--animate-action-close)]">
+                  <X size={16} />
+                </span>
+              </button>
+            </span>
           </div>
         </div>
         <SummaryFarmTable rows={rows} onOpenTrip={onOpenTrip} />
