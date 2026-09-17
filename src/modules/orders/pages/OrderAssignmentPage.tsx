@@ -244,7 +244,7 @@ function AssignmentLoadingRows() {
           className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600"
           aria-hidden="true"
         />
-        {to("orders.loading")}
+        {to("orders.loading_assignment")}
       </span>
     </div>
   );

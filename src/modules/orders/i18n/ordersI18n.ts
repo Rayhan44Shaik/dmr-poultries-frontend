@@ -233,6 +233,7 @@ const EN: Record<string, string> = {
     "WhatsApp backend is not configured (VITE_WHATSAPP_BACKEND_ENABLED)",
   "orders.whatsapp_no_rows": "No shops to send yet — add shops first",
   "orders.loading": "Loading orders…",
+  "orders.loading_assignment": "Loading Order Assignment…",
   "orders.sample_badge": "Sample data",
   "orders.sample_hint":
     "Showing bundled sample data — no backend is connected. Saving and Assignment work against the in-memory sample store and reset on refresh.",
@@ -420,10 +421,10 @@ const EN: Record<string, string> = {
   "orders.shop_unit": "shop",
   "orders.shop_unit_plural": "shops",
   "orders.filter_city_all": "All cities",
-  "orders.pool_filter_all": "All shops",
-  "orders.pool_filter_pending": "Pending (not assigned)",
-  "orders.pool_filter_assigned": "Assigned (any vehicle)",
-  "orders.pool_filter_this_vehicle": "On this vehicle",
+  "orders.pool_filter_all": "All Shops",
+  "orders.pool_filter_pending": "Pending",
+  "orders.pool_filter_assigned": "Assigned",
+  "orders.pool_filter_this_vehicle": "On This Vehicle",
   "orders.pool_showing": "{shown} of {total} shops · {selected} selected",
   "orders.vehicle_trip": "Vehicle / Trip",
   "orders.sort_pending_first": "Pending First",
@@ -680,6 +681,7 @@ const TE: Record<string, string> = {
   "orders.whatsapp_no_rows":
     "ఇంకా పంపాల్సిన షాప్‌లు లేవు — ముందు షాప్‌లు జోడించండి",
   "orders.loading": "ఆర్డర్లు లోడ్ అవుతున్నాయి…",
+  "orders.loading_assignment": "ఆర్డర్ అసైన్‌మెంట్ లోడ్ అవుతోంది…",
   "orders.sample_badge": "నమూనా డేటా",
   "orders.sample_hint":
     "నమూనా డేటా చూపబడుతోంది — బ్యాకెండ్ కనెక్ట్ కాలేదు. సేవ్, అసైన్‌మెంట్ మెమరీలో పని చేస్తాయి; రిఫ్రెష్ చేస్తే మళ్లీ మొదటి స్థితికి వస్తాయి.",
@@ -869,8 +871,8 @@ const TE: Record<string, string> = {
   "orders.shop_unit_plural": "షాప్‌లు",
   "orders.filter_city_all": "అన్ని సిటీలు",
   "orders.pool_filter_all": "అన్ని షాప్‌లు",
-  "orders.pool_filter_pending": "పెండింగ్ (కేటాయించలేదు)",
-  "orders.pool_filter_assigned": "కేటాయించినవి (ఏ వాహనమైనా)",
+  "orders.pool_filter_pending": "పెండింగ్",
+  "orders.pool_filter_assigned": "కేటాయించినవి",
   "orders.pool_filter_this_vehicle": "ఈ వాహనంపై",
   "orders.pool_showing":
     "{total} షాప్‌లలో {shown} · {selected} ఎంపిక చేయబడ్డాయి",
