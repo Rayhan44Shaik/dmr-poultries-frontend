@@ -109,7 +109,9 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
   onConfirmSend,
   onConfirmSubmit,
 }) => {
-  const [result, setResult] = useState<AssignmentSheetPdfResult | null>(null);
+  const [result, setResult] = useState<
+    (AssignmentSheetPdfResult & { builtFor: string }) | null
+  >(null);
   const [buildError, setBuildError] = useState("");
   const [sentResult, setSentResult] = useState<OrdersWhatsAppResult | null>(
     null,
@@ -177,10 +179,11 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
   //    send summary all use the very same blob. Re-ordering re-builds it
   //    (the header art is cached inside the generator, so this is fast);
   //    the previous frame stays visible until the new one is ready.
+  const buildKey = `${sheetLang}|${numberedRows.map((r) => `${r.shopId}:${r.boxes}`).join(",")}|${capacity}|${alreadyAssignedOther}`;
   useEffect(() => {
     let alive = true;
     let url: string | null = null;
-    setResult(null);
+    const key = buildKey;
     setBuildError("");
     generateAssignmentSheetPdf({
       trip,
@@ -199,7 +202,13 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
           return;
         }
         url = built.url;
-        setResult(built);
+        // Swap in place: the previous sheet stays on screen until this one is
+        // ready, so a language flip or re-order cross-fades instead of
+        // flashing an empty grey pane.
+        setResult((prev) => {
+          if (prev && prev.url !== built.url) URL.revokeObjectURL(prev.url);
+          return { ...built, builtFor: key };
+        });
         setBuildError("");
       })
       .catch((err) => {
@@ -208,7 +217,9 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
       });
     return () => {
       alive = false;
-      if (url) URL.revokeObjectURL(url);
+      // The URL is released when it is replaced (above) or on unmount; a
+      // dependency change must NOT revoke the sheet still on screen.
+      void url;
     };
     // The sheet depends on WHO/WHAT/ORDER, not on the blob bookkeeping.
   }, [
@@ -221,10 +232,25 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
     alreadyAssignedOther,
     sheetLang,
     t,
+    buildKey,
   ]);
+
+  useEffect(
+    () => () => {
+      setResult((prev) => {
+        if (prev) URL.revokeObjectURL(prev.url);
+        return null;
+      });
+    },
+    [],
+  );
 
   // "Building" = no result yet and no failure (derived, no extra state).
   const building = result === null && !buildError;
+  // Rebuilding = a sheet is on screen but a newer one is being generated
+  // (language flip / re-order) — shown as a soft overlay, not a blank pane.
+  const rebuilding =
+    result !== null && !buildError && result.builtFor !== buildKey;
 
   const sendOk = wasWhatsAppSent(sentResult);
   const sendFailed = Boolean(sentResult) && !sendOk;
@@ -458,11 +484,24 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
                     {buildError}
                   </div>
                 ) : result ? (
-                  <div
-                    key={result.url}
-                    className="h-full motion-safe:animate-[var(--animate-fade-in)]"
-                  >
-                    <PdfBlobPreview url={result.url} />
+                  <div className="relative h-full">
+                    <div
+                      key={result.url}
+                      className="h-full motion-safe:animate-[var(--animate-fade-in)]"
+                    >
+                      <PdfBlobPreview url={result.url} />
+                    </div>
+                    {rebuilding && (
+                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-[1px] transition-opacity motion-safe:animate-[var(--animate-fade-in)]">
+                        <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/95 px-3.5 py-1.5 text-xs font-semibold text-slate-600 shadow-md">
+                          <Loader2
+                            size={14}
+                            className="animate-spin text-emerald-500"
+                          />
+                          {t("orders.pdf_building")}
+                        </span>
+                      </div>
+                    )}
                   </div>
                 ) : null}
               </div>
@@ -563,7 +602,7 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
               type="button"
               onClick={() => void handleSend()}
               disabled={busy || orderedRows.length === 0 || sendOk}
-              className="group relative inline-flex items-center gap-2 rounded-2xl border border-[#25D366]/30 bg-[#25D366] px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-[#25D366]/25 transition-all hover:-translate-y-0.5 hover:bg-[#1fb95a] hover:shadow-lg active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+              className="group relative inline-flex items-center gap-2 rounded-2xl border border-[#25D366]/30 bg-[#25D366]/10 px-5 py-2.5 text-xs font-bold text-[#128C7E] shadow-sm shadow-[#25D366]/10 transition-all hover:-translate-y-0.5 hover:bg-[#25D366]/20 hover:shadow-md active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
             >
               {sending ? (
                 <Loader2 size={14} className="animate-spin" />
@@ -585,9 +624,9 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
               type="button"
               onClick={() => void handleSubmitAssignment()}
               disabled={!canSubmit}
-              className={`group relative inline-flex items-center gap-2 rounded-2xl bg-gradient-to-b from-violet-500 to-indigo-600 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-indigo-500/25 ring-1 ring-indigo-700/30 transition-all hover:-translate-y-0.5 hover:from-violet-400 hover:to-indigo-600 hover:shadow-lg hover:shadow-indigo-500/35 active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 ${
+              className={`group relative inline-flex items-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-5 py-2.5 text-xs font-bold text-indigo-700 shadow-sm shadow-indigo-100/70 transition-all hover:-translate-y-0.5 hover:border-indigo-300 hover:bg-indigo-100 hover:shadow-md active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 ${
                 canSubmit
-                  ? "motion-safe:animate-[var(--animate-pop-in)] ring-2 ring-violet-300/70 ring-offset-2"
+                  ? "motion-safe:animate-[var(--animate-pop-in)] ring-2 ring-indigo-200/80 ring-offset-1"
                   : ""
               }`}
             >
