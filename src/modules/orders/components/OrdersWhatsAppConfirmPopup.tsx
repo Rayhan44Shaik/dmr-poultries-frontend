@@ -4,24 +4,33 @@
 // Clicking WhatsApp on the assignment panel no longer fires blindly: this
 // sheet shows EXACTLY what goes out — the WhatsApp message text (shops in
 // delivery order with their assigned boxes), the branded Shop Assignment
-// Sheet PDF (hen logo, trip facts, per-shop shares), the recipient number —
+// Sheet PDF (trip facts, per-shop shares), the recipient number —
 // and only "Confirm & Send" triggers the persistence + send. One build,
 // many uses: the same PDF blob is framed, downloaded and handed to the send.
 //
-// The operator can RE-ORDER the shops here (same ↑↓ pattern as the
-// assignment tab); the list, the WhatsApp message and the PDF all track
+// The operator can RE-ORDER the shops here (typed 1, 2, 3 … positions, the
+// same control as the assignment tab); the list, the WhatsApp message and the PDF all track
 // that sequence, and Confirm persists it so the send matches the preview.
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
-  ArrowDown,
-  ArrowUp,
   CheckCircle2,
+  ClipboardCheck,
   Download,
   Loader2,
   Send,
   X,
 } from "lucide-react";
+import AppShellModal from "../../../ui/AppShellModal";
+import { ViewLanguageToggle } from "../../../ui/ViewLanguageToggle";
+import { uiActionIconMotionClass } from "../../../shared/ui/uiTokens";
+import { formatVehicleNumber } from "../../../utils/format";
+import {
+  ORDERS_NO_SPINNER,
+  SequenceArrows,
+  WhatsAppIcon,
+  onOrdersNumberWheel,
+} from "./OrdersCommon";
 import PdfBlobPreview from "../../reports/components/PdfBlobPreview";
 import type { Trip } from "../../../shared/trip";
 import type { OrdersT } from "../i18n/ordersI18n";
@@ -35,14 +44,21 @@ import {
   type AssignmentSheetPdfResult,
 } from "../pdf/generateAssignmentSheetPdf";
 import type { OrdersWhatsAppResult } from "../services/ordersService";
-import BrandMark from "../../../ui/BrandMark";
 
 // A small label/value chip for the facts grid (module level — never created
 // during render).
-const Fact: React.FC<{ label: string; value: string | number }> = ({ label, value }) => (
+const Fact: React.FC<{ label: string; value: string | number }> = ({
+  label,
+  value,
+}) => (
   <div className="min-w-0 rounded-lg border border-slate-200/80 bg-slate-50/80 px-2 py-1.5">
-    <p className="text-[9px] font-medium uppercase tracking-wide text-slate-400">{label}</p>
-    <p className="truncate text-[11px] font-bold text-slate-800" title={String(value)}>
+    <p className="text-[9px] font-medium uppercase tracking-wide text-slate-400">
+      {label}
+    </p>
+    <p
+      className="truncate text-[11px] font-bold text-slate-800"
+      title={String(value)}
+    >
       {value}
     </p>
   </div>
@@ -66,9 +82,12 @@ type Props = {
   onClose: () => void;
   /** Persist + send; resolves with the outcome (null = aborted/failed).
    *  When the operator re-ordered shops, receives the new sequence. */
-  onConfirmSend: (orderedShopIds?: number[]) => Promise<OrdersWhatsAppResult | null>;
-  /** Called after a successful send if the 10s auto-submit is not cancelled. */
-  onConfirmSubmit: () => Promise<void>;
+  onConfirmSend: (
+    orderedShopIds?: number[],
+  ) => Promise<OrdersWhatsAppResult | null>;
+  /** Submit the assignment (enabled once the sheet was sent OR downloaded).
+   *  Receives the reviewed sequence when the operator re-ordered shops. */
+  onConfirmSubmit: (orderedShopIds?: number[]) => Promise<void>;
 };
 
 function wasWhatsAppSent(r: OrdersWhatsAppResult | null): boolean {
@@ -90,9 +109,13 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
   onConfirmSend,
   onConfirmSubmit,
 }) => {
-  const [result, setResult] = useState<AssignmentSheetPdfResult | null>(null);
+  const [result, setResult] = useState<
+    (AssignmentSheetPdfResult & { builtFor: string }) | null
+  >(null);
   const [buildError, setBuildError] = useState("");
-  const [sentResult, setSentResult] = useState<OrdersWhatsAppResult | null>(null);
+  const [sentResult, setSentResult] = useState<OrdersWhatsAppResult | null>(
+    null,
+  );
   const [submitting, setSubmitting] = useState(false);
   const submittedRef = useRef(false);
   // Review & Submit only — independent of the app language. English by default.
@@ -111,20 +134,18 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
             .map((i) => rows[i])
             .filter((r): r is AssignmentSheetRow => Boolean(r))
         : rows,
-    [rows, perm]
+    [rows, perm],
   );
 
   // True when the visible order differs from what the parent persisted.
   const orderChanged = perm !== null && perm.some((v, i) => v !== i);
 
-  const moveRow = (index: number, dir: -1 | 1) => {
-    const j = index + dir;
-    if (sending || j < 0 || j >= orderedRows.length) return;
+  const moveRowTo = (from: number, to: number) => {
+    if (sending || from === to || to < 0 || to >= orderedRows.length) return;
     setPerm((prev) => {
       const next = prev ? [...prev] : rows.map((_, i) => i);
-      const tmp = next[index];
-      next[index] = next[j];
-      next[j] = tmp;
+      const [item] = next.splice(from, 1);
+      next.splice(to, 0, item);
       return next;
     });
   };
@@ -133,7 +154,7 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
   // can never disagree about the sequence.
   const numberedRows = useMemo(
     () => orderedRows.map((r, i) => ({ ...r, serialNo: i + 1 })),
-    [orderedRows]
+    [orderedRows],
   );
 
   // The message text — exactly what the send will carry.
@@ -151,17 +172,18 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
         rows: numberedRows,
         language: sheetLang,
       }),
-    [trip, supervisorMobile, orderTripNo, orderDate, numberedRows, sheetLang]
+    [trip, supervisorMobile, orderTripNo, orderDate, numberedRows, sheetLang],
   );
 
   // ── Sheets: built once per sequence — the frame, the download and the
   //    send summary all use the very same blob. Re-ordering re-builds it
   //    (the header art is cached inside the generator, so this is fast);
   //    the previous frame stays visible until the new one is ready.
+  const buildKey = `${sheetLang}|${numberedRows.map((r) => `${r.shopId}:${r.boxes}`).join(",")}|${capacity}|${alreadyAssignedOther}`;
   useEffect(() => {
     let alive = true;
     let url: string | null = null;
-    setResult(null);
+    const key = buildKey;
     setBuildError("");
     generateAssignmentSheetPdf({
       trip,
@@ -180,7 +202,13 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
           return;
         }
         url = built.url;
-        setResult(built);
+        // Swap in place: the previous sheet stays on screen until this one is
+        // ready, so a language flip or re-order cross-fades instead of
+        // flashing an empty grey pane.
+        setResult((prev) => {
+          if (prev && prev.url !== built.url) URL.revokeObjectURL(prev.url);
+          return { ...built, builtFor: key };
+        });
         setBuildError("");
       })
       .catch((err) => {
@@ -189,42 +217,72 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
       });
     return () => {
       alive = false;
-      if (url) URL.revokeObjectURL(url);
+      // The URL is released when it is replaced (above) or on unmount; a
+      // dependency change must NOT revoke the sheet still on screen.
+      void url;
     };
     // The sheet depends on WHO/WHAT/ORDER, not on the blob bookkeeping.
-  }, [trip, supervisorMobile, orderTripNo, orderDate, numberedRows, capacity, alreadyAssignedOther, sheetLang, t]);
+  }, [
+    trip,
+    supervisorMobile,
+    orderTripNo,
+    orderDate,
+    numberedRows,
+    capacity,
+    alreadyAssignedOther,
+    sheetLang,
+    t,
+    buildKey,
+  ]);
+
+  useEffect(
+    () => () => {
+      setResult((prev) => {
+        if (prev) URL.revokeObjectURL(prev.url);
+        return null;
+      });
+    },
+    [],
+  );
 
   // "Building" = no result yet and no failure (derived, no extra state).
   const building = result === null && !buildError;
+  // Rebuilding = a sheet is on screen but a newer one is being generated
+  // (language flip / re-order) — shown as a soft overlay, not a blank pane.
+  const rebuilding =
+    result !== null && !buildError && result.builtFor !== buildKey;
 
   const sendOk = wasWhatsAppSent(sentResult);
   const sendFailed = Boolean(sentResult) && !sendOk;
   const busy = sending || submitting;
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !busy) onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose, busy]);
+  const safeClose = () => {
+    if (!busy) onClose();
+  };
 
   const totalBoxes = orderedRows.reduce((s, r) => s + r.boxes, 0);
 
   const handleSend = async () => {
     if (busy || sendOk) return;
     const outcome = await onConfirmSend(
-      orderChanged ? orderedRows.map((r) => r.shopId) : undefined
+      orderChanged ? orderedRows.map((r) => r.shopId) : undefined,
     );
     if (outcome) setSentResult(outcome);
   };
 
+  // Submit unlocks once the sheet has LEFT the screen either way — sent on
+  // WhatsApp or downloaded as PDF (a printed sheet is a valid hand-over).
+  const [downloaded, setDownloaded] = useState(false);
+  const canSubmit = (sendOk || downloaded) && !busy;
+
   const handleSubmitAssignment = async () => {
-    if (!sendOk || submitting || submittedRef.current) return;
+    if (!canSubmit || submitting || submittedRef.current) return;
     submittedRef.current = true;
     setSubmitting(true);
     try {
-      await onConfirmSubmit();
+      await onConfirmSubmit(
+        orderChanged ? orderedRows.map((r) => r.shopId) : undefined,
+      );
       onClose();
     } finally {
       setSubmitting(false);
@@ -237,154 +295,164 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
     a.href = result.url;
     a.download = result.fileName;
     a.click();
+    setDownloaded(true);
   };
 
+  const subtitle = [
+    trip.tripNo,
+    formatVehicleNumber(trip.vehicleNo),
+    trip.supervisorName,
+    trip.driverName,
+  ]
+    .filter((v) => v && v !== "—")
+    .join(" · ");
+
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={t("orders.wa_check_title")}
-      className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/70 p-3"
+    <AppShellModal
+      open
+      onClose={safeClose}
+      zIndex={60}
+      panelClassName="bg-white"
     >
-      <div className="flex h-full w-full max-w-6xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
-        {/* Header */}
-        <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-3">
-          <div className="flex min-w-0 items-center gap-2.5">
-            <BrandMark size="sm" variant="plain" />
-            <div className="min-w-0">
-              <h3 className="truncate text-sm font-extrabold text-slate-800">
-                {t("orders.wa_check_title")}
-              </h3>
-              <p className="truncate text-[11px] font-semibold text-slate-500">
-                {[trip.tripNo, trip.vehicleNo, trip.supervisorName, trip.driverName]
-                  .filter(Boolean)
-                  .join(" · ")}
-              </p>
+      <div className="flex h-full w-full flex-col overflow-hidden rounded-2xl bg-white">
+        {/* ── Header — same anatomy as the Trip List view ── */}
+        <div className="rounded-t-2xl border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/80">
+          <div className="flex flex-col gap-4 px-6 py-4 sm:flex-row sm:items-center sm:justify-between md:px-8">
+            <div className="flex min-w-0 flex-1 items-center gap-4 sm:flex-none">
+              {/* Logo tile — the Review & Submit mark (no hen). */}
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-teal-400 text-white shadow-lg shadow-emerald-400/20 motion-safe:animate-[var(--animate-pop-in)]">
+                <ClipboardCheck className="h-6 w-6" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <h2 className="truncate text-lg font-bold tracking-tight text-slate-800 md:text-xl">
+                    {t("orders.wa_check_title")}
+                  </h2>
+                  <span className="hidden items-center rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 sm:inline-flex">
+                    {sheetLang === "te" ? "తెలుగు" : "EN"}
+                  </span>
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                  <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-[#25D366]/25 bg-[#25D366]/10 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[#128C7E]">
+                    <WhatsAppIcon size={11} /> WhatsApp
+                  </span>
+                  <span className="truncate text-xs font-medium text-slate-400">
+                    {subtitle}
+                  </span>
+                </div>
+              </div>
             </div>
-          </div>
-          <div className="flex shrink-0 items-center gap-2">
-            <div
-              role="group"
-              aria-label="Message and PDF language"
-              className="relative flex rounded-full bg-slate-100 p-0.5 text-[11px] font-extrabold"
-            >
-              <span
-                aria-hidden
-                className={`pointer-events-none absolute inset-y-0.5 w-[calc(50%-2px)] rounded-full bg-emerald-600 shadow-sm transition-transform duration-200 ${
-                  sheetLang === "te" ? "translate-x-[calc(100%+2px)]" : "translate-x-0.5"
-                }`}
+
+            <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-2 sm:w-auto">
+              <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full border border-slate-200 bg-slate-100 px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
+                {orderedRows.length} {t("orders.col_total_shops").toLowerCase()}{" "}
+                · {formatCount(totalBoxes)} {t("orders.boxes_short")}
+              </span>
+              <ViewLanguageToggle
+                language={sheetLang}
+                onToggle={() => {
+                  if (!busy) setSheetLang((l) => (l === "te" ? "en" : "te"));
+                }}
+                tone="emerald"
+                labelMode="target"
+                ariaLabel="Message and PDF language"
               />
               <button
                 type="button"
-                onClick={() => setSheetLang("en")}
+                onClick={safeClose}
                 disabled={busy}
-                className={`relative z-10 min-w-[4.5rem] rounded-full px-3 py-1.5 transition ${
-                  sheetLang === "en" ? "text-white" : "text-slate-500 hover:text-slate-700"
-                }`}
+                className="group relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:-translate-y-0.5 hover:border-red-100 hover:bg-red-50 hover:text-red-500 active:scale-95 disabled:opacity-40"
+                aria-label={t("orders.close")}
               >
-                English
-              </button>
-              <button
-                type="button"
-                onClick={() => setSheetLang("te")}
-                disabled={busy}
-                className={`relative z-10 min-w-[4.5rem] rounded-full px-3 py-1.5 transition ${
-                  sheetLang === "te" ? "text-white" : "text-slate-500 hover:text-slate-700"
-                }`}
-              >
-                తెలుగు
+                <span
+                  className={`inline-flex ${uiActionIconMotionClass.close}`}
+                >
+                  <X size={16} />
+                </span>
               </button>
             </div>
-            <button
-              type="button"
-              onClick={onClose}
-              disabled={busy}
-              aria-label={t("orders.close")}
-              className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"
-            >
-              <X size={17} />
-            </button>
           </div>
         </div>
 
         <div className="flex min-h-0 flex-1">
-          {/* ── Left: the shops (re-orderable) → the message → the facts ── */}
-          <aside className="flex w-80 shrink-0 flex-col overflow-y-auto border-r border-slate-100 bg-white/80">
-            {/* 1) SHOPS TO DELIVER — in delivery sequence, re-orderable */}
-            <div className="border-b border-slate-100 px-3.5 py-3">
-              <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
-                {t("orders.shops_to_deliver")} ({orderedRows.length})
+          {/* ── Left: ONLY the shops, in delivery order (re-orderable) ── */}
+          <aside className="flex w-[25rem] shrink-0 flex-col border-r border-slate-100 bg-white/80">
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
+              <p className="text-xs font-extrabold uppercase tracking-wide text-slate-600">
+                {t("orders.shops_to_deliver")}
               </p>
-              <ul className="mt-2 space-y-1.5">
-                {numberedRows.map((row, i) => (
-                  <li
-                    key={row.shopId}
-                    className="flex items-center justify-between gap-2 rounded-lg border border-slate-200/80 px-2 py-1.5"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-[11px] font-bold text-slate-700" title={row.shopName}>
-                        {row.serialNo}. {row.shopName}
-                      </p>
-                      <p className="truncate text-[10px] font-semibold text-slate-400">
-                        {row.village || "—"}
-                        {row.mobile ? ` · ${row.mobile}` : ""}
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1.5">
-                      <div className="text-right">
-                        <p className="text-[11px] font-bold text-emerald-700">
-                          {formatCount(row.boxes)} box
-                        </p>
-                        <p className="text-[10px] font-semibold text-slate-400">
-                          {row.birds > 0 ? `${formatCount(row.birds)} birds` : "—"}
-                        </p>
-                      </div>
-                      {/* Re-order mirrors the assignment tab's ↑↓ controls */}
-                      <div className="flex flex-col">
-                        <button
-                          type="button"
-                          onClick={() => moveRow(i, -1)}
-                          disabled={sending || i === 0}
-                          aria-label="Move up"
-                          className="rounded p-0.5 text-slate-400 transition hover:bg-slate-100 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-30"
-                        >
-                          <ArrowUp size={11} />
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => moveRow(i, 1)}
-                          disabled={sending || i === numberedRows.length - 1}
-                          aria-label="Move down"
-                          className="rounded p-0.5 text-slate-400 transition hover:bg-slate-100 hover:text-emerald-600 disabled:cursor-not-allowed disabled:opacity-30"
-                        >
-                          <ArrowDown size={11} />
-                        </button>
-                      </div>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <span className="inline-flex items-center justify-center rounded-full border border-slate-200/80 bg-slate-100 px-2.5 py-0.5 text-xs font-bold tabular-nums text-slate-600">
+                {orderedRows.length}
+              </span>
             </div>
+            <ul className="flex-1 space-y-1.5 overflow-y-auto px-3 py-3">
+              {numberedRows.map((row, i) => (
+                <li
+                  key={row.shopId}
+                  className="flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-white px-2.5 py-2 transition-all hover:border-emerald-200 hover:shadow-sm motion-safe:animate-[var(--animate-fade-in-up)]"
+                  style={{ animationDelay: `${Math.min(i, 12) * 25}ms` }}
+                >
+                  <OrderNumberInput
+                    value={row.serialNo}
+                    max={numberedRows.length}
+                    disabled={sending}
+                    label={`${t("orders.col_sequence")} — ${row.shopName}`}
+                    onCommit={(pos) => moveRowTo(i, pos - 1)}
+                  />
+                  <SequenceArrows
+                    index={i}
+                    count={numberedRows.length}
+                    disabled={sending}
+                    label={row.shopName}
+                    onMove={(dir) => moveRowTo(i, i + dir)}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className="truncate text-[13px] font-bold text-slate-800"
+                      title={row.shopName}
+                    >
+                      {row.shopName}
+                    </p>
+                    <p className="truncate text-[11.5px] font-semibold text-slate-500">
+                      {row.village || "—"}
+                      {row.mobile ? ` · ${row.mobile}` : ""}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-[13px] font-bold tabular-nums text-emerald-700">
+                      {formatCount(row.boxes)} {t("orders.boxes_short")}
+                    </p>
+                    <p className="text-[11.5px] font-semibold tabular-nums text-slate-500">
+                      {row.birds > 0
+                        ? `${formatCount(row.birds)} ${t("orders.birds_short")}`
+                        : "—"}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </aside>
 
-            {/* 2) The message text — what WhatsApp will carry */}
-            <div className="border-b border-slate-100 px-3.5 py-3">
-              <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
-                {t("orders.wa_message_preview")}
-              </p>
-              <pre className="mt-2 max-h-56 overflow-y-auto whitespace-pre-wrap rounded-lg border border-emerald-200 bg-[#e7f8ec] px-2.5 py-2 font-sans text-[11px] font-medium leading-relaxed text-slate-700">
-                {message}
-              </pre>
-            </div>
-
-            {/* 3) ASSIGNMENT DETAILS — under the WhatsApp message */}
-            <div className="px-3.5 py-3">
+          {/* ── Right: assignment details under the heading, then the
+                 message preview beside the sheet ── */}
+          <div className="flex min-w-0 flex-1 flex-col">
+            <div className="border-b border-slate-100 bg-slate-50/60 px-5 py-3">
               <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
                 {t("orders.assignment_details")}
               </p>
-              <div className="mt-2 grid grid-cols-2 gap-1.5">
-                <Fact label={t("orders.pdf_order_date")} value={orderDate || trip.tripDate} />
-                <Fact label={t("orders.col_total_shops")} value={orderedRows.length} />
-                <Fact label={t("orders.col_assigned_boxes")} value={formatCount(totalBoxes)} />
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
+                <Fact
+                  label={t("orders.pdf_order_date")}
+                  value={orderDate || trip.tripDate}
+                />
+                <Fact
+                  label={t("orders.col_total_shops")}
+                  value={orderedRows.length}
+                />
+                <Fact
+                  label={t("orders.col_assigned_boxes")}
+                  value={formatCount(totalBoxes)}
+                />
                 <Fact
                   label={t("orders.wa_send_to")}
                   value={supervisorMobile || "—"}
@@ -399,28 +467,77 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
                 />
               </div>
             </div>
-          </aside>
 
-          {/* ── Right: the branded sheet ── */}
-          <div className="flex min-w-0 flex-1 flex-col bg-slate-200/60">
-            {building ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2 text-xs font-medium text-slate-500">
-                <Loader2 size={16} className="animate-spin text-emerald-500" />
-                {t("orders.pdf_building")}
+            <div className="flex min-h-0 flex-1">
+              {/* Branded sheet */}
+              <div className="flex min-w-0 flex-1 flex-col bg-slate-200/60">
+                {building ? (
+                  <div className="flex h-full flex-col items-center justify-center gap-2 text-xs font-medium text-slate-500">
+                    <Loader2
+                      size={16}
+                      className="animate-spin text-emerald-500"
+                    />
+                    {t("orders.pdf_building")}
+                  </div>
+                ) : buildError ? (
+                  <div className="flex h-full flex-col items-center justify-center gap-2 text-xs font-semibold text-rose-600">
+                    {buildError}
+                  </div>
+                ) : result ? (
+                  <div className="relative h-full">
+                    <div
+                      key={result.url}
+                      className="h-full motion-safe:animate-[var(--animate-fade-in)]"
+                    >
+                      <PdfBlobPreview url={result.url} />
+                    </div>
+                    {rebuilding && (
+                      <div className="pointer-events-none absolute inset-0 flex items-center justify-center bg-white/40 backdrop-blur-[1px] transition-opacity motion-safe:animate-[var(--animate-fade-in)]">
+                        <span className="inline-flex items-center gap-2 rounded-full border border-emerald-200 bg-white/95 px-3.5 py-1.5 text-xs font-semibold text-slate-600 shadow-md">
+                          <Loader2
+                            size={14}
+                            className="animate-spin text-emerald-500"
+                          />
+                          {t("orders.pdf_building")}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : null}
               </div>
-            ) : buildError ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2 text-xs font-semibold text-rose-600">
-                {buildError}
-              </div>
-            ) : result ? (
-              <PdfBlobPreview key={result.url} url={result.url} />
-            ) : null}
+
+              {/* Message preview — a WhatsApp-style bubble column */}
+              <aside className="flex w-[20rem] shrink-0 flex-col border-l border-slate-100 bg-[#efeae2]">
+                <div className="flex items-center gap-2 border-b border-slate-200/70 bg-white/80 px-4 py-3">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#25D366] text-white">
+                    <WhatsAppIcon size={13} />
+                  </span>
+                  <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+                    {t("orders.wa_message_preview")}
+                  </p>
+                </div>
+                <div className="flex-1 overflow-y-auto px-3 py-3">
+                  <pre
+                    key={sheetLang}
+                    className="relative whitespace-pre-wrap rounded-2xl rounded-tl-sm border border-emerald-200/70 bg-[#d9fdd3] px-3.5 py-2.5 font-sans text-[11.5px] font-medium leading-relaxed text-slate-800 shadow-sm motion-safe:animate-[var(--animate-fade-in-up)]"
+                  >
+                    {message}
+                  </pre>
+                  <p className="mt-1.5 pr-1 text-right text-[10px] font-semibold text-slate-400">
+                    → {supervisorMobile || "—"}
+                  </p>
+                </div>
+              </aside>
+            </div>
           </div>
         </div>
 
-        {/* ── Footer: note + per-shop outcome + actions ── */}
-        <div className="border-t border-slate-100 px-5 py-3">
-          <div className="flex min-h-[18px] items-center gap-1.5 text-[11px] font-semibold">
+        {/* ── Footer: note + per-shop outcome + actions (Trip List footer chrome) ── */}
+        <div className="rounded-b-2xl border-t border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 px-6 py-4 md:px-8">
+          <div
+            className="flex min-h-[1.125rem] items-center gap-1.5 text-[11px] font-semibold"
+            aria-live="polite"
+          >
             {sending ? (
               <>
                 <Loader2 size={13} className="animate-spin text-emerald-600" />
@@ -430,7 +547,9 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
                 </span>
               </>
             ) : sentResult ? (
-              <span className={sendOk ? "text-emerald-700" : "text-amber-600"}>
+              <span
+                className={`motion-safe:animate-[var(--animate-fade-in-up)] ${sendOk ? "text-emerald-700" : "text-amber-600"}`}
+              >
                 {sendOk
                   ? t("orders.wa_sent_to", {
                       name: trip.supervisorName || "—",
@@ -440,67 +559,150 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
                     ? t("orders.whatsapp_not_configured")
                     : sentResult.message === "no_rows"
                       ? t("orders.whatsapp_no_rows")
-                      : t("orders.whatsapp_failed", { message: sentResult.message ?? "—" })}
+                      : t("orders.whatsapp_failed", {
+                          message: sentResult.message ?? "—",
+                        })}
               </span>
             ) : (
               <span className="text-slate-400">
                 {t("orders.wa_send_note")}
-                {result ? ` · ${t("orders.pdf_pages", { pages: result.pages })} · ${result.fileName}` : ""}
+                {result
+                  ? ` · ${t("orders.pdf_pages", { pages: result.pages })} · ${result.fileName}`
+                  : ""}
               </span>
             )}
           </div>
 
-          <div className="mt-3 flex flex-wrap items-center justify-end gap-2">
+          <div className="mt-3 flex flex-wrap items-center justify-end gap-3">
             <button
               type="button"
-              onClick={onClose}
+              onClick={safeClose}
               disabled={busy}
-              className="h-9 rounded-lg border border-slate-200 bg-white px-3.5 text-[13px] font-semibold text-slate-600 transition hover:bg-slate-50 disabled:opacity-50"
+              className="group relative inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-6 py-2.5 text-xs font-semibold text-slate-700 transition-all hover:bg-slate-200 active:scale-95 disabled:opacity-50"
             >
+              <span className={`inline-flex ${uiActionIconMotionClass.close}`}>
+                <X size={15} />
+              </span>
               {t("orders.close")}
             </button>
             <button
               type="button"
               onClick={handleDownload}
               disabled={!result || sending}
-              className="flex h-9 items-center gap-1.5 rounded-lg border border-rose-200 bg-white px-3.5 text-[13px] font-semibold text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-50"
+              className="group relative inline-flex items-center gap-2 rounded-2xl border border-red-100 bg-red-50/80 px-5 py-2.5 text-xs font-semibold text-red-600 shadow-sm shadow-red-100/60 transition-all hover:bg-red-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
             >
-              <Download size={14} />
+              <span
+                className={`inline-flex ${result && !sending ? uiActionIconMotionClass.pdf : ""}`}
+              >
+                <Download size={14} />
+              </span>
               {t("orders.pdf_download")}
             </button>
             <button
               type="button"
               onClick={() => void handleSend()}
               disabled={busy || orderedRows.length === 0 || sendOk}
-              className="flex h-9 items-center gap-1.5 rounded-lg bg-emerald-600 px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="group relative inline-flex items-center gap-2 rounded-2xl border border-[#25D366]/30 bg-[#25D366]/10 px-5 py-2.5 text-xs font-bold text-[#128C7E] shadow-sm shadow-[#25D366]/10 transition-all hover:-translate-y-0.5 hover:bg-[#25D366]/20 hover:shadow-md active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
             >
               {sending ? (
                 <Loader2 size={14} className="animate-spin" />
               ) : sendOk ? (
-                <CheckCircle2 size={14} />
+                <CheckCircle2
+                  size={14}
+                  className="motion-safe:animate-[var(--animate-pop-in)]"
+                />
               ) : (
-                <Send size={14} />
+                <span
+                  className={`inline-flex ${!busy && orderedRows.length > 0 ? uiActionIconMotionClass.whatsapp : ""}`}
+                >
+                  <Send size={14} />
+                </span>
               )}
               {sendFailed ? t("orders.wa_retry") : t("orders.wa_confirm_send")}
             </button>
             <button
               type="button"
               onClick={() => void handleSubmitAssignment()}
-              disabled={!sendOk || busy}
-              className="flex h-9 items-center gap-1.5 rounded-lg bg-slate-900 px-4 text-[13px] font-semibold text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
+              disabled={!canSubmit}
+              className={`group relative inline-flex items-center gap-2 rounded-2xl border border-indigo-200 bg-indigo-50 px-5 py-2.5 text-xs font-bold text-indigo-700 shadow-sm shadow-indigo-100/70 transition-all hover:-translate-y-0.5 hover:border-indigo-300 hover:bg-indigo-100 hover:shadow-md active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 ${
+                canSubmit
+                  ? "motion-safe:animate-[var(--animate-pop-in)] ring-2 ring-indigo-200/80 ring-offset-1"
+                  : ""
+              }`}
             >
               {submitting ? (
                 <Loader2 size={14} className="animate-spin" />
               ) : (
-                <CheckCircle2 size={14} />
+                <span
+                  className={`inline-flex ${canSubmit ? uiActionIconMotionClass.approve : ""}`}
+                >
+                  <CheckCircle2 size={14} />
+                </span>
               )}
-              {submitting ? t("orders.wa_auto_submitting") : t("orders.submit_order_assignment")}
+              {submitting
+                ? t("orders.wa_auto_submitting")
+                : t("orders.submit_order_assignment")}
             </button>
           </div>
         </div>
       </div>
-    </div>
+    </AppShellModal>
   );
 };
+
+/** Delivery-order box — type 1, 2, 3 … and the shop moves to that position
+ *  (Enter / blur commits, Escape restores). Same control as the assignment
+ *  table so the two lists behave identically. */
+function OrderNumberInput({
+  value,
+  max,
+  disabled,
+  label,
+  onCommit,
+}: {
+  value: number;
+  max: number;
+  disabled: boolean;
+  label: string;
+  onCommit: (position: number) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = () => {
+    if (draft === null) return;
+    const n = Math.round(Number(draft));
+    setDraft(null);
+    if (!Number.isFinite(n) || n < 1) return;
+    const pos = Math.min(max, n);
+    if (pos !== value) onCommit(pos);
+  };
+  return (
+    <input
+      type="number"
+      inputMode="numeric"
+      min={1}
+      max={max}
+      value={draft ?? value}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          commit();
+          e.currentTarget.blur();
+        } else if (e.key === "Escape") {
+          setDraft(null);
+          e.currentTarget.blur();
+        }
+      }}
+      onWheel={onOrdersNumberWheel}
+      className={`${ORDERS_NO_SPINNER} h-8 w-11 shrink-0 rounded-lg border border-emerald-200 bg-emerald-50 text-center text-[12.5px] font-bold tabular-nums text-emerald-700 transition-all focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 disabled:opacity-50 ${
+        draft !== null ? "border-amber-300 bg-amber-50 text-amber-800" : ""
+      }`}
+    />
+  );
+}
 
 export default OrdersWhatsAppConfirmPopup;

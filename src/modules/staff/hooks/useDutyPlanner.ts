@@ -24,7 +24,29 @@ import { useDutyPlannerText } from './useDutyPlannerText';
 import { dutyText, localizeDutyError, dutyDisplayValue, type DutyTextKey } from '../i18n/dutyPlannerCopy';
 import type { Employee, DutyAssignment, DutyPlannerFilters, LeaveRequest } from '../types/staffDashboard';
 
-const DEFAULT_ROLES = ['Supervisor', 'Driver', 'Helper', 'Loader'];
+export const DEFAULT_ROLES = ['Supervisor', 'Driver', 'Helper', 'Loader'];
+
+export function getCurrentWeekMonday(): string {
+  const now = new Date();
+  const dayOfWeek = now.getDay();
+  const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+  const startOfWeek = new Date(now.setDate(diff));
+  const year = startOfWeek.getFullYear();
+  const month = String(startOfWeek.getMonth() + 1).padStart(2, '0');
+  const date = String(startOfWeek.getDate()).padStart(2, '0');
+  return `${year}-${month}-${date}`;
+}
+
+/** True when the planner filters match their reset state (default roles, current week, no department). */
+export function isDefaultDutyFilters(f: { department: string; role: string[]; weekStart: string }): boolean {
+  const roles = [...f.role].sort().join('|');
+  return (
+    f.department === '' &&
+    roles === [...DEFAULT_ROLES].sort().join('|') &&
+    f.weekStart === getCurrentWeekMonday()
+  );
+}
+
 
 /** An employee with at least one day this week that has no duty, no approved
  *  leave and no automatic duty — a cell that is truly pending assignment. */
@@ -60,16 +82,6 @@ export function useDutyPlanner(showNotification?: (msg: string, type: 'success' 
   const [automaticSaveError, setAutomaticSaveError] = useState(false);
   const refresh = useCallback(() => setReloadKey((key) => key + 1), []);
 
-  const getCurrentWeekMonday = () => {
-    const now = new Date();
-    const dayOfWeek = now.getDay();
-    const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-    const startOfWeek = new Date(now.setDate(diff));
-    const year = startOfWeek.getFullYear();
-    const month = String(startOfWeek.getMonth() + 1).padStart(2, '0');
-    const date = String(startOfWeek.getDate()).padStart(2, '0');
-    return `${year}-${month}-${date}`;
-  };
 
   const [filters, setFilters] = useState<DutyPlannerFilters>({
     department: '',

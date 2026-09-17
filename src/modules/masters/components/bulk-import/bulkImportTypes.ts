@@ -68,7 +68,7 @@ export type BulkImportConfig<T, E = T> = {
    */
   createMany: (
     rows: ParsedImportRow<T>[],
-    onProgress: (done: number, total: number) => void
+    onProgress: (done: number, total: number) => void,
   ) => Promise<CreateManyResult>;
   /** Refresh the parent page list after a successful import. */
   refresh: () => Promise<unknown>;

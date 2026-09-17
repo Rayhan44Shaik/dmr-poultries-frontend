@@ -13,7 +13,7 @@ import { listEligibleTrips } from "../src/modules/operations/shop-sales/services
 import { fuelExpenseService } from "../src/modules/operations/fuel-expenses/services/fuelExpenseService";
 import { fetchMortalityAnalysis, fetchTripDeliveries } from "../src/modules/operations/mortality/services/mortalityAnalysisApi";
 import { collectionService } from "../src/modules/operations/collections/services/collectionService";
-import { isOrderContainer } from "../src/modules/operations/orders/ordersUtils";
+import { isOrderContainer } from "../src/modules/orders/utils/ordersUtils";
 import {
   getOperationsSampleCounts,
   getQuarterSampleInfo,
@@ -361,7 +361,7 @@ export async function runOperationsSyncCheck(): Promise<void> {
     const { MemoryRouter } = await import("react-router-dom");
     const { I18nProvider } = await import("../src/i18n");
     const { default: QuarterOperationsMap } = await import(
-      "../src/modules/operations/dashboard/components/QuarterOperationsMap"
+      "../src/modules/dashboard/components/QuarterOperationsMap"
     );
 
     const html = renderToString(

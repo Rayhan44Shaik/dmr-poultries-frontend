@@ -1,116 +1,182 @@
 import MasterStatusBadge from "../../components/MasterStatusBadge";
-import { Pencil, Trash2 } from "lucide-react";
+import {
+  AtSign,
+  CreditCard,
+  Hash,
+  KeyRound,
+  Landmark,
+  MapPin,
+  Settings2,
+  ToggleLeft,
+} from "lucide-react";
 import type { Bank } from "../types/bank";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
+import { useI18n } from "../../../../i18n";
+import { localizeTripViewText } from "../../../operations/vehicle-trips/utils/tripViewLocalization";
+import {
+  MasterTable,
+  MasterThead,
+  MasterTh,
+  MasterLoadingRow,
+  MasterEmptyRow,
+  MasterEditButton,
+  MasterDeleteButton,
+} from "../../components/MasterDirectory";
+import {
+  masterTdClass,
+  masterNameTdClass,
+  masterRowClass,
+  masterRowStyle,
+  masterHeadTint as tint,
+} from "../../components/masterTableStyles";
 
 type BankTableProps = {
   banks: Bank[];
-  onEdit: (bank: Bank) => void;
+  onEdit: (item: Bank) => void;
   onDelete: (id: number) => void;
-  /** Message shown when the list is empty (e.g. active search with no matches). */
   emptyMessage?: string;
+  loading?: boolean;
 };
 
-function BankTable({ banks, onEdit, onDelete, emptyMessage }: BankTableProps) {
+const COLS = 8;
+
+function BankTable({
+  banks,
+  onEdit,
+  onDelete,
+  emptyMessage,
+  loading = false,
+}: BankTableProps) {
+  const { t, language } = useI18n();
   const { requestDelete, cancel, pendingItems } = usePendingDelete(onDelete);
+  // Telugu reaches the record text too; stored values stay untouched.
+  const shown = (value: string | null | undefined) =>
+    localizeTripViewText(value ?? "", language);
+  const showLoadingRow = loading && banks.length === 0;
+  const rows = [...banks].sort((a, b) => (a.bankNo > b.bankNo ? 1 : -1));
+
   return (
-    <div className="master-table">
-      <table className="min-w-full divide-y divide-slate-200">
-        <thead className="bg-slate-50">
-          <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-              BANK NO
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-              BANK NAME
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-              BRANCH
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-              ACCOUNT NUMBER
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-              IFSC CODE
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-              UPI ID
-            </th>
-            <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
-              STATUS
-            </th>
-            <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
-              ACTIONS
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-200 bg-white">
-          {[...banks]
-            .sort((a, b) => (a.bankNo > b.bankNo ? 1 : -1))
-            .map((bank) => (
-              <tr key={bank.id} className="hover:bg-slate-50 transition-colors">
-                <td className="px-4 py-3 text-sm text-slate-600">
-                  {bank.bankNo}
-                </td>
-                <td className="px-4 py-3 text-sm font-semibold text-slate-800">
-                  {bank.bankName}
-                </td>
-                <td className="px-4 py-3 text-sm text-slate-600">
-                  {bank.branch}
-                </td>
-                <td className="px-4 py-3 text-sm text-slate-600">
-                  {bank.accountNumber}
-                </td>
-                <td className="px-4 py-3 text-sm text-slate-600">
-                  {bank.ifscCode}
-                </td>
-                <td className="px-4 py-3 text-sm text-slate-600">
-                  {bank.upiId || "-"}
-                </td>
-                <td className="px-4 py-3 text-center">
-                  <MasterStatusBadge status={bank.status} />
-                </td>
-                <td className="px-4 py-3 text-center">
-                  <div className="flex items-center justify-center gap-2">
-                    <button
-                      onClick={() => onEdit(bank)}
-                      className="rounded p-1 text-blue-600 hover:bg-blue-50 transition-colors"
-                      title="Edit"
-                      aria-label={`Edit bank ${bank.bankName}`}
-                    >
-                      <Pencil size={16} />
-                    </button>
-                    <button
-                      onClick={() =>
-                        requestDelete(bank.id, {
-                          label: `Deleting Bank "${bank.bankName}"`,
-                        })
-                      }
-                      className="rounded p-1 text-red-600 hover:bg-red-50 transition-colors"
-                      title="Delete"
-                      aria-label={`Delete bank ${bank.bankName}`}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          {banks.length === 0 && (
-            <tr>
+    <>
+      <MasterTable minWidth="min-w-[66rem]">
+        <colgroup>
+          <col className="w-[4rem]" />
+          <col className="w-[12rem]" />
+          <col className="w-[9rem]" />
+          <col className="w-[10rem]" />
+          <col className="w-[8rem]" />
+          <col className="w-[10rem]" />
+          <col className="w-[6.5rem]" />
+          <col className="w-[6.5rem]" />
+        </colgroup>
+        <MasterThead>
+          <MasterTh
+            icon={Hash}
+            iconClass={tint.number}
+            label={t("masters.dir.bank_no")}
+            align="center"
+          />
+          <MasterTh
+            icon={Landmark}
+            iconClass={tint.bank}
+            label={t("masters.dir.bank_name")}
+          />
+          <MasterTh
+            icon={MapPin}
+            iconClass={tint.place}
+            label={t("masters.dir.branch")}
+          />
+          <MasterTh
+            icon={CreditCard}
+            iconClass={tint.tag}
+            label={t("masters.dir.account_no")}
+          />
+          <MasterTh
+            icon={KeyRound}
+            iconClass={tint.code}
+            label={t("masters.dir.ifsc")}
+          />
+          <MasterTh
+            icon={AtSign}
+            iconClass={tint.rate}
+            label={t("masters.dir.upi")}
+          />
+          <MasterTh
+            icon={ToggleLeft}
+            iconClass={tint.status}
+            label={t("masters.dir.status")}
+            align="center"
+          />
+          <MasterTh
+            icon={Settings2}
+            iconClass={tint.action}
+            label={t("masters.dir.actions")}
+            align="center"
+          />
+        </MasterThead>
+        <tbody className="divide-y divide-slate-100">
+          {showLoadingRow && (
+            <MasterLoadingRow colSpan={COLS} label={t("masters.dir.loading")} />
+          )}
+          {!showLoadingRow && rows.length === 0 && (
+            <MasterEmptyRow
+              colSpan={COLS}
+              label={emptyMessage ?? t("masters.dir.no_records")}
+            />
+          )}
+          {rows.map((f, index) => (
+            <tr
+              key={f.id}
+              className={masterRowClass(index, loading)}
+              style={masterRowStyle(index)}
+            >
               <td
-                colSpan={8}
-                className="px-4 py-6 text-center text-sm text-slate-500"
+                className={`${masterTdClass} text-center tabular-nums text-slate-500`}
               >
-                {emptyMessage ?? "No banks found."}
+                {f.bankNo}
+              </td>
+              <td className={masterNameTdClass}>
+                <span className="block truncate">{shown(f.bankName)}</span>
+              </td>
+              <td className={masterTdClass}>
+                <span className="block truncate">{shown(f.branch) || "—"}</span>
+              </td>
+              <td className={`${masterTdClass} whitespace-nowrap tabular-nums`}>
+                {f.accountNumber || "—"}
+              </td>
+              <td
+                className={`${masterTdClass} whitespace-nowrap uppercase tabular-nums`}
+              >
+                {f.ifscCode || "—"}
+              </td>
+              <td className={masterTdClass}>
+                <span className="block truncate">{f.upiId || "—"}</span>
+              </td>
+              <td className={`${masterTdClass} text-center`}>
+                <MasterStatusBadge status={f.status} />
+              </td>
+              <td className={`${masterTdClass} text-center`}>
+                <div className="inline-flex items-center gap-2">
+                  <MasterEditButton
+                    onClick={() => onEdit(f)}
+                    ariaLabel={`Edit bank ${f.bankName}`}
+                  />
+                  <MasterDeleteButton
+                    onClick={() =>
+                      requestDelete(f.id, {
+                        label: `Deleting Bank "${f.bankName}"`,
+                      })
+                    }
+                    ariaLabel={`Delete bank ${f.bankName}`}
+                  />
+                </div>
               </td>
             </tr>
-          )}
+          ))}
         </tbody>
-      </table>
+      </MasterTable>
       <PendingDeleteNotification items={pendingItems} onCancel={cancel} />
-    </div>
+    </>
   );
 }
 

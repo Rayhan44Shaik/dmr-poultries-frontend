@@ -1,8 +1,8 @@
 import { memo, useState, useRef, useEffect, useId, type ReactNode } from 'react';
-import { ChevronDown, ChevronLeft, ChevronRight, RotateCcw, UsersRound, X, Search, FileSpreadsheet, LoaderCircle, Calendar, CalendarCheck2, CalendarRange, ArrowRight } from 'lucide-react';
+import { ChevronDown, ChevronLeft, ChevronRight, UsersRound, X, Search, FileSpreadsheet, LoaderCircle, Calendar, CalendarCheck2, CalendarRange, ArrowRight } from 'lucide-react';
 import { DatePicker } from '../../../../components/common/DatePicker';
-import { uiExcelButtonClass, uiFilterLabelClass, uiInputClass, uiResetButtonClass } from '../../../../shared/ui/uiTokens';
-import { BrandRefreshButton } from '../../../../ui';
+import { uiExcelButtonClass, uiFilterLabelClass, uiInputClass } from '../../../../shared/ui/uiTokens';
+import { BrandRefreshButton, FilterResetButton } from '../../../../ui';
 import type { DutyReportRange } from '../../services/dutyReport';
 import { useDutyPlannerText } from '../../hooks/useDutyPlannerText';
 import { dutyDisplayValue } from '../../i18n/dutyPlannerCopy';
@@ -12,6 +12,8 @@ interface Props {
   role: string[]; roles: string[]; searchQuery: string;
   onSearchChange: (value: string) => void; onRoleChange: (value: string[]) => void;
   onReset: () => void; onDownloadExcel: () => void;
+  /** Facets away from their defaults — drives the badge on Reset. */
+  activeFilterCount?: number;
   canDownloadExcel: boolean; exporting: boolean;
   onRefresh?: () => void; refreshing?: boolean;
   view: DutyPlannerView; onViewChange: (view: DutyPlannerView) => void;
@@ -22,7 +24,7 @@ interface Props {
 }
 const views = ['week', 'month', 'custom'] as const;
 
-function DutyPlannerFilters({ role, roles, searchQuery, onSearchChange, onRoleChange, onReset, onDownloadExcel, canDownloadExcel, exporting, onRefresh, refreshing, view, onViewChange, periodLabel, onPreviousPeriod, onNextPeriod, onCurrentPeriod, customRange, onCustomRangeChange, periodMeta, feedback }: Props) {
+function DutyPlannerFilters({ role, roles, searchQuery, onSearchChange, onRoleChange, onReset, activeFilterCount = 0, onDownloadExcel, canDownloadExcel, exporting, onRefresh, refreshing, view, onViewChange, periodLabel, onPreviousPeriod, onNextPeriod, onCurrentPeriod, customRange, onCustomRangeChange, periodMeta, feedback }: Props) {
   const { language, t } = useDutyPlannerText();
   const [open, setOpen] = useState(false);
   const dropdown = useRef<HTMLDivElement>(null);
@@ -105,10 +107,9 @@ function DutyPlannerFilters({ role, roles, searchQuery, onSearchChange, onRoleCh
         </div>
 
         <div role="group" aria-label={t('actions')} className="flex flex-wrap items-center gap-2 lg:col-span-2 lg:col-start-3 lg:row-start-2 lg:justify-end">
-          <button type="button" onClick={onReset} className={`group relative ${uiResetButtonClass}`} aria-label={t('reset')}>
-            <span className="inline-flex group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>
+          <FilterResetButton count={activeFilterCount} onClick={onReset} aria-label={t('reset')}>
             {t('reset')}
-          </button>
+          </FilterResetButton>
           {onRefresh && <BrandRefreshButton loading={refreshing} onClick={onRefresh} ariaLabel={t('refreshData')}>{t('refresh')}</BrandRefreshButton>}
           <button type="button" onClick={onDownloadExcel} disabled={!canDownloadExcel || exporting} aria-busy={exporting} className={`group relative ${uiExcelButtonClass}`} aria-label={t('download')}>
             <span className={`inline-flex ${canDownloadExcel && !exporting ? 'group-hover:animate-[var(--animate-action-excel)]' : ''}`}>

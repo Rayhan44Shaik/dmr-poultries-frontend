@@ -61,7 +61,7 @@ try {
  assert(Math.abs(expenses.farm - (farmTripLinked + registerFarmer)) > .01, 'register farmer settlements must not be double-counted');
  const netProfit = metrics.sales - Object.values(expenses).reduce((sum, value) => sum + value, 0);
  console.log('PASS every approved ledger category is counted exactly once; farm is trip-linked', JSON.stringify({ farmTripLinked, registerFarmerSettlementsExcluded: registerFarmer, sales: metrics.sales, totalExpenses: Object.values(expenses).reduce((sum, value) => sum + value, 0), netProfit }));
- const { loadPaymentRegisterSummary } = await server.ssrLoadModule('/src/modules/operations/dashboard/services/paymentRegisterSummary.ts');
+ const { loadPaymentRegisterSummary } = await server.ssrLoadModule('/src/modules/dashboard/services/paymentRegisterSummary.ts');
  const dashboardPayments = await loadPaymentRegisterSummary(fromDate, toDate);
  // The dashboard counts EVERY approved register payment — farmer settlements
  // included. The Analysis expense breakdown deliberately leaves those out of

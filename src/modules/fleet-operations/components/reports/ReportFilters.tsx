@@ -1,5 +1,6 @@
 import { memo } from 'react';
-import { Calendar, RotateCcw } from 'lucide-react';
+import { Calendar } from 'lucide-react';
+import { FilterResetButton, countActiveFilters } from '../../../../ui';
 
 interface ReportFiltersProps {
   fromDate: string;
@@ -54,13 +55,10 @@ const ReportFilters = ({
         </div>
 
         <div className="flex gap-2">
-          <button
+          <FilterResetButton
+            count={countActiveFilters(fromDate !== '' || toDate !== '')}
             onClick={onReset}
-            className="inline-flex items-center gap-1.5 px-4 py-2 border border-red-300 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
-          >
-            <RotateCcw className="w-4 h-4" />
-            Reset
-          </button>
+          />
           {showExport && onExport && (
             <button
               onClick={onExport}

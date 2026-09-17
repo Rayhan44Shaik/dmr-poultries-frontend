@@ -1,109 +1,165 @@
 import MasterStatusBadge from "../../components/MasterStatusBadge";
-import { Pencil, Trash2 } from "lucide-react";
+import {
+  Bird,
+  FileText,
+  Hash,
+  Scale,
+  Settings2,
+  ToggleLeft,
+} from "lucide-react";
 import type { BirdType } from "../types/birdType";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
+import { useI18n } from "../../../../i18n";
+import { localizeTripViewText } from "../../../operations/vehicle-trips/utils/tripViewLocalization";
+import {
+  MasterTable,
+  MasterThead,
+  MasterTh,
+  MasterLoadingRow,
+  MasterEmptyRow,
+  MasterEditButton,
+  MasterDeleteButton,
+} from "../../components/MasterDirectory";
+import {
+  masterTdClass,
+  masterNameTdClass,
+  masterRowClass,
+  masterRowStyle,
+  masterHeadTint as tint,
+} from "../../components/masterTableStyles";
 
 type BirdTypeTableProps = {
   birdTypes: BirdType[];
-  onEdit: (birdType: BirdType) => void;
+  onEdit: (item: BirdType) => void;
   onDelete: (id: number) => void;
-  /** Message shown when the list is empty (e.g. active search with no matches). */
   emptyMessage?: string;
+  loading?: boolean;
 };
+
+const COLS = 6;
 
 function BirdTypeTable({
   birdTypes,
   onEdit,
   onDelete,
   emptyMessage,
+  loading = false,
 }: BirdTypeTableProps) {
+  const { t, language } = useI18n();
   const { requestDelete, cancel, pendingItems } = usePendingDelete(onDelete);
+  // Telugu reaches the record text too; stored values stay untouched.
+  const shown = (value: string | null | undefined) =>
+    localizeTripViewText(value ?? "", language);
+  const showLoadingRow = loading && birdTypes.length === 0;
+  const rows = [...birdTypes].sort((a, b) =>
+    a.birdTypeNo > b.birdTypeNo ? 1 : -1,
+  );
+
   return (
-    <div className="master-table">
-      <table className="min-w-full divide-y divide-slate-200">
-        <thead className="bg-slate-50">
-          <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-              BIRD TYPE NO
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-              BIRD TYPE
-            </th>
-            <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500">
-              AVG WEIGHT (kg)
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-              DESCRIPTION
-            </th>
-            <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
-              STATUS
-            </th>
-            <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
-              ACTIONS
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-200 bg-white">
-          {[...birdTypes]
-            .sort((a, b) => (a.birdTypeNo > b.birdTypeNo ? 1 : -1))
-            .map((bt) => (
-              <tr key={bt.id} className="hover:bg-slate-50 transition-colors">
-                <td className="px-4 py-3 text-sm text-slate-600">
-                  {bt.birdTypeNo}
-                </td>
-                <td className="px-4 py-3 text-sm font-semibold text-slate-800">
-                  {bt.birdType}
-                </td>
-                <td className="px-4 py-3 text-right text-sm text-slate-600">
-                  {bt.averageWeight}
-                </td>
-                <td className="px-4 py-3 text-sm text-slate-600">
-                  {bt.description || "-"}
-                </td>
-                <td className="px-4 py-3 text-center">
-                  <MasterStatusBadge status={bt.status} />
-                </td>
-                <td className="px-4 py-3 text-center">
-                  <div className="flex items-center justify-center gap-2">
-                    <button
-                      onClick={() => onEdit(bt)}
-                      className="rounded p-1 text-blue-600 hover:bg-blue-50 transition-colors"
-                      title="Edit"
-                      aria-label={`Edit bird type ${bt.birdType}`}
-                    >
-                      <Pencil size={16} />
-                    </button>
-                    <button
-                      onClick={() =>
-                        requestDelete(bt.id, {
-                          label: `Deleting Bird Type "${bt.birdType}"`,
-                        })
-                      }
-                      className="rounded p-1 text-red-600 hover:bg-red-50 transition-colors"
-                      title="Delete"
-                      aria-label={`Delete bird type ${bt.birdType}`}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          {birdTypes.length === 0 && (
-            <tr>
+    <>
+      <MasterTable minWidth="min-w-[46rem]">
+        <colgroup>
+          <col className="w-[4rem]" />
+          <col className="w-[12rem]" />
+          <col className="w-[8rem]" />
+          <col className="w-[14rem]" />
+          <col className="w-[6.5rem]" />
+          <col className="w-[6.5rem]" />
+        </colgroup>
+        <MasterThead>
+          <MasterTh
+            icon={Hash}
+            iconClass={tint.number}
+            label={t("masters.dir.bird_type_no")}
+            align="center"
+          />
+          <MasterTh
+            icon={Bird}
+            iconClass={tint.name}
+            label={t("masters.dir.bird_type")}
+          />
+          <MasterTh
+            icon={Scale}
+            iconClass={tint.rate}
+            label={t("masters.dir.avg_weight")}
+            align="right"
+          />
+          <MasterTh
+            icon={FileText}
+            iconClass={tint.tag}
+            label={t("masters.dir.description")}
+          />
+          <MasterTh
+            icon={ToggleLeft}
+            iconClass={tint.status}
+            label={t("masters.dir.status")}
+            align="center"
+          />
+          <MasterTh
+            icon={Settings2}
+            iconClass={tint.action}
+            label={t("masters.dir.actions")}
+            align="center"
+          />
+        </MasterThead>
+        <tbody className="divide-y divide-slate-100">
+          {showLoadingRow && (
+            <MasterLoadingRow colSpan={COLS} label={t("masters.dir.loading")} />
+          )}
+          {!showLoadingRow && rows.length === 0 && (
+            <MasterEmptyRow
+              colSpan={COLS}
+              label={emptyMessage ?? t("masters.dir.no_records")}
+            />
+          )}
+          {rows.map((f, index) => (
+            <tr
+              key={f.id}
+              className={masterRowClass(index, loading)}
+              style={masterRowStyle(index)}
+            >
               <td
-                colSpan={6}
-                className="px-4 py-6 text-center text-sm text-slate-500"
+                className={`${masterTdClass} text-center tabular-nums text-slate-500`}
               >
-                {emptyMessage ?? "No bird types found."}
+                {f.birdTypeNo}
+              </td>
+              <td className={masterNameTdClass}>
+                <span className="block truncate">{shown(f.birdType)}</span>
+              </td>
+              <td className={`${masterTdClass} text-right tabular-nums`}>
+                {f.averageWeight}
+              </td>
+              <td className={masterTdClass}>
+                <span className="block truncate">
+                  {shown(f.description) || "—"}
+                </span>
+              </td>
+              <td className={`${masterTdClass} text-center`}>
+                <MasterStatusBadge status={f.status} />
+              </td>
+              <td className={`${masterTdClass} text-center`}>
+                <div className="inline-flex items-center gap-2">
+                  <MasterEditButton
+                    onClick={() => onEdit(f)}
+                    ariaLabel={`Edit bird type ${f.birdType}`}
+                  />
+                  <MasterDeleteButton
+                    onClick={() =>
+                      requestDelete(f.id, {
+                        label: `Deleting BirdType "${f.birdType}"`,
+                      })
+                    }
+                    ariaLabel={`Delete bird type ${f.birdType}`}
+                  />
+                </div>
               </td>
             </tr>
-          )}
+          ))}
         </tbody>
-      </table>
+      </MasterTable>
       <PendingDeleteNotification items={pendingItems} onCancel={cancel} />
-    </div>
+    </>
   );
 }
 

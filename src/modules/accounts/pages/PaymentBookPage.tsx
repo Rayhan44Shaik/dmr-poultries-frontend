@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback, useId } from 'react';
-import { Plus, History, RotateCcw, Pencil, CheckCircle2, Trash2, Calendar, Wallet, CreditCard } from 'lucide-react';
+import { Plus, History, Pencil, CheckCircle2, Trash2, Calendar, Wallet, CreditCard } from 'lucide-react';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import { PaymentTable } from '../components/payment-book/PaymentTable';
 import { PaymentViewModal } from '../components/payment-book/PaymentViewModal';
@@ -10,6 +10,7 @@ import type { Payment } from '../types/payment.types';
 import { DatePicker } from '../../../components/common/DatePicker';
 import { canEditItem, canDeleteItem } from '../../../utils/dateUtils';
 import { weekRange } from '../../../utils/businessDate';
+import { FilterResetButton, countActiveFilters } from '../../../ui';
 import { usePendingDelete } from '../../../hooks/usePendingDelete';
 import { ConfirmDialog } from '../../../ui/ConfirmDialog';
 import { Modal } from '../../../ui/Modal';
@@ -22,7 +23,6 @@ import {
   opsFilterCardClass,
   opsFilterLabelClass,
   opsPrimaryButtonClass,
-  opsSecondaryButtonClass,
 } from '../../../shared/ui/operationsStyles';
 import { useI18n } from '../../../i18n';
 import { EmptyState } from '../../../ui/EmptyState';
@@ -126,26 +126,17 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   /* Filter feedback: the Search / Reset glyphs beat once per click (700 ms).
      The refresh button follows the trip list's contract instead — plain hen,
      success toast when the load finishes. */
-  const [filterAction, setFilterAction] = useState<'clear' | null>(null);
-  const spinTimer = useRef<number | null>(null);
-  const animateFilterAction = (action: 'clear') => {
-    setFilterAction(action);
-    if (spinTimer.current !== null) window.clearTimeout(spinTimer.current);
-    spinTimer.current = window.setTimeout(() => setFilterAction(null), 700);
-  };
   // The trip list's refresh contract, kept identical: the hen button stays
   // plain (no loading prop, so it never pre-dances), and a finished refresh
   // confirms with the shared "Data refreshed" success notification.
   const handleRefresh = useCallback(() => {
     void loadPayments().then(ok => { if (ok) showNotification(t('notification.data_refreshed'), 'success'); });
   }, [loadPayments, showNotification, t]);
-  useEffect(() => () => { if (spinTimer.current !== null) window.clearTimeout(spinTimer.current); }, []);
 
   const changeFilter = (key: keyof typeof filters, value: string) => {
     setFilters(previous => ({ ...previous, [key]: value }));
   };
   const clearFilters = () => {
-    animateFilterAction('clear');
     setSelectedId(null);
     setFilters({ ...weekRange(), type: '', mode: '' });
     setStatus('pending');
@@ -307,10 +298,15 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
             <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-add)]"><Plus size={15} /></span>
             {t('accounts.payment.new')}
           </button>
-          <button type="button" onClick={clearFilters} className={`group relative ${opsSecondaryButtonClass}`} aria-label={t('common.reset')}>
-            <span className={`inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)] ${filterAction === 'clear' ? 'motion-safe:animate-[var(--animate-action-reset)]' : ''}`}><RotateCcw size={14} /></span>
-            {t('common.reset')}
-          </button>
+          <FilterResetButton
+            count={countActiveFilters(
+              filters.type !== '',
+              filters.mode !== '',
+              filters.from !== weekRange().from || filters.to !== weekRange().to,
+              status !== 'pending',
+            )}
+            onClick={clearFilters}
+          />
           <BrandRefreshButton onClick={handleRefresh} />
         </div>
         {invalidRange && <p role="alert" className="mt-2 text-xs text-red-600">{t('accounts.payment.invalid_range')}</p>}

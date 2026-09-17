@@ -427,7 +427,7 @@ test('one Refresh action and a clearly distinct clear-filter icon, including err
   await expect(page.getByRole('button', { name: 'Retry', exact: true })).toHaveCount(0);
   // Reset is the Trip List's spin-on-click control, visually distinct from
   // Refresh (the brand hen pill, which carries no RefreshCw arrow at all).
-  const clear = page.getByRole('region', { name: 'EMI filters and vehicle totals' }).getByRole('button', { name: 'Reset', exact: true });
+  const clear = page.getByRole('region', { name: 'EMI filters and vehicle totals' }).getByRole('button', { name: /^Reset/ });
   await expect(clear.locator('svg')).not.toHaveClass(/refresh-cw/);
   await expect(refresh(page).locator('svg')).toHaveCount(0);
   backend(page).replies.push({ status: 503 });

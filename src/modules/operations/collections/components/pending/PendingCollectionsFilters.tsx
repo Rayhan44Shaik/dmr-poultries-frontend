@@ -3,7 +3,6 @@ import {
   ArrowUpDown,
   Calendar,
   Percent,
-  RotateCcw,
   Search,
   Store,
 } from "lucide-react";
@@ -12,15 +11,22 @@ import {
   opsFilterCardClass,
   opsFilterLabelClass,
   opsInputClass,
-  opsSecondaryButtonClass,
 } from "../../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../../i18n";
-import { BrandRefreshButton } from "../../../../../ui";
+import { BrandRefreshButton, FilterResetButton, countActiveFilters } from "../../../../../ui";
+import { weekRange } from "../../../../../utils/businessDate";
 import MasterDropdown, {
   type MasterDropdownOption,
 } from "../../../../masters/components/MasterDropdown";
 import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocalization";
 import type { PendingShopSortDir, PendingShopSortKey } from "../../types/collection";
+
+/** The default window is THIS week (Mon → Sun); anything else counts as a filter. */
+const isDefaultWeek = (fromDate: string, toDate: string) => {
+  if (!fromDate && !toDate) return true;
+  const { from, to } = weekRange();
+  return fromDate === from && toDate === to;
+};
 
 interface Props {
   fromDate: string;
@@ -245,17 +251,16 @@ function PendingCollectionsFilters({
         </div>
 
         <div className="lg:col-span-4 flex flex-wrap items-center justify-end gap-2">
-          <button
-            type="button"
+          <FilterResetButton
+            count={countActiveFilters(
+              searchQuery.trim() !== "",
+              shopName !== "",
+              recoveryThreshold !== 0,
+              !(sortBy === "shopName" && sortDir === "asc"),
+              !isDefaultWeek(fromDate, toDate),
+            )}
             onClick={onReset}
-            className={`group relative ${opsSecondaryButtonClass}`}
-            aria-label={t("common.reset")}
-          >
-            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]">
-              <RotateCcw size={14} />
-            </span>
-            {t("common.reset")}
-          </button>
+          />
           <BrandRefreshButton onClick={onRefresh} loading={refreshing} />
         </div>
       </div>

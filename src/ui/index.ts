@@ -37,6 +37,12 @@ export {
   type ActionButtonProps,
   type ActionToolbarProps,
 } from "./ExportActions";
+/** Canonical filter reset control (neutral pill + active-filter count badge). */
+export {
+  FilterResetButton,
+  type FilterResetButtonProps,
+} from "./FilterResetButton";
+export { countActiveFilters } from "../shared/ui/filterCount";
 /** Canonical branded refresh control (emerald + animated hen logo). */
 export {
   BrandRefreshButton,

@@ -1,0 +1,1307 @@
+// src/modules/dashboard/pages/DashboardPage.tsx
+
+import {
+  useState,
+  useRef,
+  useEffect,
+  useMemo,
+  useCallback,
+  type CSSProperties,
+} from "react";
+import { Link } from "react-router-dom";
+import { addDays, startOfMonth, subMonths } from "date-fns";
+import { useDashboardData } from "../hooks/useDashboardData";
+import KPICards from "../components/KPICards";
+import OperationalTrendsChart from "../components/OperationalTrendsChart";
+import { useOperationalTrends } from "../hooks/useOperationalTrends";
+import { granularityForRange, type Granularity } from "../utils/trendSeries";
+import CollectionsPie from "../components/CollectionsPie";
+import PaymentRegisterChart from "../components/PaymentRegisterChart";
+
+import ActiveCounts from "../components/ActiveCounts";
+import CollectionPerformanceChart from "../components/CollectionPerformanceChart";
+import PendingApprovalsPanel from "../components/PendingApprovalsPanel";
+import QuarterOperationsMap from "../components/QuarterOperationsMap";
+import {
+  Calendar,
+  CalendarClock,
+  CalendarDays,
+  CalendarRange,
+  ChevronDown,
+  Layers,
+  ArrowUpRight,
+  RefreshCw,
+  SlidersHorizontal,
+} from "lucide-react";
+import { DatePicker } from "../../../components/common/DatePicker";
+import { useI18n } from "../../../i18n";
+import {
+  getOperationsSampleCounts,
+  getQuarterSampleInfo,
+  type QuarterOperationsCounts,
+  type SampleQuarter,
+} from "../../../sample/quarterSample";
+import { weekRange } from "../../../utils/businessDate";
+import { FIXED_DASHBOARD_GREETING } from "../../settings/services";
+import { kickApprovalSnapshot } from "../../approvals/services/approvalSnapshot";
+import { useSafeNotification } from "../../../hooks/useSafeNotification";
+import {
+  loadPaymentRegisterSummary,
+  type PaymentRegisterSummary,
+} from "../services/paymentRegisterSummary";
+
+// -------- Helper: render a dashboard date as "12 Sep 2026" --------
+const formatDashboardDate = (value: string, locale = "en-IN"): string => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleDateString(locale, {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      });
+};
+
+// -------- Helper: today at local midnight (quick-range anchor) --------
+const todayMidnight = (): Date => {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+};
+
+// The overview always opens on the complete Monday–Sunday business week that
+// contains the business "today" date (from the sample manifest when present).
+// `weekRange` is the shared calendar source used across the app.
+const getDefaultWeekRange = (anchor = todayMidnight()) => {
+  const { from, to } = weekRange(anchor);
+  return {
+    startDate: parseInputDateString(from) ?? anchor,
+    endDate: parseInputDateString(to) ?? anchor,
+  };
+};
+
+// -------- Helper: Format Date to YYYY-MM-DD safely --------
+const toInputDateString = (date: Date | undefined): string => {
+  if (!date || isNaN(date.getTime())) return "";
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+// -------- Helper: Parse YYYY-MM-DD string to Date object safely --------
+const parseInputDateString = (dateStr: string): Date | undefined => {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return undefined;
+  const [year, month, day] = dateStr.split("-").map(Number);
+  const parsed = new Date(year, month - 1, day);
+  // JavaScript silently normalises dates such as 2026-02-31 into March. Reject
+  // them instead: a custom range must describe exactly the dates the user sees.
+  return parsed.getFullYear() === year &&
+    parsed.getMonth() === month - 1 &&
+    parsed.getDate() === day
+    ? parsed
+    : undefined;
+};
+
+// -------- RangeDatePicker Component --------
+interface RangeDatePickerProps {
+  startDate: Date | undefined;
+  endDate: Date | undefined;
+  onRangeChange: (start: Date | undefined, end: Date | undefined) => void;
+  /** The sample API's business date when the quarter is pinned for review. */
+  anchorDate?: Date;
+  /** The manifest window, used verbatim by the QTR shortcut when available. */
+  sampleQuarter?: Pick<SampleQuarter, "fromDate" | "toDate"> | null;
+  placement?: "top" | "bottom";
+  className?: string;
+}
+
+function RangeDatePicker({
+  startDate,
+  endDate,
+  onRangeChange,
+  anchorDate,
+  sampleQuarter,
+  placement = "bottom",
+  className = "",
+}: RangeDatePickerProps) {
+  const { t, language } = useI18n();
+  const [isOpen, setIsOpen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const rangeAnchor = anchorDate ?? todayMidnight();
+
+  /* DRAFT-ONLY SELECTION: every pick inside the popover — a quick-range chip
+     or a custom date — lands in local draft state and the committed range
+     changes ONLY when Done is pressed, so typing/picking never churns the
+     dashboard behind the popover. Clicking outside discards the draft. */
+  const [draftStart, setDraftStart] = useState<Date | undefined>(startDate);
+  const [draftEnd, setDraftEnd] = useState<Date | undefined>(endDate);
+
+  /* The draft only lives while the popover is open — opening always restages
+     it from the committed range, so an outside-click close simply forgets it. */
+  const stageDraft = () => {
+    setDraftStart(startDate);
+    setDraftEnd(endDate);
+  };
+
+  const commitRange = () => {
+    if (!draftStart || !draftEnd) return;
+    // Swapped endpoints (picked in the other order) are sorted once, here.
+    const [first, second] =
+      draftStart.getTime() <= draftEnd.getTime()
+        ? [draftStart, draftEnd]
+        : [draftEnd, draftStart];
+    onRangeChange(first, second);
+    setIsOpen(false);
+  };
+  const draftValid = draftStart !== undefined && draftEnd !== undefined;
+
+  const formatDate = (date: Date | undefined) => {
+    if (!date) return "";
+    return date.toLocaleDateString(language === "te" ? "te-IN" : "en-IN", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    });
+  };
+
+  const handleStartChange = (dateStr: string) => {
+    setDraftStart(parseInputDateString(dateStr));
+  };
+
+  const handleEndChange = (dateStr: string) => {
+    setDraftEnd(parseInputDateString(dateStr));
+  };
+
+  const startDateStr = toInputDateString(draftStart);
+  const endDateStr = toInputDateString(draftEnd);
+
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        containerRef.current &&
+        !containerRef.current.contains(event.target as Node)
+      ) {
+        setIsOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  const toggleCalendar = () => {
+    if (!isOpen) stageDraft();
+    setIsOpen(!isOpen);
+  };
+
+  const dropdownPositionClass =
+    placement === "top"
+      ? "bottom-[calc(100%+8px)] mb-1"
+      : "top-[calc(100%+8px)] mt-1";
+
+  // ── Quick-range presets (segmented toggle) ────────────────────────────────
+  // Each preset owns a distinct colour: the sliding thumb, hover tint, live
+  // caption, trigger chip and Done button all take that colour when active.
+  type PresetTheme = {
+    from: string;
+    to: string;
+    soft: string;
+    text: string;
+    ring: string;
+    hoverText: string;
+    hoverIcon: string;
+    hoverBg: string;
+  };
+  const FALLBACK_THEME: PresetTheme = {
+    from: "#10b981",
+    to: "#059669",
+    soft: "#ecfdf5",
+    text: "#047857",
+    ring: "#a7f3d0",
+    hoverText: "hover:text-emerald-700",
+    hoverIcon: "group-hover/opt:text-emerald-600",
+    hoverBg: "hover:bg-emerald-100/70",
+  };
+  const RANGE_PRESETS: ReadonlyArray<{
+    key: string;
+    label: string;
+    /** i18n key — the full-sentence name shown under the chips. */
+    wordKey: string;
+    Icon: typeof CalendarDays;
+    start: () => Date;
+    end: () => Date;
+    theme: PresetTheme;
+  }> = [
+    {
+      key: "7d",
+      label: "7D",
+      wordKey: "ops.dashboard.preset_7d",
+      Icon: CalendarDays,
+      start: () => addDays(rangeAnchor, -6),
+      end: () => rangeAnchor,
+      theme: FALLBACK_THEME,
+    },
+    {
+      key: "15d",
+      label: "15D",
+      wordKey: "ops.dashboard.preset_15d",
+      Icon: CalendarClock,
+      start: () => addDays(rangeAnchor, -14),
+      end: () => rangeAnchor,
+      theme: {
+        from: "#0ea5e9",
+        to: "#0284c7",
+        soft: "#f0f9ff",
+        text: "#0369a1",
+        ring: "#bae6fd",
+        hoverText: "hover:text-sky-700",
+        hoverIcon: "group-hover/opt:text-sky-600",
+        hoverBg: "hover:bg-sky-100/70",
+      },
+    },
+    {
+      key: "1m",
+      label: "1M",
+      wordKey: "ops.dashboard.preset_1m",
+      Icon: CalendarRange,
+      start: () => addDays(subMonths(rangeAnchor, 1), 1),
+      end: () => rangeAnchor,
+      theme: {
+        from: "#8b5cf6",
+        to: "#7c3aed",
+        soft: "#f5f3ff",
+        text: "#6d28d9",
+        ring: "#ddd6fe",
+        hoverText: "hover:text-violet-700",
+        hoverIcon: "group-hover/opt:text-violet-600",
+        hoverBg: "hover:bg-violet-100/70",
+      },
+    },
+    {
+      key: "qtr",
+      label: "QTR",
+      wordKey: "ops.dashboard.preset_qtr",
+      Icon: Layers,
+      // Do not recreate a quarter from the browser clock. The sample API is
+      // authoritative — its manifest can be pinned and its window may not be
+      // a fixed 92 days in a future fixture.
+      start: () =>
+        parseInputDateString(sampleQuarter?.fromDate ?? "") ??
+        addDays(rangeAnchor, -91),
+      end: () =>
+        parseInputDateString(sampleQuarter?.toDate ?? "") ?? rangeAnchor,
+      theme: {
+        from: "#f59e0b",
+        to: "#d97706",
+        soft: "#fffbeb",
+        text: "#b45309",
+        ring: "#fde68a",
+        hoverText: "hover:text-amber-700",
+        hoverIcon: "group-hover/opt:text-amber-600",
+        hoverBg: "hover:bg-amber-100/70",
+      },
+    },
+  ];
+
+  /* A preset counts as "matching" only when BOTH draft dates land exactly on
+     it — the trigger chip reflects the committed range, the popover the
+     pending draft, and both are computed with one helper. */
+  const presetMatching = (from: Date | undefined, to: Date | undefined) => {
+    if (!from || !to) return undefined;
+    const toKey = toInputDateString(to);
+    return RANGE_PRESETS.find(
+      (preset) =>
+        toInputDateString(preset.start()) === toInputDateString(from) &&
+        toInputDateString(preset.end()) === toKey,
+    );
+  };
+
+  const activePreset = presetMatching(startDate, endDate);
+  const draftPreset = presetMatching(draftStart, draftEnd);
+
+  /* Quick-range chips stage into the draft — the dashboard only changes when
+     the reader presses Done. */
+  const applyPreset = (preset: (typeof RANGE_PRESETS)[number]) => {
+    setDraftStart(preset.start());
+    setDraftEnd(preset.end());
+  };
+
+  const activePresetIndex = RANGE_PRESETS.findIndex(
+    (p) => p.key === activePreset?.key,
+  );
+  const themed = activePresetIndex >= 0;
+  const activeTheme = themed ? activePreset!.theme : FALLBACK_THEME;
+
+  const draftPresetIndex = RANGE_PRESETS.findIndex(
+    (p) => p.key === draftPreset?.key,
+  );
+  const draftThemed = draftPresetIndex >= 0;
+  const draftTheme = draftThemed ? draftPreset!.theme : FALLBACK_THEME;
+  const draftWord = draftThemed
+    ? t(draftPreset!.wordKey)
+    : t("ops.dashboard.custom_range");
+
+  const slateCalendarIcon = <Calendar size={15} className="text-emerald-600" />;
+
+  const rangeLabel =
+    startDate && endDate
+      ? `${formatDate(startDate)} – ${formatDate(endDate)}`
+      : null;
+  const rangeDays =
+    startDate && endDate
+      ? Math.round((endDate.getTime() - startDate.getTime()) / 86_400_000) + 1
+      : null;
+  const draftLabel =
+    draftStart && draftEnd
+      ? `${formatDate(draftStart)} – ${formatDate(draftEnd)}`
+      : null;
+
+  return (
+    <div className={`relative ${className}`} ref={containerRef}>
+      <button
+        type="button"
+        onClick={toggleCalendar}
+        aria-label={t("ops.dashboard.select_date_range")}
+        aria-expanded={isOpen}
+        className={`group flex h-11 items-center gap-2.5 rounded-xl border bg-white py-1.5 pl-1.5 pr-2.5 shadow-sm transition-all duration-150 active:scale-[0.98] focus:outline-none focus:ring-4 focus:ring-emerald-500/10 ${
+          isOpen
+            ? "border-emerald-400 ring-2 ring-emerald-500/15"
+            : "border-slate-200 hover:border-emerald-300 hover:shadow-md"
+        }`}
+      >
+        <span
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all duration-200 group-hover:scale-105"
+          style={{
+            backgroundColor: activeTheme.soft,
+            color: activeTheme.text,
+            boxShadow: `inset 0 0 0 1px ${activeTheme.ring}`,
+          }}
+        >
+          <CalendarRange size={16} strokeWidth={2.2} />
+        </span>
+        <span className="flex flex-col items-start leading-none">
+          <span className="text-[9.5px] font-bold uppercase tracking-[0.08em] text-slate-400">
+            {t("ops.dashboard.select_range")}
+          </span>
+          <span className="mt-1 whitespace-nowrap text-[12.5px] font-bold tabular-nums text-slate-700">
+            {rangeLabel ?? "—"}
+          </span>
+        </span>
+        {rangeDays != null && (
+          <span
+            className="ml-0.5 rounded-full px-2 py-0.5 text-[10px] font-extrabold tabular-nums ring-1 ring-inset transition-colors duration-200"
+            style={{
+              backgroundColor: activeTheme.soft,
+              color: activeTheme.text,
+              boxShadow: `inset 0 0 0 1px ${activeTheme.ring}`,
+            }}
+          >
+            {themed ? activePreset!.label : `${rangeDays}d`}
+          </span>
+        )}
+        <ChevronDown
+          size={15}
+          className={`shrink-0 text-slate-400 transition-transform duration-200 ${isOpen ? "rotate-180 text-emerald-600" : "group-hover:text-emerald-600"}`}
+        />
+      </button>
+
+      {isOpen && (
+        <div
+          className={`absolute right-0 z-50 w-[min(24rem,calc(100vw-2rem))] animate-scale-in rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-xl shadow-slate-900/10 backdrop-blur-xl ring-1 ring-emerald-500/10 ${dropdownPositionClass}`}
+        >
+          <div className="space-y-4">
+            {/* Quick-range segmented toggle with a sliding indicator */}
+            <div>
+              <span className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                {t("ops.dashboard.quick_date_range")}
+              </span>
+              <div
+                role="tablist"
+                aria-label={t("ops.dashboard.quick_date_range")}
+                className="relative grid grid-cols-4 gap-1 rounded-xl bg-slate-100 p-1 transition-colors duration-200"
+                style={
+                  draftThemed ? { backgroundColor: draftTheme.soft } : undefined
+                }
+              >
+                {/* Sliding colour thumb (cell width + gap accounted for); its
+                    gradient swaps to the active preset's colour as it slides. */}
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-y-1 left-1 w-[calc((100%-1.25rem)/4)] rounded-lg ring-1 ring-inset ring-white/25 transition-[transform,opacity] duration-200 ease-[cubic-bezier(0.22,1,0.36,1)] motion-reduce:transition-none"
+                  style={
+                    {
+                      ["--i" as string]: String(Math.max(draftPresetIndex, 0)),
+                      transform:
+                        "translateX(calc(var(--i) * (100% + 0.25rem)))",
+                      backgroundImage: `linear-gradient(to bottom right, ${draftTheme.from}, ${draftTheme.to})`,
+                      boxShadow: `0 2px 8px -2px ${draftTheme.from}99`,
+                      opacity: draftThemed ? 1 : 0,
+                    } as CSSProperties
+                  }
+                />
+                {RANGE_PRESETS.map((preset) => {
+                  const active = draftPreset?.key === preset.key;
+                  const PresetIcon = preset.Icon;
+                  return (
+                    <button
+                      key={preset.key}
+                      type="button"
+                      role="tab"
+                      title={t(preset.wordKey)}
+                      onClick={() => applyPreset(preset)}
+                      aria-pressed={active}
+                      aria-selected={active}
+                      className={`group/opt relative z-10 flex items-center justify-center gap-1 rounded-lg py-2 text-[12px] font-extrabold tracking-wide transition-colors duration-200 active:scale-95 motion-reduce:transition-none ${
+                        active
+                          ? "text-white"
+                          : `text-slate-500 ${preset.theme.hoverBg} ${preset.theme.hoverText}`
+                      }`}
+                    >
+                      <PresetIcon
+                        size={13}
+                        strokeWidth={2.4}
+                        className={
+                          active
+                            ? "text-white"
+                            : `text-slate-400 transition-colors ${preset.theme.hoverIcon}`
+                        }
+                      />
+                      {preset.label}
+                    </button>
+                  );
+                })}
+              </div>
+              {/* Live description of the PENDING draft — commit needs Done. */}
+              <p className="mt-2 flex items-center justify-center gap-1.5 text-[11.5px] font-semibold text-slate-500">
+                <span
+                  className="h-1.5 w-1.5 rounded-full transition-colors duration-200"
+                  style={{
+                    backgroundColor: draftThemed ? draftTheme.from : "#cbd5e1",
+                  }}
+                />
+                <span
+                  className="font-bold transition-colors duration-200"
+                  style={{ color: draftThemed ? draftTheme.text : "#475569" }}
+                >
+                  {draftWord}
+                </span>
+                {draftLabel && (
+                  <span className="tabular-nums text-slate-400">
+                    · {draftLabel}
+                  </span>
+                )}
+              </p>
+            </div>
+
+            {/* Custom dates */}
+            <div className="flex items-center gap-2">
+              <span className="h-px flex-1 bg-slate-100" />
+              <span className="text-[10px] font-bold uppercase tracking-[0.12em] text-slate-400">
+                {t("ops.dashboard.or_custom_dates")}
+              </span>
+              <span className="h-px flex-1 bg-slate-100" />
+            </div>
+
+            {/* Stacked full-width fields: the shared DatePicker reserves right
+                space for its clear/calendar icons, so two narrow columns clip
+                the DD/MM/YYYY value. */}
+            <div className="grid grid-cols-1 gap-3.5">
+              <div>
+                <label className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                  {t("ops.dashboard.start_date")}
+                </label>
+                <DatePicker
+                  value={startDateStr}
+                  onChange={handleStartChange}
+                  placeholder={t("common.from")}
+                  className="w-full text-sm"
+                  icon={slateCalendarIcon}
+                />
+              </div>
+              <div>
+                <label className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                  {t("ops.dashboard.end_date")}
+                </label>
+                <DatePicker
+                  value={endDateStr}
+                  onChange={handleEndChange}
+                  placeholder={t("common.to")}
+                  className="w-full text-sm"
+                  icon={slateCalendarIcon}
+                />
+              </div>
+            </div>
+
+            <div className="flex justify-end border-t border-slate-100 pt-3.5">
+              <button
+                type="button"
+                onClick={commitRange}
+                disabled={!draftValid}
+                title={t("ops.dashboard.done_title")}
+                aria-label={t("ops.dashboard.done")}
+                className="rounded-lg px-5 py-2 text-[13px] font-bold text-white shadow-sm transition-all duration-200 hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                style={{
+                  backgroundImage: `linear-gradient(to bottom right, ${draftTheme.from}, ${draftTheme.to})`,
+                  boxShadow: `0 2px 8px -2px ${draftTheme.from}80`,
+                }}
+              >
+                {t("ops.dashboard.done")}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** The three quick windows the chips offer. */
+type TrendPreset = "today" | "week" | "month";
+
+/** The window the Operational Trends card reads. `null` means "follow the
+ *  global calendar" — that is the default, and it is never remembered. */
+type TrendView = TrendPreset | null;
+
+/** Today is one day, a week is its complete Monday–Sunday calendar week, and
+ *  a month is month to date. These are the same windows the trip counters
+ *  count, so a chip's number matches the card total. */
+const windowForView = (
+  view: TrendPreset,
+  anchor = todayMidnight(),
+): { from: string; to: string } => {
+  const today = anchor;
+  const to = toInputDateString(today);
+  if (view === "today") return { from: to, to };
+  if (view === "week") return weekRange(today);
+  return { from: toInputDateString(startOfMonth(today)), to };
+};
+
+/** A day-by-day reading for today and a week, a week-by-week one for a month. */
+const GRANULARITY_BY_VIEW: Record<TrendPreset, Granularity> = {
+  today: "daily",
+  week: "daily",
+  month: "weekly",
+};
+
+/** "6 Sep – 12 Sep 2026", or a single day when the window is one day. */
+const windowLabel = (from: string, to: string, locale = "en-IN"): string => {
+  if (!from || !to) return "";
+  if (from === to) return formatDashboardDate(from, locale);
+  const start = formatDashboardDate(from, locale);
+  const end = formatDashboardDate(to, locale);
+  return from.slice(0, 4) === to.slice(0, 4)
+    ? `${start.replace(/\s*\d{4}$/, "")} – ${end}`
+    : `${start} – ${end}`;
+};
+
+/** One soft accent per chip — today reads sky, week violet, month teal. */
+const VIEW_ACCENT: Record<
+  TrendPreset,
+  { active: string; icon: typeof CalendarDays }
+> = {
+  today: { active: "bg-sky-50 text-sky-700 ring-sky-200", icon: CalendarDays },
+  week: {
+    active: "bg-violet-50 text-violet-700 ring-violet-200",
+    icon: CalendarRange,
+  },
+  month: { active: "bg-teal-50 text-teal-700 ring-teal-200", icon: Calendar },
+};
+
+/** The calendar's own range reads slate — it is the default, not a preset. */
+const CALENDAR_ACCENT = {
+  active: "bg-slate-100 text-slate-700 ring-slate-200",
+  icon: SlidersHorizontal,
+};
+
+/**
+ * Segmented switcher sitting in the card header. Each option carries its trip
+ * count, so the numbers people ask for first are also the control: pick one and
+ * the chart re-buckets the calendar's window by day, week or month.
+ */
+interface TrendViewOption {
+  /** `null` is the calendar's own range, offered whenever it is custom. */
+  key: TrendView;
+  label: string;
+  /** `null` when the option is a range rather than a counted window. */
+  count: number | null;
+}
+
+/**
+ * The card's range switcher — a proper segmented control: a rounded track, one
+ * solid accent per option, an icon that says which window it is, and the trip
+ * count set into the same pill.
+ */
+function TrendViewSwitcher({
+  views,
+  active,
+  onChange,
+  label,
+  calendarTitle,
+}: {
+  views: TrendViewOption[];
+  active: TrendView;
+  onChange: (next: TrendView) => void;
+  label: string;
+  calendarTitle: string;
+}) {
+  return (
+    <div
+      role="tablist"
+      aria-label={label}
+      className="inline-flex shrink-0 items-center gap-1 rounded-full border border-slate-200/80 bg-slate-50/70 p-1 shadow-sm"
+    >
+      {views.map((view) => {
+        const selected = view.key === active;
+        const accent = view.key ? VIEW_ACCENT[view.key] : CALENDAR_ACCENT;
+        const Icon = accent.icon;
+        return (
+          <button
+            key={view.label}
+            type="button"
+            role="tab"
+            aria-selected={selected}
+            /* Tapping the lit chip lets go of the window: back to the calendar. */
+            title={selected ? calendarTitle : undefined}
+            onClick={() => onChange(selected ? null : view.key)}
+            className={`group flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[11px] font-bold tracking-tight ring-1 ring-inset transition-all duration-200 active:scale-[0.97] ${
+              selected
+                ? `${accent.active} shadow-sm`
+                : "text-slate-500 ring-transparent hover:bg-white hover:text-slate-700"
+            }`}
+          >
+            <Icon
+              size={13}
+              strokeWidth={2.4}
+              className={
+                selected
+                  ? "opacity-70"
+                  : "text-slate-400 transition-colors group-hover:text-slate-500"
+              }
+            />
+            <span className="whitespace-nowrap">{view.label}</span>
+            {view.count == null ? null : (
+              <span
+                className={`rounded-full px-1.5 py-px text-[10.5px] font-black tabular-nums ${
+                  selected ? "bg-white/80" : "bg-slate-200/70 text-slate-600"
+                }`}
+              >
+                {view.count}
+              </span>
+            )}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function DashboardPage({ embedded = false }: { embedded?: boolean }) {
+  const { t, language: uiLanguage } = useI18n();
+  const trendLocale = uiLanguage === "te" ? "te-IN" : "en-IN";
+
+  const greetingHeader = (
+    <div className="min-w-0">
+      <h1 className="truncate text-lg font-black tracking-tight text-slate-900 sm:text-xl">
+        {FIXED_DASHBOARD_GREETING}
+      </h1>
+      <span
+        aria-hidden="true"
+        className="mt-1 block h-0.5 w-10 rounded-full bg-emerald-400"
+      />
+    </div>
+  );
+  const { showNotification } = useSafeNotification();
+  const [browserAnchor] = useState<Date>(() => todayMidnight());
+  const initialRange = getDefaultWeekRange(browserAnchor);
+  const [sampleQuarter, setSampleQuarter] = useState<SampleQuarter | null>(
+    null,
+  );
+  /**
+   * The quarter file's own per-page mapping (`moduleCounts`) — the numbers
+   * the Quarter Operations Map tiles show. `null` until the sample server
+   * has reported them; a missing count is shown as "—", never estimated.
+   */
+  const [sampleCounts, setSampleCounts] = useState<QuarterOperationsCounts | null>(null);
+  const [startDate, setStartDate] = useState<Date | undefined>(
+    initialRange.startDate,
+  );
+  const [endDate, setEndDate] = useState<Date | undefined>(
+    initialRange.endDate,
+  );
+  const rangeTouchedRef = useRef(false);
+  const [comparisonPeriod] = useState<"7d" | "15d" | "30d">("7d");
+
+  // The sample server owns its business date. Resolve it before the first
+  // request so a pinned fixture still opens on its containing Monday–Sunday
+  // week. The manifest keeps its exact endpoints for the QTR shortcut; it no
+  // longer overrides the dashboard's production default range. Holding the
+  // first request prevents a browser-clock warmup and a second repaint.
+  const [sampleResolved, setSampleResolved] = useState(false);
+  useEffect(() => {
+    let active = true;
+    // Never let a dead sample API block the overview: after 1.5 s the rolling
+    // browser window proceeds on its own.
+    const failsafe = window.setTimeout(() => {
+      if (active) setSampleResolved(true);
+    }, 1500);
+    void getQuarterSampleInfo()
+      .catch(() => null)
+      .then((info) => {
+        if (!active) return;
+        if (info) {
+          setSampleQuarter(info.quarter);
+          if (!rangeTouchedRef.current) {
+            // Default to the Monday–Sunday week containing the sample business
+            // date. QTR remains a separate, exact-manifest shortcut in the
+            // picker below.
+            const sampleToday = parseInputDateString(info.quarter.today);
+            if (sampleToday) {
+              const week = getDefaultWeekRange(sampleToday);
+              setStartDate(week.startDate);
+              setEndDate(week.endDate);
+            }
+          }
+        }
+        setSampleResolved(true);
+      });
+    return () => {
+      active = false;
+      window.clearTimeout(failsafe);
+    };
+  }, []);
+
+  // The Quarter Operations Map reads the quarter file's own per-page mapping
+  // (the `moduleCounts` block the sample server publishes), so its tiles can
+  // never drift from the registers they index. Fetched only once a quarter
+  // is known; a failed probe simply leaves the card unrendered.
+  useEffect(() => {
+    if (!sampleQuarter) return;
+    let active = true;
+    void getOperationsSampleCounts()
+      .catch(() => null)
+      .then((counts) => {
+        if (active && counts) setSampleCounts(counts);
+      });
+    return () => {
+      active = false;
+    };
+  }, [sampleQuarter]);
+
+  const { data, previousData, isLoading, error, refetch } = useDashboardData(
+    startDate ?? null,
+    endDate ?? null,
+    comparisonPeriod,
+    sampleResolved,
+  );
+
+  const dashboardQuarter = data?.sampleQuarter ?? sampleQuarter;
+  const parsedDashboardAnchor = dashboardQuarter?.today
+    ? parseInputDateString(dashboardQuarter.today)
+    : undefined;
+  const dashboardAnchor = parsedDashboardAnchor ?? browserAnchor;
+
+  const isRangeSelected = startDate !== undefined && endDate !== undefined;
+  const rangeDays = isRangeSelected
+    ? Math.ceil(
+        (endDate!.getTime() - startDate!.getTime()) / (1000 * 60 * 60 * 24),
+      ) + 1
+    : undefined;
+
+  /* Counters for the chips. They count the SAME completed trips the card can
+     weigh — a trip still in transit has no weights yet, so it cannot appear in
+     the chart and must not inflate the count beside it. One fetch of the
+     smallest window covering today, the week and the month supplies all three,
+     so every chip agrees with the totals underneath. */
+  const counterToday = toInputDateString(dashboardAnchor);
+  const counterWeekFrom = weekRange(dashboardAnchor).from;
+  const counterMonthFrom = toInputDateString(startOfMonth(dashboardAnchor));
+  const countersQuery = useOperationalTrends(
+    (counterWeekFrom < counterMonthFrom ? counterWeekFrom : counterMonthFrom) ||
+      undefined,
+    counterToday || undefined,
+    sampleResolved,
+  );
+
+  const trendCounts = useMemo(() => {
+    const rows = countersQuery.trends?.rows ?? [];
+    const day = (value: string) => String(value).slice(0, 10);
+    return {
+      today: rows.filter((row) => day(row.tripDate) === counterToday).length,
+      week: rows.filter((row) => day(row.tripDate) >= counterWeekFrom).length,
+      month: rows.filter((row) => day(row.tripDate) >= counterMonthFrom).length,
+    };
+  }, [countersQuery.trends, counterToday, counterWeekFrom, counterMonthFrom]);
+
+  // Trip counts ride along with the switcher, so the numbers and the control
+  // are the same thing.
+  const trendViews: TrendViewOption[] = [
+    {
+      key: "today",
+      label: t("ops.dashboard.trend.today"),
+      count: trendCounts.today,
+    },
+    {
+      key: "week",
+      label: t("ops.dashboard.trend.week"),
+      count: trendCounts.week,
+    },
+    {
+      key: "month",
+      label: t("ops.dashboard.trend.month"),
+      count: trendCounts.month,
+    },
+  ];
+
+  // The card reads the SAME calendar window as the KPI cards until a chip is
+  // tapped; then the whole card — bars and the totals underneath — moves to
+  // today, its Monday–Sunday week, or this calendar month. The choice is never
+  // remembered, so a reload or a hard refresh lands on the calendar's window.
+  const [trendView, setTrendView] = useState<TrendView>(null);
+  const calendarFrom = toInputDateString(startDate);
+  const calendarTo = toInputDateString(endDate);
+
+  // The dashboard's own selected window — shown under the Active Fleet
+  // heading, exactly like the Collection Recovery card's timing line, so the
+  // panel's span-scoped rosters can never be read as all-time numbers.
+  const fleetRangeLabel = windowLabel(calendarFrom, calendarTo, trendLocale);
+
+  const [paymentRegister, setPaymentRegister] =
+    useState<PaymentRegisterSummary | null>(null);
+  const [paymentRegisterLoading, setPaymentRegisterLoading] = useState(true);
+  const [paymentRegisterError, setPaymentRegisterError] = useState<
+    string | null
+  >(null);
+  const paymentRegisterRequestRef = useRef(0);
+
+  const loadPaymentRegister = useCallback(async () => {
+    if (!calendarFrom || !calendarTo) {
+      setPaymentRegister(null);
+      setPaymentRegisterLoading(false);
+      return;
+    }
+
+    const requestId = ++paymentRegisterRequestRef.current;
+    setPaymentRegisterLoading(true);
+    setPaymentRegisterError(null);
+    try {
+      const summary = await loadPaymentRegisterSummary(
+        calendarFrom,
+        calendarTo,
+      );
+      if (requestId !== paymentRegisterRequestRef.current) return;
+      setPaymentRegister(summary);
+    } catch (err) {
+      if (requestId !== paymentRegisterRequestRef.current) return;
+      setPaymentRegister(null);
+      setPaymentRegisterError(
+        err instanceof Error ? err.message : "Unable to load approved payments",
+      );
+    } finally {
+      if (requestId === paymentRegisterRequestRef.current) {
+        setPaymentRegisterLoading(false);
+      }
+    }
+  }, [calendarFrom, calendarTo]);
+
+  useEffect(() => {
+    // Same once-only guarantee as the KPI data: wait for the sample window so
+    // the register fetch never runs for the browser-clock warmup range.
+    if (!sampleResolved) return;
+    const timer = window.setTimeout(() => {
+      void loadPaymentRegister();
+    }, 0);
+    return () => window.clearTimeout(timer);
+  }, [loadPaymentRegister, sampleResolved]);
+
+  /* The KPI row never navigates — tiles show the window's totals and the equal
+     window before them, and that is all they do. */
+
+  const calendarKey = `${calendarFrom}:${calendarTo}`;
+  const [lastCalendarKey, setLastCalendarKey] = useState(calendarKey);
+  if (calendarKey !== lastCalendarKey) {
+    setLastCalendarKey(calendarKey);
+    setTrendView(null);
+  }
+
+  const trendWindow: { from: string; to: string } = trendView
+    ? windowForView(trendView, dashboardAnchor)
+    : { from: calendarFrom, to: calendarTo };
+
+  const trendsQuery = useOperationalTrends(
+    trendWindow.from || undefined,
+    trendWindow.to || undefined,
+    sampleResolved,
+  );
+  const defaultGranularity = granularityForRange(rangeDays);
+  const trendGranularity: Granularity = trendView
+    ? GRANULARITY_BY_VIEW[trendView]
+    : defaultGranularity;
+
+  // Light a preset only when the calendar exactly matches that preset.
+  // Any hand-picked span stays under Custom range, even if it happens to be
+  // 7 or 30 days, so the Trip & Weight Movement card always tells the truth.
+  const calendarMatchesPreset = (["today", "week", "month"] as const).find(
+    (view) => {
+      const preset = windowForView(view, dashboardAnchor);
+      return preset.from === calendarFrom && preset.to === calendarTo;
+    },
+  );
+  const activeTrendView: TrendView = trendView ?? calendarMatchesPreset ?? null;
+
+  // Keep Custom range visible at all times: it means "follow the dashboard
+  // calendar" and is the way back from Today / Week / Month.
+  const trendViewsWithCalendar: TrendViewOption[] = [
+    ...trendViews,
+    {
+      key: null,
+      label: t("ops.dashboard.trend.custom"),
+      /* While the card is reading the calendar, it already holds the count for
+         that exact custom span — no second request needed. */
+      count:
+        activeTrendView === null
+          ? (trendsQuery.trends?.totalTrips ?? null)
+          : null,
+    },
+  ];
+
+  const handleRangeChange = (s: Date | undefined, e: Date | undefined) => {
+    rangeTouchedRef.current = true;
+    setStartDate(s);
+    setEndDate(e);
+  };
+
+  // Manual "refresh everything" — dashboard KPIs/charts AND pending counters.
+  const [refreshing, setRefreshing] = useState(false);
+  const [dashboardAnimationKey, setDashboardAnimationKey] = useState(0);
+  const handleRefreshAll = async () => {
+    if (refreshing) return;
+    setRefreshing(true);
+    // Replay every visible chart immediately, even when the refreshed totals
+    // are unchanged and the API answers from cache with the same values.
+    setDashboardAnimationKey((key) => key + 1);
+    trendsQuery.refetch();
+    countersQuery.refetch();
+    try {
+      await Promise.all([
+        refetch(),
+        kickApprovalSnapshot(),
+        loadPaymentRegister(),
+      ]);
+      showNotification(
+        "Dashboard refreshed — pending counts and charts are up to date",
+        "success",
+        3200,
+      );
+    } catch {
+      showNotification("Could not refresh — please try again", "error", 3200);
+    } finally {
+      // Keep the spin visible briefly so the tap reads as an action.
+      window.setTimeout(() => setRefreshing(false), 450);
+    }
+  };
+
+  const rangePicker = (
+    <RangeDatePicker
+      startDate={startDate}
+      endDate={endDate}
+      anchorDate={dashboardAnchor}
+      sampleQuarter={dashboardQuarter}
+      onRangeChange={handleRangeChange}
+    />
+  );
+
+  const headerActions = (
+    <>
+      <button
+        type="button"
+        onClick={handleRefreshAll}
+        disabled={refreshing}
+        title={t("ops.dashboard.refresh_all")}
+        aria-label={t("ops.dashboard.refresh_all")}
+        className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-slate-200/80 bg-slate-50/70 text-slate-600 transition-all hover:border-emerald-500/50 hover:bg-slate-100/80 hover:text-emerald-600 focus:outline-none focus:ring-4 focus:ring-emerald-500/10 active:scale-[0.96] disabled:opacity-60"
+      >
+        <RefreshCw size={18} className={refreshing ? "animate-spin" : ""} />
+      </button>
+      {rangePicker}
+    </>
+  );
+
+  if (!isRangeSelected) {
+    return (
+      <div
+        className={`min-w-0 space-y-4 ${embedded ? "" : "p-4 sm:p-5 lg:p-6"}`}
+      >
+        {greetingHeader}
+        <PendingApprovalsPanel actions={headerActions} />
+        <div className="flex items-center justify-center h-96 bg-white rounded-2xl border border-slate-200/80 shadow-sm p-8">
+          <div className="text-center max-w-sm">
+            <div className="w-16 h-16 bg-blue-50 text-blue-600 rounded-2xl flex items-center justify-center text-2xl mx-auto mb-4 border border-blue-100 shadow-sm animate-bounce">
+              📅
+            </div>
+            <h3 className="text-lg font-black text-slate-800 tracking-tight">
+              {t("ops.dashboard.select_pipeline")}
+            </h3>
+            <p className="text-xs font-semibold text-slate-400 mt-2 leading-relaxed">
+              {t("ops.dashboard.select_pipeline_hint")}
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (isLoading) {
+    return (
+      <div
+        className={`min-w-0 space-y-5 ${embedded ? "" : "p-4 sm:p-5 lg:p-6"}`}
+      >
+        {greetingHeader}
+        <PendingApprovalsPanel actions={headerActions} />
+        <div className="w-full flex flex-col items-center justify-center py-24 space-y-4 bg-white rounded-2xl border border-slate-200/80 shadow-sm">
+          <div className="relative w-12 h-12">
+            <div className="absolute inset-0 rounded-full border-4 border-slate-100" />
+            <div className="absolute inset-0 rounded-full border-4 border-t-blue-600 animate-spin" />
+          </div>
+          <p className="text-xs font-black uppercase tracking-widest text-slate-400 animate-pulse">
+            {t("ops.dashboard.syncing")}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div
+        className={`min-w-0 space-y-4 ${embedded ? "" : "p-4 sm:p-5 lg:p-6"}`}
+      >
+        {greetingHeader}
+        <PendingApprovalsPanel actions={headerActions} />
+        <div className="flex flex-col items-center justify-center py-24 space-y-4 bg-white rounded-2xl border border-slate-200/80 shadow-sm px-6">
+          <p className="text-sm font-semibold text-red-700 text-center">
+            {error}
+          </p>
+          <button
+            type="button"
+            onClick={() => refetch()}
+            className="px-4 py-2 text-sm font-bold rounded-lg bg-blue-600 text-white hover:bg-blue-700 transition-colors"
+          >
+            {t("common.retry")}
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className={`min-w-0 space-y-5 ${embedded ? "" : "p-4 sm:p-5 lg:p-6"}`}>
+      {/* Pending-approval KPIs and date-range filter on one slim row. */}
+      {greetingHeader}
+      <PendingApprovalsPanel actions={headerActions} />
+
+      <div className="relative z-10">
+        {/* The stagger replays when a window commits or refresh is pressed —
+            one pure-CSS entrance, then the tiles sit perfectly still. */}
+        <KPICards
+          key={`kpi-${dashboardAnimationKey}-${calendarKey}`}
+          current={data}
+          previous={previousData}
+          rangeDays={rangeDays}
+        />
+      </div>
+
+      {/* The quarter file's own index of the sample quarter: one linked tile
+          per Operations register, each showing the exact number that register
+          renders. Against a real backend the quarter file resolves null and
+          this card does not exist. */}
+      <QuarterOperationsMap quarter={dashboardQuarter} counts={sampleCounts} />
+
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
+        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0 xl:min-h-[33.125rem]">
+          <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
+            <div className="min-w-0">
+              {/* The title is the way through to the detail page — no second link. */}
+              <Link
+                to="/operations?tab=mortality"
+                title={t("ops.dashboard.trend.view_mortality")}
+                className="group/title mt-0.5 flex items-center gap-1.5"
+              >
+                <h3 className="text-sm font-black text-slate-800 transition-colors group-hover/title:text-emerald-600">
+                  {t("ops.dashboard.trend.title")}
+                </h3>
+                <ArrowUpRight
+                  size={13}
+                  strokeWidth={2.6}
+                  className="text-slate-300 transition-all duration-150 group-hover/title:-translate-y-[1px] group-hover/title:translate-x-[1px] group-hover/title:text-emerald-600"
+                />
+              </Link>
+              <span
+                aria-hidden="true"
+                className="mt-1 block h-0.5 w-10 rounded-full bg-blue-500"
+              />
+              {/* Which window the card is totalling — it moves with the chips. */}
+              <p className="mt-1.5 text-[10.5px] font-semibold tabular-nums text-slate-400">
+                {windowLabel(trendWindow.from, trendWindow.to, trendLocale)}
+              </p>
+            </div>
+            <TrendViewSwitcher
+              views={trendViewsWithCalendar}
+              active={activeTrendView}
+              onChange={setTrendView}
+              label={t("ops.dashboard.trend.bucket_by")}
+              calendarTitle={t("ops.dashboard.trend.back_to_calendar")}
+            />
+          </div>
+          {/* minHeight: overflow-hidden zeroes a flex item's auto min-size, so
+              without this floor the grid row (sized by content) can collapse
+              and clip the whole chart — the inline value makes the floor
+              independent of the CSS class. */}
+          <div
+            className="flex w-full flex-1 flex-col overflow-hidden"
+            style={{ minHeight: "12.5rem" }}
+          >
+            <OperationalTrendsChart
+              trends={trendsQuery.trends}
+              granularity={trendGranularity}
+              loading={trendsQuery.loading}
+              error={trendsQuery.error}
+              onRetry={trendsQuery.refetch}
+              animationKey={dashboardAnimationKey}
+              fromDate={trendWindow.from}
+              toDate={trendWindow.to}
+            />
+          </div>
+        </div>
+
+        {/* No overflow-hidden on the card itself: the donut has a centered
+            chart stage and the shrink-0 KPI footer below it stays visible. */}
+        <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-5 w-full min-w-0 xl:min-h-[33.125rem]">
+          <div className="-mt-1 min-w-0">
+            <Link
+              to="/operations?tab=collection-report"
+              title={t("nav.collectionReport")}
+              className="group/title inline-flex min-w-0 items-center gap-1.5"
+            >
+              <h3 className="truncate text-sm font-black text-slate-800 transition-colors group-hover/title:text-emerald-600">
+                {t("ops.dashboard.collection_streams")}
+              </h3>
+              <ArrowUpRight
+                size={13}
+                strokeWidth={2.6}
+                className="shrink-0 text-slate-300 transition-all duration-150 group-hover/title:-translate-y-[1px] group-hover/title:translate-x-[1px] group-hover/title:text-emerald-600"
+              />
+            </Link>
+            <span
+              aria-hidden="true"
+              className="mt-1 block h-0.5 w-10 rounded-full bg-blue-500"
+            />
+            <p className="mt-1.5 truncate text-[10.5px] font-semibold tabular-nums text-slate-400">
+              {windowLabel(calendarFrom, calendarTo, trendLocale)}
+            </p>
+          </div>
+          <CollectionsPie
+            data={data.collectionsByMode || []}
+            animationKey={dashboardAnimationKey}
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 items-stretch gap-6 lg:grid-cols-12">
+        <div className="min-w-0 lg:col-span-6">
+          <CollectionPerformanceChart
+            data={data.collectionPerformanceByShop}
+            totalSales={data.totalSalesAmount}
+            totalCollections={data.totalCollections}
+            totalPending={data.pendingCollections}
+            fromDate={calendarFrom}
+            toDate={calendarTo}
+            animationKey={dashboardAnimationKey}
+          />
+        </div>
+
+        <div className="min-w-0 lg:col-span-6">
+          <PaymentRegisterChart
+            summary={paymentRegister}
+            loading={paymentRegisterLoading}
+            error={paymentRegisterError}
+            animationKey={dashboardAnimationKey}
+          />
+        </div>
+      </div>
+
+      <div className="bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm w-full min-w-0">
+        <div className="mb-4">
+          {/* Only the Active Fleet heading — underline + the selected span,
+              in the same treatment the Collection Recovery card uses. */}
+          <h3 className="text-sm font-black text-slate-800">
+            {t("ops.dashboard.active_fleet")}
+          </h3>
+          <span
+            aria-hidden="true"
+            className="mt-1.5 block h-0.5 w-10 rounded-full bg-emerald-400"
+          />
+          {fleetRangeLabel && (
+            <p className="mt-1.5 text-[10.5px] font-semibold tabular-nums text-slate-400">
+              {fleetRangeLabel}
+            </p>
+          )}
+        </div>
+        {/* Span-scoped rosters: only the vehicles and crew that ran a trip
+            inside the selected window count on these tiles, and each tile's
+            tooltip names exactly who they are. When the trip list could not
+            be read, fall back to the dashboard API's own in-window counters
+            so the panel never blanks. */}
+        <ActiveCounts
+          rosters={
+            data?.spanFleet ?? {
+              vehicles: {
+                worked: data?.usedVehicles ?? 0,
+                activeTotal: data?.activeVehicles ?? 0,
+                items: [],
+                overflow: 0,
+                idle: [],
+                idleOverflow: 0,
+              },
+              drivers: {
+                worked: data?.usedDrivers ?? 0,
+                activeTotal: data?.activeDrivers ?? 0,
+                items: [],
+                overflow: 0,
+                idle: [],
+                idleOverflow: 0,
+              },
+              supervisors: {
+                worked: 0,
+                activeTotal: 0,
+                items: [],
+                overflow: 0,
+                idle: [],
+                idleOverflow: 0,
+              },
+              helpers: {
+                worked: data?.usedHelpers ?? 0,
+                activeTotal: data?.activeHelpers ?? 0,
+                items: [],
+                overflow: 0,
+                idle: [],
+                idleOverflow: 0,
+              },
+              loaders: {
+                worked: 0,
+                activeTotal: 0,
+                items: [],
+                overflow: 0,
+                idle: [],
+                idleOverflow: 0,
+              },
+              tripCount: 0,
+            }
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
+export default DashboardPage;

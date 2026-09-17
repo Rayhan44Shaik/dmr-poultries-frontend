@@ -21,16 +21,15 @@
 // Both calendars follow the page language, so a Telugu page gets a Telugu calendar.
 // Sort BY applies immediately (it is a view control, not a data filter).
 
-import { ArrowUpDown, Calendar, RotateCcw, Search, UserCog, Warehouse, X } from "lucide-react";
+import { ArrowUpDown, Calendar, Search, UserCog, Warehouse, X } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import {
   opsFilterCardClass,
   opsFilterLabelClass,
   opsInputClass,
   opsPrimaryButtonClass,
-  opsSecondaryButtonClass,
 } from "../../../../shared/ui/operationsStyles";
-import { BrandRefreshButton } from "../../../../ui";
+import { BrandRefreshButton, FilterResetButton, countActiveFilters } from "../../../../ui";
 import MasterDropdown, {
   type MasterDropdownOption,
 } from "../../../masters/components/MasterDropdown";
@@ -304,17 +303,16 @@ export default function LossFilters({
               </span>
             )}
           </button>
-          <button
-            type="button"
+          <FilterResetButton
+            count={countActiveFilters(
+              appliedFilters.search.trim() !== "",
+              appliedFilters.sourceFarm !== "",
+              appliedFilters.supervisor !== "",
+              appliedFilters.fromDate !== "" || appliedFilters.toDate !== "",
+              !(sort.key === "tripDate" && sort.dir === "desc"),
+            )}
             onClick={onReset}
-            className={`group relative ${opsSecondaryButtonClass}`}
-            aria-label={t("common.reset")}
-          >
-            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]">
-              <RotateCcw size={14} />
-            </span>
-            {t("common.reset")}
-          </button>
+          />
           <BrandRefreshButton onClick={onRefresh} loading={refreshing} />
         </div>
       </div>

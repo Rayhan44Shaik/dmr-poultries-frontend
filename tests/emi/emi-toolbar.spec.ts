@@ -126,7 +126,7 @@ test('status selection, search and Clear filter locally and preserve vehicle-lev
   await expect(rows(page)).toHaveCount(9);
   await toolbar(page).getByRole('textbox', { name: 'Search', exact: true }).fill('NO MATCH');
   await expect(page.getByText('No vehicles match the selected filters')).toBeVisible();
-  await toolbar(page).getByRole('button', { name: 'Reset', exact: true }).click();
+  await toolbar(page).getByRole('button', { name: /^Reset/ }).click();
   await expect(rows(page)).toHaveCount(10);
   await expect(control(page)).toHaveText('All statuses');
   await expect(page.getByRole('button', { name: 'Previous page', exact: true })).toBeDisabled();

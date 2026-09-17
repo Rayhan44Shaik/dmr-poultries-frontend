@@ -26,22 +26,38 @@ function ShopForm({ shop, onSave, onCancel, isSaving = false }: ShopFormProps) {
   const { t } = useI18n();
   const formId = useId();
   const fieldId = (text: string) => `${formId}-${text.replace(/\s+/g, "-")}`;
-  const [shopNumber, setShopNumber] = useState(shop?.shopNumber || (shop ? String(shop.shopNo).padStart(6, "0") : ""));
+  const [shopNumber, setShopNumber] = useState(
+    shop?.shopNumber || (shop ? String(shop.shopNo).padStart(6, "0") : ""),
+  );
   const [shopName, setShopName] = useState(shop?.shopName ?? "");
   const [ownerName, setOwnerName] = useState(shop?.ownerName ?? "");
   const [phoneNumber, setPhoneNumber] = useState(shop?.phoneNumber ?? "");
-  const [secondaryPhoneNumber, setSecondaryPhoneNumber] = useState(shop?.secondaryPhoneNumber ?? "");
+  const [secondaryPhoneNumber, setSecondaryPhoneNumber] = useState(
+    shop?.secondaryPhoneNumber ?? "",
+  );
   const [email, setEmail] = useState(shop?.email ?? "");
   const [city, setCity] = useState(shop?.city ?? "");
   const [address, setAddress] = useState(shop?.address ?? "");
-  const [latitude, setLatitude] = useState(shop?.latitude !== undefined ? String(shop.latitude) : "");
-  const [longitude, setLongitude] = useState(shop?.longitude !== undefined ? String(shop.longitude) : "");
-  const [paperRate, setPaperRate] = useState(shop?.paperRate !== undefined ? String(shop.paperRate) : "1");
-  const [associationType, setAssociationType] = useState(shop?.associationType ?? "");
-  const [openingBalance, setOpeningBalance] = useState(shop?.openingBalance !== undefined ? String(shop.openingBalance) : "0");
+  const [latitude, setLatitude] = useState(
+    shop?.latitude !== undefined ? String(shop.latitude) : "",
+  );
+  const [longitude, setLongitude] = useState(
+    shop?.longitude !== undefined ? String(shop.longitude) : "",
+  );
+  const [paperRate, setPaperRate] = useState(
+    shop?.paperRate !== undefined ? String(shop.paperRate) : "1",
+  );
+  const [associationType, setAssociationType] = useState(
+    shop?.associationType ?? "",
+  );
+  const [openingBalance, setOpeningBalance] = useState(
+    shop?.openingBalance !== undefined ? String(shop.openingBalance) : "0",
+  );
   const [isBalanceFocused, setIsBalanceFocused] = useState(false);
   const balanceInputRef = useRef<HTMLInputElement>(null);
-  const [status, setStatus] = useState<"Active" | "Inactive">(shop?.status ?? "Active");
+  const [status, setStatus] = useState<"Active" | "Inactive">(
+    shop?.status ?? "Active",
+  );
 
   const [errors, setErrors] = useState({
     shopNumber: "",

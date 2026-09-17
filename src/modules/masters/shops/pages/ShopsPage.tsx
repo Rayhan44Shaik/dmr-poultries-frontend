@@ -1,8 +1,6 @@
-import MasterListToolbar from "../../components/MasterListToolbar";
-import MasterListSummary from "../../components/MasterListSummary";
-import MasterPagination from "../../components/MasterPagination";
 import "../../styles/masters.css";
 import MasterDropdown from "../../components/MasterDropdown";
+import { MapPin, Store } from "lucide-react";
 // D:\Development\DMR-Poultries-ERP\frontend\dmr-poultries-web\src\modules\masters\shops\pages\ShopsPage.tsx
 
 import React, { useState, useMemo } from "react";
@@ -16,12 +14,17 @@ import { exportToExcel } from "../../../../utils/exportUtils";
 import { logAuditEvent } from "../../../../utils/securityUtils";
 import { handleApiError } from "../services/shopService";
 import type { Shop } from "../types/shop";
-import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import BulkImportDialog from "../../components/bulk-import/BulkImportDialog";
 import { buildShopBulkImportConfig } from "../bulkImportConfig";
 import { useI18n } from "../../../../i18n";
+import { countActiveFilters } from "../../../../ui";
+import {
+  MasterDirectoryFilters,
+  MasterDirectoryField,
+  MasterDirectoryCard,
+} from "../../components/MasterDirectory";
 
 type ShopsPageProps = { embedded?: boolean };
 
@@ -49,8 +52,18 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     addShop,
     addShopsBulk,
     editShop,
-    total, page: serverPage, exportRows, facets,
-  } = useShops({ page: currentPage, pageSize: pageSize, search, status: statusFilter, sort: sortOrder, city: cityFilter });
+    total,
+    page: serverPage,
+    exportRows,
+    facets,
+  } = useShops({
+    page: currentPage,
+    pageSize: pageSize,
+    search,
+    status: statusFilter,
+    sort: sortOrder,
+    city: cityFilter,
+  });
 
   const shopBulkImportConfig = useMemo(
     () => buildShopBulkImportConfig({ addShopsBulk, reload }),
@@ -72,6 +85,8 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
   const handleResetFilters = () => {
     setSearch("");
     setCityFilter("");
+    setStatusFilter("");
+    setSortOrder("number");
     setCurrentPage(1);
   };
 
@@ -86,7 +101,6 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
   // to a single option (first spelling seen wins for display).
   const cityOptions = facets.city ?? [];
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const safePage = serverPage;
   const paginatedShops = shops;
   const pageStartIndex = (safePage - 1) * pageSize;
@@ -95,166 +109,170 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     try {
       const filteredShops = await exportRows();
 
-    if (filteredShops.length === 0) {
-      showNotification(t("masters.shops.toast.no_data_export"), "error");
-      return;
+      if (filteredShops.length === 0) {
+        showNotification(t("masters.shops.toast.no_data_export"), "error");
+        return;
+      }
+
+      const doc = new jsPDF("l", "mm", "a4");
+      const pageWidth = doc.internal.pageSize.getWidth();
+      const margin = 14;
+      const usableWidth = pageWidth - margin * 2;
+
+      // Nine columns: S.No, shop, owner, mobile, city, association, paper rate,
+      // opening balance, current balance.
+      const relativeWeights = [
+        0.05, 0.19, 0.14, 0.12, 0.1, 0.11, 0.08, 0.1, 0.11,
+      ];
+      const columnStylesConfig: {
+        [key: number]: {
+          cellWidth: number;
+          halign?: "center" | "left" | "right";
+        };
+      } = {};
+
+      const headers = [
+        t("masters.shops.table.s_no"),
+        t("masters.shops.table.shop_name"),
+        t("masters.shops.table.owner"),
+        t("masters.shops.table.mobile_no"),
+        t("masters.shops.table.city"),
+        t("masters.shops.table.association_type"),
+        t("masters.shops.table.paper_rate"),
+        t("masters.shops.table.opening_balance"),
+        t("masters.shops.table.current_balance"),
+      ];
+      headers.forEach((_, index) => {
+        const computedWidth = usableWidth * relativeWeights[index];
+        const isCentered = index === 0 || index === 6;
+        columnStylesConfig[index] = {
+          cellWidth: computedWidth,
+          halign: isCentered ? "center" : "left",
+        };
+      });
+
+      doc.setFontSize(16);
+      doc.setTextColor(30, 41, 59);
+      doc.text(
+        t("masters.shops.title") + " - " + t("common.master_list"),
+        margin,
+        15,
+      );
+
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139);
+      doc.text(
+        `${t("common.generated_on")}: ${new Date().toLocaleDateString()}`,
+        margin,
+        21,
+      );
+
+      const rows = filteredShops.map((shop, index) => [
+        (index + 1).toString(),
+        shop.shopName,
+        shop.ownerName,
+        shop.phoneNumber,
+        shop.city,
+        shop.associationType || "—",
+        shop.paperRate.toString(),
+        `₹${Number(shop.openingBalance || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+        `₹${Number(shop.currentBalance || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      ]);
+
+      autoTable(doc, {
+        startY: 26,
+        head: [headers],
+        body: rows,
+        theme: "grid",
+        tableWidth: usableWidth,
+        margin: { left: margin, right: margin, bottom: 18 },
+        styles: {
+          fontSize: 8.5,
+          cellPadding: 3.5,
+          valign: "middle",
+          overflow: "linebreak",
+        },
+        headStyles: {
+          fillColor: [37, 99, 235],
+          textColor: 255,
+          fontStyle: "bold",
+          halign: "center",
+        },
+        bodyStyles: {
+          textColor: [51, 65, 85],
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252],
+        },
+        columnStyles: columnStylesConfig,
+        didDrawPage: (data) => {
+          const pageCount = doc.getNumberOfPages();
+          doc.setFontSize(8);
+          doc.setTextColor(148, 163, 184);
+          doc.text(
+            `${t("common.confidential_report")} • ${t("common.page")} ${data.pageNumber} ${t("common.of")} ${pageCount}`,
+            margin,
+            doc.internal.pageSize.height - 10,
+          );
+        },
+      });
+
+      const filename = `${t("masters.shops.title")}_${new Date().toISOString().split("T")[0]}`;
+      doc.save(`${filename}.pdf`);
+      logAuditEvent("EXPORT_PDF", "Shops", undefined, {
+        count: filteredShops.length,
+      });
+      showNotification(t("masters.shops.toast.pdf_exported"), "success");
+    } catch (err) {
+      showNotification(handleApiError(err), "error");
     }
-
-    const doc = new jsPDF("l", "mm", "a4");
-    const pageWidth = doc.internal.pageSize.getWidth();
-    const margin = 14;
-    const usableWidth = pageWidth - margin * 2;
-
-    // Nine columns: S.No, shop, owner, mobile, city, association, paper rate,
-    // opening balance, current balance.
-    const relativeWeights = [0.05, 0.19, 0.14, 0.12, 0.1, 0.11, 0.08, 0.1, 0.11];
-    const columnStylesConfig: {
-      [key: number]: {
-        cellWidth: number;
-        halign?: "center" | "left" | "right";
-      };
-    } = {};
-
-    const headers = [
-      t("masters.shops.table.s_no"),
-      t("masters.shops.table.shop_name"),
-      t("masters.shops.table.owner"),
-      t("masters.shops.table.mobile_no"),
-      t("masters.shops.table.city"),
-      t("masters.shops.table.association_type"),
-      t("masters.shops.table.paper_rate"),
-      t("masters.shops.table.opening_balance"),
-      t("masters.shops.table.current_balance"),
-    ];
-    headers.forEach((_, index) => {
-      const computedWidth = usableWidth * relativeWeights[index];
-      const isCentered = index === 0 || index === 6;
-      columnStylesConfig[index] = {
-        cellWidth: computedWidth,
-        halign: isCentered ? "center" : "left",
-      };
-    });
-
-    doc.setFontSize(16);
-    doc.setTextColor(30, 41, 59);
-    doc.text(
-      t("masters.shops.title") + " - " + t("common.master_list"),
-      margin,
-      15,
-    );
-
-    doc.setFontSize(9);
-    doc.setTextColor(100, 116, 139);
-    doc.text(
-      `${t("common.generated_on")}: ${new Date().toLocaleDateString()}`,
-      margin,
-      21,
-    );
-
-    const rows = filteredShops.map((shop, index) => [
-      (index + 1).toString(),
-      shop.shopName,
-      shop.ownerName,
-      shop.phoneNumber,
-      shop.city,
-      shop.associationType || "—",
-      shop.paperRate.toString(),
-      `₹${Number(shop.openingBalance || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-      `₹${Number(shop.currentBalance || 0).toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
-    ]);
-
-    autoTable(doc, {
-      startY: 26,
-      head: [headers],
-      body: rows,
-      theme: "grid",
-      tableWidth: usableWidth,
-      margin: { left: margin, right: margin, bottom: 18 },
-      styles: {
-        fontSize: 8.5,
-        cellPadding: 3.5,
-        valign: "middle",
-        overflow: "linebreak",
-      },
-      headStyles: {
-        fillColor: [37, 99, 235],
-        textColor: 255,
-        fontStyle: "bold",
-        halign: "center",
-      },
-      bodyStyles: {
-        textColor: [51, 65, 85],
-      },
-      alternateRowStyles: {
-        fillColor: [248, 250, 252],
-      },
-      columnStyles: columnStylesConfig,
-      didDrawPage: (data) => {
-        const pageCount = doc.getNumberOfPages();
-        doc.setFontSize(8);
-        doc.setTextColor(148, 163, 184);
-        doc.text(
-          `${t("common.confidential_report")} • ${t("common.page")} ${data.pageNumber} ${t("common.of")} ${pageCount}`,
-          margin,
-          doc.internal.pageSize.height - 10,
-        );
-      },
-    });
-
-    const filename = `${t("masters.shops.title")}_${new Date().toISOString().split("T")[0]}`;
-    doc.save(`${filename}.pdf`);
-    logAuditEvent("EXPORT_PDF", "Shops", undefined, {
-      count: filteredShops.length,
-    });
-    showNotification(t("masters.shops.toast.pdf_exported"), "success");
-  
-    } catch (err) { showNotification(handleApiError(err), "error"); }
   };
 
   const handleExportExcel = async () => {
     try {
       const filteredShops = await exportRows();
 
-    if (filteredShops.length === 0) {
-      showNotification(t("masters.shops.toast.no_data_export"), "error");
-      return;
-    }
-    const headers = [
-      t("masters.shops.table.s_no"),
-      t("masters.shops.table.shop_name"),
-      t("masters.shops.table.owner"),
-      t("masters.shops.table.mobile_no"),
-      t("masters.shops.table.city"),
-      t("masters.shops.table.association_type"),
-      t("masters.shops.table.paper_rate"),
-      t("masters.shops.table.opening_balance"),
-      t("masters.shops.table.current_balance"),
-    ];
-    const rows = filteredShops.map((shop, index) => [
-      (index + 1).toString(),
-      shop.shopName,
-      shop.ownerName,
-      shop.phoneNumber,
-      shop.city,
-      shop.associationType || "—",
-      shop.paperRate.toString(),
-      Number(shop.openingBalance || 0),
-      Number(shop.currentBalance || 0),
-    ]);
-    const filename = `${t("masters.shops.title")}_${new Date().toISOString().split("T")[0]}`;
+      if (filteredShops.length === 0) {
+        showNotification(t("masters.shops.toast.no_data_export"), "error");
+        return;
+      }
+      const headers = [
+        t("masters.shops.table.s_no"),
+        t("masters.shops.table.shop_name"),
+        t("masters.shops.table.owner"),
+        t("masters.shops.table.mobile_no"),
+        t("masters.shops.table.city"),
+        t("masters.shops.table.association_type"),
+        t("masters.shops.table.paper_rate"),
+        t("masters.shops.table.opening_balance"),
+        t("masters.shops.table.current_balance"),
+      ];
+      const rows = filteredShops.map((shop, index) => [
+        (index + 1).toString(),
+        shop.shopName,
+        shop.ownerName,
+        shop.phoneNumber,
+        shop.city,
+        shop.associationType || "—",
+        shop.paperRate.toString(),
+        Number(shop.openingBalance || 0),
+        Number(shop.currentBalance || 0),
+      ]);
+      const filename = `${t("masters.shops.title")}_${new Date().toISOString().split("T")[0]}`;
 
-    exportToExcel(
-      `${t("masters.shops.title")} - ${t("common.master_list")}`,
-      headers,
-      rows,
-      filename,
-    );
-    logAuditEvent("EXPORT_EXCEL", "Shops", undefined, {
-      count: filteredShops.length,
-    });
-    showNotification(t("masters.shops.toast.excel_exported"), "success");
-  
-    } catch (err) { showNotification(handleApiError(err), "error"); }
+      exportToExcel(
+        `${t("masters.shops.title")} - ${t("common.master_list")}`,
+        headers,
+        rows,
+        filename,
+      );
+      logAuditEvent("EXPORT_EXCEL", "Shops", undefined, {
+        count: filteredShops.length,
+      });
+      showNotification(t("masters.shops.toast.excel_exported"), "success");
+    } catch (err) {
+      showNotification(handleApiError(err), "error");
+    }
   };
 
   const validateShop = (shop: Partial<Shop>): string | null => {
@@ -355,142 +373,96 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
     setShowDialog(true);
   };
 
+  const activeFilterCount = countActiveFilters(
+    search.trim() !== "",
+    cityFilter !== "",
+    statusFilter !== "",
+    sortOrder !== "number",
+  );
+  const hasRows = paginatedShops.length > 0;
+  const searchId = "shops-search";
+
   const content = (
-    <div className="master-page w-full min-w-0 space-y-3 font-sans text-slate-700">
-      {/* Main Container */}
-      <div className="w-full bg-white rounded-xl border border-slate-200/90 shadow-sm">
-        {/* Toolbar - Search on LEFT, Buttons on RIGHT in same line */}
-        <MasterListToolbar
-          onRefresh={() => { void reload().catch(() => {}); }}
-          status={statusFilter}
-          onStatusChange={(value) => { setStatusFilter(value); setCurrentPage(1); }}
-          sort={sortOrder}
-          onSortChange={(value) => { setSortOrder(value); setCurrentPage(1); }}
-          search={search}
-          onSearchChange={handleSearchChange}
-          searchPlaceholder={t("masters.shops.search_placeholder")}
-          addLabel={t("masters.shops.add_shop")}
-          onAdd={() => {
-            setEditingShop(null);
-            setShowDialog(true);
-          }}
-          onExportPDF={handleExportPDF}
-          onExportExcel={handleExportExcel}
-          loading={loading}
-          saving={saving}
-          onImport={() => setShowBulkImport(true)}
-        >
-          <MasterDropdown
+    <div className="master-page w-full min-w-0 space-y-4 font-sans text-slate-700">
+      <MasterDirectoryFilters
+        ariaLabel={t("masters.shops.outlets_directory")}
+        searchId={searchId}
+        search={search}
+        onSearchChange={handleSearchChange}
+        searchPlaceholder={t("masters.shops.search_placeholder")}
+        extraActive={cityFilter !== ""}
+        extraFilter={
+          <MasterDirectoryField
+            icon={MapPin}
             label={t("masters.shops.filter.city")}
-            value={cityFilter}
-            placeholder={t("masters.shops.filter.all_cities")}
-            options={cityOptions}
-            onChange={handleCityChange}
-            allowClear
-            searchable
-            disabled={loading}
-            className="w-full sm:w-56"
-          />
-          {(search !== "" || cityFilter !== "") && (
-            <button
-              type="button"
-              onClick={handleResetFilters}
-              disabled={loading}
-              className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-            >
-              {t("masters.shops.filter.reset")}
-            </button>
-          )}
-        </MasterListToolbar>
-
-        {/* Status Counter Bar */}
-        <MasterListSummary
-          title={t("masters.shops.outlets_directory")}
-          total={total}
-          shown={paginatedShops.length}
-          page={safePage}
-          totalPages={totalPages}
-          loading={loading}
-          saving={saving}
-        />
-
-        {error && !loading && (
-          <div className="mx-4 mt-3 px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between gap-3">
-            <span>{error}</span>
-            <button
-              type="button"
-              onClick={() => {
-                void reload().catch(() => undefined);
-              }}
-              className="shrink-0 text-xs font-semibold text-red-700 underline"
-            >
-              {t("masters.shops.error_retry")}
-            </button>
-          </div>
-        )}
-
-        {/* Table Content */}
-        <div className="p-0 relative min-h-[120px]">
-          {loading && shops.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-3">
-              <svg
-                className="animate-spin h-8 w-8 text-blue-600"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 0 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-              <p className="text-sm font-medium">
-                {t("masters.shops.loading")}
-              </p>
-            </div>
-          ) : !loading && shops.length === 0 && !error ? (
-            <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-2">
-              <p className="text-sm font-medium text-slate-700">
-                {t("masters.shops.no_shops_found")}
-              </p>
-              <p className="text-xs text-slate-500">
-                {t("masters.shops.add_first")}
-              </p>
-            </div>
-          ) : (
-            <ShopTable
-              shops={paginatedShops}
-              onEdit={handleEditShop}
-              startIndex={pageStartIndex}
-              emptyMessage={
-                search.trim() || cityFilter
-                  ? "No shops matching your search or city filter."
-                  : undefined
-              }
+          >
+            <MasterDropdown
+              label={t("masters.shops.filter.city")}
+              hideLabel
+              value={cityFilter}
+              placeholder={t("masters.shops.filter.all_cities")}
+              options={cityOptions}
+              onChange={handleCityChange}
+              allowClear
+              searchable
+              className="w-full"
             />
-          )}
-        </div>
+          </MasterDirectoryField>
+        }
+        status={statusFilter}
+        onStatusChange={(value) => {
+          setStatusFilter(value);
+          setCurrentPage(1);
+        }}
+        sort={sortOrder}
+        onSortChange={(value) => {
+          setSortOrder(value);
+          setCurrentPage(1);
+        }}
+        onReset={handleResetFilters}
+        onRefresh={() => {
+          void reload().catch(() => {});
+        }}
+        addLabel={t("masters.shops.add_shop")}
+        onAdd={() => {
+          setEditingShop(null);
+          setShowDialog(true);
+        }}
+        onImport={() => setShowBulkImport(true)}
+        onExportPDF={handleExportPDF}
+        onExportExcel={handleExportExcel}
+        hasRows={hasRows}
+        loading={loading}
+        saving={saving}
+      />
 
-        {shouldShowPagination(total) && (
-          <MasterPagination
-            page={safePage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-            disabled={loading}
-            pageSize={pageSize}
-            onPageSizeChange={handlePageSizeChange}
-          />
-        )}
-      </div>
+      <MasterDirectoryCard
+        icon={Store}
+        title={t("masters.shops.outlets_directory")}
+        total={total}
+        error={error}
+        loading={loading}
+        onRetry={() => {
+          void reload().catch(() => undefined);
+        }}
+        retryLabel={t("masters.shops.error_retry")}
+        page={safePage}
+        pageSize={pageSize}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={handlePageSizeChange}
+      >
+        <ShopTable
+          shops={paginatedShops}
+          onEdit={handleEditShop}
+          startIndex={pageStartIndex}
+          loading={loading}
+          emptyMessage={
+            activeFilterCount > 0
+              ? t("masters.shops.no_shops_found")
+              : t("masters.shops.add_first")
+          }
+        />
+      </MasterDirectoryCard>
 
       {/* Modal Dialog */}
       <ShopDialog

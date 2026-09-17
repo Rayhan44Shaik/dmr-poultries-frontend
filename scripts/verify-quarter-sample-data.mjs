@@ -100,10 +100,18 @@ async function run() {
   assert.equal(dashboard.quarter.code, manifest.quarter.code);
   assert.ok(dashboard.totalTrips > 600);
   assert.ok(dashboard.moduleCounts, "dashboard must expose the Operations quarter map");
+  // Trip List renders Completed vehicle trips only (filterTripListTrips), so
+  // its count is exactly the Trip List endpoint total; Draft / Pending /
+  // Deleted audit rows and ORD-* day containers sit outside that table.
+  const tripList = await request("/operations/trip-list?page=1&limit=1");
   assert.equal(
-    dashboard.moduleCounts.tripRecords + dashboard.moduleCounts.orders,
-    manifest.trips,
-    "Trip List rows + Order day containers must cover the trip manifest exactly",
+    dashboard.moduleCounts.tripRecords,
+    tripList.meta.total,
+    "Trip List module count must equal the Trip List endpoint total",
+  );
+  assert.ok(
+    dashboard.moduleCounts.tripRecords + dashboard.moduleCounts.orders <= manifest.trips,
+    "Trip List rows + Order day containers must fit inside the trip manifest",
   );
   assert.equal(dashboard.moduleCounts.shopSales, manifest.deliveries);
   assert.equal(dashboard.moduleCounts.collections, manifest.collections);

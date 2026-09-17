@@ -36,7 +36,8 @@
 //
 // Two invariants make the mapping exact rather than approximate, and both are
 // asserted live by `npm run check:operations-sync`:
-//   · tripRecords + orders === manifest.trips (containers are not trips)
+//   · tripRecords = Completed vehicle trips (what Trip List renders); ORD-*
+//     containers are never trips, so tripRecords + orders <= manifest.trips
 //   · every field equals that page's endpoint total for the same quarter window
 // -----------------------------------------------------------------------------
 

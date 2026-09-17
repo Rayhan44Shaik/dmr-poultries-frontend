@@ -7,17 +7,16 @@
 // (36px, 12px corners, emerald selection), with the `emi-status__control`
 // hook kept on its trigger for the E2E suite.
 
-import { memo, useEffect, useId, useMemo, useRef, useState } from 'react';
+import { memo, useId, useMemo } from 'react';
 import { cn } from '../../../../utils/cn';
-import { BadgeCheck, RotateCcw, Search, X } from 'lucide-react';
+import { BadgeCheck, Search, X } from 'lucide-react';
 import { translateStatus, useI18n } from '../../../../i18n';
 import {
   opsFilterCardClass,
   opsFilterLabelClass,
   opsInputClass,
-  opsSecondaryButtonClass,
 } from '../../../../shared/ui/operationsStyles';
-import { BrandRefreshButton } from '../../../../ui';
+import { BrandRefreshButton, FilterResetButton, countActiveFilters } from '../../../../ui';
 import MasterDropdown from '../../../masters/components/MasterDropdown';
 import '../../../masters/styles/masters.css';
 import type { EmiOverview } from '../../types';
@@ -47,19 +46,6 @@ function EmiFilterBar({
 }: EmiFilterBarProps) {
   const { t } = useI18n();
   const id = useId();
-  const hasFilters = search.trim() !== '' || status !== 'all';
-
-  /* Reset feedback: the glyph spins once per click (700 ms) — the same
-     motion contract as the Trip List / Farm Payments Reset. */
-  const [resetting, setResetting] = useState(false);
-  const spinTimer = useRef<number | null>(null);
-  const handleReset = () => {
-    setResetting(true);
-    if (spinTimer.current !== null) window.clearTimeout(spinTimer.current);
-    spinTimer.current = window.setTimeout(() => setResetting(false), 700);
-    onReset();
-  };
-  useEffect(() => () => { if (spinTimer.current !== null) window.clearTimeout(spinTimer.current); }, []);
 
   // "All statuses" is the empty value, so it renders as the placeholder and
   // as the dropdown's clear row — the Trip List filter convention.
@@ -129,26 +115,15 @@ function EmiFilterBar({
           />
         </div>
 
-        {/* Reset spins its glyph once per click, Refresh is the brand hen —
-            the exact action cluster the Trip List and Farm Payments carry. */}
+        {/* Reset (the app-wide FilterResetButton with its active-filter count
+            badge) and the brand hen Refresh — the exact action cluster the
+            Trip List and Farm Payments carry. */}
         <div className="lg:col-span-4 flex items-center gap-2 justify-end flex-wrap">
-          <button
-            type="button"
-            onClick={handleReset}
-            disabled={!hasFilters}
-            className={`group relative ${opsSecondaryButtonClass}`}
-            aria-label={t('common.reset')}
+          <FilterResetButton
+            count={countActiveFilters(search.trim() !== '', status !== 'all')}
+            onClick={onReset}
             title={t('fleet.emi.clear_filters')}
-          >
-            <span
-              className={`inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)] ${
-                resetting ? 'motion-safe:animate-[var(--animate-action-reset)]' : ''
-              }`}
-            >
-              <RotateCcw size={14} />
-            </span>
-            {t('common.reset')}
-          </button>
+          />
           <BrandRefreshButton
             loading={refreshing}
             disabled={loading}

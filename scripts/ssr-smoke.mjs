@@ -112,7 +112,7 @@ try {
 //    we assert the chunks load + their default export is a component.
 const routeChunks = [
   ["DashboardLayout", "/src/layouts/DashboardLayout/DashboardLayout.tsx"],
-  ["DashboardPage", "/src/modules/dashboard/DashboardPage.tsx"],
+  ["DashboardPage", "/src/modules/dashboard/pages/DashboardPage.tsx"],
   ["OperationsPages", "/src/modules/operations/pages/OperationsPages.tsx"],
   // Orders is its own module now — its workspace and the three pages it mounts
   // per route all have to evaluate on their own.
@@ -395,7 +395,17 @@ try {
     let farmDetail = "not-rendered";
     try {
       const { FarmPaymentTripViewModal } = await server.ssrLoadModule("/src/modules/accounts/components/farm-payment/FarmPaymentTripViewModal.tsx");
-      const detailHtml = withProvider(React.createElement(FarmPaymentTripViewModal, { open: true, trip: rows[0].trip, onClose: () => {} }));
+      // The view now rides the portalled AppShellModal shell — render it with
+      // the document removed (same trick as the viewer check above) so the
+      // portal falls back to inline content the SSR harness can capture.
+      const savedDoc = globalThis.document;
+      let detailHtml = "";
+      try {
+        delete globalThis.document;
+        detailHtml = withProvider(React.createElement(FarmPaymentTripViewModal, { open: true, trip: rows[0].trip, onClose: () => {} }));
+      } finally {
+        globalThis.document = savedDoc;
+      }
       farmDetail = `${detailHtml.length} chars · trip=${detailHtml.includes(rows[0].trip.tripNo)}`;
       checks.farmDetailRenders = detailHtml.length > 500;
     } catch (detailErr) {

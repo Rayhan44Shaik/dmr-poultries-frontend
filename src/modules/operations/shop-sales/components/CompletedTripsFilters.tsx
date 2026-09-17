@@ -1,5 +1,5 @@
 import React from "react";
-import { Search, FileText, FileSpreadsheet, Calendar, Truck, UserCog, RotateCcw } from "lucide-react";
+import { Search, FileText, FileSpreadsheet, Calendar, Truck, UserCog } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import { useI18n } from "../../../../i18n";
 import {
@@ -7,12 +7,11 @@ import {
   opsFilterLabelClass,
   opsInputClass,
   opsPrimaryButtonClass,
-  opsSecondaryButtonClass,
   opsPdfButtonClass,
   opsExcelButtonClass,
 } from "../../../../shared/ui/operationsStyles";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
-import { BrandRefreshButton } from "../../../../ui";
+import { BrandRefreshButton, FilterResetButton, countActiveFilters } from "../../../../ui";
 import MasterDropdown, { type MasterDropdownOption } from "../../../masters/components/MasterDropdown";
 import { displayRateEntryName } from "../utils/rateEntryDisplay";
 
@@ -180,10 +179,16 @@ function CompletedTripsFilters({
             <span className={`inline-flex ${uiActionIconMotionClass.search}`}><Search size={15} /></span>
             {t("common.search")}
           </button>
-          <button type="button" onClick={onReset} className={`group relative ${opsSecondaryButtonClass}`} aria-label={t("ops.rate.reset_tooltip")}>
-            <span className={`inline-flex ${uiActionIconMotionClass.reset}`}><RotateCcw size={14} /></span>
-            {t("common.reset")}
-          </button>
+          <FilterResetButton
+            count={countActiveFilters(
+              search.trim() !== "",
+              vehicle !== "" && vehicle !== "All Vehicles",
+              supervisor !== "" && supervisor !== "All Supervisors",
+              fromDate !== "" || toDate !== "",
+            )}
+            onClick={onReset}
+            title={t("ops.rate.reset_tooltip")}
+          />
           {onRefresh && (
             <BrandRefreshButton onClick={onRefresh} loading={refreshing} ariaLabel={t("common.refresh")}>
               {t("common.refresh")}

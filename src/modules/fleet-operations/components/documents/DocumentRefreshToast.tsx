@@ -1,6 +1,6 @@
-import { memo, useEffect, useRef } from 'react';
-import { useI18n } from '../../../../i18n';
-import { push } from '../../../../ui/notifications/notificationStore';
+import { memo, useEffect, useRef } from "react";
+import { useI18n } from "../../../../i18n";
+import { push } from "../../../../ui/notifications/notificationStore";
 
 interface DocumentRefreshToastProps {
   show: boolean;
@@ -30,7 +30,11 @@ const AUTO_CLOSE_MS = 5_000;
  * `onDismiss` is ref'd and kept out of the deps so an inline callback from the
  * parent cannot restart the timer on every render.
  */
-function DocumentRefreshToast({ show, eventId, onDismiss }: DocumentRefreshToastProps) {
+function DocumentRefreshToast({
+  show,
+  eventId,
+  onDismiss,
+}: DocumentRefreshToastProps) {
   const { t } = useI18n();
   const dismissRef = useRef(onDismiss);
   // Assigned in an effect, never during render: writing a ref while
@@ -43,7 +47,9 @@ function DocumentRefreshToast({ show, eventId, onDismiss }: DocumentRefreshToast
 
   useEffect(() => {
     if (!show) return;
-    push(t('notification.data_refreshed'), 'success', { duration: AUTO_CLOSE_MS });
+    push(t("notification.data_refreshed"), "success", {
+      duration: AUTO_CLOSE_MS,
+    });
     const timer = window.setTimeout(() => dismissRef.current(), AUTO_CLOSE_MS);
     return () => window.clearTimeout(timer);
   }, [show, eventId, t]);
