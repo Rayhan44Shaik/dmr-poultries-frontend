@@ -7,16 +7,6 @@ import type { CollectionReportSummary } from "../types/collection";
 import { useShops } from "../../../masters/shops/hooks/useShops";
 import { useEmployees } from "../../../masters/employees/hooks/useEmployees";
 import {
-  Tooltip as ChartTooltip,
-  Legend as ChartLegend,
-  ResponsiveContainer,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-} from "recharts";
-import {
   FileSpreadsheet,
   FileText,
   RotateCcw,
@@ -90,86 +80,18 @@ const MODE_DISPLAY: Record<string, string> = {
 };
 const modeDisplay = (mode: string) => MODE_DISPLAY[mode] ?? mode;
 
-const compactINR = (value: number) =>
-  new Intl.NumberFormat("en-IN", { notation: "compact", maximumFractionDigits: 1 }).format(value);
-
-// Stable, DOM-safe id fragment for a payment-mode name (used by SVG gradient ids).
-const slug = (name: string) =>
-  name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
-
 // yyyy-MM-dd → dd-MM-yyyy for the branded PDF (matches the other DMR reports).
 const formatPdfDate = (value: string): string => {
   const parts = (value ?? "").split("-");
   return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : value;
 };
 
-// ── Chart tooltip — polished card used by the stacked collector chart ──────
-// White rounded card, color-coded dots, ₹ amounts and each row's share of
-// the tooltip total, plus a total footer.
+// Row shape for the collector summary table (dynamic per-mode amount columns).
 type CollectorDisplayRow = {
   collector: string;
   total: number;
   [paymentMode: string]: string | number;
 };
-
-type ChartTipEntry = {
-  name?: string | number;
-  value?: string | number;
-  color?: string;
-  dataKey?: string | number;
-  payload?: { fill?: string };
-};
-
-function ChartTipBox({
-  active,
-  payload,
-  totalLabel,
-}: {
-  active?: boolean;
-  payload?: ChartTipEntry[];
-  totalLabel: string;
-}) {
-  if (!active || !payload || payload.length === 0) return null;
-  const rows = payload.filter((p) => Number(p.value ?? 0) > 0);
-  if (rows.length === 0) return null;
-  const total = rows.reduce((sum, p) => sum + Number(p.value ?? 0), 0);
-  const inr = (v: number) => `₹ ${v.toLocaleString("en-IN")}`;
-  const dotColor = (p: ChartTipEntry) => p.color ?? p.payload?.fill ?? "#94a3b8";
-  const title = rows.length === 1 ? String(rows[0].name ?? "") : "";
-  return (
-    <div className="min-w-[11rem] rounded-xl border border-slate-200 bg-white/95 px-3 py-2 shadow-xl backdrop-blur-sm">
-      {title ? (
-        <div className="mb-1.5 flex items-center gap-1.5 border-b border-slate-100 pb-1.5">
-          <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: dotColor(rows[0]) }} />
-          <span className="text-[11px] font-bold uppercase tracking-wide text-slate-600">{title}</span>
-        </div>
-      ) : null}
-      <div className="space-y-1">
-        {rows.map((p, idx) => {
-          const value = Number(p.value ?? 0);
-          const share = total > 0 ? (value / total) * 100 : 0;
-          return (
-            <div key={idx} className="flex items-center gap-2 text-[11px]">
-              <span className="h-2 w-2 shrink-0 rounded-full" style={{ background: dotColor(p) }} />
-              <span className="mr-auto font-medium text-slate-600">
-                {rows.length > 1 ? String(p.name ?? p.dataKey ?? "") : totalLabel}
-              </span>
-              <span className="font-bold tabular-nums text-slate-800">{inr(value)}</span>
-              <span className="w-9 text-right font-semibold tabular-nums text-slate-400">{share.toFixed(1)}%</span>
-            </div>
-          );
-        })}
-      </div>
-      {rows.length > 1 ? (
-        <div className="mt-1.5 flex items-center gap-2 border-t border-slate-100 pt-1.5 text-[11px]">
-          <span className="mr-auto font-bold uppercase tracking-wide text-slate-500">{totalLabel}</span>
-          <span className="font-extrabold tabular-nums text-slate-900">{inr(total)}</span>
-          <span className="w-9" />
-        </div>
-      ) : null}
-    </div>
-  );
-}
 
 const KNOWN_MODES = ["Cash", "Union Bank", "HDFC Bank"];
 
@@ -375,9 +297,21 @@ export default function CollectionReportPage({ embedded = false }: Props) {
   // per-collector totals rather than raw transaction rows.
   const collectorSummary = useMemo(() => {
     const source = report?.collectorSummary ?? [];
-    const paymentModes = Array.from(
-      new Set(source.flatMap((row) => Object.keys(row.amounts))),
-    ).sort();
+    // Column order MUST match the Payment Mode Summary table exactly so the
+    // Cash / Union Bank / HDFC Bank columns line up across both tables. Use the
+    // backend-authoritative payment-mode order first, then append any extra
+    // mode that only appears in the collector rows (kept stable, not sorted).
+    const authoritativeOrder = (report?.paymentModeSummary ?? []).map((r) => r.paymentMode);
+    const seen = new Set<string>();
+    const paymentModes: string[] = [];
+    const pushMode = (mode: string) => {
+      if (!seen.has(mode)) {
+        seen.add(mode);
+        paymentModes.push(mode);
+      }
+    };
+    authoritativeOrder.forEach(pushMode);
+    source.forEach((row) => Object.keys(row.amounts).forEach(pushMode));
 
     // Preserve every backend collector row in the on-screen table and exports.
     // Only the final Total row is presentation-only.
@@ -458,10 +392,6 @@ export default function CollectionReportPage({ embedded = false }: Props) {
         percentage: r.percentage,
       })),
     [report]
-  );
-  const collectorChartData = useMemo(
-    () => collectorSummary.rows.filter((row) => row.collector !== "Total"),
-    [collectorSummary]
   );
 
   const getExportFileName = useCallback((ext: "xlsx" | "pdf") => {
@@ -1131,71 +1061,6 @@ export default function CollectionReportPage({ embedded = false }: Props) {
                 })}
               </tbody>
             </table>
-          </div>
-
-          <div className="flex items-center gap-3 border-y border-slate-100 bg-gradient-to-r from-sky-50/60 via-white to-sky-50/40 px-6 py-3">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-sky-100 bg-sky-50/70 text-sky-500 shadow-inner">
-              <BarChart3 className="h-5 w-5" />
-            </div>
-            <h3 className="text-base font-bold tracking-tight text-slate-800">{t("ops.collection.collector_split")}</h3>
-            <span className="ml-auto text-[11px] font-semibold uppercase tracking-wider text-slate-400">
-              {t("ops.collection.collectors")}: {collectorChartData.length}
-            </span>
-          </div>
-          <div className="px-4 py-6" style={{ height: `${Math.max(240, collectorChartData.length * 38 + 60)}px` }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart
-                layout="vertical"
-                data={collectorChartData}
-                margin={{ top: 8, right: 24, left: 8, bottom: 0 }}
-                barCategoryGap="28%"
-              >
-                <defs>
-                  {collectorSummary.paymentModes.map((mode: string) => {
-                    const c = modeColor(mode);
-                    return (
-                      <linearGradient key={mode} id={`bar-grad-${slug(mode)}`} x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0%" stopColor={c} stopOpacity={0.72} />
-                        <stop offset="100%" stopColor={c} stopOpacity={0.98} />
-                      </linearGradient>
-                    );
-                  })}
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#eef2f7" horizontal={false} />
-                <XAxis
-                  type="number"
-                  tick={{ fontSize: 10, fill: "#64748b" }}
-                  tickLine={false}
-                  axisLine={{ stroke: "#e2e8f0" }}
-                  tickFormatter={(v: number) => compactINR(v)}
-                />
-                <YAxis
-                  type="category"
-                  dataKey="collector"
-                  tick={{ fontSize: 11, fill: "#475569" }}
-                  tickLine={false}
-                  axisLine={{ stroke: "#e2e8f0" }}
-                  width={112}
-                  interval={0}
-                />
-                <ChartTooltip
-                  cursor={{ fill: "rgba(148,163,184,0.08)" }}
-                  content={<ChartTipBox totalLabel={t("common.total")} />}
-                />
-                <ChartLegend iconType="circle" wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
-                {collectorSummary.paymentModes.map((mode: string, idx: number) => (
-                  <Bar
-                    key={mode}
-                    dataKey={mode}
-                    name={modeDisplay(mode)}
-                    stackId="amount"
-                    fill={`url(#bar-grad-${slug(mode)})`}
-                    maxBarSize={26}
-                    radius={idx === collectorSummary.paymentModes.length - 1 ? [0, 5, 5, 0] : undefined}
-                  />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
           </div>
         </div>
       </div>

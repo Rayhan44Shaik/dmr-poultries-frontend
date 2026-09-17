@@ -50,6 +50,7 @@ export default {
   'nav.newPaymentEntry': 'New Payment Entry',
   'nav.shopLedger': 'Shop Ledger',
   'nav.collectionReport': 'Collection Report',
+  'nav.vehicleAnalytics': 'Vehicle Analytics',
   'nav.systemSettings': 'System Settings',
   'nav.usersRoles': 'Users & Roles',
   'nav.permissions': 'Permissions',

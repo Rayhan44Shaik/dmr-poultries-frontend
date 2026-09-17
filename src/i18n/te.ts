@@ -50,6 +50,7 @@ export default {
   'nav.newPaymentEntry': 'కొత్త చెల్లింపు నమోదు',
   'nav.shopLedger': 'షాప్ లెడ్జర్',
   'nav.collectionReport': 'కలెక్షన్ నివేదిక',
+  'nav.vehicleAnalytics': 'వాహన విశ్లేషణలు',
   'nav.systemSettings': 'సిస్టమ్ సెట్టింగ్స్',
   'nav.usersRoles': 'యూజర్లు & రోల్స్',
   'nav.permissions': 'అనుమతులు',
