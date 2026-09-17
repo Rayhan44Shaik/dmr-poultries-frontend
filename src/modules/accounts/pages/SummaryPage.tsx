@@ -1154,10 +1154,11 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
             </button>
           )}
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <button type="button" className={opsSecondaryButtonClass} onClick={() => {
+            {/* Same animated reset as the Trip List: the icon spins on hover. */}
+            <button type="button" className={`group relative ${opsSecondaryButtonClass}`} aria-label={t('common.reset')} onClick={() => {
               setPeriod('week'); setWeekAnchor(new Date()); setComparePrevious(false);
               setCustomStart(''); setCustomEnd(''); setMonthMenuOpen(false); setExportDropdownOpen(false); setCustomEditorOpen(false);
-            }}><RotateCcw size={14} />{t('common.reset')}</button>
+            }}><span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>{t('common.reset')}</button>
             <BrandRefreshButton loading={dataLoading} onClick={() => setRefreshKey(value => value + 1)} />
 
             <button
