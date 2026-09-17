@@ -13,6 +13,11 @@ import { listEligibleTrips } from "../src/modules/operations/shop-sales/services
 import { fuelExpenseService } from "../src/modules/operations/fuel-expenses/services/fuelExpenseService";
 import { fetchMortalityAnalysis, fetchTripDeliveries } from "../src/modules/operations/mortality/services/mortalityAnalysisApi";
 import { collectionService } from "../src/modules/operations/collections/services/collectionService";
+import { isOrderContainer } from "../src/modules/operations/orders/ordersUtils";
+import {
+  getOperationsSampleCounts,
+  getQuarterSampleInfo,
+} from "../src/sample/quarterSample";
 
 // Harness-only redirect: Node has no same-origin /api reverse proxy, so the
 // shared client points straight at the sample API. No app code changes.
@@ -231,7 +236,9 @@ export async function runOperationsSyncCheck(): Promise<void> {
     const prevMonday = shift(thisMonday, -7);
     const prevSunday = shift(thisMonday, -1);
     const mismatches: string[] = [];
+    const pairs: string[] = [];
     let checked = 0;
+    let sawMoney = false;
     for (const shopId of [1, 2, 3, 4, 5]) {
       // Previous period = everything up to and including last Sunday; its
       // closing figure is the last running balance (or the quarter opening
@@ -240,31 +247,99 @@ export async function runOperationsSyncCheck(): Promise<void> {
         "/operations/shop-ledger",
         { params: { shopId, fromDate: q.quarter.fromDate, toDate: prevSunday, limit: 100000 } },
       );
-      const prevRows = prevRes.data ?? [];
+      // apiGet resolves to { data: <body>, status } — the ledger rows live one
+      // level deeper (body.data). Reading body directly made both sides of the
+      // comparison collapse to 0, so this check passed without checking.
+      const prevRows = prevRes.data?.data ?? [];
       const prevClosing = prevRows.length
         ? Number(prevRows[prevRows.length - 1].balance)
-        : Number(prevRes.openingBalance) || 0;
+        : Number(prevRes.data?.openingBalance) || 0;
       // Current period = Monday → today; its opening comes from the backend.
       const thisRes = await apiGet<{ openingBalance: number }>(
         "/operations/shop-ledger",
         { params: { shopId, fromDate: thisMonday, toDate: today } },
       );
-      const thisOpening = Number(thisRes.openingBalance) || 0;
+      const thisOpening = Number(thisRes.data?.openingBalance) || 0;
       checked += 1;
+      pairs.push(`shop ${shopId} ${prevClosing}→${thisOpening}`);
+      if (prevClosing !== 0 || thisOpening !== 0) sawMoney = true;
       if (Math.abs(prevClosing - thisOpening) > 0.01) {
         mismatches.push(`shop ${shopId}: prev closing ${prevClosing} ≠ opening ${thisOpening}`);
       }
     }
+    // A zero-to-zero comparison proves nothing, so an all-zero run fails too.
+    const ok = mismatches.length === 0 && sawMoney;
     record(
       "shop-ledger",
       "previous week closing = this week opening",
-      mismatches.length === 0,
+      ok,
       mismatches.length > 0
         ? mismatches.join("; ")
-        : `${checked} shops continuous · prev week ${prevMonday}→${prevSunday} · this week ${thisMonday}→${today}`
+        : !sawMoney
+          ? "every balance read 0 — the ledger rows were not read"
+          : `${checked} shops continuous · prev week ${prevMonday}→${prevSunday} · this week ${thisMonday}→${today} · ${pairs.join(", ")}`
     );
   } catch (err) {
     record("shop-ledger", "previous week closing = this week opening", false, String(err));
+  }
+
+  // ── 13. Quarter file mapping — src/sample/quarterSample.ts ────────────────
+  // The frontend quarter helper must report the SAME number each Operations
+  // page renders. It reads the sample server's own `moduleCounts` block
+  // (GET /operations/dashboard) instead of estimating counts from the
+  // /quarter-summary manifest: five of the eight estimates used to be wrong
+  // (trips counted ORD containers, the rate queue borrowed the rate-day count,
+  // pending shops borrowed the shop count, mortality borrowed the trip count,
+  // and orders were a hardcoded Math.min(trips, 8)).
+  try {
+    const [info, counts] = await Promise.all([
+      getQuarterSampleInfo(),
+      getOperationsSampleCounts(),
+    ]);
+    if (!info || !counts) throw new Error("sample quarter probe resolved null (is DEV on?)");
+
+    const tripList = await listCompletedTrips({ page: 1, limit: 1 });
+    const eligible = await listEligibleTrips();
+    const sales = await listShopSales({ sortBy: "latest" });
+    const mortality = await fetchMortalityAnalysis({});
+    const fuel = await fuelExpenseService.list({ page: 1, limit: 1 });
+    const pending = await collectionService.fetchPendingSummary(today);
+    const allTrips = await listTrips({ full: true });
+    const collectionRows = await apiGet<unknown[]>("/operations/collection-entry", {
+      params: { fromDate: q.quarter.fromDate, toDate: q.quarter.toDate, limit: 100000 },
+    });
+
+    const expected = {
+      tripRecords: tripList.meta.total,
+      rateEntries: eligible.length,
+      shopSales: sales.length,
+      // Collection Entry lists every live row (Approved + Pending Approval);
+      // the Collection Report totals approved rows only, so it reads lower.
+      collections: Array.isArray(collectionRows.data) ? collectionRows.data.length : 0,
+      pendingShops: pending.shops.filter((shop) => Number(shop.balance) > 0).length,
+      mortalityTrips: mortality.meta?.total ?? mortality.data.length,
+      fuelBills: fuel.meta.total,
+      orders: allTrips.filter(isOrderContainer).length,
+    };
+
+    const wrong = (Object.keys(expected) as (keyof typeof expected)[]).filter(
+      (field) => counts[field] !== expected[field]
+    );
+    record(
+      "quarter-file",
+      "quarterSample counts = each page's own endpoint total",
+      wrong.length === 0,
+      wrong.length > 0
+        ? wrong.map((f) => `${f}: mapped ${counts[f]} ≠ page ${expected[f]}`).join("; ")
+        : `${info.quarter.code} · trips ${counts.tripRecords} · rates ${counts.rateEntries} · sales ${counts.shopSales} · collections ${counts.collections} · pending shops ${counts.pendingShops} · mortality ${counts.mortalityTrips} · fuel ${counts.fuelBills} · orders ${counts.orders}`
+    );
+  } catch (err) {
+    record(
+      "quarter-file",
+      "quarterSample counts = each page's own endpoint total",
+      false,
+      String(err)
+    );
   }
 
   const failed = results.filter((r) => !r.ok);

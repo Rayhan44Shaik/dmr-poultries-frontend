@@ -294,5 +294,118 @@ try {
   console.error(err);
 }
 
+// 4) Account Analysis: the farm payment view must render the real trip rows —
+//    one per trip in the span, each with its own farm, pickup weight and rate —
+//    with the running cumulative and the grand total, and no paid/balance.
+try {
+  const { loadAnalysisSnapshot, createAnalysisService } = await server.ssrLoadModule("/src/modules/accounts/services/analysisService.ts");
+  const { SummaryFarmTable, SummaryFarmAmount } = await server.ssrLoadModule("/src/modules/accounts/components/Summary/SummaryFarmViewer.tsx");
+  const { weekRange, quarterRange } = await server.ssrLoadModule("/src/modules/accounts/utils/periodRanges.ts");
+  const { I18nProvider } = await server.ssrLoadModule("/src/i18n/index.tsx");
+  const snapshot = await loadAnalysisSnapshot();
+  if (!snapshot.farmPayments.length) {
+    console.log("SKIP accounts-farm-table  (no farm payments from the API — sample backend not reachable)");
+  } else {
+    const service = createAnalysisService(snapshot);
+    const range = weekRange(new Date("2026-09-17T12:00:00"));
+    const trips = service.getCompletedTripsByDateRange(range.start, range.end);
+    // Built exactly the way SummaryPage builds it for the view.
+    const rows = trips
+      .map((trip) => ({ trip, farm: service.getFarmPaymentForTrip(trip.id) }))
+      .filter((row) => row.farm)
+      .sort((a, b) => String(b.trip.tripDate).localeCompare(String(a.trip.tripDate)) || b.trip.id - a.trip.id);
+    const payable = rows.reduce((sum, row) => sum + row.farm.amount, 0);
+    const { formatINR, formatINRExact } = await server.ssrLoadModule("/src/modules/accounts/components/farm-payment/farmPaymentFormat.ts");
+    const withProvider = (node) => renderToString(React.createElement(I18nProvider, null, node));
+    // The Farm Payment figure in the expense table is itself the trigger, and it
+    // carries the label of the column whose trips it will open.
+    const weightKg = rows.reduce((sum, row) => sum + (row.farm.dcWeight ?? row.trip.dcWeight ?? 0), 0);
+    const amountHtml = withProvider(React.createElement(SummaryFarmAmount, { value: payable, scopeLabel: "Week 15 - 21 Sep", trips: rows.length, weightKg, onOpen: () => {} }));
+    const html = withProvider(React.createElement(SummaryFarmTable, { rows, spanLabel: "2026-09-14 - 2026-09-20", onOpenTrip: () => {} }));
+    const shown = rows.filter(({ trip }) => html.includes(trip.tripNo)).length;
+    const weight = rows[0].farm.dcWeight ?? rows[0].trip.dcWeight ?? 0;
+    const checks = {
+      tripsRendered: shown === rows.length,
+      pickupWeight: html.includes(String(weight)),
+      farmRate: html.includes(String(rows[0].farm.rate)),
+      // The running cumulative column is gone; the grand total still shows.
+      noCumulativeColumn: !/<th[^>]*>[^<]*Cumulative/.test(html),
+      grandTotal: html.includes(formatINR(payable)) && html.includes(formatINRExact(payable)),
+      headers: /Trip No/.test(html) && /Pickup Weight/.test(html) && /Bird Type/.test(html),
+      noPaidOrBalance: !/Paid \(₹\)/.test(html) && !/Balance \(₹\)/.test(html),
+      // Global pagination renders its "Showing 1–3 of 3" summary.
+      pagination: html.includes("Showing") && html.includes(`of ${rows.length}`),
+      tripLinkIsButton: /<button[^>]*>\s*<!-- -->TRP-|<button[^>]*>TRP-/.test(html),
+      tripLinkOpensFarmDetail: /title="View farm &amp; pickup details"/.test(html),
+      amountIsButton: /^<button[^>]*type="button"/.test(amountHtml) && (amountHtml.match(/<button/g) ?? []).length === 1,
+      // The figure is the button's own text (the tooltip follows it as a sibling).
+      amountShowsFigure: amountHtml.includes(`>${formatINR(payable)}<`),
+      amountExactTip: amountHtml.includes(formatINRExact(payable)),
+      // The global tooltip: role, scope, exact rupees, the trips/weight line and
+      // the click hint — all present, and only one tooltip in the cell.
+      tooltipRole: (amountHtml.match(/role="tooltip"/g) ?? []).length === 1,
+      tooltipLines: amountHtml.includes("Week 15 - 21 Sep")
+        && amountHtml.includes(`${rows.length} trips`)
+        && /kg pickup/.test(amountHtml)
+        && /Click to open these trips/.test(amountHtml),
+      tooltipShowsOnFocus: /group-focus-visible:opacity-100/.test(amountHtml) && /group-hover:opacity-100/.test(amountHtml),
+      amountNamesScope: amountHtml.includes("Week 15 - 21 Sep"),
+      // No chip, pill or card of its own — the figure reads like any other cell.
+      amountNoChip: !/rounded-full|bg-white|shadow-sm|border-lime/.test(amountHtml),
+    };
+    // 500+ trips must paginate cleanly: page 1 shows exactly one page of rows,
+    // the summary names the whole set, and the pager shows a windowed last page.
+    const q = quarterRange(new Date("2026-09-17T12:00:00"));
+    const allRows = service
+      .getCompletedTripsByDateRange(q.start, q.end)
+      .map((trip) => ({ trip, farm: service.getFarmPaymentForTrip(trip.id) }))
+      .filter((row) => row.farm)
+      .sort((a, b) => String(b.trip.tripDate).localeCompare(String(a.trip.tripDate)) || b.trip.id - a.trip.id);
+    const bigHtml = withProvider(React.createElement(SummaryFarmTable, { rows: allRows, spanLabel: "Quarter", onOpenTrip: () => {} }));
+    const shownBig = allRows.filter(({ trip }) => bigHtml.includes(trip.tripNo)).length;
+    checks.bigSetPaginates =
+      allRows.length > 100 && shownBig === 20 && bigHtml.includes(`of ${allRows.length}`) && bigHtml.includes("\u2026");
+    checks.bigSetGrandTotal = bigHtml.includes(formatINR(allRows.reduce((sum, r) => sum + r.farm.amount, 0)));
+
+    // The shell (header) is not exported, so render the whole viewer with the
+    // portal disabled (no document) to prove the header carries the animated
+    // close button, the logo animation and the highlighted period chip.
+    let viewerHtml = "";
+    const savedDocument = globalThis.document;
+    try {
+      delete globalThis.document;
+      const { default: SummaryFarmViewer } = await server.ssrLoadModule("/src/modules/accounts/components/Summary/SummaryFarmViewer.tsx");
+      viewerHtml = renderToString(React.createElement(I18nProvider, null, React.createElement(SummaryFarmViewer, { open: true, rows, spanLabel: "Week 1 (14 – 20 Sep)", onClose: () => {}, onOpenTrip: () => {} })));
+    } finally {
+      globalThis.document = savedDocument;
+    }
+    checks.viewerCloseButton = /aria-label="Close"/.test(viewerHtml) && viewerHtml.includes("--animate-action-close");
+    checks.viewerLogoAnim = viewerHtml.includes("animate-farm-logo") && viewerHtml.includes("animate-farm-halo");
+    checks.viewerPeriodChip = viewerHtml.includes("Week 1 (14 – 20 Sep)");
+
+    // The trip picked in that view opens the Farm Payment page's own detail
+    // (Step 2 Farm Details + Step 3 Pickup Details) — render it for a real
+    // analysis trip to prove the wiring has something to show.
+    let farmDetail = "not-rendered";
+    try {
+      const { FarmPaymentTripViewModal } = await server.ssrLoadModule("/src/modules/accounts/components/farm-payment/FarmPaymentTripViewModal.tsx");
+      const detailHtml = withProvider(React.createElement(FarmPaymentTripViewModal, { open: true, trip: rows[0].trip, onClose: () => {} }));
+      farmDetail = `${detailHtml.length} chars · trip=${detailHtml.includes(rows[0].trip.tripNo)}`;
+      checks.farmDetailRenders = detailHtml.length > 500;
+    } catch (detailErr) {
+      farmDetail = `FAILED: ${String(detailErr).slice(0, 90)}`;
+      checks.farmDetailRenders = false;
+    }
+    console.log(`     farm trip detail  ${farmDetail}`);
+    console.log(`OK   accounts-farm-table  rows ${shown}/${rows.length}  cumulative=${formatINR(payable)}  html length=${html.length}  ${JSON.stringify(checks)}`);
+    const bad = Object.entries(checks).filter(([, ok]) => !ok).map(([name]) => name);
+    if (bad.length) failed.push({ name: "accounts-farm-table", err: new Error(`failed: ${bad.join(", ")}`) });
+  }
+} catch (err) {
+  failed.push({ name: "accounts-farm-table", err });
+  console.error("FAIL accounts-farm-table");
+  console.error(err);
+}
+
 await server.close();
 process.exit(failed.length > 0 || !hasLoginForm ? 1 : 0);

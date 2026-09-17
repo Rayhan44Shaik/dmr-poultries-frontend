@@ -1215,8 +1215,39 @@ export default {
   'accounts.summary.expense_rows.maintenance': 'వాహన మరమ్మతు (₹)',
   'accounts.summary.expense_rows.office': 'ఆఫీస్ ఖర్చులు (₹)',
   'accounts.summary.expense_rows.total': 'మొత్తం ఖర్చులు (₹)',
-  'accounts.summary.expense_rows.net_profit': 'నికర నగదు లాభం (₹)',
-  'accounts.summary.disclaimer': 'ఖర్చులు: పేమెంట్ రిజిస్టర్\u200cలో ఆమోదించిన రికార్డులు మాత్రమే. పెండింగ్ కలెక్షన్ = ఎంచుకున్న తేదీల అమ్మకాలు − కలెక్షన్లు (కనీసం 0). ఇది మొత్తం షాప్ బకాయి కాదు.',
+  'accounts.summary.expense_rows.net_profit': 'నికర లాభం (₹)',
+
+  // నికర లాభం కార్డ్ + దానికి ఆధారమైన ట్రిప్ ఫారం చెల్లింపు.
+  // నికర లాభం ఖర్చుల పట్టికలో ఒక వరుసగా ఉంటుంది — ప్రత్యేక KPI కార్డు లేదు.
+  'accounts.summary.net_profit.formula': 'షాప్ అమ్మకాలు − ఫారం చెల్లింపు − ఖర్చులు',
+  'accounts.summary.net_profit.trips_with_farm_payment': 'ఫారం చెల్లింపు ఉన్న ట్రిప్పులు',
+
+  // ఫారం చెల్లింపు పాప్-అప్: ఈ కాలంలోని ప్రతి ట్రిప్‌కు దాని బిల్లు.
+  'accounts.summary.farm_table.view_trip': 'ఫారం & పికప్ వివరాలు చూడండి',
+  'accounts.summary.farm_row.open': 'ఈ మొత్తం వెనుక ఉన్న ఫారం చెల్లింపు చూడండి',
+  'accounts.summary.farm_row.tip_trips': '{trips} ట్రిప్పులు · {weight} kg పికప్',
+  'accounts.summary.farm_row.tip_open': 'ఈ ట్రిప్పులను తెరవడానికి క్లిక్ చేయండి',
+  'accounts.summary.farm_table.trips': 'ట్రిప్పులు',
+  'accounts.summary.farm_table.weight': 'పికప్ బరువు',
+  'accounts.summary.farm_table.cumulative': 'సంచిత మొత్తం',
+  'accounts.summary.farm_table.trip_no': 'ట్రిప్ నం',
+  'accounts.summary.farm_table.date': 'తేదీ',
+  'accounts.summary.farm_table.farm': 'ఫారం',
+  'accounts.summary.farm_table.bird_type': 'పక్షి రకం',
+  'accounts.summary.farm_table.birds': 'పక్షులు',
+  'accounts.summary.farm_table.pickup_weight': 'పికప్ బరువు (kg)',
+  'accounts.summary.farm_table.rate': 'రేటు (₹/kg)',
+  'accounts.summary.farm_table.total': 'ఫారం చెల్లింపు (₹)',
+  'accounts.summary.farm_table.totals': 'మొత్తం',
+  'accounts.summary.farm_table.empty': 'ఈ కాలంలోని ట్రిప్పులకు ఫారం చెల్లింపు నమోదు కాలేదు',
+  'accounts.summary.farm_payment.title': 'ఫారం చెల్లింపు',
+  'accounts.summary.farm_payment.this_trip': 'ఈ ట్రిప్',
+  'accounts.summary.farm_payment.status': 'స్థితి',
+  'accounts.summary.farm_payment.status_paid': 'చెల్లించారు',
+  'accounts.summary.farm_payment.status_partially_paid': 'పాక్షికంగా చెల్లించారు',
+  'accounts.summary.farm_payment.status_pending': 'పెండింగ్',
+  'accounts.summary.farm_payment.group_total': 'గ్రూప్ ఫారం చెల్లింపు',
+  'accounts.summary.disclaimer': 'ఫారం చెల్లింపు అనేది ఎంచుకున్న తేదీల్లోని ట్రిప్పుల ఫారం ఖర్చు (dcWeight × రేటు) — ఫార్మర్ పేమెంట్స్ నుండి తీసుకున్నది; పేమెంట్ రిజిస్టర్ ఫార్మర్ చెల్లింపులు అదే ఖర్చుకు నగదు రూపం కాబట్టి వాటిని మళ్లీ కలపలేదు. మిగిలిన ఖర్చులన్నీ ఆమోదించిన పేమెంట్ రిజిస్టర్ రికార్డులే. నికర లాభం = షాప్ అమ్మకాలు − మొత్తం ఖర్చులు. పెండింగ్ కలెక్షన్ = ఎంచుకున్న తేదీల అమ్మకాలు − కలెక్షన్లు (కనీసం 0). ఇది మొత్తం షాప్ బకాయి కాదు.',
 
   // Reports Dashboard
   'reports.dashboard.title': 'నివేదికల డ్యాష్‌బోర్డ్',

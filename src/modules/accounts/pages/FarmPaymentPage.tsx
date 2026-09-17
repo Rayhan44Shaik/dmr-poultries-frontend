@@ -6,8 +6,9 @@ import { FarmerPaymentFilters } from '../components/farm-payment/FarmerPaymentFi
 import { listTrips } from '../../operations/vehicle-trips/services/tripHeaderApiService';
 import { FarmPaymentTripViewModal } from '../components/farm-payment/FarmPaymentTripViewModal';
 import { FarmPaymentService } from '../services/FarmPaymentService';
+import { loadTripFarmPayments } from '../services/farmPaymentApiService';
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
-import type { FarmPayment } from '../types/farmPayment.types';
+import type { FarmPayment, TripFarmPayment } from '../types/farmPayment.types';
 import { Save, RotateCcw } from 'lucide-react';
 import { formatINR, formatINRExact, formatCount, formatKg } from '../components/farm-payment/farmPaymentFormat';
 import Pagination from '../../../ui/Pagination';
@@ -63,6 +64,14 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   const [paymentData, setPaymentData] = useState<Record<string, Partial<FarmPayment>>>({});
   const [savingPayments, setSavingPayments] = useState(false);
 
+  // Backend farm payments, one row per completed trip (GET /accounts/farm-payments
+  // — the same rows the Account Analysis charges to each trip). Held in a ref
+  // because syncPaymentData() also runs after save/reset, where re-reading it
+  // from state would risk a stale closure. A locally saved payment still wins:
+  // this is the starting point for a trip nobody has edited here yet, not an
+  // override of work already saved on this machine.
+  const apiFarmByTripRef = useRef<Map<string, TripFarmPayment>>(new Map());
+
   // Filter states
   // Opens on the last complete week (Mon-Sun); see lastCompleteWeek().
   const [defaultRange] = useState(lastCompleteWeek);
@@ -110,6 +119,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   // would just flash "Loading trips..." for nothing) and by loadCompletedTrips.
   const syncPaymentData = (trips: Trip[]) => {
     const savedPayments: Record<string, Partial<FarmPayment>> = {};
+    const apiFarm = apiFarmByTripRef.current;
     trips.forEach((trip) => {
       const tripId = String(trip.id);
       const existingPayment = FarmPaymentService.getByTripId(tripId);
@@ -120,23 +130,51 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
           totalBirds: trip.totalBirds || 0,
           dcWeight: trip.dcWeight || 0,
         };
-      } else {
-        savedPayments[tripId] = {
-          tripId,
-          totalBirds: trip.totalBirds || 0,
-          dcWeight: trip.dcWeight || 0,
-          paymentStatus: 'Unpaid',
-        };
+        return;
       }
+
+      // No local record: fall back to that trip's own backend farm payment so
+      // the row opens showing what the trip actually cost instead of blanks.
+      const apiRow = apiFarm.get(tripId);
+      savedPayments[tripId] = apiRow
+        ? {
+            tripId,
+            totalBirds: trip.totalBirds || apiRow.totalBirds || 0,
+            dcWeight: trip.dcWeight || apiRow.dcWeight || 0,
+            ratePerKg: apiRow.rate,
+            totalAmount: apiRow.amount,
+            amountPaid: apiRow.paidAmount,
+            balance: apiRow.balance,
+            // The page's own vocabulary: the backend's "Pending" is "Unpaid".
+            paymentStatus:
+              apiRow.status === 'Paid'
+                ? 'Paid'
+                : apiRow.status === 'Partially Paid'
+                  ? 'Partially Paid'
+                  : 'Unpaid',
+            paidDate: apiRow.paymentDate ?? undefined,
+            paymentMode: (apiRow.paymentMode as FarmPayment['paymentMode']) ?? undefined,
+            notes: apiRow.referenceNo ? `Ref ${apiRow.referenceNo}` : undefined,
+          }
+        : {
+            tripId,
+            totalBirds: trip.totalBirds || 0,
+            dcWeight: trip.dcWeight || 0,
+            paymentStatus: 'Unpaid',
+          };
     });
     setPaymentData(savedPayments);
   };
 
   useEffect(() => {
     let cancelled = false;
-    listTrips()
-      .then((all) => {
+    // Trips and their farm payments load together. A farm ledger that fails to
+    // answer must never blank the trip list, so it degrades to an empty map and
+    // the rows simply open without a pre-filled payment.
+    Promise.all([listTrips(), loadTripFarmPayments().catch(() => [] as TripFarmPayment[])])
+      .then(([all, farmRows]) => {
         if (cancelled) return; // superseded — drop the stale response
+        apiFarmByTripRef.current = new Map(farmRows.map((row) => [String(row.tripId), row]));
         setLoadError(null);
 
         const completed = all
@@ -337,7 +375,9 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   };
 
   const handleResetPayments = () => {
-    if (Object.keys(paymentData).length === 0) {
+    // "Nothing to reset" means nothing was edited this session — paymentData is
+    // never empty now that rows open pre-filled from the backend.
+    if (dirtyTripIds.size === 0) {
       showNotification('No changes to reset', 'info');
       return;
     }

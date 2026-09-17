@@ -32,8 +32,11 @@ import { opsFilterCardClass, opsSecondaryButtonClass } from '../../../shared/ui/
 import { DatePicker } from '../../../components/common/DatePicker';
 import { exportPDF, exportExcel } from '../components/Summary';
 import SummaryTripViewer from '../components/Summary/SummaryTripViewer';
+import SummaryFarmViewer, { SummaryFarmAmount } from '../components/Summary/SummaryFarmViewer';
+import { FarmPaymentTripViewModal } from '../components/farm-payment/FarmPaymentTripViewModal';
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
 import type { WeeklyMetrics, ExpenseBreakdown } from '../types/summary.types';
+import type { TripFarmPayment } from '../types/farmPayment.types';
 import { useI18n } from '../../../i18n';
 import { useLocation } from 'react-router-dom';
 import { analysisLinkKey, readAnalysisLink } from '../../../shared/kpi/analysisLink';
@@ -156,6 +159,76 @@ const getPreviousRange = (start: Date, end: Date): { start: Date; end: Date } =>
 const sumExpenseBreakdown = (expense: ExpenseBreakdown): number =>
   Object.values(expense).reduce((a, b) => a + b, 0);
 
+/** Zero-valued breakdown: keeps net profit arithmetic total when a period has
+ * no expense row of its own yet. */
+const EMPTY_EXPENSES: ExpenseBreakdown = { farm: 0, fuel: 0, trip: 0, salary: 0, maintenance: 0, office: 0 };
+
+/** The trips that carry a farm payment, newest first, each paired with its own
+ * farm bill. Used for the whole span and for a single expense-table column, so
+ * both are built the same way. */
+const buildFarmRows = (
+  trips: readonly Trip[],
+  summaryService: { getFarmPaymentForTrip: (tripId: number) => TripFarmPayment | undefined }
+): { trip: Trip; farm: TripFarmPayment }[] =>
+  trips
+    .map((trip) => ({ trip, farm: summaryService.getFarmPaymentForTrip(trip.id) }))
+    .filter((row): row is { trip: Trip; farm: TripFarmPayment } => Boolean(row.farm))
+    .sort(
+      (a, b) =>
+        String(b.trip.tripDate).localeCompare(String(a.trip.tripDate)) ||
+        (b.trip.id ?? 0) - (a.trip.id ?? 0)
+    );
+
+const netProfitOfPeriod = (
+  metrics: WeeklyMetrics,
+  expenses: ExpenseBreakdown | undefined
+): number => metrics.sales - sumExpenseBreakdown(expenses ?? EMPTY_EXPENSES);
+
+/**
+ * Net-profit cells for the Month / Quarter / Custom comparison columns. The
+ * last column is the current period, so it also carries the swing against the
+ * period before it — the same treatment the expense rows give their current
+ * column. Shared by all three comparison modes so they cannot drift apart.
+ */
+const netProfitComparisonCells = (
+  rows: { metrics: WeeklyMetrics; expenses: ExpenseBreakdown }[]
+) =>
+  rows.map((row, idx) => {
+    const value = netProfitOfPeriod(row.metrics, row.expenses);
+    const isCurrent = idx === rows.length - 1;
+    const tone = value >= 0 ? 'text-emerald-800 dark:text-emerald-200' : 'text-rose-700 dark:text-rose-300';
+    if (!isCurrent) {
+      return (
+        <td
+          key={idx}
+          title={formatCurrencyExact(value)}
+          className={`w-28 px-3 py-2.5 text-center font-bold bg-amber-50/40 border-l border-amber-100 group-hover/row:bg-amber-100/60 dark:group-hover/row:bg-amber-500/15 ${tone}`}
+        >
+          {formatCurrency(value)}
+        </td>
+      );
+    }
+    const previous = rows[rows.length - 2];
+    const prevValue = previous ? netProfitOfPeriod(previous.metrics, previous.expenses) : 0;
+    const diff = value - prevValue;
+    const pct = prevValue !== 0 ? (diff / Math.abs(prevValue)) * 100 : null;
+    return (
+      <td
+        key={idx}
+        title={formatCurrencyExact(value)}
+        className="w-28 px-3 py-2.5 text-center font-bold bg-emerald-50/40 border-l border-emerald-100 group-hover/row:bg-emerald-100/60 dark:group-hover/row:bg-emerald-500/15"
+      >
+        <div className={tone}>{formatCurrency(value)}</div>
+        {(prevValue !== 0 || value !== 0) && (
+          <div className={`text-[9px] font-semibold leading-none mt-0.5 ${diff >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+            {formatSignedCurrency(diff)}
+            {pct == null ? '' : ` (${formatSignedPercent(pct)})`}
+          </div>
+        )}
+      </td>
+    );
+  });
+
 const getTripDistanceKm = (trip: Trip): number => {
   const totalKm = Number(trip.totalKm || 0);
   if (totalKm > 0) return totalKm;
@@ -193,6 +266,7 @@ const EXPENSE_ROW_DOT: Record<string, string> = {
   salary: 'bg-violet-500',
   maintenance: 'bg-cyan-600',
   office: 'bg-slate-400',
+  netProfit: 'bg-emerald-600',
   total: 'bg-slate-500 dark:bg-slate-400',
 };
 
@@ -281,6 +355,13 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
   const [tripViewerOpen, setTripViewerOpen] = useState(false);
   const [tripViewerTrips, setTripViewerTrips] = useState<Trip[]>([]);
   const [tripViewerLabel, setTripViewerLabel] = useState('');
+  /* The farm payment pop-up, scoped to the figure that opened it: a column's own
+     trips when an amount in the expense table is pressed, the whole span from
+     the card. `null` keeps it shut. */
+  const [farmScope, setFarmScope] = useState<{ label: string; trips: Trip[] } | null>(null);
+  // The trip picked in that pop-up — opens the Farm Payment page's own trip
+  // detail (Step 2 Farm Details + Step 3 Pickup Details).
+  const [farmTripView, setFarmTripView] = useState<Trip | null>(null);
   const { t, language } = useI18n();
 
   useEffect(() => {
@@ -753,6 +834,55 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
   const totalExpenseValue = useMemo(() => sumExpenseBreakdown(totalExpenses), [totalExpenses]);
   const previousExpenseValue = useMemo(() => sumExpenseBreakdown(previousExpenses), [previousExpenses]);
 
+  /* ── Farm payments and net profit ──────────────────────────────────────────
+     Net profit = shop sales − farm payment − every other expense. The farm
+     payment is already the `farm` sector of the expense breakdown (see
+     createAnalysisService.computeEffectiveExpenses), so subtracting the expense
+     total subtracts it exactly once — never zero times, never twice.
+     How much of it has been settled is the Farm Payment page's business — this
+     analysis charges the cost, not the cash. */
+  /* The rows behind whichever farm figure opened the pop-up: those trips, each
+     with its own pickup (DC) weight × farm rate, newest first. Built by the same
+     mapping the expense table's Farm Payment figures come from, so a column's
+     amount and the trips it opens can never disagree. */
+  const farmScopeRows = useMemo(
+    () => buildFarmRows(farmScope?.trips ?? [], summaryService),
+    [farmScope, summaryService]
+  );
+
+  /* Farm totals of a set of trips, cached by the trips array itself: every
+     expense-table column asks for this on each render and its trips array is
+     memoised, so the WeakMap keeps it to one pass per column. */
+  const farmSummaryCache = useRef(new WeakMap<readonly Trip[], { trips: number; weightKg: number }>());
+  const farmSummary = useCallback(
+    (scopeTrips: readonly Trip[]) => {
+      const cached = farmSummaryCache.current.get(scopeTrips);
+      if (cached) return cached;
+      const rows = buildFarmRows(scopeTrips, summaryService);
+      const summary = {
+        trips: rows.length,
+        weightKg: rows.reduce((sum, row) => sum + (row.farm.dcWeight ?? row.trip.dcWeight ?? 0), 0),
+      };
+      farmSummaryCache.current.set(scopeTrips, summary);
+      return summary;
+    },
+    [summaryService]
+  );
+
+  const totalNetProfit = totalMetrics.sales - totalExpenseValue;
+
+  const weeklyNetProfit = useMemo(
+    () => weeklyMetrics.map((metrics, index) => netProfitOfPeriod(metrics, weeklyExpenses[index])),
+    [weeklyMetrics, weeklyExpenses]
+  );
+  const previousWeeklyNetProfit = useMemo(
+    () =>
+      previousWeeklyMetrics.map((metrics, index) =>
+        netProfitOfPeriod(metrics, previousWeeklyExpenses[index])
+      ),
+    [previousWeeklyMetrics, previousWeeklyExpenses]
+  );
+
   const totalDistanceKm = useMemo(() => trips.reduce((sum, trip) => sum + getTripDistanceKm(trip), 0), [trips]);
   const previousDistanceKm = useMemo(() => previousTrips.reduce((sum, trip) => sum + getTripDistanceKm(trip), 0), [previousTrips]);
 
@@ -1024,10 +1154,11 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
             </button>
           )}
           <div className="ml-auto flex flex-wrap items-center gap-2">
-            <button type="button" className={opsSecondaryButtonClass} onClick={() => {
+            {/* Same animated reset as the Trip List: the icon spins on hover. */}
+            <button type="button" className={`group relative ${opsSecondaryButtonClass}`} aria-label={t('common.reset')} onClick={() => {
               setPeriod('week'); setWeekAnchor(new Date()); setComparePrevious(false);
               setCustomStart(''); setCustomEnd(''); setMonthMenuOpen(false); setExportDropdownOpen(false); setCustomEditorOpen(false);
-            }}><RotateCcw size={14} />{t('common.reset')}</button>
+            }}><span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>{t('common.reset')}</button>
             <BrandRefreshButton loading={dataLoading} onClick={() => setRefreshKey(value => value + 1)} />
 
             <button
@@ -1783,6 +1914,27 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                 { key: 'office', label: t('accounts.summary.expense_rows.office') },
               ].map((item) => {
                 const total = weeklyExpenses.reduce((a, b) => a + ((b[item.key as keyof ExpenseBreakdown] as number) || 0), 0);
+                /* Farm Payment is the one expense that is not a Payment Register
+                   total: it is the farm bill of exactly these trips (pickup
+                   weight × farm rate). Only its amount behaves differently — it
+                   opens those trips. The row itself looks like every other. */
+                const isFarm = item.key === 'farm';
+                /* The farm amount is the trigger: press it and the farm payment
+                   view opens for exactly the trips behind that figure — the
+                   column's own trips, or the whole span on the Total column. */
+                const farmAmount = (value: number, scopeLabel: string, scopeTrips: Trip[]) => {
+                  if (!isFarm) return formatCurrency(value);
+                  const info = farmSummary(scopeTrips);
+                  return (
+                    <SummaryFarmAmount
+                      value={value}
+                      scopeLabel={scopeLabel}
+                      trips={info.trips}
+                      weightKg={info.weightKg}
+                      onOpen={() => setFarmScope({ label: scopeLabel, trips: scopeTrips })}
+                    />
+                  );
+                };
                 return (
                   <tr
                   key={item.key}
@@ -1796,7 +1948,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                         {previousWeeklyExpenses.map((prevW, idx) => {
                           const prevVal = (prevW?.[item.key as keyof ExpenseBreakdown] as number) || 0;
                           return (
-                            <td key={`prev-${idx}`} className="w-24 px-3 py-2.5 text-center text-slate-800 dark:text-slate-200 bg-amber-50/30 border-l border-amber-100 group-hover/row:bg-amber-100/60 dark:group-hover/row:bg-amber-500/15">{formatCurrency(prevVal)}</td>
+                            <td key={`prev-${idx}`} className="w-24 px-3 py-2.5 text-center text-slate-800 dark:text-slate-200 bg-amber-50/30 border-l border-amber-100 group-hover/row:bg-amber-100/60 dark:group-hover/row:bg-amber-500/15">{farmAmount(prevVal, previousWeeklyGroups[idx]?.label ?? '', previousWeeklyGroups[idx]?.trips ?? [])}</td>
                           );
                         })}
                         {weeklyExpenses.map((currW, idx) => {
@@ -1806,7 +1958,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                           const expPct = prevValForDiff !== 0 ? (expDiff / Math.abs(prevValForDiff)) * 100 : null;
                           return (
                             <td key={`curr-${idx}`} className="w-24 px-3 py-2.5 text-center font-medium bg-emerald-50/20 border-l border-emerald-100 group-hover/row:bg-emerald-100/60 dark:group-hover/row:bg-emerald-500/15">
-                              <div className="text-slate-700 dark:text-slate-200">{formatCurrency(currVal)}</div>
+                              <div className="text-slate-700 dark:text-slate-200">{farmAmount(currVal, weeklyGroups[idx]?.label ?? '', weeklyGroups[idx]?.trips ?? [])}</div>
                               {(prevValForDiff !== 0 || currVal !== 0) ? (
                                 <div className={`text-[9px] font-semibold leading-none mt-0.5 ${expDiff <= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatSignedCurrency(expDiff)}{expPct == null ? '' : ` (${formatSignedPercent(expPct)})`}</div>
                               ) : null}
@@ -1821,7 +1973,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                           const val = (m.expenses[item.key as keyof ExpenseBreakdown] as number) || 0;
                           if (!isCurrent) {
                             return (
-                              <td key={idx} className="w-28 px-3 py-2.5 text-center text-slate-800 dark:text-slate-200 bg-amber-50/30 border-l border-amber-100 group-hover/row:bg-amber-100/60 dark:group-hover/row:bg-amber-500/15">{formatCurrency(val)}</td>
+                              <td key={idx} className="w-28 px-3 py-2.5 text-center text-slate-800 dark:text-slate-200 bg-amber-50/30 border-l border-amber-100 group-hover/row:bg-amber-100/60 dark:group-hover/row:bg-amber-500/15">{farmAmount(val, m.label, m.trips)}</td>
                             );
                           }
                           const prevVal = (monthComparisonData[monthComparisonData.length - 2]?.expenses[item.key as keyof ExpenseBreakdown] as number) || 0;
@@ -1829,7 +1981,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                           const expPct = prevVal !== 0 ? (expDiff / Math.abs(prevVal)) * 100 : null;
                           return (
                             <td key={idx} className="w-28 px-3 py-2.5 text-center font-medium bg-emerald-50/20 border-l border-emerald-100 group-hover/row:bg-emerald-100/60 dark:group-hover/row:bg-emerald-500/15">
-                              <div className="text-slate-700 dark:text-slate-200">{formatCurrency(val)}</div>
+                              <div className="text-slate-700 dark:text-slate-200">{farmAmount(val, m.label, m.trips)}</div>
                               {(prevVal !== 0 || val !== 0) ? (
                                 <div className={`text-[9px] font-semibold leading-none mt-0.5 ${expDiff <= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatSignedCurrency(expDiff)}{expPct == null ? '' : ` (${formatSignedPercent(expPct)})`}</div>
                               ) : null}
@@ -1844,7 +1996,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                           const val = (q.expenses[item.key as keyof ExpenseBreakdown] as number) || 0;
                           if (!isCurrent) {
                             return (
-                              <td key={idx} className="w-28 px-3 py-2.5 text-center text-slate-800 dark:text-slate-200 bg-amber-50/30 border-l border-amber-100 group-hover/row:bg-amber-100/60 dark:group-hover/row:bg-amber-500/15">{formatCurrency(val)}</td>
+                              <td key={idx} className="w-28 px-3 py-2.5 text-center text-slate-800 dark:text-slate-200 bg-amber-50/30 border-l border-amber-100 group-hover/row:bg-amber-100/60 dark:group-hover/row:bg-amber-500/15">{farmAmount(val, q.label, q.trips)}</td>
                             );
                           }
                           const prevVal = (quarterComparisonData[quarterComparisonData.length - 2]?.expenses[item.key as keyof ExpenseBreakdown] as number) || 0;
@@ -1852,7 +2004,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                           const expPct = prevVal !== 0 ? (expDiff / Math.abs(prevVal)) * 100 : null;
                           return (
                             <td key={idx} className="w-28 px-3 py-2.5 text-center font-medium bg-emerald-50/20 border-l border-emerald-100 group-hover/row:bg-emerald-100/60 dark:group-hover/row:bg-emerald-500/15">
-                              <div className="text-slate-700 dark:text-slate-200">{formatCurrency(val)}</div>
+                              <div className="text-slate-700 dark:text-slate-200">{farmAmount(val, q.label, q.trips)}</div>
                               {(prevVal !== 0 || val !== 0) ? (
                                 <div className={`text-[9px] font-semibold leading-none mt-0.5 ${expDiff <= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatSignedCurrency(expDiff)}{expPct == null ? '' : ` (${formatSignedPercent(expPct)})`}</div>
                               ) : null}
@@ -1867,7 +2019,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                           const val = (c.expenses[item.key as keyof ExpenseBreakdown] as number) || 0;
                           if (!isCurrent) {
                             return (
-                              <td key={idx} className="w-28 px-3 py-2.5 text-center text-slate-800 dark:text-slate-200 bg-amber-50/30 border-l border-amber-100 group-hover/row:bg-amber-100/60 dark:group-hover/row:bg-amber-500/15">{formatCurrency(val)}</td>
+                              <td key={idx} className="w-28 px-3 py-2.5 text-center text-slate-800 dark:text-slate-200 bg-amber-50/30 border-l border-amber-100 group-hover/row:bg-amber-100/60 dark:group-hover/row:bg-amber-500/15">{farmAmount(val, c.label, c.trips)}</td>
                             );
                           }
                           const prevVal = (customComparisonData[customComparisonData.length - 2]?.expenses[item.key as keyof ExpenseBreakdown] as number) || 0;
@@ -1875,7 +2027,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                           const expPct = prevVal !== 0 ? (expDiff / Math.abs(prevVal)) * 100 : null;
                           return (
                             <td key={idx} className="w-28 px-3 py-2.5 text-center font-medium bg-emerald-50/20 border-l border-emerald-100 group-hover/row:bg-emerald-100/60 dark:group-hover/row:bg-emerald-500/15">
-                              <div className="text-slate-700 dark:text-slate-200">{formatCurrency(val)}</div>
+                              <div className="text-slate-700 dark:text-slate-200">{farmAmount(val, c.label, c.trips)}</div>
                               {(prevVal !== 0 || val !== 0) ? (
                                 <div className={`text-[9px] font-semibold leading-none mt-0.5 ${expDiff <= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatSignedCurrency(expDiff)}{expPct == null ? '' : ` (${formatSignedPercent(expPct)})`}</div>
                               ) : null}
@@ -1887,7 +2039,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                       weeklyGroups.map((_, idx) => {
                         const currVal = (weeklyExpenses[idx]?.[item.key as keyof ExpenseBreakdown] as number) || 0;
                         return (
-                          <td key={idx} className="w-24 px-3 py-2.5 text-center text-slate-600" title={formatCurrencyExact(currVal)}>{formatCurrency(currVal)}</td>
+                          <td key={idx} className="w-24 px-3 py-2.5 text-center text-slate-600" title={formatCurrencyExact(currVal)}>{farmAmount(currVal, weeklyGroups[idx]?.label ?? '', weeklyGroups[idx]?.trips ?? [])}</td>
                         );
                       })
                     )}
@@ -1896,7 +2048,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                         className="w-20 px-3 py-2.5 text-center font-bold text-slate-800 bg-slate-50 dark:bg-slate-800 border-l border-slate-200 dark:border-slate-700 group-hover/row:bg-slate-200/70 dark:group-hover/row:bg-slate-700/60"
                         title={formatCurrencyExact(total)}
                       >
-                        {formatCurrency(total)}
+                        {farmAmount(total, rangeLabel, trips)}
                       </td>
                     )}
                   </tr>
@@ -2020,6 +2172,78 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                 )}
               </tr>
 
+              {/* Net profit: shop sales − farm payment − every other expense.
+                  It lives in the table rather than in a KPI card of its own; the
+                  formula rides along as the row's hover tip. */}
+              <tr
+                className="group/row border-b border-emerald-200 bg-emerald-50/70 transition-colors duration-150 hover:bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/15"
+                title={`${t('accounts.summary.net_profit.formula')} — ${formatCurrencyExact(totalMetrics.sales)} − ${formatCurrencyExact(totalExpenseValue)}`}
+              >
+                <td className="relative w-56 px-4 py-2.5 before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-emerald-600 before:opacity-0 before:transition-opacity before:content-[''] group-hover/row:before:opacity-100">
+                  <SummaryRowLabel
+                    color={EXPENSE_ROW_DOT.netProfit}
+                    label={t('accounts.summary.expense_rows.net_profit')}
+                    className="font-bold text-emerald-800 dark:text-emerald-200"
+                  />
+                </td>
+                {comparePrevious && period === 'week' ? (
+                  <>
+                    {previousWeeklyNetProfit.map((value, idx) => (
+                      <td
+                        key={`prev-${idx}`}
+                        title={formatCurrencyExact(value)}
+                        className="w-24 px-3 py-2.5 text-center font-bold bg-amber-50/40 border-l border-amber-100 group-hover/row:bg-amber-100/60 dark:group-hover/row:bg-amber-500/15"
+                      >
+                        {formatCurrency(value)}
+                      </td>
+                    ))}
+                    {weeklyNetProfit.map((value, idx) => {
+                      const prevValue = previousWeeklyNetProfit[previousWeeklyNetProfit.length - 1] ?? 0;
+                      const diff = value - prevValue;
+                      const pct = prevValue !== 0 ? (diff / Math.abs(prevValue)) * 100 : null;
+                      return (
+                        <td
+                          key={`curr-${idx}`}
+                          title={formatCurrencyExact(value)}
+                          className="w-24 px-3 py-2.5 text-center font-bold bg-emerald-50/40 border-l border-emerald-100 group-hover/row:bg-emerald-100/60 dark:group-hover/row:bg-emerald-500/15"
+                        >
+                          <div className={value >= 0 ? 'text-emerald-800 dark:text-emerald-200' : 'text-rose-700 dark:text-rose-300'}>{formatCurrency(value)}</div>
+                          {(prevValue !== 0 || value !== 0) && (
+                            <div className={`text-[9px] font-semibold leading-none mt-0.5 ${diff >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatSignedCurrency(diff)}{pct == null ? '' : ` (${formatSignedPercent(pct)})`}</div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </>
+                ) : comparePrevious && period === 'month' && monthComparisonData ? (
+                  <>{netProfitComparisonCells(monthComparisonData)}</>
+                ) : comparePrevious && period === 'quarter' && quarterComparisonData ? (
+                  <>{netProfitComparisonCells(quarterComparisonData)}</>
+                ) : comparePrevious && period === 'custom' && customComparisonData ? (
+                  <>{netProfitComparisonCells(customComparisonData)}</>
+                ) : (
+                  weeklyNetProfit.map((value, idx) => (
+                    <td
+                      key={idx}
+                      title={formatCurrencyExact(value)}
+                      className={`w-24 px-3 py-2.5 text-center font-bold ${value >= 0 ? 'text-emerald-800 dark:text-emerald-200' : 'text-rose-700 dark:text-rose-300'}`}
+                    >
+                      {formatCurrency(value)}
+                    </td>
+                  ))
+                )}
+                {period !== 'week' && !comparePrevious && (
+                  <td
+                    title={formatCurrencyExact(totalNetProfit)}
+                    className="w-20 px-3 py-2.5 text-center font-bold bg-emerald-100 border-l border-emerald-200 dark:border-emerald-900 group-hover/row:bg-emerald-200/70 dark:group-hover/row:bg-emerald-500/20"
+                  >
+                    <span className={totalNetProfit >= 0 ? 'text-emerald-900 dark:text-emerald-200' : 'text-rose-700 dark:text-rose-300'}>
+                      {formatCurrency(totalNetProfit)}
+                    </span>
+                  </td>
+                )}
+              </tr>
+
             </tbody>
           </table>
         </div>
@@ -2028,7 +2252,31 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
       </div>
       </div>
 
-      {tripViewerOpen && <SummaryTripViewer open trips={tripViewerTrips} groupLabel={tripViewerLabel} onClose={closeTripViewer} />}
+      {/* Farm payment pop-up: every trip of the span with its own bill. Picking
+          a trip closes this list and opens that trip's farm payment detail, so
+          only one pop-up is ever open. */}
+      {farmScope && (
+        <SummaryFarmViewer
+          open
+          rows={farmScopeRows}
+          spanLabel={farmScope.label}
+          onClose={() => setFarmScope(null)}
+          onOpenTrip={(trip) => {
+            setFarmScope(null);
+            setFarmTripView(trip);
+          }}
+        />
+      )}
+
+      {/* Same read-only detail the Farm Payment page shows for a trip: Step 2
+          (Farm Details) + Step 3 (Pickup Details), nothing else. */}
+      <FarmPaymentTripViewModal
+        open={Boolean(farmTripView)}
+        trip={farmTripView}
+        onClose={() => setFarmTripView(null)}
+      />
+
+      {tripViewerOpen && <SummaryTripViewer open trips={tripViewerTrips} groupLabel={tripViewerLabel} farmPayments={snapshot.farmPayments} onClose={closeTripViewer} />}
 
       <div className="text-xs text-slate-400 text-center border-t border-slate-200 dark:border-slate-700 pt-4 mt-2">
         {t('accounts.summary.disclaimer')}
