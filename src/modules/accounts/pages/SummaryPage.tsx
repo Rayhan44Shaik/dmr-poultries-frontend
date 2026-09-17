@@ -32,7 +32,7 @@ import { opsFilterCardClass, opsSecondaryButtonClass } from '../../../shared/ui/
 import { DatePicker } from '../../../components/common/DatePicker';
 import { exportPDF, exportExcel } from '../components/Summary';
 import SummaryTripViewer from '../components/Summary/SummaryTripViewer';
-import SummaryFarmTable from '../components/Summary/SummaryFarmTable';
+import SummaryFarmViewer, { SummaryFarmCard } from '../components/Summary/SummaryFarmViewer';
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
 import type { WeeklyMetrics, ExpenseBreakdown } from '../types/summary.types';
 import type { TripFarmPayment } from '../types/farmPayment.types';
@@ -338,8 +338,8 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
   const [tripViewerOpen, setTripViewerOpen] = useState(false);
   const [tripViewerTrips, setTripViewerTrips] = useState<Trip[]>([]);
   const [tripViewerLabel, setTripViewerLabel] = useState('');
-  // The per-trip farm payment breakdown under the expense table.
-  const [farmTableOpen, setFarmTableOpen] = useState(true);
+  // The farm payment pop-up: every trip of the span with its own bill.
+  const [farmViewerOpen, setFarmViewerOpen] = useState(false);
   const { t, language } = useI18n();
 
   useEffect(() => {
@@ -817,14 +817,12 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
      payment is already the `farm` sector of the expense breakdown (see
      createAnalysisService.computeEffectiveExpenses), so subtracting the expense
      total subtracts it exactly once — never zero times, never twice.
-     `farmTotals` splits that same figure into what has been settled and what is
-     still owed to farmers, which the expense total deliberately ignores. */
-  const farmTotals = useMemo(() => summaryService.farmTotalsForTrips(trips), [summaryService, trips]);
-
+     How much of it has been settled is the Farm Payment page's business — this
+     analysis charges the cost, not the cash. */
   /* The per-trip farm payment view: exactly the trips in the selected span, each
-     with its own pickup (DC) weight × farm rate. Newest first. Its totals are
-     the same `farmTotals` the expense table's Farm Payment row is built from, so
-     this breakdown can never disagree with the row it explains. */
+     with its own pickup (DC) weight × farm rate. Newest first. The rows total to
+     the same figure the expense table's Farm Payment row is built from, so this
+     breakdown can never disagree with the row it explains. */
   const farmRows = useMemo(
     () =>
       trips
@@ -2196,20 +2194,30 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
         </div>
       </div>
 
-      {/* Farm payment per trip — the breakdown behind the Farm Payment row.
-          Only the trips in the selected span appear, each with the pickup
-          weight and farm rate its bill was calculated from, so the row above
-          can be audited trip by trip. */}
-      <SummaryFarmTable
-        rows={farmRows}
-        totals={farmTotals}
-        open={farmTableOpen}
-        onToggle={() => setFarmTableOpen((value) => !value)}
-        onOpenTrip={(trip) => openTripViewer([trip], trip.tripNo)}
-      />
+      {/* Farm payment per trip — the breakdown behind the Farm Payment row. The
+          card carries the span's cumulative figures; "View farm payment" opens
+          the pop-up that lists every trip of the span with the pickup weight
+          and farm rate its bill was calculated from, so the row above can be
+          audited trip by trip. */}
+      <SummaryFarmCard rows={farmRows} spanLabel={rangeLabel} onOpen={() => setFarmViewerOpen(true)} />
 
       </div>
       </div>
+
+      {/* Farm payment pop-up: every trip of the span with its own bill. Picking
+          a trip hands over to the trip view, so only one pop-up is ever open. */}
+      {farmViewerOpen && (
+        <SummaryFarmViewer
+          open
+          rows={farmRows}
+          spanLabel={rangeLabel}
+          onClose={() => setFarmViewerOpen(false)}
+          onOpenTrip={(trip) => {
+            setFarmViewerOpen(false);
+            openTripViewer([trip], trip.tripNo);
+          }}
+        />
+      )}
 
       {tripViewerOpen && <SummaryTripViewer open trips={tripViewerTrips} groupLabel={tripViewerLabel} farmPayments={snapshot.farmPayments} onClose={closeTripViewer} />}
 

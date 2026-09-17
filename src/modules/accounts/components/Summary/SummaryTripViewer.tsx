@@ -38,21 +38,18 @@ function SummaryTripViewer({ open, trips, groupLabel, farmPayments, onClose }: P
   const { birdTypes } = useBirdTypes();
   const { t } = useI18n();
   const farmByTrip = useMemo(() => indexFarmPaymentsByTrip(farmPayments ?? []), [farmPayments]);
-  /** Farm cost of this whole group — the same trips the strip lists. */
+  /** Farm cost of this whole group — the same trips the strip lists. Settlement
+   * (paid / balance) belongs to the Farm Payment page, not to this view. */
   const groupFarm = useMemo(() => {
     let payable = 0;
-    let paid = 0;
-    let balance = 0;
     let count = 0;
     for (const trip of trips) {
       const row = farmByTrip.get(String(trip.id));
       if (!row) continue;
       count += 1;
       payable += row.amount;
-      paid += row.paidAmount;
-      balance += row.balance;
     }
-    return { payable, paid, balance, count };
+    return { payable, count };
   }, [trips, farmByTrip]);
   const [index, setIndex] = useState(0);
   const [sideOpen, setSideOpen] = useState(false);
@@ -126,9 +123,7 @@ function SummaryTripViewer({ open, trips, groupLabel, farmPayments, onClose }: P
         <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-lime-700 dark:text-lime-300">
           <Sprout size={13} />{t('accounts.summary.farm_payment.title')}
         </span>
-        <FarmFigure label={t('accounts.summary.farm_payment.payable')} value={currentFarm.amount} tone="text-slate-800 dark:text-slate-100" />
-        <FarmFigure label={t('accounts.summary.farm_payment.paid')} value={currentFarm.paidAmount} tone="text-emerald-700 dark:text-emerald-300" />
-        <FarmFigure label={t('accounts.summary.farm_payment.balance')} value={currentFarm.balance} tone={currentFarm.balance > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-slate-500 dark:text-slate-400'} />
+        <FarmFigure label={t('accounts.summary.farm_payment.this_trip')} value={currentFarm.amount} tone="text-slate-800 dark:text-slate-100" />
         <span
           className="ml-auto min-w-0 truncate text-[11px] text-slate-500 dark:text-slate-400"
           title={`${currentFarm.farmName ?? ''} · ${currentFarm.totalBirds ?? 0} birds · ${currentFarm.dcWeight ?? 0} kg @ ₹${currentFarm.rate ?? 0}`}

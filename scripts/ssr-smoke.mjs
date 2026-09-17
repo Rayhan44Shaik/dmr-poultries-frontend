@@ -294,12 +294,12 @@ try {
   console.error(err);
 }
 
-// 4) Account Analysis: the per-trip farm payment table must render the real
-//    trip rows — one per trip in the span, each with its own pickup weight and
-//    farm rate — and hide them again when collapsed.
+// 4) Account Analysis: the farm payment view must render the real trip rows —
+//    one per trip in the span, each with its own farm, pickup weight and rate —
+//    with the running cumulative and the grand total, and no paid/balance.
 try {
   const { loadAnalysisSnapshot, createAnalysisService } = await server.ssrLoadModule("/src/modules/accounts/services/analysisService.ts");
-  const { default: SummaryFarmTable } = await server.ssrLoadModule("/src/modules/accounts/components/Summary/SummaryFarmTable.tsx");
+  const { SummaryFarmTable, SummaryFarmCard } = await server.ssrLoadModule("/src/modules/accounts/components/Summary/SummaryFarmViewer.tsx");
   const { weekRange } = await server.ssrLoadModule("/src/modules/accounts/utils/periodRanges.ts");
   const { I18nProvider } = await server.ssrLoadModule("/src/i18n/index.tsx");
   const snapshot = await loadAnalysisSnapshot();
@@ -309,30 +309,31 @@ try {
     const service = createAnalysisService(snapshot);
     const range = weekRange(new Date("2026-09-17T12:00:00"));
     const trips = service.getCompletedTripsByDateRange(range.start, range.end);
-    // Built exactly the way SummaryPage builds it for the table.
+    // Built exactly the way SummaryPage builds it for the view.
     const rows = trips
       .map((trip) => ({ trip, farm: service.getFarmPaymentForTrip(trip.id) }))
       .filter((row) => row.farm)
       .sort((a, b) => String(b.trip.tripDate).localeCompare(String(a.trip.tripDate)) || b.trip.id - a.trip.id);
-    const totals = service.farmTotalsForTrips(trips);
-    const render = (open) => renderToString(
-      React.createElement(I18nProvider, null,
-        React.createElement(SummaryFarmTable, { rows, totals, open, onToggle: () => {}, onOpenTrip: () => {} }))
-    );
-    const html = render(true);
-    const shown = rows.filter(({ trip }) => html.includes(trip.tripNo)).length;
+    const payable = rows.reduce((sum, row) => sum + row.farm.amount, 0);
     const { formatINR, formatINRExact } = await server.ssrLoadModule("/src/modules/accounts/components/farm-payment/farmPaymentFormat.ts");
+    const withProvider = (node) => renderToString(React.createElement(I18nProvider, null, node));
+    const html = withProvider(React.createElement(SummaryFarmTable, { rows, spanLabel: "2026-09-14 - 2026-09-20", onOpenTrip: () => {} }));
+    const shown = rows.filter(({ trip }) => html.includes(trip.tripNo)).length;
     const weight = rows[0].farm.dcWeight ?? rows[0].trip.dcWeight ?? 0;
+    // The cumulative column must run up to the grand total in the footer.
+    const running = rows.reduce((acc, row) => (acc.push((acc[acc.length - 1] ?? 0) + row.farm.amount), acc), []);
     const checks = {
       tripsRendered: shown === rows.length,
       pickupWeight: html.includes(String(weight)),
       farmRate: html.includes(String(rows[0].farm.rate)),
-      totalsPayable: html.includes(formatINR(totals.payable)),
-      exactPayableTip: html.includes(formatINRExact(totals.payable)),
-      headers: /Trip No/.test(html) && /Pickup Weight/.test(html) && /Balance/.test(html),
-      collapsedHidesRows: !render(false).includes(rows[0].trip.tripNo),
+      cumulativeColumn: running.every((value, i) => i === running.length - 1 || html.includes(formatINR(value))),
+      grandTotal: html.includes(formatINR(payable)) && html.includes(formatINRExact(payable)),
+      headers: /Trip No/.test(html) && /Pickup Weight/.test(html) && /Cumulative/.test(html) && /Bird Type/.test(html),
+      noPaidOrBalance: !/Paid \(₹\)/.test(html) && !/Balance \(₹\)/.test(html),
+      tripLinkIsButton: /<button[^>]*>\s*<!-- -->TRP-|<button[^>]*>TRP-/.test(html),
+      cardRenders: withProvider(React.createElement(SummaryFarmCard, { rows, spanLabel: "2026-09-14 - 2026-09-20", onOpen: () => {} })).includes(formatINR(payable)),
     };
-    console.log(`OK   accounts-farm-table  rows ${shown}/${rows.length}  payable=${formatINR(totals.payable)}  html length=${html.length}  ${JSON.stringify(checks)}`);
+    console.log(`OK   accounts-farm-table  rows ${shown}/${rows.length}  cumulative=${formatINR(payable)}  html length=${html.length}  ${JSON.stringify(checks)}`);
     const bad = Object.entries(checks).filter(([, ok]) => !ok).map(([name]) => name);
     if (bad.length) failed.push({ name: "accounts-farm-table", err: new Error(`failed: ${bad.join(", ")}`) });
   }
