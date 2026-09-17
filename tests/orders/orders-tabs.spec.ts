@@ -158,7 +158,7 @@ test('collection columns are collection-only, and every header carries its icon'
     'Shop Name',
     'City',
     'No. of Birds',
-    'No. of Boxes',
+    'No. of Boxes *',
     'Weight',
     'Status',
     'Action',
@@ -180,11 +180,11 @@ test('the day total is a cumulative line below the table, not a header KPI', asy
   await expect(panel.getByText(/\d+ shops · \d+ boxes/)).toHaveCount(0);
 });
 
-test('filters sit in the Trip List order: day and city above sort, search and reset', async ({ page }) => {
+test('filters fill one grid: day · city · sort on the line, search + actions under it', async ({ page }) => {
   await page.goto(`${ORDERS}/collection`);
   const card = page.getByRole('region', { name: 'Order Collection filters' });
-  const field = (name: string) => card.getByText(name, { exact: true }).first();
-  const box = async (name: string) => await field(name).boundingBox();
+  const label = (name: string) => card.getByText(name, { exact: true }).first();
+  const box = async (name: string) => await label(name).boundingBox();
   const [date, city, sort, search] = await Promise.all([
     box('Date'),
     box('City'),
@@ -192,20 +192,48 @@ test('filters sit in the Trip List order: day and city above sort, search and re
     box('Search'),
   ]);
   expect(date && city && sort && search).toBeTruthy();
-  // Row 1 — the two fields that decide which day and which area.
+  // One row for the three fields, left to right: day, area, order of rows.
   expect(Math.abs(date!.y - city!.y) <= 2).toBe(true);
-  // Row 2 — sort then search, left to right, below row 1.
-  expect(sort!.y > date!.y).toBe(true);
-  expect(Math.abs(sort!.y - search!.y) <= 2).toBe(true);
-  expect(sort!.x < search!.x).toBe(true);
-  // Reset + Refresh close that second row, right-aligned and baseline-matched.
-  const actions = card.getByRole('button', { name: 'Reset', exact: true });
-  const reset = await actions.boundingBox();
+  expect(Math.abs(date!.y - sort!.y) <= 2).toBe(true);
+  expect(date!.x < city!.x).toBe(true);
+  expect(city!.x < sort!.x).toBe(true);
+  // The search runs the width of the card and takes the row under the fields,
+  // with Reset + Refresh closing it on the right.
+  const cardBox = await card.boundingBox();
+  expect(search!.y > date!.y).toBe(true);
+  expect(search!.width).toBeGreaterThan((cardBox?.width ?? 0) * 0.5);
+  const reset = await card.getByRole('button', { name: 'Reset', exact: true }).boundingBox();
   const refresh = await card.getByRole('button', { name: /Refresh/i }).boundingBox();
   expect(reset && refresh).toBeTruthy();
   expect(Math.abs(refresh!.y - reset!.y) <= 2).toBe(true);
   expect(refresh!.x > reset!.x).toBe(true);
-  expect(Math.abs(reset!.y + reset!.height - (search!.y + search!.height)) <= 6).toBe(true);
+  // Bottom-aligned: the search field and the two buttons share a baseline.
+  const searchField = await card.getByRole('textbox', { name: /search/i }).boundingBox();
+  expect(Math.abs(searchField!.y + searchField!.height - (reset!.y + reset!.height)) <= 6).toBe(true);
+});
+
+test('every filter control is the same height as the trip list inputs', async ({ page }) => {
+  await page.goto(`${ORDERS}/collection`);
+  const card = page.getByRole('region', { name: 'Order Collection filters' });
+  const heights = await Promise.all([
+    card.getByTestId('orders-date-picker').locator('input').boundingBox(),
+    card.getByRole('button', { name: 'City', exact: true }).boundingBox(),
+    card.getByRole('button', { name: 'Sort', exact: true }).boundingBox(),
+    card.getByRole('textbox', { name: /search/i }).boundingBox(),
+  ]);
+  for (const box of heights) {
+    expect(box, 'control renders').toBeTruthy();
+    // 40px (h-10) — the shared input height, so one grid line runs through all four.
+    expect(Math.abs(box!.height - 40) <= 1, `control height ${box!.height}`).toBe(true);
+  }
+});
+
+test('no tooltip is left on the collection screen', async ({ page }) => {
+  await page.goto(`${ORDERS}/collection`);
+  // Nothing on this page hides information behind a hover: the row state is the
+  // badge, the deadline is the chip. (The sidebar keeps its own native titles —
+  // that is app chrome, not this screen.)
+  await expect(page.locator('#orders-panel-collection').getByTitle(/./)).toHaveCount(0);
 });
 
 test('the header breadcrumb names the module and the page', async ({ page }) => {

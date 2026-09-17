@@ -296,6 +296,8 @@ export function OrdersDateControl({
   onDaySelect,
   t,
   className = "",
+  /** Width of the date field itself — Collection stretches it to the column. */
+  fieldClassName = "w-44",
   hideDayChip = false,
 }: {
   day: string;
@@ -304,6 +306,7 @@ export function OrdersDateControl({
   /** Orders translator — params are needed for the auto-close deadline. */
   t: OrdersT;
   className?: string;
+  fieldClassName?: string;
   /**
    * Order Collection shows the day state (TODAY / CLOSED) beside its
    * shops · boxes · birds summary instead, so it hides the chip here to keep
@@ -330,8 +333,9 @@ export function OrdersDateControl({
         hideToday
         // Full "DD/MM/YYYY" (10 chars) + calendar icon must be visible —
         // the input reserves pr-16 for the icon, so the field needs
-        // ~110px of text room. w-44 guarantees no clipping/overflow.
-        className="w-44"
+        // ~110px of text room. w-44 guarantees no clipping/overflow, and a
+        // filter grid that fills its column passes w-full instead.
+        className={fieldClassName}
         data-testid="orders-date-picker"
       />
       {hideDayChip ? null : day === today ? (
@@ -479,7 +483,7 @@ export function OrdersDropdown({
         aria-label={ariaLabel}
         onClick={() => (open ? setOpen(false) : openList(false))}
         onKeyDown={onTriggerKeyDown}
-        className={`h-9 ${widthClass} inline-flex items-center justify-between gap-2 rounded-lg border bg-white pl-3 pr-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 ${
+        className={`h-10 ${widthClass} inline-flex items-center justify-between gap-2 rounded-lg border bg-white pl-3 pr-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 ${
           value ? "border-emerald-300 text-emerald-800 bg-emerald-50/50" : "border-slate-200 text-slate-600"
         }`}
       >
@@ -579,7 +583,7 @@ export function OrdersMultiSelect({
         aria-controls={open ? listboxId : undefined}
         aria-label={ariaLabel}
         onClick={() => setOpen((o) => !o)}
-        className={`h-9 ${widthClass} inline-flex items-center justify-between gap-2 rounded-lg border bg-white pl-3 pr-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 ${
+        className={`h-10 ${widthClass} inline-flex items-center justify-between gap-2 rounded-lg border bg-white pl-3 pr-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 ${
           values.length > 0
             ? "border-emerald-300 text-emerald-800 bg-emerald-50/50"
             : "border-slate-200 text-slate-600"

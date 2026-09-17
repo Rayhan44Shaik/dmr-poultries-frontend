@@ -48,20 +48,40 @@ This is approximately **89% less processing time**, not a measurement of total b
 - Visited pages stay mounted while you move between the three routes from the sidebar: filters, page size, current page and unsaved edits survive the move. These local filters/drafts are not persisted across a full browser reload. Date changes intentionally mount a new day editor; top-level collection/assignment search and sort controls remain selected.
 - All Orders pagers now use the same `src/ui/Pagination.tsx` as Trip List, with counts, rows-per-page, disabled states and bounded page controls. Filtering/sorting occur before slicing.
 - Collection cells match Trip List's 16px column padding, 20px body padding and 16px header padding. Search includes shop number and phone in addition to existing fields.
-- Collection's filter card uses the Trip List arrangement: date + city on the first row, then sort
-  (3 cols) / search (5 cols) / reset + refresh (4 cols) on a 12-column row aligned `items-end`, so
-  every control shares one baseline. Each column header carries its own 14px icon at the same
-  spacing the trip table uses.
+- Collection's filter card is **one 12-column grid whose fields fill their cells**: Date · City · Sort
+  on the first line (4 columns each), then Search (8 columns) with Reset + Refresh (4 columns,
+  right-aligned) underneath, bottom-aligned with `lg:items-end`. Every control is the shared **40px**
+  (`h-10`) height — the Orders dropdowns and multi-selects were `h-9` while the search input and the
+  DatePicker were already `h-10`, which is what made a filter row read as three different sizes. Labels
+  use `ORDERS_FILTER_LABEL_CLASS` (12px uppercase, `min-h-[17px]` so a field without an icon still lines
+  up with its neighbours); the search field keeps only its own inset magnifier — no second one on the
+  label. Assignment was brought to the same label class, per-field icon colours and full-width fields so
+  the two screens read as one module.
+- Columns are **equal width apart from S.No** (`table-fixed`, S.No measured at 96px so its glyph plus
+  the word fit) — the heads stop chasing their content. Each header carries its own 15px icon, coloured
+  per column, at the trip table's spacing; the words are 13px.
 - Trip No and Vehicle No are **not** Collection columns (assignment facts belong to Assignment); an
-  assigned shop shows only its status, with trip / vehicle / sequence in the tooltip.
+  assigned shop shows only its status pill, and a pending count rides **beside** the pill (`25 to
+  deliver`) rather than inside it, so an equal-width column cannot be pushed over.
+- **No tooltips on this screen.** The row state is the badge, the deadline is the chip — nothing needs a
+  hover to be understood, so every `title` attribute was removed from the page (pinned by
+  `npm run test:e2e:orders`: "no tooltip is left on the collection screen").
 - The day total is one cumulative line **below** the table (`Orders taken in N shops`, with birds ·
   boxes · kg muted beside it) instead of a KPI in the header bar.
+- The **Action** column is not a delete: it zeroes that shop's birds and boxes (weight follows, since it
+  is read from the birds) and the shop keeps its row. The clear runs through the shared 10-second window
+  (`usePendingDelete`, the same controller the Recent table uses for a pending trip) — the row is marked
+  while it counts, the button turns into the countdown and cancels on click, and `Undo` in the
+  notification puts the numbers back. Nothing reaches the server until the window runs out, and the save
+  keeps the row at zero (`toOrderShopRows(rows, keepZeroFor)`) instead of dropping it.
 - Collection has one action: **Save Progress**. There is no Cancel (the saved record is the draft, so
   there is nothing to discard) and no Finish button — the day's own deadline files it: 48h from the
-  start of the day (the 16th submits at 18/09 12:00 AM). The screen states that deadline instead of
-  offering a button (`Auto-submits 18/09 12:00 AM`). The check is one `Date.now()` comparison on
-  load plus one `setTimeout` armed per mount — no interval, no polling — and the submit reuses the
-  existing `POST /trips/:id/steps/deliveries` call, so the auto-close costs no extra request.
+  start of the day (the 16th submits at 18/09 12:00 AM). The deadline is stated **once**, in the day's
+  state row, and it moves: `Auto-submits 18/09 12:00 AM · in 1d 03h 59m` with a ping dot and the window
+  drawn as a bar filling under the chip (all of it `motion-safe`). The check is one `Date.now()`
+  comparison on load plus one `setTimeout` armed per mount — no interval, no polling on the data path
+  beyond a 30s tick for the label — and the submit reuses the existing
+  `POST /trips/:id/steps/deliveries` call, so the auto-close costs no extra request.
 - Assignment now exposes search/date/sort and read-only historical rows. Historical days never mount the writable assignment editor.
 - Table refresh retains controls, navigation and drafts. Initial loading uses a table shell, not a full-app spinner. Page transitions respect reduced-motion preferences.
 

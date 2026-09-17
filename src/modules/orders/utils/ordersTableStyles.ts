@@ -30,6 +30,18 @@ export function ordersTableZebraRow(index: number, extraClass = ""): string {
   return `${opsTableRowClass} ${ordersZebraTone(index)}${extraClass ? ` ${extraClass}` : ""}`;
 }
 
-/** Trip List density: 16px column padding, 20px body and 16px header padding. */
-export const ORDERS_TABLE_TH_CLASS = "px-4 py-4 text-left text-[12px] font-bold uppercase tracking-wider text-slate-600 whitespace-nowrap";
+/**
+ * Trip List density: 16px column padding, 20px body and 16px header padding.
+ * The header word is one step larger than the shared 12px, and darker, so a
+ * column name reads at a glance beside its icon.
+ */
+export const ORDERS_TABLE_TH_CLASS = "px-4 py-4 text-left text-[13px] font-bold uppercase tracking-[0.06em] text-slate-700 whitespace-nowrap";
+
+/**
+ * Filter field label for the Orders pages: the Trip List label chrome
+ * (uppercase, bold, leading icon) one size up — 12px — because these filter
+ * cards hold only a few fields and each has to be readable at a glance.
+ */
+export const ORDERS_FILTER_LABEL_CLASS =
+  "mb-2 flex min-h-[17px] items-center gap-2 text-[12px] font-bold uppercase tracking-[0.06em] text-slate-600";
 export const ORDERS_TABLE_TD_CLASS = "px-4 py-5 text-[13px] text-slate-600 align-middle";

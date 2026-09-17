@@ -49,6 +49,11 @@ const EN: Record<string, string> = {
   "orders.entry_cleared": "Entry cleared for {shop}",
   "orders.clear_entry": "Clear entry",
   "orders.clear_entry_label": "Clear {shop}",
+  "orders.undo_clear_label": "Undo clearing {shop}",
+  // Pending counts beside a status badge (never inside it — the columns are
+  // equal width and a long pill would push past its cell).
+  "orders.boxes_to_deliver": "{boxes} to deliver",
+  "orders.boxes_to_assign": "{boxes} to assign",
   "orders.collection_summary": "{shops} shops · {boxes} boxes · {birds} birds",
   // Collection's cumulative line under the table: shops lead, rest is muted.
   "orders.collection_summary_shops":
@@ -59,14 +64,13 @@ const EN: Record<string, string> = {
   "orders.submitting": "Submitting…",
   // The day is filed by its deadline, never by a button.
   "orders.auto_submits_at": "Auto-submits {deadline}",
-  "orders.auto_submits_footer_note":
-    "Saved entries go in by themselves at {deadline} — no Finish step needed",
+  // Chip countdown: the deadline is shown as time left, so it visibly moves.
+  "orders.auto_submits_in": "in {time}",
   "orders.collection_auto_submitted":
     "Collection window closed — the day's orders were submitted automatically.",
   "orders.collection_auto_submitted_partial":
     "Collection window closed — submitted automatically ({shops} shop(s) went in without boxes).",
   "orders.collection_saved": "Collection progress saved",
-  "orders.weight_pending": "Weight comes from farm data at delivery",
 
   // ── Tab 2 · Order Assignment ──────────────────────────────────────────
   "orders.assignment_empty":
@@ -191,7 +195,6 @@ const EN: Record<string, string> = {
   "orders.hdr_diff_boxes": "Diff. (Boxes)",
   "orders.hdr_status": "Status",
   "orders.hdr_delivered_at": "Delivered At",
-  "orders.pending_boxes_hint": "{boxes} box still to deliver",
   "orders.pdf_check_summary": "Report summary",
   "orders.delivered_shops": "Delivered Shops",
   "orders.pdf_saved_btn": "Saved",
@@ -248,7 +251,6 @@ const EN: Record<string, string> = {
   // Collection table: trip / assignment / status
   "orders.col_trip_assignment": "Trip / Assignment",
   "orders.not_assigned": "Not Assigned",
-  "orders.seq_n": "Seq {n}",
   "orders.assigned_to_vehicle": "{vehicle} · Seq {n}",
   "orders.status_delivered_diff": "Delivered with Difference",
   "orders.status_part_delivered": "Part Delivered",
@@ -473,6 +475,9 @@ const TE: Record<string, string> = {
   "orders.entry_cleared": "{shop} నమోదు తీసివేయబడింది",
   "orders.clear_entry": "నమోదును క్లియర్ చేయండి",
   "orders.clear_entry_label": "{shop} క్లియర్ చేయండి",
+  "orders.undo_clear_label": "{shop} క్లియర్‌ను వెనక్కి తీసుకోండి",
+  "orders.boxes_to_deliver": "{boxes} డెలివరీ చేయాలి",
+  "orders.boxes_to_assign": "{boxes} అసైన్ చేయాలి",
   "orders.collection_summary": "{shops} షాప్‌లు · {boxes} బాక్స్‌లు · {birds} పక్షులు",
   "orders.collection_summary_shops": "{shops} షాప్‌లకు ఆర్డర్ నమోదు అయింది",
   "orders.add_at_least_one_shop": "కనీసం ఒక షాప్ ఆర్డర్ నమోదు చేయండి (పక్షులు + బాక్స్‌లు)",
@@ -480,14 +485,12 @@ const TE: Record<string, string> = {
   "orders.saving": "సేవ్ అవుతోంది…",
   "orders.submitting": "సబ్మిట్ అవుతోంది…",
   "orders.auto_submits_at": "{deadline}కు ఆటో-సబ్మిట్ అవుతుంది",
-  "orders.auto_submits_footer_note":
-    "సేవ్ చేసిన నమోదులు {deadline}కు వాటంతట అవే సబ్మిట్ అవుతాయి — ఫినిష్ అవసరం లేదు",
+  "orders.auto_submits_in": "{time} లోపల",
   "orders.collection_auto_submitted":
     "సేకరణ సమయం ముగిసింది — రోజు ఆర్డర్లు ఆటోమేటిక్‌గా సబ్మిట్ అయ్యాయి.",
   "orders.collection_auto_submitted_partial":
     "సేకరణ సమయం ముగిసింది — ఆటోమేటిక్‌గా సబ్మిట్ అయింది (బాక్స్‌లు లేని {shops} షాప్‌లు).",
   "orders.collection_saved": "సేకరణ ప్రగతి సేవ్ చేయబడింది",
-  "orders.weight_pending": "బరువు డెలివరీ సమయంలో ఫామ్ డేటా నుండి వస్తుంది",
 
   // Tab 2
   "orders.assignment_empty":
@@ -611,7 +614,6 @@ const TE: Record<string, string> = {
   "orders.hdr_diff_boxes": "తేడా (బాక్సులు)",
   "orders.hdr_status": "స్థితి",
   "orders.hdr_delivered_at": "డెలివరీ సమయం",
-  "orders.pending_boxes_hint": "ఇంకా {boxes} బాక్సులు డెలివరీ చేయాలి",
   "orders.pdf_check_summary": "రిపోర్ట్ సారాంశం",
   "orders.delivered_shops": "డెలివరీ అయిన షాప్‌లు",
   "orders.pdf_saved_btn": "సేవ్ అయింది",
@@ -666,7 +668,6 @@ const TE: Record<string, string> = {
   // Collection table
   "orders.col_trip_assignment": "ట్రిప్ / కేటాయింపు",
   "orders.not_assigned": "కేటాయించబడలేదు",
-  "orders.seq_n": "సీక్వెన్స్ {n}",
   "orders.assigned_to_vehicle": "{vehicle} · సీక్వెన్స్ {n}",
   "orders.status_delivered_diff": "వ్యత్యాసంతో పంపిణీ చేయబడింది",
   "orders.status_part_delivered": "పాక్షికంగా పంపిణీ",

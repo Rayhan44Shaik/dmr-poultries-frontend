@@ -34,12 +34,11 @@
 // Refreshing the page always reproduces the saved collection.
 
 import React, { type ComponentType, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Activity, ArrowUpDown, Bird, Boxes, Calendar, ClipboardList, Clock, Hash, Loader2, Lock, MapPin, RotateCcw, Save, Scale, Search, Store, Trash2 } from "lucide-react";
+import { Activity, ArrowUpDown, Bird, Boxes, Calendar, ClipboardList, Clock, Eraser, Hash, Loader2, Lock, MapPin, RotateCcw, Save, Scale, Store, Undo2 } from "lucide-react";
 import type { Shop } from "../../masters/shops/types/shop";
 import type { Trip } from "../../../shared/trip";
 import {
   opsFilterCardClass,
-  opsFilterLabelClass,
   opsSecondaryButtonClass,
   opsTableDivideClass,
   opsTableHeadRowClass,
@@ -49,9 +48,11 @@ import { useSafeNotification } from "../../../hooks/useSafeNotification";
 import { usePendingDelete } from "../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../components/common/PendingDeleteNotification";
 import {
+  COLLECTION_GRACE_DAYS,
   collectionAutoSubmitDelay,
   collectionTotals,
   formatCollectionDeadline,
+  formatCountdown,
   formatDayFull,
   formatKg,
   isCollectionAutoClosed,
@@ -70,6 +71,7 @@ import { useOrdersI18n } from "../i18n/ordersI18n";
 import { compareAssignmentRows, type AssignmentSort } from "../utils/assignmentSort";
 import type { OrderShopRow, OrdersDayCollection } from "../types";
 import {
+  ORDERS_FILTER_LABEL_CLASS,
   ORDERS_TABLE_FONT_CLASS,
   ORDERS_TABLE_TD_CLASS as opsTableTdClass,
   ORDERS_TABLE_TH_CLASS as opsTableThClass,
@@ -89,6 +91,28 @@ import {
 
 /** Fixed page size — 10 rows per page (global pagination component). */
 
+/**
+ * Badge + its pending count. The count is a separate, muted piece (not part of
+ * the pill) so the equal-width columns never get pushed apart by a long label;
+ * it wraps under the badge when the column is narrow.
+ */
+function StatusWithNote({
+  status,
+  label,
+  note,
+}: {
+  status: string;
+  label: string;
+  note: string;
+}) {
+  return (
+    <span className="inline-flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-0.5">
+      <OrdersStatusBadge status={status} label={label} />
+      <span className="text-[10.5px] font-bold tabular-nums text-amber-600">{note}</span>
+    </span>
+  );
+}
+
 const ORDER_REMARKS = "[ORDER]";
 
 type ColIcon = ComponentType<{ size?: number | string; className?: string; "aria-hidden"?: boolean }>;
@@ -102,18 +126,21 @@ function ColHead({
   icon: Icon,
   label,
   align = "left",
+  tone = "text-slate-400",
 }: {
   icon: ColIcon;
   label: string;
   align?: "left" | "right" | "center";
+  /** Per-column colour so the header scans by eye, the way the app's icons do. */
+  tone?: string;
 }) {
   return (
     <span
-      className={`flex items-center gap-1.5${
+      className={`flex items-center gap-2${
         align === "right" ? " justify-end" : align === "center" ? " justify-center" : ""
       }`}
     >
-      <Icon size={14} className="text-slate-400 flex-shrink-0" aria-hidden />
+      <Icon size={15} className={`${tone} flex-shrink-0`} aria-hidden />
       <span>{label}</span>
     </span>
   );
@@ -182,9 +209,11 @@ function buildInitial(
   return { map, snapshot: entrySnapshot(Array.from(map.values())) };
 }
 
-function toOrderShopRows(rows: EntryRow[]): OrderShopRow[] {
+function toOrderShopRows(rows: EntryRow[], keepZeroFor: number | null = null): OrderShopRow[] {
   return rows
-    .filter((r) => r.birds > 0 || r.boxes > 0)
+    // A row normally rides along only when it holds something. `keepZeroFor` is
+    // how "clear" persists a shop at zero instead of deleting its line.
+    .filter((r) => r.birds > 0 || r.boxes > 0 || r.shopId === keepZeroFor)
     .map((r, i) => ({
       id: r.id,
       clientKey: r.clientKey,
@@ -290,6 +319,26 @@ function CollectionEntries({
   // still open on 05/09 and AUTO-CLOSES at 06/09 12:00 AM, finished or not.
   const isAutoClosed = isCollectionAutoClosed(day);
   const isPast = day < today;
+
+  // The chip ticks (30s) so the closing moment is something you can watch
+  // moving, not a date to interpret. One interval, and only while the day can
+  // still be edited — a closed day has nothing left to count down to.
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  useEffect(() => {
+    if (isAutoClosed) return;
+    const id = window.setInterval(() => setNowMs(Date.now()), 30_000);
+    return () => window.clearInterval(id);
+  }, [isAutoClosed]);
+  const autoSubmitDeadline = formatCollectionDeadline(day);
+  const autoSubmitRemainingMs = collectionAutoSubmitDelay(day, new Date(nowMs)) ?? 0;
+  const autoSubmitRemaining = formatCountdown(autoSubmitRemainingMs);
+  const autoSubmitProgressPct = Math.min(
+    100,
+    Math.max(
+      0,
+      Math.round(100 - (autoSubmitRemainingMs / (COLLECTION_GRACE_DAYS * 86_400_000)) * 100)
+    )
+  );
   const isLocked =
     isAutoClosed || Boolean(collection?.finished) || Boolean(collection?.fullyAssigned);
   const isEditable = !isLocked;
@@ -363,64 +412,61 @@ function CollectionEntries({
     []
   );
 
-  // ── Clear a row (persisted rows re-save without it; 10s undo) ─────────────
+  // ── Clear a row: zero the order, never remove the shop ───────────────────
+  // The Action column is not a delete. The shop keeps its place on the sheet
+  // and its birds and boxes go to zero — weight follows, since it is read from
+  // the birds. Like a pending trip in the Recent table, the click opens a
+  // 10-second window: Undo puts the numbers back and nothing is written until
+  // the window runs out.
   const doClear = useCallback(
     async (shopId: number) => {
       if (persistLockRef.current) return;
       const row = entries.get(shopId);
       if (!row) return;
-      const wasPersisted = row.id > 0;
-      if (wasPersisted) {
-        const remaining = toOrderShopRows(
-          Array.from(entries.values())
-            .filter((r) => r.shopId !== shopId)
-        );
-        if (remaining.length === 0) {
-          showNotification(to("orders.add_at_least_one_shop"), "info");
-          return;
-        }
-        persistLockRef.current = true;
-        try {
-          const updated = await saveCollection(
-            containerRef.current.id,
-            containerRef.current.tripNo,
-            remaining
-          );
-          containerRef.current = { id: updated.id, tripNo: updated.tripNo };
-          const fresh = new Map(entries);
-          const kept = fresh.get(shopId);
-          if (kept) fresh.set(shopId, { ...kept, id: 0, birds: 0, boxes: 0 });
-          setEntries(fresh);
-          setSavedSnapshot(entrySnapshot(Array.from(fresh.values())));
-          onSaved(updated);
-          showNotification(to("orders.entry_cleared", { shop: row.shopName }), "success");
-        } catch (error) {
-          showNotification(handleApiError(error), "error");
-        } finally {
-          persistLockRef.current = false;
-        }
-      } else {
-        const next = new Map(entries);
-        next.set(shopId, { ...row, id: 0, birds: 0, boxes: 0 });
+      const next = new Map(entries);
+      next.set(shopId, { ...row, birds: 0, boxes: 0 });
+      if (row.id === 0) {
+        // Nothing on the server yet — zero locally and let Save Progress carry it.
         setEntries(next);
         showNotification(to("orders.entry_cleared", { shop: row.shopName }), "success");
+        return;
+      }
+      persistLockRef.current = true;
+      try {
+        const updated = await saveCollection(
+          containerRef.current.id,
+          containerRef.current.tripNo,
+          toOrderShopRows(Array.from(next.values()), shopId)
+        );
+        containerRef.current = { id: updated.id, tripNo: updated.tripNo };
+        setEntries(next);
+        setSavedSnapshot(entrySnapshot(Array.from(next.values())));
+        onSaved(updated);
+        showNotification(to("orders.entry_cleared", { shop: row.shopName }), "success");
+      } catch (error) {
+        showNotification(handleApiError(error), "error");
+      } finally {
+        persistLockRef.current = false;
       }
     },
     [entries, onSaved, showNotification, to]
   );
 
-  const { requestDelete, cancel: cancelDelete, pendingItems } =
-    usePendingDelete<number>((id) => void doClear(id));
+  const {
+    requestDelete,
+    cancel: cancelDelete,
+    isPending,
+    secondsLeft,
+    pendingItems,
+  } = usePendingDelete<number>((id) => void doClear(id));
 
   const onClearClick = (shopId: number) => {
     if (busy || !isEditable) return;
     const row = entries.get(shopId);
     if (!row || (row.birds === 0 && row.boxes === 0)) return;
-    if (row.id > 0) {
-      requestDelete(shopId, { label: to("orders.clear_entry_label", { shop: row.shopName }) });
-    } else {
-      void doClear(shopId);
-    }
+    // Every clear gets the undo window — a draft row included, so a mis-click
+    // never costs typed numbers.
+    requestDelete(shopId, { label: to("orders.clear_entry_label", { shop: row.shopName }) });
   };
 
   // ── Save Progress (no final validation) ───────────────────────────────────
@@ -661,44 +707,41 @@ function CollectionEntries({
   );
   const startIndex = filteredShopList.length === 0 ? 0 : (safePage - 1) * pageSize;
 
-  // Two rows, same rhythm as the Trip List filters: the day and the city first
-  // (they decide WHAT is being collected), then sort / search / actions on a
-  // 12-column row so every control shares one baseline. Every field is labelled
-  // with the icon it uses across the app, in the same size (17) and weight.
+  // One 12-column grid, two rows, every control filling its cell: day · city ·
+  // sort on the first line, the search and the day's actions under it, all
+  // bottom-aligned on one baseline with the same 40px controls the Trip List
+  // uses. Labels are one size up; the search keeps only its own magnifier.
   const filterCard = (
     <section className={opsFilterCardClass} aria-label={to('orders.collection_filters')}>
-      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
-        <div className="sm:col-span-2">
-          <div className={opsFilterLabelClass}>
+      <div className="grid grid-cols-1 gap-x-3.5 gap-y-4 sm:grid-cols-2 lg:grid-cols-12 lg:items-end">
+        <div className="lg:col-span-4">
+          <div className={ORDERS_FILTER_LABEL_CLASS}>
             <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
             <span>{to('orders.col_date')}</span>
           </div>
-          <OrdersDateControl day={day} today={today} onDaySelect={onDaySelect} t={to} hideDayChip />
+          <OrdersDateControl day={day} today={today} onDaySelect={onDaySelect} t={to} hideDayChip className="w-full" fieldClassName="w-full" />
         </div>
-        <div className="sm:col-span-2">
-          <div className={opsFilterLabelClass}>
+        <div className="lg:col-span-4">
+          <div className={ORDERS_FILTER_LABEL_CLASS}>
             <MapPin size={17} className="text-amber-500 flex-shrink-0" />
             <span>{to('orders.city')}</span>
           </div>
-          <OrdersMultiSelect values={cityFilters} onChange={setCityFilters} options={cityOptions} ariaLabel={to('orders.filter_city')} placeholder={to('orders.filter_city_all')} widthClass="w-full" />
+          <OrdersMultiSelect values={cityFilters} onChange={setCityFilters} options={cityOptions} ariaLabel={to('orders.filter_city')} placeholder={to('orders.filter_city_all')} className="w-full" widthClass="w-full" />
         </div>
-      </div>
-      <div className="grid grid-cols-1 items-end gap-3.5 pt-1 lg:grid-cols-12">
-        <div className="lg:col-span-3">
-          <div className={opsFilterLabelClass}>
+        <div className="lg:col-span-4">
+          <div className={ORDERS_FILTER_LABEL_CLASS}>
             <ArrowUpDown size={17} className="text-violet-500 flex-shrink-0" />
             <span>{to('orders.sort')}</span>
           </div>
-          <OrdersDropdown value={sortMode} onChange={value => setSortMode(value as CollectionSort)} options={sortOptions} ariaLabel={to('orders.sort')} widthClass="w-full" />
+          <OrdersDropdown value={sortMode} onChange={value => setSortMode(value as CollectionSort)} options={sortOptions} ariaLabel={to('orders.sort')} className="w-full" widthClass="w-full" />
         </div>
-        <div className="lg:col-span-5">
-          <div className={opsFilterLabelClass}>
-            <Search size={17} className="text-slate-400 flex-shrink-0" />
+        <div className="sm:col-span-2 lg:col-span-8">
+          <div className={ORDERS_FILTER_LABEL_CLASS}>
             <span>{to('orders.search_label')}</span>
           </div>
           <OrdersSearchInput value={query} onChange={setQuery} placeholder={to('orders.search_collection')} className="w-full" />
         </div>
-        <div className="flex flex-wrap items-center justify-end gap-2 lg:col-span-4">
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end lg:col-span-4">
           <button type="button" className={`group relative ${opsSecondaryButtonClass}`} onClick={() => {
             setQuery(''); setSortMode('collected'); setCityFilters([]); setPage(1);
             if (day !== today) onDaySelect(today);
@@ -747,12 +790,7 @@ function CollectionEntries({
               TODAY while the window is open, CLOSED once it has passed. */}
           <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
             {isAutoClosed ? (
-              <span
-                title={to("orders.auto_closed_note", {
-                  deadline: formatCollectionDeadline(day),
-                })}
-                className="inline-flex items-center gap-1 rounded-full bg-rose-50 border border-rose-200 px-2 py-0.5 text-[11px] font-bold text-rose-700 whitespace-nowrap"
-              >
+              <span className="inline-flex items-center gap-1 rounded-full bg-rose-50 border border-rose-200 px-2 py-0.5 text-[11px] font-bold text-rose-700 whitespace-nowrap">
                 <Lock size={11} />
                 {to("orders.closed_day")}
               </span>
@@ -762,15 +800,29 @@ function CollectionEntries({
               </span>
             ) : null}
             {isEditable ? (
-              /* No Finish button, so the deadline has to be visible: this says
-                 out loud when the day files itself (day + 2 days, 12:00 AM). */
-              <span
-                className="inline-flex items-center gap-1 rounded-full bg-sky-50 border border-sky-200 px-2 py-0.5 text-[11px] font-semibold text-sky-700 whitespace-nowrap"
-              >
-                <Clock size={11} className="flex-shrink-0" />
-                {to("orders.auto_submits_at", {
-                  deadline: formatCollectionDeadline(day),
-                })}
+              /* No Finish button, so the deadline has to be visible — once, in
+                 the day's own state row. It shows when the day files itself and
+                 counts down to it, with a bar across the bottom showing how much
+                 of the 48h window is behind us. */
+              <span className="relative inline-flex items-center gap-2 overflow-hidden rounded-full border border-sky-200 bg-sky-50 py-1 pl-2.5 pr-3 text-[11.5px] font-bold whitespace-nowrap text-sky-800">
+                <span className="relative flex h-1.5 w-1.5 flex-shrink-0" aria-hidden>
+                  <span className="absolute inset-0 rounded-full bg-sky-500/60 motion-safe:animate-ping" />
+                  <span className="relative h-1.5 w-1.5 rounded-full bg-sky-500" />
+                </span>
+                <Clock size={12} className="flex-shrink-0 text-sky-600" aria-hidden />
+                <span>{to("orders.auto_submits_at", { deadline: autoSubmitDeadline })}</span>
+                <span
+                  className="font-semibold tabular-nums text-sky-600 motion-safe:transition-opacity motion-safe:duration-500"
+                  aria-live="off"
+                >
+                  · {to("orders.auto_submits_in", { time: autoSubmitRemaining })}
+                </span>
+                <span className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-sky-500/15" aria-hidden>
+                  <span
+                    className="block h-full rounded-r-full bg-sky-500/70 motion-safe:transition-[width] motion-safe:duration-700 motion-safe:ease-out"
+                    style={{ width: `${autoSubmitProgressPct}%` }}
+                  />
+                </span>
               </span>
             ) : null}
           </div>
@@ -778,35 +830,39 @@ function CollectionEntries({
         </div>
 
         <div className="overflow-x-auto" aria-busy={refreshing}>
-          <table className={`w-full min-w-[900px] ${ORDERS_TABLE_FONT_CLASS}`}>
+          {/* table-fixed with one measured column: S.No keeps its 96px and every other
+              column takes an equal share of what is left, so the eight headings sit
+              on one rhythm instead of chasing their content. */}
+          <table className={`w-full min-w-[900px] table-fixed ${ORDERS_TABLE_FONT_CLASS}`}>
             <thead>
               <tr className={opsTableHeadRowClass}>
                 {/* Collection-only columns. Trip / vehicle are deliberately not
-                    here — they belong to Assignment, and repeating them makes
-                    this screen look like a different module's table. */}
-                <th className={`${opsTableThClass} w-16 text-center`}>
-                  <ColHead icon={Hash} label={to("orders.col_sno")} align="center" />
+                    here — they belong to Assignment. */}
+                {/* The only measured column: it has to hold its glyph plus the
+                    word "S.No", and everything else shares what is left. */}
+                <th className={`${opsTableThClass} w-[96px] text-center`}>
+                  <ColHead icon={Hash} label={to("orders.col_sno")} align="center" tone="text-slate-400" />
                 </th>
                 <th className={opsTableThClass}>
-                  <ColHead icon={Store} label={to("orders.col_shop_name")} />
+                  <ColHead icon={Store} label={to("orders.col_shop_name")} tone="text-sky-600" />
                 </th>
                 <th className={opsTableThClass}>
-                  <ColHead icon={MapPin} label={to("orders.col_village")} />
+                  <ColHead icon={MapPin} label={to("orders.col_village")} tone="text-amber-600" />
                 </th>
-                <th className={`${opsTableThClass} w-28`}>
-                  <ColHead icon={Bird} label={to("orders.col_birds")} />
+                <th className={opsTableThClass}>
+                  <ColHead icon={Bird} label={to("orders.col_birds")} tone="text-emerald-600" />
                 </th>
-                <th className={`${opsTableThClass} w-28`}>
-                  <ColHead icon={Boxes} label={`${to("orders.col_boxes")} *`} />
+                <th className={opsTableThClass}>
+                  <ColHead icon={Boxes} label={`${to("orders.col_boxes")} *`} tone="text-violet-600" />
                 </th>
-                <th className={`${opsTableThClass} w-24 text-right`}>
-                  <ColHead icon={Scale} label={to("orders.col_weight")} align="right" />
+                <th className={`${opsTableThClass} text-right`}>
+                  <ColHead icon={Scale} label={to("orders.col_weight")} align="right" tone="text-teal-600" />
                 </th>
-                <th className={`${opsTableThClass} w-36`}>
-                  <ColHead icon={Activity} label={to("orders.col_status")} />
+                <th className={opsTableThClass}>
+                  <ColHead icon={Activity} label={to("orders.col_status")} tone="text-indigo-600" />
                 </th>
-                <th className={`${opsTableThClass} w-20 text-right`}>
-                  <ColHead icon={Trash2} label={to("orders.col_action")} align="right" />
+                <th className={`${opsTableThClass} text-right`}>
+                  <ColHead icon={Eraser} label={to("orders.col_action")} align="right" tone="text-rose-500" />
                 </th>
               </tr>
             </thead>
@@ -818,6 +874,8 @@ function CollectionEntries({
                 const boxes = isEditable ? live?.boxes ?? 0 : ro?.boxes ?? 0;
                 const hasEntry = birds > 0 || boxes > 0;
                 const assignment = collection?.shops.get(shop.id) ?? null;
+                // Inside the undo window: the row is marked, nothing has changed.
+                const clearing = isPending(shop.id);
 
                 let statusNode: React.ReactNode = (
                   <OrdersStatusBadge status="Not Collected" label={to("orders.status_not_collected")} />
@@ -834,26 +892,22 @@ function CollectionEntries({
                     assignment.deliveredBoxes < assignment.boxes
                   ) {
                     // PART DELIVERY — the balance stays visible (25 ordered,
-                    // 10 in → 15 box pending), never a green "Delivered".
+                    // 10 in → 15 still to deliver), never a green "Delivered".
+                    // The count rides beside the badge instead of inside it: the
+                    // columns are equal width, and a long pill would push past
+                    // its cell.
                     const remaining = assignment.boxes - assignment.deliveredBoxes;
                     statusNode = (
-                      <span
-                        title={`${assignment.tripNo} · ${assignment.vehicleNo} · ${to("orders.seq_n", { n: assignment.sequence })} · ${to("orders.pending_boxes_hint", { boxes: remaining })}`}
-                      >
-                        <OrdersStatusBadge
-                          status="Part Delivered"
-                          label={`${to("orders.status_part_delivered")} · ${remaining} ${to("orders.word_boxes")}`}
-                        />
-                      </span>
+                      <StatusWithNote
+                        status="Part Delivered"
+                        label={to("orders.status_part_delivered")}
+                        note={to("orders.boxes_to_deliver", { boxes: remaining })}
+                      />
                     );
                   } else if (assignment.delivered) {
                     // Step 4 confirmed this shop was delivered → GREEN.
                     statusNode = (
-                      <span
-                        title={`${assignment.tripNo} · ${assignment.vehicleNo} · ${to("orders.seq_n", { n: assignment.sequence })}`}
-                      >
-                        <OrdersStatusBadge status="Delivered" label={to("orders.status_delivered")} />
-                      </span>
+                      <OrdersStatusBadge status="Delivered" label={to("orders.status_delivered")} />
                     );
                   } else if (
                     // SPLIT still open: part of the order is on vehicles, the
@@ -862,30 +916,29 @@ function CollectionEntries({
                   ) {
                     const pendingAssign = assignment.boxes - assignment.assignedBoxesTotal;
                     statusNode = (
-                      <span
-                        title={`${assignment.tripNo} · ${assignment.vehicleNo} · ${to("orders.seq_n", { n: assignment.sequence })}`}
-                      >
-                        <OrdersStatusBadge
-                          status="Part Assigned"
-                          label={`${to("orders.status_part_assigned")} · ${pendingAssign} ${to("orders.word_boxes")}`}
-                        />
-                      </span>
+                      <StatusWithNote
+                        status="Part Assigned"
+                        label={to("orders.status_part_assigned")}
+                        note={to("orders.boxes_to_assign", { boxes: pendingAssign })}
+                      />
                     );
                   } else {
                     // Fully placed on vehicles — this is the ONLY case that
                     // reads "Assigned"; everything else reads pending/part.
                     statusNode = (
-                      <span
-                        title={`${assignment.tripNo} · ${assignment.vehicleNo} · ${to("orders.seq_n", { n: assignment.sequence })}`}
-                      >
-                        <OrdersStatusBadge status="Assigned" label={to("orders.status_assigned")} />
-                      </span>
+                      <OrdersStatusBadge status="Assigned" label={to("orders.status_assigned")} />
                     );
                   }
                 }
 
                 return (
-                  <tr key={shop.id} className={ordersTableZebraRow(index, "align-middle")}>
+                  <tr
+                    key={shop.id}
+                    className={ordersTableZebraRow(
+                      index,
+                      clearing ? "align-middle bg-amber-50/70" : "align-middle"
+                    )}
+                  >
                     <td className={`${opsTableTdClass} text-center`}>
                       <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 text-[12px] font-semibold text-slate-600">
                         {startIndex + index + 1}
@@ -941,26 +994,35 @@ function CollectionEntries({
                           )}
                         </span>
                       ) : (
-                        <span
-                          className="text-slate-400"
-                          title={to("orders.weight_pending")}
-                        >
-                          —
-                        </span>
+                        <span className="text-slate-400">—</span>
                       )}
                     </td>
-                    <td className={opsTableTdClass}>{statusNode}</td>
+                    <td className={`${opsTableTdClass} min-w-0 break-words`}>{statusNode}</td>
                     <td className={`${opsTableTdClass} text-right`}>
                       {isEditable ? (
                         <button
                           type="button"
-                          onClick={() => onClearClick(shop.id)}
-                          disabled={!hasEntry || busy}
-                          title={to("orders.clear_entry")}
-                          aria-label={`${to("orders.clear_entry")} — ${shop.shopName}`}
-                          className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200/80 bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-colors disabled:opacity-30"
+                          onClick={() => (clearing ? cancelDelete(shop.id) : onClearClick(shop.id))}
+                          disabled={(!hasEntry && !clearing) || busy}
+                          aria-label={
+                            clearing
+                              ? to("orders.undo_clear_label", { shop: shop.shopName })
+                              : `${to("orders.clear_entry")} — ${shop.shopName}`
+                          }
+                          className={`inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-lg border px-1.5 text-[11px] font-bold transition-colors ${
+                            clearing
+                              ? "border-amber-300 bg-amber-100/70 text-amber-700 motion-safe:animate-pulse"
+                              : "border-slate-200/80 bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 disabled:opacity-30"
+                          }`}
                         >
-                          <Trash2 size={14} />
+                          {clearing ? (
+                            <>
+                              <Undo2 size={13} aria-hidden />
+                              <span className="tabular-nums">{secondsLeft(shop.id)}</span>
+                            </>
+                          ) : (
+                            <Eraser size={14} />
+                          )}
                         </button>
                       ) : (
                         <span className="text-slate-300 text-xs">—</span>
@@ -1037,12 +1099,6 @@ function CollectionEntries({
                   {to("orders.unsaved_changes")}
                 </span>
               ) : null}
-              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-400">
-                <Clock size={12} className="flex-shrink-0" aria-hidden />
-                {to("orders.auto_submits_footer_note", {
-                  deadline: formatCollectionDeadline(day),
-                })}
-              </span>
             </div>
             <div className="flex items-center gap-2.5">
               {finishing ? (

@@ -10,6 +10,7 @@ import {
   collectionAutoSubmitDelay,
   collectionDeadline,
   formatCollectionDeadline,
+  formatCountdown,
   isCollectionAutoClosed,
 } from './ordersUtils';
 
@@ -54,4 +55,18 @@ test('every selectable day fits inside a real setTimeout window', () => {
   assert.equal(delay, 0, 'an old day is already closed — it submits on load');
   const latest = collectionAutoSubmitDelay('2026-09-26', today)!;
   assert.ok(latest <= 2 ** 31 - 1, 'a day inside the picker window always arms a timer');
+});
+
+test('the chip counts the window down in d/h/m', () => {
+  const HOUR = 3_600_000;
+  const DAY = 24 * HOUR;
+  // A full day left shows the day first — the unit that matters when deciding
+  // whether there is still time to enter a shop.
+  assert.equal(formatCountdown(DAY + 4 * HOUR + 12 * 60_000), '1d 04h 12m');
+  assert.equal(formatCountdown(6 * HOUR + 1 * 60_000), '6h 01m');
+  assert.equal(formatCountdown(9 * 60_000), '9m');
+  // Past the deadline the day is filed, so nothing counts down any more.
+  assert.equal(formatCountdown(0), 'moments');
+  assert.equal(formatCountdown(-5_000), 'moments');
+  assert.equal(formatCountdown(Number.NaN), 'moments');
 });

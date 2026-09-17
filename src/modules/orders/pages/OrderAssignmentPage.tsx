@@ -37,7 +37,6 @@ import {
   RotateCcw,
   Calendar,
   ArrowUpDown,
-  Search,
   MapPin,
   Save,
   Truck,
@@ -47,7 +46,6 @@ import {
 import type { Trip } from "../../../shared/trip";
 import {
   opsFilterCardClass,
-  opsFilterLabelClass,
   opsSecondaryButtonClass,
   opsSectionTitleClass,
   opsTableCardClass,
@@ -95,6 +93,7 @@ import type {
   OrdersEligibleVehicle,
 } from "../types";
 import {
+  ORDERS_FILTER_LABEL_CLASS,
   ORDERS_TABLE_FONT_CLASS,
   ordersZebraTone,
   ordersTableZebraRow,
@@ -299,20 +298,21 @@ function OrderAssignmentPage({
       <section className={opsFilterCardClass} aria-label={to('orders.assignment_filters')}>
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
           <div>
-            <div className={opsFilterLabelClass}><Calendar size={17} className="text-emerald-500" />{to('orders.col_date')}</div>
-            <OrdersDateControl day={day} today={today} onDaySelect={onDaySelect} t={to} hideDayChip />
+            <div className={ORDERS_FILTER_LABEL_CLASS}><Calendar size={17} className="text-emerald-500 flex-shrink-0" /><span>{to('orders.col_date')}</span></div>
+            <OrdersDateControl day={day} today={today} onDaySelect={onDaySelect} t={to} hideDayChip className="w-full" fieldClassName="w-full" />
           </div>
           <div>
-            <div className={opsFilterLabelClass}><ArrowUpDown size={17} className="text-emerald-500" />{to('orders.sort')}</div>
-            <OrdersDropdown value={sortMode} onChange={value => setSortMode(value as AssignmentSort)} ariaLabel={to('orders.sort')} options={sortOptions} widthClass="w-full" />
+            <div className={ORDERS_FILTER_LABEL_CLASS}><ArrowUpDown size={17} className="text-violet-500 flex-shrink-0" /><span>{to('orders.sort')}</span></div>
+            <OrdersDropdown value={sortMode} onChange={value => setSortMode(value as AssignmentSort)} ariaLabel={to('orders.sort')} options={sortOptions} className="w-full" widthClass="w-full" />
           </div>
           <div>
-            <div className={opsFilterLabelClass}><Search size={17} className="text-emerald-500" />{to('orders.search_label')}</div>
+            {/* No Search glyph on the label — the field already carries one. */}
+            <div className={ORDERS_FILTER_LABEL_CLASS}><span>{to('orders.search_label')}</span></div>
             <OrdersSearchInput value={query} onChange={setQuery} placeholder={to('orders.search_assignment')} className="w-full" />
           </div>
           <div>
-            <div className={opsFilterLabelClass}><MapPin size={17} className="text-emerald-500" />{to('orders.city')}</div>
-            <OrdersMultiSelect values={cityFilters} onChange={setCityFilters} options={cityOptions} ariaLabel={to('orders.filter_city')} placeholder={to('orders.filter_city_all')} widthClass="w-full" />
+            <div className={ORDERS_FILTER_LABEL_CLASS}><MapPin size={17} className="text-amber-500 flex-shrink-0" /><span>{to('orders.city')}</span></div>
+            <OrdersMultiSelect values={cityFilters} onChange={setCityFilters} options={cityOptions} ariaLabel={to('orders.filter_city')} placeholder={to('orders.filter_city_all')} className="w-full" widthClass="w-full" />
           </div>
           <div className="flex items-end justify-end gap-2 sm:col-span-2 xl:col-span-4">
             <button type="button" onClick={resetFilters} className={`group ${opsSecondaryButtonClass}`} aria-label={to('common.reset')}>

@@ -759,6 +759,23 @@ export function collectionAutoSubmitDelay(day: string, now = new Date()): number
   return Math.max(0, deadline.getTime() - now.getTime());
 }
 
+/**
+ * Countdown label for an open day: "1d 04h 12m" (leading units trimmed), or
+ * "moments" under a minute — used by the auto-submit chip so the deadline is
+ * something you can see moving rather than a date to interpret.
+ */
+export function formatCountdown(ms: number): string {
+  if (!Number.isFinite(ms) || ms <= 0) return "moments";
+  const totalMinutes = Math.floor(ms / 60_000);
+  const days = Math.floor(totalMinutes / (60 * 24));
+  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
+  const minutes = totalMinutes % 60;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  if (days > 0) return `${days}d ${pad(hours)}h ${pad(minutes)}m`;
+  if (hours > 0) return `${hours}h ${pad(minutes)}m`;
+  return `${minutes}m`;
+}
+
 /** Compact chip label: "29 Aug". */
 export function formatDayLabel(day: string): string {
   return new Date(`${day}T00:00:00`).toLocaleDateString("en-IN", {
