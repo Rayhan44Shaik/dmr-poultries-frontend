@@ -53,46 +53,72 @@ export interface ShopLedgerResponse {
  * the last day). The backend returns every matching transaction — no limit is
  * applied here (optional page/limit defer to backend pagination).
  */
-export async function fetchShopLedger(filters: {
-  shopId?: number;
-  fromDate?: string;
-  toDate?: string;
-  page?: number;
-  limit?: number;
-} = {}): Promise<ShopLedgerResponse> {
-  const params: Record<string, string> = {};
-  if (filters.shopId != null) params.shopId = String(filters.shopId);
-  if (filters.fromDate) params.fromDate = filters.fromDate;
-  if (filters.toDate) params.toDate = filters.toDate;
-  if (filters.page != null) params.page = String(filters.page);
-  if (filters.limit != null) params.limit = String(filters.limit);
-  const { data } = await apiGet<ShopLedgerResponse>("/operations/shop-ledger", {
-    params,
+const inflightReads = new Map<string, Promise<ShopLedgerResponse>>();
+
+export async function fetchShopLedger(
+  filters: {
+    shopId?: number;
+    fromDate?: string;
+    toDate?: string;
+    page?: number;
+    limit?: number;
+  } = {},
+): Promise<ShopLedgerResponse> {
+  const key = JSON.stringify({
+    shopId: filters.shopId ?? null,
+    fromDate: filters.fromDate ?? "",
+    toDate: filters.toDate ?? "",
+    page: filters.page ?? null,
+    limit: filters.limit ?? null,
   });
-  return {
-    shopId: data.shopId ?? null,
-    shopName: data.shopName ?? "",
-    openingBalance: Number(data.openingBalance ?? 0),
-    data: (data.data ?? []).map((row) => ({
-      id: Number(row.id),
-      shopId: row.shopId == null ? null : Number(row.shopId),
-      shopName: String(row.shopName ?? ""),
-      date: String(row.date ?? ""),
-      type: (row.type ?? "correction") as ShopLedgerEntryType,
-      referenceType: String(row.referenceType ?? ""),
-      referenceId: Number(row.referenceId ?? 0),
-      referenceNo: String(row.referenceNo ?? ""),
-      description: String(row.description ?? ""),
-      debit: Number(row.debit ?? 0),
-      credit: Number(row.credit ?? 0),
-      balance: Number(row.balance ?? 0),
-      birds: Number(row.birds ?? 0),
-      weight: Number(row.weight ?? 0),
-      rate: Number(row.rate ?? 0),
-      paymentMode: row.paymentMode == null ? null : String(row.paymentMode),
-      status: row.status == null ? null : String(row.status),
-      createdAt: row.createdAt == null ? null : String(row.createdAt),
-    })),
-    meta: data.meta,
-  };
+  const existing = inflightReads.get(key);
+  if (existing) return existing;
+
+  const request = (async () => {
+    const params: Record<string, string> = {};
+    if (filters.shopId != null) params.shopId = String(filters.shopId);
+    if (filters.fromDate) params.fromDate = filters.fromDate;
+    if (filters.toDate) params.toDate = filters.toDate;
+    if (filters.page != null) params.page = String(filters.page);
+    if (filters.limit != null) params.limit = String(filters.limit);
+    const { data } = await apiGet<ShopLedgerResponse>(
+      "/operations/shop-ledger",
+      {
+        params,
+      },
+    );
+    return {
+      shopId: data.shopId ?? null,
+      shopName: data.shopName ?? "",
+      openingBalance: Number(data.openingBalance ?? 0),
+      data: (data.data ?? []).map((row) => ({
+        id: Number(row.id),
+        shopId: row.shopId == null ? null : Number(row.shopId),
+        shopName: String(row.shopName ?? ""),
+        date: String(row.date ?? ""),
+        type: (row.type ?? "correction") as ShopLedgerEntryType,
+        referenceType: String(row.referenceType ?? ""),
+        referenceId: Number(row.referenceId ?? 0),
+        referenceNo: String(row.referenceNo ?? ""),
+        description: String(row.description ?? ""),
+        debit: Number(row.debit ?? 0),
+        credit: Number(row.credit ?? 0),
+        balance: Number(row.balance ?? 0),
+        birds: Number(row.birds ?? 0),
+        weight: Number(row.weight ?? 0),
+        rate: Number(row.rate ?? 0),
+        paymentMode: row.paymentMode == null ? null : String(row.paymentMode),
+        status: row.status == null ? null : String(row.status),
+        createdAt: row.createdAt == null ? null : String(row.createdAt),
+      })),
+      meta: data.meta,
+    };
+  })();
+
+  inflightReads.set(key, request);
+  try {
+    return await request;
+  } finally {
+    if (inflightReads.get(key) === request) inflightReads.delete(key);
+  }
 }

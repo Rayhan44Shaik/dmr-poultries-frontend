@@ -84,6 +84,9 @@ export default {
   'shop_ledger.pdf_close': 'PDF ప్రివ్యూ మూసివేయండి',
   'shop_ledger.pdf_bytes_error': 'PDF బైట్లు చదవలేకపోయాం.',
   'shop_ledger.pdf_select_shops': 'డౌన్‌లోడ్ చేయడానికి కనీసం ఒక షాప్ ఎంచుకోండి.',
+  'shop_ledger.pdf_download_selected': 'ఎంచుకున్నవి డౌన్‌లోడ్ చేయండి ({count})',
+  'shop_ledger.pdf_download_combined': 'ఎంచుకున్నవన్నీ ఒక PDFగా డౌన్‌లోడ్ చేయండి',
+  'shop_ledger.pdf_generating_shop': '{shop} ప్రివ్యూ రూపొందుతోంది…',
   'shop_ledger.pdf_check': 'PDF చూడండి',
   'shop_ledger.pdf_hide': 'దాచండి',
 

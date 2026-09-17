@@ -268,6 +268,8 @@ export function useAnalyticsData(active = true) {
       fuelCost: kpis.fuelCost,
       maintenanceCost: kpis.maintenanceCost,
       emiDue: kpis.emiDue,
+      tollCost: kpis.tollCost,
+      otherCost: kpis.otherCost,
       totalExpense: kpis.totalExpense,
       averageMileage: kpis.averageMileage,
       costPerKm: kpis.costPerKm,
