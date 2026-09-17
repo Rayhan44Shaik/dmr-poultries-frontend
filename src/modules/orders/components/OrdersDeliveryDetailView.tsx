@@ -20,7 +20,7 @@
 //   the VISIBLE rows and never mix ordered vs delivered quantities).
 
 import React, { useMemo, useState } from "react";
-import { Check, FileText, Loader2, ShieldCheck, Truck, X } from "lucide-react";
+import { Check, FileText, ShieldCheck, Truck, X } from "lucide-react";
 import { formatVehicleNumber } from "../../../utils/format";
 import AppShellModal from "../../../ui/AppShellModal";
 import { ViewLanguageToggle } from "../../../ui/ViewLanguageToggle";
@@ -45,7 +45,6 @@ import {
   pageRange,
   rowsInSequence,
   shopDeliveryStatusI18nKey,
-  shopRemainingBoxes,
   type ShopDeliveryBreakdown,
 } from "../utils/ordersUtils";
 import {
@@ -59,11 +58,9 @@ import { useOrdersI18n, type OrdersT } from "../i18n/ordersI18n";
 import type { OrdersTrip } from "../types";
 import OrdersPdfPreview from "./OrdersPdfPreview";
 import {
-  ORDERS_NO_SPINNER,
   OrdersDropdown,
   OrdersIconButton,
   OrdersSearchInput,
-  onOrdersNumberWheel,
 } from "./OrdersCommon";
 
 const PAGE_SIZE = 10;
@@ -90,6 +87,73 @@ type Props = {
   /** Submit the delivery trip from the check popup — error message, or null. */
   onSubmitTrip: () => Promise<string | null>;
 };
+
+type ReportSortKey =
+  "time_first" | "time_last" | "sequence" | "shop_az" | "status" | "boxes_desc";
+
+const STATUS_RANK: Record<ShopDeliveryBreakdown["status"], number> = {
+  delivered: 0,
+  delivered_with_diff: 1,
+  part_delivered: 2,
+  not_listed: 3,
+  not_delivered: 4,
+  ordered: 5,
+} as Record<ShopDeliveryBreakdown["status"], number>;
+
+function deliveredMs(row: ShopDeliveryBreakdown): number {
+  if (!row.deliveredAt) return Number.NaN;
+  const t = new Date(row.deliveredAt).getTime();
+  return Number.isNaN(t) ? Number.NaN : t;
+}
+
+function bySequence(a: ShopDeliveryBreakdown, b: ShopDeliveryBreakdown) {
+  return (a.serialNo || 0) - (b.serialNo || 0);
+}
+
+/** Stable sort of the report rows; undelivered rows always sink to the end
+ *  of a time sort in their original sequence. */
+function sortReportRows(
+  rows: ShopDeliveryBreakdown[],
+  key: ReportSortKey,
+): ShopDeliveryBreakdown[] {
+  const list = rows.map((row, i) => ({ row, i }));
+  const cmp = (
+    a: { row: ShopDeliveryBreakdown; i: number },
+    b: { row: ShopDeliveryBreakdown; i: number },
+  ): number => {
+    switch (key) {
+      case "time_first":
+      case "time_last": {
+        const ta = deliveredMs(a.row);
+        const tb = deliveredMs(b.row);
+        const na = Number.isNaN(ta);
+        const nb = Number.isNaN(tb);
+        if (na && nb) return bySequence(a.row, b.row) || a.i - b.i;
+        if (na) return 1;
+        if (nb) return -1;
+        return (key === "time_first" ? ta - tb : tb - ta) || a.i - b.i;
+      }
+      case "sequence":
+        return bySequence(a.row, b.row) || a.i - b.i;
+      case "shop_az":
+        return (
+          (a.row.shopName || "").localeCompare(b.row.shopName || "") ||
+          a.i - b.i
+        );
+      case "status":
+        return (
+          (STATUS_RANK[a.row.status] ?? 9) - (STATUS_RANK[b.row.status] ?? 9) ||
+          bySequence(a.row, b.row) ||
+          a.i - b.i
+        );
+      case "boxes_desc":
+        return b.row.deliveredBoxes - a.row.deliveredBoxes || a.i - b.i;
+      default:
+        return a.i - b.i;
+    }
+  };
+  return list.sort(cmp).map((x) => x.row);
+}
 
 type ReportStatusFilter =
   | "all"
@@ -219,78 +283,6 @@ function DeliveryStatusCell({
   }
 }
 
-/**
- * Shop-level delivery capture (last column of the report).
- *
- * The order is already on the row (Ordered Birds / Boxes) — this records what
- * actually reached the shop. PARTIAL: the box input is capped at the balance
- * (ordered − delivered), so a shop can be delivered in several lots, and a
- * shop whose order is fully in shows COMPLETE with no input at all — that is
- * the duplicate guard.
- */
-function ShopDeliveryCapture({
-  row,
-  remaining,
-  busy,
-  value,
-  onValue,
-  onSubmit,
-  to,
-}: {
-  row: ShopDeliveryBreakdown;
-  remaining: number;
-  busy: boolean;
-  value: string;
-  onValue: (v: string) => void;
-  onSubmit: (boxes: number) => void;
-  to: OrdersT;
-}) {
-  if (remaining <= 0) {
-    return (
-      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 whitespace-nowrap">
-        <Check size={12} />
-        {to("orders.delivery_complete")}
-      </span>
-    );
-  }
-  const parsed = Number(value);
-  const valid = Number.isFinite(parsed) && parsed >= 1 && parsed <= remaining;
-  return (
-    <div className="flex items-center gap-1.5">
-      <input
-        type="number"
-        min={1}
-        max={remaining}
-        value={value}
-        placeholder={String(remaining)}
-        disabled={busy}
-        onChange={(e) => onValue(e.target.value)}
-        onWheel={onOrdersNumberWheel}
-        aria-label={`${to("orders.delivered_boxes")} — ${row.shopName}`}
-        className={`${ORDERS_NO_SPINNER} h-8 w-20 rounded-lg border border-slate-200 px-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500`}
-      />
-      <button
-        type="button"
-        onClick={() => onSubmit(parsed)}
-        disabled={busy || !valid}
-        title={to("orders.delivery_balance_hint", { remaining })}
-        aria-label={`${to("orders.deliver")} — ${row.shopName}`}
-        className="inline-flex items-center gap-1 rounded-lg border border-emerald-600/40 bg-emerald-500 px-2.5 py-1.5 text-[11px] font-bold text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        {busy ? (
-          <Loader2 size={13} className="animate-spin" />
-        ) : (
-          <Truck size={13} />
-        )}
-        {to("orders.deliver")}
-      </button>
-      <span className="text-[10px] font-semibold text-slate-400 whitespace-nowrap">
-        {to("orders.balance")}: {formatCount(remaining)}
-      </span>
-    </div>
-  );
-}
-
 function OrdersDeliveryDetailView({
   orderTrip,
   shopDirectory,
@@ -299,7 +291,6 @@ function OrdersDeliveryDetailView({
   whatsappBusy: _whatsappBusy,
   onClose,
   onWhatsApp,
-  onRecordDelivery,
   onSaveProgress,
   onSubmitTrip,
 }: Props) {
@@ -308,13 +299,9 @@ function OrdersDeliveryDetailView({
   const { trip, progress, originalShopIds } = orderTrip;
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ReportStatusFilter>("all");
+  const [sortKey, setSortKey] = useState<ReportSortKey>("time_first");
   // "Check PDF" popup (preview -> download / send / correct).
   const [pdfOpen, setPdfOpen] = useState(false);
-  // Shop-level capture: per-shop box entry + one in-flight shop at a time.
-  const [qty, setQty] = useState<Record<number, string>>({});
-  const [busyShopId, setBusyShopId] = useState<number | null>(null);
-  // A completed trip is closed — its deliveries are history, not editable.
-  const canDeliver = (progress?.status ?? "Assigned") !== "Completed";
 
   const breakdown = useMemo(
     () =>
@@ -327,6 +314,18 @@ function OrdersDeliveryDetailView({
         (shopId) => shopNumberOf(shopId, shopDirectory),
       ),
     [trip, originalShopIds, shopDirectory, orderTrip.originalQuantities],
+  );
+
+  const sortOptions = useMemo(
+    () => [
+      { value: "time_first", label: to("orders.sort_time_first") },
+      { value: "time_last", label: to("orders.sort_time_last") },
+      { value: "sequence", label: to("orders.sort_sequence") },
+      { value: "shop_az", label: to("orders.sort_shop_az") },
+      { value: "status", label: to("orders.sort_status") },
+      { value: "boxes_desc", label: to("orders.sort_boxes_desc") },
+    ],
+    [to],
   );
 
   const statusOptions = useMemo(
@@ -343,25 +342,6 @@ function OrdersDeliveryDetailView({
     ],
     [to],
   );
-
-  /** One shop's (partial) delivery — the balance is the hard maximum. */
-  const handleDeliver = async (row: ShopDeliveryBreakdown) => {
-    if (busyShopId !== null) return;
-    const remaining = shopRemainingBoxes(row);
-    const boxes = Math.floor(Number(qty[row.shopId] ?? ""));
-    if (!Number.isFinite(boxes) || boxes < 1 || boxes > remaining) return;
-    setBusyShopId(row.shopId);
-    try {
-      await onRecordDelivery(row, boxes);
-      setQty((prev) => {
-        const next = { ...prev };
-        delete next[row.shopId];
-        return next;
-      });
-    } finally {
-      setBusyShopId(null);
-    }
-  };
 
   // One table-level search over the WHOLE report (listed + unlisted rows).
   const searched = useMemo(
@@ -383,24 +363,16 @@ function OrdersDeliveryDetailView({
     [breakdown, query, to, trip.tripNo, trip.vehicleNo],
   );
 
-  // ── Split: shops LISTED in the original order (main paginated table) vs
-  //    shops delivered that were NEVER listed — NOT LISTED rows always live
-  //    in their own section below, never hidden, never mixed into the
-  //    matched-shop table. The status filter applies to the main table;
-  //    the NOT LISTED section is only narrowed by the shared search.
-  const listedRows = useMemo(
-    () =>
-      searched.filter(
-        (row) =>
-          row.status !== "not_listed" &&
-          (statusFilter === "all" || row.status === statusFilter),
-      ),
-    [searched, statusFilter],
-  );
-  const unlistedRows = useMemo(
-    () => searched.filter((row) => row.status === "not_listed"),
-    [searched],
-  );
+  // ── ONE table: listed shops (green) and NOT LISTED shops (orange) live
+  //    together; the status filter narrows it and the sort orders it.
+  //    Default sort: first delivery on top (undelivered rows sink to the
+  //    bottom in their original sequence).
+  const listedRows = useMemo(() => {
+    const rows = searched.filter(
+      (row) => statusFilter === "all" || row.status === statusFilter,
+    );
+    return sortReportRows(rows, sortKey);
+  }, [searched, statusFilter, sortKey]);
 
   // ── Pagination (existing global component; 10 rows per page; resets to
   //    page 1 whenever the search / status filter changes) ─────────────────
@@ -433,7 +405,7 @@ function OrdersDeliveryDetailView({
       deliveredBirds: 0,
       deliveredWeight: 0,
     };
-    for (const row of [...listedRows, ...unlistedRows]) {
+    for (const row of listedRows) {
       const isListed = row.status !== "not_listed";
       if (isListed) {
         t.orderedBoxes += row.orderedBoxes;
@@ -447,7 +419,7 @@ function OrdersDeliveryDetailView({
     t.orderedWeight = Number(t.orderedWeight.toFixed(2));
     t.deliveredWeight = Number(t.deliveredWeight.toFixed(2));
     return t;
-  }, [listedRows, unlistedRows]);
+  }, [listedRows]);
 
   const notListedCount = breakdown.filter(
     (b) => b.status === "not_listed",
@@ -670,7 +642,25 @@ function OrdersDeliveryDetailView({
                     </span>
                   )}
                 </h3>
+                <span className="inline-flex items-center gap-3 text-[11px] font-semibold text-slate-500">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                    {to("orders.legend_listed")}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-orange-500" />
+                    {to("orders.legend_not_listed")}
+                    {notListedCount > 0 ? ` (${notListedCount})` : ""}
+                  </span>
+                </span>
                 <div className="ml-auto flex items-center gap-2.5 flex-wrap">
+                  <OrdersDropdown
+                    value={sortKey}
+                    onChange={(v) => setSortKey(v as ReportSortKey)}
+                    options={sortOptions}
+                    ariaLabel={to("orders.sort")}
+                    widthClass="w-56"
+                  />
                   <OrdersSearchInput
                     value={query}
                     onChange={setQuery}
@@ -688,21 +678,20 @@ function OrdersDeliveryDetailView({
                 </div>
               </div>
               <div className={`${opsTableCardClass} overflow-x-auto`}>
-                <table className="w-full min-w-[76rem] table-fixed text-xs md:text-sm">
+                <table className="w-full min-w-[72rem] table-fixed text-xs md:text-sm">
                   <colgroup>
                     <col className="w-[3.5rem]" />
                     <col className="w-[5.5rem]" />
-                    <col className="w-[14rem]" />
+                    <col className="w-[15rem]" />
                     <col className="w-[9rem]" />
                     <col className="w-[6.25rem]" />
                     <col className="w-[6.25rem]" />
                     <col className="w-[6.25rem]" />
-                    <col className="w-[6.25rem]" />
+                    <col className="w-[6.5rem]" />
                     <col className="w-[6.25rem]" />
                     <col className="w-[6.75rem]" />
-                    <col className="w-[7.5rem]" />
-                    <col className="w-[8.5rem]" />
-                    <col className="w-[15rem]" />
+                    <col className="w-[11rem]" />
+                    <col className="w-[10rem]" />
                   </colgroup>
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-600">
@@ -761,20 +750,12 @@ function OrdersDeliveryDetailView({
                       <th className={reportThClass}>
                         {to("orders.col_delivery_status")}
                       </th>
-                      {/* Shop-level capture: the order is on this row, the
-                          delivery is entered here (partial allowed). */}
-                      <th
-                        className={reportThClass}
-                        title={to("orders.record_delivery")}
-                      >
-                        {to("orders.th_entry")}
-                      </th>
                     </tr>
                   </thead>
                   <tbody className={opsTableDivideClass}>
                     {pageRows.length === 0 && (
                       <tr>
-                        <td className={reportTdClass} colSpan={13}>
+                        <td className={reportTdClass} colSpan={12}>
                           <span className="text-slate-400 text-sm py-4 block text-center">
                             {query || statusFilter !== "all"
                               ? to("orders.no_results")
@@ -784,23 +765,34 @@ function OrdersDeliveryDetailView({
                       </tr>
                     )}
                     {pageRows.map((row, index) => {
-                      const remaining = shopRemainingBoxes(row);
+                      const unlisted = row.status === "not_listed";
                       const done =
                         row.status === "delivered" ||
                         row.status === "delivered_with_diff";
+                      const rowTone = unlisted
+                        ? "bg-orange-50/50 border-l-4 border-l-orange-400 hover:bg-orange-50"
+                        : done
+                          ? "bg-emerald-50/30 border-l-4 border-l-emerald-400 hover:bg-emerald-50/50"
+                          : "border-l-4 border-l-transparent hover:bg-slate-50/70";
                       return (
                         <tr
                           key={row.shopId}
-                          className={`align-middle transition-colors animate-fade-in-up hover:bg-slate-50/70 ${
-                            done ? "bg-emerald-50/30" : ""
-                          }`}
+                          className={`align-middle transition-colors animate-fade-in-up ${rowTone}`}
                           style={{
                             animationDelay: `${Math.min(index, 12) * 28}ms`,
                           }}
                         >
                           <td className={reportTdClass}>
-                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-[12px] font-bold text-emerald-700">
-                              {row.serialNo || startIndex + index + 1}
+                            <span
+                              className={`inline-flex h-7 w-7 items-center justify-center rounded-lg text-[12px] font-bold ${
+                                unlisted
+                                  ? "bg-orange-100 text-orange-700"
+                                  : "bg-emerald-50 text-emerald-700"
+                              }`}
+                            >
+                              {unlisted
+                                ? "+"
+                                : row.serialNo || startIndex + index + 1}
                             </span>
                           </td>
                           <td
@@ -859,32 +851,12 @@ function OrdersDeliveryDetailView({
                               : "—"}
                           </td>
                           <td
-                            className={`${reportTdClass} whitespace-nowrap text-[12px] font-medium text-slate-500`}
+                            className={`${reportTdClass} whitespace-nowrap text-[12px] font-semibold text-slate-600 tabular-nums`}
                           >
                             {formatDeliveredAtLabel(row.deliveredAt)}
                           </td>
                           <td className={reportTdClass}>
                             <DeliveryStatusCell row={row} to={to} />
-                          </td>
-                          <td className={reportTdClass}>
-                            {canDeliver && !row.additional ? (
-                              <ShopDeliveryCapture
-                                row={row}
-                                remaining={remaining}
-                                busy={busyShopId === row.shopId}
-                                value={qty[row.shopId] ?? ""}
-                                onValue={(v) =>
-                                  setQty((prev) => ({
-                                    ...prev,
-                                    [row.shopId]: v,
-                                  }))
-                                }
-                                onSubmit={() => void handleDeliver(row)}
-                                to={to}
-                              />
-                            ) : (
-                              <span className="text-slate-300">—</span>
-                            )}
                           </td>
                         </tr>
                       );
@@ -1058,111 +1030,6 @@ function OrdersDeliveryDetailView({
                 </div>
               )}
             </div>
-
-            {/* ── NOT LISTED SHOP DELIVERIES — separate section, always
-                visible (never mixed into / hidden inside the matched-shop
-                table above). Subtle warning styling; short by definition,
-                so no separate pagination. ── */}
-            {unlistedRows.length > 0 && (
-              <div className="bg-white rounded-xl border border-amber-300/70 shadow-sm overflow-hidden">
-                <div className="px-4 py-2.5 border-b border-amber-200/70 bg-amber-50/70 flex items-center justify-between gap-2 flex-wrap">
-                  <h3 className="text-xs font-bold text-amber-800 uppercase tracking-wider">
-                    {to("orders.not_listed_deliveries")}
-                  </h3>
-                  <span className="text-[11px] font-semibold text-amber-700/80">
-                    {to("orders.not_listed_note")}
-                  </span>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs md:text-sm">
-                    <thead>
-                      <tr className={opsTableHeadRowClass}>
-                        <th className={`${opsTableThClass} w-14`}>
-                          {to("orders.col_sno")}
-                        </th>
-                        <th className={opsTableThClass}>
-                          {to("orders.col_shop_name")}
-                        </th>
-                        <th className={opsTableThClass}>
-                          {to("orders.col_village")}
-                        </th>
-                        <th className={`${opsTableThClass} w-32`}>
-                          {to("orders.shop_mobile")}
-                        </th>
-                        <th className={`${opsTableThClass} w-32 text-right`}>
-                          {to("orders.delivered_birds")}
-                        </th>
-                        <th className={`${opsTableThClass} w-24 text-right`}>
-                          {to("orders.col_boxes")}
-                        </th>
-                        <th className={`${opsTableThClass} w-28 text-right`}>
-                          {to("orders.delivered_weight")}
-                        </th>
-                        <th className={`${opsTableThClass} w-44`}>
-                          {to("orders.col_delivered_at")}
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody className={opsTableDivideClass}>
-                      {unlistedRows.map((row, uIndex) => (
-                        <tr
-                          key={row.shopId}
-                          className="align-middle bg-amber-50/40"
-                        >
-                          <td className={opsTableTdClass}>
-                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-[12px] font-bold text-amber-700">
-                              {uIndex + 1}
-                            </span>
-                          </td>
-                          <td
-                            className={`${opsTableTdClass} font-semibold text-slate-800`}
-                          >
-                            <span className="inline-flex items-center gap-2 flex-wrap">
-                              {row.shopName || "—"}
-                              <span className="inline-flex items-center rounded-full bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-bold text-amber-700 whitespace-nowrap">
-                                {to("orders.added_during_delivery")}
-                              </span>
-                            </span>
-                          </td>
-                          <td className={opsTableTdClass}>
-                            {row.village || "—"}
-                          </td>
-                          <td
-                            className={`${opsTableTdClass} text-slate-600 whitespace-nowrap`}
-                          >
-                            {row.mobile || "—"}
-                          </td>
-                          <td
-                            className={`${opsTableTdClass} text-right font-semibold`}
-                          >
-                            {row.deliveredBirds > 0
-                              ? formatCount(row.deliveredBirds)
-                              : "—"}
-                          </td>
-                          <td
-                            className={`${opsTableTdClass} text-right font-bold text-emerald-800`}
-                          >
-                            {row.deliveredBoxes > 0
-                              ? formatCount(row.deliveredBoxes)
-                              : "—"}
-                          </td>
-                          <td
-                            className={`${opsTableTdClass} text-right font-semibold`}
-                          >
-                            {row.deliveredWeight > 0
-                              ? row.deliveredWeight.toFixed(2)
-                              : "—"}
-                          </td>
-                          <td className={`${opsTableTdClass} text-slate-500`}>
-                            {formatDeliveredAtLabel(row.deliveredAt)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
