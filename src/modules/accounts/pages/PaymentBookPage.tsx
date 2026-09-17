@@ -132,7 +132,6 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   const handleRefresh = useCallback(() => {
     void loadPayments().then(ok => { if (ok) showNotification(t('notification.data_refreshed'), 'success'); });
   }, [loadPayments, showNotification, t]);
-  useEffect(() => () => { if (spinTimer.current !== null) window.clearTimeout(spinTimer.current); }, []);
 
   const changeFilter = (key: keyof typeof filters, value: string) => {
     setFilters(previous => ({ ...previous, [key]: value }));
