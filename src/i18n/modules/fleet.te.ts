@@ -237,6 +237,9 @@ export default {
   'fleet.doc_summary.expired': '{count} గడువు ముగిసింది',
   'fleet.doc_summary.expiring': 'తదుపరి 30 రోజుల్లో {count} గడువు ముగుస్తున్నాయి',
 
+  'fleet.doc_edit.scan': 'స్కాన్',
+  'fleet.doc_edit.remarks': 'వ్యాఖ్యలు',
+  'fleet.doc_edit.select_date': 'తేదీ ఎంచుకోండి',
   'fleet.doc_edit.attach_scan': 'స్కాన్ జోడించండి (ఐచ్ఛికం)',
   'fleet.doc_edit.date_past': 'తేదీ గతంలో ఉండకూడదు',
   'fleet.doc_edit.document_no': 'పత్రం నంబర్',

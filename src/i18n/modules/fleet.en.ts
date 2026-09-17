@@ -237,6 +237,9 @@ export default {
   'fleet.doc_summary.expired': '{count} expired',
   'fleet.doc_summary.expiring': '{count} expiring in the next 30 days',
 
+  'fleet.doc_edit.scan': 'Scan',
+  'fleet.doc_edit.remarks': 'Remarks',
+  'fleet.doc_edit.select_date': 'Select date',
   'fleet.doc_edit.attach_scan': 'Attach Scan (Optional)',
   'fleet.doc_edit.date_past': 'Date cannot be in the past',
   'fleet.doc_edit.document_no': 'Document No.',

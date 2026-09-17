@@ -1,4 +1,9 @@
-import { memo, useState } from "react";
+import { memo, useMemo, useState } from "react";
+import AppShellModal from "../../../../ui/AppShellModal";
+import { ViewLanguageToggle } from "../../../../ui/ViewLanguageToggle";
+import { makeT, useI18n, type Language } from "../../../../i18n";
+import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
+import { formatVehicleNumber } from "../../../../utils/format";
 import { toBusinessDate } from "../../../../utils/businessDate";
 import type { LucideIcon } from "lucide-react";
 import {
@@ -9,7 +14,6 @@ import {
   FileCheck,
   Car,
   FileText,
-  Calendar,
   Upload,
   Eye,
   Trash2,
@@ -100,18 +104,22 @@ const fallbackConfig = {
   text: "text-slate-700",
 };
 
-/* Scan-action buttons share one height and padding so the row stays level
- * whether it holds one control or four. `whitespace-nowrap` keeps labels from
- * folding mid-word now that the modal is wide enough to fit them. */
-const scanActionClass =
-  "inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold whitespace-nowrap transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500";
-const scanAttachClass = `${scanActionClass} border border-slate-200 bg-white text-slate-600 shadow-sm hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800`;
-const scanViewClass = `${scanActionClass} bg-blue-50 text-blue-700 hover:bg-blue-100`;
-const scanDownloadClass = `${scanActionClass} bg-slate-100 text-slate-700 hover:bg-slate-200`;
-const scanRemoveClass = `${scanActionClass} bg-rose-50 text-rose-600 hover:bg-rose-100`;
+/* Scan actions are small icon tiles (same 8×8 tile as the table edit
+ * button): attach = label button, view / download / remove = glyph only. */
+const scanTileClass =
+  "group inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-all hover:-translate-y-0.5 hover:shadow-sm active:scale-95 focus-visible:outline-none focus-visible:ring-2";
+const scanViewClass = `${scanTileClass} border-blue-100 bg-blue-50/70 text-blue-600 hover:bg-blue-100 focus-visible:ring-blue-300`;
+const scanDownloadClass = `${scanTileClass} border-emerald-100 bg-emerald-50/70 text-emerald-600 hover:bg-emerald-100 focus-visible:ring-emerald-300`;
+const scanRemoveClass = `${scanTileClass} border-red-100 bg-red-50/70 text-red-600 hover:bg-red-100 focus-visible:ring-red-300`;
+const scanAttachClass =
+  "inline-flex h-8 shrink-0 cursor-pointer items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3 text-[12px] font-semibold text-slate-600 shadow-sm transition-all hover:-translate-y-0.5 hover:border-slate-300 hover:bg-slate-50 whitespace-nowrap";
 /** Selected-file chip and the "will be removed" confirm share one shell. */
 const scanChipClass =
-  "inline-flex h-9 min-w-0 items-center gap-2 rounded-lg border px-3 text-xs font-semibold";
+  "inline-flex h-8 min-w-0 items-center gap-2 rounded-lg border px-2.5 text-[12px] font-medium";
+const fieldLabelClass =
+  "text-[11px] font-bold uppercase tracking-wider text-slate-500";
+const fieldInputClass =
+  "w-full h-10 rounded-lg border border-slate-200 bg-slate-50 px-3 text-[13px] text-slate-800 transition-all focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20";
 
 const getExpiry = (doc: PermitDocView | undefined): string | undefined => {
   if (doc && typeof doc === "object") {
@@ -146,6 +154,12 @@ const DocumentEditModal = ({
   onSave,
 }: DocumentEditModalProps) => {
   const { showNotification } = useSafeNotification();
+  const { language: appLanguage } = useI18n();
+  // Popup-only EN ⇄ తెలుగు, like the Trip List view — the app language stays.
+  const [popupLang, setPopupLang] = useState<Language>(appLanguage);
+  const t = useMemo(() => makeT(popupLang), [popupLang]);
+  const togglePopupLang = () =>
+    setPopupLang((prev) => (prev === "en" ? "te" : "en"));
 
   const documentTypes =
     docTypes && docTypes.length > 0 ? docTypes : Object.keys(docMap);
@@ -203,14 +217,14 @@ const DocumentEditModal = ({
       if (!supported) {
         setErrors((prev) => ({
           ...prev,
-          [type]: "Only JPG, JPEG, PNG and PDF files are supported.",
+          [type]: t("fleet.doc_edit.only_supported"),
         }));
         return;
       }
       if (file.size > 10 * 1024 * 1024) {
         setErrors((prev) => ({
           ...prev,
-          [type]: "File size cannot exceed 10 MB.",
+          [type]: t("fleet.doc_edit.file_too_large"),
         }));
         return;
       }
@@ -250,7 +264,7 @@ const DocumentEditModal = ({
       const removing = Boolean(removeFlags[type]);
 
       if (newDate && newDate !== oldDate && newDate < todayStr) {
-        newErrors[type] = "Date cannot be in the past";
+        newErrors[type] = t("fleet.doc_edit.date_past");
         return;
       }
 
@@ -262,7 +276,7 @@ const DocumentEditModal = ({
       const remarksChanged = newRemarks.trim() !== oldRemarks.trim();
 
       if (newValidFrom && newDate && newValidFrom > newDate) {
-        newErrors[type] = "Valid from date must be before the expiry date.";
+        newErrors[type] = t("fleet.doc_edit.valid_from_before_expiry");
         return;
       }
 
@@ -277,8 +291,7 @@ const DocumentEditModal = ({
         return;
 
       if (!newDate && !oldDate) {
-        newErrors[type] =
-          "Please provide an expiry date before saving this document.";
+        newErrors[type] = t("fleet.doc_edit.expiry_required");
         return;
       }
 
@@ -299,18 +312,18 @@ const DocumentEditModal = ({
 
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) {
-      showNotification("Please fix the errors before saving.", "error");
+      showNotification(t("fleet.doc_edit.fix_errors"), "error");
       return;
     }
     if (Object.keys(updates).length === 0) {
-      showNotification("No changes to save", "info");
+      showNotification(t("fleet.doc_edit.no_changes"), "info");
       return;
     }
 
     try {
       await onSave(vehicle.id, updates, files, removes);
     } catch {
-      showNotification("Failed to update documents", "error");
+      showNotification(t("fleet.documents.update_failed"), "error");
     }
   };
 
@@ -319,39 +332,70 @@ const DocumentEditModal = ({
     return docConfig[key] || fallbackConfig;
   };
 
+  const vehicleNo = formatVehicleNumber(vehicle.vehicleNumber);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 sm:p-6 overflow-y-auto">
-      {/* `overflow-visible` with the scroll moved to the overlay (the
-          NewPaymentModal pattern): the shared DatePicker renders its calendar as
-          an absolutely positioned popup, so any `overflow-hidden` /
-          `overflow-y-auto` ancestor clips it and the calendar becomes unusable. */}
-      <div className="bg-slate-50 rounded-2xl shadow-2xl w-full max-w-6xl my-auto flex flex-col overflow-visible animate-fade-in">
-        {/* Header — rounded-t-2xl keeps the corners clean now that the card no
-            longer relies on overflow-hidden to clip it. */}
-        <div className="flex justify-between items-center px-6 py-4 bg-white border-b border-slate-200 shrink-0 rounded-t-2xl">
-          <div>
-            <h2 className="text-xl font-bold text-slate-800 flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-blue-600" />
-              Edit Documents
-            </h2>
-            <p className="text-sm font-semibold text-slate-500 mt-0.5">
-              Vehicle:{" "}
-              <span className="text-blue-600">{vehicle.vehicleNumber}</span>
-            </p>
+    <AppShellModal
+      open
+      onClose={onClose}
+      panelClassName="bg-white"
+      ariaLabelledBy="doc-edit-title"
+    >
+      <div className="flex h-full w-full flex-col overflow-hidden rounded-2xl bg-white">
+        {/* Header — identical anatomy to the Trip List view */}
+        <div className="shrink-0 rounded-t-2xl border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/80">
+          <div className="flex flex-col gap-4 px-6 py-4 sm:flex-row sm:items-center sm:justify-between md:px-8">
+            <div className="flex min-w-0 items-center gap-4">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-teal-400 text-white shadow-lg shadow-emerald-400/20">
+                <FileText className="h-6 w-6" />
+              </div>
+              <div className="min-w-0">
+                <h2
+                  id="doc-edit-title"
+                  className="truncate text-lg font-bold tracking-tight text-slate-800 md:text-xl"
+                >
+                  {t("fleet.doc_edit.title")}
+                </h2>
+                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-100 bg-emerald-50/80 px-2.5 py-0.5 text-[11px] font-bold tabular-nums tracking-wide text-emerald-700">
+                    <Car size={12} />
+                    {vehicleNo}
+                  </span>
+                  <span className="text-xs font-medium text-slate-400">
+                    {t("fleet.doc_edit.vehicle_label", { vehicle: vehicleNo })}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="flex shrink-0 items-center justify-end gap-2">
+              <ViewLanguageToggle
+                language={popupLang}
+                onToggle={togglePopupLang}
+                tone="emerald"
+                labelMode="target"
+                ariaLabel={t("fleet.maintenance_view.popup_language_toggle")}
+              />
+              <button
+                type="button"
+                onClick={onClose}
+                className="group relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:-translate-y-0.5 hover:border-red-100 hover:bg-red-50 hover:text-red-500 active:scale-95"
+                aria-label={t("common.close")}
+              >
+                <span
+                  className={`inline-flex ${uiActionIconMotionClass.close}`}
+                >
+                  <X size={16} />
+                </span>
+              </button>
+            </div>
           </div>
-          <button
-            onClick={onClose}
-            className="p-2 bg-slate-100 hover:bg-slate-200 text-slate-500 hover:text-slate-700 rounded-full transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
         </div>
 
         {/* Body: 2-Column Grid — no own scroll box, so the calendar popup is
             never clipped. The overlay above scrolls the whole modal instead. */}
-        <div className="p-6 flex-1">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-            {documentTypes.map((type) => {
+        <div className="flex-1 overflow-y-auto bg-slate-50/60 px-4 py-5 md:px-8 md:py-6">
+          <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+            {documentTypes.map((type, cardIndex) => {
               const doc = docMap[type];
               const expiry = getExpiry(doc);
               const currentDate = editedDates[type] || "";
@@ -367,13 +411,13 @@ const DocumentEditModal = ({
               return (
                 <div
                   key={type}
-                  // FIX: Removed overflow-hidden, added relative and focus-within:z-50
-                  className="relative bg-white rounded-xl border border-slate-200 shadow-sm flex flex-col group hover:shadow-md transition-shadow focus-within:z-50"
+                  className="relative flex flex-col rounded-xl border border-slate-200/80 bg-white shadow-sm transition-shadow hover:shadow-md focus-within:z-50 motion-safe:animate-[var(--animate-fade-in-up)]"
+                  style={{ animationDelay: `${cardIndex * 40}ms` }}
                 >
                   {/* Colored Header specific to document type */}
                   {/* FIX: Added rounded-t-xl to keep corners clean without overflow-hidden */}
                   <div
-                    className={`flex items-center gap-3 px-4 py-3 border-b rounded-t-xl ${config.bg} ${config.border}`}
+                    className={`flex items-center gap-2.5 rounded-t-xl border-b px-4 py-2.5 ${config.bg} ${config.border}`}
                   >
                     <div
                       className={`p-1.5 rounded-lg bg-white shadow-sm border ${config.border}`}
@@ -381,19 +425,24 @@ const DocumentEditModal = ({
                       <Icon className={`w-4 h-4 ${config.text}`} />
                     </div>
                     <h3
-                      className={`font-bold uppercase tracking-wide text-[13px] ${config.text}`}
+                      className={`text-[12px] font-bold uppercase tracking-wider ${config.text}`}
                     >
-                      {type}
+                      {t(`fleet.doc_label.${type}`)}
                     </h3>
+                    {hasScan && (
+                      <span className="ml-auto inline-flex items-center gap-1 rounded-full border border-emerald-100 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-600">
+                        <CheckCircle2 size={10} /> {t("fleet.doc_edit.scan")}
+                      </span>
+                    )}
                   </div>
 
                   {/* Body of Card */}
-                  <div className="p-4 flex flex-col flex-1 gap-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="flex flex-1 flex-col gap-3.5 p-4">
+                    <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
                       {/* Document Number */}
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                          Document No.
+                        <label className={fieldLabelClass}>
+                          {t("fleet.doc_edit.document_no")}
                         </label>
                         <input
                           type="text"
@@ -402,30 +451,33 @@ const DocumentEditModal = ({
                             handleNumberChange(type, e.target.value)
                           }
                           placeholder="e.g. 123456789"
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium text-slate-800"
+                          className={`${fieldInputClass} font-medium tabular-nums`}
                         />
                       </div>
 
                       {/* Expiry Date */}
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                          Expiry Date
+                        <label className={fieldLabelClass}>
+                          {t("fleet.doc_edit.expiry_date")}
                         </label>
                         <div className="relative w-full z-10">
                           <DatePicker
                             value={currentDate}
                             onChange={(val) => handleDateChange(type, val)}
                             placeholder={
-                              hasExisting ? "Update date" : "Select date"
+                              hasExisting
+                                ? t("fleet.doc_edit.update_date")
+                                : t("fleet.doc_edit.select_date")
                             }
                             error={error}
-                            className="w-full text-sm"
+                            language={popupLang}
+                            className="w-full text-[13px]"
                           />
                         </div>
                       </div>
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                          Valid From
+                        <label className={fieldLabelClass}>
+                          {t("fleet.doc_edit.valid_from")}
                         </label>
                         <DatePicker
                           value={editedValidFrom[type] || ""}
@@ -435,13 +487,14 @@ const DocumentEditModal = ({
                               [type]: normalizeDate(val),
                             }))
                           }
-                          placeholder="Valid from"
-                          className="w-full text-sm"
+                          placeholder={t("fleet.doc_edit.valid_from")}
+                          language={popupLang}
+                          className="w-full text-[13px]"
                         />
                       </div>
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
-                          Remarks
+                        <label className={fieldLabelClass}>
+                          {t("fleet.doc_edit.remarks")}
                         </label>
                         <input
                           type="text"
@@ -452,8 +505,8 @@ const DocumentEditModal = ({
                               [type]: e.target.value,
                             }))
                           }
-                          placeholder="Optional remarks"
-                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                          placeholder={t("fleet.doc_edit.remarks_placeholder")}
+                          className={fieldInputClass}
                         />
                       </div>
                     </div>
@@ -462,7 +515,7 @@ const DocumentEditModal = ({
                     {!hasExisting && !currentDate && !error && (
                       <div className="text-xs font-medium text-amber-600 bg-amber-50 px-3 py-2 rounded-lg border border-amber-200/60 flex items-center gap-2 mt-auto">
                         <Car className="w-3.5 h-3.5 shrink-0" />
-                        No document on file – pick an expiry date to add one.
+                        {t("fleet.doc_edit.no_document")}
                       </div>
                     )}
                     {error && (
@@ -474,10 +527,10 @@ const DocumentEditModal = ({
                     {/* Scan — attach / view / download / remove on one level row.
                         Label on the left, every control in a single right-aligned
                         group, all sharing one height so the row never ragged. */}
-                    <div className="mt-auto border-t border-slate-100 pt-4">
+                    <div className="mt-auto border-t border-slate-100 pt-3">
                       <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
-                        <span className="shrink-0 text-xs font-bold uppercase tracking-wider text-slate-500">
-                          Scan
+                        <span className={`shrink-0 ${fieldLabelClass}`}>
+                          {t("fleet.doc_edit.scan")}
                         </span>
 
                         <div className="flex flex-wrap items-center justify-end gap-2">
@@ -490,16 +543,13 @@ const DocumentEditModal = ({
                                 className="h-4 w-4 shrink-0"
                                 aria-hidden="true"
                               />
-                              <span
-                                className="truncate"
-
-                              >
+                              <span className="truncate">
                                 {selectedFileName}
                               </span>
                               <button
                                 type="button"
                                 onClick={() => handleFileChange(type, null)}
-                                aria-label="Undo upload"
+                                aria-label={t("fleet.doc_edit.undo_upload")}
                                 className="-mr-1 shrink-0 rounded p-1 text-emerald-600 transition-colors hover:bg-emerald-100 hover:text-emerald-800"
                               >
                                 <Undo2
@@ -509,16 +559,14 @@ const DocumentEditModal = ({
                               </button>
                             </span>
                           ) : (
-                            <label
-                              className={`${scanAttachClass} cursor-pointer`}
-                            >
+                            <label className={scanAttachClass}>
                               <Upload
                                 className="h-3.5 w-3.5 text-slate-400"
                                 aria-hidden="true"
                               />
                               {hasScan
-                                ? "Replace Scan"
-                                : "Attach Scan (Optional)"}
+                                ? t("fleet.doc_edit.replace_scan")
+                                : t("fleet.doc_edit.attach_scan")}
                               <input
                                 type="file"
                                 accept=".png,.jpg,.jpeg,.pdf"
@@ -540,9 +588,16 @@ const DocumentEditModal = ({
                               target="_blank"
                               rel="noreferrer"
                               className={scanViewClass}
+                              aria-label={t("common.view")}
                             >
-                              <Eye className="h-3.5 w-3.5" aria-hidden="true" />{" "}
-                              View
+                              <span
+                                className={`inline-flex ${uiActionIconMotionClass.view}`}
+                              >
+                                <Eye
+                                  className="h-3.5 w-3.5"
+                                  aria-hidden="true"
+                                />
+                              </span>
                             </a>
                           )}
 
@@ -557,12 +612,16 @@ const DocumentEditModal = ({
                                 )
                               }
                               className={scanDownloadClass}
+                              aria-label={t("fleet.doc_edit.download_scan")}
                             >
-                              <Download
-                                className="h-3.5 w-3.5"
-                                aria-hidden="true"
-                              />{" "}
-                              Download
+                              <span
+                                className={`inline-flex ${uiActionIconMotionClass.pdf}`}
+                              >
+                                <Download
+                                  className="h-3.5 w-3.5"
+                                  aria-hidden="true"
+                                />
+                              </span>
                             </button>
                           )}
 
@@ -580,12 +639,16 @@ const DocumentEditModal = ({
                                 }));
                               }}
                               className={scanRemoveClass}
+                              aria-label={t("common.remove")}
                             >
-                              <Trash2
-                                className="h-3.5 w-3.5"
-                                aria-hidden="true"
-                              />{" "}
-                              Remove
+                              <span
+                                className={`inline-flex ${uiActionIconMotionClass.delete}`}
+                              >
+                                <Trash2
+                                  className="h-3.5 w-3.5"
+                                  aria-hidden="true"
+                                />
+                              </span>
                             </button>
                           )}
 
@@ -593,7 +656,7 @@ const DocumentEditModal = ({
                             <span
                               className={`${scanChipClass} border-rose-200 bg-rose-50 text-rose-700`}
                             >
-                              Scan will be removed
+                              {t("fleet.doc_edit.scan_will_be_removed")}
                               <button
                                 type="button"
                                 onClick={() =>
@@ -604,7 +667,7 @@ const DocumentEditModal = ({
                                 }
                                 className="shrink-0 font-bold underline decoration-rose-300 underline-offset-2 transition-colors hover:text-rose-900"
                               >
-                                Undo
+                                {t("fleet.doc_edit.undo")}
                               </button>
                             </span>
                           )}
@@ -618,24 +681,31 @@ const DocumentEditModal = ({
           </div>
         </div>
 
-        {/* Footer — rounded-b-2xl for the same reason as the header. */}
-        <div className="px-6 py-4 bg-white border-t border-slate-200 flex items-center justify-end gap-3 shrink-0 rounded-b-2xl">
+        {/* Footer — Trip List view footer */}
+        <div className="flex shrink-0 items-center justify-end gap-3 rounded-b-2xl border-t border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 px-6 py-4 md:px-8">
           <button
+            type="button"
             onClick={onClose}
-            className="px-5 py-2 border border-slate-200 hover:bg-slate-50 text-slate-600 rounded-xl transition-all font-semibold text-sm shadow-sm"
+            className="group relative inline-flex items-center gap-2 rounded-2xl bg-slate-100 px-5 py-2.5 text-xs font-semibold text-slate-700 transition-all hover:bg-slate-200 active:scale-95"
           >
-            Cancel
+            <span className={`inline-flex ${uiActionIconMotionClass.close}`}>
+              <X size={15} />
+            </span>
+            {t("common.cancel")}
           </button>
           <button
+            type="button"
             onClick={handleSave}
-            className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-xl transition-all font-semibold text-sm flex items-center gap-2 shadow-sm active:scale-95"
+            className="group relative inline-flex items-center gap-2 rounded-2xl bg-emerald-600 px-6 py-2.5 text-xs font-semibold text-white shadow-sm shadow-emerald-600/20 transition-all hover:-translate-y-0.5 hover:bg-emerald-700 active:scale-95"
           >
-            <Save className="w-4 h-4" />
-            Save Changes
+            <span className="inline-flex transition-transform group-hover:scale-110">
+              <Save size={15} />
+            </span>
+            {t("fleet.doc_edit.save_changes")}
           </button>
         </div>
       </div>
-    </div>
+    </AppShellModal>
   );
 };
 
