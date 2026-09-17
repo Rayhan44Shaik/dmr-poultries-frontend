@@ -99,7 +99,12 @@ function FarmPaymentTripView({ open, trip, onClose }: FarmPaymentTripViewModalPr
   }
 
   if (!open || !trip) return null;
-  const viewTrip = displayTrip ?? trip;
+  // Localize prose (farm, addresses, timestamps) but keep the identifiers —
+  // trip number and vehicle number — in their stored Latin/numeric form in
+  // every language: they are codes, never transliterated.
+  const viewTrip = displayTrip
+    ? { ...displayTrip, tripNo: trip.tripNo, vehicleNo: trip.vehicleNo }
+    : trip;
 
   const stepLabel = (index: 1 | 2) =>
     `${t('ops.trip.step_label', { step: index + 1 })} · ${t(`ops.trip.step.${STEP_OPTIONS[index - 1].key}`)}`;

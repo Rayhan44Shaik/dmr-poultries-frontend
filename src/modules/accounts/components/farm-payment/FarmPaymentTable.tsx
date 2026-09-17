@@ -69,14 +69,15 @@ const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
     return payment.paymentStatus === 'Paid' || payment.paymentStatus === 'Partially Paid';
   };
 
-  // Locked (already paid/partial) rows show their saved rate read-only.
+  // Locked (already paid/partial) rows show their saved rate read-only —
+  // a light red pill so a settled rate reads as "locked" at a glance.
   const lockedRate = (value: number) => (
-    <div className="flex items-center gap-1.5">
-      <Lock size={12} className="text-slate-400" />
-      <span className="text-sm font-semibold text-slate-700">
+    <span className="inline-flex items-center gap-1.5 rounded-lg border border-rose-100 bg-rose-50/80 px-2.5 py-1 shadow-sm">
+      <Lock size={12} className="text-rose-400 shrink-0" aria-hidden="true" />
+      <span className="text-sm font-semibold text-rose-600 tabular-nums whitespace-nowrap">
         {value > 0 ? `₹${value.toFixed(2)}` : '—'}
       </span>
-    </div>
+    </span>
   );
 
   // Each column header carries its own glyph — the same icon-label language
@@ -173,8 +174,11 @@ const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
                     <td className="px-4 py-4 text-center text-[13px] text-slate-500 font-medium w-12 tabular-nums">
                       {serialNo}
                     </td>
+                    {/* Identifiers stay in their stored Latin/numeric form in every
+                        language: the trip number and vehicle number are codes, not
+                        prose, so Telugu never transliterates them. */}
                     <td className="px-4 py-4 text-[13px] font-bold text-emerald-600 whitespace-nowrap">
-                      {localizeTripViewText(trip.tripNo, language)}
+                      {trip.tripNo}
                     </td>
                     <td className="px-4 py-4 text-[13px] font-medium text-slate-600 whitespace-nowrap">
                       {formatTripListDay(trip.tripDate, language)}
@@ -183,7 +187,7 @@ const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
                       {localizeTripViewText(trip.sourceFarm, language)}
                     </td>
                     <td className="px-4 py-4 text-[13px] text-slate-600 whitespace-nowrap">
-                      {localizeTripViewText(formatVehicleNumber(trip.vehicleNo), language)}
+                      {formatVehicleNumber(trip.vehicleNo)}
                     </td>
                     <td className="px-4 py-4 text-[13px] text-right font-bold text-blue-600 whitespace-nowrap tabular-nums">
                       {formatCount(totalBirdsLoaded)}

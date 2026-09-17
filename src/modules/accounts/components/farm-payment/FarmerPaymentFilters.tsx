@@ -18,6 +18,7 @@ import { BrandRefreshButton } from '../../../../ui';
 import MasterDropdown from '../../../masters/components/MasterDropdown';
 import '../../../masters/styles/masters.css';
 import { useI18n } from '../../../../i18n';
+import { localizeTripViewText } from '../../../operations/vehicle-trips/utils/tripViewLocalization';
 
 interface FarmerPaymentFiltersProps {
   dateFrom: string;
@@ -49,7 +50,7 @@ export function FarmerPaymentFilters({
   onSearchChange,
   onClear,
 }: FarmerPaymentFiltersProps) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const fromId = React.useId();
   const toId = React.useId();
   const farmId = React.useId();
@@ -72,10 +73,20 @@ export function FarmerPaymentFilters({
   );
 
   // "All" is the sentinel — represented as an empty dropdown value so the
-  // placeholder shows and the clear affordance behaves correctly.
+  // placeholder shows and the clear affordance behaves correctly. Labels read
+  // in the active language while the value keeps its stored form (filtering
+  // compares against trip.sourceFarm, which never changes), and searchText
+  // keeps the Latin name so typing either script finds the farm.
   const farmOptions = React.useMemo(
-    () => farms.filter((farm) => farm !== 'All').map((farm) => ({ value: farm, label: farm })),
-    [farms],
+    () =>
+      farms
+        .filter((farm) => farm !== 'All')
+        .map((farm) => ({
+          value: farm,
+          label: localizeTripViewText(farm, language),
+          searchText: farm,
+        })),
+    [farms, language],
   );
 
   return (
@@ -93,6 +104,7 @@ export function FarmerPaymentFilters({
             onChange={onDateFromChange}
             placeholder={t('placeholder.enter_date')}
             className="w-full text-xs font-medium"
+            language={language}
           />
         </div>
 
@@ -107,6 +119,7 @@ export function FarmerPaymentFilters({
             onChange={onDateToChange}
             placeholder={t('placeholder.enter_date')}
             className="w-full text-xs font-medium"
+            language={language}
           />
         </div>
 
