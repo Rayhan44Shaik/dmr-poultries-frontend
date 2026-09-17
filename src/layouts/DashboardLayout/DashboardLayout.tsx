@@ -17,6 +17,7 @@ import {
   type ReactNode,
 } from "react";
 import { useLocation } from "react-router-dom";
+import { pageScrollKey } from "./pageScrollKey";
 import Sidebar from "../../ui/Sidebar/Sidebar";
 import Header from "../../ui/Header/Header";
 import CommandPalette from "../../ui/CommandPalette/CommandPalette";
@@ -87,9 +88,15 @@ function ShellFrame({ children }: DashboardLayoutProps) {
   const [navOpen, setNavOpen] = useState(false);
   const [commandOpen, setCommandOpen] = useState(false);
 
+  /* Scroll the content to the top when a DIFFERENT page mounts — and only then.
+   * Keying on the whole search string used to fire on in-page state too (a date
+   * picked in Orders, a filter, a page number), so the view jumped up while you
+   * were working at the bottom of a long page. `?tab=` is part of the key
+   * because in the hub sections it IS the page. */
+  const scrollKey = pageScrollKey(location.pathname, location.search);
   useEffect(() => {
     mainRef.current?.scrollTo({ top: 0 });
-  }, [location.pathname, location.search]);
+  }, [scrollKey]);
 
   const handleMenuClick = useCallback(() => {
     if (typeof window !== "undefined" && window.matchMedia(LG_QUERY).matches) {

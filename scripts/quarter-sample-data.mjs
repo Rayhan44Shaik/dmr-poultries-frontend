@@ -11,6 +11,28 @@
 // Staff module: duty planner, leaves, salary register) round-trip against
 // in-memory copies, so saves/approvals/submits render immediately.
 //
+// ── SUPERVISOR-MOBILE CONTRACT (same rows, re-shaped — nothing new) ────────
+//   POST /api/auth/login · GET /api/auth/me · GET /api/bootstrap
+//        additionally return a `supervisor` profile resolved from the employee
+//        master, which MobileAuthProvider requires before it will persist a
+//        mobile session (and it derives the draft-ownership key from it).
+//   GET /api/sync/health
+//        additionally answers { ok, authenticated, databaseReachable,
+//        supervisorId, serverTime }, without which useDurableMobileSync marks
+//        the office unreachable and the offline queue never flushes.
+//   POST /api/trips/steps/start · POST /api/trips/:id/steps/:step
+//        answer the durable-sync acknowledgement { acknowledged, operationId,
+//        trip, serverTime, replayed } ALONGSIDE the trip fields the desktop
+//        wizard maps, so one route serves both clients. A stale
+//        `expectedVersion` returns 409, and replaying an operationId returns
+//        the original answer instead of applying the step twice.
+//   POST /api/trips/:id/whatsapp  — Orders assignment sheet, recorded into the
+//                                  per-delivery dispatch state the Trip View reads.
+//   POST /api/fleet/emis/:id/pay  — advances the loan row, so /schedule, the EMI
+//                                  page and the fleet KPIs agree; idempotency-keyed.
+//   GET  /api/operations/fuel-expenses/:id — the bill the edit form loads.
+//   DELETE /api/fleet/maintenance/:id/documents/:documentId — drops the attachment.
+//
 //   node scripts/quarter-sample-data.mjs          # serves on port 4000
 //   PORT=4100 node scripts/quarter-sample-data.mjs
 //
@@ -4574,6 +4596,122 @@ const USER = {
   permissions: ["*"],
 };
 
+// ── Supervisor Mobile: session + durable-sync contracts ────────────────────
+// The mobile workspace (src/modules/supervisor-mobile) speaks a stricter
+// dialect than the desktop app:
+//   • POST /auth/login, GET /auth/me and GET /bootstrap must carry a
+//     `supervisor` profile (MobileAuthProvider persists it and derives the
+//     per-supervisor draft-ownership key from accountId + employeeId).
+//   • GET /sync/health must answer { ok, authenticated, databaseReachable }
+//     or useDurableMobileSync marks the office unreachable and the queue
+//     never flushes.
+//   • Every wizard write must answer with the acknowledgement envelope
+//     { acknowledged, operationId, trip, serverTime, replayed } — mobile
+//     `mapAcknowledgement` throws on anything else.
+// Nothing below invents sample records: the supervisor is an existing row of
+// the employee master (SUPERVISORS), the profile username is whatever the
+// app typed in, and the acknowledgement wraps the very trip the desktop
+// routes already return.
+
+/**
+ * Resolve a supervisor profile for the mobile app from the employee master.
+ * An exact name/number match wins; otherwise the username picks a supervisor
+ * deterministically, so two different logins get two stable identities.
+ */
+function supervisorProfile(username) {
+  const wanted = String(username ?? "").trim().toLowerCase();
+  const exact = wanted
+    ? EMPLOYEES.find(
+        (e) =>
+          String(e.employeeName ?? "").toLowerCase() === wanted ||
+          String(e.username ?? "").toLowerCase() === wanted ||
+          String(e.employeeNo ?? "") === wanted.replace(/^0+/, "")
+      )
+    : null;
+  // A username that matches a real employee wins (that IS the person signed
+  // in); anything else picks a supervisor deterministically from the master.
+  const pool = SUPERVISORS.length ? SUPERVISORS : EMPLOYEES;
+  const source = exact ?? pool[hash32(wanted) % Math.max(1, pool.length)] ?? null;
+  return {
+    accountId: "dmr-poultries",
+    employeeId: Number(source?.id ?? 1),
+    employeeName: String(source?.employeeName ?? "Supervisor"),
+    username: wanted || String(source?.employeeName ?? "supervisor").toLowerCase().replace(/\s+/g, ""),
+    role: String(source?.role ?? "Supervisor"),
+    department: String(source?.department ?? "Supervisor"),
+  };
+}
+
+/** Small stable string hash, so a username always maps to the same supervisor. */
+function hash32(value) {
+  let h = 2166136261;
+  for (let i = 0; i < value.length; i += 1) {
+    h ^= value.charCodeAt(i);
+    h = Math.imul(h, 16777619);
+  }
+  return Math.abs(h >>> 0);
+}
+
+/** Session payload shared by /auth/login and /auth/me (desktop keys stay). */
+function mobileSession(username) {
+  return {
+    supervisor: supervisorProfile(username),
+    expiresAt: `${addDays(TODAY, 30)}T23:59:59.000Z`,
+  };
+}
+
+/**
+ * Idempotency ledger for mobile writes: `tripId:operationId` → the answer the
+ * office gave the first time. The mobile queue replays an operation after a
+ * crash, and a replay must return the ORIGINAL trip (flagged `replayed`)
+ * instead of applying the same step twice.
+ */
+const MOBILE_ACKS = new Map();
+
+/** Idempotency ledger for recorded EMI instalment payments (per page). */
+const EMI_PAYMENTS = new Map();
+
+/** Bump the optimistic-concurrency stamp the mobile app reads back. */
+function tripVersion(trip) {
+  trip.version = Number(trip.version ?? 1) + 1;
+  return trip;
+}
+
+/**
+ * The step-write answer for BOTH clients: the desktop trip wizard maps the
+ * trip fields at the top level (`mapApiTripToTrip(data)`), while the mobile
+ * durable-sync queue requires the acknowledgement envelope. Merging both into
+ * one object keeps either client happy with one route.
+ */
+function tripAckPayload(trip, body, { replayed = false } = {}) {
+  const operationId = String(body?.operationId ?? "").trim() || null;
+  const key = operationId ? `${trip.id}:${operationId}` : null;
+  if (key && MOBILE_ACKS.has(key)) return { ...trip, ...MOBILE_ACKS.get(key), replayed: true };
+  const ack = {
+    acknowledged: true,
+    operationId,
+    trip,
+    serverTime: nowIso(),
+    replayed,
+  };
+  if (key) MOBILE_ACKS.set(key, ack);
+  return { ...trip, ...ack };
+}
+
+/** 409 when the mobile queue's expectedVersion is stale (conflict surface). */
+function versionConflict(trip, body, send) {
+  const expected = Number(body?.expectedVersion);
+  if (!Number.isFinite(expected) || expected <= 0) return false;
+  if (Number(trip.version ?? 1) === expected) return false;
+  send(409, {
+    error: "version_conflict",
+    message: "This Trip was changed from another device. Reload it before saving.",
+    currentVersion: Number(trip.version ?? 1),
+    expectedVersion: expected,
+  });
+  return true;
+}
+
 /** Mirrors the frontend `isOrderContainer`: a vehicle-less "[ORDER]" container. */
 function isOrderContainerRow(t) {
   return (
@@ -4687,8 +4825,22 @@ const server = http.createServer(async (req, res) => {
 
   try {
     // ── Meta / auth ────────────────────────────────────────────────────────
-    if (p === "/api/health" || p === "/api/sync/health")
-      return send(200, { status: "ok", quarter: QUARTER, sample: true });
+    if (p === "/api/health" || p === "/api/sync/health") {
+      // Desktop probes this to detect the sample server. Mobile additionally
+      // requires { ok, authenticated, databaseReachable } or
+      // useDurableMobileSync.checkOffice() marks the office unreachable and
+      // never flushes the draft queue — so the answer carries both shapes.
+      return send(200, {
+        status: "ok",
+        quarter: QUARTER,
+        sample: true,
+        ok: true,
+        authenticated: true,
+        databaseReachable: true,
+        supervisorId: supervisorProfile(null).employeeId,
+        serverTime: nowIso(),
+      });
+    }
     // Sample-data manifest. The frontend probes this endpoint (short timeout)
     // to detect that it is talking to the sample server rather than a real
     // PostgreSQL backend, so it can label the UI accordingly.
@@ -4715,13 +4867,29 @@ const server = http.createServer(async (req, res) => {
         dutyAssignments: DUTY_ASSIGNMENTS.length,
         marketRates: MARKET_RATES.length,
       });
-    if (p === "/api/auth/login" && method === "POST")
-      return send(200, { user: USER, token: "sample-quarter-token", expiresAt: addDays(TODAY, 30) });
-    if (p === "/api/auth/me") return send(200, { user: USER });
+    if (p === "/api/auth/login" && method === "POST") {
+      const body = await readBody(req);
+      // `user` serves the desktop gate, `supervisor` serves the mobile
+      // provider — both are read from the same response object.
+      const session = mobileSession(body?.username);
+      return send(200, {
+        user: USER,
+        token: "sample-quarter-token",
+        expiresAt: session.expiresAt,
+        supervisor: session.supervisor,
+      });
+    }
+    if (p === "/api/auth/me") {
+      const session = mobileSession(null);
+      return send(200, { user: USER, supervisor: session.supervisor, expiresAt: session.expiresAt });
+    }
     if (p === "/api/auth/logout") return send(200, { ok: true });
     if (p === "/api/bootstrap")
       return send(200, {
         user: USER,
+        // Mobile bootstrap payload (SupervisorMobilePage reads .supervisor and
+        // the master rows below); desktop login also consumes this shape.
+        supervisor: supervisorProfile(null),
         shops: SHOPS,
         farms: FARMS,
         vehicles: VEHICLES,
@@ -4835,12 +5003,18 @@ const server = http.createServer(async (req, res) => {
     // Step 1 (new draft): POST /api/trips/steps/start
     if (p === "/api/trips/steps/start" && method === "POST") {
       const body = await readBody(req);
-      return send(201, createTripFromWizard(body));
+      const trip = tripVersion(createTripFromWizard(body));
+      // 201 keeps the desktop happy; the envelope below is what the mobile
+      // durable-sync queue needs to mark the create operation SYNCED.
+      return send(201, tripAckPayload(trip, body));
     }
     // Steps 2-5 submit: POST /api/trips/:id/steps/:step
     if (m(/^\/api\/trips\/(\d+)\/steps\/([a-z]+)$/) && method === "POST") {
-      const trip = mergeTripBody(m(/^\/api\/trips\/(\d+)\/steps\/([a-z]+)$/)[1], await readBody(req));
-      return trip ? send(200, trip) : send(404, { error: "trip_not_found" });
+      const body = await readBody(req);
+      const trip = mergeTripBody(m(/^\/api\/trips\/(\d+)\/steps\/([a-z]+)$/)[1], body);
+      if (!trip) return send(404, { error: "trip_not_found" });
+      if (versionConflict(trip, body, send)) return undefined;
+      return send(200, tripAckPayload(tripVersion(trip), body));
     }
     // Step 4 save: PUT /api/trips/:id/deliveries
     if (m(/^\/api\/trips\/(\d+)\/deliveries$/) && ["PUT", "POST"].includes(method)) {
@@ -4871,6 +5045,39 @@ const server = http.createServer(async (req, res) => {
       const delivery = (trip.deliveries ?? []).find((d) => Number(d.id) === Number(rawDeliveryId));
       if (!delivery) return send(404, { error: "delivery_not_found" });
       return send(200, recordDeliveryDispatch(trip, delivery, channel));
+    }
+    // Whole-trip WhatsApp dispatch (Orders → Assignment Sheet): the sheet PDF
+    // is generated client-side and POSTed here, so the sample server records
+    // the send against the same per-delivery dispatch state the Trip View
+    // reads, and answers with the { sent, failed } counters the page reports.
+    if (m(/^\/api\/trips\/(\d+)\/(whatsapp|email)$/) && method === "POST") {
+      const [, rawTripId, channel] = m(/^\/api\/trips\/(\d+)\/(whatsapp|email)$/);
+      const body = await readBody(req);
+      const trip = TRIP_BY_ID.get(Number(rawTripId));
+      if (!trip) return send(404, { error: "trip_not_found" });
+      const rows = trip.deliveries ?? [];
+      let sent = 0;
+      let failed = 0;
+      for (const delivery of rows) {
+        if (recordDeliveryDispatch(trip, delivery, channel).success) sent += 1;
+        else failed += 1;
+      }
+      // A container with no shop rows still represents one real send (the
+      // assignment sheet itself), so the page never reports a silent no-op.
+      if (!rows.length && body?.recipient) sent = 1;
+      return send(200, {
+        queued: true,
+        sample: true,
+        channel,
+        tripId: trip.id,
+        tripNo: trip.tripNo,
+        fileName: body?.fileName ?? null,
+        sent,
+        failed,
+        skipped: 0,
+        recipients: sent,
+        message: `Assignment sheet for ${trip.tripNo} queued for WhatsApp delivery.`,
+      });
     }
     // Status transition: PATCH /api/trips/:id/status
     if (m(/^\/api\/trips\/(\d+)\/status$/) && method === "PATCH") {
@@ -5338,6 +5545,17 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       return send(201, createFuelRow(body));
     }
+    // One bill by id — fuelExpenseService.getById() loads this when the entry
+    // form opens an existing bill for editing. Served from the same
+    // FUEL_EXPENSES rows the list uses, so the form always agrees with the
+    // register (and PUT/approve below can mutate the identical object).
+    if (m(/^\/api\/operations\/fuel-expenses\/(\d+)$/) && method === "GET") {
+      const fuelId = m(/^\/api\/operations\/fuel-expenses\/(\d+)$/)[1];
+      const row = FUEL_EXPENSES.find((f) => String(f.id) === fuelId && f.deleted !== true);
+      return row
+        ? send(200, row)
+        : send(404, { error: "fuel_expense_not_found", message: `No fuel bill #${fuelId} in this quarter.` });
+    }
     if (m(/^\/api\/operations\/fuel-expenses\/(\d+)$/) && ["PUT", "PATCH"].includes(method)) {
       const fuelId = m(/^\/api\/operations\/fuel-expenses\/(\d+)$/)[1];
       const row = FUEL_EXPENSES.find((f) => String(f.id) === fuelId);
@@ -5524,6 +5742,22 @@ const server = http.createServer(async (req, res) => {
     if (m(/^\/api\/fleet\/maintenance\/(\d+)\/documents$/) && method === "GET") {
       const row = MAINTENANCE.find((x) => Number(x.id) === Number(m(/^\/api\/fleet\/maintenance\/(\d+)\/documents$/)[1]));
       return send(200, row?.documents ?? []);
+    }
+    // Remove one attachment: DELETE /api/fleet/maintenance/:id/documents/:docId
+    // The Documents panel refetches this list after deleting, so the row (and
+    // the uploaded-bytes side map) must shrink in place for the tile count and
+    // the entry's hasDocument flag to agree with the list.
+    if (m(/^\/api\/fleet\/maintenance\/(\d+)\/documents\/(\d+)$/) && method === "DELETE") {
+      const mm = m(/^\/api\/fleet\/maintenance\/(\d+)\/documents\/(\d+)$/);
+      const row = MAINTENANCE.find((x) => Number(x.id) === Number(mm[1]));
+      if (!row) return send(404, { error: "not_found" });
+      const docId = Number(mm[2]);
+      const before = (row.documents ?? []).length;
+      row.documents = (row.documents ?? []).filter((d) => Number(d.id) !== docId);
+      if (before === row.documents.length) return send(404, { error: "document_not_found" });
+      MAINT_DOC_BYTES.delete(docId);
+      row.updatedAt = nowIso();
+      return send(200, { ok: true, deleted: true, id: docId, documents: row.documents });
     }
     if (m(/^\/api\/fleet\/maintenance\/(\d+)\/documents\/(\d+)$/) && method === "GET") {
       const mm = m(/^\/api\/fleet\/maintenance\/(\d+)\/documents\/(\d+)$/);
@@ -5759,6 +5993,48 @@ const server = http.createServer(async (req, res) => {
       const id = Number(m(/^\/api\/fleet\/emis\/(\d+)\/schedule$/)[1]);
       const emi = EMIS.find((e) => e.id === id);
       return emi ? send(200, emiSchedule(emi)) : send(404, { error: "not_found" });
+    }
+    // Record one EMI instalment as paid: POST /api/fleet/emis/:id/pay
+    // The schedule is DERIVED from `paidEMIs`, so advancing that counter is
+    // all it takes for /schedule, the EMI page KPIs and the fleet dashboard
+    // to agree on the new state — no separate ledger to keep in step.
+    if (m(/^\/api\/fleet\/emis\/(\d+)\/pay$/) && method === "POST") {
+      const id = Number(m(/^\/api\/fleet\/emis\/(\d+)\/pay$/)[1]);
+      const body = await readBody(req);
+      const emi = EMIS.find((e) => e.id === id);
+      if (!emi) return send(404, { error: "emi_not_found" });
+      const due = emiSchedule(emi).find((s) => s.status === "pending");
+      if (!due)
+        return send(409, {
+          error: "all_installments_paid",
+          message: `All ${emi.totalEMIs} instalments of ${emi.vehicleNo} are already paid.`,
+        });
+      // Idempotency key from the page: a double click must not pay twice.
+      const idempotencyKey = String(body?.idempotencyKey ?? "").trim();
+      if (idempotencyKey && EMI_PAYMENTS.has(idempotencyKey))
+        return send(200, { ...emi, replayed: true, ...EMI_PAYMENTS.get(idempotencyKey) });
+      const paidAt = nowIso();
+      if (idempotencyKey) EMI_PAYMENTS.set(idempotencyKey, { lastPaidInstallmentNo: due.installmentNo });
+      emi.paidEMIs = Number(emi.paidEMIs ?? 0) + 1;
+      emi.completedEMIs = emi.paidEMIs;
+      emi.pendingEMIs = Math.max(0, Number(emi.totalEMIs) - emi.paidEMIs);
+      const next = emiSchedule(emi).find((s) => s.status === "pending");
+      emi.nextEMIDate = next ? next.dueDate : null;
+      emi.status =
+        emi.paidEMIs >= Number(emi.totalEMIs)
+          ? "paid"
+          : emi.nextEMIDate && emi.nextEMIDate < TODAY
+            ? "overdue"
+            : "active";
+      emi.updatedAt = paidAt;
+      emi.paidBy = String(body?.paidBy ?? "Office");
+      return send(200, {
+        ...emi,
+        lastPaidInstallmentNo: due.installmentNo,
+        lastPaidAmount: due.amount,
+        lastPaidAt: paidAt,
+        replayed: false,
+      });
     }
     if (m(/^\/api\/fleet\/emis\/(\d+)$/)) {
       const id = Number(m(/^\/api\/fleet\/emis\/(\d+)$/)[1]);

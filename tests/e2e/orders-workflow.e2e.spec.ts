@@ -106,13 +106,15 @@ function orderRow(page_: Awaited<ReturnType<typeof apiOrders>>, shop: string) {
 
 // ── UI helpers ─────────────────────────────────────────────────────────────
 
-async function gotoOrders(page: Page, tab: 'collection' | 'assignment' | 'tracking') {
-  await page.goto('/operations?tab=orders');
-  await page.waitForLoadState('networkidle');
-  if (tab !== 'collection') {
-    const name = tab === 'assignment' ? /order assignment/i : /delivery tracking/i;
-    await page.getByRole('tab', { name }).click();
-  }
+const ORDERS_ROUTE = {
+  collection: '/operations/orders/collection',
+  assignment: '/operations/orders/assignment',
+  tracking: '/operations/orders/delivery-tracking',
+} as const;
+
+/** Each Orders page is its own route now — go to it, do not click a tab. */
+async function gotoOrders(page: Page, tab: keyof typeof ORDERS_ROUTE) {
+  await page.goto(ORDERS_ROUTE[tab]);
   await page.waitForLoadState('networkidle');
 }
 
@@ -253,13 +255,13 @@ test('orders-01: working sheet shows ALL shops; Save Progress stays on Collectio
 }) => {
   await gotoOrders(page, 'collection');
 
-  // No separate page-level "Orders" heading inside the Orders module — the
-  // module header is the three attached tabs (the app's global breadcrumb may
-  // still show "Orders" in the top banner, which is expected).
+  // No page-level "Orders" heading and no in-page tab strip: the three pages are
+  // siblings in the sidebar (Operations → Orders), each behind its own URL.
   await expect(page.getByRole('main').getByRole('heading', { name: /^orders$/i })).toHaveCount(0);
-  await expect(page.getByRole('tab', { name: /order collection/i })).toBeVisible();
-  await expect(page.getByRole('tab', { name: /order assignment/i })).toBeVisible();
-  await expect(page.getByRole('tab', { name: /delivery tracking/i })).toBeVisible();
+  await expect(page.getByRole('tab')).toHaveCount(0);
+  for (const route of Object.values(ORDERS_ROUTE)) {
+    await expect(page.locator(`a[href="${route}"]`)).not.toHaveCount(0);
+  }
 
   // The collection sheet is a day-wise working sheet: every active shop is
   // shown even before any entry exists (no "no orders collected" screen).
@@ -287,10 +289,7 @@ test('orders-01: working sheet shows ALL shops; Save Progress stays on Collectio
   // Save Progress must SAVE and STAY on Collection (never navigate away).
   const res = await saveCollection(page);
   expect(res.ok(), `collection save → ${res.status()} ${await res.text()}`).toBeTruthy();
-  await expect(page.getByRole('tab', { name: /order collection/i })).toHaveAttribute(
-    'aria-selected',
-    'true'
-  );
+  await expect(page).toHaveURL(/\/operations\/orders\/collection$/);
   await expect(page.getByRole('button', { name: /save progress/i })).toBeVisible();
 
   const persisted = await apiOrders(request, `?date=${DAY}&search=${encodeURIComponent(P)}&pageSize=200`);
@@ -298,16 +297,32 @@ test('orders-01: working sheet shows ALL shops; Save Progress stays on Collectio
   expect(orderRow(persisted, SHOPS[0]).requiredBoxes).toBe(20);
   expect(orderRow(persisted, SHOPS[1]).requiredBoxes).toBe(10);
 
-  // The summary line reports total shops and shops-with-orders.
-  await expect(page.getByText(/shops with orders/i)).toBeVisible();
+  // The cumulative line under the table reports how many shops were taken.
+  await expect(page.getByText(/^Orders taken in \d+ shops$/)).toBeVisible();
   expect(persisted.summary.shopsWithOrders).toBe(SHOPS.length);
 
-  // Finish Collection → the day becomes assignment-eligible.
+  // No Finish button and no Cancel — the day is filed by its own window
+  // (48h from its start, so the 16th closes at 18/09 12:00 AM). The screen
+  // states that instead of offering a button.
+  await expect(page.getByRole('button', { name: /finish collection/i })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: /^cancel$/i })).toHaveCount(0);
+  await expect(page.getByText(/auto-submits \d{2}\/\d{2}/).first()).toBeVisible();
+
+  // Trip and vehicle are Assignment's columns, never Collection's.
+  const head = page.locator('thead th');
+  expect(await head.count()).toBe(8);
+  const headText = (await head.allInnerTexts()).join(' ').toLowerCase();
+  expect(headText).not.toMatch(/trip no|vehicle/);
+
+  // Cross the deadline: time is faked only for Date, so reloading the same day
+  // after its window ended must submit it on its own — the day becomes
+  // assignment-eligible without anyone pressing anything.
+  await page.clock.setFixedTime(Date.now() + 48 * 60 * 60 * 1000 + 5 * 60 * 1000);
   const [finishRes] = await Promise.all([
     page.waitForResponse((r) => /\/orders\/collection$/.test(r.url()) && r.request().method() === 'POST'),
-    page.getByRole('button', { name: /finish collection/i }).click(),
+    page.goto(`/operations/orders/collection?collectionDate=${DAY}`),
   ]);
-  expect(finishRes.ok(), `finish collection → ${finishRes.status()} ${await finishRes.text()}`).toBeTruthy();
+  expect(finishRes.ok(), `auto-submit → ${finishRes.status()} ${await finishRes.text()}`).toBeTruthy();
 
   // Success toast appears top-right and its X dismisses it immediately.
   const toast = page.getByRole('alert').first();
@@ -318,12 +333,17 @@ test('orders-01: working sheet shows ALL shops; Save Progress stays on Collectio
   await toast.getByRole('button', { name: /close/i }).click();
   await expect(toast).toBeHidden();
 
-  // Test I — a full reload rebuilds the table from the backend. Rows render
-  // read-only values until Edit is clicked; the saved box count is visible.
-  await page.reload();
+  // Test I — a full reload rebuilds the table from the backend. Back on real
+  // time now (the faked deadline is only for the submit check), so the day
+  // opens again as a finished, read-only day — and the box count is still the
+  // one that was saved, not a client-side leftover.
+  await page.clock.resume();
+  await page.goto(`/operations/orders/collection?collectionDate=${DAY}`);
   await page.waitForLoadState('networkidle');
   await searchBox(page).fill(SHOPS[0]);
   await expect(page.getByRole('row').filter({ hasText: SHOPS[0] })).toContainText('20');
+  // A finished day offers nothing to press: read-only, no save, no clear.
+  await expect(page.getByRole('button', { name: /save progress/i })).toHaveCount(0);
 });
 
 // ── Test K — pagination over the real dataset ─────────────────────────────

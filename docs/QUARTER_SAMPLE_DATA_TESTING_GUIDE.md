@@ -70,7 +70,7 @@ reach them. Each was a pass-through/flag change only:
 | File | Change | Why |
 |---|---|---|
 | `operations/dashboard/services/dashboardService.ts` | The response mapper hardcoded `trendData: []`, `topShops: []`, `collectionsByMode: []`, `recentTrips: []`, `activeVehicles: 0`, … Now it passes those fields through when the API supplies them (`?? []` / `toNumber`). | Dashboard KPIs worked but **every chart and panel was blank by construction**. A backend that returns only KPIs still behaves exactly as before. |
-| `operations/orders/sampleOrdersData.ts` | `ORDERS_SAMPLE_DATA_ENABLED: true → false` | The Orders page ran entirely on bundled sample rows and made **no network call**. The quarter dataset now supplies the `[ORDER]` collection containers. |
+| `orders/services/sampleOrdersData.ts` | `ORDERS_SAMPLE_DATA_ENABLED: true → false` | The Orders page ran entirely on bundled sample rows and made **no network call**. The quarter dataset now supplies the `[ORDER]` collection containers. |
 | `accounts/pages/PaymentBookPage.tsx` | `useState(import.meta.env.DEV)` → `useState(false)` | Payment Register always opened in bundled demo mode in dev, hiding the real 662 payments. The demo toggle still exists as a manual fallback. |
 
 `tsc -p tsconfig.app.json --noEmit` reports **no new errors** (only the
@@ -102,11 +102,11 @@ performance trip counts equal the Trip List.
 
 ### Orders hand-off pass — the quarter now carries collection → assignment → tracking
 
-The Orders module reads its three tabs from one feed (`/trips?full=true`): a
+The Orders module reads its three pages from one feed (`/trips?full=true`): a
 **container** is a vehicle-less trip whose rows carry `[ORDER]`, and an
 **assignment** is a vehicle row carrying `[ORDER] O:<containerTripNo>`. The
-dataset only seeded the containers, so Tab 1 rendered but **Tab 2 always read
-`0 assigned` and Tab 3 was empty** ("0 trips / No pending deliveries") — a page
+dataset only seeded the containers, so Order Collection rendered but **Order
+Assignment always read `0 assigned` and Delivery Tracking was empty** ("0 trips / No pending deliveries") — a page
 that could never show the quarter's real data until someone worked the whole
 flow by hand. The generator now seeds the same hand-off the UI produces.
 
@@ -114,8 +114,8 @@ flow by hand. The generator now seeds the same hand-off the UI produces.
 |---|---|
 | Plan rows | Every container row carries the shop's **city** (`village`) and the container carries `avgBirdWeight` (2.3), so the CITY and **WEIGHT** columns fill in before a vehicle is picked |
 | Assignment history | Each older container is assigned to the vehicle trip(s) that actually ran the **next operating day** — 8 order-tagged trips, 162 assigned rows, one shop per order deliberately **part-delivered** so `Part Delivered` badges are reachable |
-| In progress | Yesterday's finished collection is part-delivered on a trip that is still `Pending` → Tab 3's **PENDING & IN PROGRESS** table has a real row (5 shops, 19 boxes, 437 kg) |
-| Still available | Yesterday's remaining 23 shops and today's in-collection order (23 of 27) stay unassigned → Tab 2 has work to do; 4 of today's shops already sit on a vehicle (Step 4 open) |
+| In progress | Yesterday's finished collection is part-delivered on a trip that is still `Pending` → Delivery Tracking's **PENDING & IN PROGRESS** table has a real row (5 shops, 19 boxes, 437 kg) |
+| Still available | Yesterday's remaining 23 shops and today's in-collection order (23 of 27) stay unassigned → Order Assignment has work to do; 4 of today's shops already sit on a vehicle (Step 4 open) |
 | Busy-history integrity | A completed trip absorbs those shops into its own load (`dcWeight`/birds/boxes), so `dcWeight − delivered − mortality` (**weight loss**) stays positive; Draft/Pending trips keep their pickup figures |
 | Tracking history | 7 Completed order trips inside the default 7-operating-day window, with the totals strip (`Total Shops 138 · Birds 5,160 · Boxes 516`) summing exactly those rows |
 
@@ -126,7 +126,7 @@ Data-quality fixes in the same pass:
 | `scripts/quarter-sample-data.mjs` · delivery rows | The bird-balance reconciler could consume a trailing row entirely, leaving **37 junk "0 birds / ₹0" lines** in Shop Sales, Step 4 and the mortality drills | Empty rows (0 birds **and** 0 kg **and** no mortality) are dropped and serial numbers renumbered; a row that still carries mortality is kept — it is the only record of those birds dying in transit, and dropping it broke `pickup = delivered + mortality` |
 | `scripts/quarter-sample-data.mjs` · `materializeTripSales()` | Approving a trip whose Rate Entry is still open wrote ₹0 / "₹0.00" sale lines | Sales are materialized only for deliveries that have a rate; locking Rate Entry (which applies every rate first) still materializes the whole trip exactly once |
 | `scripts/quarter-sample-data.mjs` · today's lifecycle mix | All 8 of today's trips were Draft/Pending, so "Today" read **0** in the trend chips and today's weight/mortality/sales were all zero | Today's first dispatch is Completed + rate-locked (today's trend point = 5,088 kg, mortality row, Shop Sales and mortality register all populated), the second stays Pending for the rate-entry queue, and Steps 4/4/3/2/1 keep every wizard state reachable |
-| `orders/components/OrdersCollectionTab.tsx` · WEIGHT | Required an assignment before it printed anything → the whole column read `—` | Uses the vehicle's average bird weight when the row is assigned, the day's collection average before that (`formatKg`, the module's own helper) |
+| `orders/pages/OrderCollectionPage.tsx` · WEIGHT | Read-only (derived from the average bird weight), so a weight the shop actually quoted could not be written down | It is a box like birds and boxes: **no default value**, the derived figure stays behind it as the placeholder, and `collectionRowWeightKg` makes what you type win — the row, the Weight sort and the day's kg total all read from it, while only a typed weight is sent (the sheet never invents a number for billing) |
 | `orders/components/OrdersAssignmentTab.tsx` · WEIGHT | Same `—` column while planning | Weight basis = selected vehicle's average, else the day's average; unit now goes through `formatKg`, so both tables read `115.00 KG` |
 | `shop-sales/utils/shopSaleFormat.ts` · `formatSaleAmount()` | `₹7,230`, `₹6,787.5`, `₹15,351` — mixed scales inside a money column that sits next to `₹125.00` | Fixed two decimals (`₹7,230.00`) with the unit test updated |
 
@@ -271,8 +271,16 @@ a live carried-balance count, matching the Pending Collections KPI.
 | Pending Collections | `?tab=pending-collections` | 200 shop rows sorted by outstanding; total ≈ ₹1.69 Cr; each row shows total sales, total collected, last collection date and overdue days. |
 | Weight Loss / Mortality | `?tab=mortality` | KPI strip (farm birds, delivered birds, mortality %, weight loss %); farm + supervisor dropdowns populated from real data; sort every column; expand a trip → shop-wise mortality lines. |
 | Fuel Expenses | `?tab=fuel-expenses` | 738 bills on the 2026-09-15 anchor, paginated; the KPI strip is visible on the unfiltered quarter and totals **all filtered pages** (it does not change on page 2). Filter TRIP vs MANUAL and Approved / Pending / Rejected; trip-linked rows carry trip no, meter, GPS and mileage. |
-| Orders | `?tab=orders` | Now reads the live API (bundled sample mode switched off). **8 `[ORDER]` collection containers** (one per each of the last 8 operating days, 20–36 shops each): all eight fit inside the ten-calendar-day selector window, including the Sunday closure. The newest is still *in collection* (Tab 1 working order, 27 shops · 92 boxes · 920 birds) and shows the shop's **city** plus the **ordered weight** per row. Tab 2 opens on `27 collected · 4 assigned · 23 available` against **6 eligible vehicles** (Step 2 done, Step 4 open) — one of them already carries 4 shops — and every earlier day shows its read-only assignment history. Tab 3 lists **1 trip in PENDING & IN PROGRESS** (5 shops, 19 boxes, 437 kg) and **7 COMPLETED** order trips with `Delivered` / `Part Delivered` badges inside the default From → To window. |
+| Collection | `/operations/orders/collection` | **8 `[ORDER]` collection containers (one per each of the last 8 operating days, 20–36 shops each)** — all eight fit inside the ten-calendar-day selector window, including the Sunday closure. The newest is still *in collection* and its cumulative line under the table reads `Orders taken in 27 shops` with `920 birds · 92 boxes · … kg` beside it. Filters fill one 12-column grid (Date · City · Sort, then Search with Reset + Refresh under it), every control is 40px tall and every field stretches its cell, the eight column heads carry their own coloured icon and the columns are equal width apart from S.No, and there is no trip/vehicle column and no tooltip anywhere. **Save Progress is the only button**; the day chip reads `Auto-submits 18/09 12:00 AM · in 1d 03h 59m` with the 48h window drawn as a bar under it — that is when the day files itself. Action zeroes a shop's birds / boxes (weight follows) behind a 10-second Undo window, like a pending trip delete in the Recent table, and the shop keeps its row. |
+| Assignment | `/operations/orders/assignment` | Opens on `27 collected · 4 assigned · 23 available` against **6 eligible vehicles** (Step 2 done, Step 4 open) — one of them already carries 4 shops — and every earlier day shows its read-only assignment history. |
+| Delivery | `/operations/orders/delivery-tracking` | Lists **1 trip in PENDING & IN PROGRESS** (5 shops, 19 boxes, 437 kg) and **7 COMPLETED** order trips with `Delivered` / `Part Delivered` badges inside the default From → To window. |
 | Collection Report | `?tab=collection-report` | Payment-mode summary (Cash / Union Bank / HDFC) with % split; collector summary for all 20 collectors; change date range Jul→Sep and confirm totals move. |
+
+> Orders is its own module (`src/modules/orders`) with its own route table — the three rows above
+> are the grouped entries it contributes under Operations in the sidebar, named Collection /
+> Assignment / Delivery under the **Orders** group heading. The legacy
+> `/operations?tab=orders` (with `&orderTab=collection|assignment|tracking`) still resolves: it
+> canonicalises to the page path.
 
 ### 3.4 Vehicles / Fleet — `/fleet`
 

@@ -332,10 +332,13 @@ test('20: the Step-2-complete trip keeps its identity for Orders; Orders page re
   // parallel store); the page loads clean in both languages.
   for (const lang of ['en', 'te'] as const) {
     await setLanguage(page, lang);
-    await page.goto('/operations?tab=orders');
+    await page.goto('/operations/orders/collection');
     await page.waitForLoadState('networkidle');
     await assertNoRawKeys(page);
-    await expect(page.getByRole('tab', { name: lang === 'en' ? /assignment/i : /అసైన్‌మెంట్/ })).toBeVisible();
+    // No in-page switcher: the sidebar carries the three Orders pages, and the
+    // URL decides which one is mounted. Both languages must render it cleanly.
+    await expect(page.locator('a[href="/operations/orders/assignment"]')).not.toHaveCount(0);
+    await expect(page.locator('#orders-panel-collection')).toBeVisible();
   }
 });
 
@@ -464,7 +467,7 @@ test('26: EN + TE -- wizard step names, Recent Table + Orders, no raw i18n keys 
     await expect(stepBtn(page, 4)).toContainText(lang === 'en' ? /Delivery Details/ : /డెలివరీ వివరాలు/);
     await assertNoRawKeys(page);
 
-    await page.goto('/operations?tab=orders');
+    await page.goto('/operations/orders/collection');
     await page.waitForLoadState('networkidle');
     await assertNoRawKeys(page);
   }
@@ -515,12 +518,12 @@ const COLLECTION_PLAN: Array<[string, number]> = [
   [SEED.shops[4], 2],
 ];
 
-test('27: Order Collection UI — one `orders` row per shop, real quantities, survives reload, Finish latches the day', async ({
+test('27: Order Collection UI — one `orders` row per shop, real quantities, survives reload, the deadline files the day', async ({
   page,
   request,
 }) => {
   await setLanguage(page, 'en');
-  await page.goto('/operations?tab=orders');
+  await page.goto('/operations/orders/collection');
   await page.waitForLoadState('networkidle');
 
   const day = todayIso();
@@ -564,14 +567,19 @@ test('27: Order Collection UI — one `orders` row per shop, real quantities, su
   }
   await assertNoRawKeys(page);
 
-  // Finish Collection latches the day (statuses become "Collected").
+  // Nothing latches the day by hand any more: its window (48h from the start of
+  // the day) is the deadline, and crossing it submits the day on its own. Fake
+  // Date only, reopen the same day, and the page files it — no button involved.
+  await expect(page.getByRole('button', { name: /finish collection/i })).toHaveCount(0);
+  await page.clock.setFixedTime(Date.now() + 48 * 60 * 60 * 1000 + 5 * 60 * 1000);
   const [finishRes] = await Promise.all([
     page.waitForResponse(
       (r) => /\/orders\/collection$/.test(r.url()) && r.request().method() === 'POST'
     ),
-    page.getByRole('button', { name: /finish collection/i }).click(),
+    page.goto(`/operations/orders/collection?collectionDate=${day}`),
   ]);
-  expect(finishRes.ok(), `finish collection → ${finishRes.status()} ${await finishRes.text()}`).toBeTruthy();
+  expect(finishRes.ok(), `auto-submit at the deadline → ${finishRes.status()} ${await finishRes.text()}`).toBeTruthy();
+  await page.clock.resume();
 
   const finished = await apiOrders(request, `?date=${day}&pageSize=200`);
   expect(finished.total).toBe(COLLECTION_PLAN.length);
@@ -580,9 +588,8 @@ test('27: Order Collection UI — one `orders` row per shop, real quantities, su
 
 test('27b: Orders Assignment calendar — opens unclipped, month nav works, does not self-close, and the picked date drives the selected day', async ({ page }) => {
   await setLanguage(page, 'en');
-  await page.goto('/operations?tab=orders');
+  await page.goto('/operations/orders/assignment');
   await page.waitForLoadState('networkidle');
-  await page.getByRole('tab', { name: /order assignment/i }).click();
 
   const dateInput = page.getByTestId('orders-date-picker').locator('input');
   const todayStr = await dateInput.inputValue(); // DD/MM/YYYY == operational today
@@ -669,9 +676,8 @@ async function fullTrip(request: APIRequestContext, id: number) {
  * search (server-side), and return that trip's per-shop rows.
  */
 async function trackingRowsFor(page: Page, tripNo: string) {
-  await page.goto('/operations?tab=orders');
+  await page.goto('/operations/orders/delivery-tracking');
   await page.waitForLoadState('networkidle');
-  await page.getByRole('tab', { name: /delivery tracking/i }).click();
   await page.getByRole('textbox', { name: /search shop, city/i }).fill(tripNo);
   await expect(page.getByRole('row').filter({ hasText: tripNo }).first()).toBeVisible();
   return page.getByRole('row').filter({ hasText: tripNo });
@@ -831,9 +837,8 @@ test('28: complete real UI Trip Entry workflow Step 1 through Step 5', async ({ 
   await expect(stepBtn(page, 4)).toHaveAttribute('aria-label', /Locked/i);
 
   // ── STEP 2 → ORDERS: the SAME operational trip is visible in Orders ───
-  await page.goto('/operations?tab=orders');
+  await page.goto('/operations/orders/assignment');
   await page.waitForLoadState('networkidle');
-  await page.getByRole('tab', { name: /order assignment/i }).click();
   {
     const combo = page.locator('#orders-vehicle-select');
     await combo.click();
@@ -901,9 +906,8 @@ test('28: complete real UI Trip Entry workflow Step 1 through Step 5', async ({ 
   await expect(stepBtn(page, 4)).not.toHaveAttribute('aria-label', /Locked/i);
 
   // ── STEP 3 → ORDERS ASSIGNMENT (real UI): assign 5 shops to THIS trip ──
-  await page.goto('/operations?tab=orders');
+  await page.goto('/operations/orders/assignment');
   await page.waitForLoadState('networkidle');
-  await page.getByRole('tab', { name: /order assignment/i }).click();
   {
     const combo = page.locator('#orders-vehicle-select');
     await combo.click();

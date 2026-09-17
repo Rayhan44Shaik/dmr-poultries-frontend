@@ -11,14 +11,21 @@
 // (truck drives, rupee flips, wrench tightens, document turns a page…). See
 // ui/Sidebar/navMotion.ts + the `--animate-nav-*` family in styles/tokens.css.
 
-import { useEffect } from "react";
+import {
+  Fragment,
+  useEffect,
+  useRef,
+  type KeyboardEvent as ReactKeyboardEvent,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import { Link, useLocation } from "react-router-dom";
 import { PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
-import { NAV_SECTIONS, NAV_TONE_CLASS, type NavChild } from "../../routes/navigation";
+import { NAV_CHILD_GROUPS, NAV_SECTIONS, NAV_TONE_CLASS, type NavChild } from "../../routes/navigation";
 import { useI18n } from "../../i18n";
 import BrandMark from "../BrandMark";
 import { usePendingApprovals } from "../../modules/approvals/hooks/usePendingApprovals";
 import { navMotionClass } from "./navMotion";
+import { navRevealDelta, navRevealKey, shouldRevealNavRow } from "./navScroll";
 import type { SidebarMode } from "./sidebarMode";
 
 /** Pending-approval count surfaced as a badge on specific nav entries. */
@@ -51,10 +58,17 @@ interface SidebarProps {
   onModeChange: (mode: SidebarMode) => void;
 }
 
+/**
+ * A nav row is active when it *is* the current location.
+ * Query-less rows address real routes (e.g. /operations/orders/assignment):
+ * those match on the path, so page-level query state (`?collectionDate=…`)
+ * never breaks the highlight. Rows that address a tab (`?tab=orders`) still
+ * match exactly, because the query IS the page.
+ */
 function isChildActive(child: NavChild, pathname: string, search: string): boolean {
-  const childUrl = child.path;
-  const current = pathname + search;
-  return current === childUrl;
+  const [childPath, childQuery] = child.path.split("?");
+  if (childQuery) return pathname + search === child.path;
+  return pathname === childPath || pathname.startsWith(`${childPath}/`);
 }
 
 /** Small, square control in the brand row (collapse / expand / hide). */
@@ -105,60 +119,63 @@ export default function Sidebar({ open, onClose, mode, onModeChange }: SidebarPr
     return () => window.removeEventListener("keydown", onKey);
   }, [open, onClose]);
 
-  // Auto-scroll active nav item into view (e.g., Reports → Shop Ledger)
-  // so opening Shop Ledger directly shows its nav entry without manual scroll.
+  /* ------------------------------------------------------------------------
+   * Keep the active row visible — without ever stealing the position you
+   * scrolled to (see ui/Sidebar/navScroll.ts for the rules).
+   *
+   * `pathname` only: an in-page query change (a date, a filter, a page number)
+   * is not navigation, and re-running this on every keystroke of the URL is
+   * what made the list twitch while you worked.
+   * --------------------------------------------------------------------- */
+  const userNavigatedRef = useRef(false);
+  const revealedKeyRef = useRef("");
+
   useEffect(() => {
-    if (!open) return;
-    const doScroll = () => {
-      const activeLinks = document.querySelectorAll('nav a[aria-current="page"]');
-      if (activeLinks.length === 0) return;
-      activeLinks.forEach((el) => {
-        const nav = el.closest("nav") as HTMLElement | null;
-        if (!nav) return;
-        // Skip hidden navs
-        if (nav.clientHeight === 0 || (nav as HTMLElement).offsetParent === null) {
-          const style = window.getComputedStyle(nav);
-          if (style.display === "none" || style.visibility === "hidden") return;
-        }
-        try {
-          const navRect = nav.getBoundingClientRect();
-          const elRect = (el as HTMLElement).getBoundingClientRect();
-          const navHeight = nav.clientHeight;
-          const isVisible = elRect.top >= navRect.top && elRect.bottom <= navRect.bottom;
-          const elCenterDelta = elRect.top - navRect.top - navHeight / 2 + elRect.height / 2;
-          if (!isVisible || Math.abs(elCenterDelta) > 80) {
-            nav.scrollTo({ top: nav.scrollTop + elCenterDelta, behavior: "smooth" });
-          }
-          // Subtle flash to draw eye to the active row
-          (el as HTMLElement).animate?.(
-            [{ boxShadow: "0 0 0 0 rgba(16,185,129,0)" }, { boxShadow: "0 0 0 4px rgba(16,185,129,0.18)" }, { boxShadow: "0 0 0 0 rgba(16,185,129,0)" }],
-            { duration: 900, easing: "ease-out" }
-          );
-        } catch {
-          try { (el as HTMLElement).scrollIntoView({ block: "center", behavior: "smooth" }); } catch { /* non-fatal */ }
-        }
-      });
-    };
-    // Multiple attempts to cover paint + popup animation + fonts
-    const raf = requestAnimationFrame(() => {
-      doScroll();
-      const t1 = window.setTimeout(doScroll, 120);
-      const t2 = window.setTimeout(doScroll, 350);
-      const t3 = window.setTimeout(doScroll, 700);
-      (doScroll as { _t1?: number; _t2?: number; _t3?: number })._t1 = t1;
-      (doScroll as { _t1?: number; _t2?: number; _t3?: number })._t2 = t2;
-      (doScroll as { _t1?: number; _t2?: number; _t3?: number })._t3 = t3;
-    });
-    return () => {
-      cancelAnimationFrame(raf);
-      try {
-        const refs = doScroll as { _t1?: number; _t2?: number; _t3?: number };
-        window.clearTimeout(refs._t1);
-        window.clearTimeout(refs._t2);
-        window.clearTimeout(refs._t3);
-      } catch { /* non-fatal */ }
-    };
-  }, [open, pathname, search]);
+    const navs = Array.from(document.querySelectorAll<HTMLElement>("nav[data-nav-scope]")).filter(
+      // Only a list that is actually on screen — the popup and the persistent
+      // panel share the rows, and the hidden one has no height to measure.
+      (nav) => nav.clientHeight > 0 && nav.offsetParent !== null,
+    );
+    // A click inside the list already implies "the row is where I put it": the
+    // flag is one-shot, so it can never leak into the next navigation.
+    const userInitiated = userNavigatedRef.current;
+    userNavigatedRef.current = false;
+    if (userInitiated) return;
+    for (const nav of navs) {
+      const row = nav.querySelector<HTMLElement>('a[aria-current="page"]');
+      if (!row) continue;
+      const delta = navRevealDelta(nav.getBoundingClientRect(), row.getBoundingClientRect());
+      const key = navRevealKey(nav.dataset.navScope ?? "", mode, pathname);
+      if (!shouldRevealNavRow({ delta, userInitiated, alreadyRevealed: revealedKeyRef.current === key })) continue;
+      revealedKeyRef.current = key;
+      const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
+      nav.scrollTo({ top: nav.scrollTop + delta, behavior: reduceMotion ? "auto" : "smooth" });
+      if (!reduceMotion) {
+        // A soft flash so a deep link still shows which row it landed on.
+        row.animate?.(
+          [
+            { boxShadow: "0 0 0 0 rgba(16,185,129,0)" },
+            { boxShadow: "0 0 0 4px rgba(16,185,129,0.18)" },
+            { boxShadow: "0 0 0 0 rgba(16,185,129,0)" },
+          ],
+          { duration: 900, easing: "ease-out" },
+        );
+      }
+    }
+  }, [pathname, mode, open]);
+
+  /*
+   * Only an action that actually navigates counts: a click on a row (delegated,
+   * so the whole row including its icon qualifies) or Enter/Space on the focused
+   * row. Wandering the list with the arrow keys must not silence the reveal for
+   * the next real navigation.
+   */
+  const markUserNavigation = (event: ReactMouseEvent<HTMLElement>) => {
+    if ((event.target as HTMLElement).closest("a")) userNavigatedRef.current = true;
+  };
+  const markUserKeyNavigation = (event: ReactKeyboardEvent<HTMLElement>) => {
+    if (event.key === "Enter" || event.key === " ") userNavigatedRef.current = true;
+  };
 
   /**
    * One nav list, two shapes. `collapsed` = icon rail: labels are dropped in
@@ -168,10 +185,20 @@ export default function Sidebar({ open, onClose, mode, onModeChange }: SidebarPr
     return (
       <nav
         data-nav-scope={scope}
+        onClick={markUserNavigation}
+        onKeyDown={markUserKeyNavigation}
         className={
-          collapsed
-            ? "max-h-[calc(100vh-8.5rem)] overflow-y-auto overflow-x-hidden px-2 py-4 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent"
-            : "max-h-[calc(100vh-5rem)] overflow-y-auto px-3 py-4 scrollbar-thin scrollbar-thumb-slate-300 scrollbar-track-transparent lg:max-h-none"
+          /*
+           * The list IS the scroll area: `h-full` inside its bounded flex parent
+           * (no max-h guesswork — the panel's chrome heights and the font-scale
+           * control both change those), and `overscroll-contain` so the wheel
+           * stops here instead of chaining into the page behind it. Applies to
+           * the rail, the expanded panel and the small-screen popup alike, which
+           * is what makes every section reachable on a short viewport.
+           */
+          `h-full min-h-0 overflow-y-auto overflow-x-hidden overscroll-contain ${
+            collapsed ? "px-2 py-4" : "px-3 py-4"
+          } scrollbar-thin`
         }
       >
         {NAV_SECTIONS.map((section) => {
@@ -188,9 +215,16 @@ export default function Sidebar({ open, onClose, mode, onModeChange }: SidebarPr
               )}
 
               <ul className="space-y-0.5">
-                {section.children.map((child) => {
+                {section.children.map((child, index) => {
                   const Icon = child.icon ?? SectionIcon;
                   const active = isChildActive(child, pathname, search);
+                  // A grouped run of rows (e.g. the three Orders pages inside
+                  // Operations) reads as one block: a single small heading and
+                  // a hairline rail instead of a flat, ambiguous list.
+                  const groupMeta = child.group ? NAV_CHILD_GROUPS[child.group] : undefined;
+                  const groupStart = Boolean(groupMeta) && section.children[index - 1]?.group !== child.group;
+                  const GroupIcon = groupMeta?.icon;
+                  const groupLabel = groupMeta ? (groupMeta.labelKey ? t(groupMeta.labelKey) : groupMeta.label) : "";
                   const label = child.labelKey ? t(child.labelKey) : child.label;
                   const tone = NAV_TONE_CLASS[child.tone ?? "slate"];
                   const badgeCount = navApprovalBadge(child.path, pendingApprovals);
@@ -234,7 +268,17 @@ export default function Sidebar({ open, onClose, mode, onModeChange }: SidebarPr
                   }
 
                   return (
-                    <li key={child.label}>
+                    <Fragment key={child.label}>
+                      {groupStart && !collapsed && GroupIcon ? (
+                        <li
+                          aria-hidden="true"
+                          className="flex items-center gap-1.5 px-3 pb-0.5 pt-2.5 text-[10px] font-bold uppercase tracking-[0.08em] text-slate-400/80 dark:text-slate-500"
+                        >
+                          <GroupIcon size={11} />
+                          {groupLabel}
+                        </li>
+                      ) : null}
+                      <li className={child.group && !collapsed ? "ml-[18px] border-l border-slate-200/80 pl-1 dark:border-slate-800" : undefined}>
                       <Link
                         to={child.path}
                         onClick={onClose}
@@ -287,7 +331,8 @@ export default function Sidebar({ open, onClose, mode, onModeChange }: SidebarPr
                           </>
                         )}
                       </Link>
-                    </li>
+                      </li>
+                    </Fragment>
                   );
                 })}
               </ul>
@@ -390,7 +435,7 @@ export default function Sidebar({ open, onClose, mode, onModeChange }: SidebarPr
           <div
             role="dialog"
             aria-modal="true"
-            className="fixed left-3 top-[4.5rem] z-50 w-[18.75rem] max-w-[calc(100vw-1.5rem)] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-pop animate-slide-down dark:border-slate-800 dark:bg-slate-900 sm:left-4 lg:hidden"
+            className="fixed left-3 top-[4.5rem] z-50 flex max-h-[calc(100dvh-6rem)] w-[18.75rem] max-w-[calc(100vw-1.5rem)] flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-pop animate-slide-down dark:border-slate-800 dark:bg-slate-900 sm:left-4 lg:hidden"
           >
             {/* Compact brand row */}
             <div className="flex h-12 shrink-0 items-center justify-between border-b border-slate-200/80 pl-4 pr-1.5 dark:border-slate-800">
@@ -410,8 +455,9 @@ export default function Sidebar({ open, onClose, mode, onModeChange }: SidebarPr
               </button>
             </div>
 
-            {/* Scrollable nav (capped height keeps the popup small) */}
-            {renderNav(false, "popup")}
+            {/* The list scrolls inside the dialog — dvh keeps the last sections
+                reachable when the mobile browser chrome takes room. */}
+            <div className="min-h-0 flex-1 overflow-hidden">{renderNav(false, "popup")}</div>
           </div>
         </>
       )}

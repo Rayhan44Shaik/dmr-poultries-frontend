@@ -1,0 +1,27 @@
+/* Orders workspace — the host for the module's three routed pages.
+   There is no in-page tab strip any more (each page is its own route, reached
+   from the sidebar like every other page), so this file only carries the page
+   surface and its content measure. */
+.orders-workspace {
+  min-width: 0;
+  min-height: 100%;
+  /* The Orders surface stays white in both themes, as requested: the app's
+     global header/theme and the existing table layout are not changed. */
+  background: #f8fafc;
+}
+
+.orders-page-content {
+  width: 100%;
+  max-width: 1600px;
+  margin: 0 auto;
+  padding: 20px 24px 32px;
+}
+.orders-page-content > * + * {
+  margin-top: 16px;
+}
+
+@media (max-width: 639px) {
+  .orders-page-content {
+    padding: 16px 16px 24px;
+  }
+}

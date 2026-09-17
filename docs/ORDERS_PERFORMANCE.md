@@ -3,7 +3,9 @@
 ## What changed
 
 - Operations pages load on demand. Opening Orders no longer eagerly evaluates every other Operations screen.
-- Assignment, Tracking and delivery details are separate lazy chunks. Pointer/focus intent warms the next tab; PDF export code loads when requested.
+- Assignment, Tracking and delivery details are separate lazy chunks. While a page is open, the
+  next step of the flow is warmed during idle time (collect → assign → track); PDF export code loads
+  only when a document is requested.
 - Orders derives its shop directory from the existing Shop Master hook instead of issuing a second shop-list request. Subsequent master changes update both views together.
 - Assignment rows are indexed by order reference and shop once per fetched snapshot. Sorted trip rows are reused within that snapshot. There is no cross-save business-data cache.
 - The shared trip mapper reuses one fixed IST date formatter rather than constructing a formatter for each timestamp.
@@ -23,20 +25,125 @@ The collection/assignment save contracts, fresh-data conflict checks, split shar
 
 A temporary read-only benchmark compared the original HEAD Orders service/trip mapper with the updated implementation. Both were loaded through Vite SSR. After capturing the quarter API responses, the benchmark replayed identical response bodies through Axios to remove network variability. Each implementation ran 15 times.
 
-| Frontend mapping, median | Before | After |
-| --- | ---: | ---: |
-| Full Orders snapshot | 910.65 ms | 102.63 ms |
+| Frontend mapping, median |    Before |     After |
+| ------------------------ | --------: | --------: |
+| Full Orders snapshot     | 910.65 ms | 102.63 ms |
 
 This is approximately **89% less processing time**, not a measurement of total browser page-load time. Network latency, device performance and rendering still affect perceived speed. The benchmark did not mutate preview records; temporary baseline modules were removed afterward.
 
 ## Orders table/navigation alignment
 
-- Separate deep links: `/operations?tab=orders&orderTab=collection`, `assignment`, or `tracking`.
+- One route per Orders page: `/operations/orders/collection`, `/operations/orders/assignment`,
+  `/operations/orders/delivery-tracking`. Each is reloadable and shareable, and each is its own
+  sidebar row inside the Orders group under Operations (listed after Fuel Expenses, at the end of
+  the section). The rows are named **Collection / Assignment / Delivery** — the group heading above
+  them already says Orders, so the row does not repeat it, and the header breadcrumb adds the
+  module back (`Operations › Orders › Collection`). The route table that defines them is `src/modules/orders/routes/ordersRoutes.ts` —
+  the sidebar and the URL resolver both read it, so they cannot drift. There is no in-page tab
+  strip: a page is opened from the sidebar or by its URL, exactly like Shop Sales or Trip List.
+  The older
+  `/operations?tab=orders&orderTab=collection|assignment|tracking` links still work: they are
+  canonicalised to the path form on arrival.
 - Collection/Assignment date parameters are independent (`collectionDate`, `assignmentDate`). Invalid calendar dates, future dates and dates outside the advertised operational window resolve to today.
-- Visited panels stay mounted while switching tabs: filters, page size, current page and unsaved edits survive tab navigation. These local filters/drafts are not persisted across a full browser reload. Date changes intentionally mount a new day editor; top-level collection/assignment search and sort controls remain selected.
+- Visited pages stay mounted while you move between the three routes from the sidebar: filters, page size, current page and unsaved edits survive the move. These local filters/drafts are not persisted across a full browser reload. Date changes intentionally mount a new day editor; top-level collection/assignment search and sort controls remain selected.
 - All Orders pagers now use the same `src/ui/Pagination.tsx` as Trip List, with counts, rows-per-page, disabled states and bounded page controls. Filtering/sorting occur before slicing.
 - Collection cells match Trip List's 16px column padding, 20px body padding and 16px header padding. Search includes shop number and phone in addition to existing fields.
+- Collection's filter card is **one 12-column grid whose fields fill their cells**: Date · City ·
+  **Shop** · Sort on the first line (3 columns each, so the four share the width evenly), then Search
+  (8 columns) with Reset + Refresh (4 columns, right-aligned) underneath, bottom-aligned with
+  `lg:items-end`. Every control is the shared **40px** (`h-10`) height — the Orders dropdowns and
+  multi-selects were `h-9` while the search input and the DatePicker were already `h-10`, which is what
+  made a filter row read as three different sizes. Labels use `ORDERS_FILTER_LABEL_CLASS` (13px
+  uppercase, `min-h-[17px]` so a field without an icon still lines up with its neighbours). **A control
+  gets one glyph, never two**: the search field keeps only its own inset magnifier and the date field
+  only its own calendar button, so neither label repeats it; City (amber), Shop (sky) and Sort (violet)
+  carry the glyph their column already uses. The Shop picker narrows the sheet to named
+  shops and composes with the city filter and the search box instead of replacing them; because that list
+  is the long one it is `searchable` (the panel opens with the caret already in its own filter box), each
+  row shows its city on the right so two same-named shops are tellable apart, and the trigger counts the
+  picks (`1 shop` / `3 shops`) rather than spilling names into a 40px field. Assignment was brought
+  to the same label class, per-field icon colours and full-width fields so the two screens read as one
+  module.
+- **Loading is the table's business.** The filter card is built in the page component, _above_ the data
+  gate, and is never swapped for a skeleton — not on the first paint (neither the Shop Master nor the
+  day's collection has answered) and not on a refresh. `OrdersPage` therefore renders the Collection panel
+  through the load instead of replacing it with the placeholder panel, and the load is reported where it
+  belongs: the card's own header strip, the **real eight-column head** (`CollectionTableHead` is one
+  source for both states) and a single `colSpan` row with a spinner and "Loading…" under `aria-busy` —
+  the identical shape `TripMasterTable isLoading` draws. A soft refresh takes the same row, so the table
+  never changes height or width mid-read, and `CollectionEntries` being keyed per day means changing day
+  reloads rows, not controls. This is the Trip List's contract, copied, not reinvented.
+- **Two measured columns, six equal ones.** `table-fixed` with S.No at 96px (its glyph plus the word) and
+  Action at 112px (the eraser and its 10-second countdown must never clip); everything between them —
+  shop · city · birds · boxes · weight · status — divides what is left into six equal shares, so no
+  heading can buy itself extra room from its neighbours and the heads stop chasing their content. A name
+  that does not fit its share wraps inside its own cell (`ORDERS_TABLE_TH_WRAP_CLASS`, derived from the
+  shared head class so the two can never drift apart), and the table's own floor is 1020px so a narrow
+  window scrolls instead of squashing the heads. Each header carries its own 15px icon, coloured per
+  column, at the trip table's spacing; header and body words sit at **14px** (`ORDERS_TABLE_TH_CLASS` /
+  `ORDERS_TABLE_TD_CLASS`), a step above the shared 12px.
+- The three number boxes go the other way and stay deliberately small: **24px tall and no wider than
+  72px** (`ORDERS_RISE_INPUT_CLASS`), so they read as fields for a number and not as bars filling the
+  row — the words above them are what should be large. Each is tinted to its own header glyph (birds
+  emerald, boxes violet, weight teal) and carries a small rise: a soft shadow at rest, lifting a pixel on
+  hover.
+- **The status column is the one centred block.** The pill is a chip rather than a value, so it sits in
+  the middle of its share (heading included) instead of starting a fourth left edge, and it grows to
+  `size="md"` — 30px+ of border-radius and padding against the 32px boxes beside it, because a 20px badge
+  read as a footnote. Centring it also replaces the hand-made gutter it used to need before the eraser.
+- **One left edge for the rest of the sheet.** Weight and Action were right-aligned while the columns beside
+  them were left-aligned, and that — not the column widths — is what made the spacing look wrong: the air
+  landed in a different place in every column, so Boxes seemed stranded from Weight and Weight was
+  crammed against Status. Every column now starts its data at its own `padding-left`, so each cell begins
+  exactly under its heading and the gaps between columns read as one rhythm. S.No's chip and the status
+  pill follow the same rule; the only deliberate asymmetry left is the small gutter after the status
+  pill, which keeps the badge from touching the eraser.
+- Trip No and Vehicle No are **not** Collection columns (assignment facts belong to Assignment); an
+  assigned shop shows only its status pill, and a pending count rides **beside** the pill (`25 to
+deliver`) rather than inside it, so an equal-width column cannot be pushed over. The status cell carries
+  its own `pr-5` gutter, so a pill that wraps to a second line never runs into the Action column.
+- **No tooltips on this screen.** The row state is the badge, the deadline is the chip — nothing needs a
+  hover to be understood, so every `title` attribute was removed from the page (pinned by
+  `npm run test:e2e:orders`: "no tooltip is left on the collection screen").
+- The day's cumulative is a **totals row inside the table** — the Salary Register's shape, one cell per
+  column: `Orders taken in N shops` under Shop Name, the number of cities under City, birds · boxes · kg
+  under their own columns in those columns' own colours, and `N on vehicles · M awaiting assignment` under
+  Status. A total sits where it is looked for instead of being narrated underneath, and every figure comes
+  from the same `entered` rows the table renders (`footerStats` shares that memo's inputs), so the footer
+  and the body cannot disagree. An empty day renders no footer at all, and the wording exists once — the
+  sentence that used to sit below the table is gone rather than duplicated beside the row.
+- **Actions animate on the shared tokens**, not on one-off keyframes: the hover motion is
+  `uiActionIconMotionClass` (`delete` for the eraser, `approve` for Save Progress), Save Progress lifts a
+  pixel and flashes a popping `Check` plus a 2px emerald bar for 1.4s after a save, the eraser keeps
+  running the delete wiggle for as long as its 10-second window is open, and `PendingDeleteNotification`
+  pops in on `--animate-pop-in` over a `--animate-fade-in` scrim — the trip delete gets that pop too, since
+  it is the same component. Everything is `motion-safe`, so a reduced-motion user sees colour and shape only.
+- **Weight is ours to type.** The column is an input like the other two — empty, with no default value
+  written into it — and the derived figure (birds × the average bird weight in force) is only the
+  placeholder behind it. `collectionRowWeightKg` keeps that rule in one place: what was typed wins, an
+  empty box falls back to the birds, and only what was typed is sent, so the sheet never invents a number
+  for billing to chase. The day's cumulative kg is summed from those effective weights, which is also why
+  sorting by Weight and the total line always agree.
+- The **Action** column is not a delete: it zeroes that shop's birds, boxes and typed weight, and the
+  shop keeps its row. On hover the eraser does the work its name implies — it tilts and slides a pixel
+  against a rose glow, and presses flat (`motion-safe`, so reduced-motion users just get the colour). The clear runs through the shared 10-second window
+  (`usePendingDelete`, the same controller the Recent table uses for a pending trip) — the row is marked
+  while it counts, the button turns into the countdown and cancels on click, and `Undo` in the
+  notification puts the numbers back. Nothing reaches the server until the window runs out, and the save
+  keeps the row at zero (`toOrderShopRows(rows, keepZeroFor)`) instead of dropping it.
+  The shared dialog keeps its countdown chrome but not its delete wording — `description`, `busyLabel`,
+  `countdownLabel`, `icon` and `ariaLabel` are optional overrides (the trip delete in the Recent table
+  still gets "will be deleted automatically" with the trash glyph, which is what it actually does).
+- Collection has one action: **Save Progress**. There is no Cancel (the saved record is the draft, so
+  there is nothing to discard) and no Finish button — the day's own deadline files it: 48h from the
+  start of the day (the 16th submits at 18/09 12:00 AM). The deadline is stated **once**, in the day's
+  state row, and it moves: `Auto-submits 18/09 12:00 AM` with a ping dot and the window drawn as a bar
+  filling under the chip (all of it `motion-safe`). There is deliberately **no countdown text** — a
+  ticking `in 1d 03h 59m` was one more number to read for the same fact, and the bar already says it. The check is one `Date.now()`
+  comparison on load plus one `setTimeout` armed per mount — no interval, no polling on the data path
+  beyond a 30s tick for the label — and the submit reuses the existing
+  `POST /trips/:id/steps/deliveries` call, so the auto-close costs no extra request.
 - Assignment now exposes search/date/sort and read-only historical rows. Historical days never mount the writable assignment editor.
-- Table refresh retains controls, navigation and drafts. Initial loading uses a table shell, not a full-app spinner. Table/tab transitions respect reduced-motion preferences.
+- Table refresh retains controls, navigation and drafts. Initial loading uses a table shell, not a full-app spinner — and the shell keeps the filter card mounted. Page transitions respect reduced-motion preferences.
 
-Validation: `npm run test:orders-navigation` (5 passed), `npm run test:orders-performance` (6 passed), targeted ESLint and production build passed. All three preview URLs returned HTTP 200. Four browser regression scenarios are provided via `npm run test:e2e:orders`; they could not execute here because the Playwright browser executable is missing and the browser download host is unreachable. HTTP checks do not substitute for visual/browser interaction validation.
+Validation: `npm run test:orders-navigation` (18 passed), `npm run test:orders-performance` (6 passed), `npm run test:design-system` (64 passed), targeted ESLint and production build passed. The Orders Playwright suite (23 cases) pins the grid by bounding box, the 40px controls, the absent tooltips, the shop filter, the weight box, the zeroing Action and the filter card surviving a held `/api/**` request. All three preview URLs returned HTTP 200. Four browser regression scenarios are provided via `npm run test:e2e:orders`; they could not execute here because the Playwright browser executable is missing and the browser download host is unreachable. HTTP checks do not substitute for visual/browser interaction validation.
