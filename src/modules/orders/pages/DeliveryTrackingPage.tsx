@@ -66,7 +66,7 @@ import {
   partitionTrackingTrips,
   trackingSearchHaystack,
 } from "../utils/ordersUtils";
-import { addLocalDays } from "../utils/ordersUtils";
+import { todayBusinessDate, weekRange } from "../../../utils/businessDate";
 import { formatVehicleNumber } from "../../../utils/format";
 import {
   paginate,
@@ -86,7 +86,9 @@ type Props = {
   trips: OrdersTrip[];
   loading: boolean;
   /** Operational today (drives the completed [From → To] default). */
-  today: string;
+  /** Business "today" from the API (kept for callers; the range defaults
+   *  to the device week so the pickers show real current dates). */
+  today?: string;
   shopDirectory: ShopDirectory;
   supervisorDirectory: SupervisorDirectory;
   pdfBusyId: number | null;
@@ -530,7 +532,6 @@ function SelectedActions({
 function DeliveryTrackingPage({
   trips,
   loading,
-  today,
   shopDirectory,
   supervisorDirectory,
   pdfBusyId,
@@ -547,11 +548,13 @@ function DeliveryTrackingPage({
     [trips],
   );
 
-  // ── COMPLETED range: [From → To] (default = last 7 operational days).
-  const [completedFrom, setCompletedFrom] = useState(() =>
-    today ? addLocalDays(today, -6) : "",
-  );
-  const [completedTo, setCompletedTo] = useState(() => today);
+  // ── COMPLETED range: [From → To]. Default = the CURRENT calendar week
+  //    (Monday → today) on the device clock — never the sample anchor date,
+  //    so the pickers always show real dates like 15/09/2026 → 17/09/2026.
+  const today = todayBusinessDate();
+  const defaultFrom = weekRange(today).from;
+  const [completedFrom, setCompletedFrom] = useState(defaultFrom);
+  const [completedTo, setCompletedTo] = useState(today);
   const oldestCompleted = useMemo(() => {
     let min = "";
     for (const t of completedAll) {
@@ -566,10 +569,10 @@ function DeliveryTrackingPage({
         ? completedAll
         : completedAll.filter(
             (t) =>
-              t.trip.tripDate >= (completedFrom || addLocalDays(today, -6)) &&
+              t.trip.tripDate >= (completedFrom || defaultFrom) &&
               t.trip.tripDate <= (completedTo || today),
           ),
-    [completedAll, completedFrom, completedTo, today],
+    [completedAll, completedFrom, completedTo, today, defaultFrom],
   );
 
   const [query, setQuery] = useState("");
@@ -744,7 +747,6 @@ function DeliveryTrackingPage({
     setCompletedPage,
   ] = usePaged(completedFiltered, pageSize, filterKey);
 
-  const defaultFrom = today ? addLocalDays(today, -6) : "";
   const rangeChanged =
     Boolean(today) &&
     ((completedFrom || defaultFrom) !== defaultFrom ||
