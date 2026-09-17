@@ -317,6 +317,7 @@ try {
     const payable = rows.reduce((sum, row) => sum + row.farm.amount, 0);
     const { formatINR, formatINRExact } = await server.ssrLoadModule("/src/modules/accounts/components/farm-payment/farmPaymentFormat.ts");
     const withProvider = (node) => renderToString(React.createElement(I18nProvider, null, node));
+    const cardHtml = withProvider(React.createElement(SummaryFarmCard, { rows, spanLabel: "2026-09-14 - 2026-09-20", onOpen: () => {} }));
     const html = withProvider(React.createElement(SummaryFarmTable, { rows, spanLabel: "2026-09-14 - 2026-09-20", onOpenTrip: () => {} }));
     const shown = rows.filter(({ trip }) => html.includes(trip.tripNo)).length;
     const weight = rows[0].farm.dcWeight ?? rows[0].trip.dcWeight ?? 0;
@@ -331,7 +332,11 @@ try {
       headers: /Trip No/.test(html) && /Pickup Weight/.test(html) && /Cumulative/.test(html) && /Bird Type/.test(html),
       noPaidOrBalance: !/Paid \(₹\)/.test(html) && !/Balance \(₹\)/.test(html),
       tripLinkIsButton: /<button[^>]*>\s*<!-- -->TRP-|<button[^>]*>TRP-/.test(html),
-      cardRenders: withProvider(React.createElement(SummaryFarmCard, { rows, spanLabel: "2026-09-14 - 2026-09-20", onOpen: () => {} })).includes(formatINR(payable)),
+      // The card itself is the trigger: the farm payment figure sits inside a
+      // <button>, so pressing the number opens the pop-up.
+      cardIsButton: /^<button[^>]*type="button"/.test(cardHtml),
+      cardFigureOpens: cardHtml.includes(`>${formatINR(payable)}</span>`) && cardHtml.includes(formatINRExact(payable)),
+      cardNoNestedButton: (cardHtml.match(/<button/g) ?? []).length === 1,
     };
     console.log(`OK   accounts-farm-table  rows ${shown}/${rows.length}  cumulative=${formatINR(payable)}  html length=${html.length}  ${JSON.stringify(checks)}`);
     const bad = Object.entries(checks).filter(([, ok]) => !ok).map(([name]) => name);
