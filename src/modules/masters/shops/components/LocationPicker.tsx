@@ -68,6 +68,8 @@ function LocationPicker({
   const [isResolving, setIsResolving] = useState(false);
   const [isGettingGps, setIsGettingGps] = useState(false);
   const [error, setError] = useState("");
+  /** The short share link that could not be expanded server-side. */
+  const [shortLinkStuck, setShortLinkStuck] = useState<string | null>(null);
   const [capturedAddress, setCapturedAddress] = useState(initialAddress || "");
   const [detail, setDetail] = useState<CaptureDetail | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -93,20 +95,33 @@ function LocationPicker({
     [onChange],
   );
 
-  const handleResolveInput = useCallback(async () => {
-    const input = locationInput.trim();
-    if (!input || isResolving) return;
-    setError("");
-    setIsResolving(true);
-    try {
-      applyResolved(await resolveLocation(input));
-      setLocationInput("");
-    } catch (err: unknown) {
-      setError(handleApiError(err) || t("masters.shops.location.err_generic"));
-    } finally {
-      setIsResolving(false);
-    }
-  }, [locationInput, isResolving, applyResolved, t]);
+  const handleResolveInput = useCallback(
+    async (override?: string) => {
+      const input = (override ?? locationInput).trim();
+      if (!input || isResolving) return;
+      setError("");
+      setShortLinkStuck(null);
+      setIsResolving(true);
+      try {
+        applyResolved(await resolveLocation(input));
+        setLocationInput("");
+      } catch (err: unknown) {
+        const isShort = /^https?:\/\/(maps\.app\.)?goo\.gl\//i.test(input);
+        if (isShort) {
+          // The link is fine — only the expansion failed. Guide to the full URL
+          // (which resolves offline: name + exact pin live in the URL itself).
+          setShortLinkStuck(input);
+        } else {
+          setError(
+            handleApiError(err) || t("masters.shops.location.err_generic"),
+          );
+        }
+      } finally {
+        setIsResolving(false);
+      }
+    },
+    [locationInput, isResolving, applyResolved, t],
+  );
 
   const handleGetGps = useCallback(() => {
     if (isGettingGps) return;
@@ -174,6 +189,7 @@ function LocationPicker({
     setDetail(null);
     setLocationInput("");
     setError("");
+    setShortLinkStuck(null);
     inputRef.current?.focus();
   }, [onChange]);
 
@@ -215,6 +231,7 @@ function LocationPicker({
             onChange={(e) => {
               setLocationInput(e.target.value);
               setError("");
+              setShortLinkStuck(null);
             }}
             onKeyDown={(e) => {
               if (e.key === "Enter") {
@@ -226,7 +243,7 @@ function LocationPicker({
               // A pasted Maps link is captured on its own — no extra click.
               window.setTimeout(() => {
                 const v = inputRef.current?.value.trim() ?? "";
-                if (/^https?:\/\//i.test(v)) void handleResolveInput();
+                if (/^https?:\/\//i.test(v)) void handleResolveInput(v);
               }, 0);
             }}
             placeholder={t("masters.shops.location.placeholder")}
@@ -273,6 +290,43 @@ function LocationPicker({
         >
           <Loader2 size={13} className="animate-spin" />
           {t("masters.shops.location.resolving")}
+        </div>
+      )}
+
+      {/* Short link could not be expanded — show the way through, not a dead end. */}
+      {shortLinkStuck && !isLoading && (
+        <div
+          className="rounded-xl border border-amber-200 bg-amber-50/70 px-3.5 py-3 motion-safe:animate-[var(--animate-fade-in-up)]"
+          role="alert"
+        >
+          <p className="text-xs font-bold text-amber-800">
+            {t("masters.shops.location.short_link_title")}
+          </p>
+          <p className="mt-1 text-[12px] leading-relaxed text-amber-800/90">
+            {t("masters.shops.location.short_link_help")}
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <a
+              href={shortLinkStuck}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-amber-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-amber-800 hover:bg-amber-100 transition-colors"
+            >
+              <ExternalLink size={12} />
+              {t("masters.shops.location.open_link")}
+            </a>
+            <button
+              type="button"
+              onClick={() => {
+                const link = shortLinkStuck;
+                setShortLinkStuck(null);
+                void handleResolveInput(link);
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+            >
+              {t("masters.shops.location.retry")}
+            </button>
+          </div>
         </div>
       )}
 
