@@ -71,10 +71,12 @@ const FarmPaymentTable: React.FC<FarmPaymentTableProps> = ({
 
   // Locked (already paid/partial) rows show their saved rate read-only —
   // a light red pill so a settled rate reads as "locked" at a glance.
+  // Only the LOCK GLYPH carries the light red "locked" signal — the rate
+  // itself stays neutral slate so the figure reads like every other number.
   const lockedRate = (value: number) => (
     <span className="inline-flex items-center gap-1.5 rounded-lg border border-rose-100 bg-rose-50/80 px-2.5 py-1 shadow-sm">
       <Lock size={12} className="text-rose-400 shrink-0" aria-hidden="true" />
-      <span className="text-sm font-semibold text-rose-600 tabular-nums whitespace-nowrap">
+      <span className="text-sm font-semibold text-slate-700 tabular-nums whitespace-nowrap">
         {value > 0 ? `₹${value.toFixed(2)}` : '—'}
       </span>
     </span>
