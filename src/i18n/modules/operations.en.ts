@@ -228,6 +228,7 @@ export default {
   'ops.dashboard.preset_15d': 'Last 15 days',
   'ops.dashboard.preset_1m': 'Last 1 month',
   'ops.dashboard.preset_qtr': 'Quarter sample window',
+  // ----- Quarter Operations Map (sample quarter index) -----
   'ops.dashboard.payment.title': 'Payments',
   'ops.dashboard.payment.amount': 'Amount',
   'ops.dashboard.payment.entries': 'Entries',

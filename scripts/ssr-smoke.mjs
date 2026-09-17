@@ -112,7 +112,7 @@ try {
 //    we assert the chunks load + their default export is a component.
 const routeChunks = [
   ["DashboardLayout", "/src/layouts/DashboardLayout/DashboardLayout.tsx"],
-  ["DashboardPage", "/src/modules/dashboard/DashboardPage.tsx"],
+  ["DashboardPage", "/src/modules/dashboard/pages/DashboardPage.tsx"],
   ["OperationsPages", "/src/modules/operations/pages/OperationsPages.tsx"],
   // Orders is its own module now — its workspace and the three pages it mounts
   // per route all have to evaluate on their own.

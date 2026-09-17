@@ -6,7 +6,6 @@ import { parseBusinessDate } from '../../../utils/businessDate';
 import React, { useRef, useState, useMemo, useCallback, useEffect } from 'react';
 import {
   Download,
-  RotateCcw,
   ChevronLeft,
   ChevronRight,
   FileText,
@@ -27,7 +26,7 @@ import { uiFocusRing, uiTransition } from '../../../shared/ui/uiTokens';
 import { wrapIndex } from '../../../utils/interaction';
 import { format } from 'date-fns';
 import { createAnalysisService, EMPTY_ANALYSIS, loadAnalysisSnapshot } from '../services/analysisService';
-import { BrandRefreshButton } from '../../../ui';
+import { BrandRefreshButton, FilterResetButton, countActiveFilters } from '../../../ui';
 import { opsFilterCardClass, opsSecondaryButtonClass } from '../../../shared/ui/operationsStyles';
 import { DatePicker } from '../../../components/common/DatePicker';
 import { exportPDF, exportExcel } from '../components/Summary';
@@ -1155,10 +1154,17 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
           )}
           <div className="ml-auto flex flex-wrap items-center gap-2">
             {/* Same animated reset as the Trip List: the icon spins on hover. */}
-            <button type="button" className={`group relative ${opsSecondaryButtonClass}`} aria-label={t('common.reset')} onClick={() => {
-              setPeriod('week'); setWeekAnchor(new Date()); setComparePrevious(false);
-              setCustomStart(''); setCustomEnd(''); setMonthMenuOpen(false); setExportDropdownOpen(false); setCustomEditorOpen(false);
-            }}><span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>{t('common.reset')}</button>
+            <FilterResetButton
+              count={countActiveFilters(
+                period !== 'week' || !isCurrentWeek,
+                comparePrevious,
+                customStart !== '' || customEnd !== '',
+              )}
+              onClick={() => {
+                setPeriod('week'); setWeekAnchor(new Date()); setComparePrevious(false);
+                setCustomStart(''); setCustomEnd(''); setMonthMenuOpen(false); setExportDropdownOpen(false); setCustomEditorOpen(false);
+              }}
+            />
             <BrandRefreshButton loading={dataLoading} onClick={() => setRefreshKey(value => value + 1)} />
 
             <button

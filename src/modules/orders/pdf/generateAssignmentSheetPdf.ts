@@ -124,7 +124,8 @@ export async function generateAssignmentSheetPdf({
   const assets: DmrPoultryHeaderAssets = await loadHeaderAssets();
 
   const lastTableY = (fallback: number): number => {
-    const table = (doc as unknown as { lastAutoTable?: { finalY: number } }).lastAutoTable;
+    const table = (doc as unknown as { lastAutoTable?: { finalY: number } })
+      .lastAutoTable;
     return table?.finalY ?? fallback;
   };
 
@@ -184,7 +185,13 @@ export async function generateAssignmentSheetPdf({
       body: pairs,
       startY: y,
       theme: "grid",
-      styles: { fontSize: 8.5, cellPadding: 2.3, textColor: TEXT_DARK, lineColor: GRID_LINE, lineWidth: 0.15 },
+      styles: {
+        fontSize: 8.5,
+        cellPadding: 2.3,
+        textColor: TEXT_DARK,
+        lineColor: GRID_LINE,
+        lineWidth: 0.15,
+      },
       columnStyles: {
         0: { cellWidth: labelCol, fontStyle: "bold", textColor: MUTED },
         1: { cellWidth: valueCol },
@@ -210,11 +217,12 @@ export async function generateAssignmentSheetPdf({
           data.cell.y + data.cell.height / 2,
           {
             fontSizeMm: 2.9,
-            color: data.column.index % 2 === 0 ? "rgb(90,100,115)" : "rgb(30,41,59)",
+            color:
+              data.column.index % 2 === 0 ? "rgb(90,100,115)" : "rgb(30,41,59)",
             bold: data.column.index % 2 === 0,
             maxWidthMm: data.cell.width - 3,
             baseline: "middle",
-          }
+          },
         );
       },
     });
@@ -222,7 +230,10 @@ export async function generateAssignmentSheetPdf({
   };
 
   const totalBoxes = rows.reduce((s, r) => s + r.boxes, 0);
-  const availableAfter = capacity > 0 ? Math.max(0, capacity - alreadyAssignedOther - totalBoxes) : 0;
+  const availableAfter =
+    capacity > 0
+      ? Math.max(0, capacity - alreadyAssignedOther - totalBoxes)
+      : 0;
 
   // ─── PAGE 1: branded letterhead (hen logo + DMR header) ─────────────
   y = drawPreparedDmrPoultryHeader(doc, { margin, top: 8 }, assets) + 3;
@@ -258,7 +269,7 @@ export async function generateAssignmentSheetPdf({
     t("orders.assignment_sheet_sub", {
       shops: rows.length,
       boxes: count(totalBoxes),
-    })
+    }),
   );
   const body: (string | number)[][] = rows.map((row, index) => [
     row.serialNo || index + 1,
@@ -271,16 +282,19 @@ export async function generateAssignmentSheetPdf({
   if (body.length === 0) {
     body.push(["—", t("orders.sequence_empty"), "—", "—", "0", "—"]);
   }
-  // Column plan (content 182mm): the fixed columns get exactly what their
-  // content needs, Shop Name takes the REST and wraps — long names can never
-  // squeeze City/Mobile/Boxes/Birds again. Available at a glance with 30+
-  // shops: every page repeats the header and keeps clear of the page chrome.
+  // Column plan (content 182mm): balanced — Shop Name gets a third of the
+  // width (wrapping to a second line when needed) and City / Mobile / Boxes /
+  // Birds share the rest EVENLY, so no single column dominates the row.
+  // Multi-page safe: the header repeats on every page, rows never split
+  // across a page break, and the totals band always starts on a page that
+  // has room for it.
   const COL_SEQ = 10;
-  const COL_CITY = 28;
-  const COL_MOBILE = 28;
-  const COL_BOXES = 16;
-  const COL_BIRDS = 18;
-  const COL_SHOP = contentWidth - COL_SEQ - COL_CITY - COL_MOBILE - COL_BOXES - COL_BIRDS;
+  const COL_SHOP = Math.round(contentWidth * 0.34);
+  const COL_REST = (contentWidth - COL_SEQ - COL_SHOP) / 4;
+  const COL_CITY = COL_REST;
+  const COL_MOBILE = COL_REST;
+  const COL_BOXES = COL_REST;
+  const COL_BIRDS = COL_REST;
   const shopOverlays = new Map<string, string>();
   autoTable(doc, {
     head: [
@@ -322,10 +336,10 @@ export async function generateAssignmentSheetPdf({
     columnStyles: {
       0: { cellWidth: COL_SEQ, halign: "center" },
       1: { cellWidth: COL_SHOP, halign: "left" },
-      2: { cellWidth: COL_CITY },
+      2: { cellWidth: COL_CITY, halign: "center" },
       3: { cellWidth: COL_MOBILE, halign: "center" },
-      4: { cellWidth: COL_BOXES, halign: "right", fontStyle: "bold" },
-      5: { cellWidth: COL_BIRDS, halign: "right" },
+      4: { cellWidth: COL_BOXES, halign: "center", fontStyle: "bold" },
+      5: { cellWidth: COL_BIRDS, halign: "center" },
     },
     // Top clears the running navy page strip; bottom clears the footer line.
     margin: { left: margin, right: margin, top: 12, bottom: 12 },
@@ -335,17 +349,24 @@ export async function generateAssignmentSheetPdf({
       }
       const raw = String(data.cell.raw ?? data.cell.text?.join(" ") ?? "");
       if (!hasTelugu(raw)) return;
-      shopOverlays.set(`${data.section}:${data.row.index}:${data.column.index}`, raw);
+      shopOverlays.set(
+        `${data.section}:${data.row.index}:${data.column.index}`,
+        raw,
+      );
       data.cell.text = [""];
     },
     didDrawCell: (data) => {
-      const raw = shopOverlays.get(`${data.section}:${data.row.index}:${data.column.index}`);
+      const raw = shopOverlays.get(
+        `${data.section}:${data.row.index}:${data.column.index}`,
+      );
       if (!raw) return;
       const white = data.section === "head";
       addUnicodeText(
         doc,
         raw,
-        data.column.index === 1 ? data.cell.x + 1.6 : data.cell.x + data.cell.width / 2,
+        data.column.index === 1
+          ? data.cell.x + 1.6
+          : data.cell.x + data.cell.width / 2,
         data.cell.y + data.cell.height / 2,
         {
           fontSizeMm: 2.7,
@@ -354,13 +375,15 @@ export async function generateAssignmentSheetPdf({
           align: data.column.index === 1 ? "left" : "center",
           maxWidthMm: data.cell.width - 2,
           baseline: "middle",
-        }
+        },
       );
     },
   });
   y = lastTableY(y) + 5;
 
   // ─── TOTALS (boxes are the figure that matters) ──────────────────────
+  // Band + grid together on one page (never a lone band at a page foot).
+  ensureSpace(26);
   drawSectionBand(t("orders.pdf_totals"));
   kvGrid([
     [t("orders.col_total_shops"), count(rows.length)],
@@ -410,7 +433,10 @@ export async function generateAssignmentSheetPdf({
     }
   }
 
-  const safeTripNo = String(trip.tripNo || "Trip").replace(/[^a-zA-Z0-9_-]+/g, "_");
+  const safeTripNo = String(trip.tripNo || "Trip").replace(
+    /[^a-zA-Z0-9_-]+/g,
+    "_",
+  );
   const fileName = `${safeTripNo}_${orderTripNo.replace(/[^a-zA-Z0-9_-]+/g, "_")}_ShopAssignment.pdf`;
   if (mode === "download") doc.save(fileName);
   const blob = doc.output("blob") as Blob;

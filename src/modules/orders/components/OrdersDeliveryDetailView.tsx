@@ -20,7 +20,13 @@
 //   the VISIBLE rows and never mix ordered vs delivered quantities).
 
 import React, { useMemo, useState } from "react";
-import { Check, FileText, Loader2, Truck, X } from "lucide-react";
+import { Check, FileText, ShieldCheck, Truck, X } from "lucide-react";
+import { formatVehicleNumber } from "../../../utils/format";
+import AppShellModal from "../../../ui/AppShellModal";
+import { ViewLanguageToggle } from "../../../ui/ViewLanguageToggle";
+import { ActionTooltip } from "../../../ui/ActionTooltip";
+import { ScopedI18nProvider, useI18n } from "../../../i18n";
+import { uiActionIconMotionClass } from "../../../shared/ui/uiTokens";
 import {
   opsTableCardClass,
   opsTableDivideClass,
@@ -39,7 +45,6 @@ import {
   pageRange,
   rowsInSequence,
   shopDeliveryStatusI18nKey,
-  shopRemainingBoxes,
   type ShopDeliveryBreakdown,
 } from "../utils/ordersUtils";
 import {
@@ -53,12 +58,9 @@ import { useOrdersI18n, type OrdersT } from "../i18n/ordersI18n";
 import type { OrdersTrip } from "../types";
 import OrdersPdfPreview from "./OrdersPdfPreview";
 import {
-  ORDERS_NO_SPINNER,
   OrdersDropdown,
   OrdersIconButton,
   OrdersSearchInput,
-  OrdersStatusBadge,
-  onOrdersNumberWheel,
 } from "./OrdersCommon";
 
 const PAGE_SIZE = 10;
@@ -76,12 +78,82 @@ type Props = {
    * Record one shop's delivery (Step 4) — partial allowed. Resolves after the
    * page refetched, so the report re-derives from persisted data.
    */
-  onRecordDelivery: (shop: ShopDeliveryBreakdown, boxes: number) => Promise<void>;
+  onRecordDelivery: (
+    shop: ShopDeliveryBreakdown,
+    boxes: number,
+  ) => Promise<void>;
   /** Save Progress from the check popup — error message, or null. */
   onSaveProgress: () => Promise<string | null>;
   /** Submit the delivery trip from the check popup — error message, or null. */
   onSubmitTrip: () => Promise<string | null>;
 };
+
+type ReportSortKey =
+  "time_first" | "time_last" | "sequence" | "shop_az" | "status" | "boxes_desc";
+
+const STATUS_RANK: Record<ShopDeliveryBreakdown["status"], number> = {
+  delivered: 0,
+  delivered_with_diff: 1,
+  part_delivered: 2,
+  not_listed: 3,
+  not_delivered: 4,
+  ordered: 5,
+} as Record<ShopDeliveryBreakdown["status"], number>;
+
+function deliveredMs(row: ShopDeliveryBreakdown): number {
+  if (!row.deliveredAt) return Number.NaN;
+  const t = new Date(row.deliveredAt).getTime();
+  return Number.isNaN(t) ? Number.NaN : t;
+}
+
+function bySequence(a: ShopDeliveryBreakdown, b: ShopDeliveryBreakdown) {
+  return (a.serialNo || 0) - (b.serialNo || 0);
+}
+
+/** Stable sort of the report rows; undelivered rows always sink to the end
+ *  of a time sort in their original sequence. */
+function sortReportRows(
+  rows: ShopDeliveryBreakdown[],
+  key: ReportSortKey,
+): ShopDeliveryBreakdown[] {
+  const list = rows.map((row, i) => ({ row, i }));
+  const cmp = (
+    a: { row: ShopDeliveryBreakdown; i: number },
+    b: { row: ShopDeliveryBreakdown; i: number },
+  ): number => {
+    switch (key) {
+      case "time_first":
+      case "time_last": {
+        const ta = deliveredMs(a.row);
+        const tb = deliveredMs(b.row);
+        const na = Number.isNaN(ta);
+        const nb = Number.isNaN(tb);
+        if (na && nb) return bySequence(a.row, b.row) || a.i - b.i;
+        if (na) return 1;
+        if (nb) return -1;
+        return (key === "time_first" ? ta - tb : tb - ta) || a.i - b.i;
+      }
+      case "sequence":
+        return bySequence(a.row, b.row) || a.i - b.i;
+      case "shop_az":
+        return (
+          (a.row.shopName || "").localeCompare(b.row.shopName || "") ||
+          a.i - b.i
+        );
+      case "status":
+        return (
+          (STATUS_RANK[a.row.status] ?? 9) - (STATUS_RANK[b.row.status] ?? 9) ||
+          bySequence(a.row, b.row) ||
+          a.i - b.i
+        );
+      case "boxes_desc":
+        return b.row.deliveredBoxes - a.row.deliveredBoxes || a.i - b.i;
+      default:
+        return a.i - b.i;
+    }
+  };
+  return list.sort(cmp).map((x) => x.row);
+}
 
 type ReportStatusFilter =
   | "all"
@@ -94,9 +166,12 @@ type ReportStatusFilter =
 /** One difference cell: 0 → muted, short → rose, over → emerald. */
 function DiffCell({ value, show }: { value: number; show: boolean }) {
   if (!show) return <span className="text-slate-300">—</span>;
-  if (value === 0) return <span className="font-semibold text-slate-400">0</span>;
+  if (value === 0)
+    return <span className="font-semibold text-slate-400">0</span>;
   return (
-    <span className={`font-bold ${value < 0 ? "text-rose-600" : "text-emerald-600"}`}>
+    <span
+      className={`font-bold ${value < 0 ? "text-rose-600" : "text-emerald-600"}`}
+    >
       {value < 0 ? "−" : "+"}
       {Math.abs(value)}
     </span>
@@ -107,105 +182,107 @@ function DiffCell({ value, show }: { value: number; show: boolean }) {
 function WeightDiffCell({ value, show }: { value: number; show: boolean }) {
   if (!show) return <span className="text-slate-300">—</span>;
   const rounded = Number(value.toFixed(2));
-  if (rounded === 0) return <span className="font-semibold text-slate-400">0.00</span>;
+  if (rounded === 0)
+    return <span className="font-semibold text-slate-400">0.00</span>;
   return (
-    <span className={`font-bold ${rounded < 0 ? "text-rose-600" : "text-emerald-600"}`}>
+    <span
+      className={`font-bold ${rounded < 0 ? "text-rose-600" : "text-emerald-600"}`}
+    >
       {rounded < 0 ? "−" : "+"}
       {Math.abs(rounded).toFixed(2)}
     </span>
   );
 }
 
-/** Delivery Status cell for the report. */
-function DeliveryStatusCell({ row, to }: { row: ShopDeliveryBreakdown; to: OrdersT }) {
+/** Report table geometry — same anatomy as the Trip List table. */
+/* Heads may wrap to two lines (Telugu / 150% font scale) instead of
+   overflowing their fixed column; cells stay vertically centred. */
+const reportThClass =
+  "px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider leading-tight align-middle break-words";
+const reportTdClass =
+  "px-4 py-3.5 text-[13px] text-slate-700 align-middle border-b border-slate-100";
+
+/** Bold tabular count; keyed on the value so a change pops in. */
+function CountCell({
+  value,
+  tone,
+  zero = "—",
+}: {
+  value: number;
+  tone: string;
+  zero?: string;
+}) {
+  if (!(value > 0)) {
+    return <span className="text-slate-300 tabular-nums">{zero}</span>;
+  }
+  return (
+    <span
+      key={value}
+      className={`inline-block text-[14px] font-extrabold tabular-nums animate-pop-in ${tone}`}
+    >
+      {formatCount(value)}
+    </span>
+  );
+}
+
+const statusPillBase =
+  "inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider leading-tight text-left transition-transform duration-200 animate-pop-in";
+
+/** Delivery Status cell for the report — animated pill with a state dot. */
+function DeliveryStatusCell({
+  row,
+  to,
+}: {
+  row: ShopDeliveryBreakdown;
+  to: OrdersT;
+}) {
   const label = to(shopDeliveryStatusI18nKey(row.status));
   switch (row.status) {
     case "delivered":
     case "delivered_with_diff":
-      return <OrdersStatusBadge status="Delivered" label={label} />;
+      return (
+        <span
+          key={row.status}
+          className={`${statusPillBase} border-emerald-200 bg-emerald-50 text-emerald-700`}
+        >
+          <Check size={11} strokeWidth={3} />
+          {label}
+        </span>
+      );
     case "part_delivered":
       return (
-        <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-300 px-2 py-0.5 text-[10px] font-bold text-amber-700 whitespace-nowrap">
+        <span
+          key={row.status}
+          className={`${statusPillBase} border-amber-300 bg-amber-50 text-amber-700`}
+        >
+          <span className="relative flex h-2 w-2">
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-amber-400 opacity-60" />
+            <span className="relative inline-flex h-2 w-2 rounded-full bg-amber-500" />
+          </span>
           {label}
         </span>
       );
     case "not_listed":
       return (
-        <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2 py-0.5 text-[10px] font-bold text-amber-700 whitespace-nowrap">
+        <span
+          key={row.status}
+          className={`${statusPillBase} border-orange-200 bg-orange-50 text-orange-700`}
+        >
+          <span className="h-2 w-2 rounded-full bg-orange-400" />
           {label}
         </span>
       );
     default:
-      return <OrdersStatusBadge status="Pending" label={label} />;
+      return (
+        <span
+          key={row.status}
+          className={`${statusPillBase} border-slate-200 bg-slate-50 text-slate-600`}
+        >
+          <span className="h-2 w-2 rounded-full bg-slate-400" />
+          {label}
+        </span>
+      );
   }
-}
-
-/**
- * Shop-level delivery capture (last column of the report).
- *
- * The order is already on the row (Ordered Birds / Boxes) — this records what
- * actually reached the shop. PARTIAL: the box input is capped at the balance
- * (ordered − delivered), so a shop can be delivered in several lots, and a
- * shop whose order is fully in shows COMPLETE with no input at all — that is
- * the duplicate guard.
- */
-function ShopDeliveryCapture({
-  row,
-  remaining,
-  busy,
-  value,
-  onValue,
-  onSubmit,
-  to,
-}: {
-  row: ShopDeliveryBreakdown;
-  remaining: number;
-  busy: boolean;
-  value: string;
-  onValue: (v: string) => void;
-  onSubmit: (boxes: number) => void;
-  to: OrdersT;
-}) {
-  if (remaining <= 0) {
-    return (
-      <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 whitespace-nowrap">
-        <Check size={12} />
-        {to("orders.delivery_complete")}
-      </span>
-    );
-  }
-  const parsed = Number(value);
-  const valid = Number.isFinite(parsed) && parsed >= 1 && parsed <= remaining;
-  return (
-    <div className="flex items-center gap-1.5">
-      <input
-        type="number"
-        min={1}
-        max={remaining}
-        value={value}
-        placeholder={String(remaining)}
-        disabled={busy}
-        onChange={(e) => onValue(e.target.value)}
-        onWheel={onOrdersNumberWheel}
-        aria-label={`${to("orders.delivered_boxes")} — ${row.shopName}`}
-        className={`${ORDERS_NO_SPINNER} h-8 w-20 rounded-lg border border-slate-200 px-2 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500`}
-      />
-      <button
-        type="button"
-        onClick={() => onSubmit(parsed)}
-        disabled={busy || !valid}
-        title={to("orders.delivery_balance_hint", { remaining })}
-        aria-label={`${to("orders.deliver")} — ${row.shopName}`}
-        className="inline-flex items-center gap-1 rounded-lg border border-emerald-600/40 bg-emerald-500 px-2.5 py-1.5 text-[11px] font-bold text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
-      >
-        {busy ? <Loader2 size={13} className="animate-spin" /> : <Truck size={13} />}
-        {to("orders.deliver")}
-      </button>
-      <span className="text-[10px] font-semibold text-slate-400 whitespace-nowrap">
-        {to("orders.balance")}: {formatCount(remaining)}
-      </span>
-    </div>
-  );
 }
 
 function OrdersDeliveryDetailView({
@@ -216,21 +293,17 @@ function OrdersDeliveryDetailView({
   whatsappBusy: _whatsappBusy,
   onClose,
   onWhatsApp,
-  onRecordDelivery,
   onSaveProgress,
   onSubmitTrip,
 }: Props) {
-  const { to } = useOrdersI18n();
+  const { to, language } = useOrdersI18n();
+  const { toggleLanguage } = useI18n();
   const { trip, progress, originalShopIds } = orderTrip;
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ReportStatusFilter>("all");
+  const [sortKey, setSortKey] = useState<ReportSortKey>("time_first");
   // "Check PDF" popup (preview -> download / send / correct).
   const [pdfOpen, setPdfOpen] = useState(false);
-  // Shop-level capture: per-shop box entry + one in-flight shop at a time.
-  const [qty, setQty] = useState<Record<number, string>>({});
-  const [busyShopId, setBusyShopId] = useState<number | null>(null);
-  // A completed trip is closed — its deliveries are history, not editable.
-  const canDeliver = (progress?.status ?? "Assigned") !== "Completed";
 
   const breakdown = useMemo(
     () =>
@@ -240,9 +313,21 @@ function OrdersDeliveryDetailView({
         (shopId, shopName) => villageOf(shopId, shopName, shopDirectory),
         orderTrip.originalQuantities,
         (shopId) => shopMobileOf(shopId, shopDirectory),
-        (shopId) => shopNumberOf(shopId, shopDirectory)
+        (shopId) => shopNumberOf(shopId, shopDirectory),
       ),
-    [trip, originalShopIds, shopDirectory, orderTrip.originalQuantities]
+    [trip, originalShopIds, shopDirectory, orderTrip.originalQuantities],
+  );
+
+  const sortOptions = useMemo(
+    () => [
+      { value: "time_first", label: to("orders.sort_time_first") },
+      { value: "time_last", label: to("orders.sort_time_last") },
+      { value: "sequence", label: to("orders.sort_sequence") },
+      { value: "shop_az", label: to("orders.sort_shop_az") },
+      { value: "status", label: to("orders.sort_status") },
+      { value: "boxes_desc", label: to("orders.sort_boxes_desc") },
+    ],
+    [to],
   );
 
   const statusOptions = useMemo(
@@ -250,31 +335,15 @@ function OrdersDeliveryDetailView({
       { value: "all", label: to("orders.all") },
       { value: "delivered", label: to("orders.status_delivered") },
       { value: "part_delivered", label: to("orders.status_part_delivered") },
-      { value: "delivered_with_diff", label: to("orders.status_delivered_diff") },
+      {
+        value: "delivered_with_diff",
+        label: to("orders.status_delivered_diff"),
+      },
       { value: "not_delivered", label: to("orders.status_pending") },
       { value: "not_listed", label: to("orders.status_not_listed") },
     ],
-    [to]
+    [to],
   );
-
-  /** One shop's (partial) delivery — the balance is the hard maximum. */
-  const handleDeliver = async (row: ShopDeliveryBreakdown) => {
-    if (busyShopId !== null) return;
-    const remaining = shopRemainingBoxes(row);
-    const boxes = Math.floor(Number(qty[row.shopId] ?? ""));
-    if (!Number.isFinite(boxes) || boxes < 1 || boxes > remaining) return;
-    setBusyShopId(row.shopId);
-    try {
-      await onRecordDelivery(row, boxes);
-      setQty((prev) => {
-        const next = { ...prev };
-        delete next[row.shopId];
-        return next;
-      });
-    } finally {
-      setBusyShopId(null);
-    }
-  };
 
   // One table-level search over the WHOLE report (listed + unlisted rows).
   const searched = useMemo(
@@ -291,29 +360,21 @@ function OrdersDeliveryDetailView({
           notDelivered: to("orders.status_pending"),
         },
         trip.tripNo,
-        trip.vehicleNo ?? ""
+        trip.vehicleNo ?? "",
       ),
-    [breakdown, query, to, trip.tripNo, trip.vehicleNo]
+    [breakdown, query, to, trip.tripNo, trip.vehicleNo],
   );
 
-  // ── Split: shops LISTED in the original order (main paginated table) vs
-  //    shops delivered that were NEVER listed — NOT LISTED rows always live
-  //    in their own section below, never hidden, never mixed into the
-  //    matched-shop table. The status filter applies to the main table;
-  //    the NOT LISTED section is only narrowed by the shared search.
-  const listedRows = useMemo(
-    () =>
-      searched.filter(
-        (row) =>
-          row.status !== "not_listed" &&
-          (statusFilter === "all" || row.status === statusFilter)
-      ),
-    [searched, statusFilter]
-  );
-  const unlistedRows = useMemo(
-    () => searched.filter((row) => row.status === "not_listed"),
-    [searched]
-  );
+  // ── ONE table: listed shops (green) and NOT LISTED shops (orange) live
+  //    together; the status filter narrows it and the sort orders it.
+  //    Default sort: first delivery on top (undelivered rows sink to the
+  //    bottom in their original sequence).
+  const listedRows = useMemo(() => {
+    const rows = searched.filter(
+      (row) => statusFilter === "all" || row.status === statusFilter,
+    );
+    return sortReportRows(rows, sortKey);
+  }, [searched, statusFilter, sortKey]);
 
   // ── Pagination (existing global component; 10 rows per page; resets to
   //    page 1 whenever the search / status filter changes) ─────────────────
@@ -321,7 +382,7 @@ function OrdersDeliveryDetailView({
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const totalPages = Math.max(1, Math.ceil(listedRows.length / pageSize));
   const [lastKey, setLastKey] = useState(
-    `${query}|${statusFilter}|${listedRows.length}`
+    `${query}|${statusFilter}|${listedRows.length}`,
   );
   if (lastKey !== `${query}|${statusFilter}|${listedRows.length}`) {
     setLastKey(`${query}|${statusFilter}|${listedRows.length}`);
@@ -330,7 +391,7 @@ function OrdersDeliveryDetailView({
   const safePage = Math.min(page, totalPages);
   const pageRows = listedRows.slice(
     (safePage - 1) * pageSize,
-    safePage * pageSize
+    safePage * pageSize,
   );
   const startIndex = listedRows.length === 0 ? 0 : (safePage - 1) * pageSize;
 
@@ -346,7 +407,7 @@ function OrdersDeliveryDetailView({
       deliveredBirds: 0,
       deliveredWeight: 0,
     };
-    for (const row of [...listedRows, ...unlistedRows]) {
+    for (const row of listedRows) {
       const isListed = row.status !== "not_listed";
       if (isListed) {
         t.orderedBoxes += row.orderedBoxes;
@@ -360,10 +421,14 @@ function OrdersDeliveryDetailView({
     t.orderedWeight = Number(t.orderedWeight.toFixed(2));
     t.deliveredWeight = Number(t.deliveredWeight.toFixed(2));
     return t;
-  }, [listedRows, unlistedRows]);
+  }, [listedRows]);
 
-  const notListedCount = breakdown.filter((b) => b.status === "not_listed").length;
-  const notDeliveredCount = breakdown.filter((b) => b.status === "not_delivered").length;
+  const notListedCount = breakdown.filter(
+    (b) => b.status === "not_listed",
+  ).length;
+  const notDeliveredCount = breakdown.filter(
+    (b) => b.status === "not_delivered",
+  ).length;
   const report = buildDeliveryReportSummary(progress, breakdown);
   const shopPage = pageRange(listedRows.length, safePage, pageSize);
 
@@ -384,45 +449,92 @@ function OrdersDeliveryDetailView({
     [to("orders.driver"), trip.driverName || "—"],
   ];
 
-  return (
-    <div className="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
-      {/* Backdrop (click to close) */}
-      <div className="fixed inset-0 bg-black/40" onClick={onClose} aria-hidden />
+  const isCompleted = status === "Completed";
 
-      <div className="relative min-h-full flex items-start justify-center p-3 md:p-8">
-        <div className="relative bg-slate-100 w-full max-w-6xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
-          {/* Modal header — ONE concise title (the trip number), no
-              duplicated Orders/Tracking/Assignment page headers. */}
-          <div className="px-5 py-3.5 border-b border-slate-200 bg-white flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-2.5 flex-wrap min-w-0">
-              <h2 className="text-lg font-bold text-slate-900 leading-tight">
-                {to("orders.pdf_report_title")}
-              </h2>
-              <span className="text-sm font-semibold text-emerald-700">{trip.tripNo}</span>
-              <OrdersStatusBadge status={status} label={statusLabel} />
-              {notListedCount > 0 && (
-                <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">
-                  {to("orders.additional_count", { n: notListedCount })}
-                </span>
-              )}
+  return (
+    <AppShellModal open onClose={onClose} panelClassName="bg-white">
+      <div className="flex h-full w-full flex-col overflow-hidden rounded-2xl bg-white">
+        {/* Header — the Trip View header, verbatim: emerald tile, trip number,
+            status pill, language toggle and the round close. */}
+        <div className="rounded-t-2xl border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/80">
+          <div className="flex flex-col gap-4 px-6 py-4 sm:flex-row sm:items-center sm:justify-between md:px-8">
+            <div className="flex min-w-0 flex-1 items-center gap-4 sm:flex-none">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-teal-400 text-white shadow-lg shadow-emerald-400/20">
+                <Truck className="h-6 w-6" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <h2 className="truncate text-lg font-bold tracking-tight text-slate-800 md:text-xl">
+                    {trip.tripNo || to("orders.pdf_report_title")}
+                  </h2>
+                  <span className="hidden items-center rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 sm:inline-flex">
+                    {to("orders.pdf_report_title")} •{" "}
+                    {language === "te" ? "తెలుగు" : "EN"}
+                  </span>
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                  {isCompleted ? (
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+                      <ShieldCheck size={11} /> {statusLabel}
+                    </span>
+                  ) : (
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-100 bg-amber-50/80 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-500">
+                      {statusLabel}
+                    </span>
+                  )}
+                  {notListedCount > 0 && (
+                    <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">
+                      {to("orders.additional_count", { n: notListedCount })}
+                    </span>
+                  )}
+                  <span className="text-xs font-medium text-slate-400">
+                    {trip.vehicleNo ? formatVehicleNumber(trip.vehicleNo) : ""}
+                    {trip.supervisorName ? ` · ${trip.supervisorName}` : ""}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
+
+            <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-2 sm:w-auto">
               {/* Check the report in a popup first — it holds the download
                   and the send, so what you verify is what goes out. */}
-              <OrdersIconButton label={to("orders.pdf_check_title")} onClick={() => setPdfOpen(true)} busy={pdfBusy}>
+              <OrdersIconButton
+                label={to("orders.pdf_check_title")}
+                onClick={() => setPdfOpen(true)}
+                busy={pdfBusy}
+              >
                 <FileText size={15} />
               </OrdersIconButton>
+              <ViewLanguageToggle
+                language={language}
+                onToggle={toggleLanguage}
+                tone="emerald"
+                labelMode="target"
+                ariaLabel={to("ops.trip.popup_language_toggle")}
+                tooltip={
+                  <ActionTooltip
+                    label={to("ops.trip.popup_language_tooltip")}
+                    side="bottom"
+                  />
+                }
+              />
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors active:scale-95"
-                aria-label={to("orders.close")}
+                className="group relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:-translate-y-0.5 hover:border-red-100 hover:bg-red-50 hover:text-red-500 active:scale-95"
+                aria-label={to("ops.trip.close_view")}
               >
-                <X size={16} />
+                <span
+                  className={`inline-flex ${uiActionIconMotionClass.close}`}
+                >
+                  <X size={16} />
+                </span>
               </button>
             </div>
           </div>
+        </div>
 
+        <div className="flex-1 overflow-y-auto bg-slate-100">
           <div className="p-3 md:p-4 space-y-3 md:space-y-4">
             {orderTrip.assignmentIncomplete && (
               <div className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-2.5 text-xs font-semibold text-orange-800">
@@ -441,8 +553,13 @@ function OrdersDeliveryDetailView({
                 <dl className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3">
                   {details.map(([label, value]) => (
                     <div key={label} className="min-w-0">
-                      <dt className="text-[11px] font-semibold text-slate-400">{label}</dt>
-                      <dd className="text-sm font-semibold text-slate-800 truncate" title={value}>
+                      <dt className="text-[11px] font-semibold text-slate-400">
+                        {label}
+                      </dt>
+                      <dd
+                        className="text-sm font-semibold text-slate-800 truncate"
+                        title={value}
+                      >
                         {value}
                       </dd>
                     </div>
@@ -468,19 +585,47 @@ function OrdersDeliveryDetailView({
                           y: report.totalShops,
                         }),
                       ],
-                      [to("orders.collected_boxes"), formatCount(report.collectedBoxes)],
-                      [to("orders.col_assigned_boxes"), formatCount(report.assignedBoxes)],
-                      [to("orders.delivered_boxes"), formatCount(report.deliveredBoxes)],
-                      [to("orders.pending_boxes"), formatCount(report.pendingBoxes)],
-                      [to("orders.delivered_birds"), formatCount(report.deliveredBirds)],
-                      [to("orders.delivered_weight"), report.deliveredWeight.toFixed(2)],
-                      [to("orders.col_pending"), formatCount(report.pendingShops)],
-                      [to("orders.status_part_delivered"), formatCount(report.partDeliveredShops)],
+                      [
+                        to("orders.collected_boxes"),
+                        formatCount(report.collectedBoxes),
+                      ],
+                      [
+                        to("orders.col_assigned_boxes"),
+                        formatCount(report.assignedBoxes),
+                      ],
+                      [
+                        to("orders.delivered_boxes"),
+                        formatCount(report.deliveredBoxes),
+                      ],
+                      [
+                        to("orders.pending_boxes"),
+                        formatCount(report.pendingBoxes),
+                      ],
+                      [
+                        to("orders.delivered_birds"),
+                        formatCount(report.deliveredBirds),
+                      ],
+                      [
+                        to("orders.delivered_weight"),
+                        report.deliveredWeight.toFixed(2),
+                      ],
+                      [
+                        to("orders.col_pending"),
+                        formatCount(report.pendingShops),
+                      ],
+                      [
+                        to("orders.status_part_delivered"),
+                        formatCount(report.partDeliveredShops),
+                      ],
                     ] as Array<[string, string]>
                   ).map(([label, value]) => (
                     <div key={label} className="min-w-0">
-                      <dt className="text-[11px] font-semibold text-slate-400">{label}</dt>
-                      <dd className="text-sm font-semibold text-slate-800">{value}</dd>
+                      <dt className="text-[11px] font-semibold text-slate-400">
+                        {label}
+                      </dt>
+                      <dd className="text-sm font-semibold text-slate-800">
+                        {value}
+                      </dd>
                     </div>
                   ))}
                 </dl>
@@ -499,7 +644,25 @@ function OrdersDeliveryDetailView({
                     </span>
                   )}
                 </h3>
+                <span className="inline-flex items-center gap-3 text-[11px] font-semibold text-slate-500">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+                    {to("orders.legend_listed")}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-full bg-orange-500" />
+                    {to("orders.legend_not_listed")}
+                    {notListedCount > 0 ? ` (${notListedCount})` : ""}
+                  </span>
+                </span>
                 <div className="ml-auto flex items-center gap-2.5 flex-wrap">
+                  <OrdersDropdown
+                    value={sortKey}
+                    onChange={(v) => setSortKey(v as ReportSortKey)}
+                    options={sortOptions}
+                    ariaLabel={to("orders.sort")}
+                    widthClass="w-56"
+                  />
                   <OrdersSearchInput
                     value={query}
                     onChange={setQuery}
@@ -517,30 +680,84 @@ function OrdersDeliveryDetailView({
                 </div>
               </div>
               <div className={`${opsTableCardClass} overflow-x-auto`}>
-                <table className="w-full min-w-[1280px] text-xs md:text-sm">
+                <table className="w-full min-w-[72rem] table-fixed text-xs md:text-sm">
+                  <colgroup>
+                    <col className="w-[3.5rem]" />
+                    <col className="w-[5.5rem]" />
+                    <col className="w-[15rem]" />
+                    <col className="w-[9rem]" />
+                    <col className="w-[6.25rem]" />
+                    <col className="w-[6.25rem]" />
+                    <col className="w-[6.25rem]" />
+                    <col className="w-[6.5rem]" />
+                    <col className="w-[6.25rem]" />
+                    <col className="w-[6.75rem]" />
+                    <col className="w-[11rem]" />
+                    <col className="w-[10rem]" />
+                  </colgroup>
                   <thead>
-                    <tr className={opsTableHeadRowClass}>
-                      <th className={`${opsTableThClass} w-14`}>{to("orders.col_sno")}</th>
-                      <th className={`${opsTableThClass} w-24`}>{to("orders.col_shop_no")}</th>
-                      <th className={opsTableThClass}>{to("orders.col_shop_name")}</th>
-                      <th className={opsTableThClass}>{to("orders.col_village")}</th>
-                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.collected_boxes")}</th>
-                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.col_assigned_boxes")}</th>
-                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.delivered_boxes")}</th>
-                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.pending_boxes")}</th>
-                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.delivered_birds")}</th>
-                      <th className={`${opsTableThClass} w-28 text-right`}>{to("orders.delivered_weight")}</th>
-                      <th className={`${opsTableThClass} w-40`}>{to("orders.delivery_time")}</th>
-                      <th className={`${opsTableThClass} w-36`}>{to("orders.col_delivery_status")}</th>
-                      {/* Shop-level capture: the order is on this row, the
-                          delivery is entered here (partial allowed). */}
-                      <th className={`${opsTableThClass} w-64`}>{to("orders.record_delivery")}</th>
+                    <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-600">
+                      <th className={reportThClass}>{to("orders.col_sno")}</th>
+                      <th className={reportThClass}>
+                        {to("orders.col_shop_no")}
+                      </th>
+                      <th className={reportThClass}>
+                        {to("orders.col_shop_name")}
+                      </th>
+                      <th className={reportThClass}>
+                        {to("orders.col_village")}
+                      </th>
+                      <th
+                        className={`${reportThClass} text-right`}
+                        title={to("orders.collected_boxes")}
+                      >
+                        {to("orders.th_coll_boxes")}
+                      </th>
+                      <th
+                        className={`${reportThClass} text-right`}
+                        title={to("orders.col_assigned_boxes")}
+                      >
+                        {to("orders.th_ass_boxes")}
+                      </th>
+                      <th
+                        className={`${reportThClass} text-right`}
+                        title={to("orders.delivered_boxes")}
+                      >
+                        {to("orders.th_del_boxes")}
+                      </th>
+                      <th
+                        className={`${reportThClass} text-right`}
+                        title={to("orders.pending_boxes")}
+                      >
+                        {to("orders.th_pend_boxes")}
+                      </th>
+                      <th
+                        className={`${reportThClass} text-right`}
+                        title={to("orders.delivered_birds")}
+                      >
+                        {to("orders.th_del_birds")}
+                      </th>
+                      <th
+                        className={`${reportThClass} text-right`}
+                        title={to("orders.delivered_weight")}
+                      >
+                        {to("orders.th_del_wt")}
+                      </th>
+                      <th
+                        className={reportThClass}
+                        title={to("orders.delivery_time")}
+                      >
+                        {to("orders.th_time")}
+                      </th>
+                      <th className={reportThClass}>
+                        {to("orders.col_delivery_status")}
+                      </th>
                     </tr>
                   </thead>
                   <tbody className={opsTableDivideClass}>
                     {pageRows.length === 0 && (
                       <tr>
-                        <td className={opsTableTdClass} colSpan={13}>
+                        <td className={reportTdClass} colSpan={12}>
                           <span className="text-slate-400 text-sm py-4 block text-center">
                             {query || statusFilter !== "all"
                               ? to("orders.no_results")
@@ -550,67 +767,98 @@ function OrdersDeliveryDetailView({
                       </tr>
                     )}
                     {pageRows.map((row, index) => {
-                      const remaining = shopRemainingBoxes(row);
+                      const unlisted = row.status === "not_listed";
+                      const done =
+                        row.status === "delivered" ||
+                        row.status === "delivered_with_diff";
+                      const rowTone = unlisted
+                        ? "bg-orange-50/50 border-l-4 border-l-orange-400 hover:bg-orange-50"
+                        : done
+                          ? "bg-emerald-50/30 border-l-4 border-l-emerald-400 hover:bg-emerald-50/50"
+                          : "border-l-4 border-l-transparent hover:bg-slate-50/70";
                       return (
-                        <tr key={row.shopId} className="align-middle transition-colors">
-                          <td className={opsTableTdClass}>
-                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[12px] font-bold bg-emerald-50 text-emerald-700">
-                              {row.serialNo || startIndex + index + 1}
+                        <tr
+                          key={row.shopId}
+                          className={`align-middle transition-colors animate-fade-in-up ${rowTone}`}
+                          style={{
+                            animationDelay: `${Math.min(index, 12) * 28}ms`,
+                          }}
+                        >
+                          <td className={reportTdClass}>
+                            <span
+                              className={`inline-flex h-7 w-7 items-center justify-center rounded-lg text-[12px] font-bold ${
+                                unlisted
+                                  ? "bg-orange-100 text-orange-700"
+                                  : "bg-emerald-50 text-emerald-700"
+                              }`}
+                            >
+                              {unlisted
+                                ? "+"
+                                : row.serialNo || startIndex + index + 1}
                             </span>
                           </td>
-                          <td className={`${opsTableTdClass} text-slate-600`}>
+                          <td
+                            className={`${reportTdClass} font-semibold text-slate-700 tabular-nums`}
+                          >
                             {row.shopNumber || "—"}
                           </td>
-                          <td className={`${opsTableTdClass} font-semibold text-slate-800`}>
+                          <td
+                            className={`${reportTdClass} font-bold text-slate-900 truncate`}
+                            title={row.shopName || undefined}
+                          >
                             {row.shopName || "—"}
                           </td>
-                          <td className={opsTableTdClass}>{row.village || "—"}</td>
-                          <td className={`${opsTableTdClass} text-right font-bold text-emerald-800`}>
-                            {row.collectedBoxes > 0 ? formatCount(row.collectedBoxes) : "—"}
+                          <td
+                            className={`${reportTdClass} font-medium text-slate-700 truncate`}
+                            title={row.village || undefined}
+                          >
+                            {row.village || "—"}
                           </td>
-                          <td className={`${opsTableTdClass} text-right font-semibold text-slate-800`}>
-                            {row.assignedBoxes > 0 ? formatCount(row.assignedBoxes) : "—"}
+                          <td className={`${reportTdClass} text-right`}>
+                            <CountCell
+                              value={row.collectedBoxes}
+                              tone="text-emerald-700"
+                            />
                           </td>
-                          <td className={`${opsTableTdClass} text-right font-semibold`}>
-                            {row.deliveredBoxes > 0 ? formatCount(row.deliveredBoxes) : "—"}
+                          <td className={`${reportTdClass} text-right`}>
+                            <CountCell
+                              value={row.assignedBoxes}
+                              tone="text-slate-900"
+                            />
                           </td>
-                          <td className={`${opsTableTdClass} text-right`}>
-                            {row.pendingBoxes > 0 ? (
-                              <span className="font-semibold text-amber-600">
-                                {formatCount(row.pendingBoxes)}
-                              </span>
-                            ) : (
-                              <span className="text-slate-300">0</span>
-                            )}
+                          <td className={`${reportTdClass} text-right`}>
+                            <CountCell
+                              value={row.deliveredBoxes}
+                              tone="text-teal-700"
+                            />
                           </td>
-                          <td className={`${opsTableTdClass} text-right font-semibold`}>
-                            {row.deliveredBirds > 0 ? formatCount(row.deliveredBirds) : "—"}
+                          <td className={`${reportTdClass} text-right`}>
+                            <CountCell
+                              value={row.pendingBoxes}
+                              tone="text-amber-600"
+                              zero="0"
+                            />
                           </td>
-                          <td className={`${opsTableTdClass} text-right font-semibold`}>
-                            {row.deliveredWeight > 0 ? row.deliveredWeight.toFixed(2) : "—"}
+                          <td className={`${reportTdClass} text-right`}>
+                            <CountCell
+                              value={row.deliveredBirds}
+                              tone="text-blue-700"
+                            />
                           </td>
-                          <td className={`${opsTableTdClass} text-slate-500 whitespace-nowrap`}>
+                          <td
+                            className={`${reportTdClass} text-right font-bold text-slate-900 tabular-nums`}
+                          >
+                            {row.deliveredWeight > 0
+                              ? row.deliveredWeight.toFixed(2)
+                              : "—"}
+                          </td>
+                          <td
+                            className={`${reportTdClass} text-[12px] font-semibold leading-tight text-slate-600 tabular-nums`}
+                          >
                             {formatDeliveredAtLabel(row.deliveredAt)}
                           </td>
-                          <td className={opsTableTdClass}>
+                          <td className={reportTdClass}>
                             <DeliveryStatusCell row={row} to={to} />
-                          </td>
-                          <td className={opsTableTdClass}>
-                            {canDeliver && !row.additional ? (
-                              <ShopDeliveryCapture
-                                row={row}
-                                remaining={remaining}
-                                busy={busyShopId === row.shopId}
-                                value={qty[row.shopId] ?? ""}
-                                onValue={(v) =>
-                                  setQty((prev) => ({ ...prev, [row.shopId]: v }))
-                                }
-                                onSubmit={() => void handleDeliver(row)}
-                                to={to}
-                              />
-                            ) : (
-                              <span className="text-slate-300">—</span>
-                            )}
                           </td>
                         </tr>
                       );
@@ -653,57 +901,130 @@ function OrdersDeliveryDetailView({
                     <thead>
                       <tr className={opsTableHeadRowClass}>
                         <th className={opsTableThClass} />
-                        <th className={`${opsTableThClass} text-right`}>{to("orders.total_ordered")}</th>
-                        <th className={`${opsTableThClass} text-right`}>{to("orders.total_delivered")}</th>
-                        <th className={`${opsTableThClass} text-right`}>{to("orders.pending_boxes")}</th>
-                        <th className={`${opsTableThClass} text-right`}>{to("orders.col_difference")}</th>
+                        <th className={`${opsTableThClass} text-right`}>
+                          {to("orders.total_ordered")}
+                        </th>
+                        <th className={`${opsTableThClass} text-right`}>
+                          {to("orders.total_delivered")}
+                        </th>
+                        <th className={`${opsTableThClass} text-right`}>
+                          {to("orders.pending_boxes")}
+                        </th>
+                        <th className={`${opsTableThClass} text-right`}>
+                          {to("orders.col_difference")}
+                        </th>
                       </tr>
                     </thead>
                     <tbody className={opsTableDivideClass}>
                       <tr className="align-middle">
-                        <td className={`${opsTableTdClass} font-semibold text-slate-600`}>{to("orders.word_boxes")}</td>
-                        <td className={`${opsTableTdClass} text-right font-semibold`}>{formatCount(totals.orderedBoxes)}</td>
-                        <td className={`${opsTableTdClass} text-right font-semibold`}>{formatCount(totals.deliveredBoxes)}</td>
-                        <td className={`${opsTableTdClass} text-right font-semibold`}>
+                        <td
+                          className={`${opsTableTdClass} font-semibold text-slate-600`}
+                        >
+                          {to("orders.word_boxes")}
+                        </td>
+                        <td
+                          className={`${opsTableTdClass} text-right font-semibold`}
+                        >
+                          {formatCount(totals.orderedBoxes)}
+                        </td>
+                        <td
+                          className={`${opsTableTdClass} text-right font-semibold`}
+                        >
+                          {formatCount(totals.deliveredBoxes)}
+                        </td>
+                        <td
+                          className={`${opsTableTdClass} text-right font-semibold`}
+                        >
                           {/* PART DELIVERY: 25 ordered, 10 in → 15 box pending */}
                           {totals.orderedBoxes - totals.deliveredBoxes > 0 ? (
-                            <b className="text-amber-600">{formatCount(totals.orderedBoxes - totals.deliveredBoxes)}</b>
+                            <b className="text-amber-600">
+                              {formatCount(
+                                totals.orderedBoxes - totals.deliveredBoxes,
+                              )}
+                            </b>
                           ) : (
                             <span className="text-slate-300">0</span>
                           )}
                         </td>
                         <td className={opsTableTdClass}>
-                          <DiffCell value={totals.deliveredBoxes - totals.orderedBoxes} show />
+                          <DiffCell
+                            value={totals.deliveredBoxes - totals.orderedBoxes}
+                            show
+                          />
                         </td>
                       </tr>
                       <tr className="align-middle">
-                        <td className={`${opsTableTdClass} font-semibold text-slate-600`}>{to("orders.word_birds")}</td>
-                        <td className={`${opsTableTdClass} text-right font-semibold`}>{formatCount(totals.orderedBirds)}</td>
-                        <td className={`${opsTableTdClass} text-right font-semibold`}>{formatCount(totals.deliveredBirds)}</td>
-                        <td className={`${opsTableTdClass} text-right font-semibold`}>
+                        <td
+                          className={`${opsTableTdClass} font-semibold text-slate-600`}
+                        >
+                          {to("orders.word_birds")}
+                        </td>
+                        <td
+                          className={`${opsTableTdClass} text-right font-semibold`}
+                        >
+                          {formatCount(totals.orderedBirds)}
+                        </td>
+                        <td
+                          className={`${opsTableTdClass} text-right font-semibold`}
+                        >
+                          {formatCount(totals.deliveredBirds)}
+                        </td>
+                        <td
+                          className={`${opsTableTdClass} text-right font-semibold`}
+                        >
                           {totals.orderedBirds - totals.deliveredBirds > 0 ? (
-                            <b className="text-amber-600">{formatCount(totals.orderedBirds - totals.deliveredBirds)}</b>
+                            <b className="text-amber-600">
+                              {formatCount(
+                                totals.orderedBirds - totals.deliveredBirds,
+                              )}
+                            </b>
                           ) : (
                             <span className="text-slate-300">0</span>
                           )}
                         </td>
                         <td className={opsTableTdClass}>
-                          <DiffCell value={totals.deliveredBirds - totals.orderedBirds} show />
+                          <DiffCell
+                            value={totals.deliveredBirds - totals.orderedBirds}
+                            show
+                          />
                         </td>
                       </tr>
                       <tr className="align-middle">
-                        <td className={`${opsTableTdClass} font-semibold text-slate-600`}>{to("orders.weight_kg")}</td>
-                        <td className={`${opsTableTdClass} text-right font-semibold`}>{totals.orderedWeight.toFixed(2)}</td>
-                        <td className={`${opsTableTdClass} text-right font-semibold`}>{totals.deliveredWeight.toFixed(2)}</td>
-                        <td className={`${opsTableTdClass} text-right font-semibold`}>
+                        <td
+                          className={`${opsTableTdClass} font-semibold text-slate-600`}
+                        >
+                          {to("orders.weight_kg")}
+                        </td>
+                        <td
+                          className={`${opsTableTdClass} text-right font-semibold`}
+                        >
+                          {totals.orderedWeight.toFixed(2)}
+                        </td>
+                        <td
+                          className={`${opsTableTdClass} text-right font-semibold`}
+                        >
+                          {totals.deliveredWeight.toFixed(2)}
+                        </td>
+                        <td
+                          className={`${opsTableTdClass} text-right font-semibold`}
+                        >
                           {totals.orderedWeight - totals.deliveredWeight > 0 ? (
-                            <b className="text-amber-600">{(totals.orderedWeight - totals.deliveredWeight).toFixed(2)}</b>
+                            <b className="text-amber-600">
+                              {(
+                                totals.orderedWeight - totals.deliveredWeight
+                              ).toFixed(2)}
+                            </b>
                           ) : (
                             <span className="text-slate-300">0</span>
                           )}
                         </td>
                         <td className={opsTableTdClass}>
-                          <WeightDiffCell value={totals.deliveredWeight - totals.orderedWeight} show />
+                          <WeightDiffCell
+                            value={
+                              totals.deliveredWeight - totals.orderedWeight
+                            }
+                            show
+                          />
                         </td>
                       </tr>
                     </tbody>
@@ -711,74 +1032,6 @@ function OrdersDeliveryDetailView({
                 </div>
               )}
             </div>
-
-            {/* ── NOT LISTED SHOP DELIVERIES — separate section, always
-                visible (never mixed into / hidden inside the matched-shop
-                table above). Subtle warning styling; short by definition,
-                so no separate pagination. ── */}
-            {unlistedRows.length > 0 && (
-              <div className="bg-white rounded-xl border border-amber-300/70 shadow-sm overflow-hidden">
-                <div className="px-4 py-2.5 border-b border-amber-200/70 bg-amber-50/70 flex items-center justify-between gap-2 flex-wrap">
-                  <h3 className="text-xs font-bold text-amber-800 uppercase tracking-wider">
-                    {to("orders.not_listed_deliveries")}
-                  </h3>
-                  <span className="text-[11px] font-semibold text-amber-700/80">
-                    {to("orders.not_listed_note")}
-                  </span>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-xs md:text-sm">
-                    <thead>
-                      <tr className={opsTableHeadRowClass}>
-                        <th className={`${opsTableThClass} w-14`}>{to("orders.col_sno")}</th>
-                        <th className={opsTableThClass}>{to("orders.col_shop_name")}</th>
-                        <th className={opsTableThClass}>{to("orders.col_village")}</th>
-                        <th className={`${opsTableThClass} w-32`}>{to("orders.shop_mobile")}</th>
-                        <th className={`${opsTableThClass} w-32 text-right`}>{to("orders.delivered_birds")}</th>
-                        <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.col_boxes")}</th>
-                        <th className={`${opsTableThClass} w-28 text-right`}>{to("orders.delivered_weight")}</th>
-                        <th className={`${opsTableThClass} w-44`}>{to("orders.col_delivered_at")}</th>
-                      </tr>
-                    </thead>
-                    <tbody className={opsTableDivideClass}>
-                      {unlistedRows.map((row, uIndex) => (
-                        <tr key={row.shopId} className="align-middle bg-amber-50/40">
-                          <td className={opsTableTdClass}>
-                            <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-[12px] font-bold text-amber-700">
-                              {uIndex + 1}
-                            </span>
-                          </td>
-                          <td className={`${opsTableTdClass} font-semibold text-slate-800`}>
-                            <span className="inline-flex items-center gap-2 flex-wrap">
-                              {row.shopName || "—"}
-                              <span className="inline-flex items-center rounded-full bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-bold text-amber-700 whitespace-nowrap">
-                                {to("orders.added_during_delivery")}
-                              </span>
-                            </span>
-                          </td>
-                          <td className={opsTableTdClass}>{row.village || "—"}</td>
-                          <td className={`${opsTableTdClass} text-slate-600 whitespace-nowrap`}>
-                            {row.mobile || "—"}
-                          </td>
-                          <td className={`${opsTableTdClass} text-right font-semibold`}>
-                            {row.deliveredBirds > 0 ? formatCount(row.deliveredBirds) : "—"}
-                          </td>
-                          <td className={`${opsTableTdClass} text-right font-bold text-emerald-800`}>
-                            {row.deliveredBoxes > 0 ? formatCount(row.deliveredBoxes) : "—"}
-                          </td>
-                          <td className={`${opsTableTdClass} text-right font-semibold`}>
-                            {row.deliveredWeight > 0 ? row.deliveredWeight.toFixed(2) : "—"}
-                          </td>
-                          <td className={`${opsTableTdClass} text-slate-500`}>
-                            {formatDeliveredAtLabel(row.deliveredAt)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -806,8 +1059,18 @@ function OrdersDeliveryDetailView({
           onClose={() => setPdfOpen(false)}
         />
       )}
-    </div>
+    </AppShellModal>
   );
 }
 
-export default React.memo(OrdersDeliveryDetailView);
+/** Scoped language: the toggle in the header changes only this view. */
+function ScopedOrdersDeliveryDetailView(props: Props) {
+  const { language } = useI18n();
+  return (
+    <ScopedI18nProvider initialLanguage={language}>
+      <OrdersDeliveryDetailView {...props} />
+    </ScopedI18nProvider>
+  );
+}
+
+export default React.memo(ScopedOrdersDeliveryDetailView);

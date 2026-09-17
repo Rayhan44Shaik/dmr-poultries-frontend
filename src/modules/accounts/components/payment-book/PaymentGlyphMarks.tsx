@@ -42,12 +42,16 @@ export function PaymentGlyphChip({ glyph, size = 18, icon = 11, className }: { g
   );
 }
 
-/** Chip + label: the register's identifier for a payment type. */
-export function PaymentTypeMark({ type, className }: { type: string; className?: string }) {
+/**
+ * Chip + label: the register's identifier for a payment type. `type` drives
+ * the glyph (raw stored value); `label` optionally overrides the visible text
+ * — this is how a Telugu session reads the type in its own language.
+ */
+export function PaymentTypeMark({ type, label, className }: { type: string; label?: string; className?: string }) {
   return (
     <span className={cn('inline-flex min-w-0 items-center gap-2', className)}>
       <PaymentGlyphChip glyph={paymentTypeGlyph(type)} size={22} icon={12} />
-      <span className="truncate">{type || '—'}</span>
+      <span className="truncate">{(label ?? type) || '—'}</span>
     </span>
   );
 }

@@ -2,7 +2,6 @@ import React from "react";
 import {
   ArrowUpDown,
   Calendar,
-  RotateCcw,
   Search,
   Truck,
   User,
@@ -15,9 +14,8 @@ import {
   opsFilterCardClass,
   opsFilterLabelClass,
   opsInputClass,
-  opsSecondaryButtonClass,
 } from "../../../../shared/ui/operationsStyles";
-import { BrandRefreshButton } from "../../../../ui";
+import { BrandRefreshButton, FilterResetButton, countActiveFilters } from "../../../../ui";
 import MasterDropdown, {
   type MasterDropdownOption,
 } from "../../../masters/components/MasterDropdown";
@@ -237,17 +235,17 @@ function MaintenanceFilters({
       </div>
 
       <div className="flex items-center justify-end gap-2 border-t border-slate-100 pt-3">
-        <button
-          type="button"
+        <FilterResetButton
+          count={countActiveFilters(
+            search.trim() !== "",
+            vehicle !== "" && vehicle !== "all",
+            driver !== "" && driver !== "all",
+            maintenanceType !== "" && maintenanceType !== "all",
+            fromDate !== "" || toDate !== "",
+            !(sortBy === "date" && sortDir === "desc"),
+          )}
           onClick={onReset}
-          className={`group relative ${opsSecondaryButtonClass}`}
-          aria-label={t("common.reset")}
-        >
-          <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]">
-            <RotateCcw size={14} />
-          </span>
-          {t("common.reset")}
-        </button>
+        />
         <BrandRefreshButton loading={loading} onClick={onRefresh} />
       </div>
     </section>

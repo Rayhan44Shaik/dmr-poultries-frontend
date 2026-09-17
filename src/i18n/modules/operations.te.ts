@@ -228,6 +228,7 @@ export default {
   'ops.dashboard.preset_15d': 'గత 15 రోజులు',
   'ops.dashboard.preset_1m': 'గత 1 నెల',
   'ops.dashboard.preset_qtr': 'త్రైమాసిక నమూనా విండో',
+  // ----- Quarter Operations Map (sample quarter index) -----
   'ops.dashboard.payment.title': 'చెల్లింపులు',
   'ops.dashboard.payment.amount': 'మొత్తం',
   'ops.dashboard.payment.entries': 'ఎంట్రీలు',

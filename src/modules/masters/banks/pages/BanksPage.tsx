@@ -1,7 +1,11 @@
-import MasterListToolbar from "../../components/MasterListToolbar";
-import MasterListSummary from "../../components/MasterListSummary";
-import MasterPagination from "../../components/MasterPagination";
 import "../../styles/masters.css";
+import { Landmark } from "lucide-react";
+import { countActiveFilters } from "../../../../ui";
+import {
+  MasterDirectoryFilters,
+  MasterDirectoryCard,
+} from "../../components/MasterDirectory";
+import { useI18n } from "../../../../i18n";
 import React, { useState } from "react";
 
 import DashboardLayout from "../../../../layouts/DashboardLayout/DashboardLayout";
@@ -14,7 +18,6 @@ import { exportToExcel } from "../../../../utils/exportUtils";
 
 // BanksPage.tsx is inside banks/pages, while exportBankPdf is inside banks/utils.
 import { exportBanksToPDF } from "../utils/exportBankPdf";
-import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import { logAuditEvent } from "../../../../utils/securityUtils";
 import { handleApiError } from "../services/bankService";
 import type { Bank } from "../types/bank";
@@ -30,6 +33,7 @@ function BanksPage({ embedded = false }: BanksPageProps) {
 
   const [editingBank, setEditingBank] = useState<Bank | null>(null);
 
+  const { t } = useI18n();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [sortOrder, setSortOrder] = useState("number");
@@ -51,15 +55,22 @@ function BanksPage({ embedded = false }: BanksPageProps) {
     addBank,
     editBank,
     removeBank,
-    total, page: serverPage, exportRows,
-  } = useBanks({ page: currentPage, pageSize: pageSize, search, status: statusFilter, sort: sortOrder });
+    total,
+    page: serverPage,
+    exportRows,
+  } = useBanks({
+    page: currentPage,
+    pageSize: pageSize,
+    search,
+    status: statusFilter,
+    sort: sortOrder,
+  });
 
   const handleSearchChange = (value: string) => {
     setSearch(value);
     setCurrentPage(1);
   };
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const safePage = serverPage;
   const paginatedBanks = banks;
 
@@ -67,82 +78,84 @@ function BanksPage({ embedded = false }: BanksPageProps) {
     try {
       const filteredBanks = await exportRows();
 
-    if (filteredBanks.length === 0) {
-      showNotification("No data to export.", "error");
+      if (filteredBanks.length === 0) {
+        showNotification("No data to export.", "error");
 
-      return;
+        return;
+      }
+
+      const date = new Date().toISOString().split("T")[0];
+
+      const filename = `Banks_${date}`;
+
+      try {
+        exportBanksToPDF(filteredBanks, filename);
+
+        logAuditEvent("EXPORT_PDF", "Banks", undefined, {
+          count: filteredBanks.length,
+        });
+
+        showNotification("PDF exported successfully!", "success");
+      } catch (exportError) {
+        console.error("Unable to export Bank PDF:", exportError);
+
+        showNotification("Unable to export PDF. Please try again.", "error");
+      }
+    } catch (err) {
+      showNotification(handleApiError(err), "error");
     }
-
-    const date = new Date().toISOString().split("T")[0];
-
-    const filename = `Banks_${date}`;
-
-    try {
-      exportBanksToPDF(filteredBanks, filename);
-
-      logAuditEvent("EXPORT_PDF", "Banks", undefined, {
-        count: filteredBanks.length,
-      });
-
-      showNotification("PDF exported successfully!", "success");
-    } catch (exportError) {
-      console.error("Unable to export Bank PDF:", exportError);
-
-      showNotification("Unable to export PDF. Please try again.", "error");
-    }
-  
-    } catch (err) { showNotification(handleApiError(err), "error"); }
   };
 
   const handleExportExcel = async () => {
     try {
       const filteredBanks = await exportRows();
 
-    if (filteredBanks.length === 0) {
-      showNotification("No data to export.", "error");
+      if (filteredBanks.length === 0) {
+        showNotification("No data to export.", "error");
 
-      return;
+        return;
+      }
+
+      const headers = [
+        "Bank No",
+        "Bank Name",
+        "Branch",
+        "Account Number",
+        "IFSC Code",
+        "UPI ID",
+        "Status",
+      ];
+
+      const rows = filteredBanks.map((bank) => [
+        String(bank.bankNo),
+        bank.bankName,
+        bank.branch,
+        bank.accountNumber,
+        bank.ifscCode,
+        bank.upiId?.trim() || "-",
+        bank.status,
+      ]);
+
+      const date = new Date().toISOString().split("T")[0];
+
+      const filename = `Banks_${date}`;
+
+      try {
+        exportToExcel("Banks - Master List", headers, rows, filename);
+
+        logAuditEvent("EXPORT_EXCEL", "Banks", undefined, {
+          count: filteredBanks.length,
+        });
+
+        showNotification("Excel exported successfully!", "success");
+      } catch (exportError) {
+        console.error("Unable to export Bank Excel:", exportError);
+
+        showNotification("Unable to export Excel. Please try again.", "error");
+      }
+    } catch (err) {
+      showNotification(handleApiError(err), "error");
     }
-
-    const headers = [
-      "Bank No",
-      "Bank Name",
-      "Branch",
-      "Account Number",
-      "IFSC Code",
-      "UPI ID",
-      "Status",
-    ];
-
-    const rows = filteredBanks.map((bank) => [
-      String(bank.bankNo),
-      bank.bankName,
-      bank.branch,
-      bank.accountNumber,
-      bank.ifscCode,
-      bank.upiId?.trim() || "-",
-      bank.status,
-    ]);
-
-    const date = new Date().toISOString().split("T")[0];
-
-    const filename = `Banks_${date}`;
-
-    try {
-      exportToExcel("Banks - Master List", headers, rows, filename);
-
-      logAuditEvent("EXPORT_EXCEL", "Banks", undefined, {
-        count: filteredBanks.length,
-      });
-
-      showNotification("Excel exported successfully!", "success");
-    } catch (exportError) {
-      console.error("Unable to export Bank Excel:", exportError);
-
-      showNotification("Unable to export Excel. Please try again.", "error");
-    }
-  
-    } catch (err) { showNotification(handleApiError(err), "error"); }
   };
 
   const validateBank = (bank: Partial<Bank>): string | null => {
@@ -292,92 +305,79 @@ function BanksPage({ embedded = false }: BanksPageProps) {
     setShowDialog(false);
   };
 
+  const handleResetFilters = () => {
+    setSearch("");
+    setStatusFilter("");
+    setSortOrder("number");
+    setCurrentPage(1);
+  };
+  const activeFilterCount = countActiveFilters(
+    search.trim() !== "",
+    statusFilter !== "",
+    sortOrder !== "number",
+  );
+
   const content = (
-    <div className="master-page w-full min-w-0 space-y-3 font-sans text-slate-700">
-      <div className="w-full rounded-xl border border-slate-200/90 bg-white shadow-sm">
-        <MasterListToolbar
-          onRefresh={() => { void reload().catch(() => {}); }}
-          status={statusFilter}
-          onStatusChange={(value) => { setStatusFilter(value); setCurrentPage(1); }}
-          sort={sortOrder}
-          onSortChange={(value) => { setSortOrder(value); setCurrentPage(1); }}
-          search={search}
-          onSearchChange={handleSearchChange}
-          searchPlaceholder="Search Bank..."
-          addLabel="Add Bank"
-          onAdd={handleOpenAddDialog}
-          onExportPDF={handleExportPDF}
-          onExportExcel={handleExportExcel}
-          loading={loading}
-          saving={saving}
+    <div className="master-page w-full min-w-0 space-y-4 font-sans text-slate-700">
+      <MasterDirectoryFilters
+        ariaLabel={t("masters.dir.banks_title")}
+        searchId="banks-search"
+        search={search}
+        onSearchChange={handleSearchChange}
+        searchPlaceholder={t("masters.dir.search_bank")}
+        status={statusFilter}
+        onStatusChange={(value) => {
+          setStatusFilter(value);
+          setCurrentPage(1);
+        }}
+        sort={sortOrder}
+        onSortChange={(value) => {
+          setSortOrder(value);
+          setCurrentPage(1);
+        }}
+        onReset={handleResetFilters}
+        onRefresh={() => {
+          void reload().catch(() => {});
+        }}
+        addLabel={t("masters.dir.add_bank")}
+        onAdd={() => {
+          handleOpenAddDialog();
+        }}
+        onExportPDF={handleExportPDF}
+        onExportExcel={handleExportExcel}
+        hasRows={paginatedBanks.length > 0}
+        loading={loading}
+        saving={saving}
+      />
+
+      <MasterDirectoryCard
+        icon={Landmark}
+        title={t("masters.dir.banks_title")}
+        total={total}
+        error={error}
+        loading={loading}
+        onRetry={() => {
+          void reload().catch(() => undefined);
+        }}
+        retryLabel={t("masters.dir.retry")}
+        page={safePage}
+        pageSize={pageSize}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={(next) => {
+          setPageSize(next);
+          setCurrentPage(1); // a new page size invalidates the current page
+        }}
+      >
+        <BankTable
+          banks={paginatedBanks}
+          onEdit={handleEditBank}
+          onDelete={handleDeleteBank}
+          loading={loading || deletingId !== null}
+          emptyMessage={
+            activeFilterCount > 0 ? t("masters.dir.no_records") : undefined
+          }
         />
-
-        <MasterListSummary
-          title="Banks Directory"
-          total={total}
-          shown={paginatedBanks.length}
-          page={safePage}
-          totalPages={totalPages}
-          loading={loading}
-          saving={saving}
-          deleting={deletingId !== null}
-        />
-
-        {error && !loading && (
-          <div className="mx-4 mt-3 flex items-center justify-between gap-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
-            <span>{error}</span>
-
-            <button
-              type="button"
-              onClick={() => {
-                void reload().catch(() => undefined);
-              }}
-              className="shrink-0 text-xs font-semibold text-red-700 underline"
-            >
-              Retry
-            </button>
-          </div>
-        )}
-
-        <div className="relative min-h-[120px] p-0">
-          {loading && banks.length === 0 ? (
-            <div className="flex flex-col items-center justify-center gap-3 py-16 text-slate-500">
-              <p className="text-sm font-medium">Loading banks...</p>
-            </div>
-          ) : !loading && banks.length === 0 && !error ? (
-            <div className="flex flex-col items-center justify-center gap-2 py-16 text-slate-500">
-              <p className="text-sm font-medium text-slate-700">
-                No banks found.
-              </p>
-
-              <p className="text-xs">Add a bank to get started.</p>
-            </div>
-          ) : (
-            <BankTable
-              banks={paginatedBanks}
-              onEdit={handleEditBank}
-              onDelete={handleDeleteBank}
-              emptyMessage={
-                search.trim() ? "No banks matching your search." : undefined
-              }
-            />
-          )}
-        </div>
-
-        {shouldShowPagination(total) && (
-          <MasterPagination
-            page={safePage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-            disabled={loading}
-            pageSize={pageSize}
-            onPageSizeChange={(next) => {
-              setPageSize(next);
-              setCurrentPage(1); // a new page size invalidates the current page
-            }}
-          />
-        )}
-      </div>
+      </MasterDirectoryCard>
 
       <BankDialog
         open={showDialog}

@@ -1,7 +1,11 @@
-import MasterListToolbar from "../../components/MasterListToolbar";
-import MasterListSummary from "../../components/MasterListSummary";
-import MasterPagination from "../../components/MasterPagination";
 import "../../styles/masters.css";
+import { Warehouse } from "lucide-react";
+import { countActiveFilters } from "../../../../ui";
+import {
+  MasterDirectoryFilters,
+  MasterDirectoryCard,
+} from "../../components/MasterDirectory";
+import { useI18n } from "../../../../i18n";
 // D:\Development\DMR-Poultries-ERP\frontend\dmr-poultries-web\src\modules\masters\farms\pages\FarmsPage.tsx
 
 import React, { useState, useMemo } from "react";
@@ -15,7 +19,6 @@ import { exportToExcel } from "../../../../utils/exportUtils";
 import { logAuditEvent } from "../../../../utils/securityUtils";
 import { handleApiError } from "../services/farmService";
 import type { Farm } from "../types/farm";
-import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import BulkImportDialog from "../../components/bulk-import/BulkImportDialog";
 import { buildFarmBulkImportConfig } from "../bulkImportConfig";
 import jsPDF from "jspdf";
@@ -29,6 +32,7 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
   const [showDialog, setShowDialog] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [editingFarm, setEditingFarm] = useState<Farm | null>(null);
+  const { t } = useI18n();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [sortOrder, setSortOrder] = useState("number");
@@ -47,8 +51,16 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
     addFarmsBulk,
     editFarm,
     removeFarm,
-    total, page: serverPage, exportRows,
-  } = useFarms({ page: currentPage, pageSize: pageSize, search, status: statusFilter, sort: sortOrder });
+    total,
+    page: serverPage,
+    exportRows,
+  } = useFarms({
+    page: currentPage,
+    pageSize: pageSize,
+    search,
+    status: statusFilter,
+    sort: sortOrder,
+  });
 
   const farmBulkImportConfig = useMemo(
     () => buildFarmBulkImportConfig({ addFarmsBulk, reload }),
@@ -61,7 +73,6 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
     setCurrentPage(1);
   };
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const safePage = serverPage;
   const paginatedFarms = farms;
 
@@ -69,148 +80,150 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
     try {
       const filteredFarms = await exportRows();
 
-    if (filteredFarms.length === 0) {
-      showNotification("No data to export.", "error");
-      return;
+      if (filteredFarms.length === 0) {
+        showNotification("No data to export.", "error");
+        return;
+      }
+
+      // Initialize jsPDF in Landscape ('l') orientation with exact dimensions
+      const doc = new jsPDF("l", "mm", "a4");
+      const pageWidth = doc.internal.pageSize.getWidth(); // 297mm for A4 Landscape
+      const margin = 14;
+      const usableWidth = pageWidth - margin * 2;
+
+      // Adjusted weights to ensure total sum maps precisely to usableWidth without clipping right borders
+      // [Farm No, Farm Name, Owner, Supervisor, Village, Phone, Status]
+      const relativeWeights = [0.09, 0.23, 0.18, 0.18, 0.16, 0.08, 0.08];
+      const columnStylesConfig: {
+        [key: number]: {
+          cellWidth: number;
+          halign?: "center" | "left" | "right";
+        };
+      } = {};
+
+      const headers = [
+        "Farm No",
+        "Farm Name",
+        "Owner",
+        "Supervisor",
+        "Village",
+        "Phone",
+        "Status",
+      ];
+      headers.forEach((_, index) => {
+        const computedWidth = usableWidth * relativeWeights[index];
+        const isCentered = index === 0 || index === headers.length - 1;
+        columnStylesConfig[index] = {
+          cellWidth: computedWidth,
+          halign: isCentered ? "center" : "left",
+        };
+      });
+
+      // Document Header Block
+      doc.setFontSize(16);
+      doc.setTextColor(30, 41, 59);
+      doc.text("Farms - Master List", margin, 15);
+
+      doc.setFontSize(9);
+      doc.setTextColor(100, 116, 139);
+      doc.text(`Generated On: ${new Date().toLocaleDateString()}`, margin, 21);
+
+      const rows = filteredFarms.map((farm) => [
+        farm.farmNo.toString(),
+        farm.farmName,
+        farm.ownerName,
+        farm.supervisorName,
+        farm.village,
+        farm.phoneNumber,
+        farm.status,
+      ]);
+
+      // Render AutoTable with precise explicit table width bounds to prevent right-side clipping
+      autoTable(doc, {
+        startY: 26,
+        head: [headers],
+        body: rows,
+        theme: "grid",
+        tableWidth: usableWidth,
+        margin: { left: margin, right: margin, bottom: 18 },
+        styles: {
+          fontSize: 8.5,
+          cellPadding: 3.5,
+          valign: "middle",
+          overflow: "linebreak",
+        },
+        headStyles: {
+          fillColor: [37, 99, 235],
+          textColor: 255,
+          fontStyle: "bold",
+          halign: "center",
+        },
+        bodyStyles: {
+          textColor: [51, 65, 85],
+        },
+        alternateRowStyles: {
+          fillColor: [248, 250, 252],
+        },
+        columnStyles: columnStylesConfig,
+        didDrawPage: (data) => {
+          const pageCount = doc.getNumberOfPages();
+          doc.setFontSize(8);
+          doc.setTextColor(148, 163, 184);
+          doc.text(
+            `Confidential Business Report • Page ${data.pageNumber} of ${pageCount}`,
+            margin,
+            doc.internal.pageSize.height - 10,
+          );
+        },
+      });
+
+      const filename = `Farms_${new Date().toISOString().split("T")[0]}`;
+      doc.save(`${filename}.pdf`);
+      logAuditEvent("EXPORT_PDF", "Farms", undefined, {
+        count: filteredFarms.length,
+      });
+      showNotification("PDF exported successfully!", "success");
+    } catch (err) {
+      showNotification(handleApiError(err), "error");
     }
-
-    // Initialize jsPDF in Landscape ('l') orientation with exact dimensions
-    const doc = new jsPDF("l", "mm", "a4");
-    const pageWidth = doc.internal.pageSize.getWidth(); // 297mm for A4 Landscape
-    const margin = 14;
-    const usableWidth = pageWidth - margin * 2;
-
-    // Adjusted weights to ensure total sum maps precisely to usableWidth without clipping right borders
-    // [Farm No, Farm Name, Owner, Supervisor, Village, Phone, Status]
-    const relativeWeights = [0.09, 0.23, 0.18, 0.18, 0.16, 0.08, 0.08];
-    const columnStylesConfig: {
-      [key: number]: {
-        cellWidth: number;
-        halign?: "center" | "left" | "right";
-      };
-    } = {};
-
-    const headers = [
-      "Farm No",
-      "Farm Name",
-      "Owner",
-      "Supervisor",
-      "Village",
-      "Phone",
-      "Status",
-    ];
-    headers.forEach((_, index) => {
-      const computedWidth = usableWidth * relativeWeights[index];
-      const isCentered = index === 0 || index === headers.length - 1;
-      columnStylesConfig[index] = {
-        cellWidth: computedWidth,
-        halign: isCentered ? "center" : "left",
-      };
-    });
-
-    // Document Header Block
-    doc.setFontSize(16);
-    doc.setTextColor(30, 41, 59);
-    doc.text("Farms - Master List", margin, 15);
-
-    doc.setFontSize(9);
-    doc.setTextColor(100, 116, 139);
-    doc.text(`Generated On: ${new Date().toLocaleDateString()}`, margin, 21);
-
-    const rows = filteredFarms.map((farm) => [
-      farm.farmNo.toString(),
-      farm.farmName,
-      farm.ownerName,
-      farm.supervisorName,
-      farm.village,
-      farm.phoneNumber,
-      farm.status,
-    ]);
-
-    // Render AutoTable with precise explicit table width bounds to prevent right-side clipping
-    autoTable(doc, {
-      startY: 26,
-      head: [headers],
-      body: rows,
-      theme: "grid",
-      tableWidth: usableWidth,
-      margin: { left: margin, right: margin, bottom: 18 },
-      styles: {
-        fontSize: 8.5,
-        cellPadding: 3.5,
-        valign: "middle",
-        overflow: "linebreak",
-      },
-      headStyles: {
-        fillColor: [37, 99, 235],
-        textColor: 255,
-        fontStyle: "bold",
-        halign: "center",
-      },
-      bodyStyles: {
-        textColor: [51, 65, 85],
-      },
-      alternateRowStyles: {
-        fillColor: [248, 250, 252],
-      },
-      columnStyles: columnStylesConfig,
-      didDrawPage: (data) => {
-        const pageCount = doc.getNumberOfPages();
-        doc.setFontSize(8);
-        doc.setTextColor(148, 163, 184);
-        doc.text(
-          `Confidential Business Report • Page ${data.pageNumber} of ${pageCount}`,
-          margin,
-          doc.internal.pageSize.height - 10,
-        );
-      },
-    });
-
-    const filename = `Farms_${new Date().toISOString().split("T")[0]}`;
-    doc.save(`${filename}.pdf`);
-    logAuditEvent("EXPORT_PDF", "Farms", undefined, {
-      count: filteredFarms.length,
-    });
-    showNotification("PDF exported successfully!", "success");
-  
-    } catch (err) { showNotification(handleApiError(err), "error"); }
   };
 
   const handleExportExcel = async () => {
     try {
       const filteredFarms = await exportRows();
 
-    if (filteredFarms.length === 0) {
-      showNotification("No data to export.", "error");
-      return;
-    }
-    const headers = [
-      "Farm No",
-      "Farm Name",
-      "Owner",
-      "Supervisor",
-      "Village",
-      "Phone",
-      "Status",
-    ];
-    const rows = filteredFarms.map((farm) => [
-      farm.farmNo.toString(),
-      farm.farmName,
-      farm.ownerName,
-      farm.supervisorName,
-      farm.village,
-      farm.phoneNumber,
-      farm.status,
-    ]);
-    const filename = `Farms_${new Date().toISOString().split("T")[0]}`;
+      if (filteredFarms.length === 0) {
+        showNotification("No data to export.", "error");
+        return;
+      }
+      const headers = [
+        "Farm No",
+        "Farm Name",
+        "Owner",
+        "Supervisor",
+        "Village",
+        "Phone",
+        "Status",
+      ];
+      const rows = filteredFarms.map((farm) => [
+        farm.farmNo.toString(),
+        farm.farmName,
+        farm.ownerName,
+        farm.supervisorName,
+        farm.village,
+        farm.phoneNumber,
+        farm.status,
+      ]);
+      const filename = `Farms_${new Date().toISOString().split("T")[0]}`;
 
-    exportToExcel("Farms - Master List", headers, rows, filename);
-    logAuditEvent("EXPORT_EXCEL", "Farms", undefined, {
-      count: filteredFarms.length,
-    });
-    showNotification("Excel exported successfully!", "success");
-  
-    } catch (err) { showNotification(handleApiError(err), "error"); }
+      exportToExcel("Farms - Master List", headers, rows, filename);
+      logAuditEvent("EXPORT_EXCEL", "Farms", undefined, {
+        count: filteredFarms.length,
+      });
+      showNotification("Excel exported successfully!", "success");
+    } catch (err) {
+      showNotification(handleApiError(err), "error");
+    }
   };
 
   const validateFarm = (farm: Partial<Farm>): string | null => {
@@ -322,120 +335,81 @@ function FarmsPage({ embedded = false }: FarmsPageProps) {
     }
   };
 
+  const handleResetFilters = () => {
+    setSearch("");
+    setStatusFilter("");
+    setSortOrder("number");
+    setCurrentPage(1);
+  };
+  const activeFilterCount = countActiveFilters(
+    search.trim() !== "",
+    statusFilter !== "",
+    sortOrder !== "number",
+  );
+
   const content = (
-    <div className="master-page w-full min-w-0 space-y-3 font-sans text-slate-700">
-      {/* Main Container - Removed overflow-hidden so dropdowns overlay properly */}
-      <div className="w-full bg-white rounded-xl border border-slate-200/90 shadow-sm">
-        {/* Toolbar - Search on LEFT, Buttons on RIGHT in same line */}
-        <MasterListToolbar
-          onRefresh={() => { void reload().catch(() => {}); }}
-          status={statusFilter}
-          onStatusChange={(value) => { setStatusFilter(value); setCurrentPage(1); }}
-          sort={sortOrder}
-          onSortChange={(value) => { setSortOrder(value); setCurrentPage(1); }}
-          search={search}
-          onSearchChange={handleSearchChange}
-          searchPlaceholder="Search Farm..."
-          addLabel="Add Farm"
-          onAdd={() => {
-            setEditingFarm(null);
-            setShowDialog(true);
-          }}
-          onExportPDF={handleExportPDF}
-          onExportExcel={handleExportExcel}
-          loading={loading}
-          saving={saving}
-          onImport={() => setShowBulkImport(true)}
+    <div className="master-page w-full min-w-0 space-y-4 font-sans text-slate-700">
+      <MasterDirectoryFilters
+        ariaLabel={t("masters.dir.farms_title")}
+        searchId="farms-search"
+        search={search}
+        onSearchChange={handleSearchChange}
+        searchPlaceholder={t("masters.dir.search_farm")}
+        status={statusFilter}
+        onStatusChange={(value) => {
+          setStatusFilter(value);
+          setCurrentPage(1);
+        }}
+        sort={sortOrder}
+        onSortChange={(value) => {
+          setSortOrder(value);
+          setCurrentPage(1);
+        }}
+        onReset={handleResetFilters}
+        onRefresh={() => {
+          void reload().catch(() => {});
+        }}
+        addLabel={t("masters.dir.add_farm")}
+        onAdd={() => {
+          setEditingFarm(null);
+          setShowDialog(true);
+        }}
+        onImport={() => setShowBulkImport(true)}
+        onExportPDF={handleExportPDF}
+        onExportExcel={handleExportExcel}
+        hasRows={paginatedFarms.length > 0}
+        loading={loading}
+        saving={saving}
+      />
+
+      <MasterDirectoryCard
+        icon={Warehouse}
+        title={t("masters.dir.farms_title")}
+        total={total}
+        error={error}
+        loading={loading}
+        onRetry={() => {
+          void reload().catch(() => undefined);
+        }}
+        retryLabel={t("masters.dir.retry")}
+        page={safePage}
+        pageSize={pageSize}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={(next) => {
+          setPageSize(next);
+          setCurrentPage(1); // a new page size invalidates the current page
+        }}
+      >
+        <FarmTable
+          farms={paginatedFarms}
+          onEdit={handleEditFarm}
+          onDelete={handleDeleteFarm}
+          loading={loading || deletingId !== null}
+          emptyMessage={
+            activeFilterCount > 0 ? t("masters.dir.no_records") : undefined
+          }
         />
-
-        {/* Status Counter Bar */}
-        <MasterListSummary
-          title="Farms Directory"
-          total={total}
-          shown={paginatedFarms.length}
-          page={safePage}
-          totalPages={totalPages}
-          loading={loading}
-          saving={saving}
-          deleting={deletingId !== null}
-        />
-
-        {error && !loading && (
-          <div className="mx-4 mt-3 px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between gap-3">
-            <span>{error}</span>
-            <button
-              type="button"
-              onClick={() => {
-                void reload().catch(() => undefined);
-              }}
-              className="shrink-0 text-xs font-semibold text-red-700 underline"
-            >
-              Retry
-            </button>
-          </div>
-        )}
-
-        {/* Table Content */}
-        <div className="p-0 relative min-h-[120px]">
-          {loading && farms.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-3">
-              <svg
-                className="animate-spin h-8 w-8 text-blue-600"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-              <p className="text-sm font-medium">Loading farms...</p>
-            </div>
-          ) : !loading && farms.length === 0 && !error ? (
-            <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-2">
-              <p className="text-sm font-medium text-slate-700">
-                No farms found.
-              </p>
-              <p className="text-xs text-slate-500">
-                Add a farm to get started.
-              </p>
-            </div>
-          ) : (
-            <FarmTable
-              farms={paginatedFarms}
-              onEdit={handleEditFarm}
-              onDelete={handleDeleteFarm}
-              emptyMessage={
-                search.trim() ? "No farms matching your search." : undefined
-              }
-            />
-          )}
-        </div>
-
-        {shouldShowPagination(total) && (
-          <MasterPagination
-            page={safePage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-            disabled={loading}
-            pageSize={pageSize}
-            onPageSizeChange={(next) => {
-              setPageSize(next);
-              setCurrentPage(1); // a new page size invalidates the current page
-            }}
-          />
-        )}
-      </div>
+      </MasterDirectoryCard>
 
       {/* Modal Dialog */}
       <FarmDialog

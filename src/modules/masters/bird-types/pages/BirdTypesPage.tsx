@@ -1,7 +1,11 @@
-import MasterListToolbar from "../../components/MasterListToolbar";
-import MasterListSummary from "../../components/MasterListSummary";
-import MasterPagination from "../../components/MasterPagination";
 import "../../styles/masters.css";
+import { Bird } from "lucide-react";
+import { countActiveFilters } from "../../../../ui";
+import {
+  MasterDirectoryFilters,
+  MasterDirectoryCard,
+} from "../../components/MasterDirectory";
+import { useI18n } from "../../../../i18n";
 // D:\Development\DMR-Poultries-ERP\frontend\dmr-poultries-web\src\modules\masters\bird-types\pages\BirdTypesPage.tsx
 
 import React, { useState, useMemo } from "react";
@@ -16,7 +20,6 @@ import { exportBirdTypesToPDF } from "../utils/exportBirdTypePdf";
 import { logAuditEvent } from "../../../../utils/securityUtils";
 import { handleApiError } from "../services/birdTypeService";
 import type { BirdType } from "../types/birdType";
-import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import BulkImportDialog from "../../components/bulk-import/BulkImportDialog";
 import { buildBirdTypeBulkImportConfig } from "../bulkImportConfig";
 
@@ -28,6 +31,7 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
   const [showDialog, setShowDialog] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [editingBirdType, setEditingBirdType] = useState<BirdType | null>(null);
+  const { t } = useI18n();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [sortOrder, setSortOrder] = useState("number");
@@ -46,8 +50,16 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
     addBirdTypesBulk,
     editBirdType,
     removeBirdType,
-    total, page: serverPage, exportRows,
-  } = useBirdTypes({ page: currentPage, pageSize: pageSize, search, status: statusFilter, sort: sortOrder });
+    total,
+    page: serverPage,
+    exportRows,
+  } = useBirdTypes({
+    page: currentPage,
+    pageSize: pageSize,
+    search,
+    status: statusFilter,
+    sort: sortOrder,
+  });
 
   const birdTypeBulkImportConfig = useMemo(
     () => buildBirdTypeBulkImportConfig({ addBirdTypesBulk, reload }),
@@ -60,7 +72,6 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
     setCurrentPage(1);
   };
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const safePage = serverPage;
   const paginatedBirdTypes = birdTypes;
 
@@ -68,58 +79,60 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
     try {
       const filteredBirdTypes = await exportRows();
 
-    if (filteredBirdTypes.length === 0) {
-      showNotification("No data to export.", "error");
-      return;
+      if (filteredBirdTypes.length === 0) {
+        showNotification("No data to export.", "error");
+        return;
+      }
+
+      const filename = `BirdTypes_${new Date().toISOString().split("T")[0]}`;
+
+      try {
+        exportBirdTypesToPDF(filteredBirdTypes, filename);
+
+        logAuditEvent("EXPORT_PDF", "BirdTypes", undefined, {
+          count: filteredBirdTypes.length,
+        });
+        showNotification("PDF exported successfully!", "success");
+      } catch (exportError) {
+        console.error("Unable to export Bird Type PDF:", exportError);
+        showNotification("Unable to export PDF. Please try again.", "error");
+      }
+    } catch (err) {
+      showNotification(handleApiError(err), "error");
     }
-
-    const filename = `BirdTypes_${new Date().toISOString().split("T")[0]}`;
-
-    try {
-      exportBirdTypesToPDF(filteredBirdTypes, filename);
-
-      logAuditEvent("EXPORT_PDF", "BirdTypes", undefined, {
-        count: filteredBirdTypes.length,
-      });
-      showNotification("PDF exported successfully!", "success");
-    } catch (exportError) {
-      console.error("Unable to export Bird Type PDF:", exportError);
-      showNotification("Unable to export PDF. Please try again.", "error");
-    }
-  
-    } catch (err) { showNotification(handleApiError(err), "error"); }
   };
 
   const handleExportExcel = async () => {
     try {
       const filteredBirdTypes = await exportRows();
 
-    if (filteredBirdTypes.length === 0) {
-      showNotification("No data to export.", "error");
-      return;
+      if (filteredBirdTypes.length === 0) {
+        showNotification("No data to export.", "error");
+        return;
+      }
+      const headers = [
+        "Bird Type No",
+        "Bird Type",
+        "Average Weight (kg)",
+        "Description",
+        "Status",
+      ];
+      const rows = filteredBirdTypes.map((bt) => [
+        bt.birdTypeNo.toString(),
+        bt.birdType,
+        bt.averageWeight.toString(),
+        bt.description || "-",
+        bt.status,
+      ]);
+      const filename = `BirdTypes_${new Date().toISOString().split("T")[0]}`;
+      exportToExcel("Bird Types - Master List", headers, rows, filename);
+      logAuditEvent("EXPORT_EXCEL", "BirdTypes", undefined, {
+        count: filteredBirdTypes.length,
+      });
+      showNotification("Excel exported successfully!", "success");
+    } catch (err) {
+      showNotification(handleApiError(err), "error");
     }
-    const headers = [
-      "Bird Type No",
-      "Bird Type",
-      "Average Weight (kg)",
-      "Description",
-      "Status",
-    ];
-    const rows = filteredBirdTypes.map((bt) => [
-      bt.birdTypeNo.toString(),
-      bt.birdType,
-      bt.averageWeight.toString(),
-      bt.description || "-",
-      bt.status,
-    ]);
-    const filename = `BirdTypes_${new Date().toISOString().split("T")[0]}`;
-    exportToExcel("Bird Types - Master List", headers, rows, filename);
-    logAuditEvent("EXPORT_EXCEL", "BirdTypes", undefined, {
-      count: filteredBirdTypes.length,
-    });
-    showNotification("Excel exported successfully!", "success");
-  
-    } catch (err) { showNotification(handleApiError(err), "error"); }
   };
 
   const validateBirdType = (birdType: Partial<BirdType>): string | null => {
@@ -200,122 +213,81 @@ function BirdTypesPage({ embedded = false }: BirdTypesPageProps) {
     }
   };
 
+  const handleResetFilters = () => {
+    setSearch("");
+    setStatusFilter("");
+    setSortOrder("number");
+    setCurrentPage(1);
+  };
+  const activeFilterCount = countActiveFilters(
+    search.trim() !== "",
+    statusFilter !== "",
+    sortOrder !== "number",
+  );
+
   const content = (
-    <div className="master-page w-full min-w-0 space-y-3 font-sans text-slate-700">
-      {/* Main Container - Removed overflow-hidden so dropdowns overlay properly */}
-      <div className="w-full bg-white rounded-xl border border-slate-200/90 shadow-sm">
-        {/* Toolbar - Search on LEFT, Buttons on RIGHT in same line */}
-        <MasterListToolbar
-          onRefresh={() => { void reload().catch(() => {}); }}
-          status={statusFilter}
-          onStatusChange={(value) => { setStatusFilter(value); setCurrentPage(1); }}
-          sort={sortOrder}
-          onSortChange={(value) => { setSortOrder(value); setCurrentPage(1); }}
-          search={search}
-          onSearchChange={handleSearchChange}
-          searchPlaceholder="Search Bird Type..."
-          addLabel="Add Bird Type"
-          onAdd={() => {
-            setEditingBirdType(null);
-            setShowDialog(true);
-          }}
-          onExportPDF={handleExportPDF}
-          onExportExcel={handleExportExcel}
-          loading={loading}
-          saving={saving}
-          onImport={() => setShowBulkImport(true)}
+    <div className="master-page w-full min-w-0 space-y-4 font-sans text-slate-700">
+      <MasterDirectoryFilters
+        ariaLabel={t("masters.dir.bird_types_title")}
+        searchId="bird-types-search"
+        search={search}
+        onSearchChange={handleSearchChange}
+        searchPlaceholder={t("masters.dir.search_bird_type")}
+        status={statusFilter}
+        onStatusChange={(value) => {
+          setStatusFilter(value);
+          setCurrentPage(1);
+        }}
+        sort={sortOrder}
+        onSortChange={(value) => {
+          setSortOrder(value);
+          setCurrentPage(1);
+        }}
+        onReset={handleResetFilters}
+        onRefresh={() => {
+          void reload().catch(() => {});
+        }}
+        addLabel={t("masters.dir.add_bird_type")}
+        onAdd={() => {
+          setEditingBirdType(null);
+          setShowDialog(true);
+        }}
+        onImport={() => setShowBulkImport(true)}
+        onExportPDF={handleExportPDF}
+        onExportExcel={handleExportExcel}
+        hasRows={paginatedBirdTypes.length > 0}
+        loading={loading}
+        saving={saving}
+      />
+
+      <MasterDirectoryCard
+        icon={Bird}
+        title={t("masters.dir.bird_types_title")}
+        total={total}
+        error={error}
+        loading={loading}
+        onRetry={() => {
+          void reload().catch(() => undefined);
+        }}
+        retryLabel={t("masters.dir.retry")}
+        page={safePage}
+        pageSize={pageSize}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={(next) => {
+          setPageSize(next);
+          setCurrentPage(1); // a new page size invalidates the current page
+        }}
+      >
+        <BirdTypeTable
+          birdTypes={paginatedBirdTypes}
+          onEdit={handleEditBirdType}
+          onDelete={handleDeleteBirdType}
+          loading={loading || deletingId !== null}
+          emptyMessage={
+            activeFilterCount > 0 ? t("masters.dir.no_records") : undefined
+          }
         />
-
-        {/* Status Counter Bar */}
-        <MasterListSummary
-          title="Bird Types Directory"
-          total={total}
-          shown={paginatedBirdTypes.length}
-          page={safePage}
-          totalPages={totalPages}
-          loading={loading}
-          saving={saving}
-          deleting={deletingId !== null}
-        />
-
-        {error && !loading && (
-          <div className="mx-4 mt-3 px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between gap-3">
-            <span>{error}</span>
-            <button
-              type="button"
-              onClick={() => {
-                void reload().catch(() => undefined);
-              }}
-              className="shrink-0 text-xs font-semibold text-red-700 underline"
-            >
-              Retry
-            </button>
-          </div>
-        )}
-
-        {/* Table Content */}
-        <div className="p-0 relative min-h-[120px]">
-          {loading && birdTypes.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-3">
-              <svg
-                className="animate-spin h-8 w-8 text-blue-600"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-              <p className="text-sm font-medium">Loading bird types...</p>
-            </div>
-          ) : !loading && birdTypes.length === 0 && !error ? (
-            <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-2">
-              <p className="text-sm font-medium text-slate-700">
-                No bird types found.
-              </p>
-              <p className="text-xs text-slate-500">
-                Add a bird type to get started.
-              </p>
-            </div>
-          ) : (
-            <BirdTypeTable
-              birdTypes={paginatedBirdTypes}
-              onEdit={handleEditBirdType}
-              onDelete={handleDeleteBirdType}
-              emptyMessage={
-                search.trim()
-                  ? "No bird types matching your search."
-                  : undefined
-              }
-            />
-          )}
-        </div>
-
-        {shouldShowPagination(total) && (
-          <MasterPagination
-            page={safePage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-            disabled={loading}
-            pageSize={pageSize}
-            onPageSizeChange={(next) => {
-              setPageSize(next);
-              setCurrentPage(1); // a new page size invalidates the current page
-            }}
-          />
-        )}
-      </div>
+      </MasterDirectoryCard>
 
       {/* Modal Dialog */}
       <BirdTypeDialog

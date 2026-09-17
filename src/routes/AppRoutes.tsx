@@ -35,27 +35,62 @@ function lazyShell(page: () => Promise<PageModule>) {
 
 // Lazy components are created once at module level (stable identity).
 const pages = {
-  dashboard: lazyWithRetry(lazyShell(() => import("../modules/operations/dashboard/pages/OperationsDashboardPage"))),
-  masters: lazyWithRetry(lazyShell(() => import("../modules/masters/pages/MastersPage"))),
-  mastersShops: lazyWithRetry(lazyShell(() => import("../modules/masters/shops/pages/ShopsPage"))),
-  mastersFarms: lazyWithRetry(lazyShell(() => import("../modules/masters/farms/pages/FarmsPage"))),
-  mastersVehicles: lazyWithRetry(lazyShell(() => import("../modules/masters/vehicles/pages/VehiclesPage"))),
-  mastersEmployees: lazyWithRetry(lazyShell(() => import("../modules/masters/employees/pages/EmployeesPage"))),
-  mastersBanks: lazyWithRetry(lazyShell(() => import("../modules/masters/banks/pages/BanksPage"))),
-  mastersBirdTypes: lazyWithRetry(lazyShell(() => import("../modules/masters/bird-types/pages/BirdTypesPage"))),
-  operations: lazyWithRetry(lazyShell(() => import("../modules/operations/pages/OperationsPages"))),
-  accounts: lazyWithRetry(lazyShell(() => import("../modules/accounts/pages/AccountsPage"))),
-  fleet: lazyWithRetry(lazyShell(() => import("../modules/fleet-operations/pages/FleetPages"))),
-  staff: lazyWithRetry(lazyShell(() => import("../modules/staff/pages/StaffPages"))),
-  reports: lazyWithRetry(lazyShell(() => import("../modules/reports/pages/ReportsDashboardPage"))),
-  settings: lazyWithRetry(lazyShell(() => import("../modules/settings/pages/SettingsPage"))),
-  supervisorMobile: lazyWithRetry(() => import("../modules/supervisor-mobile/pages/SupervisorMobilePage")),
+  dashboard: lazyWithRetry(
+    lazyShell(() => import("../modules/dashboard/pages/DashboardPage")),
+  ),
+  masters: lazyWithRetry(
+    lazyShell(() => import("../modules/masters/pages/MastersPage")),
+  ),
+  mastersShops: lazyWithRetry(
+    lazyShell(() => import("../modules/masters/shops/pages/ShopsPage")),
+  ),
+  mastersFarms: lazyWithRetry(
+    lazyShell(() => import("../modules/masters/farms/pages/FarmsPage")),
+  ),
+  mastersVehicles: lazyWithRetry(
+    lazyShell(() => import("../modules/masters/vehicles/pages/VehiclesPage")),
+  ),
+  mastersEmployees: lazyWithRetry(
+    lazyShell(() => import("../modules/masters/employees/pages/EmployeesPage")),
+  ),
+  mastersBanks: lazyWithRetry(
+    lazyShell(() => import("../modules/masters/banks/pages/BanksPage")),
+  ),
+  mastersBirdTypes: lazyWithRetry(
+    lazyShell(
+      () => import("../modules/masters/bird-types/pages/BirdTypesPage"),
+    ),
+  ),
+  operations: lazyWithRetry(
+    lazyShell(() => import("../modules/operations/pages/OperationsPages")),
+  ),
+  accounts: lazyWithRetry(
+    lazyShell(() => import("../modules/accounts/pages/AccountsPage")),
+  ),
+  fleet: lazyWithRetry(
+    lazyShell(() => import("../modules/fleet-operations/pages/FleetPages")),
+  ),
+  staff: lazyWithRetry(
+    lazyShell(() => import("../modules/staff/pages/StaffPages")),
+  ),
+  reports: lazyWithRetry(
+    lazyShell(() => import("../modules/reports/pages/ReportsDashboardPage")),
+  ),
+  settings: lazyWithRetry(
+    lazyShell(() => import("../modules/settings/pages/SettingsPage")),
+  ),
+  supervisorMobile: lazyWithRetry(
+    () => import("../modules/supervisor-mobile/pages/SupervisorMobilePage"),
+  ),
 };
 
 function PageLoading() {
   const { t } = useI18n();
   return (
-    <div className="flex h-dvh items-center justify-center bg-slate-100 text-sm font-semibold text-slate-500" aria-busy="true">
+    <div
+      className="flex h-dvh items-center justify-center bg-slate-100 text-sm font-semibold text-slate-500"
+      aria-busy="true"
+    >
       {t("common.loading")}
     </div>
   );
@@ -66,8 +101,12 @@ function NotFoundPage() {
   return (
     <div className="flex h-screen items-center justify-center bg-slate-50">
       <div className="text-center">
-        <h1 className="text-6xl font-bold tracking-tight text-slate-800">404</h1>
-        <p className="mt-2 text-lg text-slate-600">{t("error.page_not_found")}</p>
+        <h1 className="text-6xl font-bold tracking-tight text-slate-800">
+          404
+        </h1>
+        <p className="mt-2 text-lg text-slate-600">
+          {t("error.page_not_found")}
+        </p>
         <a
           href="/dashboard"
           className="mt-4 inline-block rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-700"

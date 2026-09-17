@@ -13,13 +13,7 @@ import { PageHeader as GlobalPageHeader } from "../../../ui";
  * future import resolves to the ONE global page header rather than silently
  * reintroducing a second, conflicting one.
  */
-function PageHeader({
-  title,
-  subtitle,
-}: {
-  title: string;
-  subtitle?: string;
-}) {
+function PageHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return <GlobalPageHeader title={title} subtitle={subtitle} />;
 }
 

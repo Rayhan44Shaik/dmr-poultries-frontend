@@ -1,6 +1,6 @@
 import { describe, test } from "node:test";
 import assert from "node:assert/strict";
-import { parseMapsUrl, resolveLocationInput, GeoResolveError } from "./geoResolve.js";
+import { parseMapsUrl, parseMapsPage, resolveLocationInput, GeoResolveError } from "./geoResolve.js";
 
 describe("parseMapsUrl — deterministic, offline", () => {
   test("extracts place name + @lat,lng from /place/ URL", () => {
@@ -32,6 +32,26 @@ describe("parseMapsUrl — deterministic, offline", () => {
     const p = parseMapsUrl("https://maps.google.com/?q=P+V+P+Mall+Line%2C+Vijayawada");
     assert.equal(p.placeName, "P V P Mall Line, Vijayawada");
     assert.equal(p.latitude, undefined);
+  });
+
+  test("place pin (!3d/!4d) wins over the @viewport centre", () => {
+    const p = parseMapsUrl(
+      "https://www.google.com/maps/place/Khaleel+Bhai+Family+Restaurant/@16.5580039,80.56476,17z/data=!4m6!3m5!1s0x3a35ef6b69f9bdc9:0xf43a5266ba06bb52!8m2!3d16.5579988!4d80.5673349!16s%2Fg%2F11rqjbrg8v"
+    );
+    assert.equal(p.placeName, "Khaleel Bhai Family Restaurant");
+    assert.equal(p.latitude, 16.5579988);
+    assert.equal(p.longitude, 80.5673349);
+    assert.equal(p.pin, true);
+  });
+
+  test("parseMapsPage reads Google's own name · address line and plus code", () => {
+    const html =
+      '<html><head><meta property="og:title" content="Khaleel Bhai Family Restaurant · Bus Stop, NH 65, Nallakunta, Gollapudi, Andhra Pradesh 521225, India">' +
+      '</head><body>"HH58+5W Gollapudi, Andhra Pradesh, India"</body></html>';
+    const p = parseMapsPage(html);
+    assert.equal(p.placeName, "Khaleel Bhai Family Restaurant");
+    assert.equal(p.fullAddress, "Bus Stop, NH 65, Nallakunta, Gollapudi, Andhra Pradesh 521225, India");
+    assert.equal(p.plusCode, "HH58+5W Gollapudi");
   });
 
   test("rejects out-of-range coordinates", () => {
@@ -76,6 +96,9 @@ describe("resolveLocationInput — validation & caching (no network needed)", ()
     assert.equal(r.latitude, 16.5109);
     assert.equal(r.longitude, 80.6285);
     assert.equal(r.address, "P V P Mall");
+    assert.equal(r.placeName, "P V P Mall");
+    assert.equal(r.precision, "viewport");
+    assert.ok(r.mapsUrl?.includes("P%20V%20P%20Mall"));
   });
 
   test("identical in-flight/repeat input is de-duplicated and cached", async () => {

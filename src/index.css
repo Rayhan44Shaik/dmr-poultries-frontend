@@ -197,6 +197,32 @@
   }
 
   /* ---------------------------------------------------------------------
+     TABLE ROW ENTRANCE — global. Every data table in the project (masters,
+     Trip List, orders, reports, fleet, accounts…) shows its rows with the same
+     soft fade-in-up and a 24 ms stagger (capped at row 12) the moment data
+     lands, exactly like the Shop master / Permits tables. Pure presentation:
+     rows animate only when they mount (fresh data, page or filter change), so
+     no component logic changes. Calendars and print are excluded, and the
+     reduced-motion rule above collapses it to an instant paint.
+     --------------------------------------------------------------------- */
+  @media screen {
+    tbody > tr:not(.rdp *):not(.rdp-root *):not(.react-datepicker *) {
+      animation: var(--animate-fade-in-up);
+    }
+    tbody > tr:nth-child(2) { animation-delay: 24ms; }
+    tbody > tr:nth-child(3) { animation-delay: 48ms; }
+    tbody > tr:nth-child(4) { animation-delay: 72ms; }
+    tbody > tr:nth-child(5) { animation-delay: 96ms; }
+    tbody > tr:nth-child(6) { animation-delay: 120ms; }
+    tbody > tr:nth-child(7) { animation-delay: 144ms; }
+    tbody > tr:nth-child(8) { animation-delay: 168ms; }
+    tbody > tr:nth-child(9) { animation-delay: 192ms; }
+    tbody > tr:nth-child(10) { animation-delay: 216ms; }
+    tbody > tr:nth-child(11) { animation-delay: 240ms; }
+    tbody > tr:nth-child(n + 12) { animation-delay: 264ms; }
+  }
+
+  /* ---------------------------------------------------------------------
      SCROLLBARS — consistent, unobtrusive, never hidden where it harms use.
      ------------------------------------------------------------------- */
   ::-webkit-scrollbar {

@@ -5,7 +5,7 @@ import { readFileSync } from "node:fs";
 import "./dashboard-sync-check-stub";
 import { renderToString } from "react-dom/server";
 import { I18nProvider } from "../src/i18n";
-import CollectionsPie from "../src/modules/operations/dashboard/components/CollectionsPie";
+import CollectionsPie from "../src/modules/dashboard/components/CollectionsPie";
 
 export async function runPieRenderCheck(): Promise<void> {
   const res = await fetch("http://127.0.0.1:4000/api/operations/dashboard");
@@ -45,7 +45,7 @@ export async function runPieRenderCheck(): Promise<void> {
   // (checked against the source — recharts' ResponsiveContainer renders no
   // <svg> in SSR, so the defs are not in the markup).
   const src = readFileSync(
-    new URL("../src/modules/operations/dashboard/components/CollectionsPie.tsx", import.meta.url),
+    new URL("../src/modules/dashboard/components/CollectionsPie.tsx", import.meta.url),
     "utf8"
   );
   for (const marker of ["slug(name)", "id={`cs-grad-${d.gid}`}", "url(#cs-grad-${gid})"]) {

@@ -13,10 +13,11 @@ import { listEligibleTrips } from "../src/modules/operations/shop-sales/services
 import { fuelExpenseService } from "../src/modules/operations/fuel-expenses/services/fuelExpenseService";
 import { fetchMortalityAnalysis, fetchTripDeliveries } from "../src/modules/operations/mortality/services/mortalityAnalysisApi";
 import { collectionService } from "../src/modules/operations/collections/services/collectionService";
-import { isOrderContainer } from "../src/modules/operations/orders/ordersUtils";
+import { isOrderContainer } from "../src/modules/orders/utils/ordersUtils";
 import {
   getOperationsSampleCounts,
   getQuarterSampleInfo,
+  type QuarterOperationsCounts,
 } from "../src/sample/quarterSample";
 
 // Harness-only redirect: Node has no same-origin /api reverse proxy, so the
@@ -341,6 +342,7 @@ export async function runOperationsSyncCheck(): Promise<void> {
       String(err)
     );
   }
+
 
   const failed = results.filter((r) => !r.ok);
   console.log(`\n================= OPERATIONS MODULE SYNC REPORT =================`);

@@ -47,7 +47,7 @@ import { BrandRefreshButton } from "../../../../ui";
 import MasterDropdown, {
   type MasterDropdownOption,
 } from "../../../masters/components/MasterDropdown";
-import CollectionsPie from "../../dashboard/components/CollectionsPie";
+import CollectionsPie from "../../../dashboard/components/CollectionsPie";
 import { useI18n } from "../../../../i18n";
 
 const formatCurrency = (amount: number) =>

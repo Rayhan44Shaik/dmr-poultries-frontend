@@ -213,6 +213,9 @@ export default {
   'fleet.doc_label.puc': 'PUC',
   'fleet.doc_label.rc': 'RC',
 
+  'fleet.documents.filter.document': 'Document',
+  'fleet.documents.filter.all_documents': 'All Documents',
+  'fleet.documents.sort.nearest_expiry': 'Nearest Expiry',
   'fleet.documents.load_failed': 'Failed to load permit documents',
   'fleet.documents.loading': 'Loading permit documents...',
   'fleet.documents.no_vehicles_match': 'No vehicles found matching your criteria.',
@@ -234,6 +237,9 @@ export default {
   'fleet.doc_summary.expired': '{count} expired',
   'fleet.doc_summary.expiring': '{count} expiring in the next 30 days',
 
+  'fleet.doc_edit.scan': 'Scan',
+  'fleet.doc_edit.remarks': 'Remarks',
+  'fleet.doc_edit.select_date': 'Select date',
   'fleet.doc_edit.attach_scan': 'Attach Scan (Optional)',
   'fleet.doc_edit.date_past': 'Date cannot be in the past',
   'fleet.doc_edit.document_no': 'Document No.',

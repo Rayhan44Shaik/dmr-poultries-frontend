@@ -37,7 +37,6 @@ const RISE = "group-hover:animate-nav-rise group-focus-visible:animate-nav-rise"
 const GROW = "group-hover:animate-nav-grow group-focus-visible:animate-nav-grow";
 const BARS = "group-hover:animate-nav-bars group-focus-visible:animate-nav-bars";
 const TILES = "group-hover:animate-nav-tiles group-focus-visible:animate-nav-tiles";
-const CLIP = "group-hover:animate-nav-clip group-focus-visible:animate-nav-clip";
 const PEOPLE = "group-hover:animate-nav-people group-focus-visible:animate-nav-people";
 const PILLARS = "group-hover:animate-nav-pillars group-focus-visible:animate-nav-pillars";
 const DOOR = "group-hover:animate-nav-door group-focus-visible:animate-nav-door";
@@ -72,7 +71,6 @@ const MOTION_BY_PATH: Record<string, NavMotion> = {
   "/accounts?tab=market-rate": { motion: RISE },
 
   // ── Operations ──────────────────────────────────────────────────────────
-  "/operations?tab=overview": { motion: CLIP },
   "/operations?tab=trip-entry": { motion: DRIVE },
   "/operations?tab=trip-list": { motion: DRIVE },
   "/operations?tab=rate-entry": { motion: COIN },

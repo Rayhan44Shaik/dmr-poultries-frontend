@@ -777,6 +777,11 @@ for (const date of OP_DATES) {
       sourceFarm: farm.farmName,
       birdTypeId: birdType.id,
       birdType: birdType.birdType,
+      // Backend canonical Step 2 keys (columns farm_bird_type_id /
+      // farm_bird_type). mapApiTripToTrip reads ONLY these for the trip's
+      // bird type — without them Trip Entry / Trip View render it blank.
+      farmBirdTypeId: birdType.id,
+      farmBirdType: birdType.birdType,
       reachedTime: stage >= 2 ? ts(date, "07:20:00") : "",
       destMeter: stage >= 2 ? openingMeter + Math.round(totalKm * 0.45) : 0,
       pickupTolls,
@@ -809,6 +814,7 @@ for (const date of OP_DATES) {
       // Step 4 (deliveries) — use effectiveDeliveries for rate-entry pending sample
       deliveries: stage >= 4 ? effectiveDeliveries : [],
       deliveryStepSubmitted: stage >= 4,
+      deliveryStepSubmittedAt: stage >= 4 ? ts(date, "16:05:00") : null,
 
       // Step 5 (close + expenses)
       closingMeter: stage >= 5 ? closingMeter : 0,
@@ -871,7 +877,8 @@ let containerSeq = 0;
 for (const date of ORDER_DAYS) {
   containerSeq += 1;
   const r = rng(seedOf(date) * 29 + 7);
-  const tripNo = `ORD-${date.replaceAll("-", "")}`;
+  // Frontend contract (ordersUtils.nextOrderTripNo): ORD-YYYYMMDD-NN.
+  const tripNo = `ORD-${date.replaceAll("-", "")}-01`;
   const shopCount = between(r, 20, 36);
   const rows = [];
   for (let i = 0; i < shopCount; i += 1) {
@@ -927,6 +934,8 @@ for (const date of ORDER_DAYS) {
     destMeter: 0,
     pickupTolls: 0,
     farmStepSubmitted: false,
+    farmBirdTypeId: 1,
+    farmBirdType: "Broiler",
     dcWeight: 0,
     totalBirds: rows.reduce((a, x) => a + x.birds, 0),
     boxes: rows.reduce((a, x) => a + x.boxNo, 0),
@@ -2186,9 +2195,9 @@ function operationModuleCounts(from, to) {
   );
 
   return {
-    // Trip List deliberately includes Draft/Pending/Deleted audit rows; the
-    // headline KPI above counts live (non-deleted) trips only.
-    tripRecords: tripRecords.length,
+    // Trip List renders Completed vehicle trips only (filterTripListTrips),
+    // so the module count is that same set — never Draft/Pending/Deleted.
+    tripRecords: tripRecords.filter((trip) => !trip.deleted && trip.status === "Completed").length,
     rateEntries: rateEntries.length,
     shopSales: SHOP_SALES.filter(
       (sale) => sale.deleted !== true && inRange(sale.saleDate ?? sale.tripDate, from, to)
@@ -4276,8 +4285,156 @@ function createTripFromWizard(body) {
 function mergeTripBody(id, body) {
   const trip = TRIP_BY_ID.get(Number(id));
   if (!trip) return null;
-  Object.assign(trip, body, { id: trip.id, tripNo: trip.tripNo });
+  const { mode, operationId, expectedVersion, ...fields } = body ?? {};
+  void mode; void operationId; void expectedVersion;
+  // Step 4 rows: keep every row addressable (id + serialNo) exactly like the
+  // real backend's replaceDeliveries, so the Orders module can match plan
+  // rows and Trip View / Mortality can expand them.
+  if (Array.isArray(fields.deliveries)) {
+    fields.deliveries = fields.deliveries.map((row, index) => {
+      const shop = SHOP_BY_ID.get(Number(row.shopId));
+      return {
+        ...row,
+        id: Number(row.id) > 0 ? Number(row.id) : ++deliverySeq,
+        serialNo: Number(row.serialNo) > 0 ? Number(row.serialNo) : index + 1,
+        shopName: row.shopName || shop?.shopName || "",
+        village: row.village ?? shop?.city ?? "",
+        birds: Number(row.birds || 0),
+        weight: round(Number(row.weight || 0), 2),
+        mortality: Number(row.mortality || 0),
+        mortKg: Number(row.mortKg || 0),
+        rate: row.rate == null ? null : Number(row.rate),
+        amount: Number(row.amount || 0),
+        remarks: row.remarks ?? "",
+        deliveryMode: row.deliveryMode === "weight" ? "weight" : "box",
+        boxNo: Number(row.boxNo ?? (Array.isArray(row.selectedBoxIds) ? row.selectedBoxIds.length : 0)),
+      };
+    });
+  }
+  // Step 2 canonical bird-type keys mirror onto the short Trip names too.
+  if (fields.farmBirdTypeId != null) fields.birdTypeId = Number(fields.farmBirdTypeId);
+  if (fields.farmBirdType != null) fields.birdType = String(fields.farmBirdType);
+  // Step 3 boxes → pickup load totals (the real backend derives the same).
+  if (Array.isArray(fields.boxDetails) && fields.boxDetails.length) {
+    const birds = fields.boxDetails.reduce((a, b) => a + Number(b.birds || 0), 0);
+    const weight = round(fields.boxDetails.reduce((a, b) => a + Number(b.weight || 0), 0), 2);
+    Object.assign(fields, {
+      boxes: fields.boxDetails.length,
+      boxNo: fields.boxDetails.length,
+      totalBirds: birds,
+      birds,
+      dcWeight: weight,
+      totalWeight: weight,
+      weight,
+      avgWeight: birds ? round(weight / birds, 3) : 0,
+    });
+  }
+  Object.assign(trip, fields, { id: trip.id, tripNo: trip.tripNo });
+  if (Array.isArray(fields.deliveries)) refreshTripDeliveryTotals(trip);
   trip.updatedAt = nowIso();
+  return trip;
+}
+
+/**
+ * POST /api/trips/:id/steps/:step — the SAME flag rules as the real backend
+ * (tripsService.saveWizardStep): `mode: "save"` persists without flags,
+ * `mode: "submit"` stamps the step's submitted flag (+ `<step>StepSubmittedAt`
+ * so Trip View timestamps render), Step 5 submit moves Draft → Pending.
+ */
+const STEP_SUBMIT_FLAGS = {
+  start: { startStepSubmitted: true },
+  farm: { farmStepSubmitted: true },
+  pickup: { pickupStepSubmitted: true },
+  deliveries: { deliveryStepSubmitted: true },
+  expenses: { expensesStepSubmitted: true, endStepSubmitted: true },
+};
+const STEP_STAMP = {
+  start: "startStepSubmittedAt",
+  farm: "farmStepSubmittedAt",
+  pickup: "pickupStepSubmittedAt",
+  deliveries: "deliveryStepSubmittedAt",
+  expenses: "expensesStepSubmittedAt",
+};
+function applyWizardStep(trip, step, body) {
+  const mode = body?.mode === "save" ? "save" : "submit";
+  const merged = mergeTripBody(trip.id, body);
+  if (!merged) return null;
+  if (mode === "submit" && STEP_SUBMIT_FLAGS[step]) {
+    Object.assign(merged, STEP_SUBMIT_FLAGS[step]);
+    if (!merged[STEP_STAMP[step]]) merged[STEP_STAMP[step]] = nowIso();
+    if (step === "expenses") {
+      merged.status = body?.status && body.status !== "Draft" ? body.status : "Pending";
+      merged.submittedAt = merged.submittedAt ?? merged.expensesStepSubmittedAt;
+    }
+  }
+  return merged;
+}
+
+/**
+ * Orders → POST /api/trips/0/steps/deliveries: the day's vehicle-less
+ * collection container is created on first Save Progress (the real backend
+ * inserts a trip row with the given tripNo when id is 0/absent).
+ */
+function createOrderContainer(body) {
+  const tripDate = String(body?.tripDate ?? TODAY);
+  const id = nextNumericId(TRIPS);
+  const supervisor = SUPERVISORS[id % SUPERVISORS.length];
+  const trip = {
+    id,
+    tripNo: String(body?.tripNo || `ORD-${tripDate.replaceAll("-", "")}-01`),
+    tripDate,
+    startTime: ts(tripDate, "05:00:00"),
+    vehicleId: 0,
+    vehicleNo: "",
+    driverId: 0,
+    driverName: "",
+    supervisorId: supervisor?.id ?? 0,
+    supervisorName: supervisor?.employeeName ?? "",
+    advanceAmount: 0,
+    helpers: [],
+    loaders: [],
+    openingMeter: 0,
+    startStepSubmitted: false,
+    sourceFarmId: 0,
+    sourceFarm: "",
+    birdTypeId: 1,
+    birdType: "Broiler",
+    farmBirdTypeId: 1,
+    farmBirdType: "Broiler",
+    farmStepSubmitted: false,
+    pickupStepSubmitted: false,
+    dcWeight: 0,
+    totalBirds: 0,
+    boxes: 0,
+    avgBirdWeight: 2.3,
+    boxDetails: [],
+    deliveries: [],
+    deliveryStepSubmitted: false,
+    closingMeter: 0,
+    totalKm: 0,
+    totalShops: 0,
+    totalWeight: 0,
+    totalDeliveredWeight: 0,
+    totalBirdsDelivered: 0,
+    totalMortality: 0,
+    totalMortalityCount: 0,
+    totalMortalityWeight: 0,
+    weightLoss: 0,
+    survivalRate: 1,
+    lastShop: "",
+    fuel: 0,
+    expense: 0,
+    dieselEntries: [],
+    remarks: "[ORDER] Day collection container",
+    status: "Draft",
+    version: 1,
+    createdAt: nowIso(),
+    updatedAt: nowIso(),
+    deleted: false,
+    _orderContainer: true,
+  };
+  TRIPS.push(trip);
+  TRIP_BY_ID.set(id, trip);
   return trip;
 }
 
@@ -4781,6 +4938,27 @@ function sortLeaves(rows, sortBy, sortDir) {
   });
 }
 
+// Lazily import the production geo resolver (TypeScript) via tsx's ESM loader.
+let geoResolverPromise = null;
+function loadGeoResolver() {
+  if (!geoResolverPromise) {
+    geoResolverPromise = (async () => {
+      const { register } = await import("node:module");
+      const { pathToFileURL } = await import("node:url");
+      try {
+        register("tsx/esm", pathToFileURL("./"));
+      } catch {
+        /* already registered */
+      }
+      return import(pathToFileURL(new URL("../backend/src/utils/geoResolve.ts", import.meta.url).pathname).href);
+    })();
+    geoResolverPromise.catch(() => {
+      geoResolverPromise = null;
+    });
+  }
+  return geoResolverPromise;
+}
+
 function readBody(req) {
   return new Promise((resolve) => {
     let raw = "";
@@ -4946,12 +5124,19 @@ const server = http.createServer(async (req, res) => {
     if (p === "/api/masters/market-rates/batch" && method === "PUT")
       return send(200, MARKET_RATES.slice(-7));
     if (p === "/api/masters/resolve-location" && method === "POST") {
+      // Same resolver as production (backend/src/utils/geoResolve.ts): follows
+      // the Google Maps share link, reads the exact place pin, the place name
+      // and Google's own address line. Works offline for long links too —
+      // the name + pin are in the URL itself; only the postal line needs net.
       const body = await readBody(req);
-      return send(200, {
-        latitude: 17.385,
-        longitude: 78.4867,
-        address: `Sample resolved: ${body.input ?? ""}`,
-      });
+      try {
+        const geo = await loadGeoResolver();
+        const result = await geo.resolveLocationInput(String(body.input ?? ""));
+        return send(200, result);
+      } catch (err) {
+        const status = err && typeof err.status === "number" ? err.status : 422;
+        return send(status, { error: err?.message || "Unable to determine this location." });
+      }
     }
 
     // ── Trips / Trip Entry wizard (interactive sample) ─────────────────────
@@ -5010,16 +5195,29 @@ const server = http.createServer(async (req, res) => {
     }
     // Steps 2-5 submit: POST /api/trips/:id/steps/:step
     if (m(/^\/api\/trips\/(\d+)\/steps\/([a-z]+)$/) && method === "POST") {
+      const [, rawId, step] = m(/^\/api\/trips\/(\d+)\/steps\/([a-z]+)$/);
       const body = await readBody(req);
-      const trip = mergeTripBody(m(/^\/api\/trips\/(\d+)\/steps\/([a-z]+)$/)[1], body);
-      if (!trip) return send(404, { error: "trip_not_found" });
-      if (versionConflict(trip, body, send)) return undefined;
+      // Orders Tab 1 creates the day's collection container through id 0.
+      let target = TRIP_BY_ID.get(Number(rawId));
+      if (!target && Number(rawId) === 0 && step === "deliveries") target = createOrderContainer(body);
+      if (!target) return send(404, { error: "trip_not_found" });
+      if (versionConflict(target, body, send)) return undefined;
+      const trip = applyWizardStep(target, step, body);
+      // A container's totals follow its plan rows (Order Collection summary).
+      if (trip._orderContainer) {
+        trip.totalBirds = trip.deliveries.reduce((a, d) => a + Number(d.birds || 0), 0);
+        trip.boxes = trip.deliveries.reduce((a, d) => a + Number(d.boxNo || 0), 0);
+        trip.totalWeight = round(trip.deliveries.reduce((a, d) => a + Number(d.weight || 0), 0), 2);
+      }
       return send(200, tripAckPayload(tripVersion(trip), body));
     }
-    // Step 4 save: PUT /api/trips/:id/deliveries
+    // Step 4 save: PUT /api/trips/:id/deliveries (save only — never submits)
     if (m(/^\/api\/trips\/(\d+)\/deliveries$/) && ["PUT", "POST"].includes(method)) {
-      const trip = mergeTripBody(m(/^\/api\/trips\/(\d+)\/deliveries$/)[1], await readBody(req));
-      return trip ? send(200, trip) : send(404, { error: "trip_not_found" });
+      const trip = mergeTripBody(m(/^\/api\/trips\/(\d+)\/deliveries$/)[1], {
+        ...(await readBody(req)),
+        mode: "save",
+      });
+      return trip ? send(200, tripVersion(trip)) : send(404, { error: "trip_not_found" });
     }
     // Step 5 diesel entries: POST / PATCH / DELETE /api/trips/:id/diesel[/:entry]
     if (m(/^\/api\/trips\/(\d+)\/diesel(\/[^/]+)?$/)) {
@@ -5117,7 +5315,18 @@ const server = http.createServer(async (req, res) => {
     // ── Operations ────────────────────────────────────────────────────────
     if (p === "/api/operations/dashboard")
       return send(200, operationsDashboard(q.get("fromDate"), q.get("toDate")));
-    if (p === "/api/operations/trip-list")
+    if (p === "/api/operations/trip-list") {
+      // Same filter contract the Trip List page sends (listCompletedTrips):
+      // date range + vehicle / supervisor / driver / farm ids + free text.
+      const idFilter = (key) => {
+        const v = Number(q.get(key));
+        return Number.isFinite(v) && v > 0 ? v : null;
+      };
+      const vehicleId = idFilter("vehicleId");
+      const supervisorId = idFilter("supervisorId");
+      const driverId = idFilter("driverId");
+      const farmId = idFilter("farmId");
+      const search = (q.get("search") || "").trim().toLowerCase();
       return send(
         200,
         paginate(
@@ -5128,7 +5337,21 @@ const server = http.createServer(async (req, res) => {
                 // carries vehicle-less Orders collection containers (ORD-*) that
                 // exist purely to hold a day's order plan; they are not trips.
                 !isOrderContainerRow(t) &&
-                inRange(t.tripDate, q.get("fromDate"), q.get("toDate"))
+                // The page (filterTripListTrips) renders Completed trips only —
+                // serve exactly that set so its totals, exports and paginator
+                // match what the endpoint reports.
+                t.deleted !== true &&
+                t.status === "Completed" &&
+                inRange(t.tripDate, q.get("fromDate"), q.get("toDate")) &&
+                (vehicleId == null || Number(t.vehicleId) === vehicleId) &&
+                (supervisorId == null || Number(t.supervisorId) === supervisorId) &&
+                (driverId == null || Number(t.driverId) === driverId) &&
+                (farmId == null || Number(t.sourceFarmId) === farmId) &&
+                (!search ||
+                  [t.tripNo, t.vehicleNo, t.driverName, t.supervisorName, t.sourceFarm, t.lastShop]
+                    .join(" ")
+                    .toLowerCase()
+                    .includes(search))
             ),
             q.get("sortBy"),
             q.get("sortDir")
@@ -5136,6 +5359,7 @@ const server = http.createServer(async (req, res) => {
           q
         )
       );
+    }
     if (p === "/api/operations/vehicle-trips/list") return send(200, TRIPS);
 
     if (p === "/api/operations/rate-entry") {

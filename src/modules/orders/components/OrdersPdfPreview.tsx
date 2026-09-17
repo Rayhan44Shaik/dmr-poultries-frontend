@@ -84,7 +84,9 @@ const OrdersPdfPreview: React.FC<OrdersPdfPreviewProps> = ({
   const [submitting, setSubmitting] = useState(false);
   const [submitNote, setSubmitNote] = useState("");
   const [sendNote, setSendNote] = useState("");
-  const [sendResult, setSendResult] = useState<OrdersWhatsAppResult | null>(null);
+  const [sendResult, setSendResult] = useState<OrdersWhatsAppResult | null>(
+    null,
+  );
 
   // ── Build the report once — the frame, the download and the WhatsApp send
   //    all use this very same blob.
@@ -127,9 +129,11 @@ const OrdersPdfPreview: React.FC<OrdersPdfPreviewProps> = ({
     return () => window.removeEventListener("keydown", onKey);
   }, [onClose]);
 
-  const totalShops = progress?.totalShops ?? breakdown.filter((b) => b.ordered).length;
+  const totalShops =
+    progress?.totalShops ?? breakdown.filter((b) => b.ordered).length;
   const deliveredShops =
-    progress?.deliveredShops ?? breakdown.filter((b) => b.deliveredBoxes > 0).length;
+    progress?.deliveredShops ??
+    breakdown.filter((b) => b.deliveredBoxes > 0).length;
   const ordered = breakdown.filter((b) => b.ordered);
   const delivered = breakdown.filter((b) => b.status === "delivered").length;
   const partial = breakdown.filter((b) => b.status === "part_delivered").length;
@@ -149,7 +153,7 @@ const OrdersPdfPreview: React.FC<OrdersPdfPreviewProps> = ({
         setSendNote(
           outcome.failed === 0
             ? `${ordersTranslate("orders.pdf_sent_ok")}: ${outcome.message}`
-            : `${ordersTranslate("orders.pdf_sent_partial")}: ${outcome.message}`
+            : `${ordersTranslate("orders.pdf_sent_partial")}: ${outcome.message}`,
         );
       } else {
         setSendNote("");
@@ -185,10 +189,21 @@ const OrdersPdfPreview: React.FC<OrdersPdfPreviewProps> = ({
           ? ordersTranslate("orders.status_pending")
           : ordersTranslate("orders.not_listed_deliveries");
 
-  const Fact = ({ label, value }: { label: string; value: string | number }) => (
+  const Fact = ({
+    label,
+    value,
+  }: {
+    label: string;
+    value: string | number;
+  }) => (
     <div className="min-w-0 rounded-lg border border-slate-200/80 bg-slate-50/80 px-2 py-1.5">
-      <p className="text-[9px] font-medium uppercase tracking-wide text-slate-400">{label}</p>
-      <p className="truncate text-[11px] font-bold text-slate-800" title={String(value)}>
+      <p className="text-[9px] font-medium uppercase tracking-wide text-slate-400">
+        {label}
+      </p>
+      <p
+        className="truncate text-[11px] font-bold text-slate-800"
+        title={String(value)}
+      >
         {value}
       </p>
     </div>
@@ -213,7 +228,12 @@ const OrdersPdfPreview: React.FC<OrdersPdfPreviewProps> = ({
                 {ordersTranslate("orders.pdf_check_title")}
               </h3>
               <p className="truncate text-[11px] font-semibold text-slate-500">
-                {[trip.tripNo, trip.vehicleNo, trip.supervisorName, trip.driverName]
+                {[
+                  trip.tripNo,
+                  trip.vehicleNo,
+                  trip.supervisorName,
+                  trip.driverName,
+                ]
                   .filter(Boolean)
                   .join(" · ")}
               </p>
@@ -243,10 +263,20 @@ const OrdersPdfPreview: React.FC<OrdersPdfPreviewProps> = ({
                 />
                 <Fact
                   label={ordersTranslate("orders.pdf_order_date")}
-                  value={orderDates.length > 0 ? orderDates.join(", ") : trip.tripDate}
+                  value={
+                    orderDates.length > 0
+                      ? orderDates.join(", ")
+                      : trip.tripDate
+                  }
                 />
-                <Fact label={ordersTranslate("orders.col_total_shops")} value={`${totalShops}`} />
-                <Fact label={ordersTranslate("orders.col_status")} value={progress?.status ?? "—"} />
+                <Fact
+                  label={ordersTranslate("orders.col_total_shops")}
+                  value={`${totalShops}`}
+                />
+                <Fact
+                  label={ordersTranslate("orders.col_status")}
+                  value={progress?.status ?? "—"}
+                />
                 <Fact
                   label={ordersTranslate("orders.total_boxes")}
                   value={`${sum((b) => b.orderedBoxes)} box`}
@@ -267,9 +297,18 @@ const OrdersPdfPreview: React.FC<OrdersPdfPreviewProps> = ({
                   label={ordersTranslate("orders.delivered_shops")}
                   value={`${deliveredShops}/${totalShops}`}
                 />
-                <Fact label={ordersTranslate("orders.status_part_delivered")} value={partial} />
-                <Fact label={ordersTranslate("orders.status_pending")} value={pending} />
-                <Fact label={ordersTranslate("orders.status_delivered")} value={delivered} />
+                <Fact
+                  label={ordersTranslate("orders.status_part_delivered")}
+                  value={partial}
+                />
+                <Fact
+                  label={ordersTranslate("orders.status_pending")}
+                  value={pending}
+                />
+                <Fact
+                  label={ordersTranslate("orders.status_delivered")}
+                  value={delivered}
+                />
                 <Fact
                   label={ordersTranslate("orders.delivered_boxes")}
                   value={`${sum((b) => b.deliveredBoxes)}/${sum((b) => b.orderedBoxes)}`}
@@ -295,7 +334,10 @@ const OrdersPdfPreview: React.FC<OrdersPdfPreviewProps> = ({
                     key={shop.shopId}
                     className="rounded-lg border border-slate-200/80 px-2 py-1.5"
                   >
-                    <p className="truncate text-[11px] font-bold text-slate-700" title={shop.shopName}>
+                    <p
+                      className="truncate text-[11px] font-bold text-slate-700"
+                      title={shop.shopName}
+                    >
                       {shop.serialNo}. {shop.shopName}
                     </p>
                     <p className="truncate text-[10px] font-semibold text-slate-400">
@@ -350,23 +392,39 @@ const OrdersPdfPreview: React.FC<OrdersPdfPreviewProps> = ({
 
         {/* ── Footer: the message, then the actions ── */}
         <div className="border-t border-slate-100 px-5 py-3">
-          <div className="flex min-h-[18px] items-center gap-1.5 text-[11px] font-semibold">
+          <div className="flex min-h-[1.125rem] items-center gap-1.5 text-[11px] font-semibold">
             {sending || submitting || saving ? (
               <>
                 <Loader2 size={13} className="animate-spin text-rose-500" />
-                <span className="text-slate-500">{ordersTranslate("orders.sending")}</span>
+                <span className="text-slate-500">
+                  {ordersTranslate("orders.sending")}
+                </span>
               </>
             ) : submitNote ? (
-              <span className={submitNote === ordersTranslate("orders.pdf_saved_ok") || submitNote === ordersTranslate("orders.pdf_submitted_ok") ? "text-emerald-600" : "text-rose-600"}>
+              <span
+                className={
+                  submitNote === ordersTranslate("orders.pdf_saved_ok") ||
+                  submitNote === ordersTranslate("orders.pdf_submitted_ok")
+                    ? "text-emerald-600"
+                    : "text-rose-600"
+                }
+              >
                 {submitNote}
               </span>
             ) : sendNote ? (
-              <span className={sendResult && sendResult.failed > 0 ? "text-amber-600" : "text-emerald-600"}>
+              <span
+                className={
+                  sendResult && sendResult.failed > 0
+                    ? "text-amber-600"
+                    : "text-emerald-600"
+                }
+              >
                 {sendNote}
               </span>
             ) : result ? (
               <span className="text-slate-400">
-                {ordersTranslate("orders.pdf_pages", { pages: result.pages })} · {result.fileName}
+                {ordersTranslate("orders.pdf_pages", { pages: result.pages })} ·{" "}
+                {result.fileName}
               </span>
             ) : null}
           </div>
@@ -380,7 +438,10 @@ const OrdersPdfPreview: React.FC<OrdersPdfPreviewProps> = ({
                     key={shop.shopId}
                     className="flex items-center justify-between gap-2 text-[11px] font-medium"
                   >
-                    <span className="truncate text-slate-600" title={shop.shopName}>
+                    <span
+                      className="truncate text-slate-600"
+                      title={shop.shopName}
+                    >
                       {shop.shopName}
                     </span>
                     <span className="shrink-0 tabular-nums text-slate-600">
@@ -388,7 +449,8 @@ const OrdersPdfPreview: React.FC<OrdersPdfPreviewProps> = ({
                       {" · "}
                       <span
                         className={
-                          shop.orderedBoxes > 0 && shop.deliveredBoxes >= shop.orderedBoxes
+                          shop.orderedBoxes > 0 &&
+                          shop.deliveredBoxes >= shop.orderedBoxes
                             ? "font-bold text-emerald-700"
                             : shop.deliveredBoxes > 0
                               ? "font-bold text-amber-600"
@@ -418,7 +480,11 @@ const OrdersPdfPreview: React.FC<OrdersPdfPreviewProps> = ({
               disabled={saved || saving}
               className="flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 text-[13px] font-semibold text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
             >
-              {saved ? <CheckCircle2 size={14} className="text-emerald-600" /> : <Save size={14} />}
+              {saved ? (
+                <CheckCircle2 size={14} className="text-emerald-600" />
+              ) : (
+                <Save size={14} />
+              )}
               {saved
                 ? ordersTranslate("orders.pdf_saved_btn")
                 : ordersTranslate("orders.pdf_save_progress")}

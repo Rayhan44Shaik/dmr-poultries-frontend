@@ -39,7 +39,9 @@ function MasterToolbar({
   onPdf,
 }: MasterToolbarProps) {
   return (
-    <div className={`${uiCardClass} flex flex-wrap items-end justify-between gap-4 p-4`}>
+    <div
+      className={`${uiCardClass} flex flex-wrap items-end justify-between gap-4 p-4`}
+    >
       <div className="flex flex-wrap items-end gap-3">
         <MasterDropdown
           label="Select Module"

@@ -1,7 +1,8 @@
 // src/modules/staff/pages/DutyPlannerPage.tsx
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
-import { useDutyPlanner, isDateLocked } from '../hooks/useDutyPlanner';
+import { useDutyPlanner, isDateLocked, isDefaultDutyFilters } from '../hooks/useDutyPlanner';
+import { countActiveFilters } from '../../../ui';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import DutyPlannerFilters, { type DutyPlannerView } from '../components/duty-planner/DutyPlannerFilters';
 import DutyPlannerGrid from '../components/duty-planner/DutyPlannerGrid';
@@ -312,6 +313,12 @@ function DutyPlannerPage() {
           setFilters((f: DutyPlannerFiltersType) => ({ ...f, role: val }))
         }
         onReset={handleReset}
+        activeFilterCount={countActiveFilters(
+          searchQuery.trim() !== '',
+          !isDefaultDutyFilters(filters),
+          view !== 'week',
+          dateFilter !== null,
+        )}
         onDownloadExcel={() => { void handleDownloadExcel(); }}
         canDownloadExcel={canDownloadExcel}
         exporting={exporting}

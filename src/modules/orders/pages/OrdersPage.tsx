@@ -54,6 +54,7 @@ import {
 import { useToast } from "../../../components/common/ToastProvider";
 import {
   buildShopBreakdown,
+  localToday,
   rowsInSequence,
   type ShopDeliveryBreakdown,
 } from "../utils/ordersUtils";
@@ -104,6 +105,57 @@ const NEXT_PAGE: Record<OrdersTab, OrdersTab | null> = {
   assignment: "tracking",
   tracking: null,
 };
+
+/** Assignment's Suspense shell — mirrors the real page (filter card on top,
+ *  titled table below) so the chunk load and the data load look identical:
+ *  filters stay visible, only the record surface says it is loading. */
+function AssignmentPageFallback() {
+  const { to } = useOrdersI18n();
+  return (
+    <div className="space-y-5" aria-busy="true">
+      <section className="space-y-4 rounded-2xl border border-slate-200/80 bg-white p-4 shadow-sm md:p-5">
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-5">
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i}>
+              <div className="mb-1.5 h-3 w-20 rounded bg-slate-100" />
+              <div className="h-10 rounded-lg border border-slate-200 bg-slate-50" />
+            </div>
+          ))}
+        </div>
+        <div className="grid grid-cols-1 gap-3.5 pt-1 lg:grid-cols-12">
+          <div className="lg:col-span-3">
+            <div className="mb-1.5 h-3 w-14 rounded bg-slate-100" />
+            <div className="h-10 rounded-lg border border-slate-200 bg-slate-50" />
+          </div>
+          <div className="lg:col-span-5">
+            <div className="mb-1.5 h-3 w-16 rounded bg-slate-100" />
+            <div className="h-10 rounded-lg border border-slate-200 bg-slate-50" />
+          </div>
+        </div>
+      </section>
+      <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+        <div className="flex items-center gap-3 border-b border-slate-100 bg-gradient-to-r from-emerald-50/60 via-white to-emerald-50/40 px-6 py-3">
+          <span className="h-9 w-9 rounded-xl border border-emerald-100 bg-emerald-50" />
+          <h2 className="text-base font-bold tracking-tight text-slate-800">
+            {to("orders.tab_assignment")}
+          </h2>
+        </div>
+        <div
+          role="status"
+          className="py-16 text-center text-sm font-medium text-slate-400"
+        >
+          <span className="inline-flex items-center gap-2">
+            <span
+              className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600"
+              aria-hidden="true"
+            />
+            {to("orders.loading_assignment")}
+          </span>
+        </div>
+      </section>
+    </div>
+  );
+}
 
 function OrdersLoadingPanel({ tab }: { tab: TabKey }) {
   const { to } = useOrdersI18n();
@@ -631,7 +683,7 @@ const OrdersPage: React.FC = () => {
                   </React.Suspense>
                 </section>
               )}
-              {visited.includes("assignment") && !dataPending && (
+              {visited.includes("assignment") && (
                 <section
                   id="orders-panel-assignment"
                   hidden={activeTab !== "assignment"}
@@ -641,18 +693,18 @@ const OrdersPage: React.FC = () => {
                       : undefined
                   }
                 >
-                  <React.Suspense fallback={<OrdersTableSkeleton rows={5} />}>
+                  <React.Suspense fallback={<AssignmentPageFallback />}>
                     <OrderAssignmentPage
-                      loading={false}
-                      day={assignmentDay}
-                      today={today}
+                      loading={dataPending}
+                      day={assignmentDay || localToday()}
+                      today={today || localToday()}
                       onDaySelect={(value) =>
                         selectDay("assignmentDate", value)
                       }
-                      collection={data.collectionsByDay[assignmentDay] ?? null}
-                      eligibleVehicles={data.eligibleVehicles}
+                      collection={data?.collectionsByDay[assignmentDay] ?? null}
+                      eligibleVehicles={data?.eligibleVehicles ?? []}
                       dayVehicleViews={
-                        data.dayVehicleViews[assignmentDay] ?? []
+                        data?.dayVehicleViews[assignmentDay] ?? []
                       }
                       shopDirectory={shopDirectory}
                       supervisorDirectory={supervisorDirectory}
@@ -664,7 +716,7 @@ const OrdersPage: React.FC = () => {
                   </React.Suspense>
                 </section>
               )}
-              {visited.includes("tracking") && !dataPending && (
+              {visited.includes("tracking") && (
                 <section
                   id="orders-panel-tracking"
                   hidden={activeTab !== "tracking"}
@@ -676,8 +728,8 @@ const OrdersPage: React.FC = () => {
                 >
                   <React.Suspense fallback={<OrdersTableSkeleton rows={5} />}>
                     <DeliveryTrackingPage
-                      trips={data.tracking}
-                      loading={false}
+                      trips={data?.tracking ?? []}
+                      loading={dataPending}
                       today={today}
                       shopDirectory={shopDirectory}
                       supervisorDirectory={supervisorDirectory}
@@ -692,7 +744,9 @@ const OrdersPage: React.FC = () => {
               )}
               {/* Assignment and Delivery Tracking read their whole shape from the
                 Orders payload, so they keep the placeholder until it lands. */}
-              {dataPending && activeTab !== "collection" ? (
+              {dataPending &&
+              activeTab !== "collection" &&
+              activeTab !== "assignment" ? (
                 <OrdersLoadingPanel tab={activeTab} />
               ) : null}
             </>

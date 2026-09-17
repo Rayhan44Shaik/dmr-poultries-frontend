@@ -1,20 +1,22 @@
 import React from "react";
-import { FileText, FileSpreadsheet, Search, Eye, Calendar, Truck, UserCog, Warehouse, RotateCcw, ArrowUpDown } from "lucide-react";
+import { FileText, FileSpreadsheet, Search, Eye, Calendar, Truck, UserCog, Warehouse, ArrowUpDown } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import {
   opsFilterCardClass,
   opsFilterLabelClass,
   opsInputClass,
-  opsSecondaryButtonClass,
   opsPdfButtonClass,
   opsExcelButtonClass,
   opsViewButtonClass,
 } from "../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../i18n";
-import { BrandRefreshButton } from "../../../../ui";
+import { BrandRefreshButton, FilterResetButton, countActiveFilters } from "../../../../ui";
 import MasterDropdown, { type MasterDropdownOption } from "../../../masters/components/MasterDropdown";
 import type { TripSortKey } from "./TripMasterTable";
 import { localizeTripViewText } from "../utils/tripViewLocalization";
+
+/** "All …" sentinel values are the neutral default of every master dropdown. */
+const isAllOption = (value: string) => value === "" || /^all\b/i.test(value.trim());
 
 interface Props {
   fromDate: string;
@@ -261,10 +263,17 @@ function TripFilters({
               {t("ops.trip.view_selected")}
             </button>
           )}
-          <button type="button" onClick={onReset} className={`group relative ${opsSecondaryButtonClass}`} aria-label={t("common.reset")}>
-            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>
-            {t("common.reset")}
-          </button>
+          <FilterResetButton
+            count={countActiveFilters(
+              search.trim() !== "",
+              !isAllOption(vehicle),
+              !isAllOption(supervisor),
+              !isAllOption(farm),
+              fromDate !== "" || toDate !== "",
+              sortBy !== null,
+            )}
+            onClick={onReset}
+          />
           {onRefresh && <BrandRefreshButton onClick={onRefresh} />}
           {onExportPDF && (
             <button type="button" onClick={onExportPDF} disabled={!hasFilters} className={`group relative ${opsPdfButtonClass}`} aria-label={t("reports.export_pdf") || "PDF"}>

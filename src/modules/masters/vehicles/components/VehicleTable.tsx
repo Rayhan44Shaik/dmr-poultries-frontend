@@ -1,117 +1,176 @@
 import MasterStatusBadge from "../../components/MasterStatusBadge";
-// D:\Development\DMR-Poultries-ERP\frontend\dmr-poultries-web\src\modules\masters\vehicles\components\VehicleTable.tsx
-
-import { Pencil, Trash2 } from "lucide-react";
+import {
+  Bird,
+  Boxes,
+  Hash,
+  Settings2,
+  Tag,
+  ToggleLeft,
+  Truck,
+} from "lucide-react";
 import type { Vehicle } from "../types/vehicle";
 import { formatVehicleNumber } from "../../../../utils/format";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
+import { useI18n } from "../../../../i18n";
+import { localizeTripViewText } from "../../../operations/vehicle-trips/utils/tripViewLocalization";
+import {
+  MasterTable,
+  MasterThead,
+  MasterTh,
+  MasterLoadingRow,
+  MasterEmptyRow,
+  MasterEditButton,
+  MasterDeleteButton,
+} from "../../components/MasterDirectory";
+import {
+  masterTdClass,
+  masterRowClass,
+  masterRowStyle,
+  masterHeadTint as tint,
+} from "../../components/masterTableStyles";
 
 type VehicleTableProps = {
   vehicles: Vehicle[];
-  onEdit: (vehicle: Vehicle) => void;
+  onEdit: (item: Vehicle) => void;
   onDelete: (id: number) => void;
-  /** Message shown when the list is empty (e.g. active search with no matches). */
   emptyMessage?: string;
+  loading?: boolean;
 };
+
+const COLS = 7;
 
 function VehicleTable({
   vehicles,
   onEdit,
   onDelete,
   emptyMessage,
+  loading = false,
 }: VehicleTableProps) {
+  const { t, language } = useI18n();
   const { requestDelete, cancel, pendingItems } = usePendingDelete(onDelete);
+  // Telugu reaches the record text too; stored values stay untouched.
+  const shown = (value: string | null | undefined) =>
+    localizeTripViewText(value ?? "", language);
+  const showLoadingRow = loading && vehicles.length === 0;
+  const rows = vehicles;
+
   return (
-    <div className="master-table">
-      <table className="min-w-full divide-y divide-slate-200">
-        <thead className="bg-slate-50">
-          <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-              S.No
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-              Vehicle Number
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-              Type
-            </th>
-            <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500">
-              Boxes
-            </th>
-            <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500">
-              Bird Capacity
-            </th>
-            <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
-              Status
-            </th>
-            <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
-              Actions
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-200 bg-white">
-          {vehicles.map((vehicle, index) => (
+    <>
+      <MasterTable minWidth="min-w-[52rem]">
+        <colgroup>
+          <col className="w-[3.5rem]" />
+          <col className="w-[11rem]" />
+          <col className="w-[9rem]" />
+          <col className="w-[7rem]" />
+          <col className="w-[8rem]" />
+          <col className="w-[6.5rem]" />
+          <col className="w-[6.5rem]" />
+        </colgroup>
+        <MasterThead>
+          <MasterTh
+            icon={Hash}
+            iconClass={tint.number}
+            label={t("masters.dir.s_no")}
+            align="center"
+          />
+          <MasterTh
+            icon={Truck}
+            iconClass={tint.vehicle}
+            label={t("masters.dir.vehicle_no")}
+          />
+          <MasterTh
+            icon={Tag}
+            iconClass={tint.tag}
+            label={t("masters.dir.type")}
+          />
+          <MasterTh
+            icon={Boxes}
+            iconClass={tint.capacity}
+            label={t("masters.dir.boxes")}
+            align="right"
+          />
+          <MasterTh
+            icon={Bird}
+            iconClass={tint.rate}
+            label={t("masters.dir.bird_capacity")}
+            align="right"
+          />
+          <MasterTh
+            icon={ToggleLeft}
+            iconClass={tint.status}
+            label={t("masters.dir.status")}
+            align="center"
+          />
+          <MasterTh
+            icon={Settings2}
+            iconClass={tint.action}
+            label={t("masters.dir.actions")}
+            align="center"
+          />
+        </MasterThead>
+        <tbody className="divide-y divide-slate-100">
+          {showLoadingRow && (
+            <MasterLoadingRow colSpan={COLS} label={t("masters.dir.loading")} />
+          )}
+          {!showLoadingRow && rows.length === 0 && (
+            <MasterEmptyRow
+              colSpan={COLS}
+              label={emptyMessage ?? t("masters.dir.no_records")}
+            />
+          )}
+          {rows.map((f, index) => (
             <tr
-              key={vehicle.id}
-              className="hover:bg-slate-50 transition-colors"
+              key={f.id}
+              className={masterRowClass(index, loading)}
+              style={masterRowStyle(index)}
             >
-              <td className="px-4 py-3 text-sm text-slate-600">{index + 1}</td>
-              <td className="px-4 py-3 text-sm font-semibold text-slate-800">
-                {formatVehicleNumber(vehicle.vehicleNumber)}
+              <td
+                className={`${masterTdClass} text-center tabular-nums text-slate-500`}
+              >
+                {index + 1}
               </td>
-              <td className="px-4 py-3 text-sm text-slate-600">
-                {vehicle.vehicleType}
+              <td
+                className={`${masterTdClass} whitespace-nowrap font-medium text-slate-800 tabular-nums`}
+              >
+                {formatVehicleNumber(f.vehicleNumber)}
               </td>
-              <td className="px-4 py-3 text-right text-sm text-slate-600">
-                {vehicle.noOfBoxes}
+              <td className={masterTdClass}>
+                <span className="block truncate">
+                  {shown(f.vehicleType) || "—"}
+                </span>
               </td>
-              <td className="px-4 py-3 text-right text-sm text-slate-600">
-                {vehicle.birdCapacity}
+              <td className={`${masterTdClass} text-right tabular-nums`}>
+                {f.noOfBoxes}
               </td>
-              <td className="px-4 py-3 text-center">
-                <MasterStatusBadge status={vehicle.status} />
+              <td className={`${masterTdClass} text-right tabular-nums`}>
+                {f.birdCapacity}
               </td>
-              <td className="px-4 py-3 text-center">
-                <div className="flex items-center justify-center gap-2">
-                  <button
-                    onClick={() => onEdit(vehicle)}
-                    className="rounded p-1 text-blue-600 hover:bg-blue-50 transition-colors"
-                    title="Edit Vehicle"
-                    aria-label={`Edit vehicle ${vehicle.vehicleNumber}`}
-                  >
-                    <Pencil size={16} />
-                  </button>
-                  <button
+              <td className={`${masterTdClass} text-center`}>
+                <MasterStatusBadge status={f.status} />
+              </td>
+              <td className={`${masterTdClass} text-center`}>
+                <div className="inline-flex items-center gap-2">
+                  <MasterEditButton
+                    onClick={() => onEdit(f)}
+                    ariaLabel={`Edit vehicle ${f.vehicleNumber}`}
+                  />
+                  <MasterDeleteButton
                     onClick={() =>
-                      requestDelete(vehicle.id, {
-                        label: `Deleting Vehicle "${vehicle.vehicleNumber}"`,
+                      requestDelete(f.id, {
+                        label: `Deleting Vehicle "${f.vehicleNumber}"`,
                       })
                     }
-                    className="rounded p-1 text-red-600 hover:bg-red-50 transition-colors"
-                    title="Delete Vehicle"
-                    aria-label={`Delete vehicle ${vehicle.vehicleNumber}`}
-                  >
-                    <Trash2 size={16} />
-                  </button>
+                    ariaLabel={`Delete vehicle ${f.vehicleNumber}`}
+                  />
                 </div>
               </td>
             </tr>
           ))}
-          {vehicles.length === 0 && (
-            <tr>
-              <td
-                colSpan={7}
-                className="px-4 py-6 text-center text-sm text-slate-500"
-              >
-                {emptyMessage ?? "No vehicles found."}
-              </td>
-            </tr>
-          )}
         </tbody>
-      </table>
+      </MasterTable>
       <PendingDeleteNotification items={pendingItems} onCancel={cancel} />
-    </div>
+    </>
   );
 }
 

@@ -34,7 +34,7 @@ export interface LeaveFilters {
   search: string;
 }
 
-const DEFAULT_FILTERS: LeaveFilters = {
+export const DEFAULT_LEAVE_FILTERS: LeaveFilters = {
   status: 'All',
   month: new Date().toISOString().slice(0, 7),
   department: '',
@@ -50,6 +50,19 @@ const DEFAULT_FILTERS: LeaveFilters = {
  * instead of one per character (which is what made the page flicker and stall).
  */
 const SEARCH_DEBOUNCE_MS = 300;
+
+/** Number of leave facets away from their defaults (drives the Reset badge). */
+export function countActiveLeaveFilters(f: LeaveFilters): number {
+  const d = DEFAULT_LEAVE_FILTERS;
+  return (
+    (f.status !== d.status ? 1 : 0) +
+    (f.month !== d.month ? 1 : 0) +
+    (f.department !== d.department ? 1 : 0) +
+    (f.employeeId !== d.employeeId ? 1 : 0) +
+    (f.leaveType !== d.leaveType ? 1 : 0) +
+    (f.search.trim() !== '' ? 1 : 0)
+  );
+}
 
 export interface UseLeaveManagementOptions {
   /**
@@ -86,13 +99,13 @@ export function useLeaveManagement(
 
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [filters, setFilters] = useState<LeaveFilters>(() => ({
-    ...DEFAULT_FILTERS,
+    ...DEFAULT_LEAVE_FILTERS,
     ...(initialFilters ?? {}),
   }));
   const [list, setList] = useState<LeaveListResult>({ items: [], total: 0, page: 1, limit: 100, totalPages: 0 });
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(25);
-  const [report, setReport] = useState<LeaveReport>({ month: DEFAULT_FILTERS.month, items: [] });
+  const [report, setReport] = useState<LeaveReport>({ month: DEFAULT_LEAVE_FILTERS.month, items: [] });
   const [loading, setLoading] = useState(true);
   /** First load only — afterwards the table stays on screen while it re-fetches. */
   const [loadedOnce, setLoadedOnce] = useState(false);
@@ -288,7 +301,7 @@ export function useLeaveManagement(
     setLoading(true);
     setAppliedSearch('');
     setPage(1);
-    setFilters(DEFAULT_FILTERS);
+    setFilters(DEFAULT_LEAVE_FILTERS);
   }, []);
 
   const addLeave = useCallback(

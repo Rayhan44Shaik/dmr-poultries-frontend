@@ -10,7 +10,6 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  RotateCcw,
   Plus,
   Eye,
   CheckCircle,
@@ -21,12 +20,11 @@ import {
 import {
   uiCardClass,
   uiFilterLabelClass,
-  uiFilterResetButtonClass,
   uiFilterSearchFieldClass,
   uiIconButton,
 } from '../../../../shared/ui/uiTokens';
 import { Button } from '../../../../ui';
-import { BrandRefreshButton } from '../../../../ui';
+import { BrandRefreshButton, FilterResetButton } from '../../../../ui';
 import MasterDropdown from '../../../masters/components/MasterDropdown';
 import type { LeaveFilters as LeaveFilterState } from '../../hooks/useLeaveManagement';
 import { useI18n } from '../../../../i18n';
@@ -51,6 +49,8 @@ interface LeaveFiltersProps {
    */
   onSearch: (value?: string) => void;
   onReset: () => void;
+  /** Facets away from their defaults — drives the badge on Reset. */
+  activeFilterCount?: number;
   onRefresh: () => void;
   onNewRequest: () => void;
   loading: boolean;
@@ -225,6 +225,7 @@ function LeaveFilters({
   onFilterChange,
   onSearch,
   onReset,
+  activeFilterCount = 0,
   onRefresh,
   onNewRequest,
   loading,
@@ -459,15 +460,11 @@ function LeaveFilters({
             <span aria-hidden="true" className="mx-0.5 hidden h-6 w-px shrink-0 bg-slate-200 sm:block" />
           )}
 
-          <button
-            type="button"
+          <FilterResetButton
+            count={activeFilterCount}
             onClick={onReset}
-            className={uiFilterResetButtonClass}
-            aria-label={`${t('common.reset')} — ${t('common.filter')}`}
-          >
-            <span className="inline-flex group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>
-            {t('common.reset')}
-          </button>
+            className="h-10"
+          />
 
           <BrandRefreshButton loading={loading} onClick={onRefresh} size="lg" ariaLabel={t('staff.leave.refresh_aria')}>
             {t('common.refresh')}

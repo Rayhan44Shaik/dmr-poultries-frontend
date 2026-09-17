@@ -213,6 +213,9 @@ export default {
   'fleet.doc_label.puc': 'PUC',
   'fleet.doc_label.rc': 'RC',
 
+  'fleet.documents.filter.document': 'పత్రం',
+  'fleet.documents.filter.all_documents': 'అన్ని పత్రాలు',
+  'fleet.documents.sort.nearest_expiry': 'సమీప గడువు',
   'fleet.documents.load_failed': 'పర్మిట్ పత్రాలు లోడ్ చేయడం విఫలమైంది',
   'fleet.documents.loading': 'పర్మిట్ పత్రాలు లోడ్ అవుతున్నాయి…',
   'fleet.documents.no_vehicles_match': 'మీ ప్రమాణాలకు సరిపోలే వాహనాలు ఏవీ కనుగొనబడలేదు.',
@@ -234,6 +237,9 @@ export default {
   'fleet.doc_summary.expired': '{count} గడువు ముగిసింది',
   'fleet.doc_summary.expiring': 'తదుపరి 30 రోజుల్లో {count} గడువు ముగుస్తున్నాయి',
 
+  'fleet.doc_edit.scan': 'స్కాన్',
+  'fleet.doc_edit.remarks': 'వ్యాఖ్యలు',
+  'fleet.doc_edit.select_date': 'తేదీ ఎంచుకోండి',
   'fleet.doc_edit.attach_scan': 'స్కాన్ జోడించండి (ఐచ్ఛికం)',
   'fleet.doc_edit.date_past': 'తేదీ గతంలో ఉండకూడదు',
   'fleet.doc_edit.document_no': 'పత్రం నంబర్',

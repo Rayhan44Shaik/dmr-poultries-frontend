@@ -32,16 +32,15 @@ import {
   type FormEvent,
   type KeyboardEvent,
 } from "react";
-import { Calendar, RotateCcw, Search, UserRound } from "lucide-react";
+import { Calendar, Search, UserRound } from "lucide-react";
 import MasterDropdown from "../../../masters/components/MasterDropdown";
 import { DatePicker } from "../../../../components/common/DatePicker";
-import { BrandRefreshButton } from "../../../../ui";
+import { BrandRefreshButton, FilterResetButton } from "../../../../ui";
 import { useI18n } from "../../../../i18n";
 import {
   opsFilterCardClass,
   opsFilterLabelClass,
   opsInputClass,
-  opsSecondaryButtonClass,
 } from "../../../../shared/ui/operationsStyles";
 import { personNameLabel } from "../../utils/leaveDisplay";
 import type { StaffPersonOption } from "../../hooks/useStaffDirectory";
@@ -65,6 +64,8 @@ interface PerformanceFilterBarProps {
   onApply: () => void;
   /** Restore defaults and apply them. */
   onClear: () => void;
+  /** Facets away from their defaults — drives the badge on Reset. */
+  activeFilterCount?: number;
   /** Refresh the applied query. */
   onRefresh: () => void;
   /** Person options from the real employees master. */
@@ -83,6 +84,7 @@ function PerformanceFilterBarImpl({
   onChange,
   onApply,
   onClear,
+  activeFilterCount = 0,
   onRefresh,
   personOptions,
   personOptionsError,
@@ -234,17 +236,11 @@ function PerformanceFilterBarImpl({
 
         <div className="flex shrink-0 items-center gap-2">
           {/* Reset is the Trip List's secondary action, verbatim. */}
-          <button
-            type="button"
+          <FilterResetButton
+            count={activeFilterCount}
             onClick={onClear}
-            className={`group relative ${opsSecondaryButtonClass}`}
             aria-label={t("staff.perf.filter.clear_action")}
-          >
-            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]">
-              <RotateCcw size={14} />
-            </span>
-            {t("common.reset")}
-          </button>
+          />
 
           {/* The hen pill: identical to the Trip List, so "reload this page"
               looks the same everywhere. It dances while the data refreshes. */}

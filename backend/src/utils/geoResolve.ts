@@ -22,13 +22,26 @@
 export type ResolvedLocation = {
   latitude: number;
   longitude: number;
+  /** Full line to store: "<place name>, <street/area address>" (or whichever part is known). */
   address: string | null;
+  /** Business / landmark name as Google Maps shows it, e.g. "P V P Mall". */
+  placeName: string | null;
+  /** Postal-style address without the place name. */
+  fullAddress: string | null;
+  /** Google Plus Code when the page exposes one (e.g. "HH58+5W Gollapudi"). */
+  plusCode: string | null;
+  /** How the coordinates were obtained — "pin" is the exact place marker. */
+  precision: "pin" | "viewport" | "geocoded";
+  /** Canonical Google Maps URL to reopen the exact place. */
+  mapsUrl: string | null;
 };
 
 export type ParsedMapsUrl = {
   latitude?: number;
   longitude?: number;
   placeName?: string;
+  /** true when lat/lng came from the !3d/!4d place marker (exact pin). */
+  pin?: boolean;
 };
 
 export class GeoResolveError extends Error {
@@ -98,6 +111,21 @@ export function parseMapsUrl(input: string): ParsedMapsUrl {
   const haystacks = [input, `${u.pathname}${u.search}`, u.hash.replace(/^#/, "?")];
 
   for (const hay of haystacks) {
+    // The !3d/!4d pair is the place marker itself — the exact pin. The
+    // "@lat,lng,zoom" triple is only the map viewport centre, which can sit
+    // tens of metres away from the shop, so the pin always wins.
+    if (!out.pin) {
+      const d = hay.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/);
+      if (d) {
+        const lat = parseFloat(d[1]);
+        const lng = parseFloat(d[2]);
+        if (isValidLat(lat) && isValidLng(lng)) {
+          out.latitude = lat;
+          out.longitude = lng;
+          out.pin = true;
+        }
+      }
+    }
     if (out.latitude === undefined) {
       const at = hay.match(/@(-?\d{1,2}(?:\.\d+)?),\s*(-?\d{1,3}(?:\.\d+)?)/);
       if (at) {
@@ -106,17 +134,7 @@ export function parseMapsUrl(input: string): ParsedMapsUrl {
         if (isValidLat(lat) && isValidLng(lng)) {
           out.latitude = lat;
           out.longitude = lng;
-        }
-      }
-    }
-    if (out.latitude === undefined) {
-      const d = hay.match(/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/);
-      if (d) {
-        const lat = parseFloat(d[1]);
-        const lng = parseFloat(d[2]);
-        if (isValidLat(lat) && isValidLng(lng)) {
-          out.latitude = lat;
-          out.longitude = lng;
+          out.pin = false;
         }
       }
     }
@@ -156,13 +174,67 @@ export function parseMapsUrl(input: string): ParsedMapsUrl {
 /* Network steps (allowlisted, bounded, cached)                        */
 /* ------------------------------------------------------------------ */
 
-async function fetchFinalUrl(startUrl: string): Promise<string | undefined> {
+type MapsPage = {
+  finalUrl: string;
+  /** Google's own "<name> · <address>" title line, when the page exposes it. */
+  placeName?: string;
+  fullAddress?: string;
+  plusCode?: string;
+};
+
+const MAX_PAGE_BYTES = 512 * 1024;
+
+function decodeHtml(v: string): string {
+  return v
+    .replace(/&amp;/g, "&")
+    .replace(/&#39;|&apos;/g, "'")
+    .replace(/&quot;/g, '"')
+    .replace(/&lt;/g, "<")
+    .replace(/&gt;/g, ">")
+    .replace(/&nbsp;/g, " ")
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Read the Google Maps place page's own name/address line (pure, offline-testable). */
+export function parseMapsPage(html: string): Pick<MapsPage, "placeName" | "fullAddress" | "plusCode"> {
+  const out: Pick<MapsPage, "placeName" | "fullAddress" | "plusCode"> = {};
+  const meta = (prop: string) => {
+    const re = new RegExp(
+      `<meta[^>]+(?:property|name|itemprop)=["']${prop}["'][^>]*content=["']([^"']*)["']|<meta[^>]+content=["']([^"']*)["'][^>]*(?:property|name|itemprop)=["']${prop}["']`,
+      "i"
+    );
+    const m = html.match(re);
+    return m ? decodeHtml(m[1] ?? m[2] ?? "") : "";
+  };
+  const title = meta("og:title") || meta("twitter:title");
+  if (title) {
+    const dot = title.indexOf(" · ");
+    if (dot > 0) {
+      out.placeName = title.slice(0, dot).trim();
+      out.fullAddress = title.slice(dot + 3).trim();
+    } else if (!/google maps/i.test(title)) {
+      out.placeName = title.trim();
+    }
+  }
+  if (!out.fullAddress) {
+    // Structured data on the place page carries the same street address.
+    const addr = html.match(/"streetAddress"\s*:\s*"([^"]+)"/);
+    if (addr) out.fullAddress = decodeHtml(addr[1]);
+  }
+  const plus = html.match(/\b([23456789CFGHJMPQRVWX]{4}\+[23456789CFGHJMPQRVWX]{2,3})\s+([A-Z][^"<,]{2,40}?)(?=[",<])/);
+  if (plus) out.plusCode = `${plus[1]} ${plus[2].trim()}`;
+  return out;
+}
+
+async function fetchMapsPage(startUrl: string): Promise<MapsPage | undefined> {
   let current = startUrl;
   for (let hop = 0; hop < MAX_REDIRECT_HOPS; hop++) {
     const res = await fetch(current, {
       redirect: "manual",
       signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-      headers: { "User-Agent": USER_AGENT },
+      headers: { "User-Agent": USER_AGENT, "Accept-Language": "en-IN,en;q=0.9" },
     });
     if (res.status >= 300 && res.status < 400) {
       const loc = res.headers.get("location");
@@ -172,7 +244,16 @@ async function fetchFinalUrl(startUrl: string): Promise<string | undefined> {
       current = next;
       continue;
     }
-    return current;
+    const page: MapsPage = { finalUrl: current };
+    if (res.ok && /text\/html/i.test(res.headers.get("content-type") ?? "")) {
+      try {
+        const html = (await res.text()).slice(0, MAX_PAGE_BYTES);
+        Object.assign(page, parseMapsPage(html));
+      } catch {
+        /* the URL alone is still useful */
+      }
+    }
+    return page;
   }
   return undefined;
 }
@@ -182,7 +263,9 @@ type NominatimReverse = {
   address?: Record<string, string>;
 };
 
-async function reverseGeocode(lat: number, lng: number): Promise<string | null> {
+type ReverseResult = { fullAddress: string; placeName: string | null };
+
+async function reverseGeocode(lat: number, lng: number): Promise<ReverseResult | null> {
   const url =
     `https://nominatim.openstreetmap.org/reverse?format=jsonv2` +
     `&lat=${encodeURIComponent(lat.toFixed(6))}&lon=${encodeURIComponent(lng.toFixed(6))}` +
@@ -202,10 +285,15 @@ async function reverseGeocode(lat: number, lng: number): Promise<string | null> 
     .filter(Boolean)
     .join(", ");
   const composed = [specific, wider].filter(Boolean).join(", ");
-  return composed || data.display_name || null;
+  const fullAddress = composed || data.display_name || "";
+  if (!fullAddress) return null;
+  const placeName = a.amenity ?? a.shop ?? a.building ?? null;
+  return { fullAddress, placeName };
 }
 
-async function forwardGeocode(query: string): Promise<ResolvedLocation | null> {
+type ForwardResult = { latitude: number; longitude: number; fullAddress: string | null };
+
+async function forwardGeocode(query: string): Promise<ForwardResult | null> {
   const url =
     `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1` +
     `&q=${encodeURIComponent(query)}`;
@@ -224,7 +312,37 @@ async function forwardGeocode(query: string): Promise<ResolvedLocation | null> {
   const lat = parseFloat(row.lat);
   const lng = parseFloat(row.lon);
   if (!isValidLat(lat) || !isValidLng(lng)) return null;
-  return { latitude: lat, longitude: lng, address: row.display_name ?? null };
+  return { latitude: lat, longitude: lng, fullAddress: row.display_name ?? null };
+}
+
+/** Compose the stored line + canonical Maps URL from whatever parts are known. */
+function finish(
+  latitude: number,
+  longitude: number,
+  parts: {
+    placeName?: string | null;
+    fullAddress?: string | null;
+    plusCode?: string | null;
+    precision: ResolvedLocation["precision"];
+  }
+): ResolvedLocation {
+  const placeName = parts.placeName?.trim() || null;
+  const fullAddress = parts.fullAddress?.trim() || null;
+  const address =
+    placeName && fullAddress && !fullAddress.toLowerCase().startsWith(placeName.toLowerCase())
+      ? `${placeName}, ${fullAddress}`
+      : fullAddress ?? placeName;
+  const q = placeName ? `${placeName} ${latitude.toFixed(6)},${longitude.toFixed(6)}` : `${latitude.toFixed(6)},${longitude.toFixed(6)}`;
+  return {
+    latitude,
+    longitude,
+    address,
+    placeName,
+    fullAddress,
+    plusCode: parts.plusCode?.trim() || null,
+    precision: parts.precision,
+    mapsUrl: `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(q)}`,
+  };
 }
 
 /* ------------------------------------------------------------------ */
@@ -277,48 +395,67 @@ async function doResolve(input: string): Promise<ResolvedLocation> {
     }
 
     let parsed = parseMapsUrl(input);
+    let page: MapsPage | undefined;
 
-    // Short share links carry no data themselves — follow to the final URL.
-    if (parsed.placeName === undefined && parsed.latitude === undefined) {
-      try {
-        const finalUrl = await fetchFinalUrl(input);
-        if (finalUrl) parsed = parseMapsUrl(finalUrl);
-      } catch {
-        /* network blocked/offline: fall through to what we have (nothing) */
+    // Always try the place page: short links carry nothing themselves, and
+    // even a long link only has the name — the page has the postal address.
+    try {
+      page = await fetchMapsPage(input);
+      if (page) {
+        const fromFinal = parseMapsUrl(page.finalUrl);
+        // Take the pin if either URL has one; otherwise whatever is known.
+        parsed = fromFinal.pin || parsed.latitude === undefined ? { ...parsed, ...fromFinal } : parsed;
+        if (fromFinal.placeName && !parsed.placeName) parsed.placeName = fromFinal.placeName;
       }
+    } catch {
+      /* network blocked/offline: fall through to what the URL itself says */
     }
 
+    const placeName = page?.placeName ?? parsed.placeName ?? null;
+
     if (parsed.latitude !== undefined && parsed.longitude !== undefined) {
-      let address = parsed.placeName ?? null;
-      if (address === null) {
-        try {
-          address = await reverseGeocode(parsed.latitude, parsed.longitude);
-        } catch {
-          address = null;
-        }
+      let fullAddress = page?.fullAddress ?? null;
+      if (!fullAddress) {
+        const rev = await reverseGeocode(parsed.latitude, parsed.longitude).catch(() => null);
+        fullAddress = rev?.fullAddress ?? null;
       }
-      if (address === null) {
+      if (!fullAddress && !placeName) {
         throw new GeoResolveError(
           "Location coordinates were read from the link, but the address could not be resolved. You can still save the shop with these coordinates."
         );
       }
-      return { latitude: parsed.latitude, longitude: parsed.longitude, address };
+      return finish(parsed.latitude, parsed.longitude, {
+        placeName,
+        fullAddress,
+        plusCode: page?.plusCode,
+        precision: parsed.pin ? "pin" : "viewport",
+      });
     }
 
-    if (parsed.placeName !== undefined) {
-      const geo = await forwardGeocode(parsed.placeName).catch(() => null);
-      if (geo) return { ...geo, address: parsed.placeName };
+    if (placeName) {
+      const geo = await forwardGeocode(page?.fullAddress ? `${placeName}, ${page.fullAddress}` : placeName).catch(() => null);
+      if (geo) {
+        return finish(geo.latitude, geo.longitude, {
+          placeName,
+          fullAddress: page?.fullAddress ?? geo.fullAddress,
+          plusCode: page?.plusCode,
+          precision: "geocoded",
+        });
+      }
       throw new GeoResolveError(
-        `Could not determine coordinates for "${parsed.placeName}". Paste the full Google Maps link instead.`
+        `Could not determine coordinates for "${placeName}". Paste the full Google Maps link instead.`
       );
     }
 
+    const isShortLink = /(^|\.)goo\.gl$/i.test(new URL(input).hostname);
     throw new GeoResolveError(
-      "This link does not contain a readable location. Open it in Google Maps and copy the link again, or paste the address."
+      isShortLink && !page
+        ? "Could not reach Google Maps to expand this short link (no internet access from the server). Open the link in Google Maps, copy the full URL from the address bar and paste that instead."
+        : "This link does not contain a readable location. Open it in Google Maps and copy the link again, or paste the address."
     );
   }
 
-  // Plain address / "lat, lng" text.
+  // Plain "lat, lng" text (also what the Get GPS button sends back).
   const pair = input.match(/^(-?\d{1,2}(?:\.\d+)?)\s*,\s*(-?\d{1,3}(?:\.\d+)?)$/);
   if (pair) {
     const lat = parseFloat(pair[1]);
@@ -326,17 +463,22 @@ async function doResolve(input: string): Promise<ResolvedLocation> {
     if (!isValidLat(lat) || !isValidLng(lng)) {
       throw new GeoResolveError("Coordinates must be within latitude -90..90 and longitude -180..180.");
     }
-    let address: string | null = null;
-    try {
-      address = await reverseGeocode(lat, lng);
-    } catch {
-      address = null;
-    }
-    return { latitude: lat, longitude: lng, address };
+    const rev = await reverseGeocode(lat, lng).catch(() => null);
+    return finish(lat, lng, {
+      placeName: rev?.placeName,
+      fullAddress: rev?.fullAddress,
+      precision: "pin",
+    });
   }
 
+  // Free-text address.
   const geo = await forwardGeocode(input).catch(() => null);
-  if (geo) return geo;
+  if (geo) {
+    return finish(geo.latitude, geo.longitude, {
+      fullAddress: geo.fullAddress ?? input,
+      precision: "geocoded",
+    });
+  }
   throw new GeoResolveError(
     "Could not find this address. Paste the Google Maps link of the shop instead."
   );
