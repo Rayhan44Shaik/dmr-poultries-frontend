@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback, useId } from 'react';
-import { Plus, RefreshCw, RotateCcw, Search, Pencil, CheckCircle2, Trash2 } from 'lucide-react';
+import { Plus, RotateCcw, Search, Pencil, CheckCircle2, Trash2, Calendar, Wallet, CreditCard } from 'lucide-react';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import { PaymentTable } from '../components/payment-book/PaymentTable';
 import { PaymentViewModal } from '../components/payment-book/PaymentViewModal';
@@ -13,12 +13,20 @@ import { weekRange } from '../../../utils/businessDate';
 import { usePendingDelete } from '../../../hooks/usePendingDelete';
 import { ConfirmDialog } from '../../../ui/ConfirmDialog';
 import { Modal } from '../../../ui/Modal';
+import { BrandRefreshButton } from '../../../ui';
 import { pendingDeleteCountdownLabel } from '../../../shared/ui/pendingDelete';
 import MasterDropdown from '../../masters/components/MasterDropdown';
 import '../../masters/styles/masters.css';
 import { Button } from '../../../ui/Button';
-import { SearchInput } from '../../../ui/SearchInput';
-import { uiActionToneClass, uiBadgeClass } from '../../../shared/ui/uiTokens';
+import { uiBadgeClass } from '../../../shared/ui/uiTokens';
+import {
+  opsFilterCardClass,
+  opsFilterLabelClass,
+  opsInputClass,
+  opsPrimaryButtonClass,
+  opsSecondaryButtonClass,
+} from '../../../shared/ui/operationsStyles';
+import { useI18n } from '../../../i18n';
 import { applyDemoWrite, createDemoPayments, resetDemoPayments } from '../utils/paymentRegisterDemo';
 import { EmptyState } from '../../../ui/EmptyState';
 import { Pagination } from '../../../ui/Pagination';
@@ -32,6 +40,7 @@ const PAYMENT_VIEWS: { value: PaymentView; label: string; selectedClass: string;
 ];
 
 export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
+  const { t } = useI18n();
   const { showNotification } = useSafeNotification();
   // Show the isolated examples immediately in the development preview.
   // Production continues to open with real API data; demo remains opt-in there.
@@ -62,6 +71,10 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   const [appliedFilters, setAppliedFilters] = useState(filters);
   const [status, setStatus] = useState<PaymentView>('pending');
   const dateId = useId();
+  // Filter control ids — the visible icon labels name these through htmlFor.
+  const typeFilterId = useId();
+  const modeFilterId = useId();
+  const searchId = useId();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
@@ -297,34 +310,104 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
         <Button variant="secondary" aria-pressed={demo} disabled={!!pendingItems.length || approving} onClick={toggleDemo}>{demo ? 'Back to real payments' : 'Preview sample data'}</Button>
         {demo && <Button variant="ghost" size="sm" icon={<RotateCcw size={14} />} title="Rebuild the sample rows, discarding preview edits" onClick={resetDemo}>Reset sample rows</Button>}
       </div>
-      <section aria-label="Payment filters" className="rounded-xl border border-slate-200 bg-white p-3">
-        {/* Row one keeps dates and dropdown filters together. Row two keeps
-            search and every register action together for quick scanning. */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex w-full items-center gap-3 sm:w-[460px] sm:shrink-0">
-            <div className="min-w-0 flex-1">
-              <label htmlFor={`${dateId}-from`} className="sr-only">From Date</label>
-              <DatePicker className="[&_input]:h-12 [&_input]:rounded-xl [&_input]:pr-10 [&_input]:text-base" id={`${dateId}-from`} placeholder="From date" openOnFocus={false} value={filters.from} onChange={v => changeFilter('from', v)} hideClear />
-            </div>
-            <span aria-hidden="true" className="text-slate-400">–</span>
-            <div className="min-w-0 flex-1">
-              <label htmlFor={`${dateId}-to`} className="sr-only">To Date</label>
-              <DatePicker className="[&_input]:h-12 [&_input]:rounded-xl [&_input]:pr-10 [&_input]:text-base" id={`${dateId}-to`} placeholder="To date" openOnFocus={false} value={filters.to} onChange={v => changeFilter('to', v)} hideClear />
+      {/* The register's filter card follows the Trip List's filter exactly:
+          one labelled grid (icon + name per field, 40px controls) with the
+          search row and every register action beneath it. The glyph motions
+          come from the global tokens — search sways, clear spins, refresh is
+          the brand hen — so the register reads as part of one system. */}
+      <section aria-label="Payment filters" className={opsFilterCardClass}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          <div>
+            <label htmlFor={`${dateId}-from`} className={opsFilterLabelClass}>
+              <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
+              <span>{t('common.from')}</span>
+            </label>
+            <DatePicker id={`${dateId}-from`} placeholder={t('accounts.payment.from')} openOnFocus={false} value={filters.from} onChange={v => changeFilter('from', v)} hideClear className="w-full" />
+          </div>
+          <div>
+            <label htmlFor={`${dateId}-to`} className={opsFilterLabelClass}>
+              <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
+              <span>{t('common.to')}</span>
+            </label>
+            <DatePicker id={`${dateId}-to`} placeholder={t('accounts.payment.to')} openOnFocus={false} value={filters.to} onChange={v => changeFilter('to', v)} hideClear className="w-full" />
+          </div>
+          <div>
+            <label htmlFor={typeFilterId} className={opsFilterLabelClass}>
+              <Wallet size={17} className="text-emerald-500 flex-shrink-0" />
+              <span>{t('accounts.payment.type')}</span>
+            </label>
+            <MasterDropdown
+              hideLabel
+              label={t('accounts.payment.type')}
+              triggerId={typeFilterId}
+              value={filters.type}
+              options={types}
+              onChange={v => changeFilter('type', v)}
+              placeholder={t('accounts.payment.all_types')}
+              searchable
+              allowClear
+              triggerClassName="h-10 text-[13px]"
+              className="w-full"
+            />
+          </div>
+          <div>
+            <label htmlFor={modeFilterId} className={opsFilterLabelClass}>
+              <CreditCard size={17} className="text-sky-500 flex-shrink-0" />
+              <span>{t('accounts.payment.mode')}</span>
+            </label>
+            <MasterDropdown
+              hideLabel
+              label={t('accounts.payment.mode')}
+              triggerId={modeFilterId}
+              value={filters.mode}
+              options={modes}
+              onChange={v => changeFilter('mode', v)}
+              placeholder={t('accounts.payment.all_modes')}
+              searchable
+              allowClear
+              triggerClassName="h-10 text-[13px]"
+              className="w-full"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-end pt-1">
+          <div className="lg:col-span-5">
+            <label htmlFor={searchId} className={opsFilterLabelClass}>
+              <Search size={17} className="text-slate-400 flex-shrink-0" />
+              <span>{t('common.search')}</span>
+            </label>
+            <div className="relative">
+              <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                id={searchId}
+                value={filters.search}
+                onChange={event => changeFilter('search', event.target.value)}
+                onKeyDown={event => { if (event.key === 'Enter') applyFilters(); }}
+                placeholder={t('accounts.payment.search_placeholder')}
+                className={`${opsInputClass} pl-10`}
+              />
             </div>
           </div>
-          <MasterDropdown label="Payment Type" hideLabel className="min-w-0 flex-1 sm:flex-none sm:w-56 [&>button]:h-11 [&>button]:text-sm" value={filters.type} options={types} placeholder="All payment types" onChange={v => changeFilter('type', v)} allowClear />
-          <MasterDropdown label="Payment Mode" hideLabel className="min-w-0 flex-1 sm:flex-none sm:w-52 [&>button]:h-11 [&>button]:text-sm" value={filters.mode} options={modes} placeholder="All payment modes" onChange={v => changeFilter('mode', v)} allowClear />
-          <SearchInput value={filters.search} onChange={v => changeFilter('search', v)} onSearch={() => applyFilters()} aria-label="Search payments" placeholder="Payment no, payee, reference…" wrapperClassName="w-full min-w-0 sm:flex-1 sm:min-w-[260px]" />
+          <div className="lg:col-span-7 flex items-center gap-2 justify-end flex-wrap">
+            <button type="button" onClick={() => setIsNewModalOpen(true)} className={`group relative ${opsPrimaryButtonClass}`} aria-label={t('accounts.payment.new')}>
+              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-add)]"><Plus size={15} /></span>
+              {t('accounts.payment.new')}
+            </button>
+            <button type="button" onClick={applyFilters} disabled={invalidRange} className={`group relative ${opsSecondaryButtonClass}`} aria-label={t('common.search')}>
+              <span className={`inline-flex motion-safe:group-hover:animate-[var(--animate-action-search)] ${filterAction === 'search' ? 'motion-safe:animate-[var(--animate-action-search)]' : ''}`}><Search size={15} /></span>
+              {t('common.search')}
+            </button>
+            <button type="button" onClick={clearFilters} className={`group relative ${opsSecondaryButtonClass}`} aria-label={t('common.reset')}>
+              <span className={`inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)] ${filterAction === 'clear' ? 'motion-safe:animate-[var(--animate-action-reset)]' : ''}`}><RotateCcw size={14} /></span>
+              {t('common.reset')}
+            </button>
+            {/* The canonical brand refresh — the hen logo dances while a real
+                load runs; the sample-data beat keeps the click visible. */}
+            <BrandRefreshButton loading={spinning} onClick={handleRefresh} />
+          </div>
         </div>
-        <div className="mt-2 flex flex-wrap items-center justify-end gap-1.5 border-t border-slate-100 pt-2">
-            <Button variant="custom" size="lg" className="border border-indigo-200 bg-indigo-50 text-indigo-800 shadow-sm hover:bg-indigo-100 hover:border-indigo-300 focus-visible:ring-indigo-400/30" icon={<Plus size={16} className="transition-transform duration-200 hover:scale-125 active:scale-90" />} onClick={() => setIsNewModalOpen(true)}>New Payment</Button>
-            <Button size="lg" icon={<Search size={16} className={`transition-transform duration-300 hover:-translate-y-1 ${filterAction === 'search' ? 'animate-[bounce_0.6s_ease-in-out_1]' : ''}`} />} onClick={applyFilters} disabled={invalidRange}>Search</Button>
-            <Button variant="secondary" size="lg" icon={<RotateCcw size={15} className={`transition-transform duration-500 hover:rotate-180 ${filterAction === 'clear' ? 'animate-[spin_0.6s_ease-in-out_1]' : ''}`} />} aria-label="Clear filters" onClick={clearFilters}>Clear</Button>
-            <Button variant="custom" size="lg" iconOnly aria-label="Refresh" title="Refresh records" className={uiActionToneClass.refresh} disabled={spinning} onClick={handleRefresh}>
-              <RefreshCw size={16} strokeWidth={2} aria-hidden="true" className={`transition-transform duration-500 hover:rotate-180 ${spinning ? 'animate-[spin_0.6s_ease-in-out_1]' : ''}`} />
-            </Button>
-</div>
-        {invalidRange && <p role="alert" className="mt-2 text-xs text-red-600">From Date must be on or before To Date.</p>}
+        {invalidRange && <p role="alert" className="mt-2 text-xs text-red-600">{t('accounts.payment.invalid_range')}</p>}
       </section>
       <section ref={tableRef} aria-label="Payment records" aria-busy={loading} className="rounded-xl border border-slate-200/80 bg-white shadow-2xs overflow-hidden">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-white px-4 py-3">
@@ -369,7 +452,11 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
         <PaymentTable selectedId={selectedPayment?.id ?? null} onSelect={setSelectedId}
           emptyVariant={error ? 'error' : !payments.length ? 'no-data' : appliedFilters.search.trim() ? 'no-search' : 'no-filters'}
           payments={rows} loading={loading && !payments.length} error={error && !payments.length} onView={setViewingPayment} />
-        <Pagination page={page} pageSize={pageSize} totalItems={filtered.length}
+        {/* Global pagination: fed the CLAMPED page so the pager and the table
+            row window can never disagree for a frame, and disabled while a
+            refresh is in flight (the component's no-duplicate-requests contract). */}
+        <Pagination page={safePage} pageSize={pageSize} totalItems={filtered.length}
+          disabled={loading}
           onPageChange={next => { setSelectedId(null); setPage(next); }}
           onPageSizeChange={size => { setSelectedId(null); setPageSize(size); setPage(1); }} />
         </>}
