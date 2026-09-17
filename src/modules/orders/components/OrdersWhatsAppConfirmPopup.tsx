@@ -85,8 +85,9 @@ type Props = {
   onConfirmSend: (
     orderedShopIds?: number[],
   ) => Promise<OrdersWhatsAppResult | null>;
-  /** Called after a successful send if the 10s auto-submit is not cancelled. */
-  onConfirmSubmit: () => Promise<void>;
+  /** Submit the assignment (enabled once the sheet was sent OR downloaded).
+   *  Receives the reviewed sequence when the operator re-ordered shops. */
+  onConfirmSubmit: (orderedShopIds?: number[]) => Promise<void>;
 };
 
 function wasWhatsAppSent(r: OrdersWhatsAppResult | null): boolean {
@@ -243,12 +244,19 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
     if (outcome) setSentResult(outcome);
   };
 
+  // Submit unlocks once the sheet has LEFT the screen either way — sent on
+  // WhatsApp or downloaded as PDF (a printed sheet is a valid hand-over).
+  const [downloaded, setDownloaded] = useState(false);
+  const canSubmit = (sendOk || downloaded) && !busy;
+
   const handleSubmitAssignment = async () => {
-    if (!sendOk || submitting || submittedRef.current) return;
+    if (!canSubmit || submitting || submittedRef.current) return;
     submittedRef.current = true;
     setSubmitting(true);
     try {
-      await onConfirmSubmit();
+      await onConfirmSubmit(
+        orderChanged ? orderedRows.map((r) => r.shopId) : undefined,
+      );
       onClose();
     } finally {
       setSubmitting(false);
@@ -261,6 +269,7 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
     a.href = result.url;
     a.download = result.fileName;
     a.click();
+    setDownloaded(true);
   };
 
   const subtitle = [
@@ -340,80 +349,72 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
         </div>
 
         <div className="flex min-h-0 flex-1">
-          {/* ── Left: the shops (re-orderable) → the message → the facts ── */}
-          <aside className="flex w-[22rem] shrink-0 flex-col overflow-y-auto border-r border-slate-100 bg-white/80">
-            {/* 1) SHOPS TO DELIVER — in delivery sequence, typed re-order */}
-            <div className="border-b border-slate-100 px-4 py-3.5">
+          {/* ── Left: ONLY the shops, in delivery order (re-orderable) ── */}
+          <aside className="flex w-[22rem] shrink-0 flex-col border-r border-slate-100 bg-white/80">
+            <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
               <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
-                {t("orders.shops_to_deliver")} ({orderedRows.length})
+                {t("orders.shops_to_deliver")}
               </p>
-              <ul className="mt-2 space-y-1.5">
-                {numberedRows.map((row, i) => (
-                  <li
-                    key={row.shopId}
-                    className="flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white px-2 py-1.5 transition-all hover:border-emerald-200 hover:shadow-sm motion-safe:animate-[var(--animate-fade-in-up)]"
-                    style={{ animationDelay: `${Math.min(i, 12) * 25}ms` }}
-                  >
-                    <OrderNumberInput
-                      value={row.serialNo}
-                      max={numberedRows.length}
-                      disabled={sending}
-                      label={`${t("orders.col_sequence")} — ${row.shopName}`}
-                      onCommit={(pos) => moveRowTo(i, pos - 1)}
-                    />
-                    <SequenceArrows
-                      index={i}
-                      count={numberedRows.length}
-                      disabled={sending}
-                      label={row.shopName}
-                      onMove={(dir) => moveRowTo(i, i + dir)}
-                    />
-                    <div className="min-w-0 flex-1">
-                      <p
-                        className="truncate text-[11px] font-bold text-slate-700"
-                        title={row.shopName}
-                      >
-                        {row.shopName}
-                      </p>
-                      <p className="truncate text-[10px] font-semibold text-slate-400">
-                        {row.village || "—"}
-                        {row.mobile ? ` · ${row.mobile}` : ""}
-                      </p>
-                    </div>
-                    <div className="shrink-0 text-right">
-                      <p className="text-[11px] font-bold tabular-nums text-emerald-700">
-                        {formatCount(row.boxes)} {t("orders.boxes_short")}
-                      </p>
-                      <p className="text-[10px] font-semibold tabular-nums text-slate-400">
-                        {row.birds > 0
-                          ? `${formatCount(row.birds)} ${t("orders.birds_short")}`
-                          : "—"}
-                      </p>
-                    </div>
-                  </li>
-                ))}
-              </ul>
+              <span className="inline-flex items-center justify-center rounded-full border border-slate-200/80 bg-slate-100 px-2 py-0.5 text-[11px] font-bold tabular-nums text-slate-600">
+                {orderedRows.length}
+              </span>
             </div>
+            <ul className="flex-1 space-y-1.5 overflow-y-auto px-3 py-3">
+              {numberedRows.map((row, i) => (
+                <li
+                  key={row.shopId}
+                  className="flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white px-2 py-1.5 transition-all hover:border-emerald-200 hover:shadow-sm motion-safe:animate-[var(--animate-fade-in-up)]"
+                  style={{ animationDelay: `${Math.min(i, 12) * 25}ms` }}
+                >
+                  <OrderNumberInput
+                    value={row.serialNo}
+                    max={numberedRows.length}
+                    disabled={sending}
+                    label={`${t("orders.col_sequence")} — ${row.shopName}`}
+                    onCommit={(pos) => moveRowTo(i, pos - 1)}
+                  />
+                  <SequenceArrows
+                    index={i}
+                    count={numberedRows.length}
+                    disabled={sending}
+                    label={row.shopName}
+                    onMove={(dir) => moveRowTo(i, i + dir)}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <p
+                      className="truncate text-[11px] font-bold text-slate-700"
+                      title={row.shopName}
+                    >
+                      {row.shopName}
+                    </p>
+                    <p className="truncate text-[10px] font-semibold text-slate-400">
+                      {row.village || "—"}
+                      {row.mobile ? ` · ${row.mobile}` : ""}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-right">
+                    <p className="text-[11px] font-bold tabular-nums text-emerald-700">
+                      {formatCount(row.boxes)} {t("orders.boxes_short")}
+                    </p>
+                    <p className="text-[10px] font-semibold tabular-nums text-slate-400">
+                      {row.birds > 0
+                        ? `${formatCount(row.birds)} ${t("orders.birds_short")}`
+                        : "—"}
+                    </p>
+                  </div>
+                </li>
+              ))}
+            </ul>
+          </aside>
 
-            {/* 2) The message text — what WhatsApp will carry */}
-            <div className="border-b border-slate-100 px-4 py-3.5">
-              <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
-                {t("orders.wa_message_preview")}
-              </p>
-              <pre
-                key={sheetLang}
-                className="mt-2 max-h-56 overflow-y-auto whitespace-pre-wrap rounded-xl border border-emerald-200 bg-[#e7f8ec] px-3 py-2 font-sans text-[11px] font-medium leading-relaxed text-slate-700 motion-safe:animate-[var(--animate-fade-in)]"
-              >
-                {message}
-              </pre>
-            </div>
-
-            {/* 3) ASSIGNMENT DETAILS — under the WhatsApp message */}
-            <div className="px-4 py-3.5">
+          {/* ── Right: assignment details under the heading, then the
+                 message preview beside the sheet ── */}
+          <div className="flex min-w-0 flex-1 flex-col">
+            <div className="border-b border-slate-100 bg-slate-50/60 px-5 py-3">
               <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
                 {t("orders.assignment_details")}
               </p>
-              <div className="mt-2 grid grid-cols-2 gap-1.5">
+              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-5">
                 <Fact
                   label={t("orders.pdf_order_date")}
                   value={orderDate || trip.tripDate}
@@ -440,27 +441,55 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
                 />
               </div>
             </div>
-          </aside>
 
-          {/* ── Right: the branded sheet ── */}
-          <div className="flex min-w-0 flex-1 flex-col bg-slate-200/60">
-            {building ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2 text-xs font-medium text-slate-500">
-                <Loader2 size={16} className="animate-spin text-emerald-500" />
-                {t("orders.pdf_building")}
+            <div className="flex min-h-0 flex-1">
+              {/* Branded sheet */}
+              <div className="flex min-w-0 flex-1 flex-col bg-slate-200/60">
+                {building ? (
+                  <div className="flex h-full flex-col items-center justify-center gap-2 text-xs font-medium text-slate-500">
+                    <Loader2
+                      size={16}
+                      className="animate-spin text-emerald-500"
+                    />
+                    {t("orders.pdf_building")}
+                  </div>
+                ) : buildError ? (
+                  <div className="flex h-full flex-col items-center justify-center gap-2 text-xs font-semibold text-rose-600">
+                    {buildError}
+                  </div>
+                ) : result ? (
+                  <div
+                    key={result.url}
+                    className="h-full motion-safe:animate-[var(--animate-fade-in)]"
+                  >
+                    <PdfBlobPreview url={result.url} />
+                  </div>
+                ) : null}
               </div>
-            ) : buildError ? (
-              <div className="flex h-full flex-col items-center justify-center gap-2 text-xs font-semibold text-rose-600">
-                {buildError}
-              </div>
-            ) : result ? (
-              <div
-                key={result.url}
-                className="h-full motion-safe:animate-[var(--animate-fade-in)]"
-              >
-                <PdfBlobPreview url={result.url} />
-              </div>
-            ) : null}
+
+              {/* Message preview — a WhatsApp-style bubble column */}
+              <aside className="flex w-[20rem] shrink-0 flex-col border-l border-slate-100 bg-[#efeae2]">
+                <div className="flex items-center gap-2 border-b border-slate-200/70 bg-white/80 px-4 py-3">
+                  <span className="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#25D366] text-white">
+                    <WhatsAppIcon size={13} />
+                  </span>
+                  <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+                    {t("orders.wa_message_preview")}
+                  </p>
+                </div>
+                <div className="flex-1 overflow-y-auto px-3 py-3">
+                  <pre
+                    key={sheetLang}
+                    className="relative whitespace-pre-wrap rounded-2xl rounded-tl-sm border border-emerald-200/70 bg-[#d9fdd3] px-3.5 py-2.5 font-sans text-[11.5px] font-medium leading-relaxed text-slate-800 shadow-sm motion-safe:animate-[var(--animate-fade-in-up)]"
+                  >
+                    {message}
+                  </pre>
+                  <p className="mt-1.5 pr-1 text-right text-[10px] font-semibold text-slate-400">
+                    → {supervisorMobile || "—"}
+                  </p>
+                </div>
+              </aside>
+            </div>
           </div>
         </div>
 
@@ -555,9 +584,9 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
             <button
               type="button"
               onClick={() => void handleSubmitAssignment()}
-              disabled={!sendOk || busy}
+              disabled={!canSubmit}
               className={`group relative inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-2.5 text-xs font-bold text-white shadow-md transition-all hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-lg active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 ${
-                sendOk && !busy
+                canSubmit
                   ? "motion-safe:animate-[var(--animate-pop-in)] ring-2 ring-emerald-400/60 ring-offset-2"
                   : ""
               }`}
@@ -566,7 +595,7 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
                 <Loader2 size={14} className="animate-spin" />
               ) : (
                 <span
-                  className={`inline-flex ${sendOk && !busy ? uiActionIconMotionClass.approve : ""}`}
+                  className={`inline-flex ${canSubmit ? uiActionIconMotionClass.approve : ""}`}
                 >
                   <CheckCircle2 size={14} />
                 </span>

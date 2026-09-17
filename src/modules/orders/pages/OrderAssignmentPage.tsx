@@ -1422,45 +1422,59 @@ function AssignmentEditor({
     vehicleTripId,
   ]);
 
-  const handleFinish = useCallback(async () => {
-    if (persistLockRef.current || busy || !vehicle) return;
-    if (!checkCapacity()) return;
-    const rows =
-      selected.length > 0
-        ? toOrderShopRows(selected)
-        : (orderRowsOnTrip(vehicle.trip, orderTrip.tripNo).filter(
-            (r) => !isCapturedRow(r),
-          ) as unknown as OrderShopRow[]);
-    if (rows.length === 0) {
-      showNotification(to("orders.selection_empty"), "info");
-      return;
-    }
-    if (selected.length > 0 && !(await assertFitsBalance())) return;
-    persistLockRef.current = true;
-    setSaving(true);
-    try {
-      const trip = await finishAssignment(vehicle.trip, [
-        { orderTripNo: orderTrip.tripNo, rows: uniqueShopRows(rows) },
-      ]);
-      showNotification(to("orders.assignment_finished"), "success");
-      onFinished(trip);
-    } catch {
-      persistLockRef.current = false;
-      showNotification(to("orders.refresh_failed"), "error");
-    } finally {
-      setSaving(false);
-    }
-  }, [
-    busy,
-    vehicle,
-    checkCapacity,
-    selected,
-    assertFitsBalance,
-    orderTrip.tripNo,
-    showNotification,
-    to,
-    onFinished,
-  ]);
+  const handleFinish = useCallback(
+    async (orderedShopIds?: number[]) => {
+      if (persistLockRef.current || busy || !vehicle) return;
+      if (!checkCapacity()) return;
+      // The review sheet may have re-ordered the shops without a send (download
+      // only) — honour that order here so the submitted sequence is the one
+      // the operator saw.
+      const ordered =
+        orderedShopIds && orderedShopIds.length
+          ? [...selected].sort(
+              (a, b) =>
+                orderedShopIds.indexOf(a.shopId) -
+                orderedShopIds.indexOf(b.shopId),
+            )
+          : selected;
+      const rows =
+        ordered.length > 0
+          ? toOrderShopRows(ordered)
+          : (orderRowsOnTrip(vehicle.trip, orderTrip.tripNo).filter(
+              (r) => !isCapturedRow(r),
+            ) as unknown as OrderShopRow[]);
+      if (rows.length === 0) {
+        showNotification(to("orders.selection_empty"), "info");
+        return;
+      }
+      if (selected.length > 0 && !(await assertFitsBalance())) return;
+      persistLockRef.current = true;
+      setSaving(true);
+      try {
+        const trip = await finishAssignment(vehicle.trip, [
+          { orderTripNo: orderTrip.tripNo, rows: uniqueShopRows(rows) },
+        ]);
+        showNotification(to("orders.assignment_finished"), "success");
+        onFinished(trip);
+      } catch {
+        persistLockRef.current = false;
+        showNotification(to("orders.refresh_failed"), "error");
+      } finally {
+        setSaving(false);
+      }
+    },
+    [
+      busy,
+      vehicle,
+      checkCapacity,
+      selected,
+      assertFitsBalance,
+      orderTrip.tripNo,
+      showNotification,
+      to,
+      onFinished,
+    ],
+  );
 
   // ── Review & Submit: CONFIRM FIRST — the card opens a check popup (message text +
   //    branded assignment sheet PDF); nothing goes out until "Confirm & Send".
