@@ -73,13 +73,20 @@ This is approximately **89% less processing time**, not a measurement of total b
   the identical shape `TripMasterTable isLoading` draws. A soft refresh takes the same row, so the table
   never changes height or width mid-read, and `CollectionEntries` being keyed per day means changing day
   reloads rows, not controls. This is the Trip List's contract, copied, not reinvented.
-- Columns are **equal width apart from S.No** (`table-fixed`, S.No measured at 96px so its glyph plus
-  the word fit) — the heads stop chasing their content. Each header carries its own 15px icon, coloured
-  per column, at the trip table's spacing. Header words and body words sit at **14px**
-  (`ORDERS_TABLE_TH_CLASS` / `ORDERS_TABLE_TD_CLASS`) — a step above the shared 12px — while the three
-  number boxes go the other way and drop to **28px** (`ORDERS_RISE_INPUT_CLASS`), so a row reads as its
-  words and not as a wall of inputs. Each box is tinted to match its own header glyph (birds emerald,
-  boxes violet, weight teal) and carries a small rise: a soft shadow that lifts a pixel on hover.
+- **Two measured columns, six equal ones.** `table-fixed` with S.No at 96px (its glyph plus the word) and
+  Action at 112px (the eraser and its 10-second countdown must never clip); everything between them —
+  shop · city · birds · boxes · weight · status — divides what is left into six equal shares, so no
+  heading can buy itself extra room from its neighbours and the heads stop chasing their content. A name
+  that does not fit its share wraps inside its own cell (`ORDERS_TABLE_TH_WRAP_CLASS`, derived from the
+  shared head class so the two can never drift apart), and the table's own floor is 1020px so a narrow
+  window scrolls instead of squashing the heads. Each header carries its own 15px icon, coloured per
+  column, at the trip table's spacing; header and body words sit at **14px** (`ORDERS_TABLE_TH_CLASS` /
+  `ORDERS_TABLE_TD_CLASS`), a step above the shared 12px.
+- The three number boxes go the other way and stay deliberately small: **24px tall and no wider than
+  86px** (`ORDERS_RISE_INPUT_CLASS`), so they read as fields for a number and not as bars filling the
+  row — the words above them are what should be large. Each is tinted to its own header glyph (birds
+  emerald, boxes violet, weight teal) and carries a small rise: a soft shadow at rest, lifting a pixel on
+  hover.
 - Trip No and Vehicle No are **not** Collection columns (assignment facts belong to Assignment); an
   assigned shop shows only its status pill, and a pending count rides **beside** the pill (`25 to
   deliver`) rather than inside it, so an equal-width column cannot be pushed over. The status cell carries

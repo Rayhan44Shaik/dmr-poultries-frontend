@@ -243,6 +243,40 @@ test("collection columns are collection-only, and every header carries its icon"
   ).toHaveCount(8);
 });
 
+test("two columns are measured, the six between them are equal, and the number boxes stay small", async ({
+  page,
+}) => {
+  await page.goto(`${ORDERS}/collection`);
+  const cells = await page.locator("#orders-panel-collection thead th").all();
+  expect(cells).toHaveLength(8);
+  const boxes = await Promise.all(cells.map((cell) => cell.boundingBox()));
+  const six = boxes.slice(1, 7).map((b) => b!.width);
+  // The six share what is left exactly — that is the point of measuring only the
+  // outer pair, so no heading can buy itself extra room from its neighbours.
+  expect(Math.max(...six) - Math.min(...six)).toBeLessThanOrEqual(2);
+  expect(Math.round(boxes[0]!.width)).toBe(96); // S.No
+  expect(Math.round(boxes[7]!.width)).toBe(112); // Action (eraser + countdown)
+  // A head that does not fit its share wraps inside its own cell.
+  await expect(
+    page.locator("#orders-panel-collection thead th").nth(4),
+  ).toHaveClass(/break-words/);
+
+  const row = page
+    .locator("#orders-panel-collection tbody tr")
+    .filter({ has: page.locator("input") })
+    .first();
+  const fields = await Promise.all(
+    (await row.getByRole("spinbutton").all()).map((input) =>
+      input.boundingBox(),
+    ),
+  );
+  expect(fields).toHaveLength(3); // birds · boxes · weight
+  for (const box of fields) {
+    expect(Math.round(box!.height)).toBe(24);
+    expect(box!.width).toBeLessThanOrEqual(88);
+  }
+});
+
 test("the day total is a cumulative line below the table, not a header KPI", async ({
   page,
 }) => {

@@ -104,6 +104,7 @@ import {
   ORDERS_FILTER_LABEL_CLASS,
   ORDERS_RISE_INPUT_CLASS as ORDERS_RISE_INPUT,
   ORDERS_TABLE_FONT_CLASS,
+  ORDERS_TABLE_TH_WRAP_CLASS,
   ORDERS_TABLE_TD_CLASS as opsTableTdClass,
   ORDERS_TABLE_TH_CLASS as opsTableThClass,
   ordersTableZebraRow,
@@ -181,7 +182,9 @@ function ColHead({
       }`}
     >
       <Icon size={15} className={`${tone} flex-shrink-0`} aria-hidden />
-      <span>{label}</span>
+      {/* min-w-0 so a long name wraps inside the column instead of overflowing
+          it — a flex item refuses to shrink below its content without this. */}
+      <span className="min-w-0">{label}</span>
     </span>
   );
 }
@@ -571,7 +574,7 @@ function OrderCollectionPage(props: Props) {
               load lands as rows appearing, not as the page changing shape. */}
           <div className="overflow-x-auto">
             <table
-              className={`w-full min-w-[900px] table-fixed ${ORDERS_TABLE_FONT_CLASS}`}
+              className={`w-full min-w-[1020px] table-fixed ${ORDERS_TABLE_FONT_CLASS}`}
             >
               <CollectionTableHead />
               <tbody className={opsTableDivideClass}>
@@ -630,8 +633,10 @@ function CollectionTableHead() {
       <tr className={opsTableHeadRowClass}>
         {/* Collection-only columns. Trip / vehicle are deliberately not here —
             they belong to Assignment. */}
-        {/* The only measured column: it has to hold its glyph plus the word
-            "S.No", and everything else shares what is left. */}
+        {/* Two columns are measured, the rest are divided evenly: S.No because a
+            glyph plus "S.No" needs its own room, Action because the eraser and its
+            10-second countdown must never be clipped. Everything between them —
+            shop, city, birds, boxes, weight, status — takes an equal sixth. */}
         <th className={`${opsTableThClass} w-[96px] text-center`}>
           <ColHead
             icon={Hash}
@@ -640,35 +645,35 @@ function CollectionTableHead() {
             tone="text-slate-400"
           />
         </th>
-        <th className={opsTableThClass}>
+        <th className={ORDERS_TABLE_TH_WRAP_CLASS}>
           <ColHead
             icon={Store}
             label={to("orders.col_shop_name")}
             tone="text-sky-600"
           />
         </th>
-        <th className={opsTableThClass}>
+        <th className={ORDERS_TABLE_TH_WRAP_CLASS}>
           <ColHead
             icon={MapPin}
             label={to("orders.col_village")}
             tone="text-amber-600"
           />
         </th>
-        <th className={opsTableThClass}>
+        <th className={ORDERS_TABLE_TH_WRAP_CLASS}>
           <ColHead
             icon={Bird}
             label={to("orders.col_birds")}
             tone="text-emerald-600"
           />
         </th>
-        <th className={opsTableThClass}>
+        <th className={ORDERS_TABLE_TH_WRAP_CLASS}>
           <ColHead
             icon={Boxes}
             label={`${to("orders.col_boxes")} *`}
             tone="text-violet-600"
           />
         </th>
-        <th className={`${opsTableThClass} text-right`}>
+        <th className={`${ORDERS_TABLE_TH_WRAP_CLASS} text-right`}>
           <ColHead
             icon={Scale}
             label={to("orders.col_weight")}
@@ -676,14 +681,14 @@ function CollectionTableHead() {
             tone="text-teal-600"
           />
         </th>
-        <th className={opsTableThClass}>
+        <th className={ORDERS_TABLE_TH_WRAP_CLASS}>
           <ColHead
             icon={Activity}
             label={to("orders.col_status")}
             tone="text-indigo-600"
           />
         </th>
-        <th className={`${opsTableThClass} text-right`}>
+        <th className={`${opsTableThClass} w-[112px] text-right`}>
           <ColHead
             icon={Eraser}
             label={to("orders.col_action")}
@@ -1323,7 +1328,7 @@ function CollectionEntries({
               column takes an equal share of what is left, so the eight headings sit
               on one rhythm instead of chasing their content. */}
           <table
-            className={`w-full min-w-[900px] table-fixed ${ORDERS_TABLE_FONT_CLASS}`}
+            className={`w-full min-w-[1020px] table-fixed ${ORDERS_TABLE_FONT_CLASS}`}
           >
             <CollectionTableHead />
             <tbody

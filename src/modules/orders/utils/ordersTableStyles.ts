@@ -35,7 +35,8 @@ export function ordersTableZebraRow(index: number, extraClass = ""): string {
  * The header word sits at 14px — a step above the shared 12px and above the
  * table body — so a column name reads at a glance beside its coloured glyph.
  */
-export const ORDERS_TABLE_TH_CLASS = "px-4 py-4 text-left text-[14px] font-bold uppercase tracking-[0.05em] text-slate-800 whitespace-nowrap";
+export const ORDERS_TABLE_TH_CLASS =
+  "px-4 py-4 text-left text-[14px] font-bold uppercase tracking-[0.05em] text-slate-800 whitespace-nowrap";
 
 /**
  * Filter field label for the Orders pages: the Trip List label chrome
@@ -51,6 +52,18 @@ export const ORDERS_FILTER_LABEL_CLASS =
  * Each column passes its own tone classes so the box matches its header glyph.
  */
 export const ORDERS_RISE_INPUT_CLASS =
-  "h-7 w-full rounded-md border px-2 text-[13px] font-semibold shadow-[0_1px_2px_rgba(15,23,42,0.06)] transition-[box-shadow,border-color,transform] duration-150 ease-out hover:shadow-[0_3px_8px_-3px_rgba(15,23,42,0.3)] motion-safe:hover:-translate-y-px focus:outline-none focus:ring-2 focus:ring-slate-400/30";
+  "h-6 w-full max-w-[86px] rounded-md border px-1.5 text-[13px] font-semibold shadow-[0_1px_2px_rgba(15,23,42,0.06)] transition-[box-shadow,border-color,transform] duration-150 ease-out hover:shadow-[0_3px_8px_-3px_rgba(15,23,42,0.3)] motion-safe:hover:-translate-y-px focus:outline-none focus:ring-2 focus:ring-slate-400/30";
 
-export const ORDERS_TABLE_TD_CLASS = "px-4 py-5 text-[14px] text-slate-700 align-middle";
+/**
+ * The same head, allowed to wrap. Every Collection column but S.No and Action is
+ * an equal share of what is left, so a long name like "No. of Boxes *" has to
+ * break inside its own cell instead of pushing the row wider than its neighbours
+ * — a nowrap head would either overflow its column or quietly win extra width.
+ */
+export const ORDERS_TABLE_TH_WRAP_CLASS = ORDERS_TABLE_TH_CLASS.replace(
+  "whitespace-nowrap",
+  "whitespace-normal break-words",
+);
+
+export const ORDERS_TABLE_TD_CLASS =
+  "px-4 py-5 text-[14px] text-slate-700 align-middle";
