@@ -213,6 +213,9 @@ export default {
   'fleet.doc_label.puc': 'PUC',
   'fleet.doc_label.rc': 'RC',
 
+  'fleet.documents.filter.document': 'Document',
+  'fleet.documents.filter.all_documents': 'All Documents',
+  'fleet.documents.sort.nearest_expiry': 'Nearest Expiry',
   'fleet.documents.load_failed': 'Failed to load permit documents',
   'fleet.documents.loading': 'Loading permit documents...',
   'fleet.documents.no_vehicles_match': 'No vehicles found matching your criteria.',

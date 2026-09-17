@@ -1,6 +1,6 @@
-import { memo, useState } from 'react';
-import { toBusinessDate } from '../../../../utils/businessDate';
-import type { LucideIcon } from 'lucide-react';
+import { memo, useState } from "react";
+import { toBusinessDate } from "../../../../utils/businessDate";
+import type { LucideIcon } from "lucide-react";
 import {
   X,
   Save,
@@ -16,10 +16,10 @@ import {
   Undo2,
   CheckCircle2,
   Download,
-} from 'lucide-react';
-import { DatePicker } from '../../../../components/common/DatePicker';
-import { useSafeNotification } from '../../../../hooks/useSafeNotification';
-import permitApi from '../../services/permitApi';
+} from "lucide-react";
+import { DatePicker } from "../../../../components/common/DatePicker";
+import { useSafeNotification } from "../../../../hooks/useSafeNotification";
+import permitApi from "../../services/permitApi";
 
 /** Minimal view of a permit document as rendered by the matrix / modal. */
 interface PermitDocView {
@@ -39,9 +39,17 @@ interface DocumentEditModalProps {
   onClose: () => void;
   onSave: (
     vehicleId: string | number,
-    updates: Record<string, { expiryDate?: string; documentNumber?: string; validFrom?: string; remarks?: string }>,
+    updates: Record<
+      string,
+      {
+        expiryDate?: string;
+        documentNumber?: string;
+        validFrom?: string;
+        remarks?: string;
+      }
+    >,
     files?: Record<string, File>,
-    removes?: Record<string, boolean>
+    removes?: Record<string, boolean>,
   ) => Promise<void>;
 }
 
@@ -53,59 +61,94 @@ interface DocStyleConfig {
 }
 
 const docConfig: Record<string, DocStyleConfig> = {
-  rc: { icon: FileText, bg: 'bg-indigo-50', border: 'border-indigo-200', text: 'text-indigo-700' },
-  insurance: { icon: Shield, bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-700' },
-  fitness: { icon: Dumbbell, bg: 'bg-emerald-50', border: 'border-emerald-200', text: 'text-emerald-700' },
-  permit: { icon: FileCheck, bg: 'bg-amber-50', border: 'border-amber-200', text: 'text-amber-700' },
-  puc: { icon: Car, bg: 'bg-purple-50', border: 'border-purple-200', text: 'text-purple-700' },
+  rc: {
+    icon: FileText,
+    bg: "bg-indigo-50",
+    border: "border-indigo-200",
+    text: "text-indigo-700",
+  },
+  insurance: {
+    icon: Shield,
+    bg: "bg-blue-50",
+    border: "border-blue-200",
+    text: "text-blue-700",
+  },
+  fitness: {
+    icon: Dumbbell,
+    bg: "bg-emerald-50",
+    border: "border-emerald-200",
+    text: "text-emerald-700",
+  },
+  permit: {
+    icon: FileCheck,
+    bg: "bg-amber-50",
+    border: "border-amber-200",
+    text: "text-amber-700",
+  },
+  puc: {
+    icon: Car,
+    bg: "bg-purple-50",
+    border: "border-purple-200",
+    text: "text-purple-700",
+  },
 };
 
-const fallbackConfig = { icon: FileText, bg: 'bg-slate-50', border: 'border-slate-200', text: 'text-slate-700' };
+const fallbackConfig = {
+  icon: FileText,
+  bg: "bg-slate-50",
+  border: "border-slate-200",
+  text: "text-slate-700",
+};
 
 /* Scan-action buttons share one height and padding so the row stays level
  * whether it holds one control or four. `whitespace-nowrap` keeps labels from
  * folding mid-word now that the modal is wide enough to fit them. */
 const scanActionClass =
-  'inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold whitespace-nowrap transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500';
+  "inline-flex h-9 shrink-0 items-center justify-center gap-1.5 rounded-lg px-3.5 text-xs font-semibold whitespace-nowrap transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500";
 const scanAttachClass = `${scanActionClass} border border-slate-200 bg-white text-slate-600 shadow-sm hover:border-slate-300 hover:bg-slate-50 hover:text-slate-800`;
 const scanViewClass = `${scanActionClass} bg-blue-50 text-blue-700 hover:bg-blue-100`;
 const scanDownloadClass = `${scanActionClass} bg-slate-100 text-slate-700 hover:bg-slate-200`;
 const scanRemoveClass = `${scanActionClass} bg-rose-50 text-rose-600 hover:bg-rose-100`;
 /** Selected-file chip and the "will be removed" confirm share one shell. */
 const scanChipClass =
-  'inline-flex h-9 min-w-0 items-center gap-2 rounded-lg border px-3 text-xs font-semibold';
+  "inline-flex h-9 min-w-0 items-center gap-2 rounded-lg border px-3 text-xs font-semibold";
 
 const getExpiry = (doc: PermitDocView | undefined): string | undefined => {
-  if (doc && typeof doc === 'object') {
+  if (doc && typeof doc === "object") {
     return doc.expiryDate;
   }
   return undefined;
 };
 
 const normalizeDate = (input: string | Date | null | undefined): string => {
-  if (!input) return '';
-  if (typeof input === 'string') {
+  if (!input) return "";
+  if (typeof input === "string") {
     const date = new Date(input);
-    if (!isNaN(date.getTime())) return date.toISOString().split('T')[0];
-    const parts = input.split('/');
+    if (!isNaN(date.getTime())) return date.toISOString().split("T")[0];
+    const parts = input.split("/");
     if (parts.length === 3) {
       const d = new Date(`${parts[2]}-${parts[1]}-${parts[0]}`);
-      if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+      if (!isNaN(d.getTime())) return d.toISOString().split("T")[0];
     }
-    return '';
+    return "";
   }
   if (input instanceof Date) {
-    if (!isNaN(input.getTime())) return input.toISOString().split('T')[0];
+    if (!isNaN(input.getTime())) return input.toISOString().split("T")[0];
   }
-  return '';
+  return "";
 };
 
-const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: DocumentEditModalProps) => {
+const DocumentEditModal = ({
+  vehicle,
+  docMap,
+  docTypes,
+  onClose,
+  onSave,
+}: DocumentEditModalProps) => {
   const { showNotification } = useSafeNotification();
 
-  const documentTypes = (docTypes && docTypes.length > 0)
-    ? docTypes
-    : Object.keys(docMap);
+  const documentTypes =
+    docTypes && docTypes.length > 0 ? docTypes : Object.keys(docMap);
 
   const initialDates: Record<string, string> = {};
   const initialValidFrom: Record<string, string> = {};
@@ -123,47 +166,73 @@ const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: Docum
     if (doc?.remarks) initialRemarks[type] = String(doc.remarks);
   });
 
-  const [editedDates, setEditedDates] = useState<Record<string, string>>(() => ({ ...initialDates }));
-  const [editedValidFrom, setEditedValidFrom] = useState<Record<string, string>>(() => ({ ...initialValidFrom }));
-  const [editedNumbers, setEditedNumbers] = useState<Record<string, string>>(() => ({ ...initialNumbers }));
-  const [editedRemarks, setEditedRemarks] = useState<Record<string, string>>(() => ({ ...initialRemarks }));
-  const [selectedFiles, setSelectedFiles] = useState<Record<string, File | null>>({});
+  const [editedDates, setEditedDates] = useState<Record<string, string>>(
+    () => ({ ...initialDates }),
+  );
+  const [editedValidFrom, setEditedValidFrom] = useState<
+    Record<string, string>
+  >(() => ({ ...initialValidFrom }));
+  const [editedNumbers, setEditedNumbers] = useState<Record<string, string>>(
+    () => ({ ...initialNumbers }),
+  );
+  const [editedRemarks, setEditedRemarks] = useState<Record<string, string>>(
+    () => ({ ...initialRemarks }),
+  );
+  const [selectedFiles, setSelectedFiles] = useState<
+    Record<string, File | null>
+  >({});
   const [removeFlags, setRemoveFlags] = useState<Record<string, boolean>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
 
   const handleDateChange = (type: string, value: string | Date | null) => {
     const normalized = normalizeDate(value);
     setEditedDates((prev) => ({ ...prev, [type]: normalized }));
-    setErrors((prev) => ({ ...prev, [type]: '' }));
+    setErrors((prev) => ({ ...prev, [type]: "" }));
   };
 
   const handleNumberChange = (type: string, value: string) => {
     setEditedNumbers((prev) => ({ ...prev, [type]: value }));
-    setErrors((prev) => ({ ...prev, [type]: '' }));
+    setErrors((prev) => ({ ...prev, [type]: "" }));
   };
 
   const handleFileChange = (type: string, file: File | null) => {
     if (file) {
-      const supported = ['image/png', 'image/jpeg', 'application/pdf'].includes(file.type) || /\.(png|jpe?g|pdf)$/i.test(file.name);
+      const supported =
+        ["image/png", "image/jpeg", "application/pdf"].includes(file.type) ||
+        /\.(png|jpe?g|pdf)$/i.test(file.name);
       if (!supported) {
-        setErrors((prev) => ({ ...prev, [type]: 'Only JPG, JPEG, PNG and PDF files are supported.' }));
+        setErrors((prev) => ({
+          ...prev,
+          [type]: "Only JPG, JPEG, PNG and PDF files are supported.",
+        }));
         return;
       }
       if (file.size > 10 * 1024 * 1024) {
-        setErrors((prev) => ({ ...prev, [type]: 'File size cannot exceed 10 MB.' }));
+        setErrors((prev) => ({
+          ...prev,
+          [type]: "File size cannot exceed 10 MB.",
+        }));
         return;
       }
     }
     setSelectedFiles((prev) => ({ ...prev, [type]: file }));
     if (file) setRemoveFlags((prev) => ({ ...prev, [type]: false }));
-    setErrors((prev) => ({ ...prev, [type]: '' }));
+    setErrors((prev) => ({ ...prev, [type]: "" }));
   };
 
   const handleSave = async () => {
     const newErrors: Record<string, string> = {};
     const todayStr = toBusinessDate(new Date());
 
-    const updates: Record<string, { expiryDate?: string; documentNumber?: string; validFrom?: string; remarks?: string }> = {};
+    const updates: Record<
+      string,
+      {
+        expiryDate?: string;
+        documentNumber?: string;
+        validFrom?: string;
+        remarks?: string;
+      }
+    > = {};
     const files: Record<string, File> = {};
     const removes: Record<string, boolean> = {};
 
@@ -171,38 +240,54 @@ const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: Docum
       const doc = docMap[type];
       const newDate = editedDates[type];
       const newNumber = editedNumbers[type];
-      const newValidFrom = editedValidFrom[type] || '';
-      const newRemarks = editedRemarks[type] || '';
+      const newValidFrom = editedValidFrom[type] || "";
+      const newRemarks = editedRemarks[type] || "";
       const oldDate = initialDates[type];
-      const oldValidFrom = initialValidFrom[type] || '';
-      const oldRemarks = initialRemarks[type] || '';
-      const oldNumber = doc?.documentNumber ?? '';
+      const oldValidFrom = initialValidFrom[type] || "";
+      const oldRemarks = initialRemarks[type] || "";
+      const oldNumber = doc?.documentNumber ?? "";
       const hasFile = Boolean(selectedFiles[type]);
       const removing = Boolean(removeFlags[type]);
 
       if (newDate && newDate !== oldDate && newDate < todayStr) {
-        newErrors[type] = 'Date cannot be in the past';
+        newErrors[type] = "Date cannot be in the past";
         return;
       }
 
       const dateChanged = Boolean(newDate && newDate !== oldDate);
-      const numberChanged = newNumber != null && String(newNumber).trim() !== String(oldNumber ?? '');
+      const numberChanged =
+        newNumber != null &&
+        String(newNumber).trim() !== String(oldNumber ?? "");
       const validFromChanged = newValidFrom !== oldValidFrom;
       const remarksChanged = newRemarks.trim() !== oldRemarks.trim();
 
       if (newValidFrom && newDate && newValidFrom > newDate) {
-        newErrors[type] = 'Valid from date must be before the expiry date.';
+        newErrors[type] = "Valid from date must be before the expiry date.";
         return;
       }
 
-      if (!dateChanged && !numberChanged && !validFromChanged && !remarksChanged && !hasFile && !removing) return;
+      if (
+        !dateChanged &&
+        !numberChanged &&
+        !validFromChanged &&
+        !remarksChanged &&
+        !hasFile &&
+        !removing
+      )
+        return;
 
       if (!newDate && !oldDate) {
-        newErrors[type] = 'Please provide an expiry date before saving this document.';
+        newErrors[type] =
+          "Please provide an expiry date before saving this document.";
         return;
       }
 
-      const entry: { expiryDate?: string; documentNumber?: string; validFrom?: string; remarks?: string } = {};
+      const entry: {
+        expiryDate?: string;
+        documentNumber?: string;
+        validFrom?: string;
+        remarks?: string;
+      } = {};
       if (newDate || oldDate) entry.expiryDate = newDate || oldDate;
       if (newNumber != null) entry.documentNumber = String(newNumber).trim();
       if (validFromChanged) entry.validFrom = newValidFrom;
@@ -214,18 +299,18 @@ const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: Docum
 
     setErrors(newErrors);
     if (Object.keys(newErrors).length > 0) {
-      showNotification('Please fix the errors before saving.', 'error');
+      showNotification("Please fix the errors before saving.", "error");
       return;
     }
     if (Object.keys(updates).length === 0) {
-      showNotification('No changes to save', 'info');
+      showNotification("No changes to save", "info");
       return;
     }
 
     try {
       await onSave(vehicle.id, updates, files, removes);
     } catch {
-      showNotification('Failed to update documents', 'error');
+      showNotification("Failed to update documents", "error");
     }
   };
 
@@ -241,7 +326,6 @@ const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: Docum
           an absolutely positioned popup, so any `overflow-hidden` /
           `overflow-y-auto` ancestor clips it and the calendar becomes unusable. */}
       <div className="bg-slate-50 rounded-2xl shadow-2xl w-full max-w-6xl my-auto flex flex-col overflow-visible animate-fade-in">
-
         {/* Header — rounded-t-2xl keeps the corners clean now that the card no
             longer relies on overflow-hidden to clip it. */}
         <div className="flex justify-between items-center px-6 py-4 bg-white border-b border-slate-200 shrink-0 rounded-t-2xl">
@@ -251,7 +335,8 @@ const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: Docum
               Edit Documents
             </h2>
             <p className="text-sm font-semibold text-slate-500 mt-0.5">
-              Vehicle: <span className="text-blue-600">{vehicle.vehicleNumber}</span>
+              Vehicle:{" "}
+              <span className="text-blue-600">{vehicle.vehicleNumber}</span>
             </p>
           </div>
           <button
@@ -269,8 +354,8 @@ const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: Docum
             {documentTypes.map((type) => {
               const doc = docMap[type];
               const expiry = getExpiry(doc);
-              const currentDate = editedDates[type] || '';
-              const currentNumber = editedNumbers[type] || '';
+              const currentDate = editedDates[type] || "";
+              const currentNumber = editedNumbers[type] || "";
               const error = errors[type];
               const hasExisting = !!expiry;
               const hasScan = Boolean(doc?.hasDocument && doc?.fileName);
@@ -287,11 +372,17 @@ const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: Docum
                 >
                   {/* Colored Header specific to document type */}
                   {/* FIX: Added rounded-t-xl to keep corners clean without overflow-hidden */}
-                  <div className={`flex items-center gap-3 px-4 py-3 border-b rounded-t-xl ${config.bg} ${config.border}`}>
-                    <div className={`p-1.5 rounded-lg bg-white shadow-sm border ${config.border}`}>
+                  <div
+                    className={`flex items-center gap-3 px-4 py-3 border-b rounded-t-xl ${config.bg} ${config.border}`}
+                  >
+                    <div
+                      className={`p-1.5 rounded-lg bg-white shadow-sm border ${config.border}`}
+                    >
                       <Icon className={`w-4 h-4 ${config.text}`} />
                     </div>
-                    <h3 className={`font-bold uppercase tracking-wide text-[13px] ${config.text}`}>
+                    <h3
+                      className={`font-bold uppercase tracking-wide text-[13px] ${config.text}`}
+                    >
                       {type}
                     </h3>
                   </div>
@@ -307,7 +398,9 @@ const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: Docum
                         <input
                           type="text"
                           value={currentNumber}
-                          onChange={(e) => handleNumberChange(type, e.target.value)}
+                          onChange={(e) =>
+                            handleNumberChange(type, e.target.value)
+                          }
                           placeholder="e.g. 123456789"
                           className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all font-medium text-slate-800"
                         />
@@ -315,18 +408,53 @@ const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: Docum
 
                       {/* Expiry Date */}
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Expiry Date</label>
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                          Expiry Date
+                        </label>
                         <div className="relative w-full z-10">
-                          <DatePicker value={currentDate} onChange={(val) => handleDateChange(type, val)} placeholder={hasExisting ? 'Update date' : 'Select date'} error={error} className="w-full text-sm" />
+                          <DatePicker
+                            value={currentDate}
+                            onChange={(val) => handleDateChange(type, val)}
+                            placeholder={
+                              hasExisting ? "Update date" : "Select date"
+                            }
+                            error={error}
+                            className="w-full text-sm"
+                          />
                         </div>
                       </div>
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Valid From</label>
-                        <DatePicker value={editedValidFrom[type] || ''} onChange={(val) => setEditedValidFrom((prev) => ({ ...prev, [type]: normalizeDate(val) }))} placeholder="Valid from" className="w-full text-sm" />
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                          Valid From
+                        </label>
+                        <DatePicker
+                          value={editedValidFrom[type] || ""}
+                          onChange={(val) =>
+                            setEditedValidFrom((prev) => ({
+                              ...prev,
+                              [type]: normalizeDate(val),
+                            }))
+                          }
+                          placeholder="Valid from"
+                          className="w-full text-sm"
+                        />
                       </div>
                       <div className="flex flex-col gap-1.5">
-                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">Remarks</label>
-                        <input type="text" value={editedRemarks[type] || ''} onChange={(e) => setEditedRemarks((prev) => ({ ...prev, [type]: e.target.value }))} placeholder="Optional remarks" className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500" />
+                        <label className="text-xs font-bold text-slate-500 uppercase tracking-wider">
+                          Remarks
+                        </label>
+                        <input
+                          type="text"
+                          value={editedRemarks[type] || ""}
+                          onChange={(e) =>
+                            setEditedRemarks((prev) => ({
+                              ...prev,
+                              [type]: e.target.value,
+                            }))
+                          }
+                          placeholder="Optional remarks"
+                          className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm bg-slate-50 focus:bg-white focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                        />
                       </div>
                     </div>
 
@@ -358,29 +486,49 @@ const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: Docum
                             <span
                               className={`${scanChipClass} max-w-full border-emerald-200 bg-emerald-50 text-emerald-700 sm:max-w-[280px]`}
                             >
-                              <CheckCircle2 className="h-4 w-4 shrink-0" aria-hidden="true" />
-                              <span className="truncate" title={selectedFileName}>
+                              <CheckCircle2
+                                className="h-4 w-4 shrink-0"
+                                aria-hidden="true"
+                              />
+                              <span
+                                className="truncate"
+
+                              >
                                 {selectedFileName}
                               </span>
                               <button
                                 type="button"
                                 onClick={() => handleFileChange(type, null)}
-                                title="Undo upload"
                                 aria-label="Undo upload"
                                 className="-mr-1 shrink-0 rounded p-1 text-emerald-600 transition-colors hover:bg-emerald-100 hover:text-emerald-800"
                               >
-                                <Undo2 className="h-3.5 w-3.5" aria-hidden="true" />
+                                <Undo2
+                                  className="h-3.5 w-3.5"
+                                  aria-hidden="true"
+                                />
                               </button>
                             </span>
                           ) : (
-                            <label className={`${scanAttachClass} cursor-pointer`}>
-                              <Upload className="h-3.5 w-3.5 text-slate-400" aria-hidden="true" />
-                              {hasScan ? 'Replace Scan' : 'Attach Scan (Optional)'}
+                            <label
+                              className={`${scanAttachClass} cursor-pointer`}
+                            >
+                              <Upload
+                                className="h-3.5 w-3.5 text-slate-400"
+                                aria-hidden="true"
+                              />
+                              {hasScan
+                                ? "Replace Scan"
+                                : "Attach Scan (Optional)"}
                               <input
                                 type="file"
                                 accept=".png,.jpg,.jpeg,.pdf"
                                 className="hidden"
-                                onChange={(e) => handleFileChange(type, e.target.files?.[0] ?? null)}
+                                onChange={(e) =>
+                                  handleFileChange(
+                                    type,
+                                    e.target.files?.[0] ?? null,
+                                  )
+                                }
                               />
                             </label>
                           )}
@@ -392,20 +540,29 @@ const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: Docum
                               target="_blank"
                               rel="noreferrer"
                               className={scanViewClass}
-                              title={doc?.fileName ?? undefined}
                             >
-                              <Eye className="h-3.5 w-3.5" aria-hidden="true" /> View
+                              <Eye className="h-3.5 w-3.5" aria-hidden="true" />{" "}
+                              View
                             </a>
                           )}
 
                           {hasScan && !selectedFileName && (
                             <button
                               type="button"
-                              onClick={() => permitApi.downloadDocument(vehicle.id, type, doc?.fileName)}
+                              onClick={() =>
+                                permitApi.downloadDocument(
+                                  vehicle.id,
+                                  type,
+                                  doc?.fileName,
+                                )
+                              }
                               className={scanDownloadClass}
-                              title="Download scan"
                             >
-                              <Download className="h-3.5 w-3.5" aria-hidden="true" /> Download
+                              <Download
+                                className="h-3.5 w-3.5"
+                                aria-hidden="true"
+                              />{" "}
+                              Download
                             </button>
                           )}
 
@@ -413,13 +570,22 @@ const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: Docum
                             <button
                               type="button"
                               onClick={() => {
-                                setRemoveFlags((prev) => ({ ...prev, [type]: true }));
-                                setSelectedFiles((prev) => ({ ...prev, [type]: null }));
+                                setRemoveFlags((prev) => ({
+                                  ...prev,
+                                  [type]: true,
+                                }));
+                                setSelectedFiles((prev) => ({
+                                  ...prev,
+                                  [type]: null,
+                                }));
                               }}
                               className={scanRemoveClass}
-                              title="Remove scan"
                             >
-                              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" /> Remove
+                              <Trash2
+                                className="h-3.5 w-3.5"
+                                aria-hidden="true"
+                              />{" "}
+                              Remove
                             </button>
                           )}
 
@@ -430,7 +596,12 @@ const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: Docum
                               Scan will be removed
                               <button
                                 type="button"
-                                onClick={() => setRemoveFlags((prev) => ({ ...prev, [type]: false }))}
+                                onClick={() =>
+                                  setRemoveFlags((prev) => ({
+                                    ...prev,
+                                    [type]: false,
+                                  }))
+                                }
                                 className="shrink-0 font-bold underline decoration-rose-300 underline-offset-2 transition-colors hover:text-rose-900"
                               >
                                 Undo
@@ -440,7 +611,6 @@ const DocumentEditModal = ({ vehicle, docMap, docTypes, onClose, onSave }: Docum
                         </div>
                       </div>
                     </div>
-
                   </div>
                 </div>
               );

@@ -213,6 +213,9 @@ export default {
   'fleet.doc_label.puc': 'PUC',
   'fleet.doc_label.rc': 'RC',
 
+  'fleet.documents.filter.document': 'పత్రం',
+  'fleet.documents.filter.all_documents': 'అన్ని పత్రాలు',
+  'fleet.documents.sort.nearest_expiry': 'సమీప గడువు',
   'fleet.documents.load_failed': 'పర్మిట్ పత్రాలు లోడ్ చేయడం విఫలమైంది',
   'fleet.documents.loading': 'పర్మిట్ పత్రాలు లోడ్ అవుతున్నాయి…',
   'fleet.documents.no_vehicles_match': 'మీ ప్రమాణాలకు సరిపోలే వాహనాలు ఏవీ కనుగొనబడలేదు.',
