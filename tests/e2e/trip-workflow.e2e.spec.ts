@@ -518,7 +518,7 @@ const COLLECTION_PLAN: Array<[string, number]> = [
   [SEED.shops[4], 2],
 ];
 
-test('27: Order Collection UI — one `orders` row per shop, real quantities, survives reload, Finish latches the day', async ({
+test('27: Order Collection UI — one `orders` row per shop, real quantities, survives reload, the deadline files the day', async ({
   page,
   request,
 }) => {
@@ -567,14 +567,19 @@ test('27: Order Collection UI — one `orders` row per shop, real quantities, su
   }
   await assertNoRawKeys(page);
 
-  // Finish Collection latches the day (statuses become "Collected").
+  // Nothing latches the day by hand any more: its window (48h from the start of
+  // the day) is the deadline, and crossing it submits the day on its own. Fake
+  // Date only, reopen the same day, and the page files it — no button involved.
+  await expect(page.getByRole('button', { name: /finish collection/i })).toHaveCount(0);
+  await page.clock.setFixedTime(Date.now() + 48 * 60 * 60 * 1000 + 5 * 60 * 1000);
   const [finishRes] = await Promise.all([
     page.waitForResponse(
       (r) => /\/orders\/collection$/.test(r.url()) && r.request().method() === 'POST'
     ),
-    page.getByRole('button', { name: /finish collection/i }).click(),
+    page.goto(`/operations/orders/collection?collectionDate=${day}`),
   ]);
-  expect(finishRes.ok(), `finish collection → ${finishRes.status()} ${await finishRes.text()}`).toBeTruthy();
+  expect(finishRes.ok(), `auto-submit at the deadline → ${finishRes.status()} ${await finishRes.text()}`).toBeTruthy();
+  await page.clock.resume();
 
   const finished = await apiOrders(request, `?date=${day}&pageSize=200`);
   expect(finished.total).toBe(COLLECTION_PLAN.length);

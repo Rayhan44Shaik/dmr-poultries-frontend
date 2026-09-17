@@ -29,7 +29,7 @@ import {
   UserRound,
   Wrench,
 } from "lucide-react";
-import { QUICK_ACTIONS, resolveRoute } from "../../routes/navigation";
+import { NAV_CHILD_GROUPS, QUICK_ACTIONS, resolveRoute } from "../../routes/navigation";
 import { useTheme } from "../../providers/ThemeProvider";
 import { SHOW_THEME_CONTROLS } from "../../providers/themeControls";
 import { translateRole, useI18n } from "../../i18n";
@@ -363,6 +363,15 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
       "");
   const sectionLabel = route.section?.labelKey ? t(route.section.labelKey) : route.section?.label;
 
+  // The collapsible group the current row sits in, if any ("orders" → "Orders").
+  const group = route.page?.group ? NAV_CHILD_GROUPS[route.page.group] : undefined;
+  const groupLabel = group ? (group.labelKey ? t(group.labelKey) : group.label) : undefined;
+  // The group crumb lands on the module's own first page, so "Orders" always
+  // opens Collection — never whichever page happens to be open.
+  const groupPath = route.section?.children.find(
+    (child) => child.group === route.page?.group
+  )?.path;
+
 
   return (
     <header
@@ -397,6 +406,21 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
               {sectionLabel}
             </Link>
             <ChevronRight size={16} className="hidden mx-2 shrink-0 text-slate-400 sm:block dark:text-slate-600" />
+            {groupLabel && (
+              <>
+                {/* Sub-modules get their own crumb, so an Orders page reads
+                    "Operations › Orders › Collection" — the same three levels
+                    the sidebar shows, and it keeps a short row name ("Collection")
+                    unambiguous. */}
+                <Link
+                  to={groupPath ?? route.section?.children[0]?.path ?? "/dashboard"}
+                  className="hidden truncate text-[15px] font-medium text-slate-500 transition-colors hover:text-slate-800 sm:block dark:text-slate-400 dark:hover:text-slate-200"
+                >
+                  {groupLabel}
+                </Link>
+                <ChevronRight size={16} className="hidden mx-2 shrink-0 text-slate-400 sm:block dark:text-slate-600" />
+              </>
+            )}
           </>
         )}
         <h1 className="truncate text-[16px] font-semibold tracking-tight text-slate-900 sm:text-[17px] dark:text-white">

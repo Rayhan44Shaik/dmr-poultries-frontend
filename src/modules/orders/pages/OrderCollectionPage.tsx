@@ -1,39 +1,45 @@
 // src/modules/orders/pages/OrderCollectionPage.tsx
-// TAB 1 — ORDER COLLECTION (day-based).
+// ORDER COLLECTION — the day-based collection screen of the Orders module
+// (/operations/orders/collection, reached from the sidebar group "Orders").
 //
 // Shows the shops collected for the SELECTED OPERATIONAL DAY. A day accepts
-// entries for 48h from its start — 04/09 is still editable on 05/09 and is
-// AUTO-CLOSED at 06/09 12:00 AM whether or not anyone pressed "Finish
-// Collection" (see ordersUtils.isCollectionAutoClosed). Closed days,
+// entries for 48h from its start — 16/09 is still editable on 17/09 and is
+// AUTO-CLOSED AND AUTO-SUBMITTED at 18/09 12:00 AM (see
+// ordersUtils.isCollectionAutoClosed / collectionAutoSubmitDelay). There is no
+// "Finish Collection" and no "Cancel": the only explicit action is
+// Save Progress, and the deadline files the day by itself. Closed days,
 // finished days and fully-assigned days are READ-ONLY (locked, view only —
-// no edit, no boxes/birds, no delete, no reorder, no assignment changes
-// here), and an auto-closed day shows a CLOSED marker right beside the
-// day's shops / boxes / birds summary. The day is chosen with the single
-// global date selector (shared DatePicker) — no Previous/Next day buttons,
+// no edit, no boxes/birds, no reorder, no assignment changes here). The day is
+// chosen with the single global date selector — no Previous/Next day buttons,
 // no date-card scroller.
 //
-// The table's job is to COLLECT THE SHOP ORDER: S.No, Shop, Village,
-// Birds (optional), Boxes (mandatory), Weight, Status. Assignment facts
-// (trip / vehicle / sequence) are NOT permanent columns here — an assigned
-// shop shows a compact status (Assigned / Delivered, full trip + vehicle
-// details on hover). Assignment belongs to Tab 2, tracking to Tab 3.
+// Filters mirror the Trip List layout exactly: day + city on the first row,
+// sort / search / reset on a 12-column second row, each field labelled with its
+// own icon.
+//
+// The table's job is to COLLECT THE SHOP ORDER: S.No, Shop, City, Birds
+// (optional), Boxes (mandatory), Weight, Status, Clear. Trip and vehicle are
+// deliberately NOT columns here — they belong to Assignment, and an assigned
+// shop only shows a compact status (details on hover).
+//
+// The day's cumulative total sits BELOW the table (how many shops had orders
+// taken, with birds / boxes / kg muted next to it), not in the header.
 //
 // One compact table-level search filters the shop list (shop, village,
-// trip no, vehicle no, status); results are paginated 10 per page.
+// status); results are paginated.
 //
 // Persistence (existing API, no local-only state):
-//   Save Progress      → POST /trips/:idOr0/steps/deliveries (mode save)
-//   Finish Collection  → same call + startStepSubmitted (final validation)
+//   Save Progress → POST /trips/:idOr0/steps/deliveries (mode save)
+//   deadline      → same call + startStepSubmitted (the clock submits the day)
 // Refreshing the page always reproduces the saved collection.
 
-import React, { useCallback, useMemo, useRef, useState } from "react";
-import { Loader2, Lock, Save, Send, Trash2, X, Calendar, ArrowUpDown, Search, MapPin, RotateCcw, ClipboardList } from "lucide-react";
+import React, { type ComponentType, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Activity, ArrowUpDown, Bird, Boxes, Calendar, ClipboardList, Clock, Hash, Loader2, Lock, MapPin, RotateCcw, Save, Scale, Search, Store, Trash2 } from "lucide-react";
 import type { Shop } from "../../masters/shops/types/shop";
 import type { Trip } from "../../../shared/trip";
 import {
   opsFilterCardClass,
   opsFilterLabelClass,
-  opsPrimaryButtonClass,
   opsSecondaryButtonClass,
   opsTableDivideClass,
   opsTableHeadRowClass,
@@ -43,6 +49,7 @@ import { useSafeNotification } from "../../../hooks/useSafeNotification";
 import { usePendingDelete } from "../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../components/common/PendingDeleteNotification";
 import {
+  collectionAutoSubmitDelay,
   collectionTotals,
   formatCollectionDeadline,
   formatDayFull,
@@ -83,6 +90,37 @@ import {
 /** Fixed page size — 10 rows per page (global pagination component). */
 
 const ORDER_REMARKS = "[ORDER]";
+
+type ColIcon = ComponentType<{ size?: number | string; className?: string; "aria-hidden"?: boolean }>;
+
+/**
+ * Column header with its icon — the exact Trip List pattern (14px glyph, 6px
+ * gap, uppercase label, same header padding), so every Orders column reads
+ * with the same spacing as the trip table it sits beside.
+ */
+function ColHead({
+  icon: Icon,
+  label,
+  align = "left",
+}: {
+  icon: ColIcon;
+  label: string;
+  align?: "left" | "right" | "center";
+}) {
+  return (
+    <span
+      className={`flex items-center gap-1.5${
+        align === "right" ? " justify-end" : align === "center" ? " justify-center" : ""
+      }`}
+    >
+      <Icon size={14} className="text-slate-400 flex-shrink-0" aria-hidden />
+      <span>{label}</span>
+    </span>
+  );
+}
+
+/** setTimeout rolls over past ~24.8 days — longer waits are not armed. */
+const MAX_TIMEOUT_MS = 2 ** 31 - 1;
 
 let clientKeySeq = 0;
 function newClientKey(): string {
@@ -262,6 +300,12 @@ function CollectionEntries({
     [shops, collection]
   );
   const [entries, setEntries] = useState<Map<number, EntryRow>>(initial.map);
+  // The auto-submit timer reads the rows through this ref, so typing never
+  // re-arms the deadline timer (and the timer never holds stale rows).
+  const entriesRef = useRef(entries);
+  useEffect(() => {
+    entriesRef.current = entries;
+  }, [entries]);
   const [savedSnapshot, setSavedSnapshot] = useState<string>(initial.snapshot);
 
   const isDirty = useMemo(
@@ -421,30 +465,20 @@ function CollectionEntries({
     }
   }, [busy, isEditable, entries, onSaved, showNotification, to]);
 
-  // ── Finish Collection (final mandatory validation) ───────────────────────
-  // Boxes are MANDATORY per shop; birds are OPTIONAL (weight stays
-  // pending until the delivery step).
-  const handleFinish = useCallback(async () => {
-    if (persistLockRef.current || busy || !isEditable) return;
-    const all = Array.from(entries.values());
+  // ── The clock finishes the day (no Finish button) ─────────────────────────
+  // A day's window is 48h from its start, so the 16th is filed at the 18th
+  // 12:00 AM. Nothing to press: the deadline submits whatever is entered
+  // (validated rows included as-is — a supervisor's birds must not be lost
+  // because boxes were still blank). While the page is open a timer fires at
+  // the exact deadline; if the window closed while nobody was looking, the
+  // first load files it instead.
+  /** Files the day. Resolves true when a submit actually went out, so the
+   *  caller knows whether the day still owes one. */
+  const autoSubmitDay = useCallback(async (): Promise<boolean> => {
+    if (persistLockRef.current) return false;
+    const all = Array.from(entriesRef.current.values());
     const enteredRows = all.filter((r) => r.birds > 0 || r.boxes > 0);
-    if (enteredRows.length === 0) {
-      showNotification(to("orders.add_at_least_one_shop"), "info");
-      return;
-    }
-    const invalid = enteredRows.filter((r) => !(r.boxes > 0));
-    if (invalid.length > 0) {
-      showNotification(
-        to("orders.finish_invalid", {
-          shops: invalid
-            .slice(0, 5)
-            .map((r) => r.shopName)
-            .join(", ") + (invalid.length > 5 ? "…" : ""),
-        }),
-        "info"
-      );
-      return;
-    }
+    if (enteredRows.length === 0) return false;
     persistLockRef.current = true;
     setFinishing(true);
     try {
@@ -454,43 +488,54 @@ function CollectionEntries({
         toOrderShopRows(all)
       );
       containerRef.current = { id: updated.id, tripNo: updated.tripNo };
-      showNotification(to("orders.collection_finished"), "success");
+      const missingBoxes = enteredRows.filter((r) => !(r.boxes > 0)).length;
+      showNotification(
+        missingBoxes > 0
+          ? to("orders.collection_auto_submitted_partial", { shops: missingBoxes })
+          : to("orders.collection_auto_submitted"),
+        "success"
+      );
       onFinished(updated);
+      return true;
     } catch (error) {
       showNotification(handleApiError(error), "error");
+      return false;
     } finally {
       persistLockRef.current = false;
       setFinishing(false);
     }
-  }, [busy, isEditable, entries, onFinished, showNotification, to]);
+  }, [onFinished, showNotification, to]);
 
-  // ── Cancel (discard unsaved entries) ──────────────────────────────────────
-  const [confirmDiscard, setConfirmDiscard] = useState(false);
-  const handleCancel = () => {
-    if (busy || !isEditable) return;
-    if (isDirty) {
-      setConfirmDiscard(true);
+  const autoSubmittedDayRef = useRef<string | null>(null);
+  useEffect(() => {
+    // A day whose window is closed is read-only, but the clock still owes it a
+    // submission — so this keys off "finished", not off the lock. Each day is
+    // filed at most once per mount.
+    if (collection?.finished || autoSubmittedDayRef.current === day) return;
+    const delay = collectionAutoSubmitDelay(day);
+    if (delay == null) return;
+    if (delay === 0) {
+      // The window shut while nobody was looking. The day is only marked as
+      // handled once the POST actually went out: on a first pass the saved rows
+      // may still be landing, and an empty sheet must not swallow the submit.
+      void autoSubmitDay().then((filed) => {
+        if (filed) autoSubmittedDayRef.current = day;
+      });
       return;
     }
-  };
-  const applyDiscard = () => {
-    setEntries((prev) => {
-      const next = new Map(prev);
-      const persisted = collection ? toEditorRows(collection.trip) : [];
-      for (const [shopId, row] of next) {
-        const match = persisted.find((p) => p.shopId === shopId);
-        next.set(shopId, {
-          ...row,
-          id: match?.id ?? 0,
-          birds: Number(match?.birds) || 0,
-          boxes: match ? rowBoxes(match) : 0,
-        });
-      }
-      setSavedSnapshot(entrySnapshot(Array.from(next.values())));
-      return next;
-    });
-    setConfirmDiscard(false);
-  };
+    // The picker only offers a 10-day window, so a delay that long is a
+    // hand-typed URL; leave those days to the next load rather than arming a
+    // timer that would misfire early.
+    if (delay > MAX_TIMEOUT_MS) return;
+    const timer = window.setTimeout(() => {
+      void autoSubmitDay().then((filed) => {
+        if (filed) autoSubmittedDayRef.current = day;
+      });
+    }, delay);
+    return () => window.clearTimeout(timer);
+    // savedSnapshot is in the deps so the day is re-checked the moment the
+    // server's rows land; re-arming the timer then costs nothing.
+  }, [day, collection?.finished, savedSnapshot, autoSubmitDay]);
 
   // ── Read-only state copy (persisted values only) ─────────────────────────
   const readOnlyEntries = useMemo(() => {
@@ -506,7 +551,9 @@ function CollectionEntries({
   }, [collection]);
 
   // ── Table-level search (full dataset, not just the visible page) ────────
-  // Matches: shop name, village, trip number, vehicle number, status.
+  // Matches shop name, city / village and status. A trip or vehicle number
+  // still lands on the shop it belongs to, but the table no longer shows
+  // those columns, so the placeholder only promises what a row actually is.
   const q = query.trim().toLowerCase();
 
   const statusLabelOf = useCallback(
@@ -532,7 +579,9 @@ function CollectionEntries({
       { value: "collected", label: to("orders.sort_collected_first") },
       { value: "az", label: to("orders.sort_name_az") },
       { value: "za", label: to("orders.sort_name_za") },
-      ...["city_az", "city_za", "birds_asc", "birds_desc", "boxes_asc", "boxes_desc", "weight_asc", "weight_desc", "vehicle_trip", "status"].map(value => ({ value, label: to(`orders.sort_${value}`) })),
+      // Only what this table actually shows: a shop's vehicle / trip is not a
+      // Collection column, so it is not a Collection sort either.
+      ...["city_az", "city_za", "birds_asc", "birds_desc", "boxes_asc", "boxes_desc", "weight_asc", "weight_desc", "status"].map(value => ({ value, label: to(`orders.sort_${value}`) })),
     ],
     [to]
   );
@@ -612,23 +661,45 @@ function CollectionEntries({
   );
   const startIndex = filteredShopList.length === 0 ? 0 : (safePage - 1) * pageSize;
 
+  // Two rows, same rhythm as the Trip List filters: the day and the city first
+  // (they decide WHAT is being collected), then sort / search / actions on a
+  // 12-column row so every control shares one baseline. Every field is labelled
+  // with the icon it uses across the app, in the same size (17) and weight.
   const filterCard = (
     <section className={opsFilterCardClass} aria-label={to('orders.collection_filters')}>
-      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
-        <div><div className={opsFilterLabelClass}><Calendar size={17} className="text-emerald-500" />{to('orders.col_date')}</div>
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="sm:col-span-2">
+          <div className={opsFilterLabelClass}>
+            <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
+            <span>{to('orders.col_date')}</span>
+          </div>
           <OrdersDateControl day={day} today={today} onDaySelect={onDaySelect} t={to} hideDayChip />
         </div>
-        <div><div className={opsFilterLabelClass}><ArrowUpDown size={17} className="text-emerald-500" />{to('orders.sort')}</div>
-          <OrdersDropdown value={sortMode} onChange={value => setSortMode(value as CollectionSort)} options={sortOptions} ariaLabel={to('orders.sort')} widthClass="w-full" />
-        </div>
-        <div><div className={opsFilterLabelClass}><Search size={17} className="text-emerald-500" />{to('orders.search_label')}</div>
-          <OrdersSearchInput value={query} onChange={setQuery} placeholder={to('orders.search_collection')} className="w-full" />
-        </div>
-        <div><div className={opsFilterLabelClass}><MapPin size={17} className="text-emerald-500" />{to('orders.city')}</div>
+        <div className="sm:col-span-2">
+          <div className={opsFilterLabelClass}>
+            <MapPin size={17} className="text-amber-500 flex-shrink-0" />
+            <span>{to('orders.city')}</span>
+          </div>
           <OrdersMultiSelect values={cityFilters} onChange={setCityFilters} options={cityOptions} ariaLabel={to('orders.filter_city')} placeholder={to('orders.filter_city_all')} widthClass="w-full" />
         </div>
-        <div className="flex items-end justify-end gap-2 sm:col-span-2 xl:col-span-4">
-          <button type="button" className={`group ${opsSecondaryButtonClass}`} onClick={() => {
+      </div>
+      <div className="grid grid-cols-1 items-end gap-3.5 pt-1 lg:grid-cols-12">
+        <div className="lg:col-span-3">
+          <div className={opsFilterLabelClass}>
+            <ArrowUpDown size={17} className="text-violet-500 flex-shrink-0" />
+            <span>{to('orders.sort')}</span>
+          </div>
+          <OrdersDropdown value={sortMode} onChange={value => setSortMode(value as CollectionSort)} options={sortOptions} ariaLabel={to('orders.sort')} widthClass="w-full" />
+        </div>
+        <div className="lg:col-span-5">
+          <div className={opsFilterLabelClass}>
+            <Search size={17} className="text-slate-400 flex-shrink-0" />
+            <span>{to('orders.search_label')}</span>
+          </div>
+          <OrdersSearchInput value={query} onChange={setQuery} placeholder={to('orders.search_collection')} className="w-full" />
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2 lg:col-span-4">
+          <button type="button" className={`group relative ${opsSecondaryButtonClass}`} onClick={() => {
             setQuery(''); setSortMode('collected'); setCityFilters([]); setPage(1);
             if (day !== today) onDaySelect(today);
           }} aria-label={to('common.reset')}>
@@ -672,8 +743,8 @@ function CollectionEntries({
               {to("orders.collection_complete")}
             </span>
           )}
-          {/* Day state sits right beside the day's KPI summary — TODAY while
-              the day is open, CLOSED once the 48h window has passed. */}
+          {/* Day state only — the day's cumulative totals live under the table.
+              TODAY while the window is open, CLOSED once it has passed. */}
           <div className="ml-auto flex items-center gap-2 flex-wrap justify-end">
             {isAutoClosed ? (
               <span
@@ -690,35 +761,57 @@ function CollectionEntries({
                 {to("orders.today_chip")}
               </span>
             ) : null}
-            <span className="text-[11px] font-semibold text-slate-400 whitespace-nowrap">
-              {to("orders.collection_summary", {
-                shops: totals.totalShops,
-                boxes: totals.totalBoxes,
-                birds: totals.totalBirds,
-              })}
-            </span>
+            {isEditable ? (
+              /* No Finish button, so the deadline has to be visible: this says
+                 out loud when the day files itself (day + 2 days, 12:00 AM). */
+              <span
+                className="inline-flex items-center gap-1 rounded-full bg-sky-50 border border-sky-200 px-2 py-0.5 text-[11px] font-semibold text-sky-700 whitespace-nowrap"
+              >
+                <Clock size={11} className="flex-shrink-0" />
+                {to("orders.auto_submits_at", {
+                  deadline: formatCollectionDeadline(day),
+                })}
+              </span>
+            ) : null}
           </div>
 
         </div>
 
         <div className="overflow-x-auto" aria-busy={refreshing}>
-          <table className={`w-full min-w-[1060px] ${ORDERS_TABLE_FONT_CLASS}`}>
+          <table className={`w-full min-w-[900px] ${ORDERS_TABLE_FONT_CLASS}`}>
             <thead>
               <tr className={opsTableHeadRowClass}>
-                <th className={`${opsTableThClass} w-16`}>{to("orders.col_sno")}</th>
-                <th className={opsTableThClass}>{to("orders.col_shop_name")}</th>
-                <th className={opsTableThClass}>{to("orders.col_village")}</th>
-                <th className={`${opsTableThClass} w-28`}>{to("orders.col_birds")}</th>
-                <th className={`${opsTableThClass} w-28`}>{to("orders.col_boxes")} *</th>
-                <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.col_weight")}</th>
-                <th className={`${opsTableThClass} w-36`}>{to("orders.col_trip_no")}</th>
-                <th className={`${opsTableThClass} w-28`}>{to("orders.col_vehicle_no")}</th>
-                <th className={`${opsTableThClass} w-32`}>{to("orders.col_status")}</th>
-                <th className={`${opsTableThClass} w-20`}>{to("orders.col_action")}</th>
+                {/* Collection-only columns. Trip / vehicle are deliberately not
+                    here — they belong to Assignment, and repeating them makes
+                    this screen look like a different module's table. */}
+                <th className={`${opsTableThClass} w-16 text-center`}>
+                  <ColHead icon={Hash} label={to("orders.col_sno")} align="center" />
+                </th>
+                <th className={opsTableThClass}>
+                  <ColHead icon={Store} label={to("orders.col_shop_name")} />
+                </th>
+                <th className={opsTableThClass}>
+                  <ColHead icon={MapPin} label={to("orders.col_village")} />
+                </th>
+                <th className={`${opsTableThClass} w-28`}>
+                  <ColHead icon={Bird} label={to("orders.col_birds")} />
+                </th>
+                <th className={`${opsTableThClass} w-28`}>
+                  <ColHead icon={Boxes} label={`${to("orders.col_boxes")} *`} />
+                </th>
+                <th className={`${opsTableThClass} w-24 text-right`}>
+                  <ColHead icon={Scale} label={to("orders.col_weight")} align="right" />
+                </th>
+                <th className={`${opsTableThClass} w-36`}>
+                  <ColHead icon={Activity} label={to("orders.col_status")} />
+                </th>
+                <th className={`${opsTableThClass} w-20 text-right`}>
+                  <ColHead icon={Trash2} label={to("orders.col_action")} align="right" />
+                </th>
               </tr>
             </thead>
             <tbody key={`${safePage}|${q}|${sortMode}|${pageSize}`} className={`${opsTableDivideClass} motion-safe:animate-page-pop`}>
-              {refreshing ? <tr><td colSpan={10}><OrdersTableSkeleton rows={Math.min(pageSize, 6)} /></td></tr> : pageShops.map((shop, index) => {
+              {refreshing ? <tr><td colSpan={8}><OrdersTableSkeleton rows={Math.min(pageSize, 6)} /></td></tr> : pageShops.map((shop, index) => {
                 const live = entries.get(shop.id);
                 const ro = readOnlyEntries.get(shop.id);
                 const birds = isEditable ? live?.birds ?? 0 : ro?.birds ?? 0;
@@ -793,7 +886,7 @@ function CollectionEntries({
 
                 return (
                   <tr key={shop.id} className={ordersTableZebraRow(index, "align-middle")}>
-                    <td className={opsTableTdClass}>
+                    <td className={`${opsTableTdClass} text-center`}>
                       <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 text-[12px] font-semibold text-slate-600">
                         {startIndex + index + 1}
                       </span>
@@ -856,23 +949,8 @@ function CollectionEntries({
                         </span>
                       )}
                     </td>
-                    <td className={opsTableTdClass}>
-                      {assignment ? (
-                        <span
-                          className={`font-semibold ${assignment.delivered ? "text-emerald-600" : "text-slate-700"}`}
-                          title={assignment.delivered ? to("orders.status_delivered") : to("orders.status_assigned")}
-                        >
-                          {assignment.tripNo}
-                        </span>
-                      ) : (
-                        <span className="text-slate-300">—</span>
-                      )}
-                    </td>
-                    <td className={`${opsTableTdClass} text-slate-500`}>
-                      {assignment?.vehicleNo || <span className="text-slate-300">—</span>}
-                    </td>
                     <td className={opsTableTdClass}>{statusNode}</td>
-                    <td className={opsTableTdClass}>
+                    <td className={`${opsTableTdClass} text-right`}>
                       {isEditable ? (
                         <button
                           type="button"
@@ -893,7 +971,7 @@ function CollectionEntries({
               })}
               {!refreshing && pageShops.length === 0 && (
                 <tr>
-                  <td colSpan={10} className="px-4 py-12">
+                  <td colSpan={8} className="px-4 py-12">
                     <OrdersEmptyState
                       title={
                         q
@@ -910,6 +988,34 @@ function CollectionEntries({
           </table>
         </div>
 
+        {/* Cumulative line — BELOW the table, not a KPI row: how many shops
+            this day actually took orders (the number that matters), with the
+            birds / boxes / weight kept quiet beside it. */}
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-100 bg-slate-50/50 px-6 py-3">
+          <span className="inline-flex items-center gap-2 text-[13px] font-bold text-slate-800">
+            <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-sky-100 bg-sky-50 text-sky-600">
+              <Store size={14} aria-hidden />
+            </span>
+            {to("orders.collection_summary_shops", { shops: totals.totalShops })}
+          </span>
+          <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-slate-400">
+            <span className="inline-flex items-center gap-1">
+              <Bird size={13} className="flex-shrink-0" aria-hidden />
+              {totals.totalBirds} {to("orders.word_birds")}
+            </span>
+            <span className="text-slate-200" aria-hidden>·</span>
+            <span className="inline-flex items-center gap-1">
+              <Boxes size={13} className="flex-shrink-0" aria-hidden />
+              {totals.totalBoxes} {to("orders.word_boxes")}
+            </span>
+            <span className="text-slate-200" aria-hidden>·</span>
+            <span className="inline-flex items-center gap-1">
+              <Scale size={13} className="flex-shrink-0" aria-hidden />
+              {formatKg(totals.totalWeight)}
+            </span>
+          </span>
+        </div>
+
         {/* Global pagination (existing component) */}
         <Pagination
           page={safePage}
@@ -920,20 +1026,31 @@ function CollectionEntries({
           disabled={refreshing}
         />
 
-        {/* Footer actions (editable days only) */}
+        {/* Footer — Save Progress is the only action a day gets. There is no
+            Cancel (the draft is the record, so there is nothing to discard) and
+            no Finish: the deadline files the day itself. */}
         {isEditable ? (
           <div className="border-t border-slate-200 bg-slate-50/70 px-5 py-3.5 flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-2">
-              <button type="button" onClick={handleCancel} disabled={busy} className={opsSecondaryButtonClass}>
-                {to("orders.cancel")}
-              </button>
-              {isDirty && (
+            <div className="flex items-center gap-2.5">
+              {isDirty ? (
                 <span className="text-[11px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1">
                   {to("orders.unsaved_changes")}
                 </span>
-              )}
+              ) : null}
+              <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-400">
+                <Clock size={12} className="flex-shrink-0" aria-hidden />
+                {to("orders.auto_submits_footer_note", {
+                  deadline: formatCollectionDeadline(day),
+                })}
+              </span>
             </div>
             <div className="flex items-center gap-2.5">
+              {finishing ? (
+                <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
+                  <Loader2 size={14} className="animate-spin" />
+                  {to("orders.submitting")}
+                </span>
+              ) : null}
               <button
                 type="button"
                 onClick={() => void handleSave()}
@@ -943,22 +1060,17 @@ function CollectionEntries({
                 {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
                 {saving ? to("orders.saving") : to("orders.save_progress")}
               </button>
-              <button
-                type="button"
-                onClick={() => void handleFinish()}
-                disabled={busy || entered.length === 0}
-                className={opsPrimaryButtonClass}
-              >
-                {finishing ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                {finishing ? to("orders.submitting") : to("orders.finish_collection")}
-              </button>
             </div>
           </div>
         ) : (
           <div className="border-t border-slate-200 bg-slate-50/70 px-5 py-3 flex items-center gap-2 text-[11px] font-semibold text-slate-500">
             <Lock size={13} />
             {isAutoClosed
-              ? to("orders.auto_closed_note", { deadline: formatCollectionDeadline(day) })
+              ? collection?.finished
+                ? to("orders.auto_closed_note", { deadline: formatCollectionDeadline(day) })
+                : to("orders.auto_closed_empty_note", {
+                    deadline: formatCollectionDeadline(day),
+                  })
               : to("orders.finish_collection_locked")}
           </div>
         )}
@@ -967,32 +1079,6 @@ function CollectionEntries({
       {/* 10-second clear undo (existing global pattern) */}
       <PendingDeleteNotification items={pendingItems} onCancel={cancelDelete} />
 
-      {/* Discard confirmation */}
-      {confirmDiscard && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" role="dialog" aria-modal="true">
-          <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden border border-emerald-200">
-            <div className="bg-gradient-to-br from-emerald-50 to-teal-50 p-6">
-              <div className="flex items-start gap-4">
-                <div className="mt-0.5 p-2 rounded-full bg-white/80 border border-emerald-200">
-                  <X size={20} className="text-emerald-600" />
-                </div>
-                <div>
-                  <h3 className="text-lg font-bold text-slate-800">{to("orders.confirm_discard_title")}</h3>
-                  <p className="text-sm text-slate-600 mt-1.5 leading-relaxed">{to("orders.confirm_discard_message")}</p>
-                </div>
-              </div>
-            </div>
-            <div className="flex justify-end gap-3 px-6 py-4 bg-slate-50 border-t border-slate-100">
-              <button type="button" onClick={() => setConfirmDiscard(false)} className="px-5 py-2 rounded-lg border border-slate-300 bg-white hover:bg-slate-50 text-sm font-medium text-slate-600 transition-all shadow-xs">
-                {to("orders.cancel")}
-              </button>
-              <button type="button" onClick={applyDiscard} className="px-5 py-2 rounded-lg text-sm font-bold text-white shadow-xs transition-all active:scale-[0.98] bg-rose-600 hover:bg-rose-700 inline-flex items-center gap-2">
-                {to("orders.discard")}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

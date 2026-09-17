@@ -271,13 +271,14 @@ a live carried-balance count, matching the Pending Collections KPI.
 | Pending Collections | `?tab=pending-collections` | 200 shop rows sorted by outstanding; total ≈ ₹1.69 Cr; each row shows total sales, total collected, last collection date and overdue days. |
 | Weight Loss / Mortality | `?tab=mortality` | KPI strip (farm birds, delivered birds, mortality %, weight loss %); farm + supervisor dropdowns populated from real data; sort every column; expand a trip → shop-wise mortality lines. |
 | Fuel Expenses | `?tab=fuel-expenses` | 738 bills on the 2026-09-15 anchor, paginated; the KPI strip is visible on the unfiltered quarter and totals **all filtered pages** (it does not change on page 2). Filter TRIP vs MANUAL and Approved / Pending / Rejected; trip-linked rows carry trip no, meter, GPS and mileage. |
-| Order Collection | `/operations/orders/collection` | **8 `[ORDER]` collection containers (one per each of the last 8 operating days, 20–36 shops each)** — all eight fit inside the ten-calendar-day selector window, including the Sunday closure. The newest is still *in collection* (27 shops · 92 boxes · 920 birds) and shows the shop's **city** plus the **ordered weight** per row. |
-| Order Assignment | `/operations/orders/assignment` | Opens on `27 collected · 4 assigned · 23 available` against **6 eligible vehicles** (Step 2 done, Step 4 open) — one of them already carries 4 shops — and every earlier day shows its read-only assignment history. |
-| Delivery Tracking | `/operations/orders/delivery-tracking` | Lists **1 trip in PENDING & IN PROGRESS** (5 shops, 19 boxes, 437 kg) and **7 COMPLETED** order trips with `Delivered` / `Part Delivered` badges inside the default From → To window. |
+| Collection | `/operations/orders/collection` | **8 `[ORDER]` collection containers (one per each of the last 8 operating days, 20–36 shops each)** — all eight fit inside the ten-calendar-day selector window, including the Sunday closure. The newest is still *in collection* and its cumulative line under the table reads `Orders taken in 27 shops` with `920 birds · 92 boxes · … kg` beside it. Filters sit in the Trip List arrangement (date + city, then sort / search / reset), every column header has its icon, and there is no trip/vehicle column. **Save Progress is the only button**; the day header says `Auto-submits 18/09 12:00 AM` — that is when the day files itself. |
+| Assignment | `/operations/orders/assignment` | Opens on `27 collected · 4 assigned · 23 available` against **6 eligible vehicles** (Step 2 done, Step 4 open) — one of them already carries 4 shops — and every earlier day shows its read-only assignment history. |
+| Delivery | `/operations/orders/delivery-tracking` | Lists **1 trip in PENDING & IN PROGRESS** (5 shops, 19 boxes, 437 kg) and **7 COMPLETED** order trips with `Delivered` / `Part Delivered` badges inside the default From → To window. |
 | Collection Report | `?tab=collection-report` | Payment-mode summary (Cash / Union Bank / HDFC) with % split; collector summary for all 20 collectors; change date range Jul→Sep and confirm totals move. |
 
 > Orders is its own module (`src/modules/orders`) with its own route table — the three rows above
-> are the grouped entries it contributes under Operations in the sidebar. The legacy
+> are the grouped entries it contributes under Operations in the sidebar, named Collection /
+> Assignment / Delivery under the **Orders** group heading. The legacy
 > `/operations?tab=orders` (with `&orderTab=collection|assignment|tracking`) still resolves: it
 > canonicalises to the page path.
 

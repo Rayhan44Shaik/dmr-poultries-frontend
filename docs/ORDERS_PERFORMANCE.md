@@ -36,7 +36,9 @@ This is approximately **89% less processing time**, not a measurement of total b
 - One route per Orders page: `/operations/orders/collection`, `/operations/orders/assignment`,
   `/operations/orders/delivery-tracking`. Each is reloadable and shareable, and each is its own
   sidebar row inside the Orders group under Operations (listed after Fuel Expenses, at the end of
-  the section). The route table that defines them is `src/modules/orders/routes/ordersRoutes.ts` —
+  the section). The rows are named **Collection / Assignment / Delivery** — the group heading above
+  them already says Orders, so the row does not repeat it, and the header breadcrumb adds the
+  module back (`Operations › Orders › Collection`). The route table that defines them is `src/modules/orders/routes/ordersRoutes.ts` —
   the sidebar and the URL resolver both read it, so they cannot drift. There is no in-page tab
   strip: a page is opened from the sidebar or by its URL, exactly like Shop Sales or Trip List.
   The older
@@ -46,6 +48,20 @@ This is approximately **89% less processing time**, not a measurement of total b
 - Visited pages stay mounted while you move between the three routes from the sidebar: filters, page size, current page and unsaved edits survive the move. These local filters/drafts are not persisted across a full browser reload. Date changes intentionally mount a new day editor; top-level collection/assignment search and sort controls remain selected.
 - All Orders pagers now use the same `src/ui/Pagination.tsx` as Trip List, with counts, rows-per-page, disabled states and bounded page controls. Filtering/sorting occur before slicing.
 - Collection cells match Trip List's 16px column padding, 20px body padding and 16px header padding. Search includes shop number and phone in addition to existing fields.
+- Collection's filter card uses the Trip List arrangement: date + city on the first row, then sort
+  (3 cols) / search (5 cols) / reset + refresh (4 cols) on a 12-column row aligned `items-end`, so
+  every control shares one baseline. Each column header carries its own 14px icon at the same
+  spacing the trip table uses.
+- Trip No and Vehicle No are **not** Collection columns (assignment facts belong to Assignment); an
+  assigned shop shows only its status, with trip / vehicle / sequence in the tooltip.
+- The day total is one cumulative line **below** the table (`Orders taken in N shops`, with birds ·
+  boxes · kg muted beside it) instead of a KPI in the header bar.
+- Collection has one action: **Save Progress**. There is no Cancel (the saved record is the draft, so
+  there is nothing to discard) and no Finish button — the day's own deadline files it: 48h from the
+  start of the day (the 16th submits at 18/09 12:00 AM). The screen states that deadline instead of
+  offering a button (`Auto-submits 18/09 12:00 AM`). The check is one `Date.now()` comparison on
+  load plus one `setTimeout` armed per mount — no interval, no polling — and the submit reuses the
+  existing `POST /trips/:id/steps/deliveries` call, so the auto-close costs no extra request.
 - Assignment now exposes search/date/sort and read-only historical rows. Historical days never mount the writable assignment editor.
 - Table refresh retains controls, navigation and drafts. Initial loading uses a table shell, not a full-app spinner. Page transitions respect reduced-motion preferences.
 

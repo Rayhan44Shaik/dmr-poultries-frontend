@@ -117,7 +117,7 @@ test('the sidebar shows the module as one Orders group of three rows under Opera
   // after Fuel Expenses.
   const labels = (operations?.children ?? []).map((child) => child.label);
   const fuelAt = labels.indexOf('Fuel Expenses');
-  const ordersAt = labels.findIndex((label) => label === 'Order Collection');
+  const ordersAt = labels.findIndex((label) => label === 'Collection');
   assert.ok(fuelAt >= 0, 'Fuel Expenses is in the Operations section');
   assert.equal(ordersAt, fuelAt + 1, 'the Orders group follows Fuel Expenses');
   assert.deepEqual(
@@ -126,4 +126,28 @@ test('the sidebar shows the module as one Orders group of three rows under Opera
     'the three rows stay together and end the section',
   );
 
+});
+
+test('the three rows are named Collection / Assignment / Delivery', () => {
+  const operations = NAV_SECTIONS.find((section) => section.id === 'operations');
+  const rows = (operations?.children ?? []).filter((child) => child.group === 'orders');
+  assert.deepEqual(
+    rows.map((row) => row.label),
+    ['Collection', 'Assignment', 'Delivery'],
+    'short row names under the Orders heading — the module word is not repeated',
+  );
+  assert.equal(new Set(rows.map((row) => row.label)).size, 3, 'three distinct names');
+  for (const row of rows) {
+    assert.ok(!/^Orders?\b/.test(row.label), `${row.label} does not repeat the module`);
+    // The header breadcrumb keeps the long form by adding the group crumb:
+    // Operations › Orders › Collection. That only works if the route row
+    // carries the group id the header looks up.
+    assert.equal(resolveRoute(row.path).page?.group, 'orders');
+    assert.equal((en as Dict)[NAV_CHILD_GROUPS.orders.labelKey], 'Orders');
+    // Every language still names the row and the browser title.
+    for (const dict of [en as Dict, te as Dict]) {
+      assert.ok(dict[row.labelKey!], `${row.labelKey} is translated`);
+      assert.ok(dict[row.titleKey!], `${row.titleKey} is translated`);
+    }
+  }
 });

@@ -133,3 +133,98 @@ test('collection has a separate filter card and named table header', async ({ pa
   await expect(panel.getByRole('button', { name: 'Reset', exact: true })).toBeVisible();
   await expect(panel.getByRole('button', { name: /Refresh/i })).toBeVisible();
 });
+
+test('collection keeps one action only — Save Progress — and the deadline speaks for itself', async ({ page }) => {
+  await page.goto(`${ORDERS}/collection`);
+  const panel = page.locator('#orders-panel-collection');
+  await expect(panel.locator('table')).toBeVisible();
+
+  // No Cancel, no manual Finish: a day is filed by its own window, not by a
+  // button, so the only commit control on the screen is Save Progress.
+  await expect(panel.getByRole('button', { name: /finish collection/i })).toHaveCount(0);
+  await expect(panel.getByRole('button', { name: /^cancel$/i })).toHaveCount(0);
+  await expect(panel.getByRole('button', { name: /save progress/i })).toBeVisible();
+  // And the screen says when it will submit itself: "Auto-submits DD/MM 12:00 AM".
+  await expect(panel.getByText(/auto-submits \d{2}\/\d{2}/).first()).toBeVisible();
+});
+
+test('collection columns are collection-only, and every header carries its icon', async ({ page }) => {
+  await page.goto(`${ORDERS}/collection`);
+  const head = page.locator('#orders-panel-collection thead th');
+  await expect(head).toHaveCount(8);
+  const labels = (await head.allInnerTexts()).map((text) => text.replace(/\s+/g, ' ').trim());
+  expect(labels).toEqual([
+    'S.No',
+    'Shop Name',
+    'City',
+    'No. of Birds',
+    'No. of Boxes',
+    'Weight',
+    'Status',
+    'Action',
+  ]);
+  // One glyph per column, in the same 14px size the Trip List headers use.
+  await expect(page.locator('#orders-panel-collection thead th svg')).toHaveCount(8);
+});
+
+test('the day total is a cumulative line below the table, not a header KPI', async ({ page }) => {
+  await page.goto(`${ORDERS}/collection`);
+  const panel = page.locator('#orders-panel-collection');
+  const cumulative = panel.getByText(/^Orders taken in \d+ shops$/);
+  await expect(cumulative).toBeVisible();
+  const total = await cumulative.boundingBox();
+  const table = await panel.locator('table').first().boundingBox();
+  expect(total && table && total.y > table.y + table.height - 8).toBe(true);
+  // The old header summary ("N shops · N boxes · N birds") is gone from here —
+  // that wording now belongs to the Assignment page only.
+  await expect(panel.getByText(/\d+ shops · \d+ boxes/)).toHaveCount(0);
+});
+
+test('filters sit in the Trip List order: day and city above sort, search and reset', async ({ page }) => {
+  await page.goto(`${ORDERS}/collection`);
+  const card = page.getByRole('region', { name: 'Order Collection filters' });
+  const field = (name: string) => card.getByText(name, { exact: true }).first();
+  const box = async (name: string) => await field(name).boundingBox();
+  const [date, city, sort, search] = await Promise.all([
+    box('Date'),
+    box('City'),
+    box('Sort'),
+    box('Search'),
+  ]);
+  expect(date && city && sort && search).toBeTruthy();
+  // Row 1 — the two fields that decide which day and which area.
+  expect(Math.abs(date!.y - city!.y) <= 2).toBe(true);
+  // Row 2 — sort then search, left to right, below row 1.
+  expect(sort!.y > date!.y).toBe(true);
+  expect(Math.abs(sort!.y - search!.y) <= 2).toBe(true);
+  expect(sort!.x < search!.x).toBe(true);
+  // Reset + Refresh close that second row, right-aligned and baseline-matched.
+  const actions = card.getByRole('button', { name: 'Reset', exact: true });
+  const reset = await actions.boundingBox();
+  const refresh = await card.getByRole('button', { name: /Refresh/i }).boundingBox();
+  expect(reset && refresh).toBeTruthy();
+  expect(Math.abs(refresh!.y - reset!.y) <= 2).toBe(true);
+  expect(refresh!.x > reset!.x).toBe(true);
+  expect(Math.abs(reset!.y + reset!.height - (search!.y + search!.height)) <= 6).toBe(true);
+});
+
+test('the header breadcrumb names the module and the page', async ({ page }) => {
+  await page.goto(`${ORDERS}/collection`);
+  // Operations › Orders › Collection — the group is its own crumb, so a short
+  // row name ("Collection") is never ambiguous.
+  await expect(page.getByRole('heading', { level: 1 })).toHaveText('Collection');
+  const crumbs = page.locator('header').first().getByRole('link');
+  await expect(crumbs.filter({ hasText: 'Operations' }).first()).toBeVisible();
+  await expect(crumbs.filter({ hasText: /^Orders$/ }).first()).toHaveAttribute(
+    'href',
+    new RegExp(`${ORDERS}/collection$`)
+  );
+});
+
+test('the sidebar names the rows Collection / Assignment / Delivery', async ({ page }) => {
+  await page.goto('/dashboard');
+  const names = await page
+    .locator(`a[href^="${ORDERS}/"]`)
+    .evaluateAll((links) => [...new Set(links.map((link) => link.textContent!.trim()))]);
+  expect(names).toEqual(['Collection', 'Assignment', 'Delivery']);
+});

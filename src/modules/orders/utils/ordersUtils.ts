@@ -712,9 +712,11 @@ export function isPastDay(day: string, today: string): boolean {
 
 /**
  * An operational day's Order Collection stays open for 48 hours from the start
- * of that day: the 04/09 collection can still be edited on 05/09 and is
- * AUTO-CLOSED at 06/09 12:00 AM — finished or not. The clock, not the
- * "Finish Collection" button, decides when a day stops accepting entries.
+ * of that day: the 16/09 collection can still be edited on 17/09 and is
+ * AUTO-CLOSED at 18/09 12:00 AM — finished or not. The clock, not a button,
+ * decides when a day stops accepting entries, and the same clock FILES the
+ * day (see collectionAutoSubmitDelay + the page's auto-submit effect), so an
+ * open day never sits unsubmitted past its window.
  */
 export const COLLECTION_GRACE_DAYS = 2;
 
@@ -732,11 +734,29 @@ export function isCollectionAutoClosed(day: string, now = new Date()): boolean {
   return now.getTime() >= deadline.getTime();
 }
 
-/** "06/09 12:00 AM" — the moment the day's collection closed. */
+/** "18/09 12:00 AM" — the exact moment the day's collection closes. */
 export function formatCollectionDeadline(day: string): string {
   const d = collectionDeadline(day);
   if (Number.isNaN(d.getTime())) return "";
-  return `${d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit" })} 12:00 AM`;
+  // The hour is printed from the deadline itself rather than hardcoded, so the
+  // copy stays honest if COLLECTION_GRACE_DAYS ever moves off midnight.
+  const clock = d.toLocaleTimeString("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+    hour12: true,
+  });
+  return `${d.toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit" })} ${clock}`;
+}
+
+/**
+ * Milliseconds until the day's collection closes and submits itself:
+ * 0 = the window is already shut (submit as soon as the page can),
+ * null = nothing to schedule (unparsable day).
+ */
+export function collectionAutoSubmitDelay(day: string, now = new Date()): number | null {
+  const deadline = collectionDeadline(day);
+  if (Number.isNaN(deadline.getTime())) return null;
+  return Math.max(0, deadline.getTime() - now.getTime());
 }
 
 /** Compact chip label: "29 Aug". */

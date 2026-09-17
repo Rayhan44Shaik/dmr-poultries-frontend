@@ -33,7 +33,12 @@ export interface OrdersPageRoute {
   path: string;
   /** Fallback label; `labelKey` wins when a translation exists. */
   label: string;
-  /** Sidebar label (see src/i18n en/te dictionaries). */
+  /**
+   * Sidebar row name (see src/i18n en/te dictionaries). Deliberately short: the
+   * group heading above the row already says "Orders", so the row reads
+   * Orders › Collection instead of repeating the module name. `titleKey` keeps
+   * the full name for the browser tab, and each page keeps its own <h2>.
+   */
   labelKey: string;
   /** Browser page title. */
   titleKey: string;
@@ -49,17 +54,17 @@ export const ORDERS_PAGES: readonly OrdersPageRoute[] = [
   {
     tab: 'collection',
     path: `${ORDERS_ROUTE_BASE}/collection`,
-    label: 'Order Collection',
+    label: 'Collection',
     labelKey: 'nav.orderCollection',
     titleKey: 'page_title.orderCollection',
     icon: Inbox,
     tone: 'violet',
-    keywords: 'order collection shops pending finish collection birds boxes',
+    keywords: 'order collection shops pending birds boxes collection day',
   },
   {
     tab: 'assignment',
     path: `${ORDERS_ROUTE_BASE}/assignment`,
-    label: 'Order Assignment',
+    label: 'Assignment',
     labelKey: 'nav.orderAssignment',
     titleKey: 'page_title.orderAssignment',
     icon: Boxes,
@@ -69,7 +74,7 @@ export const ORDERS_PAGES: readonly OrdersPageRoute[] = [
   {
     tab: 'tracking',
     path: `${ORDERS_ROUTE_BASE}/delivery-tracking`,
-    label: 'Delivery Tracking',
+    label: 'Delivery',
     labelKey: 'nav.orderDeliveryTracking',
     titleKey: 'page_title.orderDeliveryTracking',
     icon: Route,

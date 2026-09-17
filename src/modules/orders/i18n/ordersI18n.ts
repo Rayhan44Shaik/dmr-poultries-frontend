@@ -50,15 +50,22 @@ const EN: Record<string, string> = {
   "orders.clear_entry": "Clear entry",
   "orders.clear_entry_label": "Clear {shop}",
   "orders.collection_summary": "{shops} shops · {boxes} boxes · {birds} birds",
+  // Collection's cumulative line under the table: shops lead, rest is muted.
+  "orders.collection_summary_shops":
+    "Orders taken in {shops} shops",
   "orders.add_at_least_one_shop": "Enter at least one shop order (birds + boxes)",
-  "orders.finish_invalid": "Enter No. of Boxes for: {shops}",
   "orders.save_progress": "Save Progress",
   "orders.saving": "Saving…",
-  "orders.finish_collection": "Finish Collection",
-  "orders.submitting": "Finishing…",
-  "orders.cancel": "Cancel",
+  "orders.submitting": "Submitting…",
+  // The day is filed by its deadline, never by a button.
+  "orders.auto_submits_at": "Auto-submits {deadline}",
+  "orders.auto_submits_footer_note":
+    "Saved entries go in by themselves at {deadline} — no Finish step needed",
+  "orders.collection_auto_submitted":
+    "Collection window closed — the day's orders were submitted automatically.",
+  "orders.collection_auto_submitted_partial":
+    "Collection window closed — submitted automatically ({shops} shop(s) went in without boxes).",
   "orders.collection_saved": "Collection progress saved",
-  "orders.collection_finished": "Order collected — assign a vehicle in Order Assignment",
   "orders.weight_pending": "Weight comes from farm data at delivery",
 
   // ── Tab 2 · Order Assignment ──────────────────────────────────────────
@@ -213,17 +220,13 @@ const EN: Record<string, string> = {
   "orders.loading": "Loading orders…",
   "orders.sample_badge": "Sample data",
   "orders.sample_hint":
-    "Showing bundled sample data — no backend is connected. Save, Finish and Assignment work against the in-memory sample store and reset on refresh.",
+    "Showing bundled sample data — no backend is connected. Saving and Assignment work against the in-memory sample store and reset on refresh.",
   "orders.error_title": "Could not load orders",
   "orders.error_message":
     "The backend did not respond. Check the connection and try again.",
   "orders.retry": "Retry",
   "orders.refresh_failed": "Could not refresh order data",
   "orders.unsaved_changes": "Unsaved changes",
-  "orders.confirm_discard_title": "Discard unsaved changes?",
-  "orders.confirm_discard_message":
-    "Your unsaved entries will be lost. Saved progress is kept.",
-  "orders.discard": "Discard changes",
   "orders.close": "Close",
 
   // Day scroller (day-based workflow)
@@ -234,7 +237,9 @@ const EN: Record<string, string> = {
   "orders.closed_day": "CLOSED",
   "orders.read_only_note": "This operational day is closed — view only.",
   "orders.auto_closed_note":
-    "Collection auto-closed at {deadline} — view only.",
+    "Collection window closed at {deadline} — submitted automatically, view only.",
+  "orders.auto_closed_empty_note":
+    "Collection window closed at {deadline} — nothing was collected, so there was nothing to submit. View only.",
   "orders.no_collection_day": "No order collection for {day}",
   "orders.collection_complete": "Complete",
   "orders.finish_collection_locked":
@@ -329,7 +334,7 @@ const EN: Record<string, string> = {
     "orders.no_completed_window": "No completed trips in the selected range",
     "orders.no_search_results": "No shops match your search",
     "orders.no_filter_results": "No shops match this filter",
-    "orders.search_collection": "Search shop, city, trip, vehicle, status…",
+    "orders.search_collection": "Search shop, city, status…",
     "orders.search_assignment": "Search shop, city, trip, vehicle, supervisor…",
     "orders.search_tracking": "Search trip, vehicle, supervisor, mobile, driver, shop no, shop, city…",
     "orders.filter_status": "Status",
@@ -469,15 +474,19 @@ const TE: Record<string, string> = {
   "orders.clear_entry": "నమోదును క్లియర్ చేయండి",
   "orders.clear_entry_label": "{shop} క్లియర్ చేయండి",
   "orders.collection_summary": "{shops} షాప్‌లు · {boxes} బాక్స్‌లు · {birds} పక్షులు",
+  "orders.collection_summary_shops": "{shops} షాప్‌లకు ఆర్డర్ నమోదు అయింది",
   "orders.add_at_least_one_shop": "కనీసం ఒక షాప్ ఆర్డర్ నమోదు చేయండి (పక్షులు + బాక్స్‌లు)",
-  "orders.finish_invalid": "ఇవీ బాక్స్‌ల సంఖ్య నమోదు చేయండి: {shops}",
   "orders.save_progress": "ప్రగతి సేవ్ చేయండి",
   "orders.saving": "సేవ్ అవుతోంది…",
-  "orders.finish_collection": "సేకరణ పూర్తి చేయండి",
-  "orders.submitting": "పూర్తి అవుతోంది…",
-  "orders.cancel": "రద్దు చేయండి",
+  "orders.submitting": "సబ్మిట్ అవుతోంది…",
+  "orders.auto_submits_at": "{deadline}కు ఆటో-సబ్మిట్ అవుతుంది",
+  "orders.auto_submits_footer_note":
+    "సేవ్ చేసిన నమోదులు {deadline}కు వాటంతట అవే సబ్మిట్ అవుతాయి — ఫినిష్ అవసరం లేదు",
+  "orders.collection_auto_submitted":
+    "సేకరణ సమయం ముగిసింది — రోజు ఆర్డర్లు ఆటోమేటిక్‌గా సబ్మిట్ అయ్యాయి.",
+  "orders.collection_auto_submitted_partial":
+    "సేకరణ సమయం ముగిసింది — ఆటోమేటిక్‌గా సబ్మిట్ అయింది (బాక్స్‌లు లేని {shops} షాప్‌లు).",
   "orders.collection_saved": "సేకరణ ప్రగతి సేవ్ చేయబడింది",
-  "orders.collection_finished": "ఆర్డర్ సేకరించబడింది — ఆర్డర్ అసైన్‌మెంట్‌లో వాహనం అసైన్ చేయండి",
   "orders.weight_pending": "బరువు డెలివరీ సమయంలో ఫామ్ డేటా నుండి వస్తుంది",
 
   // Tab 2
@@ -630,16 +639,12 @@ const TE: Record<string, string> = {
   "orders.loading": "ఆర్డర్లు లోడ్ అవుతున్నాయి…",
   "orders.sample_badge": "నమూనా డేటా",
   "orders.sample_hint":
-    "నమూనా డేటా చూపబడుతోంది — బ్యాకెండ్ కనెక్ట్ కాలేదు. సేవ్, ఫినిష్, అసైన్‌మెంట్ మెమరీలో పని చేస్తాయి; రిఫ్రెష్ చేస్తే మళ్లీ మొదటి స్థితికి వస్తాయి.",
+    "నమూనా డేటా చూపబడుతోంది — బ్యాకెండ్ కనెక్ట్ కాలేదు. సేవ్, అసైన్‌మెంట్ మెమరీలో పని చేస్తాయి; రిఫ్రెష్ చేస్తే మళ్లీ మొదటి స్థితికి వస్తాయి.",
   "orders.error_title": "ఆర్డర్లను లోడ్ చేయలేకపోయాను",
   "orders.error_message": "బ్యాకెండ్ సమాధానం ఇవ్వలేదు. కనెక్షన్ తనిఖీ చేసి మళ్లీ ప్రయత్నించండి.",
   "orders.retry": "మళ్లీ ప్రయత్నించండి",
   "orders.refresh_failed": "ఆర్డర్ల డేటాను రిఫ్రెష్ చేయలేకపోయాను",
   "orders.unsaved_changes": "సేవ్ చేయப்படని మార్పులు",
-  "orders.confirm_discard_title": "సేవ్ చేయని మార్పులను తీసివేయాలా?",
-  "orders.confirm_discard_message":
-    "మీ సేవ్ చేయని నమోదులు తొలగిపోతాయి. సేవ్ చేసిన ప్రగతి ఉంటుంది.",
-  "orders.discard": "మార్పులను తీసివేయండి",
   "orders.close": "మూసివేయండి",
 
   // Day scroller
@@ -650,7 +655,9 @@ const TE: Record<string, string> = {
   "orders.closed_day": "మూసి వేయబడింది",
   "orders.read_only_note": "ఈ పని రోజు మూసి వేయబడింది — చూడటం మాత్రమే.",
   "orders.auto_closed_note":
-    "సేకరణ {deadline}కు ఆటోమేటిక్‌గా మూసివేయబడింది — చూడటం మాత్రమే.",
+    "సేకరణ {deadline}కు మూసివేయబడింది — ఆటోమేటిక్‌గా సబ్మిట్ అయింది, చూడటం మాత్రమే.",
+  "orders.auto_closed_empty_note":
+    "సేకరణ {deadline}కు మూసివేయబడింది — ఏ ఆర్డర్ నమోదు కాలేదు, అందుకే సబ్మిట్ అవడం లేదు. చూడటం మాత్రమే.",
   "orders.no_collection_day": "{day} కి ఆర్డర్ సేకరణ లేదు",
   "orders.collection_complete": "పూర్తయింది",
   "orders.finish_collection_locked":
@@ -745,7 +752,7 @@ const TE: Record<string, string> = {
   "orders.no_completed_window": "చివరి 7 రోజులలో పూర్తయిన ట్రిప్‌లు లేవు",
   "orders.no_search_results": "మీ వెతకడానికి సరిపోలే షాప్‌లు లేవు",
   "orders.no_filter_results": "ఈ ఫిల్టర్‌కు సరిపోయే షాప్‌లు లేవు",
-  "orders.search_collection": "షాప్, సిటీ, ట్రిప్, వాహనం, స్థితి వెతకండి…",
+  "orders.search_collection": "షాప్, సిటీ, స్థితి వెతకండి…",
   "orders.search_assignment": "షాప్, సిటీ, ట్రిప్, వాహనం, సూపర్‌వైజర్ వెతకండి…",
   "orders.search_tracking": "ట్రిప్, వాహనం, సూపర్‌వైజర్, మొబైల్, డ్రైవర్, షాప్ నంబర్, షాప్, సిటీ వెతకండి…",
   "orders.filter_status": "స్థితి",
