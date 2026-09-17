@@ -30,6 +30,7 @@ import React, {
 } from "react";
 import {
   AlertTriangle,
+  ChevronDown,
   CheckCheck,
   PackageCheck,
   GripVertical,
@@ -1108,6 +1109,9 @@ function AssignmentEditor({
     [hydrateFromVehicle],
   );
 
+  // Selected-shops table: collapsible so a long pool table can breathe.
+  const [sequenceOpen, setSequenceOpen] = useState(true);
+
   const [saving, setSaving] = useState(false);
   const [waBusy, setWaBusy] = useState(false);
   const [waProgress, setWaProgress] = useState<string | null>(null);
@@ -2020,7 +2024,7 @@ function AssignmentEditor({
           Sticky toolbar so search + filters stay in reach on ~100-shop days. */}
                 <div className="sticky top-0 z-20 border-b border-slate-200/80 bg-slate-50/95 backdrop-blur">
                   {/* Live summary pills — status toggle now lives in the header. */}
-                  <div className="flex flex-wrap items-center gap-2 px-4 py-2.5">
+                  <div className="flex flex-wrap items-center gap-2 px-6 py-2.5">
                     <div className="flex items-center gap-2 flex-wrap">
                       {selected.length > 0 && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm">
@@ -2064,9 +2068,9 @@ function AssignmentEditor({
                             remaining width equally, so there is never a wide
                             gap between them; numeric columns are equal too. */}
                         <colgroup>
-                          <col className="w-16" />
-                          <col />
-                          <col />
+                          <col className="w-[7%]" />
+                          <col className="w-[31%]" />
+                          <col className="w-[23%]" />
                           <col className="w-[13%]" />
                           <col className="w-[13%]" />
                           <col className="w-[13%]" />
@@ -2219,7 +2223,7 @@ function AssignmentEditor({
 
                 {/* 2 — Selected shops → select vehicle → sequence & boxes */}
                 {selected.length === 0 && (
-                  <div className="border-t border-slate-100 bg-slate-50/40 px-4 py-4">
+                  <div className="border-t border-slate-100 bg-slate-50/40 px-6 py-4">
                     <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
                       {to("orders.selected_shops")}: <b>0</b>
                     </p>
@@ -2230,10 +2234,25 @@ function AssignmentEditor({
                 )}
                 {selected.length > 0 && (
                   <>
-                    <div className="border-t border-slate-200 bg-emerald-50/60 px-4 py-2.5 flex items-center gap-3 flex-wrap">
-                      <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">
-                        {to("orders.selected_shops")}: <b>{selected.length}</b>
-                      </span>
+                    <div className="border-t border-slate-200 bg-emerald-50/60 px-6 py-2.5 flex items-center gap-3 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => setSequenceOpen((v) => !v)}
+                        aria-expanded={sequenceOpen}
+                        aria-controls="orders-selected-shops"
+                        className="group inline-flex items-center gap-2 rounded-lg px-1.5 py-1 -ml-1.5 text-[11px] font-bold uppercase tracking-wider text-emerald-700 transition-colors hover:bg-emerald-100/70"
+                      >
+                        <ChevronDown
+                          size={14}
+                          className={`transition-transform duration-300 ${
+                            sequenceOpen ? "rotate-0" : "-rotate-90"
+                          }`}
+                        />
+                        {to("orders.selected_shops")}
+                        <span className="inline-flex items-center justify-center rounded-full border border-emerald-200 bg-white px-2 py-px text-[11px] tabular-nums text-emerald-700">
+                          {selected.length}
+                        </span>
+                      </button>
                       <span className="text-[11px] font-semibold text-slate-400">
                         {to("orders.assign_hint")}
                       </span>
@@ -2268,305 +2287,347 @@ function AssignmentEditor({
                       </span>
                     </div>
 
-                    {vehicle && (
-                      <>
-                        {/* Live capacity only — the truck's static facts already sit in
+                    <div
+                      id="orders-selected-shops"
+                      className={`grid transition-[grid-template-rows] duration-300 ease-[cubic-bezier(0.16,1,0.3,1)] ${
+                        sequenceOpen ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                      }`}
+                    >
+                      <div className="min-h-0 overflow-hidden">
+                        {vehicle && (
+                          <>
+                            {/* Live capacity only — the truck's static facts already sit in
                   the sheet header, so they are never repeated here. */}
-                        <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-3">
-                          <div className="flex items-center gap-4 flex-wrap rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-600">
-                            <span>
-                              {to("orders.vehicle_box_capacity")}:{" "}
-                              <b className="text-slate-800">{capacity}</b>
-                            </span>
-                            <span>
-                              {to("orders.col_assigned")}:{" "}
-                              <b className="text-slate-800">
-                                {alreadyAssignedOther + requested}
-                              </b>
-                            </span>
-                            <span>
-                              {to("orders.available_boxes")}:{" "}
-                              <b
-                                className={
-                                  remaining < 0
-                                    ? "text-rose-600"
-                                    : "text-emerald-700"
-                                }
-                              >
-                                {remaining}
-                              </b>
-                            </span>
-                            <span>
-                              {to("orders.col_shops")}:{" "}
-                              <b className="text-slate-800">
-                                {selected.length}
-                              </b>
-                            </span>
-                            <span className="ml-auto text-[11px] text-slate-400">
-                              {to("orders.collection_summary", {
-                                shops: totals.totalShops,
-                                boxes: totals.totalBoxes,
-                                birds: totals.totalBirds,
-                              })}
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* Assignment table: editable sequence — drag a row, ↑/↓ one
-                  step, ⤒/⤓ first/last, or sort the whole list — + boxes. */}
-                        <div className="border-t border-slate-100" />
-                        <div className="max-h-80 overflow-y-auto">
-                          <table
-                            className={`w-full min-w-[880px] table-fixed ${ORDERS_TABLE_FONT_CLASS}`}
-                          >
-                            <colgroup>
-                              <col className="w-32" />
-                              <col />
-                              <col />
-                              <col className="w-[10%]" />
-                              <col className="w-[10%]" />
-                              <col className="w-[20%]" />
-                              <col className="w-[10%]" />
-                              <col className="w-14" />
-                            </colgroup>
-                            <thead>
-                              <tr className={opsTableHeadRowClass}>
-                                <th className={`${opsTableThClass} text-left`}>
-                                  {to("orders.col_sequence")}
-                                </th>
-                                <th className={`${opsTableThClass} text-left`}>
-                                  {to("orders.col_shop_name")}
-                                </th>
-                                <th className={`${opsTableThClass} text-left`}>
-                                  {to("orders.col_village")}
-                                </th>
-                                <th className={`${opsTableThClass} text-right`}>
-                                  {to("orders.col_birds")}
-                                </th>
-                                <th className={`${opsTableThClass} text-right`}>
-                                  {to("orders.col_boxes")}
-                                </th>
-                                <th className={`${opsTableThClass} text-left`}>
-                                  {to("orders.assigned_boxes")}
-                                </th>
-                                <th className={`${opsTableThClass} text-right`}>
-                                  {to("orders.weight")}
-                                </th>
-                                <th className={opsTableThClass} />
-                              </tr>
-                            </thead>
-                            <tbody className={opsTableDivideClass}>
-                              {selected.map((row, index) => {
-                                const lifted = dragKey === row.clientKey;
-                                const isDropTarget =
-                                  dropIndex === index && !!dragKey && !lifted;
-                                return (
-                                  <tr
-                                    key={row.clientKey}
-                                    draggable={!busy}
-                                    onDragStart={(e) => {
-                                      setDragKey(row.clientKey);
-                                      setDropIndex(index);
-                                      e.dataTransfer.effectAllowed = "move";
-                                      try {
-                                        e.dataTransfer.setData(
-                                          "text/plain",
-                                          row.clientKey,
-                                        );
-                                      } catch {
-                                        /* dataTransfer is read-only in some browsers */
-                                      }
-                                    }}
-                                    onDragOver={(e) => {
-                                      if (!dragKey) return;
-                                      e.preventDefault();
-                                      e.dataTransfer.dropEffect = "move";
-                                      if (dropIndex !== index)
-                                        setDropIndex(index);
-                                    }}
-                                    onDrop={(e) => {
-                                      e.preventDefault();
-                                      const from =
-                                        dragKey ||
-                                        e.dataTransfer.getData("text/plain");
-                                      if (from) moveRowTo(from, index);
-                                      setDragKey(null);
-                                      setDropIndex(null);
-                                    }}
-                                    onDragEnd={() => {
-                                      setDragKey(null);
-                                      setDropIndex(null);
-                                    }}
-                                    className={`${opsTableRowClass} align-middle ${
-                                      isDropTarget
-                                        ? "bg-emerald-50/50"
-                                        : ordersZebraTone(index)
-                                    } ${lifted ? "opacity-40" : ""} ${
-                                      isDropTarget
-                                        ? "border-t-2 border-t-emerald-500"
-                                        : ""
-                                    }`}
+                            <div className="border-t border-slate-100 bg-slate-50/50 px-6 py-3">
+                              <div className="flex items-center gap-4 flex-wrap rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-600">
+                                <span>
+                                  {to("orders.vehicle_box_capacity")}:{" "}
+                                  <b className="text-slate-800">{capacity}</b>
+                                </span>
+                                <span>
+                                  {to("orders.col_assigned")}:{" "}
+                                  <b className="text-slate-800">
+                                    {alreadyAssignedOther + requested}
+                                  </b>
+                                </span>
+                                <span>
+                                  {to("orders.available_boxes")}:{" "}
+                                  <b
+                                    className={
+                                      remaining < 0
+                                        ? "text-rose-600"
+                                        : "text-emerald-700"
+                                    }
                                   >
-                                    <td className={opsTableTdClass}>
-                                      <div className="flex items-center gap-1.5">
-                                        {/* Drag handle (the whole row drags as well) */}
-                                        <GripVertical
-                                          size={14}
-                                          aria-label={to("orders.drag_handle")}
-                                          className="shrink-0 cursor-grab text-slate-300 transition-colors hover:text-emerald-500 active:cursor-grabbing"
-                                        />
-                                        {/* Delivery order — type the position
+                                    {remaining}
+                                  </b>
+                                </span>
+                                <span>
+                                  {to("orders.col_shops")}:{" "}
+                                  <b className="text-slate-800">
+                                    {selected.length}
+                                  </b>
+                                </span>
+                                <span className="ml-auto text-[11px] text-slate-400">
+                                  {to("orders.collection_summary", {
+                                    shops: totals.totalShops,
+                                    boxes: totals.totalBoxes,
+                                    birds: totals.totalBirds,
+                                  })}
+                                </span>
+                              </div>
+                            </div>
+
+                            {/* Assignment table: editable sequence — drag a row, ↑/↓ one
+                  step, ⤒/⤓ first/last, or sort the whole list — + boxes. */}
+                            <div className="border-t border-slate-100" />
+                            <div className="max-h-80 overflow-y-auto">
+                              <table
+                                className={`w-full min-w-[880px] table-fixed ${ORDERS_TABLE_FONT_CLASS}`}
+                              >
+                                <colgroup>
+                                  <col className="w-32" />
+                                  <col />
+                                  <col />
+                                  <col className="w-[10%]" />
+                                  <col className="w-[10%]" />
+                                  <col className="w-[20%]" />
+                                  <col className="w-[10%]" />
+                                  <col className="w-14" />
+                                </colgroup>
+                                <thead>
+                                  <tr className={opsTableHeadRowClass}>
+                                    <th
+                                      className={`${opsTableThClass} text-left`}
+                                    >
+                                      {to("orders.col_sequence")}
+                                    </th>
+                                    <th
+                                      className={`${opsTableThClass} text-left`}
+                                    >
+                                      {to("orders.col_shop_name")}
+                                    </th>
+                                    <th
+                                      className={`${opsTableThClass} text-left`}
+                                    >
+                                      {to("orders.col_village")}
+                                    </th>
+                                    <th
+                                      className={`${opsTableThClass} text-right`}
+                                    >
+                                      {to("orders.col_birds")}
+                                    </th>
+                                    <th
+                                      className={`${opsTableThClass} text-right`}
+                                    >
+                                      {to("orders.col_boxes")}
+                                    </th>
+                                    <th
+                                      className={`${opsTableThClass} text-left`}
+                                    >
+                                      {to("orders.assigned_boxes")}
+                                    </th>
+                                    <th
+                                      className={`${opsTableThClass} text-right`}
+                                    >
+                                      {to("orders.weight")}
+                                    </th>
+                                    <th className={opsTableThClass} />
+                                  </tr>
+                                </thead>
+                                <tbody className={opsTableDivideClass}>
+                                  {selected.map((row, index) => {
+                                    const lifted = dragKey === row.clientKey;
+                                    const isDropTarget =
+                                      dropIndex === index &&
+                                      !!dragKey &&
+                                      !lifted;
+                                    return (
+                                      <tr
+                                        key={row.clientKey}
+                                        draggable={!busy}
+                                        onDragStart={(e) => {
+                                          setDragKey(row.clientKey);
+                                          setDropIndex(index);
+                                          e.dataTransfer.effectAllowed = "move";
+                                          try {
+                                            e.dataTransfer.setData(
+                                              "text/plain",
+                                              row.clientKey,
+                                            );
+                                          } catch {
+                                            /* dataTransfer is read-only in some browsers */
+                                          }
+                                        }}
+                                        onDragOver={(e) => {
+                                          if (!dragKey) return;
+                                          e.preventDefault();
+                                          e.dataTransfer.dropEffect = "move";
+                                          if (dropIndex !== index)
+                                            setDropIndex(index);
+                                        }}
+                                        onDrop={(e) => {
+                                          e.preventDefault();
+                                          const from =
+                                            dragKey ||
+                                            e.dataTransfer.getData(
+                                              "text/plain",
+                                            );
+                                          if (from) moveRowTo(from, index);
+                                          setDragKey(null);
+                                          setDropIndex(null);
+                                        }}
+                                        onDragEnd={() => {
+                                          setDragKey(null);
+                                          setDropIndex(null);
+                                        }}
+                                        className={`${opsTableRowClass} align-middle ${
+                                          isDropTarget
+                                            ? "bg-emerald-50/50"
+                                            : ordersZebraTone(index)
+                                        } ${lifted ? "opacity-40" : ""} ${
+                                          isDropTarget
+                                            ? "border-t-2 border-t-emerald-500"
+                                            : ""
+                                        }`}
+                                      >
+                                        <td className={opsTableTdClass}>
+                                          <div className="flex items-center gap-1.5">
+                                            {/* Drag handle (the whole row drags as well) */}
+                                            <GripVertical
+                                              size={14}
+                                              aria-label={to(
+                                                "orders.drag_handle",
+                                              )}
+                                              className="shrink-0 cursor-grab text-slate-300 transition-colors hover:text-emerald-500 active:cursor-grabbing"
+                                            />
+                                            {/* Delivery order — type the position
                                             (1, 2, 3 …) and the row moves there
                                             on Enter / blur. */}
-                                        <SequenceInput
-                                          value={index + 1}
-                                          max={selected.length}
-                                          disabled={busy}
-                                          label={`${to("orders.col_sequence")} — ${row.shopName}`}
-                                          onCommit={(pos) =>
-                                            moveRowTo(row.clientKey, pos - 1)
-                                          }
-                                        />
-                                        <SequenceArrows
-                                          index={index}
-                                          count={selected.length}
-                                          disabled={busy}
-                                          label={row.shopName}
-                                          onMove={(dir) =>
-                                            moveRowTo(
-                                              row.clientKey,
-                                              index + dir,
-                                            )
-                                          }
-                                        />
-                                      </div>
-                                    </td>
-                                    <td
-                                      className={`${opsTableTdClass} font-semibold text-slate-800`}
-                                    >
-                                      {row.shopName || "—"}
-                                    </td>
-                                    <td className={opsTableTdClass}>
-                                      {row.village || "—"}
-                                    </td>
-                                    <td
-                                      className={`${opsTableTdClass} text-right tabular-nums font-medium`}
-                                    >
-                                      {formatCount(row.orderedBirds)}
-                                    </td>
-                                    <td
-                                      className={`${opsTableTdClass} text-right tabular-nums font-semibold text-emerald-800`}
-                                    >
-                                      {formatCount(row.orderedBoxes)}
-                                    </td>
-                                    <td className={opsTableTdClass}>
-                                      {/* PARTIAL ASSIGNMENT: send part of a shop's order on
+                                            <SequenceInput
+                                              value={index + 1}
+                                              max={selected.length}
+                                              disabled={busy}
+                                              label={`${to("orders.col_sequence")} — ${row.shopName}`}
+                                              onCommit={(pos) =>
+                                                moveRowTo(
+                                                  row.clientKey,
+                                                  pos - 1,
+                                                )
+                                              }
+                                            />
+                                            <SequenceArrows
+                                              index={index}
+                                              count={selected.length}
+                                              disabled={busy}
+                                              label={row.shopName}
+                                              onMove={(dir) =>
+                                                moveRowTo(
+                                                  row.clientKey,
+                                                  index + dir,
+                                                )
+                                              }
+                                            />
+                                          </div>
+                                        </td>
+                                        <td
+                                          className={`${opsTableTdClass} font-semibold text-slate-800`}
+                                        >
+                                          {row.shopName || "—"}
+                                        </td>
+                                        <td className={opsTableTdClass}>
+                                          {row.village || "—"}
+                                        </td>
+                                        <td
+                                          className={`${opsTableTdClass} text-right tabular-nums font-medium`}
+                                        >
+                                          {formatCount(row.orderedBirds)}
+                                        </td>
+                                        <td
+                                          className={`${opsTableTdClass} text-right tabular-nums font-semibold text-emerald-800`}
+                                        >
+                                          {formatCount(row.orderedBoxes)}
+                                        </td>
+                                        <td className={opsTableTdClass}>
+                                          {/* PARTIAL ASSIGNMENT: send part of a shop's order on
                                 this truck — the balance stays pending for another
                                 vehicle. The cap is the shop's REMAINING balance
                                 (ordered − boxes already on other vehicles), so
                                 splitting 40 into 20 + 20 works while 20 + 40
                                 is impossible. */}
-                                      <div className="flex items-center gap-2">
-                                        <input
-                                          type="number"
-                                          min={1}
-                                          max={maxAssignable(row)}
-                                          value={
-                                            row.assigned === 0
-                                              ? ""
-                                              : row.assigned
-                                          }
-                                          placeholder="0"
-                                          aria-label={`${to("orders.assigned_boxes")} — ${row.shopName}`}
-                                          onChange={(e) =>
-                                            setAssigned(
-                                              row.clientKey,
-                                              e.target.value,
-                                            )
-                                          }
-                                          onWheel={onOrdersNumberWheel}
-                                          className={`${ORDERS_NO_SPINNER} h-8 w-24 rounded-lg border px-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 ${
-                                            row.assigned === 0
-                                              ? "border-amber-300 bg-amber-50/60 text-amber-800"
-                                              : "border-emerald-300/70 bg-emerald-50/50 text-emerald-900"
-                                          }`}
-                                        />
-                                        <span className="whitespace-nowrap text-[11px] font-semibold text-slate-400">
-                                          / {formatCount(maxAssignable(row))}
-                                          {row.assignedElsewhere > 0 && (
-                                            <span
-                                              className="ml-1.5 text-slate-500"
-                                              title={to(
-                                                "orders.on_other_vehicles",
-                                                {
-                                                  boxes: row.assignedElsewhere,
-                                                },
+                                          <div className="flex items-center gap-2">
+                                            <input
+                                              type="number"
+                                              min={1}
+                                              max={maxAssignable(row)}
+                                              value={
+                                                row.assigned === 0
+                                                  ? ""
+                                                  : row.assigned
+                                              }
+                                              placeholder="0"
+                                              aria-label={`${to("orders.assigned_boxes")} — ${row.shopName}`}
+                                              onChange={(e) =>
+                                                setAssigned(
+                                                  row.clientKey,
+                                                  e.target.value,
+                                                )
+                                              }
+                                              onWheel={onOrdersNumberWheel}
+                                              className={`${ORDERS_NO_SPINNER} h-8 w-24 rounded-lg border px-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 ${
+                                                row.assigned === 0
+                                                  ? "border-amber-300 bg-amber-50/60 text-amber-800"
+                                                  : "border-emerald-300/70 bg-emerald-50/50 text-emerald-900"
+                                              }`}
+                                            />
+                                            <span className="whitespace-nowrap text-[11px] font-semibold text-slate-400">
+                                              /{" "}
+                                              {formatCount(maxAssignable(row))}
+                                              {row.assignedElsewhere > 0 && (
+                                                <span
+                                                  className="ml-1.5 text-slate-500"
+                                                  title={to(
+                                                    "orders.on_other_vehicles",
+                                                    {
+                                                      boxes:
+                                                        row.assignedElsewhere,
+                                                    },
+                                                  )}
+                                                >
+                                                  (
+                                                  {to(
+                                                    "orders.on_other_vehicles",
+                                                    {
+                                                      boxes:
+                                                        row.assignedElsewhere,
+                                                    },
+                                                  )}
+                                                  )
+                                                </span>
                                               )}
-                                            >
-                                              (
-                                              {to("orders.on_other_vehicles", {
-                                                boxes: row.assignedElsewhere,
-                                              })}
-                                              )
+                                              {row.assigned > 0 &&
+                                                row.assigned <
+                                                  maxAssignable(row) && (
+                                                  <span className="ml-1.5 font-semibold text-amber-600">
+                                                    {to(
+                                                      "orders.part_assign_left",
+                                                      {
+                                                        boxes:
+                                                          maxAssignable(row) -
+                                                          row.assigned,
+                                                      },
+                                                    )}
+                                                  </span>
+                                                )}
                                             </span>
-                                          )}
-                                          {row.assigned > 0 &&
-                                            row.assigned <
-                                              maxAssignable(row) && (
-                                              <span className="ml-1.5 font-semibold text-amber-600">
-                                                {to("orders.part_assign_left", {
-                                                  boxes:
-                                                    maxAssignable(row) -
-                                                    row.assigned,
-                                                })}
-                                              </span>
-                                            )}
-                                        </span>
-                                      </div>
-                                    </td>
-                                    <td
-                                      className={`${opsTableTdClass} text-right tabular-nums text-slate-500`}
-                                    >
-                                      {orderWeightBasis
-                                        ? formatKg(
-                                            weightForBirds(
-                                              assignedBirdsFor(row),
-                                              orderWeightBasis,
-                                            ),
-                                          )
-                                        : "—"}
-                                    </td>
-                                    <td className={opsTableTdClass}>
-                                      <button
-                                        type="button"
-                                        onClick={() =>
-                                          setSelected((prev) =>
-                                            prev.filter(
-                                              (r) =>
-                                                r.clientKey !== row.clientKey,
-                                            ),
-                                          )
-                                        }
-                                        disabled={busy}
-                                        aria-label={`${to("orders.close")} — ${row.shopName}`}
-                                        className="group inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200/80 bg-white text-slate-400 transition-all hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 hover:shadow-sm active:scale-95 disabled:opacity-30"
-                                      >
-                                        <X
-                                          size={13}
-                                          className={
-                                            uiActionIconMotionClass.close
-                                          }
-                                        />
-                                      </button>
-                                    </td>
-                                  </tr>
-                                );
-                              })}
-                            </tbody>
-                          </table>
-                        </div>
-                      </>
-                    )}
+                                          </div>
+                                        </td>
+                                        <td
+                                          className={`${opsTableTdClass} text-right tabular-nums text-slate-500`}
+                                        >
+                                          {orderWeightBasis
+                                            ? formatKg(
+                                                weightForBirds(
+                                                  assignedBirdsFor(row),
+                                                  orderWeightBasis,
+                                                ),
+                                              )
+                                            : "—"}
+                                        </td>
+                                        <td className={opsTableTdClass}>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              setSelected((prev) =>
+                                                prev.filter(
+                                                  (r) =>
+                                                    r.clientKey !==
+                                                    row.clientKey,
+                                                ),
+                                              )
+                                            }
+                                            disabled={busy}
+                                            aria-label={`${to("orders.close")} — ${row.shopName}`}
+                                            className="group inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200/80 bg-white text-slate-400 transition-all hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 hover:shadow-sm active:scale-95 disabled:opacity-30"
+                                          >
+                                            <X
+                                              size={13}
+                                              className={
+                                                uiActionIconMotionClass.close
+                                              }
+                                            />
+                                          </button>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                              </table>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
                   </>
                 )}
               </div>
