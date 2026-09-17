@@ -17,7 +17,6 @@ import {
   Calendar,
   CalendarDays,
   CalendarRange,
-  CheckCircle2,
   CheckSquare,
   Download,
   Eye,
@@ -1449,7 +1448,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   // received the report — no duplicate messages, ever.
   const waSendingRef = useRef(false);
   const waSucceededRef = useRef<string[]>([]);
-  const [waSucceededShops, setWaSucceededShops] = useState<string[]>([]);
   // Attachment verification: the exact per-shop PDF the message will carry,
   // generated on demand from the modal's own filters and previewable/downloadable
   // before sending.
@@ -1462,7 +1460,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
   const resetWaSucceeded = useCallback(() => {
     waSucceededRef.current = [];
-    setWaSucceededShops([]);
   }, []);
 
   // Lock background scroll while a modal is open (with scrollbar-width
@@ -1725,16 +1722,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     [waAllShopNames, waSelectedShops],
   );
 
-  const waWeekTotal = useMemo(
-    () =>
-      waTargetShops.reduce(
-        (sum, shop) =>
-          sum + weeklySendCount(waSendCounts, currentWeekKey, shop),
-        0,
-      ),
-    [waTargetShops, waSendCounts, currentWeekKey],
-  );
-
   const toggleWaShop = (shop: string) => {
     setWaSelectedShops((prev) =>
       prev.includes(shop)
@@ -1867,7 +1854,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           // and record it as done for this modal run (dedupes any retry).
           successCount += 1;
           waSucceededRef.current = [...waSucceededRef.current, shop];
-          setWaSucceededShops(waSucceededRef.current);
           const key = weeklySendKey(weekStart, shop);
           setWaSendCounts((prev) => ({
             ...prev,
@@ -3012,74 +2998,13 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             </div>
           </div>
 
-          {/* Top bar — same dropdown chrome as the page toolbar */}
-          <div className="grid grid-cols-1 gap-3 border-b border-slate-100 px-5 py-3 sm:grid-cols-3">
-            <div>
-              <label className={opsFilterLabelClass}>
-                <Layers size={15} className="shrink-0 text-emerald-500" />
-                <span>{waT("shop_ledger.report_type")}</span>
-              </label>
-              <MasterDropdown
-                hideLabel
-                label={waT("shop_ledger.report_type")}
-                value={waReportType}
-                options={[
-                  { value: "All", label: waT("common.all") },
-                  { value: "Sales", label: waT("shop_ledger.type.sales") },
-                  {
-                    value: "Collection",
-                    label: waT("shop_ledger.type.collection"),
-                  },
-                ]}
-                onChange={(next) => {
-                  setWaReportType((next as WaReportType) || "All");
-                  resetWaSucceeded();
-                }}
-                placeholder={waT("shop_ledger.wa.type_all")}
-                className="w-full"
-              />
-            </div>
-            <div>
-              <label className={opsFilterLabelClass}>
-                <CalendarRange size={15} className="shrink-0 text-emerald-500" />
-                <span>{waT("shop_ledger.wa.date_from")}</span>
-              </label>
-              <DatePicker
-                value={waDateFrom}
-                onChange={(value) => {
-                  setWaDateFrom(value);
-                  resetWaSucceeded();
-                  resetWaAttachment();
-                }}
-                placeholder={waT("shop_ledger.wa.from_placeholder")}
-                className="w-full"
-              />
-            </div>
-            <div>
-              <label className={opsFilterLabelClass}>
-                <CalendarDays size={15} className="shrink-0 text-emerald-500" />
-                <span>{waT("shop_ledger.wa.date_to")}</span>
-              </label>
-              <DatePicker
-                value={waDateTo}
-                onChange={(value) => {
-                  setWaDateTo(value);
-                  resetWaSucceeded();
-                  resetWaAttachment();
-                }}
-                placeholder={waT("shop_ledger.wa.to_placeholder")}
-                className="w-full"
-              />
-            </div>
-          </div>
-
           {/* Body */}
           <div className="flex min-h-0 flex-1">
             {/* Left: shop selector */}
-            <aside className="flex w-72 shrink-0 flex-col border-r border-slate-100 bg-slate-50/60">
+            <aside className="flex w-72 shrink-0 flex-col border-r border-slate-100 bg-slate-50/70">
               <div className="space-y-2.5 border-b border-slate-100 bg-white/70 px-3.5 py-3">
                 <div className="flex items-center justify-between">
-                  <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-600">
+                  <span className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wide text-slate-500">
                     <span className="flex h-5 w-5 items-center justify-center rounded-md bg-gradient-to-br from-[#25D366] to-[#1DA851] text-white shadow-sm">
                       <ListChecks size={12} />
                     </span>
@@ -3157,27 +3082,18 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     </button>
                   )}
                 </div>
-                <p className="text-[10px] font-medium leading-4 text-slate-500">
-                  {waT("shop_ledger.wa.sent_this_week")} {waWeekTotal} · {formatDisplayDate(currentWeekKey)}
-                </p>
               </div>
 
               <div className="min-h-0 flex-1 space-y-0.5 overflow-y-auto px-2.5 py-2.5">
                 {waVisibleShops.map((shop) => {
                   const recipient = resolveWaRecipient(shop);
-                  const weekCount = weeklySendCount(
-                    waSendCounts,
-                    currentWeekKey,
-                    shop,
-                  );
                   const isSending = waSendingShop === shop;
-                  const shopSucceeded = waSucceededShops.includes(shop);
                   const isPreview = waPreviewShop === shop;
                   const isSelected = waSelectedShops.includes(shop);
                   return (
                     <div
                       key={shop}
-                      className={`flex items-center gap-2 rounded-xl border px-2 py-1.5 transition ${
+                      className={`group flex items-center gap-2 rounded-xl border px-2 py-1.5 transition ${
                         isPreview
                           ? "border-emerald-200 bg-emerald-50/80 ring-1 ring-emerald-300"
                           : isSelected
@@ -3222,17 +3138,14 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                       {isSending ? (
                         <Loader2
                           size={13}
-                          className="mt-1 shrink-0 animate-spin text-[#25D366]"
+                          className="shrink-0 animate-spin text-[#25D366]"
                         />
-                      ) : shopSucceeded ? (
-                        <CheckCircle2
-                          size={14}
-                          className="mt-0.5 shrink-0 text-emerald-600"
+                      ) : isPreview ? (
+                        <Eye
+                          size={13}
+                          className="shrink-0 text-emerald-600"
+                          aria-label={waT("shop_ledger.pdf_ready")}
                         />
-                      ) : weekCount > 0 ? (
-                        <span className="mt-0.5 shrink-0 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
-                          {weekCount}×
-                        </span>
                       ) : null}
                     </div>
                   );
@@ -3242,11 +3155,77 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     No shops match “{waShopSearch}”.
                   </p>
                 )}
+                {waShopSearch && waVisibleShops.length > 0 && (
+                  <p className="mt-1.5 px-2 text-center text-[10px] font-medium text-slate-400">
+                    Showing {waVisibleShops.length} of {waAllShopNames.length} shops
+                  </p>
+                )}
               </div>
             </aside>
 
             {/* Right: recipient details + message preview */}
             <div className="flex min-w-0 flex-1 flex-col">
+              {/* Top bar — same dropdown chrome as the page toolbar */}
+              <div className="grid grid-cols-1 gap-3 border-b border-slate-100 px-5 py-3 sm:grid-cols-3">
+                <div>
+                  <label className={opsFilterLabelClass}>
+                    <Layers size={15} className="shrink-0 text-emerald-500" />
+                    <span>{waT("shop_ledger.report_type")}</span>
+                  </label>
+                  <MasterDropdown
+                    hideLabel
+                    label={waT("shop_ledger.report_type")}
+                    value={waReportType}
+                    options={[
+                      { value: "All", label: waT("common.all") },
+                      { value: "Sales", label: waT("shop_ledger.type.sales") },
+                      {
+                        value: "Collection",
+                        label: waT("shop_ledger.type.collection"),
+                      },
+                    ]}
+                    onChange={(next) => {
+                      setWaReportType((next as WaReportType) || "All");
+                      resetWaSucceeded();
+                    }}
+                    placeholder={waT("shop_ledger.wa.type_all")}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <label className={opsFilterLabelClass}>
+                    <CalendarRange size={15} className="shrink-0 text-emerald-500" />
+                    <span>{waT("shop_ledger.wa.date_from")}</span>
+                  </label>
+                  <DatePicker
+                    value={waDateFrom}
+                    onChange={(value) => {
+                      setWaDateFrom(value);
+                      resetWaSucceeded();
+                      resetWaAttachment();
+                    }}
+                    placeholder={waT("shop_ledger.wa.from_placeholder")}
+                    className="w-full"
+                  />
+                </div>
+                <div>
+                  <label className={opsFilterLabelClass}>
+                    <CalendarDays size={15} className="shrink-0 text-emerald-500" />
+                    <span>{waT("shop_ledger.wa.date_to")}</span>
+                  </label>
+                  <DatePicker
+                    value={waDateTo}
+                    onChange={(value) => {
+                      setWaDateTo(value);
+                      resetWaSucceeded();
+                      resetWaAttachment();
+                    }}
+                    placeholder={waT("shop_ledger.wa.to_placeholder")}
+                    className="w-full"
+                  />
+                </div>
+              </div>
+
               <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
                 {waPreviewShop && waPreviewRecipient ? (
                   <>
