@@ -31,9 +31,15 @@ This is approximately **89% less processing time**, not a measurement of total b
 
 ## Orders table/navigation alignment
 
-- Separate deep links: `/operations?tab=orders&orderTab=collection`, `assignment`, or `tracking`.
+- One route per Orders page: `/operations/orders/collection`, `/operations/orders/assignment`,
+  `/operations/orders/delivery-tracking`. Each is reloadable and shareable, and each is its own
+  sidebar row inside the Orders group under Operations. The route table that defines them is
+  `src/modules/orders/routes/ordersRoutes.ts` — the sidebar, the in-page tab rail and the URL
+  resolver all read it, so they cannot drift. The older
+  `/operations?tab=orders&orderTab=collection|assignment|tracking` links still work: they are
+  canonicalised to the path form on arrival.
 - Collection/Assignment date parameters are independent (`collectionDate`, `assignmentDate`). Invalid calendar dates, future dates and dates outside the advertised operational window resolve to today.
-- Visited panels stay mounted while switching tabs: filters, page size, current page and unsaved edits survive tab navigation. These local filters/drafts are not persisted across a full browser reload. Date changes intentionally mount a new day editor; top-level collection/assignment search and sort controls remain selected.
+- Visited panels stay mounted while switching pages — from the tab rail or from the sidebar: filters, page size, current page and unsaved edits survive the move. These local filters/drafts are not persisted across a full browser reload. Date changes intentionally mount a new day editor; top-level collection/assignment search and sort controls remain selected.
 - All Orders pagers now use the same `src/ui/Pagination.tsx` as Trip List, with counts, rows-per-page, disabled states and bounded page controls. Filtering/sorting occur before slicing.
 - Collection cells match Trip List's 16px column padding, 20px body padding and 16px header padding. Search includes shop number and phone in addition to existing fields.
 - Assignment now exposes search/date/sort and read-only historical rows. Historical days never mount the writable assignment editor.

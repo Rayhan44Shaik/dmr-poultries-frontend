@@ -70,7 +70,7 @@ reach them. Each was a pass-through/flag change only:
 | File | Change | Why |
 |---|---|---|
 | `operations/dashboard/services/dashboardService.ts` | The response mapper hardcoded `trendData: []`, `topShops: []`, `collectionsByMode: []`, `recentTrips: []`, `activeVehicles: 0`, … Now it passes those fields through when the API supplies them (`?? []` / `toNumber`). | Dashboard KPIs worked but **every chart and panel was blank by construction**. A backend that returns only KPIs still behaves exactly as before. |
-| `operations/orders/sampleOrdersData.ts` | `ORDERS_SAMPLE_DATA_ENABLED: true → false` | The Orders page ran entirely on bundled sample rows and made **no network call**. The quarter dataset now supplies the `[ORDER]` collection containers. |
+| `orders/services/sampleOrdersData.ts` | `ORDERS_SAMPLE_DATA_ENABLED: true → false` | The Orders page ran entirely on bundled sample rows and made **no network call**. The quarter dataset now supplies the `[ORDER]` collection containers. |
 | `accounts/pages/PaymentBookPage.tsx` | `useState(import.meta.env.DEV)` → `useState(false)` | Payment Register always opened in bundled demo mode in dev, hiding the real 662 payments. The demo toggle still exists as a manual fallback. |
 
 `tsc -p tsconfig.app.json --noEmit` reports **no new errors** (only the
@@ -271,8 +271,15 @@ a live carried-balance count, matching the Pending Collections KPI.
 | Pending Collections | `?tab=pending-collections` | 200 shop rows sorted by outstanding; total ≈ ₹1.69 Cr; each row shows total sales, total collected, last collection date and overdue days. |
 | Weight Loss / Mortality | `?tab=mortality` | KPI strip (farm birds, delivered birds, mortality %, weight loss %); farm + supervisor dropdowns populated from real data; sort every column; expand a trip → shop-wise mortality lines. |
 | Fuel Expenses | `?tab=fuel-expenses` | 738 bills on the 2026-09-15 anchor, paginated; the KPI strip is visible on the unfiltered quarter and totals **all filtered pages** (it does not change on page 2). Filter TRIP vs MANUAL and Approved / Pending / Rejected; trip-linked rows carry trip no, meter, GPS and mileage. |
-| Orders | `?tab=orders` | Now reads the live API (bundled sample mode switched off). **8 `[ORDER]` collection containers** (one per each of the last 8 operating days, 20–36 shops each): all eight fit inside the ten-calendar-day selector window, including the Sunday closure. The newest is still *in collection* (Tab 1 working order, 27 shops · 92 boxes · 920 birds) and shows the shop's **city** plus the **ordered weight** per row. Tab 2 opens on `27 collected · 4 assigned · 23 available` against **6 eligible vehicles** (Step 2 done, Step 4 open) — one of them already carries 4 shops — and every earlier day shows its read-only assignment history. Tab 3 lists **1 trip in PENDING & IN PROGRESS** (5 shops, 19 boxes, 437 kg) and **7 COMPLETED** order trips with `Delivered` / `Part Delivered` badges inside the default From → To window. |
+| Order Collection | `/operations/orders/collection` | **8 `[ORDER]` collection containers (one per each of the last 8 operating days, 20–36 shops each)** — all eight fit inside the ten-calendar-day selector window, including the Sunday closure. The newest is still *in collection* (27 shops · 92 boxes · 920 birds) and shows the shop's **city** plus the **ordered weight** per row. |
+| Order Assignment | `/operations/orders/assignment` | Opens on `27 collected · 4 assigned · 23 available` against **6 eligible vehicles** (Step 2 done, Step 4 open) — one of them already carries 4 shops — and every earlier day shows its read-only assignment history. |
+| Delivery Tracking | `/operations/orders/delivery-tracking` | Lists **1 trip in PENDING & IN PROGRESS** (5 shops, 19 boxes, 437 kg) and **7 COMPLETED** order trips with `Delivered` / `Part Delivered` badges inside the default From → To window. |
 | Collection Report | `?tab=collection-report` | Payment-mode summary (Cash / Union Bank / HDFC) with % split; collector summary for all 20 collectors; change date range Jul→Sep and confirm totals move. |
+
+> Orders is its own module (`src/modules/orders`) with its own route table — the three rows above
+> are the grouped entries it contributes under Operations in the sidebar. The legacy
+> `/operations?tab=orders` (with `&orderTab=collection|assignment|tracking`) still resolves: it
+> canonicalises to the page path.
 
 ### 3.4 Vehicles / Fleet — `/fleet`
 

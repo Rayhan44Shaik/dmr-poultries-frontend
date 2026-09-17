@@ -17,7 +17,7 @@ import { notify as globalNotify } from "../../../../ui/notifications/notificatio
 import { uniqueTripsById } from "../services/tripHeaderApiService";
 import { BrandRefreshButton } from "../../../../ui";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
-import { isOrderContainer } from "../../orders/ordersUtils";
+import { isOrderContainer } from "../../../orders/utils/ordersUtils";
 
 interface Props {
   trips?: Trip[];

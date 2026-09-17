@@ -82,6 +82,12 @@ const MOTION_BY_PATH: Record<string, NavMotion> = {
   "/operations?tab=mortality": { motion: SEESAW },
   "/operations?tab=fuel-expenses": { motion: PUMP },
   "/operations?tab=orders": { motion: STACK },
+  // Orders is a module of its own — one motion per page, matching what it does:
+  // slips stack up on collection, a delivery gets ticked off on assignment, and
+  // the truck rolls while you track it.
+  "/operations/orders/collection": { motion: STACK },
+  "/operations/orders/assignment": { motion: CHECK },
+  "/operations/orders/delivery-tracking": { motion: DRIVE },
   "/operations?tab=collection-report": { motion: FLIP },
 
   // ── Fleet ───────────────────────────────────────────────────────────────

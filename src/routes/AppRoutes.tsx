@@ -170,15 +170,13 @@ function AppRoutes() {
         }
       />
 
-      {/* ============ OPERATIONS ============ */}
-      <Route
-        path="/operations"
-        element={
-          <Suspense fallback={<PageLoading />}>
-            <pages.operations />
-          </Suspense>
-        }
-      />
+      {/* ============ OPERATIONS ============
+          One splat route serves the whole section: /operations (overview and the
+          ?tab= deep links), its legacy path aliases, and the nested routes that
+          modules own — e.g. Orders at /operations/orders/{collection,assignment,
+          delivery-tracking} (see src/modules/orders/routes/ordersRoutes.ts).
+          A single match means the section is never remounted while you move
+          between its pages, so each module keeps its loaded data and filters. */}
       <Route
         path="/operations/*"
         element={

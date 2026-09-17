@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 
 import { retryableImport } from "../../../routes/lazyWithRetry";
 import { useI18n } from "../../../i18n";
+import { ORDERS_ROUTE_BASE } from "../../orders/routes/ordersRoutes";
 
 const OperationsDashboardPage = React.lazy(retryableImport(() => import("../dashboard/pages/OperationsDashboardPage")));
 const TripEntryPage = React.lazy(retryableImport(() => import("../vehicle-trips/pages/TripEntryPage")));
@@ -16,7 +17,7 @@ const PendingCollectionsPage = React.lazy(retryableImport(() => import("../colle
 const CollectionReportPage = React.lazy(retryableImport(() => import("../collections/pages/CollectionReportPage")));
 const FuelExpensesPage = React.lazy(retryableImport(() => import("../fuel-expenses/pages/FuelExpensesPage")));
 const MortalityEntryPage = React.lazy(retryableImport(() => import("../mortality/pages/MortalityEntryPage")));
-const OrdersPage = React.lazy(retryableImport(() => import("../orders/pages/OrdersPage")));
+const OrdersPage = React.lazy(retryableImport(() => import("../../orders/pages/OrdersPage")));
 
 // Map tab keys (resolved from ?tab= sidebar deep-links / path aliases)
 // to their child page components.
@@ -56,7 +57,11 @@ function OperationsPages() {
     if (pathname.includes("collections/report")) return "collection-report";
     if (pathname.includes("mortality")) return "mortality";
     if (pathname.includes("fuel-expenses")) return "fuel-expenses";
-    if (pathname.includes("orders")) return "orders";
+    // Orders is its own module with its own routes under /operations/orders/*.
+    // All three pages resolve to this one entry on purpose: the module keeps
+    // every page it has opened mounted (shared day data, pending work, filters),
+    // so moving between its sidebar rows is instant and never refetches.
+    if (pathname.startsWith(ORDERS_ROUTE_BASE)) return "orders";
 
     return "overview"; // Default tab
   }, [location.pathname, searchParams]);

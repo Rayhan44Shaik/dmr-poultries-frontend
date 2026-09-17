@@ -41,7 +41,9 @@ import {
   Settings,
   Database,
   Scale,
+  ReceiptText,
 } from "lucide-react";
+import { ORDERS_PAGES } from "../modules/orders/routes/ordersRoutes";
 
 /** Accent used by the sidebar icon + active row for this item. */
 export type NavTone =
@@ -158,7 +160,16 @@ export interface NavChild {
   /** Marks a planned module — rendered with a subtle "Soon" pill. */
   soon?: boolean;
   keywords?: string;
+  /** Ids a run of related pages (e.g. "orders"). The sidebar renders a small
+   *  sub-heading for the group and indents its rows, so a module that owns
+   *  several pages still reads as one block inside its section. */
+  group?: string;
 }
+
+/** Headings for `NavChild.group` runs, keyed by group id. */
+export const NAV_CHILD_GROUPS: Record<string, { label: string; labelKey: string; icon: LucideIcon }> = {
+  orders: { label: "Orders", labelKey: "nav.orders", icon: ReceiptText },
+};
 
 export interface NavSection {
   id: string;
@@ -170,6 +181,18 @@ export interface NavSection {
   path?: string;
   children: NavChild[];
 }
+
+/** Sidebar rows for the Orders module, derived from its route table. */
+const ORDERS_NAV_CHILDREN: NavChild[] = ORDERS_PAGES.map((page) => ({
+  label: page.label,
+  labelKey: page.labelKey,
+  titleKey: page.titleKey,
+  path: page.path,
+  icon: page.icon,
+  tone: page.tone,
+  group: "orders",
+  keywords: page.keywords,
+}));
 
 export const NAV_SECTIONS: NavSection[] = [
   {
@@ -270,6 +293,11 @@ export const NAV_SECTIONS: NavSection[] = [
         keywords: "daily report operations overview",
       },
 
+      // Orders is its own module (src/modules/orders) with its own route table,
+      // so these rows are generated from it — the sidebar and the app routes can
+      // never disagree. Inside Operations they read as one grouped block.
+      ...ORDERS_NAV_CHILDREN,
+
       {
         label: "Trip Entry",
         labelKey: "nav.vehicleDeliveryEntry",
@@ -336,14 +364,6 @@ export const NAV_SECTIONS: NavSection[] = [
         icon: Fuel,
         tone: "amber",
         keywords: "fuel diesel expenses bills",
-      },
-      {
-        label: "Orders",
-        labelKey: "nav.orders",
-        path: "/operations?tab=orders",
-        icon: ClipboardList,
-        tone: "emerald",
-        keywords: "orders shop order collection delivery sequence pending completed",
       },
     ],
   },

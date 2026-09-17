@@ -114,6 +114,12 @@ const routeChunks = [
   ["DashboardLayout", "/src/layouts/DashboardLayout/DashboardLayout.tsx"],
   ["DashboardPage", "/src/modules/dashboard/DashboardPage.tsx"],
   ["OperationsPages", "/src/modules/operations/pages/OperationsPages.tsx"],
+  // Orders is its own module now — its workspace and the three pages it mounts
+  // per route all have to evaluate on their own.
+  ["OrdersPage", "/src/modules/orders/pages/OrdersPage.tsx"],
+  ["OrderCollectionPage", "/src/modules/orders/pages/OrderCollectionPage.tsx"],
+  ["OrderAssignmentPage", "/src/modules/orders/pages/OrderAssignmentPage.tsx"],
+  ["DeliveryTrackingPage", "/src/modules/orders/pages/DeliveryTrackingPage.tsx"],
   ["AccountsPage", "/src/modules/accounts/pages/AccountsPage.tsx"],
   ["MastersPage", "/src/modules/masters/pages/MastersPage.tsx"],
   ["SettingsPage", "/src/modules/settings/pages/SettingsPage.tsx"],

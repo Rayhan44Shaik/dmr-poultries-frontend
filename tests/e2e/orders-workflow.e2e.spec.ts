@@ -107,7 +107,7 @@ function orderRow(page_: Awaited<ReturnType<typeof apiOrders>>, shop: string) {
 // ── UI helpers ─────────────────────────────────────────────────────────────
 
 async function gotoOrders(page: Page, tab: 'collection' | 'assignment' | 'tracking') {
-  await page.goto('/operations?tab=orders');
+  await page.goto('/operations/orders/collection');
   await page.waitForLoadState('networkidle');
   if (tab !== 'collection') {
     const name = tab === 'assignment' ? /order assignment/i : /delivery tracking/i;

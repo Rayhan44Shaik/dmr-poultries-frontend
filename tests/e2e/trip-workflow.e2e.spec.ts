@@ -332,7 +332,7 @@ test('20: the Step-2-complete trip keeps its identity for Orders; Orders page re
   // parallel store); the page loads clean in both languages.
   for (const lang of ['en', 'te'] as const) {
     await setLanguage(page, lang);
-    await page.goto('/operations?tab=orders');
+    await page.goto('/operations/orders/collection');
     await page.waitForLoadState('networkidle');
     await assertNoRawKeys(page);
     await expect(page.getByRole('tab', { name: lang === 'en' ? /assignment/i : /అసైన్‌మెంట్/ })).toBeVisible();
@@ -464,7 +464,7 @@ test('26: EN + TE -- wizard step names, Recent Table + Orders, no raw i18n keys 
     await expect(stepBtn(page, 4)).toContainText(lang === 'en' ? /Delivery Details/ : /డెలివరీ వివరాలు/);
     await assertNoRawKeys(page);
 
-    await page.goto('/operations?tab=orders');
+    await page.goto('/operations/orders/collection');
     await page.waitForLoadState('networkidle');
     await assertNoRawKeys(page);
   }
@@ -520,7 +520,7 @@ test('27: Order Collection UI — one `orders` row per shop, real quantities, su
   request,
 }) => {
   await setLanguage(page, 'en');
-  await page.goto('/operations?tab=orders');
+  await page.goto('/operations/orders/collection');
   await page.waitForLoadState('networkidle');
 
   const day = todayIso();
@@ -580,7 +580,7 @@ test('27: Order Collection UI — one `orders` row per shop, real quantities, su
 
 test('27b: Orders Assignment calendar — opens unclipped, month nav works, does not self-close, and the picked date drives the selected day', async ({ page }) => {
   await setLanguage(page, 'en');
-  await page.goto('/operations?tab=orders');
+  await page.goto('/operations/orders/collection');
   await page.waitForLoadState('networkidle');
   await page.getByRole('tab', { name: /order assignment/i }).click();
 
@@ -669,7 +669,7 @@ async function fullTrip(request: APIRequestContext, id: number) {
  * search (server-side), and return that trip's per-shop rows.
  */
 async function trackingRowsFor(page: Page, tripNo: string) {
-  await page.goto('/operations?tab=orders');
+  await page.goto('/operations/orders/collection');
   await page.waitForLoadState('networkidle');
   await page.getByRole('tab', { name: /delivery tracking/i }).click();
   await page.getByRole('textbox', { name: /search shop, city/i }).fill(tripNo);
@@ -831,7 +831,7 @@ test('28: complete real UI Trip Entry workflow Step 1 through Step 5', async ({ 
   await expect(stepBtn(page, 4)).toHaveAttribute('aria-label', /Locked/i);
 
   // ── STEP 2 → ORDERS: the SAME operational trip is visible in Orders ───
-  await page.goto('/operations?tab=orders');
+  await page.goto('/operations/orders/collection');
   await page.waitForLoadState('networkidle');
   await page.getByRole('tab', { name: /order assignment/i }).click();
   {
@@ -901,7 +901,7 @@ test('28: complete real UI Trip Entry workflow Step 1 through Step 5', async ({ 
   await expect(stepBtn(page, 4)).not.toHaveAttribute('aria-label', /Locked/i);
 
   // ── STEP 3 → ORDERS ASSIGNMENT (real UI): assign 5 shops to THIS trip ──
-  await page.goto('/operations?tab=orders');
+  await page.goto('/operations/orders/collection');
   await page.waitForLoadState('networkidle');
   await page.getByRole('tab', { name: /order assignment/i }).click();
   {

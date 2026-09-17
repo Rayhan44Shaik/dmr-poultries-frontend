@@ -11,10 +11,10 @@
 // (truck drives, rupee flips, wrench tightens, document turns a page…). See
 // ui/Sidebar/navMotion.ts + the `--animate-nav-*` family in styles/tokens.css.
 
-import { useEffect } from "react";
+import { Fragment, useEffect } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
-import { NAV_SECTIONS, NAV_TONE_CLASS, type NavChild } from "../../routes/navigation";
+import { NAV_CHILD_GROUPS, NAV_SECTIONS, NAV_TONE_CLASS, type NavChild } from "../../routes/navigation";
 import { useI18n } from "../../i18n";
 import BrandMark from "../BrandMark";
 import { usePendingApprovals } from "../../modules/approvals/hooks/usePendingApprovals";
@@ -51,10 +51,17 @@ interface SidebarProps {
   onModeChange: (mode: SidebarMode) => void;
 }
 
+/**
+ * A nav row is active when it *is* the current location.
+ * Query-less rows address real routes (e.g. /operations/orders/assignment):
+ * those match on the path, so page-level query state (`?collectionDate=…`)
+ * never breaks the highlight. Rows that address a tab (`?tab=orders`) still
+ * match exactly, because the query IS the page.
+ */
 function isChildActive(child: NavChild, pathname: string, search: string): boolean {
-  const childUrl = child.path;
-  const current = pathname + search;
-  return current === childUrl;
+  const [childPath, childQuery] = child.path.split("?");
+  if (childQuery) return pathname + search === child.path;
+  return pathname === childPath || pathname.startsWith(`${childPath}/`);
 }
 
 /** Small, square control in the brand row (collapse / expand / hide). */
@@ -188,9 +195,16 @@ export default function Sidebar({ open, onClose, mode, onModeChange }: SidebarPr
               )}
 
               <ul className="space-y-0.5">
-                {section.children.map((child) => {
+                {section.children.map((child, index) => {
                   const Icon = child.icon ?? SectionIcon;
                   const active = isChildActive(child, pathname, search);
+                  // A grouped run of rows (e.g. the three Orders pages inside
+                  // Operations) reads as one block: a single small heading and
+                  // a hairline rail instead of a flat, ambiguous list.
+                  const groupMeta = child.group ? NAV_CHILD_GROUPS[child.group] : undefined;
+                  const groupStart = Boolean(groupMeta) && section.children[index - 1]?.group !== child.group;
+                  const GroupIcon = groupMeta?.icon;
+                  const groupLabel = groupMeta ? (groupMeta.labelKey ? t(groupMeta.labelKey) : groupMeta.label) : "";
                   const label = child.labelKey ? t(child.labelKey) : child.label;
                   const tone = NAV_TONE_CLASS[child.tone ?? "slate"];
                   const badgeCount = navApprovalBadge(child.path, pendingApprovals);
@@ -234,7 +248,17 @@ export default function Sidebar({ open, onClose, mode, onModeChange }: SidebarPr
                   }
 
                   return (
-                    <li key={child.label}>
+                    <Fragment key={child.label}>
+                      {groupStart && !collapsed && GroupIcon ? (
+                        <li
+                          aria-hidden="true"
+                          className="flex items-center gap-1.5 px-3 pb-0.5 pt-2.5 text-[10px] font-bold uppercase tracking-[0.08em] text-slate-400/80 dark:text-slate-500"
+                        >
+                          <GroupIcon size={11} />
+                          {groupLabel}
+                        </li>
+                      ) : null}
+                      <li className={child.group && !collapsed ? "ml-[18px] border-l border-slate-200/80 pl-1 dark:border-slate-800" : undefined}>
                       <Link
                         to={child.path}
                         onClick={onClose}
@@ -287,7 +311,8 @@ export default function Sidebar({ open, onClose, mode, onModeChange }: SidebarPr
                           </>
                         )}
                       </Link>
-                    </li>
+                      </li>
+                    </Fragment>
                   );
                 })}
               </ul>
