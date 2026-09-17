@@ -12,12 +12,12 @@ import VehiclePerformanceTable from '../components/analytics/VehiclePerformanceT
 import AttentionSection from '../components/analytics/AttentionSection';
 import { DatePicker } from '../../../components/common/DatePicker';
 import {
-  Banknote,
   Calendar,
   FileSpreadsheet,
   FileText,
   Fuel,
   Gauge,
+  IndianRupee,
   RotateCcw,
   Search,
   TrendingUp,
@@ -127,17 +127,17 @@ const VehicleAnalyticsPage = ({ embedded = false, active = true }: VehicleAnalyt
 
   const showSkeleton = loading && !lastRefreshed;
 
-  // A deliberately small, focused KPI set — the five figures operators actually
-  // read at a glance: trips run, distance covered, fuel burnt, what that fuel
-  // cost, and the resulting mileage. Everything else lives in the charts and the
-  // Vehicle Details table below, so the summary stays clean.
+  // Five focused KPIs that still cover the whole picture: how much the fleet
+  // ran (trips + distance), how much fuel that took, the mileage it returned,
+  // and Total Cost — the all-in expense (fuel + maintenance + EMI + toll +
+  // other) so no cost line is lost from the summary.
   const kpis = useMemo<KpiDef[]>(() => {
     return [
       { label: t('fleet.analytics.total_trips'), value: formatNumberCompact(stats.totalTrips), icon: Truck, tone: 'blue' },
       { label: t('fleet.analytics.total_distance'), value: `${formatNumberCompact(stats.totalDistance)} km`, icon: TrendingUp, tone: 'cyan' },
       { label: t('fleet.analytics.fuel_used'), value: `${formatNumberCompact(stats.totalFuelLitres)} L`, icon: Fuel, tone: 'amber' },
-      { label: t('fleet.analytics.fuel_cost'), value: formatCurrencyCompact(stats.fuelCost), icon: Banknote, tone: 'rose' },
       { label: t('fleet.analytics.avg_mileage'), value: stats.averageMileage > 0 ? `${stats.averageMileage.toFixed(2)} km/l` : '—', icon: Gauge, tone: 'emerald' },
+      { label: t('fleet.analytics.total_fleet_cost'), value: formatCurrencyCompact(stats.totalExpense), icon: IndianRupee, tone: 'rose' },
     ];
   }, [stats, t]);
 
