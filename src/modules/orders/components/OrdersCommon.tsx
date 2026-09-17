@@ -5,8 +5,8 @@
 // Deliberately NO dashboard-style KPI cards: this is an operational
 // table page, and summaries live in compact bars inside each workflow.
 
-import React, { useEffect, useId, useRef, useState } from "react";
-import { uiSearchInputWithClearClass } from '../../../shared/ui/uiTokens';
+import React, { useEffect, useId, useMemo, useRef, useState } from "react";
+import { uiSearchInputWithClearClass } from "../../../shared/ui/uiTokens";
 import {
   AlertTriangle,
   Check,
@@ -23,7 +23,11 @@ import {
   opsPrimaryButtonClass,
 } from "../../../shared/ui/operationsStyles";
 import { DatePicker } from "../../../components/common/DatePicker";
-import { addLocalDays, formatCollectionDeadline, isCollectionAutoClosed } from "../utils/ordersUtils";
+import {
+  addLocalDays,
+  formatCollectionDeadline,
+  isCollectionAutoClosed,
+} from "../utils/ordersUtils";
 import type { OrdersT } from "../i18n/ordersI18n";
 
 // ─── Numeric fields (module-wide behaviour) ──────────────────────────────────
@@ -39,7 +43,9 @@ import type { OrdersT } from "../i18n/ordersI18n";
  */
 export const ORDERS_NO_SPINNER = "no-spinner";
 
-export function onOrdersNumberWheel(event: React.WheelEvent<HTMLInputElement>): void {
+export function onOrdersNumberWheel(
+  event: React.WheelEvent<HTMLInputElement>,
+): void {
   event.currentTarget.blur();
 }
 
@@ -74,7 +80,8 @@ export function OrdersStatusBadge({
   status: string;
   label: string;
 }) {
-  const tone = STATUS_TONES[status] ?? "bg-slate-100 text-slate-600 border-slate-200";
+  const tone =
+    STATUS_TONES[status] ?? "bg-slate-100 text-slate-600 border-slate-200";
   return (
     <span
       className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold whitespace-nowrap ${tone}`}
@@ -108,7 +115,13 @@ export function OrdersEmptyState({
   compact?: boolean;
 }) {
   return (
-    <div className={compact ? "px-4 py-4 text-center text-sm font-medium text-slate-500" : opsEmptyStateClass}>
+    <div
+      className={
+        compact
+          ? "px-4 py-4 text-center text-sm font-medium text-slate-500"
+          : opsEmptyStateClass
+      }
+    >
       <div className="flex flex-col items-center justify-center gap-1.5">
         {compact ? null : (
           <div className="h-14 w-14 rounded-full bg-slate-50 flex items-center justify-center text-slate-300">
@@ -179,8 +192,10 @@ export function OrdersIconButton({
   className?: string;
 }) {
   const tones: Record<string, string> = {
-    slate: "border-slate-200/80 text-slate-500 hover:bg-slate-50 hover:text-slate-800",
-    emerald: "border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700",
+    slate:
+      "border-slate-200/80 text-slate-500 hover:bg-slate-50 hover:text-slate-800",
+    emerald:
+      "border-emerald-200 text-emerald-600 hover:bg-emerald-50 hover:text-emerald-700",
     rose: "border-rose-200 text-rose-500 hover:bg-rose-50 hover:text-rose-600",
     sky: "border-sky-200 text-sky-600 hover:bg-sky-50 hover:text-sky-700",
   };
@@ -217,7 +232,8 @@ export function OrdersLabelButton({
   className?: string;
 }) {
   const tones: Record<string, string> = {
-    slate: "border-slate-200/80 text-slate-600 hover:bg-slate-50 hover:text-slate-800",
+    slate:
+      "border-slate-200/80 text-slate-600 hover:bg-slate-50 hover:text-slate-800",
     emerald: "border-emerald-200 text-emerald-700 hover:bg-emerald-50",
     rose: "border-rose-200 text-rose-600 hover:bg-rose-50",
     sky: "border-sky-200 text-sky-700 hover:bg-sky-50",
@@ -345,7 +361,9 @@ export function OrdersDateControl({
       ) : isCollectionAutoClosed(day) ? (
         <span
           className="inline-flex items-center gap-1 rounded-full bg-rose-50 border border-rose-200 px-2 py-0.5 text-[10px] font-bold text-rose-700 whitespace-nowrap"
-          title={t("orders.auto_closed_note", { deadline: formatCollectionDeadline(day) })}
+          title={t("orders.auto_closed_note", {
+            deadline: formatCollectionDeadline(day),
+          })}
         >
           <Lock size={10} />
           {t("orders.closed_day")}
@@ -426,7 +444,12 @@ export function OrdersDropdown({
   }, [open, activeIndex]);
 
   const openList = (focusList: boolean) => {
-    setActiveIndex(Math.max(0, options.findIndex((o) => o.value === value)));
+    setActiveIndex(
+      Math.max(
+        0,
+        options.findIndex((o) => o.value === value),
+      ),
+    );
     setOpen(true);
     if (focusList) {
       requestAnimationFrame(() => listRef.current?.focus());
@@ -439,7 +462,12 @@ export function OrdersDropdown({
   };
 
   const onTriggerKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "ArrowDown" || e.key === "ArrowUp" || e.key === "Enter" || e.key === " ") {
+    if (
+      e.key === "ArrowDown" ||
+      e.key === "ArrowUp" ||
+      e.key === "Enter" ||
+      e.key === " "
+    ) {
       e.preventDefault();
       openList(true);
     } else if (e.key === "Escape") {
@@ -484,7 +512,9 @@ export function OrdersDropdown({
         onClick={() => (open ? setOpen(false) : openList(false))}
         onKeyDown={onTriggerKeyDown}
         className={`h-10 ${widthClass} inline-flex items-center justify-between gap-2 rounded-lg border bg-white pl-3 pr-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 ${
-          value ? "border-emerald-300 text-emerald-800 bg-emerald-50/50" : "border-slate-200 text-slate-600"
+          value
+            ? "border-emerald-300 text-emerald-800 bg-emerald-50/50"
+            : "border-slate-200 text-slate-600"
         }`}
       >
         <span className="truncate text-left">{selected?.label ?? "—"}</span>
@@ -513,11 +543,19 @@ export function OrdersDropdown({
                 onMouseDown={(e) => e.preventDefault()}
                 onMouseEnter={() => setActiveIndex(i)}
                 className={`flex w-full items-center justify-between gap-2 px-3 py-2 text-left text-xs font-semibold transition-colors ${
-                  i === activeIndex ? "bg-emerald-50 text-emerald-800" : "text-slate-600"
+                  i === activeIndex
+                    ? "bg-emerald-50 text-emerald-800"
+                    : "text-slate-600"
                 } ${o.value === value ? "font-bold" : ""}`}
               >
                 <span className="truncate">{o.label}</span>
-                {o.value === value && <Check size={13} className="flex-shrink-0 text-emerald-600" aria-hidden />}
+                {o.value === value && (
+                  <Check
+                    size={13}
+                    className="flex-shrink-0 text-emerald-600"
+                    aria-hidden
+                  />
+                )}
               </button>
             </li>
           ))}
@@ -537,19 +575,62 @@ export function OrdersMultiSelect({
   placeholder,
   className = "",
   widthClass = "w-56",
+  searchable = false,
+  searchLabel,
+  unitLabel,
+  unitLabelPlural,
 }: {
   values: string[];
   onChange: (next: string[]) => void;
-  options: Array<{ value: string; label: string }>;
+  options: Array<{
+    value: string;
+    label: string;
+    /** muted secondary text on the option row — a city beside a shop name */
+    hint?: string;
+  }>;
   ariaLabel: string;
   placeholder: string;
   className?: string;
   widthClass?: string;
+  /** A filter box above the list, for a picker long enough to scroll. */
+  searchable?: boolean;
+  /** Text for that box (the caller's i18n, since this component owns none). */
+  searchLabel?: string;
+  /**
+   * Renders the trigger as "N {unitLabel}" instead of naming the picks — for a
+   * list of shops or cities the count is the useful half, and the names belong in
+   * the panel. Both forms come from the caller, because this component has no
+   * business guessing at a plural in another language.
+   */
+  unitLabel?: string;
+  unitLabelPlural?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [pick, setPick] = useState("");
   const rootRef = useRef<HTMLDivElement>(null);
+  const pickRef = useRef<HTMLInputElement>(null);
   const listboxId = useId();
   const selected = new Set(values);
+
+  const needle = pick.trim().toLowerCase();
+  const visible = useMemo(
+    () =>
+      !searchable || !needle
+        ? options
+        : options.filter((o) =>
+            `${o.label} ${o.hint ?? ""}`.toLowerCase().includes(needle),
+          ),
+    [options, needle, searchable],
+  );
+
+  // A searchable picker opens with the caret already in the box — that is the
+  // point of it. The filter word itself is dropped on open rather than on close,
+  // so a stale one can never hide the options the next time the panel is raised.
+  useEffect(() => {
+    if (!open || !searchable) return;
+    const raf = requestAnimationFrame(() => pickRef.current?.focus());
+    return () => cancelAnimationFrame(raf);
+  }, [open, searchable]);
 
   useEffect(() => {
     if (!open) return;
@@ -570,9 +651,13 @@ export function OrdersMultiSelect({
   const summary =
     values.length === 0
       ? placeholder
-      : values.length <= 2
-        ? values.join(", ")
-        : `${values.slice(0, 2).join(", ")} +${values.length - 2}`;
+      : unitLabel
+        ? `${values.length} ${
+            values.length === 1 ? unitLabel : (unitLabelPlural ?? unitLabel)
+          }`
+        : values.length <= 2
+          ? values.join(", ")
+          : `${values.slice(0, 2).join(", ")} +${values.length - 2}`;
 
   return (
     <div ref={rootRef} className={`relative inline-block ${className}`}>
@@ -582,7 +667,10 @@ export function OrdersMultiSelect({
         aria-expanded={open}
         aria-controls={open ? listboxId : undefined}
         aria-label={ariaLabel}
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => {
+          setPick("");
+          setOpen((o) => !o);
+        }}
         className={`h-10 ${widthClass} inline-flex items-center justify-between gap-2 rounded-lg border bg-white pl-3 pr-2.5 text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-400 ${
           values.length > 0
             ? "border-emerald-300 text-emerald-800 bg-emerald-50/50"
@@ -604,10 +692,29 @@ export function OrdersMultiSelect({
           aria-label={ariaLabel}
           className={`absolute right-0 z-30 mt-1 max-h-64 min-w-full overflow-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg ${widthClass}`}
         >
+          {searchable ? (
+            <li className="px-2 pb-1.5 pt-1">
+              <input
+                ref={pickRef}
+                type="text"
+                value={pick}
+                onChange={(e) => setPick(e.target.value)}
+                placeholder={searchLabel ?? ariaLabel}
+                aria-label={searchLabel ?? ariaLabel}
+                className="h-8 w-full rounded-lg border border-slate-200 bg-slate-50/60 px-2.5 text-[12px] font-medium text-slate-700 placeholder:font-normal placeholder:text-slate-400 focus:border-emerald-400 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/25"
+              />
+            </li>
+          ) : null}
           {options.length === 0 ? (
-            <li className="px-3 py-2 text-xs font-semibold text-slate-400">—</li>
+            <li className="px-3 py-2 text-xs font-semibold text-slate-400">
+              —
+            </li>
+          ) : visible.length === 0 ? (
+            <li className="px-3 py-2 text-xs font-semibold text-slate-400">
+              {`— ${pick}`}
+            </li>
           ) : (
-            options.map((o) => {
+            visible.map((o) => {
               const on = selected.has(o.value);
               return (
                 <li key={o.value} role="option" aria-selected={on}>
@@ -615,17 +722,26 @@ export function OrdersMultiSelect({
                     type="button"
                     onClick={() => toggle(o.value)}
                     className={`flex w-full items-center gap-2 px-3 py-2 text-left text-xs font-semibold transition-colors ${
-                      on ? "bg-emerald-50 text-emerald-800" : "text-slate-600 hover:bg-slate-50"
+                      on
+                        ? "bg-emerald-50 text-emerald-800"
+                        : "text-slate-600 hover:bg-slate-50"
                     }`}
                   >
                     <span
                       className={`inline-flex h-3.5 w-3.5 items-center justify-center rounded border ${
-                        on ? "border-emerald-600 bg-emerald-600 text-white" : "border-slate-300 bg-white"
+                        on
+                          ? "border-emerald-600 bg-emerald-600 text-white"
+                          : "border-slate-300 bg-white"
                       }`}
                     >
                       {on ? <Check size={10} /> : null}
                     </span>
                     <span className="truncate">{o.label}</span>
+                    {o.hint ? (
+                      <span className="ml-auto flex-shrink-0 pl-2 text-[11px] font-medium text-slate-400">
+                        {o.hint}
+                      </span>
+                    ) : null}
                   </button>
                 </li>
               );

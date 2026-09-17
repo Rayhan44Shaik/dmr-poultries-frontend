@@ -77,6 +77,7 @@ const EN: Record<string, string> = {
   "orders.collection_auto_submitted_partial":
     "Collection window closed — submitted automatically ({shops} shop(s) went in without boxes).",
   "orders.collection_saved": "Collection progress saved",
+  "orders.collection_saved_short": "Saved",
 
   // ── Tab 2 · Order Assignment ──────────────────────────────────────────
   "orders.assignment_empty":
@@ -413,6 +414,8 @@ const EN: Record<string, string> = {
   "orders.filter_city": "City",
   "orders.filter_shop": "Shop",
   "orders.filter_shop_all": "All shops",
+  "orders.shop_unit": "shop",
+  "orders.shop_unit_plural": "shops",
   "orders.filter_city_all": "All cities",
   "orders.pool_filter_all": "All shops",
   "orders.pool_filter_pending": "Pending (not assigned)",
@@ -513,6 +516,7 @@ const TE: Record<string, string> = {
   "orders.collection_auto_submitted_partial":
     "సేకరణ సమయం ముగిసింది — ఆటోమేటిక్‌గా సబ్మిట్ అయింది (బాక్స్‌లు లేని {shops} షాప్‌లు).",
   "orders.collection_saved": "సేకరణ ప్రగతి సేవ్ చేయబడింది",
+  "orders.collection_saved_short": "నమోదు అయినది",
 
   // Tab 2
   "orders.assignment_empty":
@@ -855,6 +859,8 @@ const TE: Record<string, string> = {
   "orders.filter_city": "సిటీ",
   "orders.filter_shop": "షాప్",
   "orders.filter_shop_all": "అన్ని షాప్‌లు",
+  "orders.shop_unit": "షాప్",
+  "orders.shop_unit_plural": "షాప్‌లు",
   "orders.filter_city_all": "అన్ని సిటీలు",
   "orders.pool_filter_all": "అన్ని షాప్‌లు",
   "orders.pool_filter_pending": "పెండింగ్ (కేటాయించలేదు)",

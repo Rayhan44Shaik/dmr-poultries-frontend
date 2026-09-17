@@ -43,6 +43,7 @@ import React, {
 } from "react";
 import {
   Activity,
+  Check,
   ArrowUpDown,
   Bird,
   Boxes,
@@ -58,10 +59,10 @@ import {
   Save,
   Scale,
   Store,
-  Undo2,
 } from "lucide-react";
 import type { Shop } from "../../masters/shops/types/shop";
 import type { Trip } from "../../../shared/trip";
+import { uiActionIconMotionClass } from "../../../shared/ui/uiTokens";
 import {
   opsFilterCardClass,
   opsSecondaryButtonClass,
@@ -115,7 +116,6 @@ import {
   OrdersMultiSelect,
   OrdersSearchInput,
   OrdersStatusBadge,
-  OrdersTableSkeleton,
   onOrdersNumberWheel,
 } from "../components/OrdersCommon";
 
@@ -395,12 +395,19 @@ function OrderCollectionPage(props: Props) {
         .map((city) => ({ value: city, label: city })),
     [shops, shopDirectory],
   );
+  // The shop list is the long one, so it gets the searchable panel, and every row
+  // names its city on the right — two shops of the same name in two cities are
+  // then tellable apart without leaving the picker.
   const shopOptions = useMemo(
     () =>
       shops
-        .map((shop) => ({ value: shop.shopName, label: shop.shopName }))
+        .map((shop) => ({
+          value: shop.shopName,
+          label: shop.shopName,
+          hint: villageOf(shop.id, shop.shopName, shopDirectory).trim(),
+        }))
         .sort((a, b) => a.label.localeCompare(b.label)),
-    [shops],
+    [shops, shopDirectory],
   );
   const sortOptions = useMemo(
     () => [
@@ -492,6 +499,10 @@ function OrderCollectionPage(props: Props) {
             options={shopOptions}
             ariaLabel={to("orders.filter_shop")}
             placeholder={to("orders.filter_shop_all")}
+            searchable
+            searchLabel={to("orders.filter_shops")}
+            unitLabel={to("orders.shop_unit")}
+            unitLabelPlural={to("orders.shop_unit_plural")}
             className="w-full"
             widthClass="w-full"
           />
@@ -556,7 +567,18 @@ function OrderCollectionPage(props: Props) {
           <div className="border-b border-slate-100 bg-sky-50/40 px-6 py-3">
             <CollectionPanelHead />
           </div>
-          <OrdersTableSkeleton rows={6} />
+          {/* The table frame is already here — heads, widths, density — so the
+              load lands as rows appearing, not as the page changing shape. */}
+          <div className="overflow-x-auto">
+            <table
+              className={`w-full min-w-[900px] table-fixed ${ORDERS_TABLE_FONT_CLASS}`}
+            >
+              <CollectionTableHead />
+              <tbody className={opsTableDivideClass}>
+                <CollectionLoadingRow />
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     );
@@ -592,6 +614,109 @@ function OrderCollectionPage(props: Props) {
         setPageSize={setPageSize}
       />
     </div>
+  );
+}
+
+/**
+ * The eight Collection columns, in one place: the loaded table and the loading
+ * shell render the identical frame, so the first paint shows the real grid with
+ * a body that is simply still arriving — Trip List does exactly this with
+ * `TripMasterTable isLoading`.
+ */
+function CollectionTableHead() {
+  const { to } = useOrdersI18n();
+  return (
+    <thead>
+      <tr className={opsTableHeadRowClass}>
+        {/* Collection-only columns. Trip / vehicle are deliberately not here —
+            they belong to Assignment. */}
+        {/* The only measured column: it has to hold its glyph plus the word
+            "S.No", and everything else shares what is left. */}
+        <th className={`${opsTableThClass} w-[96px] text-center`}>
+          <ColHead
+            icon={Hash}
+            label={to("orders.col_sno")}
+            align="center"
+            tone="text-slate-400"
+          />
+        </th>
+        <th className={opsTableThClass}>
+          <ColHead
+            icon={Store}
+            label={to("orders.col_shop_name")}
+            tone="text-sky-600"
+          />
+        </th>
+        <th className={opsTableThClass}>
+          <ColHead
+            icon={MapPin}
+            label={to("orders.col_village")}
+            tone="text-amber-600"
+          />
+        </th>
+        <th className={opsTableThClass}>
+          <ColHead
+            icon={Bird}
+            label={to("orders.col_birds")}
+            tone="text-emerald-600"
+          />
+        </th>
+        <th className={opsTableThClass}>
+          <ColHead
+            icon={Boxes}
+            label={`${to("orders.col_boxes")} *`}
+            tone="text-violet-600"
+          />
+        </th>
+        <th className={`${opsTableThClass} text-right`}>
+          <ColHead
+            icon={Scale}
+            label={to("orders.col_weight")}
+            align="right"
+            tone="text-teal-600"
+          />
+        </th>
+        <th className={opsTableThClass}>
+          <ColHead
+            icon={Activity}
+            label={to("orders.col_status")}
+            tone="text-indigo-600"
+          />
+        </th>
+        <th className={`${opsTableThClass} text-right`}>
+          <ColHead
+            icon={Eraser}
+            label={to("orders.col_action")}
+            align="right"
+            tone="text-rose-500"
+          />
+        </th>
+      </tr>
+    </thead>
+  );
+}
+
+/** The table's own "in flight" row — a spinner in the body, never a page swap. */
+function CollectionLoadingRow() {
+  const { to } = useOrdersI18n();
+  return (
+    <tr>
+      <td colSpan={8} className="px-4 py-14 text-center">
+        <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-slate-400">
+          <span
+            className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600"
+            aria-hidden="true"
+          />
+          {to("common.loading")}
+          <span className="text-slate-300" aria-hidden>
+            ·
+          </span>
+          <span className="font-medium normal-case tracking-normal text-slate-400">
+            {to("orders.tab_collection")}
+          </span>
+        </span>
+      </td>
+    </tr>
   );
 }
 
@@ -818,6 +943,16 @@ function CollectionEntries({
     });
   };
 
+  // The button confirms itself: for a moment after a save it carries a popping
+  // check instead of the disk, so the click is answered inside the button and not
+  // only in a toast at the corner of the screen. Cosmetic by design — no cleanup
+  // and no timer bookkeeping, and a re-click simply re-arms the same flash.
+  const [savedFlash, setSavedFlash] = useState(false);
+  const flashSaved = useCallback(() => {
+    setSavedFlash(true);
+    window.setTimeout(() => setSavedFlash(false), 1_400);
+  }, []);
+
   // ── Save Progress (no final validation) ───────────────────────────────────
   const handleSave = useCallback(async () => {
     if (persistLockRef.current || busy || !isEditable) return;
@@ -852,13 +987,14 @@ function CollectionEntries({
       setSavedSnapshot(entrySnapshot(Array.from(next.values())));
       onSaved(updated);
       showNotification(to("orders.collection_saved"), "success");
+      flashSaved();
     } catch (error) {
       showNotification(handleApiError(error), "error");
     } finally {
       persistLockRef.current = false;
       setSaving(false);
     }
-  }, [busy, isEditable, entries, onSaved, showNotification, to]);
+  }, [busy, isEditable, entries, onSaved, showNotification, flashSaved, to]);
 
   // ── The clock finishes the day (no Finish button) ─────────────────────────
   // A day's window is 48h from its start, so the 16th is filed at the 18th
@@ -1189,83 +1325,13 @@ function CollectionEntries({
           <table
             className={`w-full min-w-[900px] table-fixed ${ORDERS_TABLE_FONT_CLASS}`}
           >
-            <thead>
-              <tr className={opsTableHeadRowClass}>
-                {/* Collection-only columns. Trip / vehicle are deliberately not
-                    here — they belong to Assignment. */}
-                {/* The only measured column: it has to hold its glyph plus the
-                    word "S.No", and everything else shares what is left. */}
-                <th className={`${opsTableThClass} w-[96px] text-center`}>
-                  <ColHead
-                    icon={Hash}
-                    label={to("orders.col_sno")}
-                    align="center"
-                    tone="text-slate-400"
-                  />
-                </th>
-                <th className={opsTableThClass}>
-                  <ColHead
-                    icon={Store}
-                    label={to("orders.col_shop_name")}
-                    tone="text-sky-600"
-                  />
-                </th>
-                <th className={opsTableThClass}>
-                  <ColHead
-                    icon={MapPin}
-                    label={to("orders.col_village")}
-                    tone="text-amber-600"
-                  />
-                </th>
-                <th className={opsTableThClass}>
-                  <ColHead
-                    icon={Bird}
-                    label={to("orders.col_birds")}
-                    tone="text-emerald-600"
-                  />
-                </th>
-                <th className={opsTableThClass}>
-                  <ColHead
-                    icon={Boxes}
-                    label={`${to("orders.col_boxes")} *`}
-                    tone="text-violet-600"
-                  />
-                </th>
-                <th className={`${opsTableThClass} text-right`}>
-                  <ColHead
-                    icon={Scale}
-                    label={to("orders.col_weight")}
-                    align="right"
-                    tone="text-teal-600"
-                  />
-                </th>
-                <th className={opsTableThClass}>
-                  <ColHead
-                    icon={Activity}
-                    label={to("orders.col_status")}
-                    tone="text-indigo-600"
-                  />
-                </th>
-                <th className={`${opsTableThClass} text-right`}>
-                  <ColHead
-                    icon={Eraser}
-                    label={to("orders.col_action")}
-                    align="right"
-                    tone="text-rose-500"
-                  />
-                </th>
-              </tr>
-            </thead>
+            <CollectionTableHead />
             <tbody
               key={`${safePage}|${q}|${sortMode}|${pageSize}`}
               className={`${opsTableDivideClass} motion-safe:animate-page-pop`}
             >
               {refreshing ? (
-                <tr>
-                  <td colSpan={8}>
-                    <OrdersTableSkeleton rows={Math.min(pageSize, 6)} />
-                  </td>
-                </tr>
+                <CollectionLoadingRow />
               ) : (
                 pageShops.map((shop, index) => {
                   const live = entries.get(shop.id);
@@ -1459,8 +1525,13 @@ function CollectionEntries({
                           <span className="text-slate-400">—</span>
                         )}
                       </td>
-                      <td className={`${opsTableTdClass} min-w-0 break-words`}>
-                        {statusNode}
+                      <td className={opsTableTdClass}>
+                        {/* A gutter after the pill: the status column and the Action
+                            column share the sheet's last two cells, and without room
+                            of its own the badge reads as if it is being cut off. */}
+                        <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 pr-5">
+                          {statusNode}
+                        </div>
                       </td>
                       <td className={`${opsTableTdClass} text-right`}>
                         {isEditable ? (
@@ -1479,29 +1550,34 @@ function CollectionEntries({
                                   })
                                 : `${to("orders.clear_entry")} — ${shop.shopName}`
                             }
-                            className={`group/clear inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-lg border px-1.5 text-[11px] font-bold transition-[color,background-color,border-color,box-shadow,transform] duration-200 ease-out ${
+                            className={`group inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-lg border px-1.5 text-[11px] font-bold transition-[color,background-color,border-color,box-shadow,transform] duration-200 ease-out ${
                               clearing
                                 ? "border-amber-300 bg-amber-100/70 text-amber-700 motion-safe:animate-pulse"
-                                : "border-slate-200/80 bg-white text-slate-400 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600 hover:shadow-[0_4px_12px_-4px_rgba(244,63,94,0.55)] motion-safe:hover:-translate-y-px active:translate-y-0 motion-safe:active:scale-95 disabled:opacity-30 disabled:shadow-none"
+                                : "border-slate-200/80 bg-white text-slate-400 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600 hover:shadow-[0_4px_12px_-4px_rgba(244,63,94,0.55)] motion-safe:hover:-translate-y-px active:translate-y-0 active:scale-95 disabled:opacity-30 disabled:shadow-none"
                             }`}
                           >
+                            {/*
+                             * The same motion the trip delete uses, from the same
+                             * token. On hover the eraser wiggles; while the
+                             * 10-second window is open it keeps wiggling, so the
+                             * row visibly holds the pending clear instead of
+                             * freezing on a swapped icon — and the click cancels.
+                             */}
+                            <span
+                              className={`inline-flex ${
+                                clearing
+                                  ? "motion-safe:animate-[var(--animate-action-delete)]"
+                                  : uiActionIconMotionClass.delete
+                              }`}
+                              aria-hidden
+                            >
+                              <Eraser size={14} />
+                            </span>
                             {clearing ? (
-                              <>
-                                <Undo2 size={13} aria-hidden />
-                                <span className="tabular-nums">
-                                  {secondsLeft(shop.id)}
-                                </span>
-                              </>
-                            ) : (
-                              // The eraser does the work on hover — it tilts and
-                              // slides across the cell the way a hand would.
-                              <span
-                                className="inline-flex motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-out motion-safe:group-hover/clear:-translate-x-px motion-safe:group-hover/clear:rotate-[-14deg] motion-safe:group-active/clear:rotate-[6deg]"
-                                aria-hidden
-                              >
-                                <Eraser size={14} />
+                              <span className="tabular-nums">
+                                {secondsLeft(shop.id)}
                               </span>
-                            )}
+                            ) : null}
                           </button>
                         ) : (
                           <span className="text-slate-300 text-xs">—</span>
@@ -1602,14 +1678,37 @@ function CollectionEntries({
                 type="button"
                 onClick={() => void handleSave()}
                 disabled={busy || entered.length === 0}
-                className={`${opsSecondaryButtonClass} border-emerald-300 text-emerald-700 hover:bg-emerald-50`}
+                className={`group relative ${opsSecondaryButtonClass} border-emerald-300 text-emerald-700 transition-[background-color,box-shadow,transform,border-color] duration-200 ease-out hover:-translate-y-px hover:bg-emerald-50 hover:shadow-[0_6px_16px_-8px_rgba(16,185,129,0.6)] focus-visible:ring-2 focus-visible:ring-emerald-500/40 active:translate-y-0 active:scale-[0.985] motion-safe:transition ${
+                  savedFlash ? "border-emerald-400 bg-emerald-50/70 " : ""
+                }`}
               >
                 {saving ? (
                   <Loader2 size={14} className="animate-spin" />
+                ) : savedFlash ? (
+                  // Saved: the check pops in once, then the disk returns.
+                  <span className="inline-flex motion-safe:animate-[var(--animate-pop-in)]">
+                    <Check size={14} />
+                  </span>
                 ) : (
-                  <Save size={14} />
+                  <span
+                    className={`inline-flex ${uiActionIconMotionClass.approve}`}
+                  >
+                    <Save size={14} />
+                  </span>
                 )}
-                {saving ? to("orders.saving") : to("orders.save_progress")}
+                {saving
+                  ? to("orders.saving")
+                  : savedFlash
+                    ? to("orders.collection_saved_short")
+                    : to("orders.save_progress")}
+                {/* The window's own bar, so the button says "kept" even after the
+                    check has gone back to a disk. */}
+                <span
+                  className={`pointer-events-none absolute inset-x-2 bottom-0 h-[2px] rounded-full bg-emerald-500/70 transition-opacity duration-500 ${
+                    savedFlash ? "opacity-100" : "opacity-0"
+                  }`}
+                  aria-hidden
+                />
               </button>
             </div>
           </div>

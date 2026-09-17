@@ -57,17 +57,22 @@ This is approximately **89% less processing time**, not a measurement of total b
   uppercase, `min-h-[17px]` so a field without an icon still lines up with its neighbours). **A control
   gets one glyph, never two**: the search field keeps only its own inset magnifier and the date field
   only its own calendar button, so neither label repeats it; City (amber), Shop (sky) and Sort (violet)
-  carry the glyph their column already uses. The Shop picker is the day's sheet narrowed to named shops —
-  it composes with the city filter and the search box instead of replacing them. Assignment was brought
+  carry the glyph their column already uses.   The Shop picker narrows the sheet to named
+  shops and composes with the city filter and the search box instead of replacing them; because that list
+  is the long one it is `searchable` (the panel opens with the caret already in its own filter box), each
+  row shows its city on the right so two same-named shops are tellable apart, and the trigger counts the
+  picks (`1 shop` / `3 shops`) rather than spilling names into a 40px field. Assignment was brought
   to the same label class, per-field icon colours and full-width fields so the two screens read as one
   module.
 - **Loading is the table's business.** The filter card is built in the page component, *above* the data
   gate, and is never swapped for a skeleton — not on the first paint (neither the Shop Master nor the
   day's collection has answered) and not on a refresh. `OrdersPage` therefore renders the Collection panel
   through the load instead of replacing it with the placeholder panel, and the load is reported where it
-  belongs: `aria-busy` plus a skeleton `tbody` inside the card, with `OrdersTableSkeleton` between a header
-  strip that is identical to the loaded one so nothing jumps when the rows land. This is the Trip List's
-  contract (`TripMasterTable isLoading`) copied, not reinvented.
+  belongs: the card's own header strip, the **real eight-column head** (`CollectionTableHead` is one
+  source for both states) and a single `colSpan` row with a spinner and "Loading…" under `aria-busy` —
+  the identical shape `TripMasterTable isLoading` draws. A soft refresh takes the same row, so the table
+  never changes height or width mid-read, and `CollectionEntries` being keyed per day means changing day
+  reloads rows, not controls. This is the Trip List's contract, copied, not reinvented.
 - Columns are **equal width apart from S.No** (`table-fixed`, S.No measured at 96px so its glyph plus
   the word fit) — the heads stop chasing their content. Each header carries its own 15px icon, coloured
   per column, at the trip table's spacing. Header words and body words sit at **14px**
@@ -77,12 +82,19 @@ This is approximately **89% less processing time**, not a measurement of total b
   boxes violet, weight teal) and carries a small rise: a soft shadow that lifts a pixel on hover.
 - Trip No and Vehicle No are **not** Collection columns (assignment facts belong to Assignment); an
   assigned shop shows only its status pill, and a pending count rides **beside** the pill (`25 to
-  deliver`) rather than inside it, so an equal-width column cannot be pushed over.
+  deliver`) rather than inside it, so an equal-width column cannot be pushed over. The status cell carries
+  its own `pr-5` gutter, so a pill that wraps to a second line never runs into the Action column.
 - **No tooltips on this screen.** The row state is the badge, the deadline is the chip — nothing needs a
   hover to be understood, so every `title` attribute was removed from the page (pinned by
   `npm run test:e2e:orders`: "no tooltip is left on the collection screen").
 - The day total is one cumulative line **below** the table (`Orders taken in N shops`, with birds ·
   boxes · kg muted beside it) instead of a KPI in the header bar.
+- **Actions animate on the shared tokens**, not on one-off keyframes: the hover motion is
+  `uiActionIconMotionClass` (`delete` for the eraser, `approve` for Save Progress), Save Progress lifts a
+  pixel and flashes a popping `Check` plus a 2px emerald bar for 1.4s after a save, the eraser keeps
+  running the delete wiggle for as long as its 10-second window is open, and `PendingDeleteNotification`
+  pops in on `--animate-pop-in` over a `--animate-fade-in` scrim — the trip delete gets that pop too, since
+  it is the same component. Everything is `motion-safe`, so a reduced-motion user sees colour and shape only.
 - **Weight is ours to type.** The column is an input like the other two — empty, with no default value
   written into it — and the derived figure (birds × the average bird weight in force) is only the
   placeholder behind it. `collectionRowWeightKg` keeps that rule in one place: what was typed wins, an

@@ -390,6 +390,13 @@ test("only the table loads: the filter card stays mounted while data is in fligh
     await expect(
       page.locator('#orders-panel-collection [aria-busy="true"]'),
     ).toBeVisible();
+    // The table arrives as the real frame — eight heads on their columns — with a
+    // spinner row in the body, exactly the Trip List's shape. Nothing about the
+    // page changes when the data lands, except the rows.
+    await expect(page.locator("#orders-panel-collection thead th")).toHaveCount(
+      8,
+    );
+    await expect(page.getByText("Loading…").first()).toBeVisible();
   } finally {
     release();
   }
@@ -434,6 +441,88 @@ test("the deadline chip says when, animates, and adds no countdown", async ({
   await expect(chip).not.toContainText(/·/);
   await expect(panel.getByText(/\bin \d+[dhm]\b/)).toHaveCount(0);
   await expect(panel.locator('[class*="animate-ping"]').first()).toBeVisible();
+});
+
+test("the shop picker searches its own list and counts the picks on the trigger", async ({
+  page,
+}) => {
+  await page.goto(`${ORDERS}/collection`);
+  const card = page.getByRole("region", { name: "Order Collection filters" });
+  await card.getByRole("button", { name: "Shop", exact: true }).click();
+
+  // A long shop list is not scrolled through: the picker opens with the caret in
+  // its own filter box and the list narrows as you type.
+  const pick = card.getByRole("textbox", { name: "Refine shops" });
+  await expect(pick).toBeVisible();
+  const first = await card
+    .getByRole("listbox")
+    .getByRole("option")
+    .first()
+    .innerText();
+  const word = first.trim().split(/\s+/)[0];
+  await pick.fill(word);
+  await expect(card.getByRole("listbox").getByRole("option")).not.toHaveCount(
+    0,
+  );
+
+  await card
+    .getByRole("listbox")
+    .getByRole("button", { name: word, exact: false })
+    .first()
+    .click();
+  await expect(
+    card.getByRole("button", { name: "Shop", exact: true }),
+  ).toContainText("1 shop");
+  await pick.fill("");
+  await card.getByRole("listbox").getByRole("button").nth(1).click();
+  await expect(
+    card.getByRole("button", { name: "Shop", exact: true }),
+  ).toContainText("2 shops");
+});
+
+test("the pending clear keeps running the delete motion, and the undo dialog pops in", async ({
+  page,
+}) => {
+  await page.goto(`${ORDERS}/collection`);
+  const panel = page.locator("#orders-panel-collection");
+  const row = panel
+    .locator("tbody tr")
+    .filter({ has: page.locator("input") })
+    .first();
+  await row.getByRole("spinbutton", { name: /No. of Birds/ }).fill("9");
+  await row.locator("td").last().getByRole("button").click();
+
+  // The eraser itself keeps wiggling for the whole window — the same token the
+  // trip delete uses — instead of swapping to a different icon, and the dialog
+  // pops in the way the app's confirmations do.
+  await expect(
+    row.locator("td").last().locator('[class*="--animate-action-delete"]'),
+  ).toBeVisible();
+  await expect(
+    page.locator('[class*="--animate-pop-in"]').first(),
+  ).toBeVisible();
+
+  await row.locator("td").last().getByRole("button").click();
+  await expect(
+    row.getByRole("spinbutton", { name: /No. of Birds/ }),
+  ).toHaveValue("9");
+});
+
+test("Save Progress answers the click the way the other action buttons do", async ({
+  page,
+}) => {
+  await page.goto(`${ORDERS}/collection`);
+  const save = page
+    .locator("#orders-panel-collection")
+    .getByRole("button", { name: /save progress/i });
+  await expect(save).toBeVisible();
+  // Hover motion from the shared token (the app's own action animation), a lift on
+  // the button, and the icon wrapped so the animation lands on the glyph.
+  await expect(save.locator('[class*="--animate-action-approve"]')).toHaveCount(
+    1,
+  );
+  await expect(save).toHaveClass(/group/);
+  await expect(save).toHaveClass(/hover:-translate-y-px/);
 });
 
 test("the action zeroes the shop instead of deleting it, with a 10-second undo", async ({

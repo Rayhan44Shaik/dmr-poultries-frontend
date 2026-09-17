@@ -52,7 +52,7 @@ export function PendingDeleteNotification<TId extends string | number>({
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/25 px-4"
+      className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-900/25 px-4 motion-safe:animate-[var(--animate-fade-in)]"
       role="dialog"
       aria-modal="true"
       aria-label={ariaLabel ?? t("pendingDelete.aria")}
@@ -67,7 +67,7 @@ export function PendingDeleteNotification<TId extends string | number>({
           return (
             <div
               key={String(item.id)}
-              className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-900/10"
+              className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xl shadow-slate-900/10 motion-safe:animate-[var(--animate-pop-in)]"
             >
               <div className="flex flex-col items-center text-center">
                 <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-rose-200 bg-rose-50 text-rose-600">
