@@ -2392,7 +2392,11 @@ function AssignmentEditor({
                             {/* Assignment table: editable sequence — drag a row, ↑/↓ one
                   step, ⤒/⤓ first/last, or sort the whole list — + boxes. */}
                             <div className="border-t border-slate-100" />
-                            <div className="max-h-80 overflow-y-auto">
+                            {/* Six rows visible before scrolling (head ≈ 2.5rem +
+                                6 × ≈ 3.25rem); the head stays pinned while the
+                                rest scrolls. rem units so 150 % font scale
+                                still shows six. */}
+                            <div className="max-h-[22.5rem] overflow-y-auto overscroll-contain">
                               <table
                                 className={`w-full min-w-[55rem] table-fixed ${ORDERS_TABLE_FONT_CLASS}`}
                               >
@@ -2406,7 +2410,7 @@ function AssignmentEditor({
                                   <col className="w-[10%]" />
                                   <col className="w-14" />
                                 </colgroup>
-                                <thead>
+                                <thead className="sticky top-0 z-10 bg-white shadow-[inset_0_-1px_0_0_rgb(226_232_240)]">
                                   <tr className={opsTableHeadRowClass}>
                                     <th
                                       className={`${opsTableThClass} text-left`}
