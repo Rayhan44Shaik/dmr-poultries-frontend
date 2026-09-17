@@ -1534,39 +1534,6 @@ function AssignmentEditor({
     (tripNo: string) => supervisorByTripNo.get(tripNo) ?? "",
     [supervisorByTripNo],
   );
-  // ── Status counts for the segmented filter (same kind rules as
-  //     filteredPool below: "pending" = still needs a vehicle, i.e. pending
-  //     + partial-balance rows; "assigned" = fully placed).
-  const poolCounts = useMemo(() => {
-    const counts = {
-      all: collection.rows.length,
-      pending: 0,
-      assigned: 0,
-      thisVehicle: 0,
-    };
-    for (const row of collection.rows) {
-      const a = collection.shops.get(row.shopId);
-      const parts = a?.parts ?? [];
-      const partsTotal = a?.assignedBoxesTotal ?? 0;
-      const orderedBoxes = Math.max(1, Number(row.boxNo) || 0);
-      const boxesOnThisVehicle = parts
-        .filter((p) => p.tripNo === thisTripNo)
-        .reduce((sum, p) => sum + p.boxes, 0);
-      const onThisVehicle =
-        boxesOnThisVehicle > 0 || parts.some((p) => p.tripNo === thisTripNo);
-      const remainingBoxes = Math.max(0, orderedBoxes - partsTotal);
-      const kind =
-        parts.length === 0
-          ? "pending"
-          : remainingBoxes > 0 && !onThisVehicle
-            ? "partial"
-            : "assigned";
-      if (kind === "assigned") counts.assigned += 1;
-      else counts.pending += 1;
-      if (onThisVehicle) counts.thisVehicle += 1;
-    }
-    return counts;
-  }, [collection, thisTripNo]);
   const filteredPool = useMemo(() => {
     const list: PoolRow[] = [];
     collection.rows.forEach((row, i) => {
@@ -1787,65 +1754,64 @@ function AssignmentEditor({
             className={opsTableCardClass}
           >
             <div className="flex w-full flex-col overflow-hidden">
-              {/* ── Header ── */}
-              <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-3">
-                <div className="flex min-w-0 flex-wrap items-center gap-2.5">
-                  <span className="rounded-lg bg-emerald-100 p-1.5 text-emerald-600">
-                    <PackageCheck size={17} />
-                  </span>
-                  <div className="min-w-0">
-                    <h3 className="truncate text-sm font-bold text-slate-800">
+              {/* ── Header — same anatomy as the Recent tables: icon tile ·
+                  title · selected-tab count · status toggle · close ── */}
+              <div className="flex flex-col justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-slate-50 px-6 py-3 lg:flex-row lg:items-center">
+                <div className="flex flex-wrap items-center gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50/70 text-emerald-500 shadow-inner">
+                      <PackageCheck className="h-5 w-5" />
+                    </div>
+                    <h3 className="text-base font-bold tracking-tight text-slate-800">
                       {to("orders.assign_shops")}
                     </h3>
                   </div>
-                  {/* Count follows the selected toggle — same as the Recent table. */}
+
+                  {/* Selected-tab count beside the title (updates on every toggle). */}
                   <span
                     key={filteredPool.length}
                     className="inline-flex items-center justify-center rounded-full border border-slate-200/80 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold tabular-nums text-slate-600 shadow-sm motion-safe:animate-[var(--animate-pop-in)]"
                   >
                     {filteredPool.length}
                   </span>
+
+                  {/* Status toggle — labels only, Recent-table chrome and tints. */}
                   <div
                     role="group"
                     aria-label={to("orders.filter_status")}
-                    className="ml-1 flex items-center overflow-hidden rounded-lg border border-slate-200/80 bg-slate-50 p-0.5 shadow-sm"
+                    className="ml-2 flex items-center overflow-hidden rounded-lg border border-slate-200/80 bg-slate-50 p-0.5 shadow-sm"
                   >
                     {(
                       [
                         {
                           value: "all",
                           labelKey: "orders.pool_filter_all",
-                          count: poolCounts.all,
                           tone: "bg-slate-200/70 text-slate-700 shadow-sm",
                         },
                         {
                           value: "pending",
                           labelKey: "orders.pool_filter_pending",
-                          count: poolCounts.pending,
                           tone: "bg-orange-50/80 text-orange-500 shadow-sm",
                         },
                         {
                           value: "assigned",
                           labelKey: "orders.pool_filter_assigned",
-                          count: poolCounts.assigned,
                           tone: "bg-emerald-50/80 text-emerald-500 shadow-sm",
                         },
                         {
                           value: "this_vehicle",
                           labelKey: "orders.pool_filter_this_vehicle",
-                          count: poolCounts.thisVehicle,
                           tone: "bg-sky-50/80 text-sky-500 shadow-sm",
                           needsVehicle: true,
                         },
                       ] as Array<{
                         value: "all" | "pending" | "assigned" | "this_vehicle";
                         labelKey: string;
-                        count: number;
                         tone: string;
                         needsVehicle?: boolean;
                       }>
                     ).map((opt) => {
-                      const active = poolFilter === opt.value;
+                      const isActive = poolFilter === opt.value;
                       const disabled = opt.needsVehicle === true && !vehicle;
                       return (
                         <button
@@ -1853,22 +1819,19 @@ function AssignmentEditor({
                           type="button"
                           onClick={() => setPoolFilter(opt.value)}
                           disabled={disabled}
-                          aria-pressed={active}
+                          aria-pressed={isActive}
                           title={
                             disabled
                               ? to("orders.select_vehicle")
                               : to(opt.labelKey)
                           }
-                          className={`inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-4 py-1.5 text-xs font-semibold transition-all ${
-                            active
+                          className={`inline-flex items-center whitespace-nowrap rounded-md px-5 py-1.5 text-xs font-semibold transition-all ${
+                            isActive
                               ? opt.tone
                               : "bg-transparent text-slate-500 hover:bg-slate-200/50 hover:text-slate-800"
                           } disabled:cursor-not-allowed disabled:opacity-40`}
                         >
                           {to(opt.labelKey)}
-                          <span className="text-[10px] font-bold tabular-nums opacity-70">
-                            {opt.count}
-                          </span>
                         </button>
                       );
                     })}
@@ -1878,7 +1841,7 @@ function AssignmentEditor({
                   type="button"
                   onClick={() => setVehicleTripId(null)}
                   aria-label={to("orders.close")}
-                  className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                  className="self-end rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 lg:self-auto"
                 >
                   <X size={17} />
                 </button>
