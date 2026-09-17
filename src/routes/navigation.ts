@@ -293,11 +293,6 @@ export const NAV_SECTIONS: NavSection[] = [
         keywords: "daily report operations overview",
       },
 
-      // Orders is its own module (src/modules/orders) with its own route table,
-      // so these rows are generated from it — the sidebar and the app routes can
-      // never disagree. Inside Operations they read as one grouped block.
-      ...ORDERS_NAV_CHILDREN,
-
       {
         label: "Trip Entry",
         labelKey: "nav.vehicleDeliveryEntry",
@@ -365,6 +360,11 @@ export const NAV_SECTIONS: NavSection[] = [
         tone: "amber",
         keywords: "fuel diesel expenses bills",
       },
+      // Orders is its own module (src/modules/orders) with its own route table,
+      // so these rows are generated from it — the sidebar and the app routes can
+      // never disagree. Inside Operations they read as one grouped block.
+      ...ORDERS_NAV_CHILDREN,
+
     ],
   },
   {

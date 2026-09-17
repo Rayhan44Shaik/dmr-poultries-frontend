@@ -102,11 +102,11 @@ performance trip counts equal the Trip List.
 
 ### Orders hand-off pass — the quarter now carries collection → assignment → tracking
 
-The Orders module reads its three tabs from one feed (`/trips?full=true`): a
+The Orders module reads its three pages from one feed (`/trips?full=true`): a
 **container** is a vehicle-less trip whose rows carry `[ORDER]`, and an
 **assignment** is a vehicle row carrying `[ORDER] O:<containerTripNo>`. The
-dataset only seeded the containers, so Tab 1 rendered but **Tab 2 always read
-`0 assigned` and Tab 3 was empty** ("0 trips / No pending deliveries") — a page
+dataset only seeded the containers, so Order Collection rendered but **Order
+Assignment always read `0 assigned` and Delivery Tracking was empty** ("0 trips / No pending deliveries") — a page
 that could never show the quarter's real data until someone worked the whole
 flow by hand. The generator now seeds the same hand-off the UI produces.
 
@@ -114,8 +114,8 @@ flow by hand. The generator now seeds the same hand-off the UI produces.
 |---|---|
 | Plan rows | Every container row carries the shop's **city** (`village`) and the container carries `avgBirdWeight` (2.3), so the CITY and **WEIGHT** columns fill in before a vehicle is picked |
 | Assignment history | Each older container is assigned to the vehicle trip(s) that actually ran the **next operating day** — 8 order-tagged trips, 162 assigned rows, one shop per order deliberately **part-delivered** so `Part Delivered` badges are reachable |
-| In progress | Yesterday's finished collection is part-delivered on a trip that is still `Pending` → Tab 3's **PENDING & IN PROGRESS** table has a real row (5 shops, 19 boxes, 437 kg) |
-| Still available | Yesterday's remaining 23 shops and today's in-collection order (23 of 27) stay unassigned → Tab 2 has work to do; 4 of today's shops already sit on a vehicle (Step 4 open) |
+| In progress | Yesterday's finished collection is part-delivered on a trip that is still `Pending` → Delivery Tracking's **PENDING & IN PROGRESS** table has a real row (5 shops, 19 boxes, 437 kg) |
+| Still available | Yesterday's remaining 23 shops and today's in-collection order (23 of 27) stay unassigned → Order Assignment has work to do; 4 of today's shops already sit on a vehicle (Step 4 open) |
 | Busy-history integrity | A completed trip absorbs those shops into its own load (`dcWeight`/birds/boxes), so `dcWeight − delivered − mortality` (**weight loss**) stays positive; Draft/Pending trips keep their pickup figures |
 | Tracking history | 7 Completed order trips inside the default 7-operating-day window, with the totals strip (`Total Shops 138 · Birds 5,160 · Boxes 516`) summing exactly those rows |
 

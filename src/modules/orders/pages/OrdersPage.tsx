@@ -1,12 +1,17 @@
-// Orders — the workspace that hosts the module's three pages:
-//   /operations/orders/collection       → pages/OrderCollectionPage
-//   /operations/orders/assignment       → pages/OrderAssignmentPage
+// Orders — the host for the module's three pages, each of which is its own URL:
+//   /operations/orders/collection        → pages/OrderCollectionPage
+//   /operations/orders/assignment        → pages/OrderAssignmentPage
 //   /operations/orders/delivery-tracking → pages/DeliveryTrackingPage
-// The active page comes from the PATH, so every page is deep-linkable,
-// reloadable and independently listed in the sidebar. This component stays
-// mounted across all three (one instance, shared fetch), which is what lets
-// visited pages keep their local filters, pagination and in-progress drafts —
-// the Collection → Assignment → Tracking handoff never loses work.
+//
+// There is deliberately NO in-page tab strip. A page is reached the same way as
+// every other page in the app — from the sidebar (Operations → Orders) or by its
+// own URL — so the URL, the sidebar highlight and what is on screen are always
+// the same fact, and there is no second, redundant switcher to learn.
+//
+// This host still stays mounted across the three routes and keeps every page it
+// has opened mounted underneath, so filters, pagination, the selected day and
+// half-typed rows survive a sidebar move: the Collection → Assignment →
+// Tracking handoff never loses work just because the URL changed.
 // Legacy `?tab=orders&orderTab=x` links are canonicalised to the path form.
 // Existing trip/Step 4 contracts remain the source of truth.
 
@@ -50,40 +55,27 @@ const OrderAssignmentPage = React.lazy(retryableImport(loadAssignmentPage));
 const DeliveryTrackingPage = React.lazy(retryableImport(loadTrackingPage));
 const OrdersDeliveryDetailView = React.lazy(retryableImport(() => import("../components/OrdersDeliveryDetailView")));
 
-// The three pages of this module. `TabKey`/`activeTab` naming is kept for the
-// panel ids (`orders-panel-<tab>`) that the pages and tests already address.
+// The module's three pages. `TabKey`/`activeTab` naming is kept for the panel
+// ids (`orders-panel-<tab>`) that the pages, tests and deep links use.
 type TabKey = OrdersTab;
 
-// Warm only the page the user intends to open, not every Orders/PDF chunk.
+// Warm one page's chunk — never every Orders/PDF chunk up front.
 function preloadTab(tab: TabKey) {
   const loader = tab === "assignment" ? loadAssignmentPage : tab === "tracking" ? loadTrackingPage : null;
   if (loader) void loader().catch(() => { /* React.lazy handles retries on open. */ });
 }
 
-/** Icon accent per page, matching the sidebar tone for the same route. */
-const STRIP_TONE: Record<TabKey, { idle: string; active: string }> = {
-  collection: { idle: "text-violet-500", active: "text-violet-600" },
-  assignment: { idle: "text-lime-600", active: "text-lime-700" },
-  tracking: { idle: "text-teal-500", active: "text-teal-600" },
+/*
+ * The flow is linear (collect → assign → track), so the page the user is
+ * *probably* going to open next is warm during idle time. That keeps the
+ * sidebar handoff instant without fetching a page nobody asked for — the strip's
+ * hover-preload, minus the strip.
+ */
+const NEXT_PAGE: Record<OrdersTab, OrdersTab | null> = {
+  collection: "assignment",
+  assignment: "tracking",
+  tracking: null,
 };
-
-// Built from the module route table, so the strip and the sidebar can never
-// disagree about which pages exist, their order, or their icons.
-const TAB_DEFS: Array<{
-  key: TabKey;
-  path: string;
-  labelKey: string;
-  icon: React.ReactNode;
-  iconIdle: string;
-  iconActive: string;
-}> = ORDERS_PAGES.map((page) => ({
-  key: page.tab,
-  path: page.path,
-  labelKey: `orders.tab_${page.tab}`,
-  icon: <page.icon size={13} />,
-  iconIdle: STRIP_TONE[page.tab].idle,
-  iconActive: STRIP_TONE[page.tab].active,
-}));
 
 function OrdersLoadingPanel({ tab }: { tab: TabKey }) {
   const { to } = useOrdersI18n();
@@ -112,9 +104,9 @@ const OrdersPage: React.FC = () => {
   // Which page is open is decided by the URL path (see routes/ordersRoutes.ts).
   const activeTab = resolveOrdersTab(location.pathname, location.search);
   const activePath = ORDERS_PAGES.find((page) => page.tab === activeTab)?.path ?? ORDERS_PAGES[0].path;
-  // Switching pages is a route change, so the browser back button, reload and
-  // the sidebar all agree with what is on screen.
-  const setActiveTab = useCallback((tab: TabKey) => {
+  // Switching pages is a route change (the sidebar does it), so the browser
+  // back button, a reload and what is on screen always agree.
+  const openPage = useCallback((tab: TabKey) => {
     navigate(ordersTabUrl(location.search, tab));
   }, [location.search, navigate]);
   // Normalise: legacy `?tab=orders&orderTab=x` (and a bare /operations/orders)
@@ -124,9 +116,20 @@ const OrdersPage: React.FC = () => {
     navigate(ordersCanonicalUrl(location.pathname, location.search), { replace: true });
   }, [activePath, location.pathname, location.search, navigate]);
   useEffect(() => {
-    document.getElementById(`orders-tab-${activeTab}`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    const next = NEXT_PAGE[activeTab];
+    if (!next) return;
+    let idle = 0;
+    const schedule = () => { preloadTab(next); };
+    const w = window as Window & { requestIdleCallback?: (cb: IdleRequestCallback, opts?: IdleRequestOptions) => number };
+    if (typeof w.requestIdleCallback === "function") idle = w.requestIdleCallback(schedule, { timeout: 2000 });
+    else idle = window.setTimeout(schedule, 1200) as unknown as number;
+    return () => {
+      const c = w.cancelIdleCallback;
+      if (typeof w.requestIdleCallback === "function" && typeof c === "function") c.call(w, idle);
+      else window.clearTimeout(idle);
+    };
   }, [activeTab]);
-  // Retain drafts and each tab's independent filters/pages when switching.
+  // Retain drafts and each page's independent filters/pages across a route move.
   const [visited, setVisited] = useState<TabKey[]>([activeTab]);
   if (!visited.includes(activeTab)) setVisited([...visited, activeTab]);
   const [viewingId, setViewingId] = useState<number | null>(null);
@@ -255,8 +258,8 @@ const OrdersPage: React.FC = () => {
 
   const handleCollectionFinished = useCallback(async () => {
     await load();
-    setActiveTab("assignment");
-  }, [load, setActiveTab]);
+    openPage("assignment");
+  }, [load, openPage]);
 
   const handleAssignmentChanged = useCallback(async () => {
     await load();
@@ -264,8 +267,8 @@ const OrdersPage: React.FC = () => {
 
   const handleAssignmentFinished = useCallback(async () => {
     await load();
-    setActiveTab("tracking");
-  }, [load, setActiveTab]);
+    openPage("tracking");
+  }, [load, openPage]);
 
   // ── Table-level Refresh (all three tabs) ─────────────────────────────────
   // Refetches only the Orders data for the current tab: no app reload, no
@@ -439,7 +442,7 @@ const OrdersPage: React.FC = () => {
     [load, to, showNotification]
   );
 
-  // ── Detail view (opened from Tab 3) — rendered as a modal over the tab ─
+  // ── Detail view (opened from Delivery Tracking) — a modal over that page ──
   const viewing: OrdersTrip | null =
     (viewingId != null && data?.tracking.find((t) => t.trip.id === viewingId)) || null;
 
@@ -447,56 +450,19 @@ const OrdersPage: React.FC = () => {
 
   return (
     <div className="orders-workspace">
-      {/* Tabs are URL-backed; filters and drafts remain isolated per panel. */}
-      <div className="orders-tab-rail">
-      <div role="tablist" aria-label={to("orders.tabs_label")} className="orders-browser-tabs">
-        {TAB_DEFS.map((tab) => {
-          const active = activeTab === tab.key;
-          return (
-            <button
-              key={tab.key}
-              id={`orders-tab-${tab.key}`}
-              role="tab"
-              aria-selected={active}
-              aria-controls={`orders-panel-${tab.key}`}
-              tabIndex={active ? 0 : -1}
-              onKeyDown={(event) => {
-                const index = TAB_DEFS.findIndex(item => item.key === tab.key);
-                const next = event.key === "ArrowRight" ? (index + 1) % TAB_DEFS.length
-                  : event.key === "ArrowLeft" ? (index + TAB_DEFS.length - 1) % TAB_DEFS.length
-                  : event.key === "Home" ? 0 : event.key === "End" ? TAB_DEFS.length - 1 : -1;
-                if (next < 0) return;
-                event.preventDefault();
-                const key = TAB_DEFS[next].key;
-                setActiveTab(key);
-                document.getElementById(`orders-tab-${key}`)?.focus();
-              }}
-              type="button"
-              onClick={() => setActiveTab(tab.key)}
-              onPointerEnter={() => preloadTab(tab.key)}
-              onFocus={() => preloadTab(tab.key)}
-              className="orders-browser-tab"
-            >
-              <span className={`orders-browser-tab-icon ${active ? tab.iconActive : tab.iconIdle}`}>{tab.icon}</span>
-              <span className="orders-browser-tab-label">{to(tab.labelKey)}</span>
-            </button>
-          );
-        })}
-
-        {/* Honest marker while the page runs on bundled sample data (no
-            backend). Save / Finish actions work against the in-memory store. */}
-        {ORDERS_SAMPLE_DATA_ENABLED && (
+      {/* No tab strip — see the header note. The only thing that used to live
+          here is the honest marker for a page running on bundled sample data. */}
+      {ORDERS_SAMPLE_DATA_ENABLED && (
+        <div className="flex justify-end px-1 pt-1">
           <span
             title={to("orders.sample_hint")}
-            className="ml-auto inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-2 text-[10px] md:text-[11px] font-bold text-amber-700"
+            className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700 md:text-[11px]"
           >
             <DatabaseZap size={12} />
             {to("orders.sample_badge")}
           </span>
-        )}
-      </div>
-
-      </div>
+        </div>
+      )}
       <div className="orders-page-content">
       {error && data && <OrdersErrorState title={to("orders.error_title")} message={error} onRetry={() => void load()} retryLabel={to("orders.retry")} />}
       <React.Suspense fallback={<OrdersTableSkeleton rows={5} />}>
@@ -512,7 +478,7 @@ const OrdersPage: React.FC = () => {
         ) : data ? (
           <>
             {visited.includes("collection") && (
-              <section id="orders-panel-collection" role="tabpanel" aria-labelledby="orders-tab-collection" hidden={activeTab !== "collection"} className={activeTab === "collection" ? "motion-safe:animate-page-pop" : undefined}>
+              <section id="orders-panel-collection" hidden={activeTab !== "collection"} className={activeTab === "collection" ? "motion-safe:animate-page-pop" : undefined}>
                 <React.Suspense fallback={<OrdersTableSkeleton rows={5} />}>
                 <OrderCollectionPage
                   shops={shops}
@@ -532,7 +498,7 @@ const OrdersPage: React.FC = () => {
               </section>
             )}
             {visited.includes("assignment") && (
-              <section id="orders-panel-assignment" role="tabpanel" aria-labelledby="orders-tab-assignment" hidden={activeTab !== "assignment"} className={activeTab === "assignment" ? "motion-safe:animate-page-pop" : undefined}>
+              <section id="orders-panel-assignment" hidden={activeTab !== "assignment"} className={activeTab === "assignment" ? "motion-safe:animate-page-pop" : undefined}>
                 <React.Suspense fallback={<OrdersTableSkeleton rows={5} />}>
                 <OrderAssignmentPage
                   loading={false}
@@ -553,7 +519,7 @@ const OrdersPage: React.FC = () => {
               </section>
             )}
             {visited.includes("tracking") && (
-              <section id="orders-panel-tracking" role="tabpanel" aria-labelledby="orders-tab-tracking" hidden={activeTab !== "tracking"} className={activeTab === "tracking" ? "motion-safe:animate-page-pop" : undefined}>
+              <section id="orders-panel-tracking" hidden={activeTab !== "tracking"} className={activeTab === "tracking" ? "motion-safe:animate-page-pop" : undefined}>
                 <React.Suspense fallback={<OrdersTableSkeleton rows={5} />}>
                 <DeliveryTrackingPage
                   trips={data.tracking}

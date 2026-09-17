@@ -106,13 +106,15 @@ function orderRow(page_: Awaited<ReturnType<typeof apiOrders>>, shop: string) {
 
 // ── UI helpers ─────────────────────────────────────────────────────────────
 
-async function gotoOrders(page: Page, tab: 'collection' | 'assignment' | 'tracking') {
-  await page.goto('/operations/orders/collection');
-  await page.waitForLoadState('networkidle');
-  if (tab !== 'collection') {
-    const name = tab === 'assignment' ? /order assignment/i : /delivery tracking/i;
-    await page.getByRole('tab', { name }).click();
-  }
+const ORDERS_ROUTE = {
+  collection: '/operations/orders/collection',
+  assignment: '/operations/orders/assignment',
+  tracking: '/operations/orders/delivery-tracking',
+} as const;
+
+/** Each Orders page is its own route now — go to it, do not click a tab. */
+async function gotoOrders(page: Page, tab: keyof typeof ORDERS_ROUTE) {
+  await page.goto(ORDERS_ROUTE[tab]);
   await page.waitForLoadState('networkidle');
 }
 
@@ -253,13 +255,13 @@ test('orders-01: working sheet shows ALL shops; Save Progress stays on Collectio
 }) => {
   await gotoOrders(page, 'collection');
 
-  // No separate page-level "Orders" heading inside the Orders module — the
-  // module header is the three attached tabs (the app's global breadcrumb may
-  // still show "Orders" in the top banner, which is expected).
+  // No page-level "Orders" heading and no in-page tab strip: the three pages are
+  // siblings in the sidebar (Operations → Orders), each behind its own URL.
   await expect(page.getByRole('main').getByRole('heading', { name: /^orders$/i })).toHaveCount(0);
-  await expect(page.getByRole('tab', { name: /order collection/i })).toBeVisible();
-  await expect(page.getByRole('tab', { name: /order assignment/i })).toBeVisible();
-  await expect(page.getByRole('tab', { name: /delivery tracking/i })).toBeVisible();
+  await expect(page.getByRole('tab')).toHaveCount(0);
+  for (const route of Object.values(ORDERS_ROUTE)) {
+    await expect(page.locator(`a[href="${route}"]`)).not.toHaveCount(0);
+  }
 
   // The collection sheet is a day-wise working sheet: every active shop is
   // shown even before any entry exists (no "no orders collected" screen).
@@ -287,10 +289,7 @@ test('orders-01: working sheet shows ALL shops; Save Progress stays on Collectio
   // Save Progress must SAVE and STAY on Collection (never navigate away).
   const res = await saveCollection(page);
   expect(res.ok(), `collection save → ${res.status()} ${await res.text()}`).toBeTruthy();
-  await expect(page.getByRole('tab', { name: /order collection/i })).toHaveAttribute(
-    'aria-selected',
-    'true'
-  );
+  await expect(page).toHaveURL(/\/operations\/orders\/collection$/);
   await expect(page.getByRole('button', { name: /save progress/i })).toBeVisible();
 
   const persisted = await apiOrders(request, `?date=${DAY}&search=${encodeURIComponent(P)}&pageSize=200`);

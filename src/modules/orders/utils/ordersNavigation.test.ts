@@ -112,4 +112,18 @@ test('the sidebar shows the module as one Orders group of three rows under Opera
     }
   }
   assert.ok((en as Dict)[group.labelKey] && (te as Dict)[group.labelKey], 'the group heading is translated');
+
+  // Where the block sits: one contiguous run at the end of Operations, straight
+  // after Fuel Expenses.
+  const labels = (operations?.children ?? []).map((child) => child.label);
+  const fuelAt = labels.indexOf('Fuel Expenses');
+  const ordersAt = labels.findIndex((label) => label === 'Order Collection');
+  assert.ok(fuelAt >= 0, 'Fuel Expenses is in the Operations section');
+  assert.equal(ordersAt, fuelAt + 1, 'the Orders group follows Fuel Expenses');
+  assert.deepEqual(
+    (operations?.children ?? []).slice(ordersAt).map((child) => child.group),
+    ['orders', 'orders', 'orders'],
+    'the three rows stay together and end the section',
+  );
+
 });

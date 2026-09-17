@@ -335,7 +335,10 @@ test('20: the Step-2-complete trip keeps its identity for Orders; Orders page re
     await page.goto('/operations/orders/collection');
     await page.waitForLoadState('networkidle');
     await assertNoRawKeys(page);
-    await expect(page.getByRole('tab', { name: lang === 'en' ? /assignment/i : /అసైన్‌మెంట్/ })).toBeVisible();
+    // No in-page switcher: the sidebar carries the three Orders pages, and the
+    // URL decides which one is mounted. Both languages must render it cleanly.
+    await expect(page.locator('a[href="/operations/orders/assignment"]')).not.toHaveCount(0);
+    await expect(page.locator('#orders-panel-collection')).toBeVisible();
   }
 });
 
@@ -580,9 +583,8 @@ test('27: Order Collection UI — one `orders` row per shop, real quantities, su
 
 test('27b: Orders Assignment calendar — opens unclipped, month nav works, does not self-close, and the picked date drives the selected day', async ({ page }) => {
   await setLanguage(page, 'en');
-  await page.goto('/operations/orders/collection');
+  await page.goto('/operations/orders/assignment');
   await page.waitForLoadState('networkidle');
-  await page.getByRole('tab', { name: /order assignment/i }).click();
 
   const dateInput = page.getByTestId('orders-date-picker').locator('input');
   const todayStr = await dateInput.inputValue(); // DD/MM/YYYY == operational today
@@ -669,9 +671,8 @@ async function fullTrip(request: APIRequestContext, id: number) {
  * search (server-side), and return that trip's per-shop rows.
  */
 async function trackingRowsFor(page: Page, tripNo: string) {
-  await page.goto('/operations/orders/collection');
+  await page.goto('/operations/orders/delivery-tracking');
   await page.waitForLoadState('networkidle');
-  await page.getByRole('tab', { name: /delivery tracking/i }).click();
   await page.getByRole('textbox', { name: /search shop, city/i }).fill(tripNo);
   await expect(page.getByRole('row').filter({ hasText: tripNo }).first()).toBeVisible();
   return page.getByRole('row').filter({ hasText: tripNo });
@@ -831,9 +832,8 @@ test('28: complete real UI Trip Entry workflow Step 1 through Step 5', async ({ 
   await expect(stepBtn(page, 4)).toHaveAttribute('aria-label', /Locked/i);
 
   // ── STEP 2 → ORDERS: the SAME operational trip is visible in Orders ───
-  await page.goto('/operations/orders/collection');
+  await page.goto('/operations/orders/assignment');
   await page.waitForLoadState('networkidle');
-  await page.getByRole('tab', { name: /order assignment/i }).click();
   {
     const combo = page.locator('#orders-vehicle-select');
     await combo.click();
@@ -901,9 +901,8 @@ test('28: complete real UI Trip Entry workflow Step 1 through Step 5', async ({ 
   await expect(stepBtn(page, 4)).not.toHaveAttribute('aria-label', /Locked/i);
 
   // ── STEP 3 → ORDERS ASSIGNMENT (real UI): assign 5 shops to THIS trip ──
-  await page.goto('/operations/orders/collection');
+  await page.goto('/operations/orders/assignment');
   await page.waitForLoadState('networkidle');
-  await page.getByRole('tab', { name: /order assignment/i }).click();
   {
     const combo = page.locator('#orders-vehicle-select');
     await combo.click();

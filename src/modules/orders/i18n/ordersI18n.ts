@@ -22,7 +22,6 @@ const EN: Record<string, string> = {
   "orders.sort_weight_desc": "Weight: High → Low",
 
   // Tabs
-  "orders.tabs_label": "Orders pages",
   "orders.tab_collection": "Order Collection",
   "orders.tab_assignment": "Order Assignment",
   "orders.tab_tracking": "Delivery Tracking",
@@ -441,7 +440,6 @@ const TE: Record<string, string> = {
   "orders.sort_weight_asc": "బరువు: తక్కువ → ఎక్కువ",
   "orders.sort_weight_desc": "బరువు: ఎక్కువ → తక్కువ",
 
-  "orders.tabs_label": "ఆర్డర్ పేజీలు",
   // Tabs
   "orders.tab_collection": "ఆర్డర్ సేకరణ",
   "orders.tab_assignment": "ఆర్డర్ అసైన్‌మెంట్",

@@ -37,7 +37,7 @@ export interface OrdersPageRoute {
   labelKey: string;
   /** Browser page title. */
   titleKey: string;
-  /** Same glyph the in-page tab strip shows, so nav and page agree. */
+  /** The page's own glyph — shown by the sidebar row, so nav and page agree. */
   icon: LucideIcon;
   /** Sidebar accent for the row/icon. */
   tone: 'violet' | 'lime' | 'teal';

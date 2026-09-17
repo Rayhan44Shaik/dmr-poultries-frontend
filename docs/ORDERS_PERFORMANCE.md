@@ -3,7 +3,9 @@
 ## What changed
 
 - Operations pages load on demand. Opening Orders no longer eagerly evaluates every other Operations screen.
-- Assignment, Tracking and delivery details are separate lazy chunks. Pointer/focus intent warms the next tab; PDF export code loads when requested.
+- Assignment, Tracking and delivery details are separate lazy chunks. While a page is open, the
+  next step of the flow is warmed during idle time (collect → assign → track); PDF export code loads
+  only when a document is requested.
 - Orders derives its shop directory from the existing Shop Master hook instead of issuing a second shop-list request. Subsequent master changes update both views together.
 - Assignment rows are indexed by order reference and shop once per fetched snapshot. Sorted trip rows are reused within that snapshot. There is no cross-save business-data cache.
 - The shared trip mapper reuses one fixed IST date formatter rather than constructing a formatter for each timestamp.
@@ -33,16 +35,18 @@ This is approximately **89% less processing time**, not a measurement of total b
 
 - One route per Orders page: `/operations/orders/collection`, `/operations/orders/assignment`,
   `/operations/orders/delivery-tracking`. Each is reloadable and shareable, and each is its own
-  sidebar row inside the Orders group under Operations. The route table that defines them is
-  `src/modules/orders/routes/ordersRoutes.ts` — the sidebar, the in-page tab rail and the URL
-  resolver all read it, so they cannot drift. The older
+  sidebar row inside the Orders group under Operations (listed after Fuel Expenses, at the end of
+  the section). The route table that defines them is `src/modules/orders/routes/ordersRoutes.ts` —
+  the sidebar and the URL resolver both read it, so they cannot drift. There is no in-page tab
+  strip: a page is opened from the sidebar or by its URL, exactly like Shop Sales or Trip List.
+  The older
   `/operations?tab=orders&orderTab=collection|assignment|tracking` links still work: they are
   canonicalised to the path form on arrival.
 - Collection/Assignment date parameters are independent (`collectionDate`, `assignmentDate`). Invalid calendar dates, future dates and dates outside the advertised operational window resolve to today.
-- Visited panels stay mounted while switching pages — from the tab rail or from the sidebar: filters, page size, current page and unsaved edits survive the move. These local filters/drafts are not persisted across a full browser reload. Date changes intentionally mount a new day editor; top-level collection/assignment search and sort controls remain selected.
+- Visited pages stay mounted while you move between the three routes from the sidebar: filters, page size, current page and unsaved edits survive the move. These local filters/drafts are not persisted across a full browser reload. Date changes intentionally mount a new day editor; top-level collection/assignment search and sort controls remain selected.
 - All Orders pagers now use the same `src/ui/Pagination.tsx` as Trip List, with counts, rows-per-page, disabled states and bounded page controls. Filtering/sorting occur before slicing.
 - Collection cells match Trip List's 16px column padding, 20px body padding and 16px header padding. Search includes shop number and phone in addition to existing fields.
 - Assignment now exposes search/date/sort and read-only historical rows. Historical days never mount the writable assignment editor.
-- Table refresh retains controls, navigation and drafts. Initial loading uses a table shell, not a full-app spinner. Table/tab transitions respect reduced-motion preferences.
+- Table refresh retains controls, navigation and drafts. Initial loading uses a table shell, not a full-app spinner. Page transitions respect reduced-motion preferences.
 
-Validation: `npm run test:orders-navigation` (5 passed), `npm run test:orders-performance` (6 passed), targeted ESLint and production build passed. All three preview URLs returned HTTP 200. Four browser regression scenarios are provided via `npm run test:e2e:orders`; they could not execute here because the Playwright browser executable is missing and the browser download host is unreachable. HTTP checks do not substitute for visual/browser interaction validation.
+Validation: `npm run test:orders-navigation` (8 passed), `npm run test:orders-performance` (6 passed), targeted ESLint and production build passed. All three preview URLs returned HTTP 200. Four browser regression scenarios are provided via `npm run test:e2e:orders`; they could not execute here because the Playwright browser executable is missing and the browser download host is unreachable. HTTP checks do not substitute for visual/browser interaction validation.
