@@ -127,11 +127,6 @@ export function useDashboardData(
     const requestId = ++requestRef.current;
     const fromDate = _fromDate ?? new Date();
     const toDate = _toDate ?? new Date();
-    // Yield once before touching state: the effect that schedules this load
-    // never sets state synchronously (no cascading render), and the previous
-    // dashboard stays on screen — no blank frame — while the new window loads.
-    await Promise.resolve();
-    if (requestId !== requestRef.current) return;
     if (!hasLoadedRef.current) setIsLoading(true);
     setError((current) => (current === null ? current : null));
     try {
@@ -206,7 +201,11 @@ export function useDashboardData(
 
   useEffect(() => {
     if (!_ready) return;
-    void loadData();
+    // Kick the load from a task, not the effect body: the effect itself never
+    // writes state, and a range change that is undone within the same frame
+    // never fires a wasted request.
+    const handle = window.setTimeout(() => void loadData(), 0);
+    return () => window.clearTimeout(handle);
   }, [loadData, _ready]);
 
   const refetch = useCallback(() => {
