@@ -850,6 +850,25 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
     [farmScope, summaryService]
   );
 
+  /* Farm totals of a set of trips, cached by the trips array itself: every
+     expense-table column asks for this on each render and its trips array is
+     memoised, so the WeakMap keeps it to one pass per column. */
+  const farmSummaryCache = useRef(new WeakMap<readonly Trip[], { trips: number; weightKg: number }>());
+  const farmSummary = useCallback(
+    (scopeTrips: readonly Trip[]) => {
+      const cached = farmSummaryCache.current.get(scopeTrips);
+      if (cached) return cached;
+      const rows = buildFarmRows(scopeTrips, summaryService);
+      const summary = {
+        trips: rows.length,
+        weightKg: rows.reduce((sum, row) => sum + (row.farm.dcWeight ?? row.trip.dcWeight ?? 0), 0),
+      };
+      farmSummaryCache.current.set(scopeTrips, summary);
+      return summary;
+    },
+    [summaryService]
+  );
+
   const totalNetProfit = totalMetrics.sales - totalExpenseValue;
 
   const weeklyNetProfit = useMemo(
@@ -1902,16 +1921,19 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                 /* The farm amount is the trigger: press it and the farm payment
                    view opens for exactly the trips behind that figure — the
                    column's own trips, or the whole span on the Total column. */
-                const farmAmount = (value: number, scopeLabel: string, scopeTrips: Trip[]) =>
-                  isFarm ? (
+                const farmAmount = (value: number, scopeLabel: string, scopeTrips: Trip[]) => {
+                  if (!isFarm) return formatCurrency(value);
+                  const info = farmSummary(scopeTrips);
+                  return (
                     <SummaryFarmAmount
                       value={value}
                       scopeLabel={scopeLabel}
+                      trips={info.trips}
+                      weightKg={info.weightKg}
                       onOpen={() => setFarmScope({ label: scopeLabel, trips: scopeTrips })}
                     />
-                  ) : (
-                    formatCurrency(value)
                   );
+                };
                 return (
                   <tr
                   key={item.key}

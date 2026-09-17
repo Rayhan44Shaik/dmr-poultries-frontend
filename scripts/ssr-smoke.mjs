@@ -319,7 +319,8 @@ try {
     const withProvider = (node) => renderToString(React.createElement(I18nProvider, null, node));
     // The Farm Payment figure in the expense table is itself the trigger, and it
     // carries the label of the column whose trips it will open.
-    const amountHtml = withProvider(React.createElement(SummaryFarmAmount, { value: payable, scopeLabel: "Week 15 - 21 Sep", onOpen: () => {} }));
+    const weightKg = rows.reduce((sum, row) => sum + (row.farm.dcWeight ?? row.trip.dcWeight ?? 0), 0);
+    const amountHtml = withProvider(React.createElement(SummaryFarmAmount, { value: payable, scopeLabel: "Week 15 - 21 Sep", trips: rows.length, weightKg, onOpen: () => {} }));
     const html = withProvider(React.createElement(SummaryFarmTable, { rows, spanLabel: "2026-09-14 - 2026-09-20", onOpenTrip: () => {} }));
     const shown = rows.filter(({ trip }) => html.includes(trip.tripNo)).length;
     const weight = rows[0].farm.dcWeight ?? rows[0].trip.dcWeight ?? 0;
@@ -336,8 +337,17 @@ try {
       tripLinkIsButton: /<button[^>]*>\s*<!-- -->TRP-|<button[^>]*>TRP-/.test(html),
       tripLinkOpensFarmDetail: /title="View farm &amp; pickup details"/.test(html),
       amountIsButton: /^<button[^>]*type="button"/.test(amountHtml) && (amountHtml.match(/<button/g) ?? []).length === 1,
-      amountShowsFigure: amountHtml.includes(`>${formatINR(payable)}</span>`),
+      // The figure is the button's own text (the tooltip follows it as a sibling).
+      amountShowsFigure: amountHtml.includes(`>${formatINR(payable)}<`),
       amountExactTip: amountHtml.includes(formatINRExact(payable)),
+      // The global tooltip: role, scope, exact rupees, the trips/weight line and
+      // the click hint — all present, and only one tooltip in the cell.
+      tooltipRole: (amountHtml.match(/role="tooltip"/g) ?? []).length === 1,
+      tooltipLines: amountHtml.includes("Week 15 - 21 Sep")
+        && amountHtml.includes(`${rows.length} trips`)
+        && /kg pickup/.test(amountHtml)
+        && /Click to open these trips/.test(amountHtml),
+      tooltipShowsOnFocus: /group-focus-visible:opacity-100/.test(amountHtml) && /group-hover:opacity-100/.test(amountHtml),
       amountNamesScope: amountHtml.includes("Week 15 - 21 Sep"),
       // No chip, pill or card of its own — the figure reads like any other cell.
       amountNoChip: !/rounded-full|bg-white|shadow-sm|border-lime/.test(amountHtml),

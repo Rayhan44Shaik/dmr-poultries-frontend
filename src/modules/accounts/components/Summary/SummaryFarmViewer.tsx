@@ -13,6 +13,7 @@ import { useI18n } from '../../../../i18n';
 import { formatCount, formatINR, formatINRExact } from '../farm-payment/farmPaymentFormat';
 import type { TripFarmPayment } from '../../types/farmPayment.types';
 import AppShellModal from '../../../../ui/AppShellModal';
+import ActionTooltip from '../../../../ui/ActionTooltip';
 
 /** Weight and rate: Indian grouping, up to two decimals, no trailing zeros. */
 const quantity = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 });
@@ -238,16 +239,23 @@ export function SummaryFarmTable({ rows, spanLabel, onOpenTrip }: TableProps) {
  * the one expense that is not a Payment Register total — it is the farm bill of
  * the trips behind that very figure — so the amount itself is what you press to
  * see those trips. It carries no chip or row highlight of its own: the number
- * reads like every other cell and only its underline says "press me".
+ * reads like every other cell, its dotted underline says "press me", and the
+ * app's global tooltip says exactly what pressing it will show.
  * `formatINR` matches the page's own compact ₹L/₹Cr notation.
  */
 export function SummaryFarmAmount({
   value,
   scopeLabel,
+  trips,
+  weightKg,
   onOpen,
 }: {
   value: number;
   scopeLabel: string;
+  /** Trips whose farm bills add up to `value`. */
+  trips: number;
+  /** Their pickup (DC) weight, so the figure can be checked at a glance. */
+  weightKg: number;
   onOpen: () => void;
 }) {
   const { t } = useI18n();
@@ -255,11 +263,28 @@ export function SummaryFarmAmount({
     <button
       type="button"
       onClick={onOpen}
-      title={`${t('accounts.summary.farm_row.open')} — ${scopeLabel}`}
       aria-label={`${t('accounts.summary.farm_row.open')} — ${scopeLabel}: ${formatINRExact(value)}`}
-      className="cursor-pointer rounded bg-transparent p-0 font-bold tabular-nums text-lime-700 underline decoration-lime-300 decoration-dotted underline-offset-[3px] outline-none transition hover:text-lime-900 hover:decoration-lime-600 hover:decoration-solid focus-visible:ring-2 focus-visible:ring-emerald-500 dark:text-lime-300 dark:decoration-lime-700 dark:hover:text-lime-200 dark:hover:decoration-lime-400"
+      className="group relative cursor-pointer rounded bg-transparent p-0 font-bold tabular-nums text-lime-700 underline decoration-lime-300 decoration-dotted underline-offset-[3px] outline-none transition hover:text-lime-900 hover:decoration-lime-600 hover:decoration-solid focus-visible:ring-2 focus-visible:ring-emerald-500 dark:text-lime-300 dark:decoration-lime-700 dark:hover:text-lime-200 dark:hover:decoration-lime-400"
     >
-      <span title={formatINRExact(value)}>{formatINR(value)}</span>
+      {formatINR(value)}
+      <ActionTooltip
+        side="bottom"
+        label={
+          <span className="flex flex-col items-start gap-1 text-left">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-slate-300">{scopeLabel}</span>
+            <span className="text-[13px] font-bold tabular-nums text-white" title={formatINRExact(value)}>
+              {formatINRExact(value)}
+            </span>
+            <span className="text-[11px] font-medium tabular-nums text-slate-300">
+              {t('accounts.summary.farm_row.tip_trips', { trips: formatCount(trips), weight: formatQuantity(weightKg) })}
+            </span>
+            <span className="mt-0.5 inline-flex items-center gap-1 text-[11px] font-semibold text-lime-300">
+              <Sprout size={11} aria-hidden="true" />
+              {t('accounts.summary.farm_row.tip_open')}
+            </span>
+          </span>
+        }
+      />
     </button>
   );
 }

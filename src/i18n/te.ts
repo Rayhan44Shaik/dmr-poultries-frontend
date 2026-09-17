@@ -1227,6 +1227,8 @@ export default {
   'accounts.summary.farm_table.subtitle': 'ఈ కాలంలోని ట్రిప్పులు మాత్రమే · పికప్ బరువు × ఫారం రేటు',
   'accounts.summary.farm_table.view_trip': 'ఫారం & పికప్ వివరాలు చూడండి',
   'accounts.summary.farm_row.open': 'ఈ మొత్తం వెనుక ఉన్న ఫారం చెల్లింపు చూడండి',
+  'accounts.summary.farm_row.tip_trips': '{trips} ట్రిప్పులు · {weight} kg పికప్',
+  'accounts.summary.farm_row.tip_open': 'ఈ ట్రిప్పులను తెరవడానికి క్లిక్ చేయండి',
   'accounts.summary.farm_table.trips': 'ట్రిప్పులు',
   'accounts.summary.farm_table.weight': 'పికప్ బరువు',
   'accounts.summary.farm_table.cumulative': 'సంచిత మొత్తం',

@@ -1,7 +1,9 @@
+import type { ReactNode } from "react";
 import { cn } from "../utils/cn";
 
 type ActionTooltipProps = {
-  label: string;
+  /** Text, or a small layout of lines — the tooltip is content-sized either way. */
+  label: ReactNode;
   placement?: "top" | "bottom";
   side?: "top" | "bottom";
   className?: string;
