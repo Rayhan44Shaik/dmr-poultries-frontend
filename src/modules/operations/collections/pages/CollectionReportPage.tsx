@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import type { ReactNode } from "react";
 import { collectionService } from "../services/collectionService";
-import type { CollectionApiEntry, CollectionReportSummary } from "../types/collection";
+import type { CollectionReportSummary } from "../types/collection";
 import { useShops } from "../../../masters/shops/hooks/useShops";
 import { useEmployees } from "../../../masters/employees/hooks/useEmployees";
 import {
@@ -23,8 +23,6 @@ import {
   Wallet,
   Users,
   User,
-  Search,
-  Loader2,
   Inbox,
   Calendar,
   Store,
@@ -38,15 +36,19 @@ import {
   ArrowDown,
 } from "lucide-react";
 import * as XLSX from "xlsx";
-import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import type { jsPDF } from "jspdf";
+import {
+  createDmrPoultryPdf,
+  drawDmrPoultryHeader,
+} from "../../../../utils/drawDmrPoultryHeader";
+import henImage from "../../../../assets/dmr-hen.jpg";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import {
   opsFilterCardClass,
   opsFilterLabelClass,
   opsEmptyStateClass,
-  opsPrimaryButtonClass,
   opsSecondaryButtonClass,
   opsPdfButtonClass,
   opsExcelButtonClass,
@@ -94,6 +96,12 @@ const compactINR = (value: number) =>
 // Stable, DOM-safe id fragment for a payment-mode name (used by SVG gradient ids).
 const slug = (name: string) =>
   name.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "");
+
+// yyyy-MM-dd → dd-MM-yyyy for the branded PDF (matches the other DMR reports).
+const formatPdfDate = (value: string): string => {
+  const parts = (value ?? "").split("-");
+  return parts.length === 3 ? `${parts[2]}-${parts[1]}-${parts[0]}` : value;
+};
 
 // ── Chart tooltip — polished card used by the stacked collector chart ──────
 // White rounded card, color-coded dots, ₹ amounts and each row's share of
@@ -246,7 +254,6 @@ export default function CollectionReportPage({ embedded = false }: Props) {
       { value: "Cash", label: t("accounts.cash") },
       { value: "Union Bank", label: "Union Bank" },
       { value: "HDFC Bank", label: "HDFC Bank" },
-      { value: "Others", label: t("common.other") },
     ],
     [t],
   );
@@ -506,137 +513,170 @@ export default function CollectionReportPage({ embedded = false }: Props) {
     }
     try {
       const applied = appliedFiltersRef.current;
-      const doc = new jsPDF("p", "mm", "a4");
-      const margin = 14;
-      let y = 20;
 
-      doc.setFontSize(16);
-      doc.setTextColor(30, 58, 138);
-      doc.text(t("ops.collection.collection_report_title"), margin, y);
-      y += 10;
-      doc.setFontSize(10);
-      doc.setTextColor(0, 0, 0);
-      doc.text(`${t("common.from")}: ${applied.fromDate || "N/A"} ${t("common.to")}: ${applied.toDate || "N/A"}`, margin, y);
-      y += 10;
+      // Branded palette — same as the global DMR letterhead so every report
+      // document looks identical across modules.
+      const NAVY: [number, number, number] = [52, 68, 115];
+      const RED: [number, number, number] = [222, 96, 110];
+      const MUTED: [number, number, number] = [110, 118, 132];
+      const HEAD_BG: [number, number, number] = [52, 68, 115];
+      const TOTAL_BG: [number, number, number] = [238, 242, 249];
+      const ZEBRA_BG: [number, number, number] = [248, 250, 252];
 
-      doc.setFontSize(12);
-      doc.setTextColor(30, 58, 138);
-      doc.text(t("ops.collection.payment_mode_summary"), margin, y);
+      const MARGIN = 12;
+      const inr = (v: number) =>
+        new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(v || 0);
+
+      // A4 portrait with the shared branded letterhead (proprietor block,
+      // centred DMR POULTRIES wordmark, hen mark, decorative divider).
+      const doc: jsPDF = createDmrPoultryPdf("portrait");
+      doc.setProperties({
+        title: "Collection Report",
+        subject: "DMR POULTRIES collection report",
+        author: "DMR POULTRIES",
+        creator: "DMR POULTRIES",
+      });
+
+      const headerBottom = await drawDmrPoultryHeader(doc, { margin: MARGIN, top: 8, henUrl: henImage });
+      const pageWidth = doc.internal.pageSize.getWidth();
+
+      // ── Report title + applied-filter meta line ──────────────────────────
+      let y = headerBottom + 2;
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(13);
+      doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
+      doc.text(t("ops.collection.collection_report_title"), pageWidth / 2, y, { align: "center" });
+      y += 6;
+
+      const metaParts = [
+        `${t("common.from")}: ${formatPdfDate(applied.fromDate) || "N/A"}`,
+        `${t("common.to")}: ${formatPdfDate(applied.toDate) || "N/A"}`,
+      ];
+      if (applied.shopName) metaParts.push(`${t("operations.shop_name")}: ${applied.shopName}`);
+      if (applied.collector) metaParts.push(`${t("common.collector")}: ${applied.collector}`);
+      if (applied.paymentMode) metaParts.push(`${t("operations.payment_mode")}: ${applied.paymentMode}`);
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(8.5);
+      doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+      doc.text(metaParts.join("    •    "), pageWidth / 2, y, { align: "center" });
+      y += 6;
+
+      // ── Section 1: Payment Mode Summary ──────────────────────────────────
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10.5);
+      doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
+      doc.text(t("ops.collection.payment_mode_summary"), MARGIN, y);
+      doc.setDrawColor(RED[0], RED[1], RED[2]);
+      doc.setLineWidth(0.4);
+      doc.line(MARGIN, y + 1.6, MARGIN + 46, y + 1.6);
       y += 5;
-      const pmData = paymentModeSummary.map((row) => [
-        row.mode,
-        row.count.toString(),
-        row.amount.toFixed(2),
-        row.percentage.toFixed(2) + "%",
-      ]);
-      autoTable(doc, {
-        head: [[t("ops.collection.payment_mode"), t("ops.collection.no_of_collections"), t("operations.amount_received"), t("ops.collection.percentage")]],
-        body: pmData,
-        startY: y,
-        theme: "striped",
-        headStyles: { fillColor: [30, 58, 138], textColor: 255, fontStyle: "bold" },
-        styles: { fontSize: 8 },
-      });
-      y = (doc as typeof doc & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 10;
 
-      doc.setFontSize(12);
-      doc.setTextColor(30, 58, 138);
-      doc.text(t("ops.collection.collector_summary"), margin, y);
+      const pmBody = paymentModeSummary.map((row) => {
+        const share = totalCollections > 0 ? (row.amount / totalCollections) * 100 : 0;
+        return [
+          row.mode === "Total" ? t("common.total") : modeDisplay(row.mode),
+          row.mode === "Total"
+            ? String(totalCollectorsCount)
+            : String(collectorCountsByMode.find((c) => c.mode === row.mode)?.count ?? 0),
+          String(row.count),
+          inr(row.amount),
+          `${share.toFixed(1)}%`,
+        ];
+      });
+      autoTable(doc, {
+        head: [[
+          t("ops.collection.mode"),
+          t("ops.collection.collectors"),
+          t("ops.collection.no_short"),
+          t("table.amount"),
+          t("ops.collection.share"),
+        ]],
+        body: pmBody,
+        startY: y,
+        theme: "grid",
+        margin: { left: MARGIN, right: MARGIN },
+        headStyles: { fillColor: HEAD_BG, textColor: 255, fontStyle: "bold", fontSize: 8.5, halign: "center", cellPadding: 2.2, lineWidth: 0.1, lineColor: [255, 255, 255] },
+        bodyStyles: { fontSize: 8.5, textColor: [30, 30, 30], cellPadding: 2.2, lineWidth: 0.1, lineColor: [214, 220, 230] },
+        alternateRowStyles: { fillColor: ZEBRA_BG },
+        columnStyles: {
+          0: { halign: "left", fontStyle: "bold" },
+          1: { halign: "center" },
+          2: { halign: "center" },
+          3: { halign: "right" },
+          4: { halign: "center" },
+        },
+        didParseCell: (hook) => {
+          if (hook.row.index === pmBody.length - 1) {
+            hook.cell.styles.fillColor = TOTAL_BG;
+            hook.cell.styles.fontStyle = "bold";
+            hook.cell.styles.textColor = NAVY;
+          }
+        },
+      });
+      y = (doc as typeof doc & { lastAutoTable: { finalY: number } }).lastAutoTable.finalY + 9;
+
+      // ── Section 2: Collector Summary ─────────────────────────────────────
+      doc.setFont("helvetica", "bold");
+      doc.setFontSize(10.5);
+      doc.setTextColor(NAVY[0], NAVY[1], NAVY[2]);
+      doc.text(t("ops.collection.collector_summary"), MARGIN, y);
+      doc.setDrawColor(RED[0], RED[1], RED[2]);
+      doc.setLineWidth(0.4);
+      doc.line(MARGIN, y + 1.6, MARGIN + 40, y + 1.6);
       y += 5;
-      const header = [t("common.collector"), ...collectorSummary.paymentModes, t("common.total")];
-      const body = collectorSummary.rows.map((row) => {
-        const rowData: (string | number)[] = [row.collector];
-        collectorSummary.paymentModes.forEach((mode: string) => {
-          rowData.push(Number(row[mode] || 0).toFixed(2));
-        });
-        rowData.push(row.total.toFixed(2));
-        return rowData;
+
+      const collectorHead = [
+        t("common.collector"),
+        ...collectorSummary.paymentModes.map((m) => modeDisplay(m)),
+        t("common.total"),
+        t("ops.collection.share"),
+      ];
+      const collectorBody = sortedCollectorRows.map((row) => {
+        const share = totalCollections > 0 ? (row.total / totalCollections) * 100 : 0;
+        return [
+          row.collector === "Total" ? t("common.total") : row.collector,
+          ...collectorSummary.paymentModes.map((mode: string) => inr(Number(row[mode]) || 0)),
+          inr(row.total),
+          `${share.toFixed(1)}%`,
+        ];
       });
+      const modeColCount = collectorSummary.paymentModes.length;
       autoTable(doc, {
-        head: [header],
-        body: body,
+        head: [collectorHead],
+        body: collectorBody,
         startY: y,
-        theme: "striped",
-        headStyles: { fillColor: [30, 58, 138], textColor: 255, fontStyle: "bold" },
-        styles: { fontSize: 8 },
+        theme: "grid",
+        margin: { left: MARGIN, right: MARGIN },
+        headStyles: { fillColor: HEAD_BG, textColor: 255, fontStyle: "bold", fontSize: 8.5, halign: "center", cellPadding: 2.2, lineWidth: 0.1, lineColor: [255, 255, 255] },
+        bodyStyles: { fontSize: 8.5, textColor: [30, 30, 30], cellPadding: 2.2, lineWidth: 0.1, lineColor: [214, 220, 230] },
+        alternateRowStyles: { fillColor: ZEBRA_BG },
+        columnStyles: {
+          0: { halign: "left", fontStyle: "bold" },
+          [modeColCount + 1]: { halign: "right", fontStyle: "bold" },
+          [modeColCount + 2]: { halign: "center" },
+        },
+        didParseCell: (hook) => {
+          if (hook.column.index >= 1 && hook.column.index <= modeColCount) {
+            hook.cell.styles.halign = "right";
+          }
+          if (hook.row.index === collectorBody.length - 1) {
+            hook.cell.styles.fillColor = TOTAL_BG;
+            hook.cell.styles.fontStyle = "bold";
+            hook.cell.styles.textColor = NAVY;
+          }
+        },
       });
 
-      // ── Collection Details (transaction rows) ────────────────────────────
-      // Rows come from the backend's /collection-entry/recent endpoint
-      // (contract endpoint; per shop). Date-range filtering and ordering here
-      // are presentation-only — summary totals above remain authoritative.
-      try {
-        const selectedShopId = applied.shopName
-          ? collectionService.getShopIdForName(applied.shopName) ?? null
-          : null;
-        let detailRows: CollectionApiEntry[] = [];
-        if (selectedShopId) {
-          detailRows = await collectionService.fetchRecentCollectionsForShop(selectedShopId, 500);
-        } else {
-          const perShop = await Promise.all(
-            shops.map((shop) =>
-              collectionService
-                .fetchRecentCollectionsForShop(shop.id, 500)
-                .catch((): CollectionApiEntry[] => [])
-            )
-          );
-          detailRows = perShop.flat();
-        }
-        detailRows = detailRows
-          .filter(
-            (row) =>
-              (!row.collectionDate ||
-                (row.collectionDate >= applied.fromDate && row.collectionDate <= applied.toDate))
-          )
-          .sort(
-            (a, b) =>
-              a.collectionDate.localeCompare(b.collectionDate) ||
-              a.collectionNo.localeCompare(b.collectionNo, undefined, { numeric: true })
-          );
-
-        doc.addPage();
-        let dy = 20;
-        doc.setFontSize(12);
-        doc.setTextColor(30, 58, 138);
-        doc.text(`${t("ops.collection.details")} (${detailRows.length} ${t("ops.collection.records")})`, margin, dy);
-        dy += 5;
-        if (detailRows.length > 0) {
-          const detailBody = detailRows.map((row) => [
-            row.collectionDate || "—",
-            row.collectionNo || "—",
-            row.shopName || "—",
-            row.paymentMode || "—",
-            (row.amount ?? 0).toFixed(2),
-          ]);
-          detailBody.push([
-            "",
-            "",
-            t("common.total"),
-            "",
-            detailRows.reduce((sum, row) => sum + (row.amount ?? 0), 0).toFixed(2),
-          ]);
-          autoTable(doc, {
-            head: [[
-              t("common.date"),
-              t("ops.collection.collection_no_label"),
-              t("operations.shop_name"),
-              t("operations.payment_mode"),
-              t("table.amount"),
-            ]],
-            body: detailBody,
-            startY: dy,
-            theme: "striped",
-            headStyles: { fillColor: [30, 58, 138], textColor: 255, fontStyle: "bold" },
-            styles: { fontSize: 8 },
-            columnStyles: { 4: { halign: "right" } },
-          });
-        } else {
-          doc.setFontSize(9);
-          doc.setTextColor(100, 116, 139);
-          doc.text(t("ops.collection.empty.title"), margin, dy + 4);
-        }
-      } catch {
-        // Detail section is best-effort; summary PDF still exports.
+      // ── Footer page numbers on every page ────────────────────────────────
+      const pageCount = doc.getNumberOfPages();
+      const pageHeight = doc.internal.pageSize.getHeight();
+      for (let p = 1; p <= pageCount; p++) {
+        doc.setPage(p);
+        doc.setFont("helvetica", "normal");
+        doc.setFontSize(7.5);
+        doc.setTextColor(MUTED[0], MUTED[1], MUTED[2]);
+        doc.text(`Page ${p} of ${pageCount}`, pageWidth - MARGIN, pageHeight - 7, { align: "right" });
+        doc.text("DMR POULTRIES — Collection Report", MARGIN, pageHeight - 7);
       }
 
       doc.save(getExportFileName("pdf"));
@@ -644,7 +684,18 @@ export default function CollectionReportPage({ embedded = false }: Props) {
     } catch {
       showNotification(t("ops.collection.pdf_failed"), "error");
     }
-  }, [report, paymentModeSummary, collectorSummary, showNotification, t, shops, getExportFileName]);
+  }, [
+    report,
+    paymentModeSummary,
+    collectorSummary,
+    sortedCollectorRows,
+    collectorCountsByMode,
+    totalCollections,
+    totalCollectorsCount,
+    showNotification,
+    t,
+    getExportFileName,
+  ]);
 
   const resetFilters = useCallback(() => {
     const defaults = {
@@ -664,14 +715,42 @@ export default function CollectionReportPage({ embedded = false }: Props) {
     });
   }, [defaultBounds, loadReport, showNotification, t]);
 
-  const handleSearch = useCallback(() => {
-    if (loading) return;
-    if (!fromDate || !toDate) {
-      void loadWeekBounds();
-      return;
-    }
-    void loadReport({ fromDate, toDate, shopName, collector, paymentMode });
-  }, [loading, fromDate, toDate, shopName, collector, paymentMode, loadReport, loadWeekBounds]);
+  // Filters apply instantly — no Search button. Every selector change sets its
+  // own state and immediately reloads the report from the applied filter set,
+  // merged with the new value (like the Trip List instant filters).
+  const applyFilterChange = useCallback(
+    (patch: Partial<{ fromDate: string; toDate: string; shopName: string; collector: string; paymentMode: string }>) => {
+      const next = { ...appliedFiltersRef.current, ...patch };
+      if (!next.fromDate || !next.toDate) return;
+      void loadReport(next);
+    },
+    [loadReport],
+  );
+
+  const handleFromDateChange = useCallback((value: string) => {
+    setFromDate(value);
+    applyFilterChange({ fromDate: value });
+  }, [applyFilterChange]);
+
+  const handleToDateChange = useCallback((value: string) => {
+    setToDate(value);
+    applyFilterChange({ toDate: value });
+  }, [applyFilterChange]);
+
+  const handleShopChange = useCallback((value: string) => {
+    setShopName(value);
+    applyFilterChange({ shopName: value });
+  }, [applyFilterChange]);
+
+  const handleCollectorChange = useCallback((value: string) => {
+    setCollector(value);
+    applyFilterChange({ collector: value });
+  }, [applyFilterChange]);
+
+  const handlePaymentModeChange = useCallback((value: string) => {
+    setPaymentMode(value);
+    applyFilterChange({ paymentMode: value });
+  }, [applyFilterChange]);
 
   const handleRefresh = useCallback(() => {
     if (loading) return;
@@ -704,8 +783,8 @@ export default function CollectionReportPage({ embedded = false }: Props) {
   // Content matching the precise structural layout and spacing of RatesEntryPage
   const content = (
     <div className="w-full space-y-5" data-embedded={embedded || undefined}>
-      {/* Filter Bar Card — Excel / PDF / Reset / Search sit in the last grid
-          cell, right after the Pay Mode filter */}
+      {/* Filter Bar Card — filters apply instantly; only Reset / Refresh /
+          PDF / Excel actions sit after the Pay Mode filter (no Search). */}
       <div className={opsFilterCardClass}>
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-5">
           <div>
@@ -715,7 +794,7 @@ export default function CollectionReportPage({ embedded = false }: Props) {
             </label>
             <DatePicker
               value={fromDate}
-              onChange={setFromDate}
+              onChange={handleFromDateChange}
               placeholder={t("placeholder.enter_date")}
               className="w-full text-xs font-medium"
             />
@@ -727,7 +806,7 @@ export default function CollectionReportPage({ embedded = false }: Props) {
             </label>
             <DatePicker
               value={toDate}
-              onChange={setToDate}
+              onChange={handleToDateChange}
               placeholder={t("placeholder.enter_date")}
               className="w-full text-xs font-medium"
             />
@@ -742,7 +821,7 @@ export default function CollectionReportPage({ embedded = false }: Props) {
               label={t("operations.shop_name")}
               value={shopName}
               options={shopOptions}
-              onChange={setShopName}
+              onChange={handleShopChange}
               placeholder={t("ops.collection.all_shops")}
               searchable
               allowClear
@@ -759,7 +838,7 @@ export default function CollectionReportPage({ embedded = false }: Props) {
               label={t("common.collector")}
               value={collector}
               options={collectorOptions}
-              onChange={setCollector}
+              onChange={handleCollectorChange}
               placeholder={t("ops.collection.all_collectors")}
               searchable
               allowClear
@@ -776,7 +855,7 @@ export default function CollectionReportPage({ embedded = false }: Props) {
               label={t("operations.payment_mode")}
               value={paymentMode}
               options={paymentModeOptions}
-              onChange={setPaymentMode}
+              onChange={handlePaymentModeChange}
               placeholder={t("ops.collection.all_modes")}
               searchable
               allowClear
@@ -786,16 +865,6 @@ export default function CollectionReportPage({ embedded = false }: Props) {
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2 pt-1">
-          <button
-            type="button"
-            onClick={handleSearch}
-            disabled={loading}
-            className={`group relative ${opsPrimaryButtonClass}`}
-            aria-label={t("common.search")}
-          >
-            {loading ? <Loader2 size={15} className="animate-spin" /> : <Search size={15} />}
-            {t("common.search")}
-          </button>
           <button
             type="button"
             onClick={resetFilters}
@@ -1073,28 +1142,47 @@ export default function CollectionReportPage({ embedded = false }: Props) {
               {t("ops.collection.collectors")}: {collectorChartData.length}
             </span>
           </div>
-          <div className="h-80 px-4 py-6">
+          <div className="px-4 py-6" style={{ height: `${Math.max(240, collectorChartData.length * 38 + 60)}px` }}>
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={collectorChartData} margin={{ top: 8, right: 8, left: -8, bottom: 0 }} barCategoryGap="22%">
+              <BarChart
+                layout="vertical"
+                data={collectorChartData}
+                margin={{ top: 8, right: 24, left: 8, bottom: 0 }}
+                barCategoryGap="28%"
+              >
                 <defs>
                   {collectorSummary.paymentModes.map((mode: string) => {
                     const c = modeColor(mode);
                     return (
-                      <linearGradient key={mode} id={`bar-grad-${slug(mode)}`} x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="0%" stopColor={c} stopOpacity={0.95} />
-                        <stop offset="100%" stopColor={c} stopOpacity={0.7} />
+                      <linearGradient key={mode} id={`bar-grad-${slug(mode)}`} x1="0" y1="0" x2="1" y2="0">
+                        <stop offset="0%" stopColor={c} stopOpacity={0.72} />
+                        <stop offset="100%" stopColor={c} stopOpacity={0.98} />
                       </linearGradient>
                     );
                   })}
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#eef2f7" vertical={false} />
-                <XAxis dataKey="collector" tick={{ fontSize: 10, fill: "#64748b" }} tickLine={false} axisLine={{ stroke: "#e2e8f0" }} interval={0} angle={-18} textAnchor="end" height={54} />
-                <YAxis tick={{ fontSize: 10, fill: "#64748b" }} tickLine={false} axisLine={false} tickFormatter={(v: number) => compactINR(v)} />
+                <CartesianGrid strokeDasharray="3 3" stroke="#eef2f7" horizontal={false} />
+                <XAxis
+                  type="number"
+                  tick={{ fontSize: 10, fill: "#64748b" }}
+                  tickLine={false}
+                  axisLine={{ stroke: "#e2e8f0" }}
+                  tickFormatter={(v: number) => compactINR(v)}
+                />
+                <YAxis
+                  type="category"
+                  dataKey="collector"
+                  tick={{ fontSize: 11, fill: "#475569" }}
+                  tickLine={false}
+                  axisLine={{ stroke: "#e2e8f0" }}
+                  width={112}
+                  interval={0}
+                />
                 <ChartTooltip
                   cursor={{ fill: "rgba(148,163,184,0.08)" }}
                   content={<ChartTipBox totalLabel={t("common.total")} />}
                 />
-                <ChartLegend iconType="circle" wrapperStyle={{ fontSize: 11, paddingTop: 6 }} />
+                <ChartLegend iconType="circle" wrapperStyle={{ fontSize: 11, paddingTop: 8 }} />
                 {collectorSummary.paymentModes.map((mode: string, idx: number) => (
                   <Bar
                     key={mode}
@@ -1102,8 +1190,8 @@ export default function CollectionReportPage({ embedded = false }: Props) {
                     name={modeDisplay(mode)}
                     stackId="amount"
                     fill={`url(#bar-grad-${slug(mode)})`}
-                    maxBarSize={46}
-                    radius={idx === collectorSummary.paymentModes.length - 1 ? [5, 5, 0, 0] : undefined}
+                    maxBarSize={26}
+                    radius={idx === collectorSummary.paymentModes.length - 1 ? [0, 5, 5, 0] : undefined}
                   />
                 ))}
               </BarChart>
