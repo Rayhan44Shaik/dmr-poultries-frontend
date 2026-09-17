@@ -30,12 +30,8 @@ import React, {
 } from "react";
 import {
   AlertTriangle,
-  ArrowDown,
-  ArrowUp,
   CheckCheck,
   PackageCheck,
-  ChevronsDown,
-  ChevronsUp,
   GripVertical,
   Loader2,
   RotateCcw,
@@ -228,6 +224,61 @@ type Props = {
   /** Refresh in flight (duplicate-call guard + busy icon). */
   refreshing: boolean;
 };
+
+/** Delivery-order box: shows the row's position and lets the operator TYPE a
+ *  new one (1, 2, 3 …). Commits on Enter or blur, clamps to 1..max, and Escape
+ *  restores the current position. */
+function SequenceInput({
+  value,
+  max,
+  disabled,
+  label,
+  onCommit,
+}: {
+  value: number;
+  max: number;
+  disabled: boolean;
+  label: string;
+  onCommit: (position: number) => void;
+}) {
+  const [draft, setDraft] = useState<string | null>(null);
+  const commit = () => {
+    if (draft === null) return;
+    const n = Math.round(Number(draft));
+    setDraft(null);
+    if (!Number.isFinite(n) || n < 1) return;
+    const pos = Math.min(max, n);
+    if (pos !== value) onCommit(pos);
+  };
+  return (
+    <input
+      type="number"
+      inputMode="numeric"
+      min={1}
+      max={max}
+      value={draft ?? value}
+      disabled={disabled}
+      aria-label={label}
+      title={label}
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) => setDraft(e.target.value)}
+      onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === "Enter") {
+          commit();
+          e.currentTarget.blur();
+        } else if (e.key === "Escape") {
+          setDraft(null);
+          e.currentTarget.blur();
+        }
+      }}
+      onWheel={onOrdersNumberWheel}
+      className={`${ORDERS_NO_SPINNER} h-7 w-11 rounded-lg border border-emerald-200 bg-emerald-50 text-center text-[12px] font-semibold tabular-nums text-emerald-700 transition-all focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 disabled:opacity-50 ${
+        draft !== null ? "border-amber-300 bg-amber-50 text-amber-800" : ""
+      }`}
+    />
+  );
+}
 
 /** Trip-List-style in-table loading row: the filter card and the table
  *  header stay put, only the record surface says it is fetching. */
@@ -1062,14 +1113,6 @@ function AssignmentEditor({
     });
   }, []);
 
-  const moveRow = useCallback((clientKey: string, dir: -1 | 1) => {
-    setSelected((prev) => {
-      const from = prev.findIndex((r) => r.clientKey === clientKey);
-      if (from < 0) return prev;
-      return moveInSequence(prev, from, from + dir);
-    });
-  }, []);
-
   const sortSelected = useCallback((mode: "shop_az" | "village_az") => {
     setSelected((prev) => {
       const next = [...prev];
@@ -1702,6 +1745,8 @@ function AssignmentEditor({
   );
 
   // ── Delivery state of a selected shop from persisted day data ───────────
+  const waEnabled = !waBusy && !!vehicle && waSheetRows.length > 0;
+
   // ── Render — VEHICLE-FIRST: the trucks that finished Step 2 are listed
   //     with their trip / vehicle / supervisor / farm / capacity facts, and a
   //     › arrow opens that vehicle's shop-assignment panel. ─────────────────
@@ -2202,9 +2247,7 @@ function AssignmentEditor({
 
                         {/* Assignment table: editable sequence — drag a row, ↑/↓ one
                   step, ⤒/⤓ first/last, or sort the whole list — + boxes. */}
-                        <div className="border-t border-slate-100 bg-slate-50/40 px-4 py-1.5 text-[11px] font-semibold text-slate-400">
-                          {to("orders.drag_hint")}
-                        </div>
+                        <div className="border-t border-slate-100" />
                         <div className="max-h-80 overflow-y-auto">
                           <table
                             className={`w-full min-w-[880px] table-fixed ${ORDERS_TABLE_FONT_CLASS}`}
@@ -2213,11 +2256,11 @@ function AssignmentEditor({
                               <col className="w-24" />
                               <col />
                               <col />
-                              <col className="w-[11%]" />
-                              <col className="w-[11%]" />
-                              <col className="w-[18%]" />
-                              <col className="w-[11%]" />
-                              <col className="w-12" />
+                              <col className="w-[10%]" />
+                              <col className="w-[10%]" />
+                              <col className="w-[20%]" />
+                              <col className="w-[10%]" />
+                              <col className="w-14" />
                             </colgroup>
                             <thead>
                               <tr className={opsTableHeadRowClass}>
@@ -2231,10 +2274,10 @@ function AssignmentEditor({
                                   {to("orders.col_village")}
                                 </th>
                                 <th className={`${opsTableThClass} text-right`}>
-                                  {to("orders.ordered_birds")}
+                                  {to("orders.col_birds")}
                                 </th>
                                 <th className={`${opsTableThClass} text-right`}>
-                                  {to("orders.ordered_boxes")}
+                                  {to("orders.col_boxes")}
                                 </th>
                                 <th className={`${opsTableThClass} text-left`}>
                                   {to("orders.assigned_boxes")}
@@ -2303,69 +2346,20 @@ function AssignmentEditor({
                                         <GripVertical
                                           size={14}
                                           aria-label={to("orders.drag_handle")}
-                                          className="shrink-0 cursor-grab text-slate-300 active:cursor-grabbing"
+                                          className="shrink-0 cursor-grab text-slate-300 transition-colors hover:text-emerald-500 active:cursor-grabbing"
                                         />
-                                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-[12px] font-semibold text-emerald-700">
-                                          {index + 1}
-                                        </span>
-                                        {/* ↑ ↓ step one place · ⤒ ⤓ jump to first / last */}
-                                        <div className="grid grid-cols-2 -my-1.5">
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              moveRow(row.clientKey, -1)
-                                            }
-                                            disabled={index === 0 || busy}
-                                            aria-label={`${to("orders.col_sequence")} ↑ ${row.shopName}`}
-                                            className="h-5 w-5 rounded text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 disabled:opacity-25 flex items-center justify-center"
-                                          >
-                                            <ArrowUp size={12} />
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              moveRowTo(row.clientKey, 0)
-                                            }
-                                            disabled={index === 0 || busy}
-                                            title={to("orders.move_first")}
-                                            aria-label={`${to("orders.move_first")} — ${row.shopName}`}
-                                            className="h-5 w-5 rounded text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 disabled:opacity-25 flex items-center justify-center"
-                                          >
-                                            <ChevronsUp size={12} />
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              moveRow(row.clientKey, 1)
-                                            }
-                                            disabled={
-                                              index === selected.length - 1 ||
-                                              busy
-                                            }
-                                            aria-label={`${to("orders.col_sequence")} ↓ ${row.shopName}`}
-                                            className="h-5 w-5 rounded text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 disabled:opacity-25 flex items-center justify-center"
-                                          >
-                                            <ArrowDown size={12} />
-                                          </button>
-                                          <button
-                                            type="button"
-                                            onClick={() =>
-                                              moveRowTo(
-                                                row.clientKey,
-                                                selected.length - 1,
-                                              )
-                                            }
-                                            disabled={
-                                              index === selected.length - 1 ||
-                                              busy
-                                            }
-                                            title={to("orders.move_last")}
-                                            aria-label={`${to("orders.move_last")} — ${row.shopName}`}
-                                            className="h-5 w-5 rounded text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 disabled:opacity-25 flex items-center justify-center"
-                                          >
-                                            <ChevronsDown size={12} />
-                                          </button>
-                                        </div>
+                                        {/* Delivery order — type the position
+                                            (1, 2, 3 …) and the row moves there
+                                            on Enter / blur. */}
+                                        <SequenceInput
+                                          value={index + 1}
+                                          max={selected.length}
+                                          disabled={busy}
+                                          label={`${to("orders.col_sequence")} — ${row.shopName}`}
+                                          onCommit={(pos) =>
+                                            moveRowTo(row.clientKey, pos - 1)
+                                          }
+                                        />
                                       </div>
                                     </td>
                                     <td
@@ -2476,9 +2470,14 @@ function AssignmentEditor({
                                         }
                                         disabled={busy}
                                         aria-label={`${to("orders.close")} — ${row.shopName}`}
-                                        className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200/80 bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-colors disabled:opacity-30"
+                                        className="group inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200/80 bg-white text-slate-400 transition-all hover:border-rose-200 hover:bg-rose-50 hover:text-rose-600 hover:shadow-sm active:scale-95 disabled:opacity-30"
                                       >
-                                        <X size={13} />
+                                        <X
+                                          size={13}
+                                          className={
+                                            uiActionIconMotionClass.close
+                                          }
+                                        />
                                       </button>
                                     </td>
                                   </tr>
@@ -2514,7 +2513,7 @@ function AssignmentEditor({
                   <button
                     type="button"
                     onClick={() => setWaPopupOpen(true)}
-                    disabled={waBusy || !vehicle || waSheetRows.length === 0}
+                    disabled={!waEnabled}
                     title={to("orders.wa_check_title")}
                     aria-label={to("orders.whatsapp")}
                     className="group inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-b from-emerald-500 to-emerald-600 pl-1.5 pr-4 text-xs font-bold text-white shadow-md shadow-emerald-600/20 ring-1 ring-emerald-700/30 transition-all duration-200 hover:-translate-y-px hover:from-emerald-400 hover:to-emerald-600 hover:shadow-lg hover:shadow-emerald-600/30 active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-md"
@@ -2527,7 +2526,9 @@ function AssignmentEditor({
                       ) : (
                         <WhatsAppIcon
                           size={15}
-                          className={uiActionIconMotionClass.whatsapp}
+                          className={
+                            waEnabled ? uiActionIconMotionClass.whatsapp : ""
+                          }
                         />
                       )}
                     </span>
