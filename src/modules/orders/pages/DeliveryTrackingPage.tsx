@@ -82,7 +82,7 @@ type Props = {
 function usePaged<T>(
   items: T[],
   pageSize: number,
-  resetKey: string
+  resetKey: string,
 ): [T[], number, number, (p: number) => void] {
   const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
   const [page, setPage] = useState(1);
@@ -94,7 +94,7 @@ function usePaged<T>(
   const safePage = Math.min(page, totalPages);
   const slice = useMemo(
     () => paginate(items, safePage, pageSize),
-    [items, safePage, pageSize]
+    [items, safePage, pageSize],
   );
   return [slice, safePage, totalPages, setPage];
 }
@@ -124,19 +124,40 @@ function differenceMatches(ot: OrdersTrip, f: DifferenceFilter): boolean {
   }
 }
 
-function DeliveryStateBadge({ state }: { state: OrdersDeliveryState | undefined }) {
+function DeliveryStateBadge({
+  state,
+}: {
+  state: OrdersDeliveryState | undefined;
+}) {
   const { to } = useOrdersI18n();
   const s = state ?? "pending";
   if (s === "complete") {
-    return <OrdersStatusBadge status="Delivered" label={to("orders.status_delivered")} />;
+    return (
+      <OrdersStatusBadge
+        status="Delivered"
+        label={to("orders.status_delivered")}
+      />
+    );
   }
   if (s === "partial") {
-    return <OrdersStatusBadge status="Part Delivered" label={to("orders.delivery_partial")} />;
+    return (
+      <OrdersStatusBadge
+        status="Part Delivered"
+        label={to("orders.delivery_partial")}
+      />
+    );
   }
   if (s === "in_progress") {
-    return <OrdersStatusBadge status="In Progress" label={to("orders.delivery_in_progress")} />;
+    return (
+      <OrdersStatusBadge
+        status="In Progress"
+        label={to("orders.delivery_in_progress")}
+      />
+    );
   }
-  return <OrdersStatusBadge status="Pending" label={to("orders.delivery_pending")} />;
+  return (
+    <OrdersStatusBadge status="Pending" label={to("orders.delivery_pending")} />
+  );
 }
 
 function ActionButtons({
@@ -154,7 +175,11 @@ function ActionButtons({
   const { trip } = ot;
   return (
     <div className="flex items-center gap-1.5">
-      <OrdersLabelButton label={to("orders.view")} onClick={() => onView(ot)} tone="emerald">
+      <OrdersLabelButton
+        label={to("orders.view")}
+        onClick={() => onView(ot)}
+        tone="emerald"
+      >
         <Eye size={13} />
       </OrdersLabelButton>
       <OrdersIconButton
@@ -181,13 +206,18 @@ function ProgressBar({ ot }: { ot: OrdersTrip }) {
         ? "bg-amber-400"
         : "bg-sky-400";
   return (
-    <div className="min-w-[110px]">
+    <div className="min-w-[6.875rem]">
       <div className="flex items-center justify-between text-[11px] font-semibold text-slate-500 mb-1">
-        <span>{to("orders.delivered_of", { x: p.deliveredShops, y: p.totalShops })}</span>
+        <span>
+          {to("orders.delivered_of", { x: p.deliveredShops, y: p.totalShops })}
+        </span>
         <span className="text-slate-400">{pct}%</span>
       </div>
       <div className="h-1.5 rounded-full bg-slate-100 overflow-hidden">
-        <div className={`h-full rounded-full transition-all ${bar}`} style={{ width: `${pct}%` }} />
+        <div
+          className={`h-full rounded-full transition-all ${bar}`}
+          style={{ width: `${pct}%` }}
+        />
       </div>
     </div>
   );
@@ -196,8 +226,12 @@ function ProgressBar({ ot }: { ot: OrdersTrip }) {
 function SectionTitle({ label, note }: { label: string; note?: string }) {
   return (
     <div className="px-5 py-3 border-b border-slate-200 bg-slate-50/60 flex items-center justify-between flex-wrap gap-2">
-      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">{label}</h3>
-      {note ? <span className="text-[11px] font-semibold text-slate-400">{note}</span> : null}
+      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+        {label}
+      </h3>
+      {note ? (
+        <span className="text-[11px] font-semibold text-slate-400">{note}</span>
+      ) : null}
     </div>
   );
 }
@@ -232,125 +266,165 @@ function TrackingTable({
   const { to } = useOrdersI18n();
   return (
     <div className="overflow-x-auto">
-      <table className={`w-full min-w-[1480px] ${ORDERS_TABLE_FONT_CLASS}`}>
+      <table className={`w-full min-w-[92.5rem] ${ORDERS_TABLE_FONT_CLASS}`}>
         <thead>
           <tr className={opsTableHeadRowClass}>
-            <th className={`${opsTableThClass} w-14`}>{to("orders.col_sno")}</th>
+            <th className={`${opsTableThClass} w-14`}>
+              {to("orders.col_sno")}
+            </th>
             <th className={opsTableThClass}>{to("orders.col_trip_no")}</th>
-            <th className={`${opsTableThClass} w-24`}>{to("orders.col_date")}</th>
+            <th className={`${opsTableThClass} w-24`}>
+              {to("orders.col_date")}
+            </th>
             <th className={opsTableThClass}>{to("orders.col_vehicle_no")}</th>
             <th className={opsTableThClass}>{to("orders.supervisor")}</th>
             <th className={opsTableThClass}>{to("orders.driver")}</th>
-            <th className={`${opsTableThClass} w-32`}>{to("orders.col_total_shops")}</th>
-            <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.total_boxes")}</th>
-            <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.col_delivered_boxes")}</th>
-            <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.delivered_birds")}</th>
-            <th className={`${opsTableThClass} w-28 text-right`}>{to("orders.delivered_weight")}</th>
-            <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.pending_boxes")}</th>
-            <th className={`${opsTableThClass} w-28`}>{to("orders.col_delivery_status")}</th>
-            <th className={`${opsTableThClass} w-36`}>{to("orders.col_action")}</th>
+            <th className={`${opsTableThClass} w-32`}>
+              {to("orders.col_total_shops")}
+            </th>
+            <th className={`${opsTableThClass} w-24 text-right`}>
+              {to("orders.total_boxes")}
+            </th>
+            <th className={`${opsTableThClass} w-24 text-right`}>
+              {to("orders.col_delivered_boxes")}
+            </th>
+            <th className={`${opsTableThClass} w-24 text-right`}>
+              {to("orders.delivered_birds")}
+            </th>
+            <th className={`${opsTableThClass} w-28 text-right`}>
+              {to("orders.delivered_weight")}
+            </th>
+            <th className={`${opsTableThClass} w-24 text-right`}>
+              {to("orders.pending_boxes")}
+            </th>
+            <th className={`${opsTableThClass} w-28`}>
+              {to("orders.col_delivery_status")}
+            </th>
+            <th className={`${opsTableThClass} w-36`}>
+              {to("orders.col_action")}
+            </th>
           </tr>
         </thead>
         <tbody className={opsTableDivideClass}>
-          {refreshing ? <tr><td colSpan={14}><OrdersTableSkeleton rows={5} /></td></tr> : pageSlice.map((ot, index) => {
-            const { trip, progress } = ot;
-            const mobile = supervisorOf(ot);
-            return (
-              <tr key={trip.id} className={ordersTableZebraRow(index, "align-middle")}>
-                <td className={opsTableTdClass}>
-                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 text-[12px] font-semibold text-slate-600">
-                    {(safePage - 1) * pageSize + index + 1}
-                  </span>
-                </td>
-                <td className={`${opsTableTdClass} font-semibold text-emerald-700`}>
-                  <span className="inline-flex flex-col leading-tight">
-                    {trip.tripNo}
-                    {ot.assignmentIncomplete && (
+          {refreshing ? (
+            <tr>
+              <td colSpan={14}>
+                <OrdersTableSkeleton rows={5} />
+              </td>
+            </tr>
+          ) : (
+            pageSlice.map((ot, index) => {
+              const { trip, progress } = ot;
+              const mobile = supervisorOf(ot);
+              return (
+                <tr
+                  key={trip.id}
+                  className={ordersTableZebraRow(index, "align-middle")}
+                >
+                  <td className={opsTableTdClass}>
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 text-[12px] font-semibold text-slate-600">
+                      {(safePage - 1) * pageSize + index + 1}
+                    </span>
+                  </td>
+                  <td
+                    className={`${opsTableTdClass} font-semibold text-emerald-700`}
+                  >
+                    <span className="inline-flex flex-col leading-tight">
+                      {trip.tripNo}
+                      {ot.assignmentIncomplete && (
+                        <span
+                          className="mt-0.5 inline-flex w-fit items-center rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-orange-700"
+                          title={to("orders.assignment_incomplete_warning")}
+                        >
+                          {to("orders.assignment_incomplete")}
+                        </span>
+                      )}
+                    </span>
+                  </td>
+                  <td
+                    className={`${opsTableTdClass} text-slate-500 whitespace-nowrap`}
+                  >
+                    {formatDayShort(trip.tripDate)}
+                  </td>
+                  <td className={opsTableTdClass}>{trip.vehicleNo || "—"}</td>
+                  <td className={opsTableTdClass}>
+                    <span className="inline-flex flex-col leading-tight">
+                      <span>{trip.supervisorName || "—"}</span>
+                      {mobile ? (
+                        <span className="text-[10px] font-semibold text-slate-400">
+                          {mobile}
+                        </span>
+                      ) : null}
+                    </span>
+                  </td>
+                  <td className={opsTableTdClass}>{trip.driverName || "—"}</td>
+                  <td className={opsTableTdClass}>
+                    <ProgressBar ot={ot} />
+                  </td>
+                  <td
+                    className={`${opsTableTdClass} text-right font-semibold text-emerald-800`}
+                  >
+                    {progress ? formatCount(progress.totalBoxes) : "—"}
+                  </td>
+                  <td className={`${opsTableTdClass} text-right font-medium`}>
+                    {progress ? formatCount(progress.deliveredBoxes) : "—"}
+                  </td>
+                  <td className={`${opsTableTdClass} text-right font-medium`}>
+                    {progress && progress.deliveredBirds > 0 ? (
+                      formatCount(progress.deliveredBirds)
+                    ) : (
+                      <span className="text-slate-300">—</span>
+                    )}
+                  </td>
+                  <td className={`${opsTableTdClass} text-right font-medium`}>
+                    {progress && progress.deliveredWeight > 0 ? (
+                      progress.deliveredWeight.toFixed(2)
+                    ) : (
+                      <span className="text-slate-300">—</span>
+                    )}
+                  </td>
+                  <td className={`${opsTableTdClass} text-right`}>
+                    {progress ? (
+                      progress.pendingBoxes > 0 ? (
+                        <span className="inline-flex flex-col items-end leading-tight">
+                          <span className="font-semibold text-amber-600">
+                            {formatCount(progress.pendingBoxes)}{" "}
+                            {to("orders.word_boxes")}
+                          </span>
+                          {progress.pendingShops > 0 && (
+                            <span className="text-[10px] font-semibold text-slate-400">
+                              {progress.pendingShops} {to("orders.col_shops")}
+                              {progress.partDeliveredShops > 0
+                                ? ` · ${progress.partDeliveredShops} ${to("orders.status_part_delivered")}`
+                                : ""}
+                            </span>
+                          )}
+                        </span>
+                      ) : (
+                        <span className="text-slate-300">0</span>
+                      )
+                    ) : (
+                      <span className="text-slate-300">—</span>
+                    )}
+                  </td>
+                  <td className={opsTableTdClass}>
+                    <DeliveryStateBadge state={progress?.deliveryState} />
+                    {progress && progress.additionalShopCount > 0 && (
                       <span
-                        className="mt-0.5 inline-flex w-fit items-center rounded-full border border-orange-200 bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-orange-700"
-                        title={to("orders.assignment_incomplete_warning")}
+                        className="ml-1.5 inline-flex items-center rounded-full bg-rose-50 border border-rose-200 px-2 py-0.5 text-[10px] font-semibold text-rose-600"
+                        title={to("orders.additional_legend")}
                       >
-                        {to("orders.assignment_incomplete")}
+                        +{progress.additionalShopCount}
                       </span>
                     )}
-                  </span>
-                </td>
-                <td className={`${opsTableTdClass} text-slate-500 whitespace-nowrap`}>
-                  {formatDayShort(trip.tripDate)}
-                </td>
-                <td className={opsTableTdClass}>{trip.vehicleNo || "—"}</td>
-                <td className={opsTableTdClass}>
-                  <span className="inline-flex flex-col leading-tight">
-                    <span>{trip.supervisorName || "—"}</span>
-                    {mobile ? (
-                      <span className="text-[10px] font-semibold text-slate-400">{mobile}</span>
-                    ) : null}
-                  </span>
-                </td>
-                <td className={opsTableTdClass}>{trip.driverName || "—"}</td>
-                <td className={opsTableTdClass}>
-                  <ProgressBar ot={ot} />
-                </td>
-                <td className={`${opsTableTdClass} text-right font-semibold text-emerald-800`}>
-                  {progress ? formatCount(progress.totalBoxes) : "—"}
-                </td>
-                <td className={`${opsTableTdClass} text-right font-medium`}>
-                  {progress ? formatCount(progress.deliveredBoxes) : "—"}
-                </td>
-                <td className={`${opsTableTdClass} text-right font-medium`}>
-                  {progress && progress.deliveredBirds > 0 ? (
-                    formatCount(progress.deliveredBirds)
-                  ) : (
-                    <span className="text-slate-300">—</span>
-                  )}
-                </td>
-                <td className={`${opsTableTdClass} text-right font-medium`}>
-                  {progress && progress.deliveredWeight > 0 ? (
-                    progress.deliveredWeight.toFixed(2)
-                  ) : (
-                    <span className="text-slate-300">—</span>
-                  )}
-                </td>
-                <td className={`${opsTableTdClass} text-right`}>
-                  {progress ? (
-                    progress.pendingBoxes > 0 ? (
-                      <span className="inline-flex flex-col items-end leading-tight">
-                        <span className="font-semibold text-amber-600">
-                          {formatCount(progress.pendingBoxes)} {to("orders.word_boxes")}
-                        </span>
-                        {progress.pendingShops > 0 && (
-                          <span className="text-[10px] font-semibold text-slate-400">
-                            {progress.pendingShops} {to("orders.col_shops")}
-                            {progress.partDeliveredShops > 0
-                              ? ` · ${progress.partDeliveredShops} ${to("orders.status_part_delivered")}`
-                              : ""}
-                          </span>
-                        )}
-                      </span>
-                    ) : (
-                      <span className="text-slate-300">0</span>
-                    )
-                  ) : (
-                    <span className="text-slate-300">—</span>
-                  )}
-                </td>
-                <td className={opsTableTdClass}>
-                  <DeliveryStateBadge state={progress?.deliveryState} />
-                  {progress && progress.additionalShopCount > 0 && (
-                    <span
-                      className="ml-1.5 inline-flex items-center rounded-full bg-rose-50 border border-rose-200 px-2 py-0.5 text-[10px] font-semibold text-rose-600"
-                      title={to("orders.additional_legend")}
-                    >
-                      +{progress.additionalShopCount}
-                    </span>
-                  )}
-                </td>
-                <td className={opsTableTdClass}>
-                  <ActionButtons ot={ot} {...actionProps} />
-                </td>
-              </tr>
-            );
-          })}
+                  </td>
+                  <td className={opsTableTdClass}>
+                    <ActionButtons ot={ot} {...actionProps} />
+                  </td>
+                </tr>
+              );
+            })
+          )}
         </tbody>
       </table>
       <Pagination
@@ -382,18 +456,19 @@ function DeliveryTrackingPage({
   // Table membership = Trip Entry lifecycle, never shop-delivery %.
   const { pending: active, completed: completedAll } = useMemo(
     () => partitionTrackingTrips(trips),
-    [trips]
+    [trips],
   );
 
   // ── COMPLETED range: [From → To] (default = last 7 operational days).
   const [completedFrom, setCompletedFrom] = useState(() =>
-    today ? addLocalDays(today, -6) : ""
+    today ? addLocalDays(today, -6) : "",
   );
   const [completedTo, setCompletedTo] = useState(() => today);
   const oldestCompleted = useMemo(() => {
     let min = "";
     for (const t of completedAll) {
-      if (t.trip.tripDate && (!min || t.trip.tripDate < min)) min = t.trip.tripDate;
+      if (t.trip.tripDate && (!min || t.trip.tripDate < min))
+        min = t.trip.tripDate;
     }
     return min || undefined;
   }, [completedAll]);
@@ -404,15 +479,16 @@ function DeliveryTrackingPage({
         : completedAll.filter(
             (t) =>
               t.trip.tripDate >= (completedFrom || addLocalDays(today, -6)) &&
-              t.trip.tripDate <= (completedTo || today)
+              t.trip.tripDate <= (completedTo || today),
           ),
-    [completedAll, completedFrom, completedTo, today]
+    [completedAll, completedFrom, completedTo, today],
   );
 
   const [query, setQuery] = useState("");
   const [sortMode, setSortMode] = useState("newest");
   const [deliveryFilter, setDeliveryFilter] = useState<DeliveryFilter>("all");
-  const [differenceFilter, setDifferenceFilter] = useState<DifferenceFilter>("all");
+  const [differenceFilter, setDifferenceFilter] =
+    useState<DifferenceFilter>("all");
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const q = query.trim().toLowerCase();
 
@@ -424,7 +500,7 @@ function DeliveryTrackingPage({
       { value: "partial", label: to("orders.delivery_partial") },
       { value: "complete", label: to("orders.status_delivered") },
     ],
-    [to]
+    [to],
   );
   const differenceOptions = useMemo(
     () => [
@@ -434,37 +510,80 @@ function DeliveryTrackingPage({
       { value: "extra", label: to("orders.extra_delivery") },
       { value: "not_listed", label: to("orders.status_not_listed") },
     ],
-    [to]
+    [to],
   );
 
   const haystackFor = (ot: OrdersTrip): string =>
     trackingSearchHaystack(ot, {
       supervisorMobile: supervisorMobileOf(ot.trip, supervisorDirectory),
       shopNumberOf: (shopId) => shopNumberOf(shopId, shopDirectory),
-      villageOf: (shopId, shopName) => villageOf(shopId, shopName, shopDirectory),
+      villageOf: (shopId, shopName) =>
+        villageOf(shopId, shopName, shopDirectory),
     });
 
   const activeFiltered = useMemo(
     () =>
-      active.filter(
-        (ot) =>
-          deliveryMatches(ot, deliveryFilter) &&
-          differenceMatches(ot, differenceFilter) &&
-          (!q || haystackFor(ot).includes(q))
-      ).sort((a, b) => sortMode === "oldest" ? a.trip.tripDate.localeCompare(b.trip.tripDate) || a.trip.id - b.trip.id : sortMode === "vehicle" ? String(a.trip.vehicleNo).localeCompare(String(b.trip.vehicleNo)) || a.trip.id - b.trip.id : b.trip.tripDate.localeCompare(a.trip.tripDate) || b.trip.id - a.trip.id),
+      active
+        .filter(
+          (ot) =>
+            deliveryMatches(ot, deliveryFilter) &&
+            differenceMatches(ot, differenceFilter) &&
+            (!q || haystackFor(ot).includes(q)),
+        )
+        .sort((a, b) =>
+          sortMode === "oldest"
+            ? a.trip.tripDate.localeCompare(b.trip.tripDate) ||
+              a.trip.id - b.trip.id
+            : sortMode === "vehicle"
+              ? String(a.trip.vehicleNo).localeCompare(
+                  String(b.trip.vehicleNo),
+                ) || a.trip.id - b.trip.id
+              : b.trip.tripDate.localeCompare(a.trip.tripDate) ||
+                b.trip.id - a.trip.id,
+        ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [active, sortMode, deliveryFilter, differenceFilter, q, to, shopDirectory, supervisorDirectory]
+    [
+      active,
+      sortMode,
+      deliveryFilter,
+      differenceFilter,
+      q,
+      to,
+      shopDirectory,
+      supervisorDirectory,
+    ],
   );
   const completedFiltered = useMemo(
     () =>
-      completed.filter(
-        (ot) =>
-          deliveryMatches(ot, deliveryFilter) &&
-          differenceMatches(ot, differenceFilter) &&
-          (!q || haystackFor(ot).includes(q))
-      ).sort((a, b) => sortMode === "oldest" ? a.trip.tripDate.localeCompare(b.trip.tripDate) || a.trip.id - b.trip.id : sortMode === "vehicle" ? String(a.trip.vehicleNo).localeCompare(String(b.trip.vehicleNo)) || a.trip.id - b.trip.id : b.trip.tripDate.localeCompare(a.trip.tripDate) || b.trip.id - a.trip.id),
+      completed
+        .filter(
+          (ot) =>
+            deliveryMatches(ot, deliveryFilter) &&
+            differenceMatches(ot, differenceFilter) &&
+            (!q || haystackFor(ot).includes(q)),
+        )
+        .sort((a, b) =>
+          sortMode === "oldest"
+            ? a.trip.tripDate.localeCompare(b.trip.tripDate) ||
+              a.trip.id - b.trip.id
+            : sortMode === "vehicle"
+              ? String(a.trip.vehicleNo).localeCompare(
+                  String(b.trip.vehicleNo),
+                ) || a.trip.id - b.trip.id
+              : b.trip.tripDate.localeCompare(a.trip.tripDate) ||
+                b.trip.id - a.trip.id,
+        ),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [completed, sortMode, deliveryFilter, differenceFilter, q, to, shopDirectory, supervisorDirectory]
+    [
+      completed,
+      sortMode,
+      deliveryFilter,
+      differenceFilter,
+      q,
+      to,
+      shopDirectory,
+      supervisorDirectory,
+    ],
   );
 
   const scope = useMemo(() => {
@@ -494,19 +613,25 @@ function DeliveryTrackingPage({
   }, [activeFiltered, completedFiltered]);
 
   const filterKey = `${q}|${sortMode}|${pageSize}|${deliveryFilter}|${differenceFilter}|${completedFrom}|${completedTo}`;
-  const [activePage, safeActivePage, activeTotalPages, setActivePage] = usePaged(
-    activeFiltered,
-    pageSize,
-    filterKey
-  );
-  const [completedPage, safeCompletedPage, completedTotalPages, setCompletedPage] =
-    usePaged(completedFiltered, pageSize, filterKey);
+  const [activePage, safeActivePage, activeTotalPages, setActivePage] =
+    usePaged(activeFiltered, pageSize, filterKey);
+  const [
+    completedPage,
+    safeCompletedPage,
+    completedTotalPages,
+    setCompletedPage,
+  ] = usePaged(completedFiltered, pageSize, filterKey);
 
   if (loading) return <OrdersTableSkeleton rows={5} />;
 
   const actionProps = { pdfBusyId, onPdf, onView };
-  const filtersActive = sortMode !== "newest" || q !== "" || deliveryFilter !== "all" || differenceFilter !== "all";
-  const supervisorOf = (ot: OrdersTrip) => supervisorMobileOf(ot.trip, supervisorDirectory);
+  const filtersActive =
+    sortMode !== "newest" ||
+    q !== "" ||
+    deliveryFilter !== "all" ||
+    differenceFilter !== "all";
+  const supervisorOf = (ot: OrdersTrip) =>
+    supervisorMobileOf(ot.trip, supervisorDirectory);
 
   return (
     <div className="space-y-4">
@@ -518,11 +643,16 @@ function DeliveryTrackingPage({
           ariaLabel={to("orders.search_tracking")}
           className="w-full sm:w-64"
         />
-        <OrdersDropdown value={sortMode} onChange={setSortMode} ariaLabel={to("orders.sort")} options={[
-          { value: "newest", label: to("orders.sort_newest") },
-          { value: "oldest", label: to("orders.sort_oldest") },
-          { value: "vehicle", label: to("orders.sort_vehicle_trip") },
-        ]} />
+        <OrdersDropdown
+          value={sortMode}
+          onChange={setSortMode}
+          ariaLabel={to("orders.sort")}
+          options={[
+            { value: "newest", label: to("orders.sort_newest") },
+            { value: "oldest", label: to("orders.sort_oldest") },
+            { value: "vehicle", label: to("orders.sort_vehicle_trip") },
+          ]}
+        />
         <OrdersDropdown
           value={deliveryFilter}
           onChange={(v) => setDeliveryFilter(v as DeliveryFilter)}
@@ -626,7 +756,10 @@ function DeliveryTrackingPage({
               className="w-44"
               data-testid="orders-completed-from"
             />
-            <span className="text-[11px] font-semibold text-slate-400" aria-hidden>
+            <span
+              className="text-[11px] font-semibold text-slate-400"
+              aria-hidden
+            >
               →
             </span>
             <span className="text-[11px] font-semibold text-slate-500">
@@ -635,7 +768,8 @@ function DeliveryTrackingPage({
             <DatePicker
               value={completedTo}
               onChange={(v) => {
-                if (v && v >= (completedFrom || addLocalDays(today, -6))) setCompletedTo(v);
+                if (v && v >= (completedFrom || addLocalDays(today, -6)))
+                  setCompletedTo(v);
               }}
               minDate={completedFrom || addLocalDays(today, -6)}
               maxDate={today}

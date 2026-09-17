@@ -856,7 +856,7 @@ function OrderAssignmentPage({
               <RotateCcw size={14} className={uiActionIconMotionClass.reset} />
               {to("common.reset")}
               {hasFilters && (
-                <span className="ml-1 inline-flex h-5 min-w-[20px] items-center justify-center rounded-full bg-emerald-600 px-1.5 text-[10px] font-bold tabular-nums text-white motion-safe:animate-[var(--animate-pop-in)]">
+                <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-600 px-1.5 text-[10px] font-bold tabular-nums text-white motion-safe:animate-[var(--animate-pop-in)]">
                   {activeChips.length}
                 </span>
               )}
@@ -1676,6 +1676,12 @@ function AssignmentEditor({
     "all" | "pending" | "assigned" | "this_vehicle"
   >("pending");
   const thisTripNo = vehicle?.trip.tripNo ?? "";
+  // Trip numbers still open for assignment — a part on any other trip means
+  // that share was submitted (or delivered) and is frozen.
+  const eligibleTripNos = useMemo(
+    () => new Set(eligibleVehicles.map((v) => v.trip.tripNo)),
+    [eligibleVehicles],
+  );
   const cityFilterSet = useMemo(() => new Set(cityFilters), [cityFilters]);
   const filterTripNo = useMemo(
     () =>
@@ -1826,7 +1832,7 @@ function AssignmentEditor({
       {/* ── LEFT — the day's vehicles: the ones still WAITING for shops on
           top, the ones that already carry shops below. Picking one drives the
           shop panel on the right. ───────────────────────────────────────── */}
-      <aside className="w-full shrink-0 lg:sticky lg:top-4 lg:w-[336px]">
+      <aside className="w-full shrink-0 lg:sticky lg:top-4 lg:w-[21rem]">
         <div className={opsTableCardClass}>
           <div className={opsTableHeaderBarClass}>
             <span className={opsSectionTitleClass}>
@@ -1845,7 +1851,7 @@ function AssignmentEditor({
               <OrdersEmptyState title={to("orders.no_search_results")} />
             </div>
           ) : (
-            <div className="max-h-[calc(100vh-190px)] overflow-y-auto">
+            <div className="max-h-[calc(100vh-12rem)] overflow-y-auto">
               <ul className="divide-y divide-slate-100">
                 {pendingVehicles.map((v, index) => {
                   const city = farmCityOf(v.trip);
@@ -2062,7 +2068,7 @@ function AssignmentEditor({
                   <>
                     <div className="overflow-x-auto">
                       <table
-                        className={`w-full min-w-[760px] table-fixed ${ORDERS_TABLE_FONT_CLASS}`}
+                        className={`w-full min-w-[47.5rem] table-fixed ${ORDERS_TABLE_FONT_CLASS}`}
                       >
                         {/* Fixed column plan — Shop and City share the
                             remaining width equally, so there is never a wide
@@ -2105,7 +2111,16 @@ function AssignmentEditor({
                         <tbody className={opsTableDivideClass}>
                           {pageAvailable.map((row, index) => {
                             const checked = selectedIds.has(row.shopId);
-                            const isLockedRow = row.kind === "assigned";
+                            // Locked = fully placed, OR any share of it sits
+                            // on a vehicle whose assignment is already
+                            // SUBMITTED (that truck is no longer editable, so
+                            // its share of the order is final).
+                            const isLockedRow =
+                              row.kind === "assigned" ||
+                              row.delivered ||
+                              row.parts.some(
+                                (p) => !eligibleTripNos.has(p.tripNo),
+                              );
                             // Two-tone rows; a checked row's emerald state colour wins.
                             const tone =
                               checked && !isLockedRow
@@ -2343,7 +2358,7 @@ function AssignmentEditor({
                             <div className="border-t border-slate-100" />
                             <div className="max-h-80 overflow-y-auto">
                               <table
-                                className={`w-full min-w-[880px] table-fixed ${ORDERS_TABLE_FONT_CLASS}`}
+                                className={`w-full min-w-[55rem] table-fixed ${ORDERS_TABLE_FONT_CLASS}`}
                               >
                                 <colgroup>
                                   <col className="w-32" />

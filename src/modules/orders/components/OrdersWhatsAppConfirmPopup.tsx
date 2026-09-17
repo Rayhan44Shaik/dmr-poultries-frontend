@@ -535,7 +535,7 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
         {/* ── Footer: note + per-shop outcome + actions (Trip List footer chrome) ── */}
         <div className="rounded-b-2xl border-t border-slate-100 bg-gradient-to-r from-slate-50/80 via-white to-slate-50/80 px-6 py-4 md:px-8">
           <div
-            className="flex min-h-[18px] items-center gap-1.5 text-[11px] font-semibold"
+            className="flex min-h-[1.125rem] items-center gap-1.5 text-[11px] font-semibold"
             aria-live="polite"
           >
             {sending ? (

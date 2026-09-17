@@ -575,7 +575,7 @@ function OrderCollectionPage(props: Props) {
               load lands as rows appearing, not as the page changing shape. */}
           <div className="overflow-x-auto">
             <table
-              className={`w-full min-w-[1020px] table-fixed ${ORDERS_TABLE_FONT_CLASS}`}
+              className={`w-full min-w-[63.75rem] table-fixed ${ORDERS_TABLE_FONT_CLASS}`}
             >
               <CollectionTableHead />
               <tbody className={opsTableDivideClass}>
@@ -642,7 +642,7 @@ function CollectionTableHead() {
             right-aligning the last two put the air in different places per column,
             which is what made Weight look crammed against Status and stranded
             after Boxes. */}
-        <th className={`${opsTableThClass} w-[96px]`}>
+        <th className={`${opsTableThClass} w-24`}>
           <ColHead
             icon={Hash}
             label={to("orders.col_sno")}
@@ -694,7 +694,7 @@ function CollectionTableHead() {
             tone="text-indigo-600"
           />
         </th>
-        <th className={`${opsTableThClass} w-[112px]`}>
+        <th className={`${opsTableThClass} w-28`}>
           <ColHead
             icon={Eraser}
             label={to("orders.col_action")}
@@ -888,6 +888,8 @@ function CollectionEntries({
   // ── Row updates (editable days only) ─────────────────────────────────────
   const updateEntry = useCallback(
     (shopId: number, field: "birds" | "boxes" | "weight", raw: string) => {
+      // Loaded-on-a-vehicle shops are immutable here (see rowLocked).
+      if ((collection?.shops.get(shopId)?.assignedBoxesTotal ?? 0) > 0) return;
       // Birds and boxes are counts; weight is a measured kg figure, so it keeps
       // its decimals (2dp) instead of being floored like a count.
       const n =
@@ -902,7 +904,7 @@ function CollectionEntries({
         return next;
       });
     },
-    [],
+    [collection],
   );
 
   // ── Clear a row: zero the order, never remove the shop ───────────────────
@@ -1352,7 +1354,7 @@ function CollectionEntries({
               column takes an equal share of what is left, so the eight headings sit
               on one rhythm instead of chasing their content. */}
           <table
-            className={`w-full min-w-[1020px] table-fixed ${ORDERS_TABLE_FONT_CLASS}`}
+            className={`w-full min-w-[63.75rem] table-fixed ${ORDERS_TABLE_FONT_CLASS}`}
           >
             <CollectionTableHead />
             <tbody
@@ -1390,6 +1392,14 @@ function CollectionEntries({
                   );
                   // Inside the undo window: the row is marked, nothing has changed.
                   const clearing = isPending(shop.id);
+                  // Once a shop's order is ON A VEHICLE (assignment saved or
+                  // submitted) the collected figures are the contract the truck
+                  // was loaded against — the row becomes read-only here even on
+                  // an editable day. Un-assigning happens in Order Assignment.
+                  const rowLocked = Boolean(
+                    assignment && assignment.assignedBoxesTotal > 0,
+                  );
+                  const rowEditable = isEditable && !rowLocked;
 
                   let statusNode: React.ReactNode = (
                     <OrdersStatusBadge
@@ -1492,7 +1502,7 @@ function CollectionEntries({
                           "—"}
                       </td>
                       <td className={opsTableTdClass}>
-                        {isEditable ? (
+                        {rowEditable ? (
                           <input
                             type="number"
                             min={0}
@@ -1512,7 +1522,7 @@ function CollectionEntries({
                         )}
                       </td>
                       <td className={opsTableTdClass}>
-                        {isEditable ? (
+                        {rowEditable ? (
                           <input
                             type="number"
                             min={0}
@@ -1536,7 +1546,7 @@ function CollectionEntries({
                           the vehicle's average bird weight once it is assigned,
                           and the day's own average before that — so a collected
                           row never shows a dash when its birds are known. */}
-                        {isEditable ? (
+                        {rowEditable ? (
                           <input
                             type="number"
                             min={0}
@@ -1572,7 +1582,7 @@ function CollectionEntries({
                         </div>
                       </td>
                       <td className={opsTableTdClass}>
-                        {isEditable ? (
+                        {rowEditable ? (
                           <button
                             type="button"
                             onClick={() =>
@@ -1617,6 +1627,14 @@ function CollectionEntries({
                               </span>
                             ) : null}
                           </button>
+                        ) : rowLocked && isEditable ? (
+                          <span
+                            title={to("orders.row_locked_assigned")}
+                            aria-label={to("orders.row_locked_assigned")}
+                            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200/80 bg-slate-50 text-slate-400"
+                          >
+                            <Lock size={13} aria-hidden />
+                          </span>
                         ) : (
                           <span className="text-slate-300 text-xs">—</span>
                         )}

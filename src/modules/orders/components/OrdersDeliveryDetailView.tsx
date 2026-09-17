@@ -76,7 +76,10 @@ type Props = {
    * Record one shop's delivery (Step 4) — partial allowed. Resolves after the
    * page refetched, so the report re-derives from persisted data.
    */
-  onRecordDelivery: (shop: ShopDeliveryBreakdown, boxes: number) => Promise<void>;
+  onRecordDelivery: (
+    shop: ShopDeliveryBreakdown,
+    boxes: number,
+  ) => Promise<void>;
   /** Save Progress from the check popup — error message, or null. */
   onSaveProgress: () => Promise<string | null>;
   /** Submit the delivery trip from the check popup — error message, or null. */
@@ -94,9 +97,12 @@ type ReportStatusFilter =
 /** One difference cell: 0 → muted, short → rose, over → emerald. */
 function DiffCell({ value, show }: { value: number; show: boolean }) {
   if (!show) return <span className="text-slate-300">—</span>;
-  if (value === 0) return <span className="font-semibold text-slate-400">0</span>;
+  if (value === 0)
+    return <span className="font-semibold text-slate-400">0</span>;
   return (
-    <span className={`font-bold ${value < 0 ? "text-rose-600" : "text-emerald-600"}`}>
+    <span
+      className={`font-bold ${value < 0 ? "text-rose-600" : "text-emerald-600"}`}
+    >
       {value < 0 ? "−" : "+"}
       {Math.abs(value)}
     </span>
@@ -107,9 +113,12 @@ function DiffCell({ value, show }: { value: number; show: boolean }) {
 function WeightDiffCell({ value, show }: { value: number; show: boolean }) {
   if (!show) return <span className="text-slate-300">—</span>;
   const rounded = Number(value.toFixed(2));
-  if (rounded === 0) return <span className="font-semibold text-slate-400">0.00</span>;
+  if (rounded === 0)
+    return <span className="font-semibold text-slate-400">0.00</span>;
   return (
-    <span className={`font-bold ${rounded < 0 ? "text-rose-600" : "text-emerald-600"}`}>
+    <span
+      className={`font-bold ${rounded < 0 ? "text-rose-600" : "text-emerald-600"}`}
+    >
       {rounded < 0 ? "−" : "+"}
       {Math.abs(rounded).toFixed(2)}
     </span>
@@ -117,7 +126,13 @@ function WeightDiffCell({ value, show }: { value: number; show: boolean }) {
 }
 
 /** Delivery Status cell for the report. */
-function DeliveryStatusCell({ row, to }: { row: ShopDeliveryBreakdown; to: OrdersT }) {
+function DeliveryStatusCell({
+  row,
+  to,
+}: {
+  row: ShopDeliveryBreakdown;
+  to: OrdersT;
+}) {
   const label = to(shopDeliveryStatusI18nKey(row.status));
   switch (row.status) {
     case "delivered":
@@ -198,7 +213,11 @@ function ShopDeliveryCapture({
         aria-label={`${to("orders.deliver")} — ${row.shopName}`}
         className="inline-flex items-center gap-1 rounded-lg border border-emerald-600/40 bg-emerald-500 px-2.5 py-1.5 text-[11px] font-bold text-white transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-40"
       >
-        {busy ? <Loader2 size={13} className="animate-spin" /> : <Truck size={13} />}
+        {busy ? (
+          <Loader2 size={13} className="animate-spin" />
+        ) : (
+          <Truck size={13} />
+        )}
         {to("orders.deliver")}
       </button>
       <span className="text-[10px] font-semibold text-slate-400 whitespace-nowrap">
@@ -240,9 +259,9 @@ function OrdersDeliveryDetailView({
         (shopId, shopName) => villageOf(shopId, shopName, shopDirectory),
         orderTrip.originalQuantities,
         (shopId) => shopMobileOf(shopId, shopDirectory),
-        (shopId) => shopNumberOf(shopId, shopDirectory)
+        (shopId) => shopNumberOf(shopId, shopDirectory),
       ),
-    [trip, originalShopIds, shopDirectory, orderTrip.originalQuantities]
+    [trip, originalShopIds, shopDirectory, orderTrip.originalQuantities],
   );
 
   const statusOptions = useMemo(
@@ -250,11 +269,14 @@ function OrdersDeliveryDetailView({
       { value: "all", label: to("orders.all") },
       { value: "delivered", label: to("orders.status_delivered") },
       { value: "part_delivered", label: to("orders.status_part_delivered") },
-      { value: "delivered_with_diff", label: to("orders.status_delivered_diff") },
+      {
+        value: "delivered_with_diff",
+        label: to("orders.status_delivered_diff"),
+      },
       { value: "not_delivered", label: to("orders.status_pending") },
       { value: "not_listed", label: to("orders.status_not_listed") },
     ],
-    [to]
+    [to],
   );
 
   /** One shop's (partial) delivery — the balance is the hard maximum. */
@@ -291,9 +313,9 @@ function OrdersDeliveryDetailView({
           notDelivered: to("orders.status_pending"),
         },
         trip.tripNo,
-        trip.vehicleNo ?? ""
+        trip.vehicleNo ?? "",
       ),
-    [breakdown, query, to, trip.tripNo, trip.vehicleNo]
+    [breakdown, query, to, trip.tripNo, trip.vehicleNo],
   );
 
   // ── Split: shops LISTED in the original order (main paginated table) vs
@@ -306,13 +328,13 @@ function OrdersDeliveryDetailView({
       searched.filter(
         (row) =>
           row.status !== "not_listed" &&
-          (statusFilter === "all" || row.status === statusFilter)
+          (statusFilter === "all" || row.status === statusFilter),
       ),
-    [searched, statusFilter]
+    [searched, statusFilter],
   );
   const unlistedRows = useMemo(
     () => searched.filter((row) => row.status === "not_listed"),
-    [searched]
+    [searched],
   );
 
   // ── Pagination (existing global component; 10 rows per page; resets to
@@ -321,7 +343,7 @@ function OrdersDeliveryDetailView({
   const [pageSize, setPageSize] = useState(PAGE_SIZE);
   const totalPages = Math.max(1, Math.ceil(listedRows.length / pageSize));
   const [lastKey, setLastKey] = useState(
-    `${query}|${statusFilter}|${listedRows.length}`
+    `${query}|${statusFilter}|${listedRows.length}`,
   );
   if (lastKey !== `${query}|${statusFilter}|${listedRows.length}`) {
     setLastKey(`${query}|${statusFilter}|${listedRows.length}`);
@@ -330,7 +352,7 @@ function OrdersDeliveryDetailView({
   const safePage = Math.min(page, totalPages);
   const pageRows = listedRows.slice(
     (safePage - 1) * pageSize,
-    safePage * pageSize
+    safePage * pageSize,
   );
   const startIndex = listedRows.length === 0 ? 0 : (safePage - 1) * pageSize;
 
@@ -362,8 +384,12 @@ function OrdersDeliveryDetailView({
     return t;
   }, [listedRows, unlistedRows]);
 
-  const notListedCount = breakdown.filter((b) => b.status === "not_listed").length;
-  const notDeliveredCount = breakdown.filter((b) => b.status === "not_delivered").length;
+  const notListedCount = breakdown.filter(
+    (b) => b.status === "not_listed",
+  ).length;
+  const notDeliveredCount = breakdown.filter(
+    (b) => b.status === "not_delivered",
+  ).length;
   const report = buildDeliveryReportSummary(progress, breakdown);
   const shopPage = pageRange(listedRows.length, safePage, pageSize);
 
@@ -385,9 +411,17 @@ function OrdersDeliveryDetailView({
   ];
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto" role="dialog" aria-modal="true">
+    <div
+      className="fixed inset-0 z-50 overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+    >
       {/* Backdrop (click to close) */}
-      <div className="fixed inset-0 bg-black/40" onClick={onClose} aria-hidden />
+      <div
+        className="fixed inset-0 bg-black/40"
+        onClick={onClose}
+        aria-hidden
+      />
 
       <div className="relative min-h-full flex items-start justify-center p-3 md:p-8">
         <div className="relative bg-slate-100 w-full max-w-6xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
@@ -398,7 +432,9 @@ function OrdersDeliveryDetailView({
               <h2 className="text-lg font-bold text-slate-900 leading-tight">
                 {to("orders.pdf_report_title")}
               </h2>
-              <span className="text-sm font-semibold text-emerald-700">{trip.tripNo}</span>
+              <span className="text-sm font-semibold text-emerald-700">
+                {trip.tripNo}
+              </span>
               <OrdersStatusBadge status={status} label={statusLabel} />
               {notListedCount > 0 && (
                 <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">
@@ -409,7 +445,11 @@ function OrdersDeliveryDetailView({
             <div className="flex items-center gap-2">
               {/* Check the report in a popup first — it holds the download
                   and the send, so what you verify is what goes out. */}
-              <OrdersIconButton label={to("orders.pdf_check_title")} onClick={() => setPdfOpen(true)} busy={pdfBusy}>
+              <OrdersIconButton
+                label={to("orders.pdf_check_title")}
+                onClick={() => setPdfOpen(true)}
+                busy={pdfBusy}
+              >
                 <FileText size={15} />
               </OrdersIconButton>
               <button
@@ -441,8 +481,13 @@ function OrdersDeliveryDetailView({
                 <dl className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-x-6 gap-y-3">
                   {details.map(([label, value]) => (
                     <div key={label} className="min-w-0">
-                      <dt className="text-[11px] font-semibold text-slate-400">{label}</dt>
-                      <dd className="text-sm font-semibold text-slate-800 truncate" title={value}>
+                      <dt className="text-[11px] font-semibold text-slate-400">
+                        {label}
+                      </dt>
+                      <dd
+                        className="text-sm font-semibold text-slate-800 truncate"
+                        title={value}
+                      >
                         {value}
                       </dd>
                     </div>
@@ -468,19 +513,47 @@ function OrdersDeliveryDetailView({
                           y: report.totalShops,
                         }),
                       ],
-                      [to("orders.collected_boxes"), formatCount(report.collectedBoxes)],
-                      [to("orders.col_assigned_boxes"), formatCount(report.assignedBoxes)],
-                      [to("orders.delivered_boxes"), formatCount(report.deliveredBoxes)],
-                      [to("orders.pending_boxes"), formatCount(report.pendingBoxes)],
-                      [to("orders.delivered_birds"), formatCount(report.deliveredBirds)],
-                      [to("orders.delivered_weight"), report.deliveredWeight.toFixed(2)],
-                      [to("orders.col_pending"), formatCount(report.pendingShops)],
-                      [to("orders.status_part_delivered"), formatCount(report.partDeliveredShops)],
+                      [
+                        to("orders.collected_boxes"),
+                        formatCount(report.collectedBoxes),
+                      ],
+                      [
+                        to("orders.col_assigned_boxes"),
+                        formatCount(report.assignedBoxes),
+                      ],
+                      [
+                        to("orders.delivered_boxes"),
+                        formatCount(report.deliveredBoxes),
+                      ],
+                      [
+                        to("orders.pending_boxes"),
+                        formatCount(report.pendingBoxes),
+                      ],
+                      [
+                        to("orders.delivered_birds"),
+                        formatCount(report.deliveredBirds),
+                      ],
+                      [
+                        to("orders.delivered_weight"),
+                        report.deliveredWeight.toFixed(2),
+                      ],
+                      [
+                        to("orders.col_pending"),
+                        formatCount(report.pendingShops),
+                      ],
+                      [
+                        to("orders.status_part_delivered"),
+                        formatCount(report.partDeliveredShops),
+                      ],
                     ] as Array<[string, string]>
                   ).map(([label, value]) => (
                     <div key={label} className="min-w-0">
-                      <dt className="text-[11px] font-semibold text-slate-400">{label}</dt>
-                      <dd className="text-sm font-semibold text-slate-800">{value}</dd>
+                      <dt className="text-[11px] font-semibold text-slate-400">
+                        {label}
+                      </dt>
+                      <dd className="text-sm font-semibold text-slate-800">
+                        {value}
+                      </dd>
                     </div>
                   ))}
                 </dl>
@@ -517,24 +590,50 @@ function OrdersDeliveryDetailView({
                 </div>
               </div>
               <div className={`${opsTableCardClass} overflow-x-auto`}>
-                <table className="w-full min-w-[1280px] text-xs md:text-sm">
+                <table className="w-full min-w-[80rem] text-xs md:text-sm">
                   <thead>
                     <tr className={opsTableHeadRowClass}>
-                      <th className={`${opsTableThClass} w-14`}>{to("orders.col_sno")}</th>
-                      <th className={`${opsTableThClass} w-24`}>{to("orders.col_shop_no")}</th>
-                      <th className={opsTableThClass}>{to("orders.col_shop_name")}</th>
-                      <th className={opsTableThClass}>{to("orders.col_village")}</th>
-                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.collected_boxes")}</th>
-                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.col_assigned_boxes")}</th>
-                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.delivered_boxes")}</th>
-                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.pending_boxes")}</th>
-                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.delivered_birds")}</th>
-                      <th className={`${opsTableThClass} w-28 text-right`}>{to("orders.delivered_weight")}</th>
-                      <th className={`${opsTableThClass} w-40`}>{to("orders.delivery_time")}</th>
-                      <th className={`${opsTableThClass} w-36`}>{to("orders.col_delivery_status")}</th>
+                      <th className={`${opsTableThClass} w-14`}>
+                        {to("orders.col_sno")}
+                      </th>
+                      <th className={`${opsTableThClass} w-24`}>
+                        {to("orders.col_shop_no")}
+                      </th>
+                      <th className={opsTableThClass}>
+                        {to("orders.col_shop_name")}
+                      </th>
+                      <th className={opsTableThClass}>
+                        {to("orders.col_village")}
+                      </th>
+                      <th className={`${opsTableThClass} w-24 text-right`}>
+                        {to("orders.collected_boxes")}
+                      </th>
+                      <th className={`${opsTableThClass} w-24 text-right`}>
+                        {to("orders.col_assigned_boxes")}
+                      </th>
+                      <th className={`${opsTableThClass} w-24 text-right`}>
+                        {to("orders.delivered_boxes")}
+                      </th>
+                      <th className={`${opsTableThClass} w-24 text-right`}>
+                        {to("orders.pending_boxes")}
+                      </th>
+                      <th className={`${opsTableThClass} w-24 text-right`}>
+                        {to("orders.delivered_birds")}
+                      </th>
+                      <th className={`${opsTableThClass} w-28 text-right`}>
+                        {to("orders.delivered_weight")}
+                      </th>
+                      <th className={`${opsTableThClass} w-40`}>
+                        {to("orders.delivery_time")}
+                      </th>
+                      <th className={`${opsTableThClass} w-36`}>
+                        {to("orders.col_delivery_status")}
+                      </th>
                       {/* Shop-level capture: the order is on this row, the
                           delivery is entered here (partial allowed). */}
-                      <th className={`${opsTableThClass} w-64`}>{to("orders.record_delivery")}</th>
+                      <th className={`${opsTableThClass} w-64`}>
+                        {to("orders.record_delivery")}
+                      </th>
                     </tr>
                   </thead>
                   <tbody className={opsTableDivideClass}>
@@ -552,7 +651,10 @@ function OrdersDeliveryDetailView({
                     {pageRows.map((row, index) => {
                       const remaining = shopRemainingBoxes(row);
                       return (
-                        <tr key={row.shopId} className="align-middle transition-colors">
+                        <tr
+                          key={row.shopId}
+                          className="align-middle transition-colors"
+                        >
                           <td className={opsTableTdClass}>
                             <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg text-[12px] font-bold bg-emerald-50 text-emerald-700">
                               {row.serialNo || startIndex + index + 1}
@@ -561,18 +663,34 @@ function OrdersDeliveryDetailView({
                           <td className={`${opsTableTdClass} text-slate-600`}>
                             {row.shopNumber || "—"}
                           </td>
-                          <td className={`${opsTableTdClass} font-semibold text-slate-800`}>
+                          <td
+                            className={`${opsTableTdClass} font-semibold text-slate-800`}
+                          >
                             {row.shopName || "—"}
                           </td>
-                          <td className={opsTableTdClass}>{row.village || "—"}</td>
-                          <td className={`${opsTableTdClass} text-right font-bold text-emerald-800`}>
-                            {row.collectedBoxes > 0 ? formatCount(row.collectedBoxes) : "—"}
+                          <td className={opsTableTdClass}>
+                            {row.village || "—"}
                           </td>
-                          <td className={`${opsTableTdClass} text-right font-semibold text-slate-800`}>
-                            {row.assignedBoxes > 0 ? formatCount(row.assignedBoxes) : "—"}
+                          <td
+                            className={`${opsTableTdClass} text-right font-bold text-emerald-800`}
+                          >
+                            {row.collectedBoxes > 0
+                              ? formatCount(row.collectedBoxes)
+                              : "—"}
                           </td>
-                          <td className={`${opsTableTdClass} text-right font-semibold`}>
-                            {row.deliveredBoxes > 0 ? formatCount(row.deliveredBoxes) : "—"}
+                          <td
+                            className={`${opsTableTdClass} text-right font-semibold text-slate-800`}
+                          >
+                            {row.assignedBoxes > 0
+                              ? formatCount(row.assignedBoxes)
+                              : "—"}
+                          </td>
+                          <td
+                            className={`${opsTableTdClass} text-right font-semibold`}
+                          >
+                            {row.deliveredBoxes > 0
+                              ? formatCount(row.deliveredBoxes)
+                              : "—"}
                           </td>
                           <td className={`${opsTableTdClass} text-right`}>
                             {row.pendingBoxes > 0 ? (
@@ -583,13 +701,23 @@ function OrdersDeliveryDetailView({
                               <span className="text-slate-300">0</span>
                             )}
                           </td>
-                          <td className={`${opsTableTdClass} text-right font-semibold`}>
-                            {row.deliveredBirds > 0 ? formatCount(row.deliveredBirds) : "—"}
+                          <td
+                            className={`${opsTableTdClass} text-right font-semibold`}
+                          >
+                            {row.deliveredBirds > 0
+                              ? formatCount(row.deliveredBirds)
+                              : "—"}
                           </td>
-                          <td className={`${opsTableTdClass} text-right font-semibold`}>
-                            {row.deliveredWeight > 0 ? row.deliveredWeight.toFixed(2) : "—"}
+                          <td
+                            className={`${opsTableTdClass} text-right font-semibold`}
+                          >
+                            {row.deliveredWeight > 0
+                              ? row.deliveredWeight.toFixed(2)
+                              : "—"}
                           </td>
-                          <td className={`${opsTableTdClass} text-slate-500 whitespace-nowrap`}>
+                          <td
+                            className={`${opsTableTdClass} text-slate-500 whitespace-nowrap`}
+                          >
                             {formatDeliveredAtLabel(row.deliveredAt)}
                           </td>
                           <td className={opsTableTdClass}>
@@ -603,7 +731,10 @@ function OrdersDeliveryDetailView({
                                 busy={busyShopId === row.shopId}
                                 value={qty[row.shopId] ?? ""}
                                 onValue={(v) =>
-                                  setQty((prev) => ({ ...prev, [row.shopId]: v }))
+                                  setQty((prev) => ({
+                                    ...prev,
+                                    [row.shopId]: v,
+                                  }))
                                 }
                                 onSubmit={() => void handleDeliver(row)}
                                 to={to}
@@ -653,57 +784,130 @@ function OrdersDeliveryDetailView({
                     <thead>
                       <tr className={opsTableHeadRowClass}>
                         <th className={opsTableThClass} />
-                        <th className={`${opsTableThClass} text-right`}>{to("orders.total_ordered")}</th>
-                        <th className={`${opsTableThClass} text-right`}>{to("orders.total_delivered")}</th>
-                        <th className={`${opsTableThClass} text-right`}>{to("orders.pending_boxes")}</th>
-                        <th className={`${opsTableThClass} text-right`}>{to("orders.col_difference")}</th>
+                        <th className={`${opsTableThClass} text-right`}>
+                          {to("orders.total_ordered")}
+                        </th>
+                        <th className={`${opsTableThClass} text-right`}>
+                          {to("orders.total_delivered")}
+                        </th>
+                        <th className={`${opsTableThClass} text-right`}>
+                          {to("orders.pending_boxes")}
+                        </th>
+                        <th className={`${opsTableThClass} text-right`}>
+                          {to("orders.col_difference")}
+                        </th>
                       </tr>
                     </thead>
                     <tbody className={opsTableDivideClass}>
                       <tr className="align-middle">
-                        <td className={`${opsTableTdClass} font-semibold text-slate-600`}>{to("orders.word_boxes")}</td>
-                        <td className={`${opsTableTdClass} text-right font-semibold`}>{formatCount(totals.orderedBoxes)}</td>
-                        <td className={`${opsTableTdClass} text-right font-semibold`}>{formatCount(totals.deliveredBoxes)}</td>
-                        <td className={`${opsTableTdClass} text-right font-semibold`}>
+                        <td
+                          className={`${opsTableTdClass} font-semibold text-slate-600`}
+                        >
+                          {to("orders.word_boxes")}
+                        </td>
+                        <td
+                          className={`${opsTableTdClass} text-right font-semibold`}
+                        >
+                          {formatCount(totals.orderedBoxes)}
+                        </td>
+                        <td
+                          className={`${opsTableTdClass} text-right font-semibold`}
+                        >
+                          {formatCount(totals.deliveredBoxes)}
+                        </td>
+                        <td
+                          className={`${opsTableTdClass} text-right font-semibold`}
+                        >
                           {/* PART DELIVERY: 25 ordered, 10 in → 15 box pending */}
                           {totals.orderedBoxes - totals.deliveredBoxes > 0 ? (
-                            <b className="text-amber-600">{formatCount(totals.orderedBoxes - totals.deliveredBoxes)}</b>
+                            <b className="text-amber-600">
+                              {formatCount(
+                                totals.orderedBoxes - totals.deliveredBoxes,
+                              )}
+                            </b>
                           ) : (
                             <span className="text-slate-300">0</span>
                           )}
                         </td>
                         <td className={opsTableTdClass}>
-                          <DiffCell value={totals.deliveredBoxes - totals.orderedBoxes} show />
+                          <DiffCell
+                            value={totals.deliveredBoxes - totals.orderedBoxes}
+                            show
+                          />
                         </td>
                       </tr>
                       <tr className="align-middle">
-                        <td className={`${opsTableTdClass} font-semibold text-slate-600`}>{to("orders.word_birds")}</td>
-                        <td className={`${opsTableTdClass} text-right font-semibold`}>{formatCount(totals.orderedBirds)}</td>
-                        <td className={`${opsTableTdClass} text-right font-semibold`}>{formatCount(totals.deliveredBirds)}</td>
-                        <td className={`${opsTableTdClass} text-right font-semibold`}>
+                        <td
+                          className={`${opsTableTdClass} font-semibold text-slate-600`}
+                        >
+                          {to("orders.word_birds")}
+                        </td>
+                        <td
+                          className={`${opsTableTdClass} text-right font-semibold`}
+                        >
+                          {formatCount(totals.orderedBirds)}
+                        </td>
+                        <td
+                          className={`${opsTableTdClass} text-right font-semibold`}
+                        >
+                          {formatCount(totals.deliveredBirds)}
+                        </td>
+                        <td
+                          className={`${opsTableTdClass} text-right font-semibold`}
+                        >
                           {totals.orderedBirds - totals.deliveredBirds > 0 ? (
-                            <b className="text-amber-600">{formatCount(totals.orderedBirds - totals.deliveredBirds)}</b>
+                            <b className="text-amber-600">
+                              {formatCount(
+                                totals.orderedBirds - totals.deliveredBirds,
+                              )}
+                            </b>
                           ) : (
                             <span className="text-slate-300">0</span>
                           )}
                         </td>
                         <td className={opsTableTdClass}>
-                          <DiffCell value={totals.deliveredBirds - totals.orderedBirds} show />
+                          <DiffCell
+                            value={totals.deliveredBirds - totals.orderedBirds}
+                            show
+                          />
                         </td>
                       </tr>
                       <tr className="align-middle">
-                        <td className={`${opsTableTdClass} font-semibold text-slate-600`}>{to("orders.weight_kg")}</td>
-                        <td className={`${opsTableTdClass} text-right font-semibold`}>{totals.orderedWeight.toFixed(2)}</td>
-                        <td className={`${opsTableTdClass} text-right font-semibold`}>{totals.deliveredWeight.toFixed(2)}</td>
-                        <td className={`${opsTableTdClass} text-right font-semibold`}>
+                        <td
+                          className={`${opsTableTdClass} font-semibold text-slate-600`}
+                        >
+                          {to("orders.weight_kg")}
+                        </td>
+                        <td
+                          className={`${opsTableTdClass} text-right font-semibold`}
+                        >
+                          {totals.orderedWeight.toFixed(2)}
+                        </td>
+                        <td
+                          className={`${opsTableTdClass} text-right font-semibold`}
+                        >
+                          {totals.deliveredWeight.toFixed(2)}
+                        </td>
+                        <td
+                          className={`${opsTableTdClass} text-right font-semibold`}
+                        >
                           {totals.orderedWeight - totals.deliveredWeight > 0 ? (
-                            <b className="text-amber-600">{(totals.orderedWeight - totals.deliveredWeight).toFixed(2)}</b>
+                            <b className="text-amber-600">
+                              {(
+                                totals.orderedWeight - totals.deliveredWeight
+                              ).toFixed(2)}
+                            </b>
                           ) : (
                             <span className="text-slate-300">0</span>
                           )}
                         </td>
                         <td className={opsTableTdClass}>
-                          <WeightDiffCell value={totals.deliveredWeight - totals.orderedWeight} show />
+                          <WeightDiffCell
+                            value={
+                              totals.deliveredWeight - totals.orderedWeight
+                            }
+                            show
+                          />
                         </td>
                       </tr>
                     </tbody>
@@ -730,25 +934,46 @@ function OrdersDeliveryDetailView({
                   <table className="w-full text-xs md:text-sm">
                     <thead>
                       <tr className={opsTableHeadRowClass}>
-                        <th className={`${opsTableThClass} w-14`}>{to("orders.col_sno")}</th>
-                        <th className={opsTableThClass}>{to("orders.col_shop_name")}</th>
-                        <th className={opsTableThClass}>{to("orders.col_village")}</th>
-                        <th className={`${opsTableThClass} w-32`}>{to("orders.shop_mobile")}</th>
-                        <th className={`${opsTableThClass} w-32 text-right`}>{to("orders.delivered_birds")}</th>
-                        <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.col_boxes")}</th>
-                        <th className={`${opsTableThClass} w-28 text-right`}>{to("orders.delivered_weight")}</th>
-                        <th className={`${opsTableThClass} w-44`}>{to("orders.col_delivered_at")}</th>
+                        <th className={`${opsTableThClass} w-14`}>
+                          {to("orders.col_sno")}
+                        </th>
+                        <th className={opsTableThClass}>
+                          {to("orders.col_shop_name")}
+                        </th>
+                        <th className={opsTableThClass}>
+                          {to("orders.col_village")}
+                        </th>
+                        <th className={`${opsTableThClass} w-32`}>
+                          {to("orders.shop_mobile")}
+                        </th>
+                        <th className={`${opsTableThClass} w-32 text-right`}>
+                          {to("orders.delivered_birds")}
+                        </th>
+                        <th className={`${opsTableThClass} w-24 text-right`}>
+                          {to("orders.col_boxes")}
+                        </th>
+                        <th className={`${opsTableThClass} w-28 text-right`}>
+                          {to("orders.delivered_weight")}
+                        </th>
+                        <th className={`${opsTableThClass} w-44`}>
+                          {to("orders.col_delivered_at")}
+                        </th>
                       </tr>
                     </thead>
                     <tbody className={opsTableDivideClass}>
                       {unlistedRows.map((row, uIndex) => (
-                        <tr key={row.shopId} className="align-middle bg-amber-50/40">
+                        <tr
+                          key={row.shopId}
+                          className="align-middle bg-amber-50/40"
+                        >
                           <td className={opsTableTdClass}>
                             <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100 text-[12px] font-bold text-amber-700">
                               {uIndex + 1}
                             </span>
                           </td>
-                          <td className={`${opsTableTdClass} font-semibold text-slate-800`}>
+                          <td
+                            className={`${opsTableTdClass} font-semibold text-slate-800`}
+                          >
                             <span className="inline-flex items-center gap-2 flex-wrap">
                               {row.shopName || "—"}
                               <span className="inline-flex items-center rounded-full bg-amber-100 border border-amber-300 px-2 py-0.5 text-[10px] font-bold text-amber-700 whitespace-nowrap">
@@ -756,18 +981,34 @@ function OrdersDeliveryDetailView({
                               </span>
                             </span>
                           </td>
-                          <td className={opsTableTdClass}>{row.village || "—"}</td>
-                          <td className={`${opsTableTdClass} text-slate-600 whitespace-nowrap`}>
+                          <td className={opsTableTdClass}>
+                            {row.village || "—"}
+                          </td>
+                          <td
+                            className={`${opsTableTdClass} text-slate-600 whitespace-nowrap`}
+                          >
                             {row.mobile || "—"}
                           </td>
-                          <td className={`${opsTableTdClass} text-right font-semibold`}>
-                            {row.deliveredBirds > 0 ? formatCount(row.deliveredBirds) : "—"}
+                          <td
+                            className={`${opsTableTdClass} text-right font-semibold`}
+                          >
+                            {row.deliveredBirds > 0
+                              ? formatCount(row.deliveredBirds)
+                              : "—"}
                           </td>
-                          <td className={`${opsTableTdClass} text-right font-bold text-emerald-800`}>
-                            {row.deliveredBoxes > 0 ? formatCount(row.deliveredBoxes) : "—"}
+                          <td
+                            className={`${opsTableTdClass} text-right font-bold text-emerald-800`}
+                          >
+                            {row.deliveredBoxes > 0
+                              ? formatCount(row.deliveredBoxes)
+                              : "—"}
                           </td>
-                          <td className={`${opsTableTdClass} text-right font-semibold`}>
-                            {row.deliveredWeight > 0 ? row.deliveredWeight.toFixed(2) : "—"}
+                          <td
+                            className={`${opsTableTdClass} text-right font-semibold`}
+                          >
+                            {row.deliveredWeight > 0
+                              ? row.deliveredWeight.toFixed(2)
+                              : "—"}
                           </td>
                           <td className={`${opsTableTdClass} text-slate-500`}>
                             {formatDeliveredAtLabel(row.deliveredAt)}

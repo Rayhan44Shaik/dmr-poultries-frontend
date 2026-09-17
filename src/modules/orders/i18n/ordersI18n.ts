@@ -251,6 +251,7 @@ const EN: Record<string, string> = {
   "orders.day_prev": "Previous Day",
   "orders.day_next": "Next Day",
   "orders.locked": "LOCKED",
+  "orders.row_locked_assigned": "Assigned to a vehicle — edit from Order Assignment",
   "orders.closed_day": "CLOSED",
   "orders.read_only_note": "This operational day is closed — view only.",
   "orders.auto_closed_note":
@@ -700,6 +701,7 @@ const TE: Record<string, string> = {
   "orders.day_prev": "మునుపటి రోజు",
   "orders.day_next": "తర్వాత రోజు",
   "orders.locked": "లాక్",
+  "orders.row_locked_assigned": "వాహనానికి కేటాయించారు — ఆర్డర్ అసైన్‌మెంట్ నుండి మార్చండి",
   "orders.closed_day": "మూసి వేయబడింది",
   "orders.read_only_note": "ఈ పని రోజు మూసి వేయబడింది — చూడటం మాత్రమే.",
   "orders.auto_closed_note":
