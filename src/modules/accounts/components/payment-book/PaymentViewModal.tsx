@@ -27,7 +27,7 @@ interface PaymentViewModalProps {
   onEdit?: () => void;
   /** False keeps the edit affordances visible but disabled, with `editHint`. */
   canEdit?: boolean;
-  /** Why editing is unavailable — surfaced as the disabled control's tooltip. */
+  /** Why editing is unavailable — shown as text beside the disabled control. */
   editHint?: string;
 }
 
@@ -91,7 +91,7 @@ export function PaymentViewModal({ isOpen, payment, onClose, onEdit, canEdit = f
         {showEdit && !canEdit && <p className="mr-auto text-[11px] leading-4 text-slate-500">{editHint}</p>}
         <Button variant="secondary" onClick={onClose}>Close</Button>
         {showEdit && (
-          <Button icon={<Pencil size={14} />} disabled={!canEdit} title={canEdit ? 'Edit this payment' : editHint} onClick={onEdit}>Edit payment</Button>
+          <Button icon={<Pencil size={14} />} disabled={!canEdit} onClick={onEdit}>Edit payment</Button>
         )}
       </>}>
       <div className="space-y-4">

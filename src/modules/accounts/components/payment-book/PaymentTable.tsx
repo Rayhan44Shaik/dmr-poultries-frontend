@@ -31,7 +31,7 @@ function MobilePaymentCard({ payment, selectedId, onSelect, onView }: Pick<Payme
         </button>
         <div className="flex shrink-0 items-center gap-2">
           <StatusBadge status={payment.status} label={paymentStatusLabel(payment.status)} tone={payment.status === 'Draft' ? 'warning' : undefined} />
-          <Button variant="ghost" size="xs" iconOnly aria-label={`View ${paymentNoDisplay(payment.paymentNo) || payment.paidTo}`} title="View payment" onClick={event => { event.stopPropagation(); onView(payment); }}><Eye size={15} /></Button>
+          <Button variant="ghost" size="xs" iconOnly aria-label={`View ${paymentNoDisplay(payment.paymentNo) || payment.paidTo}`} onClick={event => { event.stopPropagation(); onView(payment); }}><Eye size={15} /></Button>
         </div>
       </div>
       <dl className="mt-3 grid grid-cols-2 gap-x-4 gap-y-2 border-t border-slate-100 pt-2 text-xs">
@@ -71,7 +71,7 @@ export function PaymentTable({ payments, loading, error, selectedId, onSelect, e
                 <td className={`${uiTableTdClass} text-slate-700`}>{payment.paymentMode || '—'}</td>
                 <td className={`${uiTableTdClass} whitespace-nowrap text-slate-500`}>{payment.referenceNo || '—'}</td>
                 <td className={uiTableTdClass}><StatusBadge status={payment.status} label={paymentStatusLabel(payment.status)} tone={payment.status === 'Draft' ? 'warning' : undefined} /></td>
-                <td className={uiTableTdClass}><div className="flex justify-end gap-1"><Button variant="ghost" size="xs" iconOnly aria-label={`View ${paymentNoDisplay(payment.paymentNo) || payment.paidTo}`} title="View payment" onClick={event => { event.stopPropagation(); onView(payment); }}><Eye size={15} /></Button></div></td>
+                <td className={uiTableTdClass}><div className="flex justify-end gap-1"><Button variant="ghost" size="xs" iconOnly aria-label={`View ${paymentNoDisplay(payment.paymentNo) || payment.paidTo}`} onClick={event => { event.stopPropagation(); onView(payment); }}><Eye size={15} /></Button></div></td>
               </tr>
             ))}
           </tbody>

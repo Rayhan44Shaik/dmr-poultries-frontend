@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo, useRef, useCallback, useId } from 'react';
-import { Plus, RefreshCw, RotateCcw, Search, Pencil, CheckCircle2, Trash2 } from 'lucide-react';
+import { Plus, RotateCcw, Search, Pencil, CheckCircle2, Trash2, Calendar, Wallet, CreditCard } from 'lucide-react';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
 import { PaymentTable } from '../components/payment-book/PaymentTable';
 import { PaymentViewModal } from '../components/payment-book/PaymentViewModal';
@@ -14,24 +14,33 @@ import { usePendingDelete } from '../../../hooks/usePendingDelete';
 import { ConfirmDialog } from '../../../ui/ConfirmDialog';
 import { Modal } from '../../../ui/Modal';
 import { pendingDeleteCountdownLabel } from '../../../shared/ui/pendingDelete';
+import { shouldShowPagination } from '../../../shared/ui/paginationStyles';
 import MasterDropdown from '../../masters/components/MasterDropdown';
 import '../../masters/styles/masters.css';
 import { Button } from '../../../ui/Button';
-import { SearchInput } from '../../../ui/SearchInput';
-import { uiActionToneClass, uiBadgeClass } from '../../../shared/ui/uiTokens';
+import { uiBadgeClass } from '../../../shared/ui/uiTokens';
+import {
+  opsFilterCardClass,
+  opsFilterLabelClass,
+  opsInputClass,
+  opsPrimaryButtonClass,
+  opsSecondaryButtonClass,
+} from '../../../shared/ui/operationsStyles';
+import { useI18n } from '../../../i18n';
 import { applyDemoWrite, createDemoPayments, resetDemoPayments } from '../utils/paymentRegisterDemo';
 import { EmptyState } from '../../../ui/EmptyState';
-import { Pagination } from '../../../ui/Pagination';
+import { BrandRefreshButton, Pagination } from '../../../ui';
 import { filterPayments, PAYMENT_TYPES, PAYMENT_MODES, paymentCurrency, paymentNoDisplay } from '../utils/paymentRegister';
 
 type PaymentView = 'pending' | 'approved' | 'deleted';
-const PAYMENT_VIEWS: { value: PaymentView; label: string; selectedClass: string; hint?: string }[] = [
-  { value: 'pending', label: 'Pending', selectedClass: 'bg-orange-100 text-orange-700 shadow-sm', hint: 'Payments awaiting approval.' },
+const PAYMENT_VIEWS: { value: PaymentView; label: string; selectedClass: string }[] = [
+  { value: 'pending', label: 'Pending', selectedClass: 'bg-orange-100 text-orange-700 shadow-sm' },
   { value: 'approved', label: 'Approved', selectedClass: 'bg-emerald-100 text-emerald-700 shadow-sm' },
   { value: 'deleted', label: 'Deleted', selectedClass: 'bg-rose-100 text-rose-700 shadow-sm' },
 ];
 
 export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
+  const { t } = useI18n();
   const { showNotification } = useSafeNotification();
   // Show the isolated examples immediately in the development preview.
   // Production continues to open with real API data; demo remains opt-in there.
@@ -62,6 +71,11 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   const [appliedFilters, setAppliedFilters] = useState(filters);
   const [status, setStatus] = useState<PaymentView>('pending');
   const dateId = useId();
+  // Filter control ids — the visible icon labels name these through htmlFor,
+  // exactly like the Trip List's filter card.
+  const typeFilterId = useId();
+  const modeFilterId = useId();
+  const searchId = useId();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const [isNewModalOpen, setIsNewModalOpen] = useState(false);
@@ -243,7 +257,6 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   const canEditSelected = Boolean(selectedPayment && !selectedBusy && inEditWindow(selectedPayment));
   const canDeleteSelected = Boolean(selectedPayment && !selectedBusy && (isSample(selectedPayment) || canDeleteItem(selectedPayment.createdAt)));
   const canApproveSelected = Boolean(canEditSelected && selectedPayment?.status === 'Draft');
-  const sampleHint = 'Sample row · changes stay in this preview and are never sent to the server.';
 
   const confirmApproval = async () => {
     const payment = approvalPayment;
@@ -290,90 +303,186 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
   };
 
   return (
-    <div className={`master-page w-full min-w-0 space-y-3 text-slate-700 ${embedded ? '' : 'p-4 sm:p-6'}`}>
-      {/* The application header owns Accounts > Payment Register. */}
+    <div className={`w-full space-y-5 animate-in fade-in duration-200 ${embedded ? '' : 'px-3 md:px-6 py-4 bg-slate-50/50 min-h-screen text-slate-800'}`}>
+      {/* Sample-data preview toggle — this register's own demo affordance.
+          The application header owns the Accounts > Payment Register title. */}
       <div className="flex flex-wrap items-center justify-end gap-2">
         {demo && <span className={uiBadgeClass('warning')}>Sample data</span>}
         <Button variant="secondary" aria-pressed={demo} disabled={!!pendingItems.length || approving} onClick={toggleDemo}>{demo ? 'Back to real payments' : 'Preview sample data'}</Button>
-        {demo && <Button variant="ghost" size="sm" icon={<RotateCcw size={14} />} title="Rebuild the sample rows, discarding preview edits" onClick={resetDemo}>Reset sample rows</Button>}
+        {demo && <Button variant="ghost" size="sm" icon={<RotateCcw size={14} />} onClick={resetDemo}>Reset sample rows</Button>}
       </div>
-      <section aria-label="Payment filters" className="rounded-xl border border-slate-200 bg-white p-3">
-        {/* Row one keeps dates and dropdown filters together. Row two keeps
-            search and every register action together for quick scanning. */}
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="flex w-full items-center gap-3 sm:w-[460px] sm:shrink-0">
-            <div className="min-w-0 flex-1">
-              <label htmlFor={`${dateId}-from`} className="sr-only">From Date</label>
-              <DatePicker className="[&_input]:h-12 [&_input]:rounded-xl [&_input]:pr-10 [&_input]:text-base" id={`${dateId}-from`} placeholder="From date" openOnFocus={false} value={filters.from} onChange={v => changeFilter('from', v)} hideClear />
-            </div>
-            <span aria-hidden="true" className="text-slate-400">–</span>
-            <div className="min-w-0 flex-1">
-              <label htmlFor={`${dateId}-to`} className="sr-only">To Date</label>
-              <DatePicker className="[&_input]:h-12 [&_input]:rounded-xl [&_input]:pr-10 [&_input]:text-base" id={`${dateId}-to`} placeholder="To date" openOnFocus={false} value={filters.to} onChange={v => changeFilter('to', v)} hideClear />
+
+      {/* The same filter card the Trip List uses (opsFilterCardClass): one
+          labelled grid — icon + name per field — with the search row and every
+          register action beneath it. Glyph motions come from the global
+          tokens: search sways, reset spins, refresh is the brand hen. */}
+      <section aria-label="Payment filters" className={opsFilterCardClass}>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
+          <div>
+            <label htmlFor={`${dateId}-from`} className={opsFilterLabelClass}>
+              <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
+              <span>{t('common.from')}</span>
+            </label>
+            <DatePicker
+              id={`${dateId}-from`}
+              value={filters.from}
+              onChange={v => changeFilter('from', v)}
+              placeholder={t('accounts.payment.from')}
+              className="w-full text-xs font-medium"
+              openOnFocus={false}
+              hideClear
+            />
+          </div>
+          <div>
+            <label htmlFor={`${dateId}-to`} className={opsFilterLabelClass}>
+              <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
+              <span>{t('common.to')}</span>
+            </label>
+            <DatePicker
+              id={`${dateId}-to`}
+              value={filters.to}
+              onChange={v => changeFilter('to', v)}
+              placeholder={t('accounts.payment.to')}
+              className="w-full text-xs font-medium"
+              openOnFocus={false}
+              hideClear
+            />
+          </div>
+          <div>
+            <label htmlFor={typeFilterId} className={opsFilterLabelClass}>
+              <Wallet size={17} className="text-emerald-500 flex-shrink-0" />
+              <span>{t('accounts.payment.type')}</span>
+            </label>
+            <MasterDropdown
+              hideLabel
+              label={t('accounts.payment.type')}
+              triggerId={typeFilterId}
+              value={filters.type}
+              options={types}
+              onChange={v => changeFilter('type', v)}
+              placeholder={t('accounts.payment.all_types')}
+              searchable
+              allowClear
+              className="w-full"
+            />
+          </div>
+          <div>
+            <label htmlFor={modeFilterId} className={opsFilterLabelClass}>
+              <CreditCard size={17} className="text-sky-500 flex-shrink-0" />
+              <span>{t('accounts.payment.mode')}</span>
+            </label>
+            <MasterDropdown
+              hideLabel
+              label={t('accounts.payment.mode')}
+              triggerId={modeFilterId}
+              value={filters.mode}
+              options={modes}
+              onChange={v => changeFilter('mode', v)}
+              placeholder={t('accounts.payment.all_modes')}
+              searchable
+              allowClear
+              className="w-full"
+            />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-3.5 items-end pt-1">
+          <div className="lg:col-span-5">
+            <label htmlFor={searchId} className={opsFilterLabelClass}>
+              <Search size={17} className="text-slate-400 flex-shrink-0" />
+              <span>{t('common.search')}</span>
+            </label>
+            <div className="relative">
+              <Search size={18} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
+              <input
+                id={searchId}
+                value={filters.search}
+                onChange={event => changeFilter('search', event.target.value)}
+                onKeyDown={event => { if (event.key === 'Enter') applyFilters(); }}
+                placeholder={t('accounts.payment.search_placeholder')}
+                className={`${opsInputClass} pl-10`}
+              />
             </div>
           </div>
-          <MasterDropdown label="Payment Type" hideLabel className="min-w-0 flex-1 sm:flex-none sm:w-56 [&>button]:h-11 [&>button]:text-sm" value={filters.type} options={types} placeholder="All payment types" onChange={v => changeFilter('type', v)} allowClear />
-          <MasterDropdown label="Payment Mode" hideLabel className="min-w-0 flex-1 sm:flex-none sm:w-52 [&>button]:h-11 [&>button]:text-sm" value={filters.mode} options={modes} placeholder="All payment modes" onChange={v => changeFilter('mode', v)} allowClear />
-          <SearchInput value={filters.search} onChange={v => changeFilter('search', v)} onSearch={() => applyFilters()} aria-label="Search payments" placeholder="Payment no, payee, reference…" wrapperClassName="w-full min-w-0 sm:flex-1 sm:min-w-[260px]" />
+          <div className="lg:col-span-7 flex items-center gap-2 justify-end flex-wrap">
+            <button type="button" onClick={() => setIsNewModalOpen(true)} className={`group relative ${opsPrimaryButtonClass}`} aria-label={t('accounts.payment.new')}>
+              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-add)]"><Plus size={15} /></span>
+              {t('accounts.payment.new')}
+            </button>
+            <button type="button" onClick={applyFilters} disabled={invalidRange} className={`group relative ${opsSecondaryButtonClass}`} aria-label={t('common.search')}>
+              <span className={`inline-flex motion-safe:group-hover:animate-[var(--animate-action-search)] ${filterAction === 'search' ? 'motion-safe:animate-[var(--animate-action-search)]' : ''}`}><Search size={15} /></span>
+              {t('common.search')}
+            </button>
+            <button type="button" onClick={clearFilters} className={`group relative ${opsSecondaryButtonClass}`} aria-label={t('common.reset')}>
+              <span className={`inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)] ${filterAction === 'clear' ? 'motion-safe:animate-[var(--animate-action-reset)]' : ''}`}><RotateCcw size={14} /></span>
+              {t('common.reset')}
+            </button>
+            <BrandRefreshButton loading={spinning} onClick={handleRefresh} />
+          </div>
         </div>
-        <div className="mt-2 flex flex-wrap items-center justify-end gap-1.5 border-t border-slate-100 pt-2">
-            <Button variant="custom" size="lg" className="border border-indigo-200 bg-indigo-50 text-indigo-800 shadow-sm hover:bg-indigo-100 hover:border-indigo-300 focus-visible:ring-indigo-400/30" icon={<Plus size={16} className="transition-transform duration-200 hover:scale-125 active:scale-90" />} onClick={() => setIsNewModalOpen(true)}>New Payment</Button>
-            <Button size="lg" icon={<Search size={16} className={`transition-transform duration-300 hover:-translate-y-1 ${filterAction === 'search' ? 'animate-[bounce_0.6s_ease-in-out_1]' : ''}`} />} onClick={applyFilters} disabled={invalidRange}>Search</Button>
-            <Button variant="secondary" size="lg" icon={<RotateCcw size={15} className={`transition-transform duration-500 hover:rotate-180 ${filterAction === 'clear' ? 'animate-[spin_0.6s_ease-in-out_1]' : ''}`} />} aria-label="Clear filters" onClick={clearFilters}>Clear</Button>
-            <Button variant="custom" size="lg" iconOnly aria-label="Refresh" title="Refresh records" className={uiActionToneClass.refresh} disabled={spinning} onClick={handleRefresh}>
-              <RefreshCw size={16} strokeWidth={2} aria-hidden="true" className={`transition-transform duration-500 hover:rotate-180 ${spinning ? 'animate-[spin_0.6s_ease-in-out_1]' : ''}`} />
-            </Button>
-</div>
-        {invalidRange && <p role="alert" className="mt-2 text-xs text-red-600">From Date must be on or before To Date.</p>}
+        {invalidRange && <p role="alert" className="mt-2 text-xs text-red-600">{t('accounts.payment.invalid_range')}</p>}
       </section>
-      <section ref={tableRef} aria-label="Payment records" aria-busy={loading} className="rounded-xl border border-slate-200/80 bg-white shadow-2xs overflow-hidden">
-        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-white px-4 py-3">
-          <div className="flex min-w-0 flex-wrap items-center gap-x-4 gap-y-2">
-            <h2 className="text-sm font-bold tracking-wide text-slate-800">Payment</h2>
+
+      {/* The table card — the exact shell the Trip List uses: white rounded-2xl
+          card, gradient header bar with icon tile + title, table, global
+          pagination at the foot. */}
+      <section ref={tableRef} aria-label="Payment records" aria-busy={loading} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden text-xs md:text-sm">
+        {/* Header — same treatment at top as the Trip List header. */}
+        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-blue-50/60 via-white to-blue-50/40">
+          <div className="flex items-center gap-3">
+            <div className="h-9 w-9 rounded-xl bg-blue-50/70 border border-blue-100 flex items-center justify-center text-blue-500 shadow-inner">
+              <Wallet className="w-5 h-5" />
+            </div>
+            <h3 className="text-base font-bold text-slate-800 tracking-tight">{t('accounts.payment.register_title')}</h3>
             <span aria-live="polite" className="inline-flex items-center justify-center rounded-full border border-slate-200/80 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600 shadow-sm">
               {loading ? 'Updating…' : status === 'deleted' ? '—' : filtered.length}
             </span>
-            <div ref={statusGroupRef} role="group" aria-label="Payment status" className="flex items-center overflow-hidden rounded-lg border border-slate-200/80 bg-slate-50 p-0.5 shadow-sm sm:ml-2">
-              {PAYMENT_VIEWS.map(item => <Button key={item.value} variant="custom" size="sm" aria-pressed={status === item.value} title={item.hint}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <div ref={statusGroupRef} role="group" aria-label="Payment status" className="flex items-center overflow-hidden rounded-lg border border-slate-200/80 bg-slate-50 p-0.5 shadow-sm">
+              {PAYMENT_VIEWS.map(item => <Button key={item.value} variant="custom" size="sm" aria-pressed={status === item.value}
                 className={`h-auto rounded-md px-3 py-1.5 text-xs font-semibold ${status === item.value ? item.selectedClass : 'bg-transparent text-slate-500 hover:bg-slate-200/50 hover:text-slate-800'}`}
                 onClick={() => { setSelectedId(null); setStatus(item.value); setPage(1); }}>
                 {item.label}
               </Button>)}
             </div>
+            {/* Row actions appear only once a row is selected — the same
+                pattern as the Trip List's View button. No hover tooltips:
+                the buttons state their meaning in label and colour. */}
+            {selectedPayment && (
+              <div role="group" aria-label="Selected payment actions" className="flex flex-wrap items-center gap-2">
+                <Button variant="secondary" size="sm" icon={<Pencil size={14} />} aria-label="Edit selected payment" disabled={!canEditSelected}
+                  onClick={() => { if (canEditSelected) setEditingPayment(selectedPayment); }}>Edit</Button>
+                <Button variant="success" size="sm" icon={<CheckCircle2 size={14} />} aria-label="Approve selected payment" disabled={!canApproveSelected}
+                  onClick={() => { if (canApproveSelected) { setApprovalError(''); setApprovalPayment(selectedPayment); } }}>Approve</Button>
+                <Button variant="destructiveOutline" size="sm" icon={<Trash2 size={14} />} aria-label="Delete selected payment" disabled={!canDeleteSelected}
+                  onClick={() => { if (canDeleteSelected) requestDelete(selectedPayment.id, { label: `Deleting payment to ${selectedPayment.paidTo}` }); }}>Delete</Button>
+              </div>
+            )}
           </div>
-          {selectedPayment ? <div role="group" aria-label="Selected payment actions" title={isSample(selectedPayment) ? sampleHint : undefined} className="flex flex-wrap items-center gap-2">
-            <span className="sr-only">Selected payment: {selectedPayment.paymentNo || selectedPayment.paidTo}</span>
-            {/* Sample rows are read-only by design; said in words next to the
-                buttons rather than hidden in a tooltip nobody discovers. */}
-            {isSample(selectedPayment) && <span className={uiBadgeClass('info')}>Sample row · preview edits</span>}
-            <Button variant="secondary" size="sm" icon={<Pencil size={14} />} aria-label="Edit selected payment" disabled={!canEditSelected}
-              title={canEditSelected ? (isSample(selectedPayment) ? 'Update this sample row (preview only)' : 'Edit selected payment') : 'Payments older than 10 days cannot be edited'}
-              onClick={() => { if (canEditSelected) setEditingPayment(selectedPayment); }}>Edit</Button>
-            <Button variant="success" size="sm" icon={<CheckCircle2 size={14} />} aria-label="Approve selected payment" disabled={!canApproveSelected}
-              title={canApproveSelected ? (isSample(selectedPayment) ? 'Approve this sample row (preview only)' : 'Approve selected pending payment') : selectedPayment.status !== 'Draft' ? 'This payment is already approved' : 'Payments older than 10 days cannot be approved'}
-              onClick={() => { if (canApproveSelected) { setApprovalError(''); setApprovalPayment(selectedPayment); } }}>Approve</Button>
-            <Button variant="destructiveOutline" size="sm" icon={<Trash2 size={14} />} aria-label="Delete selected payment" disabled={!canDeleteSelected}
-              title={canDeleteSelected ? (isSample(selectedPayment) ? 'Remove this sample row (preview only)' : 'Delete selected payment') : 'Payments older than 10 days cannot be deleted'}
-              onClick={() => { if (canDeleteSelected) requestDelete(selectedPayment.id, { label: `Deleting payment to ${selectedPayment.paidTo}` }); }}>Delete</Button>
-          </div> : status !== 'deleted' && filtered.length > 0 && (
-            /* Replaces the old "Filtered total" readout: the register is a work
-               list, so the empty slot invites the row action instead of showing
-               an amount that never drives anything. */
-            <p className="text-[11px] text-slate-400">
-              {demo ? 'Sample rows work like real ones here — select one to view, edit, approve or delete.' : 'Select a row to edit, approve or delete.'}
-            </p>
-          )}
         </div>
         {error && <p role="alert" className="border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">Unable to refresh records. {payments.length ? 'Previously loaded records are still shown. ' : ''}Use Refresh to try again.</p>}
-        {status === 'deleted' ? <EmptyState title="Deleted payments are unavailable" description="The current payment API does not provide deleted records. Cancelled payments are not treated as deleted." /> : <>
-        <PaymentTable selectedId={selectedPayment?.id ?? null} onSelect={setSelectedId}
-          emptyVariant={error ? 'error' : !payments.length ? 'no-data' : appliedFilters.search.trim() ? 'no-search' : 'no-filters'}
-          payments={rows} loading={loading && !payments.length} error={error && !payments.length} onView={setViewingPayment} />
-        <Pagination page={page} pageSize={pageSize} totalItems={filtered.length}
-          onPageChange={next => { setSelectedId(null); setPage(next); }}
-          onPageSizeChange={size => { setSelectedId(null); setPageSize(size); setPage(1); }} />
-        </>}
-
+        {status === 'deleted' ? <EmptyState title="Deleted payments are unavailable" description="The current payment API does not provide deleted records. Cancelled payments are not treated as deleted." />
+          : (<>
+          <PaymentTable selectedId={selectedPayment?.id ?? null} onSelect={setSelectedId}
+            emptyVariant={error ? 'error' : !payments.length ? 'no-data' : appliedFilters.search.trim() ? 'no-search' : 'no-filters'}
+            payments={rows} loading={loading && !payments.length} error={error && !payments.length} onView={setViewingPayment} />
+          {/* Global pagination, exactly as the Trip List renders it: the same
+              shared component, shown only when there is more than one page,
+              and blocked while a refresh is in flight. Fed the clamped page
+              so the pager and the row window can never disagree. */}
+          {shouldShowPagination(filtered.length) && (
+            <Pagination
+              page={safePage}
+              pageSize={pageSize}
+              totalItems={filtered.length}
+              disabled={loading}
+              onPageChange={next => { setSelectedId(null); setPage(next); }}
+              onPageSizeChange={size => { setSelectedId(null); setPageSize(size); setPage(1); }}
+            />
+          )}
+        </>
+          )}
       </section>
       <Modal isOpen={pendingItems.length > 0} title="Payment deletion pending" size="md"
         closeOnOverlay={false} showCloseButton={false} closeOnEscape={!pendingItems.some(item => item.committing)}
