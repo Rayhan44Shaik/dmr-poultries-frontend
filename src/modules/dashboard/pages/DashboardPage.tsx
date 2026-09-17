@@ -1086,7 +1086,7 @@ function DashboardPage({ embedded = false }: { embedded?: boolean }) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
-        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0 xl:h-[33.125rem]">
+        <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0 xl:min-h-[33.125rem]">
           <div className="flex flex-wrap items-start justify-between gap-x-3 gap-y-2">
             <div className="min-w-0">
               {/* The title is the way through to the detail page — no second link. */}
@@ -1144,7 +1144,7 @@ function DashboardPage({ embedded = false }: { embedded?: boolean }) {
 
         {/* No overflow-hidden on the card itself: the donut has a centered
             chart stage and the shrink-0 KPI footer below it stays visible. */}
-        <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-5 w-full min-w-0 xl:h-[33.125rem]">
+        <div className="lg:col-span-5 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-5 w-full min-w-0 xl:min-h-[33.125rem]">
           <div className="-mt-1 min-w-0">
             <Link
               to="/operations?tab=collection-report"

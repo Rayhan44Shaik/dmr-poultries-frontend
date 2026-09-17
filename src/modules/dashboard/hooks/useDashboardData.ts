@@ -127,8 +127,13 @@ export function useDashboardData(
     const requestId = ++requestRef.current;
     const fromDate = _fromDate ?? new Date();
     const toDate = _toDate ?? new Date();
+    // Yield once before touching state: the effect that schedules this load
+    // never sets state synchronously (no cascading render), and the previous
+    // dashboard stays on screen — no blank frame — while the new window loads.
+    await Promise.resolve();
+    if (requestId !== requestRef.current) return;
     if (!hasLoadedRef.current) setIsLoading(true);
-    setError(null);
+    setError((current) => (current === null ? current : null));
     try {
       const dashboard = await loadOperationsDashboard(_fromDate, _toDate);
       if (requestId !== requestRef.current) return;
