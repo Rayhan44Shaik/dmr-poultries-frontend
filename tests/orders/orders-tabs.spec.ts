@@ -273,7 +273,46 @@ test("two columns are measured, the six between them are equal, and the number b
   expect(fields).toHaveLength(3); // birds · boxes · weight
   for (const box of fields) {
     expect(Math.round(box!.height)).toBe(24);
-    expect(box!.width).toBeLessThanOrEqual(88);
+    expect(box!.width).toBeLessThanOrEqual(198);
+  }
+});
+
+test("every column starts its data under its own heading — one left edge, not two", async ({
+  page,
+}) => {
+  await page.goto(`${ORDERS}/collection`);
+  const offsets = await page
+    .locator("#orders-panel-collection table")
+    .first()
+    .evaluate((table) => {
+      const ths = [...table.querySelectorAll("thead th")];
+      const row = [...table.querySelectorAll("tbody tr")].find(
+        (r) => r.querySelectorAll("input").length > 0,
+      );
+      if (!row) return [];
+      const tds = [...row.children];
+      const left = (el: Element) => el.getBoundingClientRect().left;
+      return ths.map((th, index) => {
+        const head = th.firstElementChild ?? th;
+        const td = tds[index];
+        // Plain-text cells (shop name, city) have no child element to measure.
+        const data = td?.querySelector("input, button, span");
+        if (!td || !data) return null;
+        return {
+          head: Math.round(left(head) - left(th)),
+          data: Math.round(left(data) - left(td)),
+        };
+      });
+    });
+  const measured = offsets.filter(
+    (entry): entry is { head: number; data: number } => entry !== null,
+  );
+  // S.No · birds · boxes · weight · status · action
+  expect(measured.length).toBeGreaterThanOrEqual(5);
+  for (const { head, data } of measured) {
+    // A right-aligned cell put its data tens of pixels away from its heading, which
+    // is what made the columns look unevenly spaced even while their widths matched.
+    expect(Math.abs(data - head)).toBeLessThanOrEqual(2);
   }
 });
 

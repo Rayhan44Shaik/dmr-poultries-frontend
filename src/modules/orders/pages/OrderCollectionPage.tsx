@@ -636,12 +636,16 @@ function CollectionTableHead() {
         {/* Two columns are measured, the rest are divided evenly: S.No because a
             glyph plus "S.No" needs its own room, Action because the eraser and its
             10-second countdown must never be clipped. Everything between them —
-            shop, city, birds, boxes, weight, status — takes an equal sixth. */}
-        <th className={`${opsTableThClass} w-[96px] text-center`}>
+            shop, city, birds, boxes, weight, status — takes an equal sixth.
+            Every column, measured or not, starts its content at the same left edge:
+            right-aligning the last two put the air in different places per column,
+            which is what made Weight look crammed against Status and stranded
+            after Boxes. */}
+        <th className={`${opsTableThClass} w-[96px]`}>
           <ColHead
             icon={Hash}
             label={to("orders.col_sno")}
-            align="center"
+            align="left"
             tone="text-slate-400"
           />
         </th>
@@ -673,11 +677,11 @@ function CollectionTableHead() {
             tone="text-violet-600"
           />
         </th>
-        <th className={`${ORDERS_TABLE_TH_WRAP_CLASS} text-right`}>
+        <th className={ORDERS_TABLE_TH_WRAP_CLASS}>
           <ColHead
             icon={Scale}
             label={to("orders.col_weight")}
-            align="right"
+            align="left"
             tone="text-teal-600"
           />
         </th>
@@ -688,11 +692,11 @@ function CollectionTableHead() {
             tone="text-indigo-600"
           />
         </th>
-        <th className={`${opsTableThClass} w-[112px] text-right`}>
+        <th className={`${opsTableThClass} w-[112px]`}>
           <ColHead
             icon={Eraser}
             label={to("orders.col_action")}
-            align="right"
+            align="left"
             tone="text-rose-500"
           />
         </th>
@@ -1449,7 +1453,7 @@ function CollectionEntries({
                           : "align-middle",
                       )}
                     >
-                      <td className={`${opsTableTdClass} text-center`}>
+                      <td className={opsTableTdClass}>
                         <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 text-[12px] font-semibold text-slate-600">
                           {startIndex + index + 1}
                         </span>
@@ -1503,7 +1507,7 @@ function CollectionEntries({
                           </span>
                         )}
                       </td>
-                      <td className={`${opsTableTdClass} text-right`}>
+                      <td className={opsTableTdClass}>
                         {/* The ORDERED weight of the row: the shop's birds against
                           the vehicle's average bird weight once it is assigned,
                           and the day's own average before that — so a collected
@@ -1520,7 +1524,7 @@ function CollectionEntries({
                               updateEntry(shop.id, "weight", e.target.value)
                             }
                             onWheel={onOrdersNumberWheel}
-                            className={`${ORDERS_NO_SPINNER} ${ORDERS_RISE_INPUT} text-right border-teal-300/70 bg-teal-50/50 text-teal-900 focus:border-teal-500`}
+                            className={`${ORDERS_NO_SPINNER} ${ORDERS_RISE_INPUT} border-teal-300/70 bg-teal-50/50 text-teal-900 focus:border-teal-500`}
                           />
                         ) : rowKg > 0 ? (
                           <span className="font-medium text-slate-600">
@@ -1538,7 +1542,7 @@ function CollectionEntries({
                           {statusNode}
                         </div>
                       </td>
-                      <td className={`${opsTableTdClass} text-right`}>
+                      <td className={opsTableTdClass}>
                         {isEditable ? (
                           <button
                             type="button"

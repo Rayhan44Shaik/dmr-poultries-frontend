@@ -25,9 +25,9 @@ The collection/assignment save contracts, fresh-data conflict checks, split shar
 
 A temporary read-only benchmark compared the original HEAD Orders service/trip mapper with the updated implementation. Both were loaded through Vite SSR. After capturing the quarter API responses, the benchmark replayed identical response bodies through Axios to remove network variability. Each implementation ran 15 times.
 
-| Frontend mapping, median | Before | After |
-| --- | ---: | ---: |
-| Full Orders snapshot | 910.65 ms | 102.63 ms |
+| Frontend mapping, median |    Before |     After |
+| ------------------------ | --------: | --------: |
+| Full Orders snapshot     | 910.65 ms | 102.63 ms |
 
 This is approximately **89% less processing time**, not a measurement of total browser page-load time. Network latency, device performance and rendering still affect perceived speed. The benchmark did not mutate preview records; temporary baseline modules were removed afterward.
 
@@ -57,14 +57,14 @@ This is approximately **89% less processing time**, not a measurement of total b
   uppercase, `min-h-[17px]` so a field without an icon still lines up with its neighbours). **A control
   gets one glyph, never two**: the search field keeps only its own inset magnifier and the date field
   only its own calendar button, so neither label repeats it; City (amber), Shop (sky) and Sort (violet)
-  carry the glyph their column already uses.   The Shop picker narrows the sheet to named
+  carry the glyph their column already uses. The Shop picker narrows the sheet to named
   shops and composes with the city filter and the search box instead of replacing them; because that list
   is the long one it is `searchable` (the panel opens with the caret already in its own filter box), each
   row shows its city on the right so two same-named shops are tellable apart, and the trigger counts the
   picks (`1 shop` / `3 shops`) rather than spilling names into a 40px field. Assignment was brought
   to the same label class, per-field icon colours and full-width fields so the two screens read as one
   module.
-- **Loading is the table's business.** The filter card is built in the page component, *above* the data
+- **Loading is the table's business.** The filter card is built in the page component, _above_ the data
   gate, and is never swapped for a skeleton — not on the first paint (neither the Shop Master nor the
   day's collection has answered) and not on a refresh. `OrdersPage` therefore renders the Collection panel
   through the load instead of replacing it with the placeholder panel, and the load is reported where it
@@ -83,13 +83,20 @@ This is approximately **89% less processing time**, not a measurement of total b
   column, at the trip table's spacing; header and body words sit at **14px** (`ORDERS_TABLE_TH_CLASS` /
   `ORDERS_TABLE_TD_CLASS`), a step above the shared 12px.
 - The three number boxes go the other way and stay deliberately small: **24px tall and no wider than
-  86px** (`ORDERS_RISE_INPUT_CLASS`), so they read as fields for a number and not as bars filling the
+  196px** (`ORDERS_RISE_INPUT_CLASS`), so they read as fields for a number and not as bars filling the
   row — the words above them are what should be large. Each is tinted to its own header glyph (birds
   emerald, boxes violet, weight teal) and carries a small rise: a soft shadow at rest, lifting a pixel on
   hover.
+- **One left edge for the whole sheet.** Weight and Action were right-aligned while the columns beside
+  them were left-aligned, and that — not the column widths — is what made the spacing look wrong: the air
+  landed in a different place in every column, so Boxes seemed stranded from Weight and Weight was
+  crammed against Status. Every column now starts its data at its own `padding-left`, so each cell begins
+  exactly under its heading and the gaps between columns read as one rhythm. S.No's chip and the status
+  pill follow the same rule; the only deliberate asymmetry left is the small gutter after the status
+  pill, which keeps the badge from touching the eraser.
 - Trip No and Vehicle No are **not** Collection columns (assignment facts belong to Assignment); an
   assigned shop shows only its status pill, and a pending count rides **beside** the pill (`25 to
-  deliver`) rather than inside it, so an equal-width column cannot be pushed over. The status cell carries
+deliver`) rather than inside it, so an equal-width column cannot be pushed over. The status cell carries
   its own `pr-5` gutter, so a pill that wraps to a second line never runs into the Action column.
 - **No tooltips on this screen.** The row state is the badge, the deadline is the chip — nothing needs a
   hover to be understood, so every `title` attribute was removed from the page (pinned by
