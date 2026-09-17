@@ -87,6 +87,24 @@ interface ShopLedgerProps {
 type ReportTypeFilter = "all" | "sales" | "collection";
 type WaReportType = "All" | "Sales" | "Collection";
 
+const filterStatementByType = (
+  data: LedgerTransaction[],
+  reportType: ReportTypeFilter | WaReportType,
+): LedgerTransaction[] => {
+  if (data.length === 0) return [];
+  const normalized = reportType.toLowerCase();
+  if (normalized === "all") return data;
+
+  const opening = { ...data[0] };
+  const transactionType = normalized === "sales" ? "sale" : "collection";
+  let running = opening.balance;
+  const rows = data.slice(1).filter((row) => row.type === transactionType).map((row) => {
+    running = round2(running + row.debit - row.credit);
+    return { ...row, balance: running };
+  });
+  return [opening, ...rows];
+};
+
 interface WhatsAppSendPayload {
   reportType: WaReportType;
   dateFrom: string;
@@ -1015,7 +1033,10 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
       revokePdfUrls(pdfPreviewRef.current);
       const shopData = Object.fromEntries(
-        allLedgers.map((entry) => [entry.shop, entry.data]),
+        allLedgers.map((entry) => [
+          entry.shop,
+          filterStatementByType(entry.data, appliedReportType),
+        ]),
       );
       const files = allLedgers.map(({ shop }) => ({
         shop,
@@ -1025,7 +1046,10 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       const nextState: PdfPreviewState = {
         files,
         selectedIndex: 0,
-        selectedShops: files.length === 1 ? [files[0].shop] : [],
+        // PDF and WhatsApp both open with every shop in the applied page
+        // scope selected. Users can narrow the list with the shared left-side
+        // selector; there is never an ambiguous null selection.
+        selectedShops: files.map((file) => file.shop),
         shopData,
       };
       pdfPreviewRef.current = nextState;
@@ -1050,6 +1074,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     appliedSelectedShop,
     appliedDateFrom,
     appliedDateTo,
+    appliedReportType,
     showNotification,
     shopMasterMap,
     getCachedLedger,
@@ -1452,9 +1477,16 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   const [whatsappOpen, setWhatsappOpen] = useState(false);
   const [waViewLanguage, setWaViewLanguage] = useState<Language>(language);
   const waT = useMemo(() => makeT(waViewLanguage), [waViewLanguage]);
-  const [waReportType, setWaReportType] = useState<WaReportType>("All");
-  const [waDateFrom, setWaDateFrom] = useState(toWeekAgoDefault);
-  const [waDateTo, setWaDateTo] = useState(toDateDefault);
+  // WhatsApp is a delivery view of the page's applied data, just like PDF.
+  // It has no second date/type filter state that can drift from the table.
+  const waReportType: WaReportType =
+    appliedReportType === "sales"
+      ? "Sales"
+      : appliedReportType === "collection"
+        ? "Collection"
+        : "All";
+  const waDateFrom = appliedDateFrom;
+  const waDateTo = appliedDateTo;
   const [waSending, setWaSending] = useState(false);
   const [waError, setWaError] = useState<string | null>(null);
   const [waSendingShop, setWaSendingShop] = useState<string | null>(null);
@@ -1568,11 +1600,17 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   }, [waLastSent, currentWeekKey]);
 
   const waAllShopNames = useMemo(() => {
-    const source = shops.map((shop: Shop) => shop.shopName);
-    return Array.from(new Set(source)).sort((a, b) =>
-      a.localeCompare(b, "en", { sensitivity: "base" }),
-    );
-  }, [shops]);
+    const source = Array.from(
+      new Set(shops.map((shop: Shop) => shop.shopName).filter(Boolean)),
+    ).sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
+
+    // WhatsApp uses exactly the same applied shop scope as the table and PDF.
+    // A specific page shop produces one recipient; All Shops produces the
+    // complete recipient list.
+    return appliedSelectedShop === "All Shops"
+      ? source
+      : [appliedSelectedShop];
+  }, [shops, appliedSelectedShop]);
 
   /**
    * WhatsApp recipient for a shop — `whatsappNumber` from Shop Master when
@@ -1640,7 +1678,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           [
             {
               shop,
-              data: ledger,
+              data: filterStatementByType(ledger, waReportType),
               ownerName: master?.ownerName || undefined,
               mobile: master?.phoneNumber || undefined,
               city: master?.city || undefined,
@@ -1667,7 +1705,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         setWaAttachmentBusy(false);
       }
     },
-    [waDateFrom, waDateTo, shopMasterMap, getCachedLedger],
+    [waDateFrom, waDateTo, waReportType, shopMasterMap, getCachedLedger],
   );
 
   const handleWaToggleAttachmentPreview = () => {
@@ -1696,19 +1734,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     // WhatsApp follows the currently applied filters, but its language is a
     // local view preference and never changes the page behind it.
     setWaViewLanguage(language);
-    setWaReportType(
-      appliedReportType === "sales"
-        ? "Sales"
-        : appliedReportType === "collection"
-          ? "Collection"
-          : "All",
-    );
-    setWaDateFrom(appliedDateFrom);
-    setWaDateTo(appliedDateTo);
-    const initial =
-      appliedSelectedShop === "All Shops"
-        ? waAllShopNames
-        : waAllShopNames.filter((name) => name === appliedSelectedShop);
+    const initial = [...waAllShopNames];
     setWaSelectedShops(initial);
     setWaPreviewShop(initial[0] ?? null);
     setWaShopSearch("");
@@ -1717,10 +1743,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     resetWaAttachment();
     setWhatsappOpen(true);
   }, [
-    appliedReportType,
-    appliedDateFrom,
-    appliedDateTo,
-    appliedSelectedShop,
     waAllShopNames,
     resetWaSucceeded,
     resetWaAttachment,
@@ -1831,7 +1853,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
             [
               {
                 shop,
-                data: ledger,
+                data: filterStatementByType(ledger, waReportType),
                 ownerName: waMaster?.ownerName || undefined,
                 mobile: waMaster?.phoneNumber || undefined,
                 city: waMaster?.city || undefined,
@@ -2990,6 +3012,13 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                 >
                   {waT("shop_ledger.wa.title")}
                 </h3>
+                <p className="text-[11px] font-medium text-slate-400">
+                  {waReportType === "All"
+                    ? waT("common.all")
+                    : waReportType === "Sales"
+                      ? waT("shop_ledger.type.sales")
+                      : waT("shop_ledger.type.collection")} · {formatDisplayDate(waDateFrom)} – {formatDisplayDate(waDateTo)}
+                </p>
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-2">
@@ -3189,67 +3218,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
             {/* Right: recipient details + message preview */}
             <div className="flex min-w-0 flex-1 flex-col">
-              {/* Top bar — same dropdown chrome as the page toolbar */}
-              <div className="grid grid-cols-1 gap-3 border-b border-slate-100 px-5 py-3 sm:grid-cols-3">
-                <div>
-                  <label className={opsFilterLabelClass}>
-                    <Layers size={15} className="shrink-0 text-emerald-500" />
-                    <span>{waT("shop_ledger.report_type")}</span>
-                  </label>
-                  <MasterDropdown
-                    hideLabel
-                    label={waT("shop_ledger.report_type")}
-                    value={waReportType}
-                    options={[
-                      { value: "All", label: waT("common.all") },
-                      { value: "Sales", label: waT("shop_ledger.type.sales") },
-                      {
-                        value: "Collection",
-                        label: waT("shop_ledger.type.collection"),
-                      },
-                    ]}
-                    onChange={(next) => {
-                      setWaReportType((next as WaReportType) || "All");
-                      resetWaSucceeded();
-                    }}
-                    placeholder={waT("shop_ledger.wa.type_all")}
-                    className="w-full"
-                  />
-                </div>
-                <div>
-                  <label className={opsFilterLabelClass}>
-                    <CalendarRange size={15} className="shrink-0 text-emerald-500" />
-                    <span>{waT("shop_ledger.wa.date_from")}</span>
-                  </label>
-                  <DatePicker
-                    value={waDateFrom}
-                    onChange={(value) => {
-                      setWaDateFrom(value);
-                      resetWaSucceeded();
-                      resetWaAttachment();
-                    }}
-                    placeholder={waT("shop_ledger.wa.from_placeholder")}
-                    className="w-full"
-                  />
-                </div>
-                <div>
-                  <label className={opsFilterLabelClass}>
-                    <CalendarDays size={15} className="shrink-0 text-emerald-500" />
-                    <span>{waT("shop_ledger.wa.date_to")}</span>
-                  </label>
-                  <DatePicker
-                    value={waDateTo}
-                    onChange={(value) => {
-                      setWaDateTo(value);
-                      resetWaSucceeded();
-                      resetWaAttachment();
-                    }}
-                    placeholder={waT("shop_ledger.wa.to_placeholder")}
-                    className="w-full"
-                  />
-                </div>
-              </div>
-
               <div className="min-h-0 flex-1 space-y-3 overflow-y-auto px-5 py-4">
                 {waPreviewShop && waPreviewRecipient ? (
                   <>
