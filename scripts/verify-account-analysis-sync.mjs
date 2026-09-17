@@ -95,8 +95,36 @@ try {
      const date = parseBusinessDate(trip.tripDate.slice(0,10));
      assert.equal(groups.filter(g => date >= g.start && date <= g.end).length, 1, `${trip.tripNo}: grouped exactly once`);
    }
-   const expenses = service.computeEffectiveExpenses(analysis, range.start, range.end);
-   console.log('PASS reconciliation', name, toBusinessDate(range.start), toBusinessDate(range.end), JSON.stringify({metrics,expenses,...(name === 'This week' ? {trips:analysis.map(t=>({id:t.id,tripNo:t.tripNo,date:t.tripDate,status:t.status}))} : {})}));
+    const expenses = service.computeEffectiveExpenses(analysis, range.start, range.end);
+
+    /* ── Farm Payment — per trip ─────────────────────────────────────────────
+       These are the very rows the Analysis page renders in its own table: one
+       per trip in the span, with that trip's pickup (DC) weight and farm rate,
+       what has been paid and what is still owed. Audited here so the table can
+       never show a weight/rate/amount that does not reconcile with the Farm
+       Payment expense row above it. */
+    const farmRows = analysis
+      .map(trip => ({trip, farm: service.getFarmPaymentForTrip(trip.id)}))
+      .filter(row => row.farm)
+      .sort((a,b) => String(b.trip.tripDate).localeCompare(String(a.trip.tripDate)) || b.trip.id - a.trip.id);
+    const farmWeightKg = farmRows.reduce((sum,row) => sum + (row.farm.dcWeight ?? row.trip.dcWeight ?? 0), 0);
+    const farmTotals = service.farmTotalsForTrips(analysis);
+    assert.equal(new Set(farmRows.map(r => r.trip.id)).size, farmRows.length, `${name}: one farm row per trip`);
+    assert.equal(farmRows.length, analysis.filter(trip => service.getFarmPaymentForTrip(trip.id)).length, `${name}: every analysed trip with a farm payment gets a row`);
+    for (const {trip, farm} of farmRows) {
+      const weight = farm.dcWeight ?? trip.dcWeight ?? 0;
+      assert(Math.abs(weight * Number(farm.rate) - Number(farm.amount)) < .01, `${trip.tripNo}: pickup weight × rate = farm payment`);
+      assert(Math.abs(Number(farm.paidAmount) + Number(farm.balance) - Number(farm.amount)) < .01, `${trip.tripNo}: paid + balance = farm payment`);
+    }
+    assert.deepEqual(farmRows.map(r => r.trip.tripDate), [...farmRows.map(r => r.trip.tripDate)].sort().reverse(), `${name}: newest trip first`);
+    const rowPayable = farmRows.reduce((sum,row) => sum + Number(row.farm.amount), 0);
+    assert(Math.abs(rowPayable - farmTotals.payable) < .01, `${name}: rows total = farm totals payable`);
+    assert(Math.abs(rowPayable - expenses.farm) < .01, `${name}: rows total = Farm Payment expense row`);
+    assert(Math.abs(farmTotals.paid + farmTotals.balance - farmTotals.payable) < .01, `${name}: farm paid + balance = payable`);
+    assert(Math.abs(farmWeightKg - metrics.weight) < .01, `${name}: table pickup weight = Birds in KG of the same trips`);
+    const spanNetProfit = metrics.sales - Object.values(expenses).reduce((sum, value) => sum + value, 0);
+    console.log('PASS farm payment per trip', name, JSON.stringify({rows:farmRows.length, pickupWeightKg:Math.round(farmWeightKg*100)/100, payable:farmTotals.payable, paid:farmTotals.paid, balance:farmTotals.balance, netProfit:Math.round(spanNetProfit*100)/100, firstRow:{tripNo:farmRows[0]?.trip.tripNo, weight:farmRows[0]?.farm.dcWeight, rate:farmRows[0]?.farm.rate, amount:farmRows[0]?.farm.amount}}));
+    console.log('PASS reconciliation', name, toBusinessDate(range.start), toBusinessDate(range.end), JSON.stringify({metrics,expenses,...(name === 'This week' ? {trips:analysis.map(t=>({id:t.id,tripNo:t.tripNo,date:t.tripDate,status:t.status}))} : {})}));
  }
 
 } finally { await server.close(); }

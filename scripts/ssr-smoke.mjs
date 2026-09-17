@@ -294,5 +294,53 @@ try {
   console.error(err);
 }
 
+// 4) Account Analysis: the per-trip farm payment table must render the real
+//    trip rows — one per trip in the span, each with its own pickup weight and
+//    farm rate — and hide them again when collapsed.
+try {
+  const { loadAnalysisSnapshot, createAnalysisService } = await server.ssrLoadModule("/src/modules/accounts/services/analysisService.ts");
+  const { default: SummaryFarmTable } = await server.ssrLoadModule("/src/modules/accounts/components/Summary/SummaryFarmTable.tsx");
+  const { weekRange } = await server.ssrLoadModule("/src/modules/accounts/utils/periodRanges.ts");
+  const { I18nProvider } = await server.ssrLoadModule("/src/i18n/index.tsx");
+  const snapshot = await loadAnalysisSnapshot();
+  if (!snapshot.farmPayments.length) {
+    console.log("SKIP accounts-farm-table  (no farm payments from the API — sample backend not reachable)");
+  } else {
+    const service = createAnalysisService(snapshot);
+    const range = weekRange(new Date("2026-09-17T12:00:00"));
+    const trips = service.getCompletedTripsByDateRange(range.start, range.end);
+    // Built exactly the way SummaryPage builds it for the table.
+    const rows = trips
+      .map((trip) => ({ trip, farm: service.getFarmPaymentForTrip(trip.id) }))
+      .filter((row) => row.farm)
+      .sort((a, b) => String(b.trip.tripDate).localeCompare(String(a.trip.tripDate)) || b.trip.id - a.trip.id);
+    const totals = service.farmTotalsForTrips(trips);
+    const render = (open) => renderToString(
+      React.createElement(I18nProvider, null,
+        React.createElement(SummaryFarmTable, { rows, totals, open, onToggle: () => {}, onOpenTrip: () => {} }))
+    );
+    const html = render(true);
+    const shown = rows.filter(({ trip }) => html.includes(trip.tripNo)).length;
+    const { formatINR, formatINRExact } = await server.ssrLoadModule("/src/modules/accounts/components/farm-payment/farmPaymentFormat.ts");
+    const weight = rows[0].farm.dcWeight ?? rows[0].trip.dcWeight ?? 0;
+    const checks = {
+      tripsRendered: shown === rows.length,
+      pickupWeight: html.includes(String(weight)),
+      farmRate: html.includes(String(rows[0].farm.rate)),
+      totalsPayable: html.includes(formatINR(totals.payable)),
+      exactPayableTip: html.includes(formatINRExact(totals.payable)),
+      headers: /Trip No/.test(html) && /Pickup Weight/.test(html) && /Balance/.test(html),
+      collapsedHidesRows: !render(false).includes(rows[0].trip.tripNo),
+    };
+    console.log(`OK   accounts-farm-table  rows ${shown}/${rows.length}  payable=${formatINR(totals.payable)}  html length=${html.length}  ${JSON.stringify(checks)}`);
+    const bad = Object.entries(checks).filter(([, ok]) => !ok).map(([name]) => name);
+    if (bad.length) failed.push({ name: "accounts-farm-table", err: new Error(`failed: ${bad.join(", ")}`) });
+  }
+} catch (err) {
+  failed.push({ name: "accounts-farm-table", err });
+  console.error("FAIL accounts-farm-table");
+  console.error(err);
+}
+
 await server.close();
 process.exit(failed.length > 0 || !hasLoginForm ? 1 : 0);

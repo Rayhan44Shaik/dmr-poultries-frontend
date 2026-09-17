@@ -32,8 +32,10 @@ import { opsFilterCardClass, opsSecondaryButtonClass } from '../../../shared/ui/
 import { DatePicker } from '../../../components/common/DatePicker';
 import { exportPDF, exportExcel } from '../components/Summary';
 import SummaryTripViewer from '../components/Summary/SummaryTripViewer';
+import SummaryFarmTable from '../components/Summary/SummaryFarmTable';
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
 import type { WeeklyMetrics, ExpenseBreakdown } from '../types/summary.types';
+import type { TripFarmPayment } from '../types/farmPayment.types';
 import { useI18n } from '../../../i18n';
 import { useLocation } from 'react-router-dom';
 import { analysisLinkKey, readAnalysisLink } from '../../../shared/kpi/analysisLink';
@@ -336,6 +338,8 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
   const [tripViewerOpen, setTripViewerOpen] = useState(false);
   const [tripViewerTrips, setTripViewerTrips] = useState<Trip[]>([]);
   const [tripViewerLabel, setTripViewerLabel] = useState('');
+  // The per-trip farm payment breakdown under the expense table.
+  const [farmTableOpen, setFarmTableOpen] = useState(true);
   const { t, language } = useI18n();
 
   useEffect(() => {
@@ -817,8 +821,24 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
      still owed to farmers, which the expense total deliberately ignores. */
   const farmTotals = useMemo(() => summaryService.farmTotalsForTrips(trips), [summaryService, trips]);
 
+  /* The per-trip farm payment view: exactly the trips in the selected span, each
+     with its own pickup (DC) weight × farm rate. Newest first. Its totals are
+     the same `farmTotals` the expense table's Farm Payment row is built from, so
+     this breakdown can never disagree with the row it explains. */
+  const farmRows = useMemo(
+    () =>
+      trips
+        .map((trip) => ({ trip, farm: summaryService.getFarmPaymentForTrip(trip.id) }))
+        .filter((row): row is { trip: Trip; farm: TripFarmPayment } => Boolean(row.farm))
+        .sort(
+          (a, b) =>
+            String(b.trip.tripDate).localeCompare(String(a.trip.tripDate)) ||
+            (b.trip.id ?? 0) - (a.trip.id ?? 0)
+        ),
+    [trips, summaryService]
+  );
+
   const totalNetProfit = totalMetrics.sales - totalExpenseValue;
-  const previousNetProfit = previousMetrics.sales - previousExpenseValue;
 
   const weeklyNetProfit = useMemo(
     () => weeklyMetrics.map((metrics, index) => netProfitOfPeriod(metrics, weeklyExpenses[index])),
@@ -1401,74 +1421,6 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
               </div>
             )}
           </div>
-        </div>
-      </div>
-
-      {/* Net profit — the one figure the whole analysis exists for:
-          shop sales − farm payment − every other expense. */}
-      <div className="group relative overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-sm transition-all duration-200 hover:border-emerald-300 dark:border-emerald-900 dark:bg-slate-900 dark:hover:border-emerald-800">
-        <span aria-hidden="true" className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-emerald-500 to-emerald-300/30" />
-        <div className="p-5 sm:p-6">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:border-emerald-900 dark:text-emerald-300">
-              {totalNetProfit >= 0 ? <TrendingUp size={20} strokeWidth={2} /> : <TrendingDown size={20} strokeWidth={2} />}
-            </div>
-            <div className="min-w-0">
-              <p className="text-[13px] font-bold tracking-wide text-slate-700 dark:text-slate-200">{t('accounts.summary.net_profit.title')}</p>
-              <p className="text-[13px] leading-relaxed text-slate-500 dark:text-slate-400 mt-1">
-                {t('accounts.summary.net_profit.formula')}
-              </p>
-            </div>
-            {comparePrevious && (
-              <span className="ml-auto shrink-0 rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-[12px] font-semibold tracking-wide text-slate-600 dark:border-slate-700">
-                {t('accounts.summary.vs_previous')} {formatCurrency(previousNetProfit)}
-              </span>
-            )}
-          </div>
-
-          <div className="mt-5 flex flex-wrap items-baseline gap-2.5">
-            <p
-              title={formatCurrencyExact(totalNetProfit)}
-              className={`text-[32px] font-bold tabular-nums tracking-tight leading-tight ${totalNetProfit >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}`}
-            >
-              {formatCurrency(totalNetProfit)}
-            </p>
-            {comparePrevious && previousNetProfit !== 0 && (
-              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[12px] font-semibold ${totalNetProfit >= previousNetProfit ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : 'border-rose-100 bg-rose-50 text-rose-700'}`}>
-                {totalNetProfit >= previousNetProfit ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
-                {formatSignedCurrency(totalNetProfit - previousNetProfit)}
-                {` (${formatSignedPercent(((totalNetProfit - previousNetProfit) / Math.abs(previousNetProfit)) * 100)})`}
-              </span>
-            )}
-          </div>
-
-          {/* The three figures that make it up, so the number is auditable. */}
-          <dl className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
-            <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800">
-              <dt className="text-[11px] font-semibold tracking-widest text-slate-500 dark:text-slate-400">{t('accounts.summary.net_profit.sales')}</dt>
-              <dd className="mt-1 text-[15px] font-bold tabular-nums text-slate-800 dark:text-slate-100" title={formatCurrencyExact(totalMetrics.sales)}>{formatCurrency(totalMetrics.sales)}</dd>
-            </div>
-            <div className="rounded-xl border border-lime-200 bg-lime-50/70 px-3 py-2.5 dark:border-lime-900 dark:bg-lime-500/10">
-              <dt className="text-[11px] font-semibold tracking-widest text-lime-700 dark:text-lime-300">{t('accounts.summary.expense_rows.farm')}</dt>
-              <dd className="mt-1 text-[15px] font-bold tabular-nums text-lime-800 dark:text-lime-200" title={formatCurrencyExact(totalExpenses.farm)}>− {formatCurrency(totalExpenses.farm)}</dd>
-              <p className="mt-1 text-[11px] text-lime-700/80 dark:text-lime-300/80">
-                {formatNumber(farmTotals.trips)} {t('accounts.summary.net_profit.trips_with_farm_payment')}
-              </p>
-            </div>
-            <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800">
-              <dt className="text-[11px] font-semibold tracking-widest text-slate-500 dark:text-slate-400">{t('accounts.summary.net_profit.other_expenses')}</dt>
-              <dd className="mt-1 text-[15px] font-bold tabular-nums text-slate-800 dark:text-slate-100" title={formatCurrencyExact(totalExpenseValue - totalExpenses.farm)}>− {formatCurrency(totalExpenseValue - totalExpenses.farm)}</dd>
-            </div>
-          </dl>
-
-          {/* Cash position of the same farm cost: settled vs still owed. */}
-          <p className="mt-3 text-[12px] text-slate-500 dark:text-slate-400">
-            {t('accounts.summary.net_profit.farm_settled')}{' '}
-            <strong className="font-semibold text-slate-700 dark:text-slate-200" title={formatCurrencyExact(farmTotals.paid)}>{formatCurrency(farmTotals.paid)}</strong>
-            {' · '}
-            {t('accounts.summary.net_profit.farm_balance')}{' '}
-            <strong className={`font-semibold ${farmTotals.balance > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-slate-700 dark:text-slate-200'}`} title={formatCurrencyExact(farmTotals.balance)}>{formatCurrency(farmTotals.balance)}</strong>
-          </p>
         </div>
       </div>
 
@@ -2167,8 +2119,13 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                 )}
               </tr>
 
-              {/* Net profit: shop sales − farm payment − every other expense. */}
-              <tr className="group/row border-b border-emerald-200 bg-emerald-50/70 transition-colors duration-150 hover:bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/15">
+              {/* Net profit: shop sales − farm payment − every other expense.
+                  It lives in the table rather than in a KPI card of its own; the
+                  formula rides along as the row's hover tip. */}
+              <tr
+                className="group/row border-b border-emerald-200 bg-emerald-50/70 transition-colors duration-150 hover:bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/15"
+                title={`${t('accounts.summary.net_profit.formula')} — ${formatCurrencyExact(totalMetrics.sales)} − ${formatCurrencyExact(totalExpenseValue)}`}
+              >
                 <td className="relative w-56 px-4 py-2.5 before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-emerald-600 before:opacity-0 before:transition-opacity before:content-[''] group-hover/row:before:opacity-100">
                   <SummaryRowLabel
                     color={EXPENSE_ROW_DOT.netProfit}
@@ -2238,6 +2195,18 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
           </table>
         </div>
       </div>
+
+      {/* Farm payment per trip — the breakdown behind the Farm Payment row.
+          Only the trips in the selected span appear, each with the pickup
+          weight and farm rate its bill was calculated from, so the row above
+          can be audited trip by trip. */}
+      <SummaryFarmTable
+        rows={farmRows}
+        totals={farmTotals}
+        open={farmTableOpen}
+        onToggle={() => setFarmTableOpen((value) => !value)}
+        onOpenTrip={(trip) => openTripViewer([trip], trip.tripNo)}
+      />
 
       </div>
       </div>

@@ -1218,13 +1218,28 @@ export default {
   'accounts.summary.expense_rows.net_profit': 'నికర లాభం (₹)',
 
   // నికర లాభం కార్డ్ + దానికి ఆధారమైన ట్రిప్ ఫారం చెల్లింపు.
-  'accounts.summary.net_profit.title': 'నికర లాభం',
+  // నికర లాభం ఖర్చుల పట్టికలో ఒక వరుసగా ఉంటుంది — ప్రత్యేక KPI కార్డు లేదు.
   'accounts.summary.net_profit.formula': 'షాప్ అమ్మకాలు − ఫారం చెల్లింపు − ఖర్చులు',
-  'accounts.summary.net_profit.sales': 'షాప్ అమ్మకాలు (₹)',
-  'accounts.summary.net_profit.other_expenses': 'ఇతర ఖర్చులు (₹)',
   'accounts.summary.net_profit.trips_with_farm_payment': 'ఫారం చెల్లింపు ఉన్న ట్రిప్పులు',
-  'accounts.summary.net_profit.farm_settled': 'ఫారం చెల్లించింది:',
-  'accounts.summary.net_profit.farm_balance': 'ఫారం బకాయి:',
+
+  // ఫారం చెల్లింపు వరుసను వివరించే ట్రిప్ వారీ వివరణ.
+  'accounts.summary.farm_table.title': 'ఫారం చెల్లింపు — ట్రిప్ వారీగా',
+  'accounts.summary.farm_table.subtitle': 'ఈ కాలంలోని ట్రిప్పులు మాత్రమే · పికప్ బరువు × ఫారం రేటు',
+  'accounts.summary.farm_table.trips': 'ట్రిప్పులు',
+  'accounts.summary.farm_table.weight': 'పికప్ బరువు',
+  'accounts.summary.farm_table.trip_no': 'ట్రిప్ నం',
+  'accounts.summary.farm_table.date': 'తేదీ',
+  'accounts.summary.farm_table.farm': 'ఫారం',
+  'accounts.summary.farm_table.birds': 'పక్షులు',
+  'accounts.summary.farm_table.pickup_weight': 'పికప్ బరువు (kg)',
+  'accounts.summary.farm_table.rate': 'రేటు (₹/kg)',
+  'accounts.summary.farm_table.total': 'ఫారం చెల్లింపు (₹)',
+  'accounts.summary.farm_table.paid': 'చెల్లించింది (₹)',
+  'accounts.summary.farm_table.balance': 'బకాయి (₹)',
+  'accounts.summary.farm_table.totals': 'మొత్తం',
+  'accounts.summary.farm_table.empty': 'ఈ కాలంలోని ట్రిప్పులకు ఫారం చెల్లింపు నమోదు కాలేదు',
+  'accounts.summary.farm_table.hide': 'ట్రిప్పులు దాచు',
+  'accounts.summary.farm_table.show': 'ట్రిప్పులు చూపు',
   'accounts.summary.farm_payment.title': 'ఫారం చెల్లింపు',
   'accounts.summary.farm_payment.payable': 'చెల్లించవలసినది',
   'accounts.summary.farm_payment.paid': 'చెల్లించింది',
