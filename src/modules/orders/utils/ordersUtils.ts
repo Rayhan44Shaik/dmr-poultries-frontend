@@ -641,6 +641,23 @@ export function weightForBirds(birds: number, avgBirdWeight: number | null | und
   return Number((b * w).toFixed(2));
 }
 
+/**
+ * The weight a collection row carries. The sheet owns a Weight box, so a number
+ * typed there always wins; left empty, the row is worth its birds against the
+ * average bird weight in force (the vehicle's once assigned, the day's before
+ * that). Nothing is invented as a default — an empty box stays empty on screen
+ * and is simply not sent.
+ */
+export function collectionRowWeightKg(
+  typed: number | null | undefined,
+  birds: number,
+  avgBirdWeight: number | null | undefined,
+): number {
+  const t = num(typed);
+  if (t > 0) return Number(t.toFixed(2));
+  return weightForBirds(birds, avgBirdWeight);
+}
+
 // ─── Farm location ───────────────────────────────────────────────────────────
 
 /** Segments that name an area, never a city (district / state / pincode). */
@@ -759,22 +776,6 @@ export function collectionAutoSubmitDelay(day: string, now = new Date()): number
   return Math.max(0, deadline.getTime() - now.getTime());
 }
 
-/**
- * Countdown label for an open day: "1d 04h 12m" (leading units trimmed), or
- * "moments" under a minute — used by the auto-submit chip so the deadline is
- * something you can see moving rather than a date to interpret.
- */
-export function formatCountdown(ms: number): string {
-  if (!Number.isFinite(ms) || ms <= 0) return "moments";
-  const totalMinutes = Math.floor(ms / 60_000);
-  const days = Math.floor(totalMinutes / (60 * 24));
-  const hours = Math.floor((totalMinutes % (60 * 24)) / 60);
-  const minutes = totalMinutes % 60;
-  const pad = (n: number) => String(n).padStart(2, "0");
-  if (days > 0) return `${days}d ${pad(hours)}h ${pad(minutes)}m`;
-  if (hours > 0) return `${hours}h ${pad(minutes)}m`;
-  return `${minutes}m`;
-}
 
 /** Compact chip label: "29 Aug". */
 export function formatDayLabel(day: string): string {

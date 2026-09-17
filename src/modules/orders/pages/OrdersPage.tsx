@@ -16,9 +16,20 @@
 // Existing trip/Step 4 contracts remain the source of truth.
 
 import "./OrdersPage.css";
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useLocation, useNavigate } from "react-router-dom";
-import { ordersCanonicalUrl, ordersDay, ordersTabUrl, resolveOrdersTab } from "../utils/ordersNavigation";
+import {
+  ordersCanonicalUrl,
+  ordersDay,
+  ordersTabUrl,
+  resolveOrdersTab,
+} from "../utils/ordersNavigation";
 import { ORDERS_PAGES } from "../routes/ordersRoutes";
 import { DatabaseZap } from "lucide-react";
 import { useI18n } from "../../../i18n";
@@ -41,19 +52,28 @@ import {
   type SupervisorDirectory,
 } from "../services/ordersService";
 import { useToast } from "../../../components/common/ToastProvider";
-import { buildShopBreakdown, rowsInSequence, type ShopDeliveryBreakdown } from "../utils/ordersUtils";
+import {
+  buildShopBreakdown,
+  rowsInSequence,
+  type ShopDeliveryBreakdown,
+} from "../utils/ordersUtils";
 import { retryableImport } from "../../../routes/lazyWithRetry";
 import type { OrdersFetch, OrdersTrip, OrdersTab } from "../types";
 import { useOrdersI18n } from "../i18n/ordersI18n";
 import { useOrdersShopSource } from "../hooks/useOrdersShopSource";
 import OrderCollectionPage from "./OrderCollectionPage";
-import { OrdersErrorState, OrdersTableSkeleton } from "../components/OrdersCommon";
+import {
+  OrdersErrorState,
+  OrdersTableSkeleton,
+} from "../components/OrdersCommon";
 
 const loadAssignmentPage = () => import("./OrderAssignmentPage");
 const loadTrackingPage = () => import("./DeliveryTrackingPage");
 const OrderAssignmentPage = React.lazy(retryableImport(loadAssignmentPage));
 const DeliveryTrackingPage = React.lazy(retryableImport(loadTrackingPage));
-const OrdersDeliveryDetailView = React.lazy(retryableImport(() => import("../components/OrdersDeliveryDetailView")));
+const OrdersDeliveryDetailView = React.lazy(
+  retryableImport(() => import("../components/OrdersDeliveryDetailView")),
+);
 
 // The module's three pages. `TabKey`/`activeTab` naming is kept for the panel
 // ids (`orders-panel-<tab>`) that the pages, tests and deep links use.
@@ -61,8 +81,16 @@ type TabKey = OrdersTab;
 
 // Warm one page's chunk — never every Orders/PDF chunk up front.
 function preloadTab(tab: TabKey) {
-  const loader = tab === "assignment" ? loadAssignmentPage : tab === "tracking" ? loadTrackingPage : null;
-  if (loader) void loader().catch(() => { /* React.lazy handles retries on open. */ });
+  const loader =
+    tab === "assignment"
+      ? loadAssignmentPage
+      : tab === "tracking"
+        ? loadTrackingPage
+        : null;
+  if (loader)
+    void loader().catch(() => {
+      /* React.lazy handles retries on open. */
+    });
 }
 
 /*
@@ -79,14 +107,36 @@ const NEXT_PAGE: Record<OrdersTab, OrdersTab | null> = {
 
 function OrdersLoadingPanel({ tab }: { tab: TabKey }) {
   const { to } = useOrdersI18n();
-  return <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white" aria-busy="true">
-    <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-slate-50/60 px-5 py-2.5">
-      <input disabled aria-label={to(`orders.search_${tab}`)} placeholder={to(`orders.search_${tab}`)} className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs sm:w-64" />
-      <button type="button" disabled className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-400">{to("orders.col_date")}</button>
-      <button type="button" disabled className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-400">{to("orders.sort")}</button>
+  return (
+    <div
+      className="overflow-hidden rounded-2xl border border-slate-200 bg-white"
+      aria-busy="true"
+    >
+      <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 bg-slate-50/60 px-5 py-2.5">
+        <input
+          disabled
+          aria-label={to(`orders.search_${tab}`)}
+          placeholder={to(`orders.search_${tab}`)}
+          className="h-9 w-full rounded-lg border border-slate-200 bg-white px-3 text-xs sm:w-64"
+        />
+        <button
+          type="button"
+          disabled
+          className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-400"
+        >
+          {to("orders.col_date")}
+        </button>
+        <button
+          type="button"
+          disabled
+          className="h-9 rounded-lg border border-slate-200 bg-white px-3 text-xs text-slate-400"
+        >
+          {to("orders.sort")}
+        </button>
+      </div>
+      <OrdersTableSkeleton rows={6} />
     </div>
-    <OrdersTableSkeleton rows={6} />
-  </div>;
+  );
 }
 
 const OrdersPage: React.FC = () => {
@@ -100,32 +150,54 @@ const OrdersPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const location = useLocation();
   const navigate = useNavigate();
-  const params = useMemo(() => new URLSearchParams(location.search), [location.search]);
+  const params = useMemo(
+    () => new URLSearchParams(location.search),
+    [location.search],
+  );
   // Which page is open is decided by the URL path (see routes/ordersRoutes.ts).
   const activeTab = resolveOrdersTab(location.pathname, location.search);
-  const activePath = ORDERS_PAGES.find((page) => page.tab === activeTab)?.path ?? ORDERS_PAGES[0].path;
+  const activePath =
+    ORDERS_PAGES.find((page) => page.tab === activeTab)?.path ??
+    ORDERS_PAGES[0].path;
   // Switching pages is a route change (the sidebar does it), so the browser
   // back button, a reload and what is on screen always agree.
-  const openPage = useCallback((tab: TabKey) => {
-    navigate(ordersTabUrl(location.search, tab));
-  }, [location.search, navigate]);
+  const openPage = useCallback(
+    (tab: TabKey) => {
+      navigate(ordersTabUrl(location.search, tab));
+    },
+    [location.search, navigate],
+  );
   // Normalise: legacy `?tab=orders&orderTab=x` (and a bare /operations/orders)
   // is replaced by the canonical page path, keeping the operational params.
   useEffect(() => {
     if (location.pathname === activePath) return;
-    navigate(ordersCanonicalUrl(location.pathname, location.search), { replace: true });
+    navigate(ordersCanonicalUrl(location.pathname, location.search), {
+      replace: true,
+    });
   }, [activePath, location.pathname, location.search, navigate]);
   useEffect(() => {
     const next = NEXT_PAGE[activeTab];
     if (!next) return;
     let idle = 0;
-    const schedule = () => { preloadTab(next); };
-    const w = window as Window & { requestIdleCallback?: (cb: IdleRequestCallback, opts?: IdleRequestOptions) => number };
-    if (typeof w.requestIdleCallback === "function") idle = w.requestIdleCallback(schedule, { timeout: 2000 });
+    const schedule = () => {
+      preloadTab(next);
+    };
+    const w = window as Window & {
+      requestIdleCallback?: (
+        cb: IdleRequestCallback,
+        opts?: IdleRequestOptions,
+      ) => number;
+    };
+    if (typeof w.requestIdleCallback === "function")
+      idle = w.requestIdleCallback(schedule, { timeout: 2000 });
     else idle = window.setTimeout(schedule, 1200) as unknown as number;
     return () => {
       const c = w.cancelIdleCallback;
-      if (typeof w.requestIdleCallback === "function" && typeof c === "function") c.call(w, idle);
+      if (
+        typeof w.requestIdleCallback === "function" &&
+        typeof c === "function"
+      )
+        c.call(w, idle);
       else window.clearTimeout(idle);
     };
   }, [activeTab]);
@@ -139,24 +211,35 @@ const OrdersPage: React.FC = () => {
   const [refreshing, setRefreshing] = useState<TabKey | null>(null);
 
   const shopDirectory = useMemo(() => buildShopDirectory(shops), [shops]);
-  const [supervisorDirectory, setSupervisorDirectory] = useState<SupervisorDirectory>(new Map());
+  const [supervisorDirectory, setSupervisorDirectory] =
+    useState<SupervisorDirectory>(new Map());
 
   // Independent collection/assignment days, today by default.
   const today = data?.today ?? "";
   const day = ordersDay(params.get("collectionDate"), today, data?.days ?? []);
-  const assignmentDay = ordersDay(params.get("assignmentDate"), today, data?.days ?? []);
+  const assignmentDay = ordersDay(
+    params.get("assignmentDate"),
+    today,
+    data?.days ?? [],
+  );
   // Days live in the query of the CURRENT page's route, so a reload restores
   // exactly the page + day that was on screen.
   const selectDay = (key: string, value: string) => {
     const next = new URLSearchParams(location.search);
     next.set(key, value);
-    navigate({ pathname: location.pathname, search: next.toString() }, { replace: true });
+    navigate(
+      { pathname: location.pathname, search: next.toString() },
+      { replace: true },
+    );
   };
   useEffect(() => {
     if (!data) return;
     const next = new URLSearchParams(location.search);
     let changed = false;
-    for (const [key, value] of [["collectionDate", day], ["assignmentDate", assignmentDay]]) {
+    for (const [key, value] of [
+      ["collectionDate", day],
+      ["assignmentDate", assignmentDay],
+    ]) {
       if (next.has(key) && next.get(key) !== value) {
         next.set(key, value);
         changed = true;
@@ -183,19 +266,21 @@ const OrdersPage: React.FC = () => {
   // async callbacks (no synchronous setState in the effect body).
   useEffect(() => {
     let cancelled = false;
-    void fetchOrdersData().then(
-      (next) => {
-        if (cancelled) return;
-        setData(next);
-        setError(null);
-      },
-      (e: unknown) => {
-        if (cancelled) return;
-        setError(e instanceof Error ? e.message : "Failed to load orders");
-      }
-    ).finally(() => {
-      if (!cancelled) setLoading(false);
-    });
+    void fetchOrdersData()
+      .then(
+        (next) => {
+          if (cancelled) return;
+          setData(next);
+          setError(null);
+        },
+        (e: unknown) => {
+          if (cancelled) return;
+          setError(e instanceof Error ? e.message : "Failed to load orders");
+        },
+      )
+      .finally(() => {
+        if (!cancelled) setLoading(false);
+      });
     void (async () => {
       try {
         const supDir = await loadSupervisorDirectory();
@@ -219,7 +304,11 @@ const OrdersPage: React.FC = () => {
     let cancelled = false;
     const refresh = () => {
       if (inFlight) return;
-      if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
+      if (
+        typeof document !== "undefined" &&
+        document.visibilityState === "hidden"
+      )
+        return;
       inFlight = true;
       void fetchOrdersData()
         .then((next) => {
@@ -248,7 +337,7 @@ const OrdersPage: React.FC = () => {
 
   const mobileOf = useCallback(
     (trip: Trip) => supervisorMobileOf(trip, supervisorDirectory),
-    [supervisorDirectory]
+    [supervisorDirectory],
   );
 
   // ── Tab 1 / Tab 2 completion flows ─────────────────────────────────────
@@ -296,7 +385,7 @@ const OrdersPage: React.FC = () => {
         setRefreshing(null);
       }
     },
-    [toastSuccess, toastError, to]
+    [toastSuccess, toastError, to],
   );
 
   // ── Row-level operations (PDF / WhatsApp) ──────────────────────────────
@@ -316,17 +405,20 @@ const OrdersPage: React.FC = () => {
             (shopId, shopName) => villageOf(shopId, shopName, shopDirectory),
             ot.originalQuantities,
             (shopId) => shopMobileOf(shopId, shopDirectory),
-            (shopId) => shopNumberOf(shopId, shopDirectory)
+            (shopId) => shopNumberOf(shopId, shopDirectory),
           ),
           language,
         });
       } catch (e) {
-        showNotification(e instanceof Error ? e.message : to("orders.pdf_failed"), "error");
+        showNotification(
+          e instanceof Error ? e.message : to("orders.pdf_failed"),
+          "error",
+        );
       } finally {
         setPdfBusyId(null);
       }
     },
-    [pdfBusyId, mobileOf, shopDirectory, language, to, showNotification]
+    [pdfBusyId, mobileOf, shopDirectory, language, to, showNotification],
   );
 
   const handleWhatsApp = useCallback(
@@ -336,31 +428,45 @@ const OrdersPage: React.FC = () => {
       try {
         const result = await sendOrdersWhatsApp(ot.trip, mobileOf(ot.trip));
         if (result.sent > 0 && result.failed === 0) {
-          showNotification(to("orders.whatsapp_done", { sent: result.sent, total: result.sent }), "success");
+          showNotification(
+            to("orders.whatsapp_done", {
+              sent: result.sent,
+              total: result.sent,
+            }),
+            "success",
+          );
         } else if (result.sent > 0) {
           showNotification(
-            to("orders.whatsapp_partial", { sent: result.sent, failed: result.failed }),
-            "info"
+            to("orders.whatsapp_partial", {
+              sent: result.sent,
+              failed: result.failed,
+            }),
+            "info",
           );
         } else if (result.message?.includes("not configured")) {
           showNotification(to("orders.whatsapp_not_configured"), "info");
         } else if (result.message === "no_rows") {
           showNotification(to("orders.whatsapp_no_rows"), "info");
         } else {
-          showNotification(to("orders.whatsapp_failed", { message: result.message ?? "—" }), "error");
+          showNotification(
+            to("orders.whatsapp_failed", { message: result.message ?? "—" }),
+            "error",
+          );
         }
         return result;
       } catch (e) {
         showNotification(
-          e instanceof Error ? e.message : to("orders.whatsapp_failed", { message: "network" }),
-          "error"
+          e instanceof Error
+            ? e.message
+            : to("orders.whatsapp_failed", { message: "network" }),
+          "error",
         );
         return null;
       } finally {
         setWhatsappBusyId(null);
       }
     },
-    [whatsappBusyId, mobileOf, to, showNotification]
+    [whatsappBusyId, mobileOf, to, showNotification],
   );
 
   // ── Shop-level delivery capture (Tab 3 detail) ─────────────────────────
@@ -382,17 +488,20 @@ const OrdersPage: React.FC = () => {
         await recordShopDelivery(current.trip, { shopId: shop.shopId, boxes });
         await load();
         showNotification(
-          to("orders.delivery_saved_partial", { shop: shop.shopName || "—", boxes }),
-          "success"
+          to("orders.delivery_saved_partial", {
+            shop: shop.shopName || "—",
+            boxes,
+          }),
+          "success",
         );
       } catch (e) {
         showNotification(
           e instanceof Error ? e.message : to("orders.refresh_failed"),
-          "error"
+          "error",
         );
       }
     },
-    [load, to, showNotification]
+    [load, to, showNotification],
   );
 
   // ── Check-popup actions: bank the entries, then submit the trip ─────────
@@ -411,12 +520,13 @@ const OrdersPage: React.FC = () => {
         showNotification(to("orders.pdf_saved_ok"), "success");
         return null;
       } catch (e) {
-        const message = e instanceof Error ? e.message : to("orders.refresh_failed");
+        const message =
+          e instanceof Error ? e.message : to("orders.refresh_failed");
         showNotification(message, "error");
         return message;
       }
     },
-    [load, to, showNotification]
+    [load, to, showNotification],
   );
 
   const handleSubmitTrip = useCallback(
@@ -434,19 +544,27 @@ const OrdersPage: React.FC = () => {
         showNotification(to("orders.pdf_submitted_ok"), "success");
         return null;
       } catch (e) {
-        const message = e instanceof Error ? e.message : to("orders.refresh_failed");
+        const message =
+          e instanceof Error ? e.message : to("orders.refresh_failed");
         showNotification(message, "error");
         return message;
       }
     },
-    [load, to, showNotification]
+    [load, to, showNotification],
   );
 
   // ── Detail view (opened from Delivery Tracking) — a modal over that page ──
   const viewing: OrdersTrip | null =
-    (viewingId != null && data?.tracking.find((t) => t.trip.id === viewingId)) || null;
+    (viewingId != null &&
+      data?.tracking.find((t) => t.trip.id === viewingId)) ||
+    null;
 
-  const dayCollection = data && day ? data.collectionsByDay[day] ?? null : null;
+  // Collection paints its filters before this lands (it only needs the Shop
+  // Master for them), so the page renders through the load instead of being
+  // replaced by a placeholder.
+  const dataPending = loading || !data;
+  const dayCollection =
+    data && day ? (data.collectionsByDay[day] ?? null) : null;
 
   return (
     <div className="orders-workspace">
@@ -464,107 +582,157 @@ const OrdersPage: React.FC = () => {
         </div>
       )}
       <div className="orders-page-content">
-      {error && data && <OrdersErrorState title={to("orders.error_title")} message={error} onRetry={() => void load()} retryLabel={to("orders.retry")} />}
-      <React.Suspense fallback={<OrdersTableSkeleton rows={5} />}>
-        {loading ? (
-          <OrdersLoadingPanel tab={activeTab} />
-        ) : error && !data ? (
+        {error && data && (
           <OrdersErrorState
             title={to("orders.error_title")}
             message={error}
             onRetry={() => void load()}
             retryLabel={to("orders.retry")}
           />
-        ) : data ? (
-          <>
-            {visited.includes("collection") && (
-              <section id="orders-panel-collection" hidden={activeTab !== "collection"} className={activeTab === "collection" ? "motion-safe:animate-page-pop" : undefined}>
-                <React.Suspense fallback={<OrdersTableSkeleton rows={5} />}>
-                <OrderCollectionPage
-                  shops={shops}
-                  shopsLoading={shopsLoading}
-                  shopDirectory={shopDirectory}
-                  day={day}
-                  today={today}
-                  onDaySelect={(value) => selectDay("collectionDate", value)}
-                  collection={dayCollection}
-                  nextTripNo={data.nextTripNo}
-                  onSaved={() => void handleCollectionSaved()}
-                  onFinished={() => void handleCollectionFinished()}
-                  onRefresh={() => void handleRefresh("collection")}
-                  refreshing={refreshing === "collection"}
-                />
-                </React.Suspense>
-              </section>
-            )}
-            {visited.includes("assignment") && (
-              <section id="orders-panel-assignment" hidden={activeTab !== "assignment"} className={activeTab === "assignment" ? "motion-safe:animate-page-pop" : undefined}>
-                <React.Suspense fallback={<OrdersTableSkeleton rows={5} />}>
-                <OrderAssignmentPage
-                  loading={false}
-                  day={assignmentDay}
-                  today={today}
-                  onDaySelect={(value) => selectDay("assignmentDate", value)}
-                  collection={data.collectionsByDay[assignmentDay] ?? null}
-                  eligibleVehicles={data.eligibleVehicles}
-                  dayVehicleViews={data.dayVehicleViews[assignmentDay] ?? []}
-                  shopDirectory={shopDirectory}
-                  supervisorDirectory={supervisorDirectory}
-                  onChanged={() => void handleAssignmentChanged()}
-                  onFinished={() => void handleAssignmentFinished()}
-                  onRefresh={() => void handleRefresh("assignment")}
-                  refreshing={refreshing === "assignment"}
-                />
-                </React.Suspense>
-              </section>
-            )}
-            {visited.includes("tracking") && (
-              <section id="orders-panel-tracking" hidden={activeTab !== "tracking"} className={activeTab === "tracking" ? "motion-safe:animate-page-pop" : undefined}>
-                <React.Suspense fallback={<OrdersTableSkeleton rows={5} />}>
-                <DeliveryTrackingPage
-                  trips={data.tracking}
-                  loading={false}
-                  today={today}
-                  shopDirectory={shopDirectory}
-                  supervisorDirectory={supervisorDirectory}
-                  pdfBusyId={pdfBusyId}
-                  onPdf={(ot) => void handlePdf(ot)}
-                  onView={(ot) => setViewingId(ot.trip.id)}
-                  onRefresh={() => void handleRefresh("tracking")}
-                  refreshing={refreshing === "tracking"}
-                />
-                </React.Suspense>
-              </section>
-            )}
-          </>
-        ) : null}
-      </React.Suspense>
-
+        )}
+        <React.Suspense fallback={<OrdersTableSkeleton rows={5} />}>
+          {error && !data && !dataPending ? (
+            <OrdersErrorState
+              title={to("orders.error_title")}
+              message={error}
+              onRetry={() => void load()}
+              retryLabel={to("orders.retry")}
+            />
+          ) : (
+            <>
+              {visited.includes("collection") && (
+                <section
+                  id="orders-panel-collection"
+                  hidden={activeTab !== "collection"}
+                  className={
+                    activeTab === "collection"
+                      ? "motion-safe:animate-page-pop"
+                      : undefined
+                  }
+                >
+                  <React.Suspense fallback={<OrdersTableSkeleton rows={5} />}>
+                    <OrderCollectionPage
+                      shops={shops}
+                      shopsLoading={shopsLoading}
+                      loading={dataPending}
+                      shopDirectory={shopDirectory}
+                      day={day}
+                      today={today}
+                      onDaySelect={(value) =>
+                        selectDay("collectionDate", value)
+                      }
+                      collection={dayCollection}
+                      nextTripNo={data?.nextTripNo ?? ""}
+                      onSaved={() => void handleCollectionSaved()}
+                      onFinished={() => void handleCollectionFinished()}
+                      onRefresh={() => void handleRefresh("collection")}
+                      refreshing={refreshing === "collection"}
+                    />
+                  </React.Suspense>
+                </section>
+              )}
+              {visited.includes("assignment") && !dataPending && (
+                <section
+                  id="orders-panel-assignment"
+                  hidden={activeTab !== "assignment"}
+                  className={
+                    activeTab === "assignment"
+                      ? "motion-safe:animate-page-pop"
+                      : undefined
+                  }
+                >
+                  <React.Suspense fallback={<OrdersTableSkeleton rows={5} />}>
+                    <OrderAssignmentPage
+                      loading={false}
+                      day={assignmentDay}
+                      today={today}
+                      onDaySelect={(value) =>
+                        selectDay("assignmentDate", value)
+                      }
+                      collection={data.collectionsByDay[assignmentDay] ?? null}
+                      eligibleVehicles={data.eligibleVehicles}
+                      dayVehicleViews={
+                        data.dayVehicleViews[assignmentDay] ?? []
+                      }
+                      shopDirectory={shopDirectory}
+                      supervisorDirectory={supervisorDirectory}
+                      onChanged={() => void handleAssignmentChanged()}
+                      onFinished={() => void handleAssignmentFinished()}
+                      onRefresh={() => void handleRefresh("assignment")}
+                      refreshing={refreshing === "assignment"}
+                    />
+                  </React.Suspense>
+                </section>
+              )}
+              {visited.includes("tracking") && !dataPending && (
+                <section
+                  id="orders-panel-tracking"
+                  hidden={activeTab !== "tracking"}
+                  className={
+                    activeTab === "tracking"
+                      ? "motion-safe:animate-page-pop"
+                      : undefined
+                  }
+                >
+                  <React.Suspense fallback={<OrdersTableSkeleton rows={5} />}>
+                    <DeliveryTrackingPage
+                      trips={data.tracking}
+                      loading={false}
+                      today={today}
+                      shopDirectory={shopDirectory}
+                      supervisorDirectory={supervisorDirectory}
+                      pdfBusyId={pdfBusyId}
+                      onPdf={(ot) => void handlePdf(ot)}
+                      onView={(ot) => setViewingId(ot.trip.id)}
+                      onRefresh={() => void handleRefresh("tracking")}
+                      refreshing={refreshing === "tracking"}
+                    />
+                  </React.Suspense>
+                </section>
+              )}
+              {/* Assignment and Delivery Tracking read their whole shape from the
+                Orders payload, so they keep the placeholder until it lands. */}
+              {dataPending && activeTab !== "collection" ? (
+                <OrdersLoadingPanel tab={activeTab} />
+              ) : null}
+            </>
+          )}
+        </React.Suspense>
       </div>
 
       {/* Delivery detail modal (one clean sheet; no duplicate page header) */}
       {viewing && (
-        <React.Suspense fallback={
-          <div role="status" aria-busy="true" className="fixed inset-0 z-50 grid place-items-center bg-slate-900/20">
-            <div className="rounded-xl bg-white p-4"><OrdersTableSkeleton rows={3} /></div>
-          </div>
-        }>
-        <OrdersDeliveryDetailView
-          orderTrip={viewing}
-          shopDirectory={shopDirectory}
-          supervisorMobile={mobileOf(viewing.trip)}
-          pdfBusy={pdfBusyId === viewing.trip.id}
-          whatsappBusy={whatsappBusyId === viewing.trip.id}
-          onClose={() => setViewingId(null)}
-          onWhatsApp={() => handleWhatsApp(viewing)}
-          onRecordDelivery={(shop, boxes) => handleRecordDelivery(viewing, shop, boxes)}
-          onSaveProgress={() => handleSaveProgress(viewing)}
-          onSubmitTrip={() => handleSubmitTrip(viewing)}
-        />
+        <React.Suspense
+          fallback={
+            <div
+              role="status"
+              aria-busy="true"
+              className="fixed inset-0 z-50 grid place-items-center bg-slate-900/20"
+            >
+              <div className="rounded-xl bg-white p-4">
+                <OrdersTableSkeleton rows={3} />
+              </div>
+            </div>
+          }
+        >
+          <OrdersDeliveryDetailView
+            orderTrip={viewing}
+            shopDirectory={shopDirectory}
+            supervisorMobile={mobileOf(viewing.trip)}
+            pdfBusy={pdfBusyId === viewing.trip.id}
+            whatsappBusy={whatsappBusyId === viewing.trip.id}
+            onClose={() => setViewingId(null)}
+            onWhatsApp={() => handleWhatsApp(viewing)}
+            onRecordDelivery={(shop, boxes) =>
+              handleRecordDelivery(viewing, shop, boxes)
+            }
+            onSaveProgress={() => handleSaveProgress(viewing)}
+            onSubmitTrip={() => handleSubmitTrip(viewing)}
+          />
         </React.Suspense>
       )}
     </div>
   );
-}
+};
 
 export default OrdersPage;

@@ -32,16 +32,25 @@ export function ordersTableZebraRow(index: number, extraClass = ""): string {
 
 /**
  * Trip List density: 16px column padding, 20px body and 16px header padding.
- * The header word is one step larger than the shared 12px, and darker, so a
- * column name reads at a glance beside its icon.
+ * The header word sits at 14px — a step above the shared 12px and above the
+ * table body — so a column name reads at a glance beside its coloured glyph.
  */
-export const ORDERS_TABLE_TH_CLASS = "px-4 py-4 text-left text-[13px] font-bold uppercase tracking-[0.06em] text-slate-700 whitespace-nowrap";
+export const ORDERS_TABLE_TH_CLASS = "px-4 py-4 text-left text-[14px] font-bold uppercase tracking-[0.05em] text-slate-800 whitespace-nowrap";
 
 /**
  * Filter field label for the Orders pages: the Trip List label chrome
- * (uppercase, bold, leading icon) one size up — 12px — because these filter
- * cards hold only a few fields and each has to be readable at a glance.
+ * (uppercase, bold, leading icon) at 13px, and one shade darker — these filter
+ * cards hold only a handful of fields, so each name has to read at a glance.
  */
 export const ORDERS_FILTER_LABEL_CLASS =
-  "mb-2 flex min-h-[17px] items-center gap-2 text-[12px] font-bold uppercase tracking-[0.06em] text-slate-600";
-export const ORDERS_TABLE_TD_CLASS = "px-4 py-5 text-[13px] text-slate-600 align-middle";
+  "mb-2 flex min-h-[17px] items-center gap-2 text-[13px] font-bold uppercase tracking-[0.05em] text-slate-700";
+/**
+ * A number box inside a Collection / Assignment row: compact (28px, so the row
+ * stays tight while its words grow), square-rounded, with a small rise — a soft
+ * shadow at rest that lifts a pixel on hover and lights up its ring on focus.
+ * Each column passes its own tone classes so the box matches its header glyph.
+ */
+export const ORDERS_RISE_INPUT_CLASS =
+  "h-7 w-full rounded-md border px-2 text-[13px] font-semibold shadow-[0_1px_2px_rgba(15,23,42,0.06)] transition-[box-shadow,border-color,transform] duration-150 ease-out hover:shadow-[0_3px_8px_-3px_rgba(15,23,42,0.3)] motion-safe:hover:-translate-y-px focus:outline-none focus:ring-2 focus:ring-slate-400/30";
+
+export const ORDERS_TABLE_TD_CLASS = "px-4 py-5 text-[14px] text-slate-700 align-middle";

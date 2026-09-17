@@ -9,8 +9,8 @@ import {
   COLLECTION_GRACE_DAYS,
   collectionAutoSubmitDelay,
   collectionDeadline,
+  collectionRowWeightKg,
   formatCollectionDeadline,
-  formatCountdown,
   isCollectionAutoClosed,
 } from './ordersUtils';
 
@@ -24,7 +24,8 @@ test('the deadline is printed with the clock time it actually is', () => {
   // Midnight, because the window ends at the start of the third day — and the
   // copy derives it from the Date rather than hardcoding "12:00 AM".
   assert.equal(formatCollectionDeadline('2026-09-16'), '18/09 12:00 AM');
-  assert.equal(formatCollectionDeadline('not-a-day'), '');
+  // A day nobody can name is not a deadline, and prints nothing rather than NaN.
+  assert.equal(formatCollectionDeadline('not-a-date'), '');
 });
 
 test('the day locks on the deadline, not the day after it', () => {
@@ -57,16 +58,16 @@ test('every selectable day fits inside a real setTimeout window', () => {
   assert.ok(latest <= 2 ** 31 - 1, 'a day inside the picker window always arms a timer');
 });
 
-test('the chip counts the window down in d/h/m', () => {
-  const HOUR = 3_600_000;
-  const DAY = 24 * HOUR;
-  // A full day left shows the day first — the unit that matters when deciding
-  // whether there is still time to enter a shop.
-  assert.equal(formatCountdown(DAY + 4 * HOUR + 12 * 60_000), '1d 04h 12m');
-  assert.equal(formatCountdown(6 * HOUR + 1 * 60_000), '6h 01m');
-  assert.equal(formatCountdown(9 * 60_000), '9m');
-  // Past the deadline the day is filed, so nothing counts down any more.
-  assert.equal(formatCountdown(0), 'moments');
-  assert.equal(formatCountdown(-5_000), 'moments');
-  assert.equal(formatCountdown(Number.NaN), 'moments');
+test('a typed weight wins, and an empty box falls back to the birds', () => {
+  // The Weight column is a box on the sheet, not a derived read-out: whatever the
+  // row's own box holds is what the row is worth, decimals and all.
+  assert.equal(collectionRowWeightKg(912.5, 300, 2.4), 912.5);
+  // Left empty (0 / unset), the row is worth its birds at the average in force —
+  // which is why the day's kg still reads a number before anyone types one.
+  assert.equal(collectionRowWeightKg(0, 300, 2.4), 720);
+  assert.equal(collectionRowWeightKg(undefined, 300, 2.4), 720);
+  // Neither birds nor a typed number → nothing, and never a rounding artefact.
+  assert.equal(collectionRowWeightKg(0, 0, 2.4), 0);
+  // A weight stands on its own even with no average to check it against.
+  assert.equal(collectionRowWeightKg(480, 200, null), 480);
 });

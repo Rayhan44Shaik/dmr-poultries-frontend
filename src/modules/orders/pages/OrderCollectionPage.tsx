@@ -46,7 +46,7 @@ import {
   ArrowUpDown,
   Bird,
   Boxes,
-  Calendar,
+  Building2,
   ClipboardList,
   Clock,
   Eraser,
@@ -78,11 +78,11 @@ import {
   collectionAutoSubmitDelay,
   collectionTotals,
   formatCollectionDeadline,
-  formatCountdown,
   formatDayFull,
   formatKg,
   isCollectionAutoClosed,
   rowBoxes,
+  collectionRowWeightKg,
   weightForBirds,
 } from "../utils/ordersUtils";
 import { handleApiError } from "../../../api";
@@ -101,6 +101,7 @@ import {
 import type { OrderShopRow, OrdersDayCollection } from "../types";
 import {
   ORDERS_FILTER_LABEL_CLASS,
+  ORDERS_RISE_INPUT_CLASS as ORDERS_RISE_INPUT,
   ORDERS_TABLE_FONT_CLASS,
   ORDERS_TABLE_TD_CLASS as opsTableTdClass,
   ORDERS_TABLE_TH_CLASS as opsTableThClass,
@@ -196,6 +197,24 @@ function newClientKey(): string {
     : `ck-${Date.now()}-${clientKeySeq}`;
 }
 
+/**
+ * The panel head — shared by the loaded table and by the loading shell, so the
+ * card keeps its exact shape while the day's rows arrive instead of jumping.
+ */
+function CollectionPanelHead() {
+  const { to } = useOrdersI18n();
+  return (
+    <div className="flex items-center gap-3">
+      <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-sky-100 bg-sky-50 text-sky-600 shadow-inner">
+        <ClipboardList size={20} aria-hidden />
+      </span>
+      <h2 className="text-base font-bold tracking-tight text-slate-800">
+        {to("orders.tab_collection")}
+      </h2>
+    </div>
+  );
+}
+
 /** Local editing state for one shop row. */
 type EntryRow = {
   clientKey: string;
@@ -206,13 +225,19 @@ type EntryRow = {
   village: string;
   birds: number;
   boxes: number;
+  /**
+   * Weight typed on this sheet (kg). 0 means "not entered" — the row is then
+   * worth its birds against the average bird weight, which is what the day's
+   * total reads. Nothing is prefilled: the box starts empty every time.
+   */
+  weight: number;
 };
 
 function entrySnapshot(rows: EntryRow[]): string {
   return JSON.stringify(
     rows
-      .filter((r) => r.birds > 0 || r.boxes > 0)
-      .map((r) => [r.shopId, r.birds, r.boxes])
+      .filter((r) => r.birds > 0 || r.boxes > 0 || r.weight > 0)
+      .map((r) => [r.shopId, r.birds, r.boxes, r.weight])
       .sort((a, b) => a[0] - b[0]),
   );
 }
@@ -233,6 +258,7 @@ function buildInitial(
       village: shop.city,
       birds: 0,
       boxes: 0,
+      weight: 0,
     });
   }
   if (dayCollection) {
@@ -242,6 +268,7 @@ function buildInitial(
         existing.id = row.id;
         existing.birds = Number(row.birds) || 0;
         existing.boxes = rowBoxes(row);
+        existing.weight = Number(row.weight) || 0;
       }
     }
   }
@@ -267,7 +294,9 @@ function toOrderShopRows(
         birdTypeId: 0,
         birdType: "",
         birds: r.birds,
-        weight: 0,
+        // Only a weight we were given is sent; the derived one stays a screen
+        // figure so the sheet never invents a number for billing to chase.
+        weight: r.weight,
         mortality: 0,
         mortKg: 0,
         rate: null,
@@ -284,6 +313,11 @@ type Props = {
   /** Active shops from the Shop Master (already filtered + sorted). */
   shops: Shop[];
   shopsLoading: boolean;
+  /**
+   * The day's Orders data is still being fetched. It never blanks the screen:
+   * the filters stay and only the table reports it (the Trip List's contract).
+   */
+  loading: boolean;
   shopDirectory: ShopDirectory;
   /** Selected operational day (YYYY-MM-DD). */
   day: string;
@@ -310,6 +344,8 @@ type CollectionSort =
 
 type CollectionFilters = {
   cityFilters: string[];
+  shopFilters: string[];
+  setShopFilters: (values: string[]) => void;
   setCityFilters: (values: string[]) => void;
   query: string;
   setQuery: (value: string) => void;
@@ -321,38 +357,241 @@ type CollectionFilters = {
 
 function OrderCollectionPage(props: Props) {
   const { to } = useOrdersI18n();
-  const { shops, shopsLoading } = props;
+  const {
+    shops,
+    shopsLoading,
+    loading,
+    shopDirectory,
+    day,
+    today,
+    onDaySelect,
+    onRefresh,
+    refreshing,
+  } = props;
   const [query, setQuery] = useState("");
   const [cityFilters, setCityFilters] = useState<string[]>([]);
+  const [shopFilters, setShopFilters] = useState<string[]>([]);
   const [sortMode, setSortMode] = useState<CollectionSort>("collected");
   const [pageSize, setPageSize] = useState(10);
 
-  // Shops load asynchronously. The stateful editor mounts only once they are
-  // ready (and re-mounts per day via key={day} from the page), so it can seed
-  // its entries in a useState initializer — no effect-based state sync.
-  if (shopsLoading) {
-    return <OrdersTableSkeleton rows={6} />;
+  // The filter card is built HERE, above the loading gate, and it never
+  // unmounts: a filter that is swapped for a skeleton while data arrives is a
+  // filter that throws away what you just picked. City and shop names come from
+  // the Shop Master, which is already in memory, so the controls are usable
+  // immediately — exactly how the Trip List behaves: its filters stay put and
+  // only the table body reports the load.
+  const cityOptions = useMemo(
+    () =>
+      [
+        ...new Set(
+          shops
+            .map((shop) =>
+              villageOf(shop.id, shop.shopName, shopDirectory).trim(),
+            )
+            .filter(Boolean),
+        ),
+      ]
+        .sort((a, b) => a.localeCompare(b))
+        .map((city) => ({ value: city, label: city })),
+    [shops, shopDirectory],
+  );
+  const shopOptions = useMemo(
+    () =>
+      shops
+        .map((shop) => ({ value: shop.shopName, label: shop.shopName }))
+        .sort((a, b) => a.label.localeCompare(b.label)),
+    [shops],
+  );
+  const sortOptions = useMemo(
+    () => [
+      { value: "collected", label: to("orders.sort_collected_first") },
+      { value: "az", label: to("orders.sort_name_az") },
+      { value: "za", label: to("orders.sort_name_za") },
+      // Only what this table actually shows: a shop's vehicle / trip is not a
+      // Collection column, so it is not a Collection sort either.
+      ...[
+        "city_az",
+        "city_za",
+        "birds_asc",
+        "birds_desc",
+        "boxes_asc",
+        "boxes_desc",
+        "weight_asc",
+        "weight_desc",
+        "status",
+      ].map((value) => ({ value, label: to(`orders.sort_${value}`) })),
+    ],
+    [to],
+  );
+
+  const resetFilters = () => {
+    setQuery("");
+    setSortMode("collected");
+    setCityFilters([]);
+    setShopFilters([]);
+    if (day !== today) onDaySelect(today);
+  };
+
+  // One 12-column grid, two rows, every control filling its cell: day · city ·
+  // shop · sort across the first line, then the search (8) with the day's
+  // buttons (4) under it — bottom-aligned on one baseline, all controls 40px.
+  // Labels are 13px and each carries one coloured glyph, never a second copy of
+  // a glyph the field already shows (which is why the date has no icon here: the
+  // picker's own calendar is the one you click).
+  const filterCard = (
+    <section
+      className={opsFilterCardClass}
+      aria-label={to("orders.collection_filters")}
+    >
+      <div className="grid grid-cols-1 gap-x-3.5 gap-y-4 sm:grid-cols-2 lg:grid-cols-12 lg:items-end">
+        <div className="lg:col-span-3">
+          <div className={ORDERS_FILTER_LABEL_CLASS}>
+            <span>{to("orders.col_date")}</span>
+          </div>
+          <OrdersDateControl
+            day={day}
+            today={today}
+            onDaySelect={onDaySelect}
+            t={to}
+            hideDayChip
+            className="w-full"
+            fieldClassName="w-full"
+          />
+        </div>
+        <div className="lg:col-span-3">
+          <div className={ORDERS_FILTER_LABEL_CLASS}>
+            <MapPin
+              size={17}
+              className="text-amber-500 flex-shrink-0"
+              aria-hidden
+            />
+            <span>{to("orders.city")}</span>
+          </div>
+          <OrdersMultiSelect
+            values={cityFilters}
+            onChange={setCityFilters}
+            options={cityOptions}
+            ariaLabel={to("orders.filter_city")}
+            placeholder={to("orders.filter_city_all")}
+            className="w-full"
+            widthClass="w-full"
+          />
+        </div>
+        <div className="lg:col-span-3">
+          <div className={ORDERS_FILTER_LABEL_CLASS}>
+            <Building2
+              size={17}
+              className="text-sky-600 flex-shrink-0"
+              aria-hidden
+            />
+            <span>{to("orders.filter_shop")}</span>
+          </div>
+          <OrdersMultiSelect
+            values={shopFilters}
+            onChange={setShopFilters}
+            options={shopOptions}
+            ariaLabel={to("orders.filter_shop")}
+            placeholder={to("orders.filter_shop_all")}
+            className="w-full"
+            widthClass="w-full"
+          />
+        </div>
+        <div className="lg:col-span-3">
+          <div className={ORDERS_FILTER_LABEL_CLASS}>
+            <ArrowUpDown
+              size={17}
+              className="text-violet-500 flex-shrink-0"
+              aria-hidden
+            />
+            <span>{to("orders.sort")}</span>
+          </div>
+          <OrdersDropdown
+            value={sortMode}
+            onChange={(value) => setSortMode(value as CollectionSort)}
+            options={sortOptions}
+            ariaLabel={to("orders.sort")}
+            className="w-full"
+            widthClass="w-full"
+          />
+        </div>
+        <div className="sm:col-span-2 lg:col-span-8">
+          <div className={ORDERS_FILTER_LABEL_CLASS}>
+            <span>{to("orders.search_label")}</span>
+          </div>
+          <OrdersSearchInput
+            value={query}
+            onChange={setQuery}
+            placeholder={to("orders.search_collection")}
+            className="w-full"
+          />
+        </div>
+        <div className="flex flex-wrap items-center gap-2 sm:justify-end lg:col-span-4">
+          <button
+            type="button"
+            className={`group relative ${opsSecondaryButtonClass}`}
+            onClick={resetFilters}
+            aria-label={to("common.reset")}
+          >
+            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]">
+              <RotateCcw size={14} />
+            </span>
+            {to("common.reset")}
+          </button>
+          <BrandRefreshButton onClick={onRefresh} loading={refreshing} />
+        </div>
+      </div>
+    </section>
+  );
+
+  // Shops and the day's collection land at different times; both are the
+  // TABLE's problem to report, never the filter's.
+  if (loading || shopsLoading) {
+    return (
+      <div className="space-y-5">
+        {filterCard}
+        <div
+          className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm"
+          aria-busy="true"
+        >
+          <div className="border-b border-slate-100 bg-sky-50/40 px-6 py-3">
+            <CollectionPanelHead />
+          </div>
+          <OrdersTableSkeleton rows={6} />
+        </div>
+      </div>
+    );
   }
   if (shops.length === 0) {
     return (
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm">
-        <OrdersEmptyState title={to("orders.no_active_shops")} />
+      <div className="space-y-5">
+        {filterCard}
+        <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+          <OrdersEmptyState title={to("orders.no_active_shops")} />
+        </div>
       </div>
     );
   }
   return (
-    <CollectionEntries
-      key={props.day}
-      {...props}
-      query={query}
-      setQuery={setQuery}
-      cityFilters={cityFilters}
-      setCityFilters={setCityFilters}
-      sortMode={sortMode}
-      setSortMode={setSortMode}
-      pageSize={pageSize}
-      setPageSize={setPageSize}
-    />
+    <div className="space-y-5">
+      {filterCard}
+      {/* Shops load asynchronously. The stateful editor mounts only once they are
+          ready (and re-mounts per day via key={day}), so it can seed its entries
+          in a useState initializer — no effect-based state sync. */}
+      <CollectionEntries
+        key={props.day}
+        {...props}
+        query={query}
+        setQuery={setQuery}
+        cityFilters={cityFilters}
+        setCityFilters={setCityFilters}
+        shopFilters={shopFilters}
+        setShopFilters={setShopFilters}
+        sortMode={sortMode}
+        setSortMode={setSortMode}
+        pageSize={pageSize}
+        setPageSize={setPageSize}
+      />
+    </div>
   );
 }
 
@@ -361,22 +600,19 @@ function CollectionEntries({
   shopDirectory,
   day,
   today,
-  onDaySelect,
   collection,
   nextTripNo,
   onSaved,
   onFinished,
-  onRefresh,
   refreshing,
   cityFilters,
-  setCityFilters,
+  shopFilters,
   query,
-  setQuery,
   sortMode,
-  setSortMode,
   pageSize,
   setPageSize,
-}: Omit<Props, "shopsLoading"> & CollectionFilters) {
+}: Omit<Props, "shopsLoading" | "loading" | "onDaySelect" | "onRefresh"> &
+  CollectionFilters) {
   const { to } = useOrdersI18n();
   const { showNotification } = useSafeNotification();
 
@@ -385,9 +621,10 @@ function CollectionEntries({
   const isAutoClosed = isCollectionAutoClosed(day);
   const isPast = day < today;
 
-  // The chip ticks (30s) so the closing moment is something you can watch
-  // moving, not a date to interpret. One interval, and only while the day can
-  // still be edited — a closed day has nothing left to count down to.
+  // The chip ticks (30s) so the deadline reads as something moving rather than
+  // a date to interpret — no countdown text beside it, only the window filling
+  // underneath. One interval, and only while the day can still be edited: a
+  // closed day has nothing left to count down to.
   const [nowMs, setNowMs] = useState(() => Date.now());
   useEffect(() => {
     if (isAutoClosed) return;
@@ -397,7 +634,6 @@ function CollectionEntries({
   const autoSubmitDeadline = formatCollectionDeadline(day);
   const autoSubmitRemainingMs =
     collectionAutoSubmitDelay(day, new Date(nowMs)) ?? 0;
-  const autoSubmitRemaining = formatCountdown(autoSubmitRemainingMs);
   const autoSubmitProgressPct = Math.min(
     100,
     Math.max(
@@ -465,20 +701,45 @@ function CollectionEntries({
       Array.from(entries.values()).filter((r) => r.birds > 0 || r.boxes > 0),
     [entries],
   );
-  const totals = useMemo(
-    () => collectionTotals(toOrderShopRows(entered)),
-    [entered],
+  // The average in force for the day's own rows: a vehicle's once the shop is on
+  // one, the day's before that. Declared here so the totals and every row read
+  // the same number.
+  const dayAvgBirdWeight = Number(collection?.trip.avgBirdWeight) || 0;
+  /** What one row is worth in kg: typed weight first, birds × average next. */
+  const rowWeightKg = useCallback(
+    (row: { birds: number; weight: number } | undefined, shopId: number) =>
+      collectionRowWeightKg(
+        row?.weight,
+        row?.birds ?? 0,
+        collection?.shops.get(shopId)?.avgBirdWeight ?? dayAvgBirdWeight,
+      ),
+    [collection, dayAvgBirdWeight],
   );
+  const totals = useMemo(() => {
+    const base = collectionTotals(toOrderShopRows(entered));
+    // collectionTotals can only add up what the sheet carries, and an empty Weight
+    // box carries nothing — so the day's kg is summed from each row's effective
+    // weight instead of the raw payload.
+    const weight = entered.reduce(
+      (sum, row) => sum + rowWeightKg(row, row.shopId),
+      0,
+    );
+    return { ...base, totalWeight: Number(weight.toFixed(2)) };
+  }, [entered, rowWeightKg]);
 
   // The day's own average bird weight comes from the collection container, so
   // an ordered row shows its weight before it is assigned to a vehicle (the
   // vehicle's own average takes over once the row has an assignment).
-  const dayAvgBirdWeight = Number(collection?.trip.avgBirdWeight) || 0;
 
   // ── Row updates (editable days only) ─────────────────────────────────────
   const updateEntry = useCallback(
-    (shopId: number, field: "birds" | "boxes", raw: string) => {
-      const n = Math.max(0, Math.min(9999, Math.floor(Number(raw) || 0)));
+    (shopId: number, field: "birds" | "boxes" | "weight", raw: string) => {
+      // Birds and boxes are counts; weight is a measured kg figure, so it keeps
+      // its decimals (2dp) instead of being floored like a count.
+      const n =
+        field === "weight"
+          ? Math.max(0, Math.min(999999, Number(raw) || 0))
+          : Math.max(0, Math.min(9999, Math.floor(Number(raw) || 0)));
       setEntries((prev) => {
         const row = prev.get(shopId);
         if (!row) return prev;
@@ -502,7 +763,9 @@ function CollectionEntries({
       const row = entries.get(shopId);
       if (!row) return;
       const next = new Map(entries);
-      next.set(shopId, { ...row, birds: 0, boxes: 0 });
+      // Birds and boxes go to zero and the typed weight goes with them, so the
+      // row cannot end up "0 birds, 900 kg".
+      next.set(shopId, { ...row, birds: 0, boxes: 0, weight: 0 });
       if (row.id === 0) {
         // Nothing on the server yet — zero locally and let Save Progress carry it.
         setEntries(next);
@@ -673,12 +936,21 @@ function CollectionEntries({
 
   // ── Read-only state copy (persisted values only) ─────────────────────────
   const readOnlyEntries = useMemo(() => {
-    const map = new Map<number, { id: number; birds: number; boxes: number }>();
+    const map = new Map<
+      number,
+      {
+        id: number;
+        birds: number;
+        boxes: number;
+        weight: number;
+      }
+    >();
     for (const row of collection ? toEditorRows(collection.trip) : []) {
       map.set(row.shopId, {
         id: row.id,
         birds: Number(row.birds) || 0,
         boxes: rowBoxes(row),
+        weight: Number(row.weight) || 0,
       });
     }
     return map;
@@ -711,28 +983,7 @@ function CollectionEntries({
   // ── Compact table-level sort (works with search + pagination + date) ────
   // "Collected" = the shop has an order entry for the selected day
   // (persisted, or in-progress on an editable day).
-  const sortOptions = useMemo(
-    () => [
-      { value: "collected", label: to("orders.sort_collected_first") },
-      { value: "az", label: to("orders.sort_name_az") },
-      { value: "za", label: to("orders.sort_name_za") },
-      // Only what this table actually shows: a shop's vehicle / trip is not a
-      // Collection column, so it is not a Collection sort either.
-      ...[
-        "city_az",
-        "city_za",
-        "birds_asc",
-        "birds_desc",
-        "boxes_asc",
-        "boxes_desc",
-        "weight_asc",
-        "weight_desc",
-        "status",
-      ].map((value) => ({ value, label: to(`orders.sort_${value}`) })),
-    ],
-    [to],
-  );
-
+  /** "Collected" for a row = it holds an order, saved or being typed right now. */
   const collectedOf = useCallback(
     (shopId: number): boolean => {
       const ro = readOnlyEntries.get(shopId);
@@ -746,22 +997,8 @@ function CollectionEntries({
     [readOnlyEntries, entries, isEditable],
   );
 
-  const cityOptions = useMemo(
-    () =>
-      [
-        ...new Set(
-          shops
-            .map((shop) =>
-              villageOf(shop.id, shop.shopName, shopDirectory).trim(),
-            )
-            .filter(Boolean),
-        ),
-      ]
-        .sort((a, b) => a.localeCompare(b))
-        .map((city) => ({ value: city, label: city })),
-    [shops, shopDirectory],
-  );
   const citySet = useMemo(() => new Set(cityFilters), [cityFilters]);
+  const shopSet = useMemo(() => new Set(shopFilters), [shopFilters]);
 
   const filteredShopList = useMemo(() => {
     const list = shops.filter((shop) => {
@@ -770,6 +1007,9 @@ function CollectionEntries({
         !citySet.has(villageOf(shop.id, shop.shopName, shopDirectory).trim())
       )
         return false;
+      // The shop-name dropdown picks exact shops; the search box still narrows
+      // inside that pick rather than replacing it.
+      if (shopSet.size && !shopSet.has(shop.shopName)) return false;
       if (!q) return true;
       const assignment = collection?.shops.get(shop.id) ?? null;
       const ro = readOnlyEntries.get(shop.id);
@@ -803,9 +1043,11 @@ function CollectionEntries({
         city: villageOf(shop.id, shop.shopName, shopDirectory),
         birds,
         boxes: entry?.boxes ?? 0,
-        weight: weightForBirds(
-          birds,
-          assignment?.avgBirdWeight ?? dayAvgBirdWeight,
+        weight: rowWeightKg(
+          isEditable
+            ? entry
+            : { birds, weight: readOnlyEntries.get(shop.id)?.weight ?? 0 },
+          shop.id,
         ),
         sequence: shop.id,
         vehicle: assignment?.vehicleNo ?? "",
@@ -840,14 +1082,15 @@ function CollectionEntries({
     sortMode,
     collectedOf,
     citySet,
-    dayAvgBirdWeight,
+    shopSet,
+    rowWeightKg,
   ]);
 
   // ── Pagination (existing global component; reset to page 1 when the
   //     filtered result or the day changes) ─────────────────────────────────
   const totalPages = Math.max(1, Math.ceil(filteredShopList.length / pageSize));
   const [page, setPage] = useState(1);
-  const listKey = `${day}|${q}|${sortMode}|${pageSize}|${cityFilters.join(",")}`;
+  const listKey = `${day}|${q}|${sortMode}|${pageSize}|${cityFilters.join(",")}|${shopFilters.join(",")}`;
   const [lastKey, setLastKey] = useState(listKey);
   if (lastKey !== listKey) {
     setLastKey(listKey);
@@ -861,126 +1104,25 @@ function CollectionEntries({
   const startIndex =
     filteredShopList.length === 0 ? 0 : (safePage - 1) * pageSize;
 
-  // One 12-column grid, two rows, every control filling its cell: day · city ·
-  // sort on the first line, the search and the day's actions under it, all
-  // bottom-aligned on one baseline with the same 40px controls the Trip List
-  // uses. Labels are one size up; the search keeps only its own magnifier.
-  const filterCard = (
-    <section
-      className={opsFilterCardClass}
-      aria-label={to("orders.collection_filters")}
-    >
-      <div className="grid grid-cols-1 gap-x-3.5 gap-y-4 sm:grid-cols-2 lg:grid-cols-12 lg:items-end">
-        <div className="lg:col-span-4">
-          <div className={ORDERS_FILTER_LABEL_CLASS}>
-            <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
-            <span>{to("orders.col_date")}</span>
-          </div>
-          <OrdersDateControl
-            day={day}
-            today={today}
-            onDaySelect={onDaySelect}
-            t={to}
-            hideDayChip
-            className="w-full"
-            fieldClassName="w-full"
-          />
-        </div>
-        <div className="lg:col-span-4">
-          <div className={ORDERS_FILTER_LABEL_CLASS}>
-            <MapPin size={17} className="text-amber-500 flex-shrink-0" />
-            <span>{to("orders.city")}</span>
-          </div>
-          <OrdersMultiSelect
-            values={cityFilters}
-            onChange={setCityFilters}
-            options={cityOptions}
-            ariaLabel={to("orders.filter_city")}
-            placeholder={to("orders.filter_city_all")}
-            className="w-full"
-            widthClass="w-full"
-          />
-        </div>
-        <div className="lg:col-span-4">
-          <div className={ORDERS_FILTER_LABEL_CLASS}>
-            <ArrowUpDown size={17} className="text-violet-500 flex-shrink-0" />
-            <span>{to("orders.sort")}</span>
-          </div>
-          <OrdersDropdown
-            value={sortMode}
-            onChange={(value) => setSortMode(value as CollectionSort)}
-            options={sortOptions}
-            ariaLabel={to("orders.sort")}
-            className="w-full"
-            widthClass="w-full"
-          />
-        </div>
-        <div className="sm:col-span-2 lg:col-span-8">
-          <div className={ORDERS_FILTER_LABEL_CLASS}>
-            <span>{to("orders.search_label")}</span>
-          </div>
-          <OrdersSearchInput
-            value={query}
-            onChange={setQuery}
-            placeholder={to("orders.search_collection")}
-            className="w-full"
-          />
-        </div>
-        <div className="flex flex-wrap items-center gap-2 sm:justify-end lg:col-span-4">
-          <button
-            type="button"
-            className={`group relative ${opsSecondaryButtonClass}`}
-            onClick={() => {
-              setQuery("");
-              setSortMode("collected");
-              setCityFilters([]);
-              setPage(1);
-              if (day !== today) onDaySelect(today);
-            }}
-            aria-label={to("common.reset")}
-          >
-            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]">
-              <RotateCcw size={14} />
-            </span>
-            {to("common.reset")}
-          </button>
-          <BrandRefreshButton onClick={onRefresh} loading={refreshing} />
-        </div>
-      </div>
-    </section>
-  );
-  const tableTitle = (
-    <div className="flex items-center gap-3">
-      <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-sky-100 bg-sky-50 text-sky-600 shadow-inner">
-        <ClipboardList size={20} aria-hidden />
-      </span>
-      <h2 className="text-base font-bold tracking-tight text-slate-800">
-        {to("orders.tab_collection")}
-      </h2>
-    </div>
-  );
+  const tableTitle = <CollectionPanelHead />;
 
   // ── Render ────────────────────────────────────────────────────────────────
   // Closed day with nothing collected: clean empty state (read-only by nature).
   if (isAutoClosed && !collection) {
     return (
-      <div className="space-y-5">
-        {filterCard}
-        <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
-          <div className="border-b border-slate-100 bg-sky-50/40 px-6 py-3">
-            {tableTitle}
-          </div>
-          <OrdersEmptyState
-            title={to("orders.no_orders_for_day", { date: formatDayFull(day) })}
-          />
+      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+        <div className="border-b border-slate-100 bg-sky-50/40 px-6 py-3">
+          {tableTitle}
         </div>
+        <OrdersEmptyState
+          title={to("orders.no_orders_for_day", { date: formatDayFull(day) })}
+        />
       </div>
     );
   }
 
   return (
-    <div className="space-y-5">
-      {filterCard}
+    <>
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
         <div className="flex flex-wrap items-center gap-3 border-b border-slate-100 bg-gradient-to-r from-sky-50/60 via-white to-sky-50/40 px-6 py-3">
           {tableTitle}
@@ -1025,13 +1167,6 @@ function CollectionEntries({
                   {to("orders.auto_submits_at", {
                     deadline: autoSubmitDeadline,
                   })}
-                </span>
-                <span
-                  className="font-semibold tabular-nums text-sky-600 motion-safe:transition-opacity motion-safe:duration-500"
-                  aria-live="off"
-                >
-                  ·{" "}
-                  {to("orders.auto_submits_in", { time: autoSubmitRemaining })}
                 </span>
                 <span
                   className="pointer-events-none absolute inset-x-0 bottom-0 h-[2px] bg-sky-500/15"
@@ -1143,6 +1278,21 @@ function CollectionEntries({
                     : (ro?.boxes ?? 0);
                   const hasEntry = birds > 0 || boxes > 0;
                   const assignment = collection?.shops.get(shop.id) ?? null;
+                  // Weight: what this sheet typed, else what the birds are worth
+                  // at the average in force. The empty box keeps the derived
+                  // number as its placeholder, so nothing is ever prefilled.
+                  const typedKg = isEditable
+                    ? (live?.weight ?? 0)
+                    : (ro?.weight ?? 0);
+                  const autoKg = weightForBirds(
+                    birds,
+                    assignment?.avgBirdWeight ?? dayAvgBirdWeight,
+                  );
+                  const rowKg = collectionRowWeightKg(
+                    typedKg,
+                    birds,
+                    assignment?.avgBirdWeight ?? dayAvgBirdWeight,
+                  );
                   // Inside the undo window: the row is marked, nothing has changed.
                   const clearing = isPending(shop.id);
 
@@ -1254,7 +1404,7 @@ function CollectionEntries({
                               updateEntry(shop.id, "birds", e.target.value)
                             }
                             onWheel={onOrdersNumberWheel}
-                            className={`${ORDERS_NO_SPINNER} h-8 w-full rounded-lg border border-emerald-300/70 bg-emerald-50/50 px-2 text-xs font-medium text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500`}
+                            className={`${ORDERS_NO_SPINNER} ${ORDERS_RISE_INPUT} border-emerald-300/70 bg-emerald-50/50 text-emerald-900 focus:border-emerald-500`}
                           />
                         ) : (
                           <span className="font-medium text-slate-700">
@@ -1274,7 +1424,7 @@ function CollectionEntries({
                               updateEntry(shop.id, "boxes", e.target.value)
                             }
                             onWheel={onOrdersNumberWheel}
-                            className={`${ORDERS_NO_SPINNER} h-8 w-full rounded-lg border border-emerald-300/70 bg-emerald-50/50 px-2 text-xs font-medium text-emerald-900 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500`}
+                            className={`${ORDERS_NO_SPINNER} ${ORDERS_RISE_INPUT} border-violet-300/70 bg-violet-50/50 text-violet-900 focus:border-violet-500`}
                           />
                         ) : (
                           <span className="font-medium text-slate-700">
@@ -1287,15 +1437,23 @@ function CollectionEntries({
                           the vehicle's average bird weight once it is assigned,
                           and the day's own average before that — so a collected
                           row never shows a dash when its birds are known. */}
-                        {birds > 0 &&
-                        (assignment?.avgBirdWeight ?? dayAvgBirdWeight) > 0 ? (
+                        {isEditable ? (
+                          <input
+                            type="number"
+                            min={0}
+                            step="0.01"
+                            value={typedKg || ""}
+                            placeholder={autoKg ? String(autoKg) : "0"}
+                            aria-label={`${to("orders.col_weight")} — ${shop.shopName}`}
+                            onChange={(e) =>
+                              updateEntry(shop.id, "weight", e.target.value)
+                            }
+                            onWheel={onOrdersNumberWheel}
+                            className={`${ORDERS_NO_SPINNER} ${ORDERS_RISE_INPUT} text-right border-teal-300/70 bg-teal-50/50 text-teal-900 focus:border-teal-500`}
+                          />
+                        ) : rowKg > 0 ? (
                           <span className="font-medium text-slate-600">
-                            {formatKg(
-                              weightForBirds(
-                                birds,
-                                assignment?.avgBirdWeight ?? dayAvgBirdWeight,
-                              ),
-                            )}
+                            {formatKg(rowKg)}
                           </span>
                         ) : (
                           <span className="text-slate-400">—</span>
@@ -1321,10 +1479,10 @@ function CollectionEntries({
                                   })
                                 : `${to("orders.clear_entry")} — ${shop.shopName}`
                             }
-                            className={`inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-lg border px-1.5 text-[11px] font-bold transition-colors ${
+                            className={`group/clear inline-flex h-8 min-w-8 items-center justify-center gap-1 rounded-lg border px-1.5 text-[11px] font-bold transition-[color,background-color,border-color,box-shadow,transform] duration-200 ease-out ${
                               clearing
                                 ? "border-amber-300 bg-amber-100/70 text-amber-700 motion-safe:animate-pulse"
-                                : "border-slate-200/80 bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 disabled:opacity-30"
+                                : "border-slate-200/80 bg-white text-slate-400 hover:border-rose-300 hover:bg-rose-50 hover:text-rose-600 hover:shadow-[0_4px_12px_-4px_rgba(244,63,94,0.55)] motion-safe:hover:-translate-y-px active:translate-y-0 motion-safe:active:scale-95 disabled:opacity-30 disabled:shadow-none"
                             }`}
                           >
                             {clearing ? (
@@ -1335,7 +1493,14 @@ function CollectionEntries({
                                 </span>
                               </>
                             ) : (
-                              <Eraser size={14} />
+                              // The eraser does the work on hover — it tilts and
+                              // slides across the cell the way a hand would.
+                              <span
+                                className="inline-flex motion-safe:transition-transform motion-safe:duration-200 motion-safe:ease-out motion-safe:group-hover/clear:-translate-x-px motion-safe:group-hover/clear:rotate-[-14deg] motion-safe:group-active/clear:rotate-[6deg]"
+                                aria-hidden
+                              >
+                                <Eraser size={14} />
+                              </span>
                             )}
                           </button>
                         ) : (
@@ -1479,7 +1644,7 @@ function CollectionEntries({
         ariaLabel={to("orders.pending_clear_aria")}
         countdownLabel={(seconds) => to("orders.clear_in_seconds", { seconds })}
       />
-    </div>
+    </>
   );
 }
 

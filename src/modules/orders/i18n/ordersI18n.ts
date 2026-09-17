@@ -72,7 +72,6 @@ const EN: Record<string, string> = {
   // The day is filed by its deadline, never by a button.
   "orders.auto_submits_at": "Auto-submits {deadline}",
   // Chip countdown: the deadline is shown as time left, so it visibly moves.
-  "orders.auto_submits_in": "in {time}",
   "orders.collection_auto_submitted":
     "Collection window closed — the day's orders were submitted automatically.",
   "orders.collection_auto_submitted_partial":
@@ -412,6 +411,8 @@ const EN: Record<string, string> = {
   "orders.search_pool": "Search shop, city, vehicle, trip…",
   "orders.filter_shops": "Refine shops",
   "orders.filter_city": "City",
+  "orders.filter_shop": "Shop",
+  "orders.filter_shop_all": "All shops",
   "orders.filter_city_all": "All cities",
   "orders.pool_filter_all": "All shops",
   "orders.pool_filter_pending": "Pending (not assigned)",
@@ -507,7 +508,6 @@ const TE: Record<string, string> = {
   "orders.saving": "సేవ్ అవుతోంది…",
   "orders.submitting": "సబ్మిట్ అవుతోంది…",
   "orders.auto_submits_at": "{deadline}కు ఆటో-సబ్మిట్ అవుతుంది",
-  "orders.auto_submits_in": "{time} లోపల",
   "orders.collection_auto_submitted":
     "సేకరణ సమయం ముగిసింది — రోజు ఆర్డర్లు ఆటోమేటిక్‌గా సబ్మిట్ అయ్యాయి.",
   "orders.collection_auto_submitted_partial":
@@ -853,6 +853,8 @@ const TE: Record<string, string> = {
   "orders.search_pool": "షాప్, సిటీ, వాహనం, ట్రిప్ వెతకండి…",
   "orders.filter_shops": "షాప్‌లను ఫిల్టర్ చేయండి",
   "orders.filter_city": "సిటీ",
+  "orders.filter_shop": "షాప్",
+  "orders.filter_shop_all": "అన్ని షాప్‌లు",
   "orders.filter_city_all": "అన్ని సిటీలు",
   "orders.pool_filter_all": "అన్ని షాప్‌లు",
   "orders.pool_filter_pending": "పెండింగ్ (కేటాయించలేదు)",

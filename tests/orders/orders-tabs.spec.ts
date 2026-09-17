@@ -236,7 +236,8 @@ test("collection columns are collection-only, and every header carries its icon"
     "Status",
     "Action",
   ]);
-  // One glyph per column, in the same 14px size the Trip List headers use.
+  // One glyph per column, each in its own colour — and never the same glyph
+  // twice for one control (15px here, so it reads beside a 14px word).
   await expect(
     page.locator("#orders-panel-collection thead th svg"),
   ).toHaveCount(8);
@@ -257,25 +258,33 @@ test("the day total is a cumulative line below the table, not a header KPI", asy
   await expect(panel.getByText(/\d+ shops · \d+ boxes/)).toHaveCount(0);
 });
 
-test("filters fill one grid: day · city · sort on the line, search + actions under it", async ({
+test("filters fill one grid: day · city · shop · sort on the line, search + actions under it", async ({
   page,
 }) => {
   await page.goto(`${ORDERS}/collection`);
   const card = page.getByRole("region", { name: "Order Collection filters" });
   const label = (name: string) => card.getByText(name, { exact: true }).first();
   const box = async (name: string) => await label(name).boundingBox();
-  const [date, city, sort, search] = await Promise.all([
+  const [date, city, shop, sort, search] = await Promise.all([
     box("Date"),
     box("City"),
+    box("Shop"),
     box("Sort"),
     box("Search"),
   ]);
-  expect(date && city && sort && search).toBeTruthy();
-  // One row for the three fields, left to right: day, area, order of rows.
-  expect(Math.abs(date!.y - city!.y) <= 2).toBe(true);
-  expect(Math.abs(date!.y - sort!.y) <= 2).toBe(true);
+  expect(date && city && shop && sort && search).toBeTruthy();
+  // Four fields share one row, left to right: day, area, shop, order of rows.
+  for (const other of [city!, shop!, sort!]) {
+    expect(Math.abs(date!.y - other.y) <= 2).toBe(true);
+  }
   expect(date!.x < city!.x).toBe(true);
-  expect(city!.x < sort!.x).toBe(true);
+  expect(city!.x < shop!.x).toBe(true);
+  expect(shop!.x < sort!.x).toBe(true);
+  // Equal weight: nothing on the line is allowed to be twice the width of its
+  // neighbour, which is what made the first pass read as controls floating in a
+  // wide card.
+  const widths = [date!, city!, shop!, sort!].map((b) => b.width);
+  expect(Math.max(...widths) / Math.min(...widths)).toBeLessThan(2);
   // The search runs the width of the card and takes the row under the fields,
   // with Reset + Refresh closing it on the right.
   const cardBox = await card.boundingBox();
@@ -309,12 +318,14 @@ test("every filter control is the same height as the trip list inputs", async ({
   const heights = await Promise.all([
     card.getByTestId("orders-date-picker").locator("input").boundingBox(),
     card.getByRole("button", { name: "City", exact: true }).boundingBox(),
+    card.getByRole("button", { name: "Shop", exact: true }).boundingBox(),
     card.getByRole("button", { name: "Sort", exact: true }).boundingBox(),
     card.getByRole("textbox", { name: /search/i }).boundingBox(),
   ]);
   for (const box of heights) {
     expect(box, "control renders").toBeTruthy();
-    // 40px (h-10) — the shared input height, so one grid line runs through all four.
+    // 40px (h-10) — the shared input height, so one grid line runs through every
+    // field on the card.
     expect(
       Math.abs(box!.height - 40) <= 1,
       `control height ${box!.height}`,
@@ -330,6 +341,99 @@ test("no tooltip is left on the collection screen", async ({ page }) => {
   await expect(
     page.locator("#orders-panel-collection").getByTitle(/./),
   ).toHaveCount(0);
+});
+
+test("the shop-name filter narrows the sheet to the shops picked", async ({
+  page,
+}) => {
+  await page.goto(`${ORDERS}/collection`);
+  const card = page.getByRole("region", { name: "Order Collection filters" });
+  const panel = page.locator("#orders-panel-collection");
+  const firstName = (
+    await panel.locator("tbody tr td:nth-child(2)").first().innerText()
+  ).trim();
+
+  await card.getByRole("button", { name: "Shop", exact: true }).click();
+  const listbox = card.getByRole("listbox");
+  await listbox.getByRole("button", { name: firstName, exact: true }).click();
+  await page.keyboard.press("Escape");
+
+  // Only that shop is left on the sheet, and the picker says so with a count.
+  await expect(panel.locator("tbody tr")).toHaveCount(1);
+  await expect(panel.locator("tbody tr").first()).toContainText(firstName);
+  await expect(
+    card.getByRole("button", { name: "Shop", exact: true }),
+  ).not.toHaveText("All shops");
+});
+
+test("only the table loads: the filter card stays mounted while data is in flight", async ({
+  page,
+}) => {
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  // Every source request is held, so this is the first paint of the page — the
+  // moment the whole screen used to be swapped for a skeleton.
+  await page.route("**/api/**", async (route) => {
+    await gate;
+    await route.continue();
+  });
+  try {
+    await page.goto(`${ORDERS}/collection`, { waitUntil: "commit" });
+    const card = page.getByRole("region", { name: "Order Collection filters" });
+    await expect(card).toBeVisible();
+    await expect(
+      card.getByRole("button", { name: "Sort", exact: true }),
+    ).toBeVisible();
+    // …and the load is reported where it belongs: on the table, not the filters.
+    await expect(
+      page.locator('#orders-panel-collection [aria-busy="true"]'),
+    ).toBeVisible();
+  } finally {
+    release();
+  }
+  await expect(page.locator("#orders-panel-collection table")).toBeVisible();
+  await expect(
+    page.locator('#orders-panel-collection [aria-busy="true"]'),
+  ).toHaveCount(0);
+});
+
+test("weight is a box on the sheet: empty until you type it, and it wins over the derived figure", async ({
+  page,
+}) => {
+  await page.goto(`${ORDERS}/collection`);
+  const panel = page.locator("#orders-panel-collection");
+  const row = panel
+    .locator("tbody tr")
+    .filter({ has: page.locator("input") })
+    .first();
+  const weight = row.getByRole("spinbutton", { name: /^Weight/ });
+
+  // No default value is written into the box — the derived kg is only a hint.
+  await expect(weight).toHaveValue("");
+  await row.getByRole("spinbutton", { name: /No. of Birds/ }).fill("10");
+  await weight.fill("123.45");
+
+  // A typed weight takes the row over, and the day's cumulative line follows it
+  // instead of the average.
+  await expect(weight).toHaveValue("123.45");
+  await expect(panel.getByText("123.45 KG").first()).toBeVisible();
+});
+
+test("the deadline chip says when, animates, and adds no countdown", async ({
+  page,
+}) => {
+  await page.goto(`${ORDERS}/collection`);
+  const panel = page.locator("#orders-panel-collection");
+  const chip = panel.getByText(/Auto-submits/).first();
+  await expect(chip).toBeVisible();
+  // The window itself is the animation — a ticking dot and a bar filling under
+  // the deadline — and the countdown text was dropped from it.
+  await expect(chip).toContainText("12:00 AM");
+  await expect(chip).not.toContainText(/·/);
+  await expect(panel.getByText(/\bin \d+[dhm]\b/)).toHaveCount(0);
+  await expect(panel.locator('[class*="animate-ping"]').first()).toBeVisible();
 });
 
 test("the action zeroes the shop instead of deleting it, with a 10-second undo", async ({

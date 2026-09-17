@@ -21,7 +21,13 @@
 // Capacity is a HARD BLOCK with the exact numbers (Capacity / Already
 // Assigned / Available / Requested). No invalid state is ever saved.
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import {
   AlertTriangle,
   ArrowDown,
@@ -35,7 +41,6 @@ import {
   LayoutGrid,
   Loader2,
   RotateCcw,
-  Calendar,
   ArrowUpDown,
   MapPin,
   Save,
@@ -109,10 +114,11 @@ import {
   WhatsAppIcon,
   onOrdersNumberWheel,
 } from "../components/OrdersCommon";
-import { compareAssignmentRows, type AssignmentSort } from "../utils/assignmentSort";
+import {
+  compareAssignmentRows,
+  type AssignmentSort,
+} from "../utils/assignmentSort";
 import OrdersWhatsAppConfirmPopup from "../components/OrdersWhatsAppConfirmPopup";
-
-
 
 let clientKeySeq = 0;
 function newClientKey(): string {
@@ -141,7 +147,9 @@ type SelectedRow = {
 };
 
 /** Boxes one selected shop may still take on this vehicle. */
-function maxAssignable(row: Pick<SelectedRow, "orderedBoxes" | "assignedElsewhere">): number {
+function maxAssignable(
+  row: Pick<SelectedRow, "orderedBoxes" | "assignedElsewhere">,
+): number {
   return Math.max(0, row.orderedBoxes - row.assignedElsewhere);
 }
 
@@ -152,35 +160,38 @@ function assignedBirdsFor(row: SelectedRow): number {
 
 function toOrderShopRows(rows: SelectedRow[]): OrderShopRow[] {
   return uniqueShopRows(rows.filter((r) => r.assigned > 0)).map((r, i) => {
-      const birds = assignedBirdsFor(r);
-      return {
-        id: 0,
-        clientKey: r.clientKey,
-        serialNo: i + 1,
-        boxNo: r.assigned,
-        shopId: r.shopId,
-        shopName: r.shopName,
-        birdTypeId: 0,
-        birdType: "",
-        birds,
-        weight: 0,
-        mortality: 0,
-        mortKg: 0,
-        rate: null,
-        amount: 0,
-        remarks: "[ORDER]",
-        deliveryMode: "box" as const,
-        selectedBoxIds: [],
-        village: r.village,
-      };
-    });
+    const birds = assignedBirdsFor(r);
+    return {
+      id: 0,
+      clientKey: r.clientKey,
+      serialNo: i + 1,
+      boxNo: r.assigned,
+      shopId: r.shopId,
+      shopName: r.shopName,
+      birdTypeId: 0,
+      birdType: "",
+      birds,
+      weight: 0,
+      mortality: 0,
+      mortKg: 0,
+      rate: null,
+      amount: 0,
+      remarks: "[ORDER]",
+      deliveryMode: "box" as const,
+      selectedBoxIds: [],
+      village: r.village,
+    };
+  });
 }
 
 function selectionSnapshot(
   vehicleTripId: number | null,
-  rows: SelectedRow[]
+  rows: SelectedRow[],
 ): string {
-  return JSON.stringify([vehicleTripId, rows.map((r) => [r.shopId, r.assigned])]);
+  return JSON.stringify([
+    vehicleTripId,
+    rows.map((r) => [r.shopId, r.assigned]),
+  ]);
 }
 
 type Props = {
@@ -210,40 +221,133 @@ type Props = {
 };
 
 /** Historical days are inspection-only; never mount a writable editor. */
-function AssignmentHistory({ views, query, sortMode, refreshing, cityFilters, shopDirectory, resetVersion }: {
-  views: DayVehicleView[]; query: string; sortMode: AssignmentSort; refreshing: boolean; cityFilters: string[]; shopDirectory: ShopDirectory; resetVersion: number;
+function AssignmentHistory({
+  views,
+  query,
+  sortMode,
+  refreshing,
+  cityFilters,
+  shopDirectory,
+  resetVersion,
+}: {
+  views: DayVehicleView[];
+  query: string;
+  sortMode: AssignmentSort;
+  refreshing: boolean;
+  cityFilters: string[];
+  shopDirectory: ShopDirectory;
+  resetVersion: number;
 }) {
   const { to } = useOrdersI18n();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
   const rows = useMemo(() => {
-    const result = views.flatMap(view => view.rows.map(row => ({ ...row, trip: view.trip })))
-      .filter(row => {
+    const result = views
+      .flatMap((view) => view.rows.map((row) => ({ ...row, trip: view.trip })))
+      .filter((row) => {
         const city = villageOf(row.shopId, row.shopName, shopDirectory);
-        return (!cityFilters.length || cityFilters.includes(city)) && [row.shopName, city, row.trip.tripNo, row.trip.vehicleNo].join(' ').toLowerCase().includes(query);
+        return (
+          (!cityFilters.length || cityFilters.includes(city)) &&
+          [row.shopName, city, row.trip.tripNo, row.trip.vehicleNo]
+            .join(" ")
+            .toLowerCase()
+            .includes(query)
+        );
       });
-    const sortable = (row: typeof result[number]) => ({ name: row.shopName, city: villageOf(row.shopId, row.shopName, shopDirectory), birds: row.birds, boxes: row.boxes, weight: 0, sequence: row.sequence, vehicle: row.trip.vehicleNo ?? '', trip: row.trip.tripNo, assigned: row.delivered });
-    return result.sort((a, b) => compareAssignmentRows(sortable(a), sortable(b), sortMode));
+    const sortable = (row: (typeof result)[number]) => ({
+      name: row.shopName,
+      city: villageOf(row.shopId, row.shopName, shopDirectory),
+      birds: row.birds,
+      boxes: row.boxes,
+      weight: 0,
+      sequence: row.sequence,
+      vehicle: row.trip.vehicleNo ?? "",
+      trip: row.trip.tripNo,
+      assigned: row.delivered,
+    });
+    return result.sort((a, b) =>
+      compareAssignmentRows(sortable(a), sortable(b), sortMode),
+    );
   }, [views, query, sortMode, cityFilters, shopDirectory]);
-  const resetKey = `${query}|${sortMode}|${pageSize}|${cityFilters.join(',')}|${resetVersion}`;
+  const resetKey = `${query}|${sortMode}|${pageSize}|${cityFilters.join(",")}|${resetVersion}`;
   const [lastKey, setLastKey] = useState(resetKey);
-  if (lastKey !== resetKey) { setLastKey(resetKey); setPage(1); }
-  const safePage = Math.min(page, Math.max(1, Math.ceil(rows.length / pageSize)));
-  return <>
-    <div className="border-b border-slate-100 px-4 py-3 text-xs font-semibold text-slate-500">{to("orders.read_only_note")}</div>
-    <div className="overflow-x-auto" aria-busy={refreshing}>
-      <table className={`w-full ${ORDERS_TABLE_FONT_CLASS}`}>
-        <thead><tr className={opsTableHeadRowClass}>
-          {["orders.col_sno", "orders.col_shop_name", "orders.col_village", "orders.col_trip_no", "orders.col_vehicle_no", "orders.col_boxes", "orders.col_birds"].map(key => <th key={key} className={opsTableThClass}>{to(key)}</th>)}
-        </tr></thead>
-        <tbody>{refreshing ? <tr><td colSpan={7}><OrdersTableSkeleton rows={5} /></td></tr> : rows.slice((safePage - 1) * pageSize, safePage * pageSize).map((row, index) => <tr key={`${row.trip.id}-${row.shopId}`} className={ordersTableZebraRow(index)}>
-          <td className={opsTableTdClass}>{(safePage - 1) * pageSize + index + 1}</td><td className={opsTableTdClass}>{row.shopName}</td><td className={opsTableTdClass}>{villageOf(row.shopId, row.shopName, shopDirectory)}</td><td className={opsTableTdClass}>{row.trip.tripNo}</td><td className={opsTableTdClass}>{row.trip.vehicleNo}</td><td className={opsTableTdClass}>{row.boxes}</td><td className={opsTableTdClass}>{row.birds}</td>
-        </tr>)}</tbody>
-      </table>
-      {!refreshing && rows.length === 0 && <OrdersEmptyState title={to("orders.no_search_results")} />}
-    </div>
-    <Pagination page={safePage} pageSize={pageSize} totalItems={rows.length} onPageChange={setPage} onPageSizeChange={setPageSize} disabled={refreshing} />
-  </>;
+  if (lastKey !== resetKey) {
+    setLastKey(resetKey);
+    setPage(1);
+  }
+  const safePage = Math.min(
+    page,
+    Math.max(1, Math.ceil(rows.length / pageSize)),
+  );
+  return (
+    <>
+      <div className="border-b border-slate-100 px-4 py-3 text-xs font-semibold text-slate-500">
+        {to("orders.read_only_note")}
+      </div>
+      <div className="overflow-x-auto" aria-busy={refreshing}>
+        <table className={`w-full ${ORDERS_TABLE_FONT_CLASS}`}>
+          <thead>
+            <tr className={opsTableHeadRowClass}>
+              {[
+                "orders.col_sno",
+                "orders.col_shop_name",
+                "orders.col_village",
+                "orders.col_trip_no",
+                "orders.col_vehicle_no",
+                "orders.col_boxes",
+                "orders.col_birds",
+              ].map((key) => (
+                <th key={key} className={opsTableThClass}>
+                  {to(key)}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {refreshing ? (
+              <tr>
+                <td colSpan={7}>
+                  <OrdersTableSkeleton rows={5} />
+                </td>
+              </tr>
+            ) : (
+              rows
+                .slice((safePage - 1) * pageSize, safePage * pageSize)
+                .map((row, index) => (
+                  <tr
+                    key={`${row.trip.id}-${row.shopId}`}
+                    className={ordersTableZebraRow(index)}
+                  >
+                    <td className={opsTableTdClass}>
+                      {(safePage - 1) * pageSize + index + 1}
+                    </td>
+                    <td className={opsTableTdClass}>{row.shopName}</td>
+                    <td className={opsTableTdClass}>
+                      {villageOf(row.shopId, row.shopName, shopDirectory)}
+                    </td>
+                    <td className={opsTableTdClass}>{row.trip.tripNo}</td>
+                    <td className={opsTableTdClass}>{row.trip.vehicleNo}</td>
+                    <td className={opsTableTdClass}>{row.boxes}</td>
+                    <td className={opsTableTdClass}>{row.birds}</td>
+                  </tr>
+                ))
+            )}
+          </tbody>
+        </table>
+        {!refreshing && rows.length === 0 && (
+          <OrdersEmptyState title={to("orders.no_search_results")} />
+        )}
+      </div>
+      <Pagination
+        page={safePage}
+        pageSize={pageSize}
+        totalItems={rows.length}
+        onPageChange={setPage}
+        onPageSizeChange={setPageSize}
+        disabled={refreshing}
+      />
+    </>
+  );
 }
 
 function OrderAssignmentPage({
@@ -272,94 +376,209 @@ function OrderAssignmentPage({
   const [cityFilters, setCityFilters] = useState<string[]>([]);
   const [resetVersion, setResetVersion] = useState(0);
   const cityOptions = useMemo(() => {
-    const rows = day < today ? dayVehicleViews.flatMap(view => view.rows) : collection?.rows ?? [];
-    return [...new Set(rows.map(row => villageOf(row.shopId, row.shopName, shopDirectory).trim()).filter(Boolean))]
-      .sort((a, b) => a.localeCompare(b)).map(city => ({ value: city, label: city }));
+    const rows =
+      day < today
+        ? dayVehicleViews.flatMap((view) => view.rows)
+        : (collection?.rows ?? []);
+    return [
+      ...new Set(
+        rows
+          .map((row) =>
+            villageOf(row.shopId, row.shopName, shopDirectory).trim(),
+          )
+          .filter(Boolean),
+      ),
+    ]
+      .sort((a, b) => a.localeCompare(b))
+      .map((city) => ({ value: city, label: city }));
   }, [day, today, dayVehicleViews, collection, shopDirectory]);
   const sortOptions = useMemo(() => {
-    const modes: AssignmentSort[] = ['pending', 'sequence', 'az', 'za', 'city_az', 'city_za', 'birds_asc', 'birds_desc', 'boxes_asc', 'boxes_desc', ...(day === today ? ['weight_asc', 'weight_desc'] as AssignmentSort[] : []), 'vehicle_trip'];
-    const existing: Partial<Record<AssignmentSort, string>> = { pending: 'orders.sort_pending_first', az: 'orders.sort_name_az', za: 'orders.sort_name_za', vehicle_trip: 'orders.sort_vehicle_trip' };
-    return modes.map(value => ({ value, label: to(existing[value] ?? `orders.sort_${value}`) }));
+    const modes: AssignmentSort[] = [
+      "pending",
+      "sequence",
+      "az",
+      "za",
+      "city_az",
+      "city_za",
+      "birds_asc",
+      "birds_desc",
+      "boxes_asc",
+      "boxes_desc",
+      ...(day === today
+        ? (["weight_asc", "weight_desc"] as AssignmentSort[])
+        : []),
+      "vehicle_trip",
+    ];
+    const existing: Partial<Record<AssignmentSort, string>> = {
+      pending: "orders.sort_pending_first",
+      az: "orders.sort_name_az",
+      za: "orders.sort_name_za",
+      vehicle_trip: "orders.sort_vehicle_trip",
+    };
+    return modes.map((value) => ({
+      value,
+      label: to(existing[value] ?? `orders.sort_${value}`),
+    }));
   }, [day, today, to]);
   const resetFilters = () => {
-    setQuery('');
-    setSortMode('pending');
+    setQuery("");
+    setSortMode("pending");
     setCityFilters([]);
-    setResetVersion(value => value + 1);
+    setResetVersion((value) => value + 1);
     // Reset to today. Today's mounted editor is not remounted, so picks survive.
     if (day !== today) onDaySelect(today);
   };
-
 
   if (loading) return <OrdersTableSkeleton rows={4} />;
 
   return (
     <div className="space-y-5">
-      <section className={opsFilterCardClass} aria-label={to('orders.assignment_filters')}>
+      <section
+        className={opsFilterCardClass}
+        aria-label={to("orders.assignment_filters")}
+      >
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
           <div>
-            <div className={ORDERS_FILTER_LABEL_CLASS}><Calendar size={17} className="text-emerald-500 flex-shrink-0" /><span>{to('orders.col_date')}</span></div>
-            <OrdersDateControl day={day} today={today} onDaySelect={onDaySelect} t={to} hideDayChip className="w-full" fieldClassName="w-full" />
+            {/* No Calendar glyph on the label: the date field carries its own, and that one is the button you click. */}
+            <div className={ORDERS_FILTER_LABEL_CLASS}>
+              <span>{to("orders.col_date")}</span>
+            </div>
+            <OrdersDateControl
+              day={day}
+              today={today}
+              onDaySelect={onDaySelect}
+              t={to}
+              hideDayChip
+              className="w-full"
+              fieldClassName="w-full"
+            />
           </div>
           <div>
-            <div className={ORDERS_FILTER_LABEL_CLASS}><ArrowUpDown size={17} className="text-violet-500 flex-shrink-0" /><span>{to('orders.sort')}</span></div>
-            <OrdersDropdown value={sortMode} onChange={value => setSortMode(value as AssignmentSort)} ariaLabel={to('orders.sort')} options={sortOptions} className="w-full" widthClass="w-full" />
+            <div className={ORDERS_FILTER_LABEL_CLASS}>
+              <ArrowUpDown
+                size={17}
+                className="text-violet-500 flex-shrink-0"
+              />
+              <span>{to("orders.sort")}</span>
+            </div>
+            <OrdersDropdown
+              value={sortMode}
+              onChange={(value) => setSortMode(value as AssignmentSort)}
+              ariaLabel={to("orders.sort")}
+              options={sortOptions}
+              className="w-full"
+              widthClass="w-full"
+            />
           </div>
           <div>
             {/* No Search glyph on the label — the field already carries one. */}
-            <div className={ORDERS_FILTER_LABEL_CLASS}><span>{to('orders.search_label')}</span></div>
-            <OrdersSearchInput value={query} onChange={setQuery} placeholder={to('orders.search_assignment')} className="w-full" />
+            <div className={ORDERS_FILTER_LABEL_CLASS}>
+              <span>{to("orders.search_label")}</span>
+            </div>
+            <OrdersSearchInput
+              value={query}
+              onChange={setQuery}
+              placeholder={to("orders.search_assignment")}
+              className="w-full"
+            />
           </div>
           <div>
-            <div className={ORDERS_FILTER_LABEL_CLASS}><MapPin size={17} className="text-amber-500 flex-shrink-0" /><span>{to('orders.city')}</span></div>
-            <OrdersMultiSelect values={cityFilters} onChange={setCityFilters} options={cityOptions} ariaLabel={to('orders.filter_city')} placeholder={to('orders.filter_city_all')} className="w-full" widthClass="w-full" />
+            <div className={ORDERS_FILTER_LABEL_CLASS}>
+              <MapPin size={17} className="text-amber-500 flex-shrink-0" />
+              <span>{to("orders.city")}</span>
+            </div>
+            <OrdersMultiSelect
+              values={cityFilters}
+              onChange={setCityFilters}
+              options={cityOptions}
+              ariaLabel={to("orders.filter_city")}
+              placeholder={to("orders.filter_city_all")}
+              className="w-full"
+              widthClass="w-full"
+            />
           </div>
           <div className="flex items-end justify-end gap-2 sm:col-span-2 xl:col-span-4">
-            <button type="button" onClick={resetFilters} className={`group ${opsSecondaryButtonClass}`} aria-label={to('common.reset')}>
-              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>{to('common.reset')}
+            <button
+              type="button"
+              onClick={resetFilters}
+              className={`group ${opsSecondaryButtonClass}`}
+              aria-label={to("common.reset")}
+            >
+              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]">
+                <RotateCcw size={14} />
+              </span>
+              {to("common.reset")}
             </button>
             <BrandRefreshButton onClick={onRefresh} loading={refreshing} />
           </div>
         </div>
       </section>
 
-      <section className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm" aria-label={to('orders.tab_assignment')}>
+      <section
+        className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm"
+        aria-label={to("orders.tab_assignment")}
+      >
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 bg-gradient-to-r from-emerald-50/60 via-white to-emerald-50/40 px-6 py-3">
           <div className="flex items-center gap-3">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-600 shadow-inner"><PackageCheck size={20} aria-hidden /></span>
-            <h2 className="text-base font-bold tracking-tight text-slate-800">{to('orders.tab_assignment')}</h2>
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-emerald-100 bg-emerald-50 text-emerald-600 shadow-inner">
+              <PackageCheck size={20} aria-hidden />
+            </span>
+            <h2 className="text-base font-bold tracking-tight text-slate-800">
+              {to("orders.tab_assignment")}
+            </h2>
           </div>
-          <span className="text-xs font-medium text-slate-500">{to('orders.pool_summary', { collected: collection?.totalShops ?? 0, assigned: collection?.assignedShops ?? 0, available: (collection?.totalShops ?? 0) - (collection?.assignedShops ?? 0) })}</span>
+          <span className="text-xs font-medium text-slate-500">
+            {to("orders.pool_summary", {
+              collected: collection?.totalShops ?? 0,
+              assigned: collection?.assignedShops ?? 0,
+              available:
+                (collection?.totalShops ?? 0) -
+                (collection?.assignedShops ?? 0),
+            })}
+          </span>
         </div>
 
-      {day < today ? (
-        <AssignmentHistory key={day} views={dayVehicleViews} query={q} sortMode={sortMode} refreshing={refreshing} cityFilters={cityFilters} shopDirectory={shopDirectory} resetVersion={resetVersion} />
-      ) : !collection ? (
-        <OrdersEmptyState
-          title={to("orders.assignment_empty")}
-          hint={to("orders.select_order")}
-        />
-      ) : (
-        <div className="relative" aria-busy={refreshing}>
-        {refreshing && <div className="absolute inset-0 z-20 bg-white/90"><OrdersTableSkeleton rows={6} /></div>}
-        <div inert={refreshing}>
-        <AssignmentEditor
-          key={`${day}|${collection.trip.id}`}
-          day={day}
-          collection={collection}
-          eligibleVehicles={eligibleVehicles}
-          shopDirectory={shopDirectory}
-          supervisorDirectory={supervisorDirectory}
-          q={q}
-          sortMode={sortMode}
-          cityFilters={cityFilters}
-          resetVersion={resetVersion}
-          onChanged={onChanged}
-          onFinished={onFinished}
-        />
-        </div>
-        </div>
-      )}
+        {day < today ? (
+          <AssignmentHistory
+            key={day}
+            views={dayVehicleViews}
+            query={q}
+            sortMode={sortMode}
+            refreshing={refreshing}
+            cityFilters={cityFilters}
+            shopDirectory={shopDirectory}
+            resetVersion={resetVersion}
+          />
+        ) : !collection ? (
+          <OrdersEmptyState
+            title={to("orders.assignment_empty")}
+            hint={to("orders.select_order")}
+          />
+        ) : (
+          <div className="relative" aria-busy={refreshing}>
+            {refreshing && (
+              <div className="absolute inset-0 z-20 bg-white/90">
+                <OrdersTableSkeleton rows={6} />
+              </div>
+            )}
+            <div inert={refreshing}>
+              <AssignmentEditor
+                key={`${day}|${collection.trip.id}`}
+                day={day}
+                collection={collection}
+                eligibleVehicles={eligibleVehicles}
+                shopDirectory={shopDirectory}
+                supervisorDirectory={supervisorDirectory}
+                q={q}
+                sortMode={sortMode}
+                cityFilters={cityFilters}
+                resetVersion={resetVersion}
+                onChanged={onChanged}
+                onFinished={onFinished}
+              />
+            </div>
+          </div>
+        )}
       </section>
     </div>
   );
@@ -400,7 +619,12 @@ function AssignmentEditor({
   // ── Day pool split: available vs already assigned (persisted facts) ──────
   const pool = useMemo(() => {
     const available: OrderShopRow[] = [];
-    const assigned: Array<{ row: OrderShopRow; tripNo: string; vehicleNo: string; delivered: boolean }> = [];
+    const assigned: Array<{
+      row: OrderShopRow;
+      tripNo: string;
+      vehicleNo: string;
+      delivered: boolean;
+    }> = [];
     for (const row of collection.rows) {
       const a = collection.shops.get(row.shopId);
       if (!a) {
@@ -421,16 +645,15 @@ function AssignmentEditor({
   const [vehicleTripId, setVehicleTripId] = useState<number | null>(null);
   const vehicle = useMemo(
     () => eligibleVehicles.find((v) => v.trip.id === vehicleTripId) ?? null,
-    [eligibleVehicles, vehicleTripId]
+    [eligibleVehicles, vehicleTripId],
   );
 
   // ── Step 3: selection (one shop at a time) + Step 5/6: order & boxes ─────
   const [selected, setSelected] = useState<SelectedRow[]>([]);
   const [savedSnapshot, setSavedSnapshot] = useState<string>(() =>
-    selectionSnapshot(null, [])
+    selectionSnapshot(null, []),
   );
-  const isDirty =
-    selectionSnapshot(vehicleTripId, selected) !== savedSnapshot;
+  const isDirty = selectionSnapshot(vehicleTripId, selected) !== savedSnapshot;
 
   const [saving, setSaving] = useState(false);
   const [waBusy, setWaBusy] = useState(false);
@@ -447,34 +670,37 @@ function AssignmentEditor({
 
   const selectedIds = useMemo(
     () => new Set(selected.map((r) => r.shopId)),
-    [selected]
+    [selected],
   );
 
-  const toggleShop = useCallback((row: OrderShopRow, checked: boolean, assignedElsewhere = 0) => {
-    setSelected((prev) => {
-      if (checked) {
-        if (prev.some((r) => r.shopId === row.shopId)) return prev;
-        const orderedBoxes = Math.max(1, Number(row.boxNo) || 0);
-        // A partially-assigned shop comes in with only its BALANCE pre-filled:
-        // 40 ordered, 20 already on another truck → this one gets 20, not 40.
-        const takeable = Math.max(0, orderedBoxes - assignedElsewhere);
-        return [
-          ...prev,
-          {
-            clientKey: newClientKey(),
-            shopId: row.shopId,
-            shopName: row.shopName || "—",
-            village: villageOf(row.shopId, row.shopName, shopDirectory),
-            orderedBirds: Number(row.birds) || 0,
-            orderedBoxes,
-            assignedElsewhere,
-            assigned: takeable,
-          },
-        ];
-      }
-      return prev.filter((r) => r.shopId !== row.shopId);
-    });
-  }, [shopDirectory]);
+  const toggleShop = useCallback(
+    (row: OrderShopRow, checked: boolean, assignedElsewhere = 0) => {
+      setSelected((prev) => {
+        if (checked) {
+          if (prev.some((r) => r.shopId === row.shopId)) return prev;
+          const orderedBoxes = Math.max(1, Number(row.boxNo) || 0);
+          // A partially-assigned shop comes in with only its BALANCE pre-filled:
+          // 40 ordered, 20 already on another truck → this one gets 20, not 40.
+          const takeable = Math.max(0, orderedBoxes - assignedElsewhere);
+          return [
+            ...prev,
+            {
+              clientKey: newClientKey(),
+              shopId: row.shopId,
+              shopName: row.shopName || "—",
+              village: villageOf(row.shopId, row.shopName, shopDirectory),
+              orderedBirds: Number(row.birds) || 0,
+              orderedBoxes,
+              assignedElsewhere,
+              assigned: takeable,
+            },
+          ];
+        }
+        return prev.filter((r) => r.shopId !== row.shopId);
+      });
+    },
+    [shopDirectory],
+  );
 
   // ── Sequence editing (a vehicle can carry ~45 shops, so stepping with ↑/↓
   //     is never the only way): drag a row, jump it to first/last, or sort the
@@ -487,16 +713,13 @@ function AssignmentEditor({
     });
   }, []);
 
-  const moveRow = useCallback(
-    (clientKey: string, dir: -1 | 1) => {
-      setSelected((prev) => {
-        const from = prev.findIndex((r) => r.clientKey === clientKey);
-        if (from < 0) return prev;
-        return moveInSequence(prev, from, from + dir);
-      });
-    },
-    []
-  );
+  const moveRow = useCallback((clientKey: string, dir: -1 | 1) => {
+    setSelected((prev) => {
+      const from = prev.findIndex((r) => r.clientKey === clientKey);
+      if (from < 0) return prev;
+      return moveInSequence(prev, from, from + dir);
+    });
+  }, []);
 
   const sortSelected = useCallback((mode: "shop_az" | "village_az") => {
     setSelected((prev) => {
@@ -505,7 +728,7 @@ function AssignmentEditor({
         mode === "shop_az"
           ? (a.shopName || "").localeCompare(b.shopName || "")
           : (a.village || "").localeCompare(b.village || "") ||
-            (a.shopName || "").localeCompare(b.shopName || "")
+            (a.shopName || "").localeCompare(b.shopName || ""),
       );
       return next;
     });
@@ -522,9 +745,12 @@ function AssignmentEditor({
         // Assigned boxes: 1 … remaining balance (0 = not assigned to this
         // vehicle). The cap already discounts boxes on other vehicles, so a
         // 40-box shop split 20 + 20 can never become 20 + 40.
-        const n = Math.max(0, Math.min(maxAssignable(r), Math.floor(Number(raw) || 0)));
+        const n = Math.max(
+          0,
+          Math.min(maxAssignable(r), Math.floor(Number(raw) || 0)),
+        );
         return { ...r, assigned: n };
-      })
+      }),
     );
   }, []);
 
@@ -545,8 +771,11 @@ function AssignmentEditor({
   // code subtracted the collection's TOTAL assigned boxes, which breaks
   // once an order is split over several vehicles.)
   const ownOrderBoxes = useMemo(
-    () => (vehicle ? planShareBoxes(orderRowsOnTrip(vehicle.trip, orderTrip.tripNo)) : 0),
-    [vehicle, orderTrip.tripNo]
+    () =>
+      vehicle
+        ? planShareBoxes(orderRowsOnTrip(vehicle.trip, orderTrip.tripNo))
+        : 0,
+    [vehicle, orderTrip.tripNo],
   );
   const alreadyAssignedOther = vehicle
     ? Math.max(0, vehicle.alreadyAssigned - ownOrderBoxes)
@@ -579,7 +808,7 @@ function AssignmentEditor({
   }, [collection]);
   const savedShopsOn = useCallback(
     (tripNo: string): number => savedShopsByTripNo.get(tripNo) ?? 0,
-    [savedShopsByTripNo]
+    [savedShopsByTripNo],
   );
 
   // The vehicle list is split in two so the operator sees at a glance which
@@ -598,23 +827,28 @@ function AssignmentEditor({
         .toLowerCase();
       return hay.includes(q);
     },
-    [q]
+    [q],
   );
 
   const pendingVehicles = useMemo(
     () => eligibleVehicles.filter((v) => vehicleMatches(v)),
-    [eligibleVehicles, vehicleMatches]
+    [eligibleVehicles, vehicleMatches],
   );
 
   const savedOnVehicle = useMemo(
     () =>
       vehicle
-        ? pool.assigned.filter((a) => a.tripNo === vehicle.trip.tripNo && !a.delivered).length
+        ? pool.assigned.filter(
+            (a) => a.tripNo === vehicle.trip.tripNo && !a.delivered,
+          ).length
         : 0,
-    [pool.assigned, vehicle]
+    [pool.assigned, vehicle],
   );
   const remaining = available - requested;
-  const totals = useMemo(() => collectionTotals(toOrderShopRows(selected)), [selected]);
+  const totals = useMemo(
+    () => collectionTotals(toOrderShopRows(selected)),
+    [selected],
+  );
 
   const checkCapacity = useCallback((): boolean => {
     if (!vehicle) {
@@ -622,11 +856,24 @@ function AssignmentEditor({
       return false;
     }
     if (requested > available) {
-      setCapacityExceeded({ capacity, assigned: alreadyAssignedOther, available, requested });
+      setCapacityExceeded({
+        capacity,
+        assigned: alreadyAssignedOther,
+        available,
+        requested,
+      });
       return false;
     }
     return true;
-  }, [vehicle, requested, available, capacity, alreadyAssignedOther, showNotification, to]);
+  }, [
+    vehicle,
+    requested,
+    available,
+    capacity,
+    alreadyAssignedOther,
+    showNotification,
+    to,
+  ]);
 
   // ── Pre-save balance re-check from FRESH persisted data ─────────────────
   // The hard rule behind split orders: summed over ALL vehicles, a shop can
@@ -640,8 +887,12 @@ function AssignmentEditor({
     try {
       const issues = await findDayOverAssignments(
         day,
-        selected.map((r) => ({ shopId: r.shopId, shopName: r.shopName, boxes: r.assigned })),
-        vehicle.trip.tripNo
+        selected.map((r) => ({
+          shopId: r.shopId,
+          shopName: r.shopName,
+          boxes: r.assigned,
+        })),
+        vehicle.trip.tripNo,
       );
       if (issues.length > 0) {
         // Auto-correct the selection to the fresh remaining balance and make
@@ -652,17 +903,19 @@ function AssignmentEditor({
             .map((r) =>
               remainingOf.has(r.shopId)
                 ? { ...r, assigned: remainingOf.get(r.shopId)! }
-                : r
+                : r,
             )
-            .filter((r) => r.assigned > 0)
+            .filter((r) => r.assigned > 0),
         );
         showNotification(
           to("orders.over_assign_message", {
             shops: issues
-              .map((i) => `${i.shopName} (${i.requested} > ${i.remaining} left)`)
+              .map(
+                (i) => `${i.shopName} (${i.requested} > ${i.remaining} left)`,
+              )
               .join(", "),
           }),
-          "error"
+          "error",
         );
         onChanged();
         return false;
@@ -705,7 +958,18 @@ function AssignmentEditor({
       persistLockRef.current = false;
       setSaving(false);
     }
-  }, [busy, vehicle, checkCapacity, selected, assertFitsBalance, orderTrip.tripNo, showNotification, to, onChanged, vehicleTripId]);
+  }, [
+    busy,
+    vehicle,
+    checkCapacity,
+    selected,
+    assertFitsBalance,
+    orderTrip.tripNo,
+    showNotification,
+    to,
+    onChanged,
+    vehicleTripId,
+  ]);
 
   const handleFinish = useCallback(async () => {
     if (persistLockRef.current || busy || !vehicle) return;
@@ -713,7 +977,9 @@ function AssignmentEditor({
     const rows =
       selected.length > 0
         ? toOrderShopRows(selected)
-        : (orderRowsOnTrip(vehicle.trip, orderTrip.tripNo).filter((r) => !isCapturedRow(r)) as unknown as OrderShopRow[]);
+        : (orderRowsOnTrip(vehicle.trip, orderTrip.tripNo).filter(
+            (r) => !isCapturedRow(r),
+          ) as unknown as OrderShopRow[]);
     if (rows.length === 0) {
       showNotification(to("orders.selection_empty"), "info");
       return;
@@ -733,7 +999,17 @@ function AssignmentEditor({
     } finally {
       setSaving(false);
     }
-  }, [busy, vehicle, checkCapacity, selected, assertFitsBalance, orderTrip.tripNo, showNotification, to, onFinished]);
+  }, [
+    busy,
+    vehicle,
+    checkCapacity,
+    selected,
+    assertFitsBalance,
+    orderTrip.tripNo,
+    showNotification,
+    to,
+    onFinished,
+  ]);
 
   // ── Review & Submit: CONFIRM FIRST — the card opens a check popup (message text +
   //    branded assignment sheet PDF); nothing goes out until "Confirm & Send".
@@ -778,7 +1054,12 @@ function AssignmentEditor({
     async (orderedShopIds?: number[]): Promise<OrdersWhatsAppResult | null> => {
       if (persistLockRef.current || waBusy || !vehicle) return null;
       if (!supervisorMobile.trim()) {
-        showNotification(to("orders.whatsapp_failed", { message: "Supervisor mobile missing" }), "error");
+        showNotification(
+          to("orders.whatsapp_failed", {
+            message: "Supervisor mobile missing",
+          }),
+          "error",
+        );
         return null;
       }
       persistLockRef.current = true;
@@ -801,7 +1082,7 @@ function AssignmentEditor({
           // Re-send of saved rows: re-number the persisted rows, no other
           // field changes — the order becomes the new saved sequence.
           const saved = orderRowsOnTrip(vehicle.trip, orderTrip.tripNo).filter(
-            (r) => !isCapturedRow(r)
+            (r) => !isCapturedRow(r),
           );
           const byShop = new Map(saved.map((r) => [r.shopId, r]));
           const reordered = orderedShopIds.flatMap((id) => {
@@ -809,7 +1090,7 @@ function AssignmentEditor({
             return row ? [row] : [];
           });
           payload = reordered.map(
-            (r, i) => ({ ...r, serialNo: i + 1 }) as unknown as OrderShopRow
+            (r, i) => ({ ...r, serialNo: i + 1 }) as unknown as OrderShopRow,
           );
         }
       }
@@ -829,7 +1110,7 @@ function AssignmentEditor({
           // as Save Progress above) — never wipe the operator's work here.
           if (reorderedSelection) setSelected(reorderedSelection);
           setSavedSnapshot(
-            selectionSnapshot(vehicleTripId, reorderedSelection ?? selected)
+            selectionSnapshot(vehicleTripId, reorderedSelection ?? selected),
           );
           onChanged();
         } catch {
@@ -844,33 +1125,56 @@ function AssignmentEditor({
         const result = await sendOrdersWhatsApp(
           trip,
           supervisorMobile,
-          (sent, total, shop) => setWaProgress(shop || `${sent}/${total}`)
+          (sent, total, shop) => setWaProgress(shop || `${sent}/${total}`),
         );
         if (result.enabled && result.sent > 0 && result.failed === 0) {
           // Success UI lives on the confirm popup — never toast success here.
         } else if (result.sent > 0) {
-          showNotification(to("orders.whatsapp_partial", { sent: result.sent, failed: result.failed }), "info");
+          showNotification(
+            to("orders.whatsapp_partial", {
+              sent: result.sent,
+              failed: result.failed,
+            }),
+            "info",
+          );
         } else {
           const message =
-            !result.enabled || (result.message && result.message.includes("not configured"))
+            !result.enabled ||
+            (result.message && result.message.includes("not configured"))
               ? to("orders.whatsapp_not_configured")
               : result.message === "no_rows"
                 ? to("orders.whatsapp_no_rows")
-                : to("orders.whatsapp_failed", { message: result.message ?? "—" });
+                : to("orders.whatsapp_failed", {
+                    message: result.message ?? "—",
+                  });
           showNotification(message, "error");
         }
         return result;
       } catch {
-        showNotification(to("orders.whatsapp_failed", { message: "network" }), "error");
+        showNotification(
+          to("orders.whatsapp_failed", { message: "network" }),
+          "error",
+        );
         return null;
       } finally {
         persistLockRef.current = false;
         setWaBusy(false);
       }
     },
-    [waBusy, vehicle, isDirty, selected, assertFitsBalance, orderTrip.tripNo, vehicleTripId, supervisorMobile, showNotification, onChanged, to]
+    [
+      waBusy,
+      vehicle,
+      isDirty,
+      selected,
+      assertFitsBalance,
+      orderTrip.tripNo,
+      vehicleTripId,
+      supervisorMobile,
+      showNotification,
+      onChanged,
+      to,
+    ],
   );
-
 
   // ── Day pool table: PENDING + PARTIALLY-SPLIT + ASSIGNED shops together ──
   //     pending  — the shop is on no vehicle yet (full balance assignable)
@@ -908,7 +1212,12 @@ function AssignmentEditor({
   //     filteredPool below: "pending" = still needs a vehicle, i.e. pending
   //     + partial-balance rows; "assigned" = fully placed).
   const poolCounts = useMemo(() => {
-    const counts = { all: collection.rows.length, pending: 0, assigned: 0, thisVehicle: 0 };
+    const counts = {
+      all: collection.rows.length,
+      pending: 0,
+      assigned: 0,
+      thisVehicle: 0,
+    };
     for (const row of collection.rows) {
       const a = collection.shops.get(row.shopId);
       const parts = a?.parts ?? [];
@@ -921,7 +1230,11 @@ function AssignmentEditor({
         boxesOnThisVehicle > 0 || parts.some((p) => p.tripNo === thisTripNo);
       const remainingBoxes = Math.max(0, orderedBoxes - partsTotal);
       const kind =
-        parts.length === 0 ? "pending" : remainingBoxes > 0 && !onThisVehicle ? "partial" : "assigned";
+        parts.length === 0
+          ? "pending"
+          : remainingBoxes > 0 && !onThisVehicle
+            ? "partial"
+            : "assigned";
       if (kind === "assigned") counts.assigned += 1;
       else counts.pending += 1;
       if (onThisVehicle) counts.thisVehicle += 1;
@@ -938,10 +1251,15 @@ function AssignmentEditor({
       const boxesOnThisVehicle = parts
         .filter((p) => p.tripNo === thisTripNo)
         .reduce((sum, p) => sum + p.boxes, 0);
-      const onThisVehicle = boxesOnThisVehicle > 0 || parts.some((p) => p.tripNo === thisTripNo);
+      const onThisVehicle =
+        boxesOnThisVehicle > 0 || parts.some((p) => p.tripNo === thisTripNo);
       const remainingBoxes = Math.max(0, orderedBoxes - partsTotal);
       const kind: PoolRow["kind"] =
-        parts.length === 0 ? "pending" : remainingBoxes > 0 && !onThisVehicle ? "partial" : "assigned";
+        parts.length === 0
+          ? "pending"
+          : remainingBoxes > 0 && !onThisVehicle
+            ? "partial"
+            : "assigned";
       const item: PoolRow = {
         ...row,
         poolIndex: i,
@@ -968,20 +1286,38 @@ function AssignmentEditor({
       list.push(item);
     });
     const sortable = (row: PoolRow) => ({
-      name: row.shopName || '', city: villageOf(row.shopId, row.shopName, shopDirectory),
-      birds: Number(row.birds) || 0, boxes: rowBoxes(row),
-      weight: orderWeightBasis ? weightForBirds(Number(row.birds) || 0, orderWeightBasis) : 0,
-      sequence: row.poolIndex, vehicle: row.parts[0]?.vehicleNo ?? '', trip: row.parts[0]?.tripNo ?? '', assigned: row.kind === 'assigned',
+      name: row.shopName || "",
+      city: villageOf(row.shopId, row.shopName, shopDirectory),
+      birds: Number(row.birds) || 0,
+      boxes: rowBoxes(row),
+      weight: orderWeightBasis
+        ? weightForBirds(Number(row.birds) || 0, orderWeightBasis)
+        : 0,
+      sequence: row.poolIndex,
+      vehicle: row.parts[0]?.vehicleNo ?? "",
+      trip: row.parts[0]?.tripNo ?? "",
+      assigned: row.kind === "assigned",
     });
-    list.sort((a, b) => compareAssignmentRows(sortable(a), sortable(b), sortMode));
+    list.sort((a, b) =>
+      compareAssignmentRows(sortable(a), sortable(b), sortMode),
+    );
     return list;
-  }, [collection, q, poolFilter, cityFilterSet, thisTripNo, shopDirectory, sortMode, orderWeightBasis]);
+  }, [
+    collection,
+    q,
+    poolFilter,
+    cityFilterSet,
+    thisTripNo,
+    shopDirectory,
+    sortMode,
+    orderWeightBasis,
+  ]);
 
   const [availablePage, setAvailablePage] = useState(1);
   const [lastResetVersion, setLastResetVersion] = useState(resetVersion);
   if (lastResetVersion !== resetVersion) {
     setLastResetVersion(resetVersion);
-    setPoolFilter('pending');
+    setPoolFilter("pending");
     setAvailablePage(1);
   }
 
@@ -994,14 +1330,14 @@ function AssignmentEditor({
   }
   const availableTotalPages = Math.max(
     1,
-    Math.ceil(filteredPool.length / availablePageSize)
+    Math.ceil(filteredPool.length / availablePageSize),
   );
   const safeAvailablePage = Math.min(availablePage, availableTotalPages);
   const availableStartIndex =
     filteredPool.length === 0 ? 0 : (safeAvailablePage - 1) * availablePageSize;
   const pageAvailable = filteredPool.slice(
     (safeAvailablePage - 1) * availablePageSize,
-    safeAvailablePage * availablePageSize
+    safeAvailablePage * availablePageSize,
   );
 
   // ── Delivery state of a selected shop from persisted day data ───────────
@@ -1016,7 +1352,9 @@ function AssignmentEditor({
       <aside className="w-full shrink-0 lg:sticky lg:top-4 lg:w-[336px]">
         <div className={opsTableCardClass}>
           <div className={opsTableHeaderBarClass}>
-            <span className={opsSectionTitleClass}>{to("orders.vehicles_ready")}</span>
+            <span className={opsSectionTitleClass}>
+              {to("orders.vehicles_ready")}
+            </span>
             <span className="text-[11px] font-semibold text-slate-400">
               {pendingVehicles.length}
             </span>
@@ -1031,53 +1369,60 @@ function AssignmentEditor({
             </div>
           ) : (
             <div className="max-h-[calc(100vh-190px)] overflow-y-auto">
-                    <ul className="divide-y divide-slate-100">
-                      {pendingVehicles.map((v) => {
-                        const city = farmCityOf(v.trip);
-                        const shops = savedShopsOn(v.trip.tripNo);
-                        const selectedCard = vehicleTripId === v.trip.id;
-                        return (
-                          <li key={v.trip.id}>
-                            <button
-                              type="button"
-                              onClick={() => setVehicleTripId(v.trip.id)}
-                              aria-label={`${to("orders.assign_shops")} — ${v.trip.vehicleNo || "—"} · ${v.trip.tripNo}`}
-                              aria-current={selectedCard ? "true" : undefined}
-                              className={`w-full border-l-[3px] px-3.5 py-3 text-left transition-colors ${
-                                selectedCard
-                                  ? "border-emerald-500 bg-emerald-50/70"
-                                  : "border-transparent hover:bg-slate-50"
-                              }`}
-                            >
-                              <span className="flex items-center justify-between gap-2">
-                                <span className="truncate text-xs font-semibold text-slate-800">
-                                  {v.trip.vehicleNo || "—"}
-                                </span>
-                                <span className="shrink-0 text-[11px] font-semibold text-slate-400">
-                                  {v.trip.tripNo || "—"}
-                                </span>
-                              </span>
-                              <span className="mt-0.5 block truncate text-[12px] font-medium text-slate-500">
-                                {v.trip.supervisorName || "—"} · {v.trip.driverName || "—"}
-                              </span>
-                              <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold text-slate-500">
-                                <span>{city}</span>
-                                <span className="text-slate-300">·</span>
-                                <span>
-                                  {formatCount(v.capacity)} {to("orders.boxes_short")}
-                                </span>
-                                <span className="text-slate-300">·</span>
-                                <span className={shops > 0 ? "text-emerald-700" : "text-amber-600"}>
-                                  {shops > 0
-                                    ? to("orders.vehicle_shops_assigned", { n: shops })
-                                    : to("orders.vehicle_shops_none")}
-                                </span>
-                              </span>
-                            </button>
-                          </li>
-                        );
-                      })}
-                    </ul>
+              <ul className="divide-y divide-slate-100">
+                {pendingVehicles.map((v) => {
+                  const city = farmCityOf(v.trip);
+                  const shops = savedShopsOn(v.trip.tripNo);
+                  const selectedCard = vehicleTripId === v.trip.id;
+                  return (
+                    <li key={v.trip.id}>
+                      <button
+                        type="button"
+                        onClick={() => setVehicleTripId(v.trip.id)}
+                        aria-label={`${to("orders.assign_shops")} — ${v.trip.vehicleNo || "—"} · ${v.trip.tripNo}`}
+                        aria-current={selectedCard ? "true" : undefined}
+                        className={`w-full border-l-[3px] px-3.5 py-3 text-left transition-colors ${
+                          selectedCard
+                            ? "border-emerald-500 bg-emerald-50/70"
+                            : "border-transparent hover:bg-slate-50"
+                        }`}
+                      >
+                        <span className="flex items-center justify-between gap-2">
+                          <span className="truncate text-xs font-semibold text-slate-800">
+                            {v.trip.vehicleNo || "—"}
+                          </span>
+                          <span className="shrink-0 text-[11px] font-semibold text-slate-400">
+                            {v.trip.tripNo || "—"}
+                          </span>
+                        </span>
+                        <span className="mt-0.5 block truncate text-[12px] font-medium text-slate-500">
+                          {v.trip.supervisorName || "—"} ·{" "}
+                          {v.trip.driverName || "—"}
+                        </span>
+                        <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] font-semibold text-slate-500">
+                          <span>{city}</span>
+                          <span className="text-slate-300">·</span>
+                          <span>
+                            {formatCount(v.capacity)} {to("orders.boxes_short")}
+                          </span>
+                          <span className="text-slate-300">·</span>
+                          <span
+                            className={
+                              shops > 0 ? "text-emerald-700" : "text-amber-600"
+                            }
+                          >
+                            {shops > 0
+                              ? to("orders.vehicle_shops_assigned", {
+                                  n: shops,
+                                })
+                              : to("orders.vehicle_shops_none")}
+                          </span>
+                        </span>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
             </div>
           )}
         </div>
@@ -1087,544 +1432,756 @@ function AssignmentEditor({
           collected-shops pool (to assign or already assigned) plus the
           delivery sequence and the save actions. ───────────────────────── */}
       <section className="min-w-0 flex-1">
-
         {/* ASSIGNMENT PANEL — the chosen truck: its facts on top, the shop
             pool and the delivery sequence in the body, and Save / WhatsApp /
             Submit in the footer. */}
-        {(
-        <div
-          aria-label={`${to("orders.assign_shops")} — ${vehicle?.trip.vehicleNo || vehicle?.trip.tripNo || ""}`}
-          className={opsTableCardClass}
-        >
-          <div className="flex w-full flex-col overflow-hidden">
-            {/* ── Header ── */}
-            <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-3">
-              <div className="flex min-w-0 items-center gap-2.5">
-                <span className="rounded-lg bg-emerald-100 p-1.5 text-emerald-600">
-                  <PackageCheck size={17} />
-                </span>
-                <div className="min-w-0">
-                  <h3 className="truncate text-sm font-bold text-slate-800">
-                    {to("orders.assign_shops")}
-                  </h3>
+        {
+          <div
+            aria-label={`${to("orders.assign_shops")} — ${vehicle?.trip.vehicleNo || vehicle?.trip.tripNo || ""}`}
+            className={opsTableCardClass}
+          >
+            <div className="flex w-full flex-col overflow-hidden">
+              {/* ── Header ── */}
+              <div className="flex items-start justify-between gap-3 border-b border-slate-100 px-5 py-3">
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <span className="rounded-lg bg-emerald-100 p-1.5 text-emerald-600">
+                    <PackageCheck size={17} />
+                  </span>
+                  <div className="min-w-0">
+                    <h3 className="truncate text-sm font-bold text-slate-800">
+                      {to("orders.assign_shops")}
+                    </h3>
+                  </div>
                 </div>
+                <button
+                  type="button"
+                  onClick={() => setVehicleTripId(null)}
+                  aria-label={to("orders.close")}
+                  className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                >
+                  <X size={17} />
+                </button>
               </div>
-              <button
-                type="button"
-                onClick={() => setVehicleTripId(null)}
-                aria-label={to("orders.close")}
-                className="rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-              >
-                <X size={17} />
-              </button>
-            </div>
 
-            {/* ── Body: shop pool + delivery sequence ── */}
-            <div className="min-h-0">
-      {/* 1 — Day pool: pending + assigned collected shops (select
+              {/* ── Body: shop pool + delivery sequence ── */}
+              <div className="min-h-0">
+                {/* 1 — Day pool: pending + assigned collected shops (select
           pending shops one by one; assigned rows are visible, locked).
           Sticky toolbar so search + filters stay in reach on ~100-shop days. */}
-      <div className="sticky top-0 z-20 border-b border-slate-200/80 bg-slate-50/95 backdrop-blur">
-        {/* Filter controls: search + status + city, with live summary pills.
+                <div className="sticky top-0 z-20 border-b border-slate-200/80 bg-slate-50/95 backdrop-blur">
+                  {/* Filter controls: search + status + city, with live summary pills.
             Narrows the table only — ticked shops stay selected. */}
-        <div className="flex items-center gap-2 px-4 py-3 flex-wrap">
-          <div
-            role="group"
-            aria-label={to("orders.filter_status")}
-            className="inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-xl border border-slate-200 bg-slate-100/90 p-1"
-          >
-            {(
-              [
-                { value: "all", labelKey: "orders.pool_filter_all", count: poolCounts.all, icon: LayoutGrid },
-                { value: "pending", labelKey: "orders.pool_filter_pending", count: poolCounts.pending, icon: Clock },
-                { value: "assigned", labelKey: "orders.pool_filter_assigned", count: poolCounts.assigned, icon: CheckCheck },
-                {
-                  value: "this_vehicle",
-                  labelKey: "orders.pool_filter_this_vehicle",
-                  count: poolCounts.thisVehicle,
-                  icon: Truck,
-                  needsVehicle: true,
-                },
-              ] as Array<{
-                value: "all" | "pending" | "assigned" | "this_vehicle";
-                labelKey: string;
-                count: number;
-                icon: LucideIcon;
-                needsVehicle?: boolean;
-              }>
-            ).map((opt) => {
-              const active = poolFilter === opt.value;
-              const disabled = opt.needsVehicle === true && !vehicle;
-              const Icon = opt.icon;
-              return (
-                <button
-                  key={opt.value}
-                  type="button"
-                  onClick={() => setPoolFilter(opt.value)}
-                  disabled={disabled}
-                  aria-pressed={active}
-                  title={disabled ? to("orders.select_vehicle") : to(opt.labelKey)}
-                  className={`inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-bold whitespace-nowrap transition-all ${
-                    active
-                      ? "bg-white text-emerald-700 shadow-sm ring-1 ring-slate-900/5"
-                      : "text-slate-500 hover:bg-white/70 hover:text-slate-700"
-                  } disabled:cursor-not-allowed disabled:opacity-40`}
-                >
-                  <Icon size={13} aria-hidden className={active ? "text-emerald-600" : "text-slate-400"} />
-                  {to(opt.labelKey)}
-                  <span
-                    className={`rounded-md px-1.5 py-px text-[10px] font-bold tabular-nums ${
-                      active ? "bg-emerald-100 text-emerald-700" : "bg-slate-200/70 text-slate-500"
-                    }`}
-                  >
-                    {opt.count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          <div className="ml-auto flex items-center gap-2 flex-wrap">
-            {selected.length > 0 && (
-              <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm">
-                <CheckCheck size={12} aria-hidden />
-                {to("orders.selected_shops")}: {selected.length}
-              </span>
-            )}
-            <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500">
-              {to("orders.pool_showing", {
-                shown: filteredPool.length,
-                total: collection.totalShops,
-                selected: selected.length,
-              })}
-            </span>
-          </div>
-        </div>
-      </div>
-      {filteredPool.length === 0 ? (
-        <div className="px-4 py-5">
-          <OrdersEmptyState
-            title={
-              q
-                ? to("orders.no_search_results")
-                : poolFilter !== "all" || cityFilters.length > 0
-                  ? to("orders.no_filter_results")
-                  : to("orders.pool_summary", {
-                      collected: collection.totalShops,
-                      assigned: collection.assignedShops,
-                      available: 0,
-                    })
-            }
-          />
-        </div>
-      ) : (
-        <>
-          <div className="overflow-x-auto">
-            <table className={`w-full min-w-[980px] ${ORDERS_TABLE_FONT_CLASS}`}>
-              <thead>
-                <tr className={opsTableHeadRowClass}>
-                  <th className={`${opsTableThClass} w-14`}>{to("orders.select_col")}</th>
-                  <th className={`${opsTableThClass} w-14`}>{to("orders.col_sno")}</th>
-                  <th className={opsTableThClass}>{to("orders.col_shop_name")}</th>
-                  <th className={opsTableThClass}>{to("orders.col_village")}</th>
-                  <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.col_birds")}</th>
-                  <th className={`${opsTableThClass} w-28 text-right`}>{to("orders.ordered_boxes")}</th>
-                  <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.weight")}</th>
-                </tr>
-              </thead>
-              <tbody className={opsTableDivideClass}>
-                {pageAvailable.map((row, index) => {
-                  const checked = selectedIds.has(row.shopId);
-                  const isLockedRow = row.kind === "assigned";
-                  // Two-tone rows; a checked row's emerald state colour wins.
-                           const tone = checked && !isLockedRow ? "bg-emerald-50/50" : ordersZebraTone(index);
-                  return (
-                    <tr
-                      key={row.shopId}
-                      className={`${opsTableRowClass} ${tone} ${
-                        isLockedRow
-                          ? "cursor-default opacity-60"
-                          : "cursor-pointer"
-                      }`}
-                      onClick={() => {
-                        if (!isLockedRow) toggleShop(row, !checked, row.assignedElsewhere);
-                      }}
+                  <div className="flex items-center gap-2 px-4 py-3 flex-wrap">
+                    <div
+                      role="group"
+                      aria-label={to("orders.filter_status")}
+                      className="inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-xl border border-slate-200 bg-slate-100/90 p-1"
                     >
-                      <td className={opsTableTdClass} onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          disabled={isLockedRow}
-                          onChange={(e) => toggleShop(row, e.target.checked, row.assignedElsewhere)}
-                          aria-label={`${to("orders.select_col")} — ${row.shopName}`}
-                          className={`h-4 w-4 accent-emerald-600 ${
-                            isLockedRow ? "cursor-not-allowed opacity-40" : "cursor-pointer"
-                          }`}
-                        />
-                      </td>
-                      <td className={opsTableTdClass}>
-                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 text-[12px] font-semibold text-slate-600">
-                          {availableStartIndex + index + 1}
-                        </span>
-                      </td>
-                      <td className={`${opsTableTdClass} font-semibold text-slate-800`}>
-                        {row.shopName || "—"}
-                      </td>
-                      <td className={opsTableTdClass}>
-                        {villageOf(row.shopId, row.shopName, shopDirectory) || "—"}
-                      </td>
-                      <td className={`${opsTableTdClass} text-right font-medium`}>
-                        {formatCount(Number(row.birds) || 0)}
-                      </td>
-                      <td className={`${opsTableTdClass} text-right font-semibold text-emerald-800`}>
-                        {formatCount(Math.max(1, Number(row.boxNo) || 0))}
-                      </td>
-                      <td className={`${opsTableTdClass} text-right text-slate-500`}>
-                        {orderWeightBasis
-                          ? formatKg(weightForBirds(Number(row.birds) || 0, orderWeightBasis))
-                          : "—"}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          <Pagination
-            page={safeAvailablePage}
-            pageSize={availablePageSize}
-            totalItems={filteredPool.length}
-            onPageChange={setAvailablePage}
-            onPageSizeChange={(size) => { setAvailablePageSize(size); setAvailablePage(1); }}
-          />
-        </>
-      )}
-
-      {/* 2 — Selected shops → select vehicle → sequence & boxes */}
-      {selected.length === 0 && (
-        <div className="border-t border-slate-100 bg-slate-50/40 px-4 py-4">
-          <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
-            {to("orders.selected_shops")}: <b>0</b>
-          </p>
-          <p className="mt-1 text-[11px] font-semibold text-slate-400">
-            {to("orders.sequence_empty_hint")}
-          </p>
-        </div>
-      )}
-      {selected.length > 0 && (
-        <>
-          <div className="border-t border-slate-200 bg-emerald-50/60 px-4 py-2.5 flex items-center gap-3 flex-wrap">
-            <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">
-              {to("orders.selected_shops")}: <b>{selected.length}</b>
-            </span>
-            <span className="text-[11px] font-semibold text-slate-400">
-              {to("orders.assign_hint")}
-            </span>
-            {/* One-click sequence sorting — with ~45 shops on a vehicle,
-                sorting the list beats dragging it row by row. */}
-            <span className="inline-flex items-center gap-1">
-              <span className="text-[11px] font-semibold text-slate-400">
-                {to("orders.sequence_sort")}:
-              </span>
-              <button
-                type="button"
-                onClick={() => sortSelected("shop_az")}
-                disabled={busy || selected.length < 2}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-600 transition-colors hover:border-emerald-300 hover:text-emerald-700 disabled:opacity-40"
-              >
-                {to("orders.seq_shop_az")}
-              </button>
-              <button
-                type="button"
-                onClick={() => sortSelected("village_az")}
-                disabled={busy || selected.length < 2}
-                className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-600 transition-colors hover:border-emerald-300 hover:text-emerald-700 disabled:opacity-40"
-              >
-                {to("orders.seq_village_az")}
-              </button>
-            </span>
-            {/* The vehicle comes from the › row above — no second selector. */}
-            <span className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-[11px] font-bold text-emerald-700">
-              {vehicle ? `${vehicle.trip.tripNo} · ${vehicle.trip.vehicleNo || "—"}` : "—"}
-            </span>
-          </div>
-
-          {vehicle && (
-            <>
-              {/* Live capacity only — the truck's static facts already sit in
-                  the sheet header, so they are never repeated here. */}
-              <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-3">
-                <div className="flex items-center gap-4 flex-wrap rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-600">
-                  <span>
-                    {to("orders.vehicle_box_capacity")}: <b className="text-slate-800">{capacity}</b>
-                  </span>
-                  <span>
-                    {to("orders.col_assigned")}: <b className="text-slate-800">{alreadyAssignedOther + requested}</b>
-                  </span>
-                  <span>
-                    {to("orders.available_boxes")}:{" "}
-                    <b className={remaining < 0 ? "text-rose-600" : "text-emerald-700"}>{remaining}</b>
-                  </span>
-                  <span>
-                    {to("orders.col_shops")}: <b className="text-slate-800">{selected.length}</b>
-                  </span>
-                  <span className="ml-auto text-[11px] text-slate-400">
-                    {to("orders.collection_summary", { shops: totals.totalShops, boxes: totals.totalBoxes, birds: totals.totalBirds })}
-                  </span>
-                </div>
-              </div>
-
-              {/* Assignment table: editable sequence — drag a row, ↑/↓ one
-                  step, ⤒/⤓ first/last, or sort the whole list — + boxes. */}
-              <div className="border-t border-slate-100 bg-slate-50/40 px-4 py-1.5 text-[11px] font-semibold text-slate-400">
-                {to("orders.drag_hint")}
-              </div>
-              <div className="max-h-80 overflow-y-auto">
-                <table className={`w-full min-w-[900px] ${ORDERS_TABLE_FONT_CLASS}`}>
-                  <thead>
-                    <tr className={opsTableHeadRowClass}>
-                      <th className={`${opsTableThClass} w-20`}>{to("orders.col_sequence")}</th>
-                      <th className={opsTableThClass}>{to("orders.col_shop_name")}</th>
-                      <th className={opsTableThClass}>{to("orders.col_village")}</th>
-                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.ordered_birds")}</th>
-                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.ordered_boxes")}</th>
-                      <th className={`${opsTableThClass} w-28 text-right`}>{to("orders.assigned_boxes")}</th>
-                      <th className={`${opsTableThClass} w-24 text-right`}>{to("orders.weight")}</th>
-                      <th className={`${opsTableThClass} w-12`} />
-                    </tr>
-                  </thead>
-                  <tbody className={opsTableDivideClass}>
-                    {selected.map((row, index) => {
-                                      const lifted = dragKey === row.clientKey;
-                      const isDropTarget =
-                        dropIndex === index && !!dragKey && !lifted;
-                      return (
-                        <tr
-                          key={row.clientKey}
-                          draggable={!busy}
-                          onDragStart={(e) => {
-                            setDragKey(row.clientKey);
-                            setDropIndex(index);
-                            e.dataTransfer.effectAllowed = "move";
-                            try {
-                              e.dataTransfer.setData("text/plain", row.clientKey);
-                            } catch {
-                              /* dataTransfer is read-only in some browsers */
+                      {(
+                        [
+                          {
+                            value: "all",
+                            labelKey: "orders.pool_filter_all",
+                            count: poolCounts.all,
+                            icon: LayoutGrid,
+                          },
+                          {
+                            value: "pending",
+                            labelKey: "orders.pool_filter_pending",
+                            count: poolCounts.pending,
+                            icon: Clock,
+                          },
+                          {
+                            value: "assigned",
+                            labelKey: "orders.pool_filter_assigned",
+                            count: poolCounts.assigned,
+                            icon: CheckCheck,
+                          },
+                          {
+                            value: "this_vehicle",
+                            labelKey: "orders.pool_filter_this_vehicle",
+                            count: poolCounts.thisVehicle,
+                            icon: Truck,
+                            needsVehicle: true,
+                          },
+                        ] as Array<{
+                          value:
+                            "all" | "pending" | "assigned" | "this_vehicle";
+                          labelKey: string;
+                          count: number;
+                          icon: LucideIcon;
+                          needsVehicle?: boolean;
+                        }>
+                      ).map((opt) => {
+                        const active = poolFilter === opt.value;
+                        const disabled = opt.needsVehicle === true && !vehicle;
+                        const Icon = opt.icon;
+                        return (
+                          <button
+                            key={opt.value}
+                            type="button"
+                            onClick={() => setPoolFilter(opt.value)}
+                            disabled={disabled}
+                            aria-pressed={active}
+                            title={
+                              disabled
+                                ? to("orders.select_vehicle")
+                                : to(opt.labelKey)
                             }
-                          }}
-                          onDragOver={(e) => {
-                            if (!dragKey) return;
-                            e.preventDefault();
-                            e.dataTransfer.dropEffect = "move";
-                            if (dropIndex !== index) setDropIndex(index);
-                          }}
-                          onDrop={(e) => {
-                            e.preventDefault();
-                            const from = dragKey || e.dataTransfer.getData("text/plain");
-                            if (from) moveRowTo(from, index);
-                            setDragKey(null);
-                            setDropIndex(null);
-                          }}
-                          onDragEnd={() => {
-                            setDragKey(null);
-                            setDropIndex(null);
-                          }}
-                          className={`${opsTableRowClass} align-middle ${
-                            isDropTarget ? "bg-emerald-50/50" : ordersZebraTone(index)
-                          } ${lifted ? "opacity-40" : ""} ${
-                            isDropTarget ? "border-t-2 border-t-emerald-500" : ""
-                          }`}
+                            className={`inline-flex h-7 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-[11px] font-bold whitespace-nowrap transition-all ${
+                              active
+                                ? "bg-white text-emerald-700 shadow-sm ring-1 ring-slate-900/5"
+                                : "text-slate-500 hover:bg-white/70 hover:text-slate-700"
+                            } disabled:cursor-not-allowed disabled:opacity-40`}
+                          >
+                            <Icon
+                              size={13}
+                              aria-hidden
+                              className={
+                                active ? "text-emerald-600" : "text-slate-400"
+                              }
+                            />
+                            {to(opt.labelKey)}
+                            <span
+                              className={`rounded-md px-1.5 py-px text-[10px] font-bold tabular-nums ${
+                                active
+                                  ? "bg-emerald-100 text-emerald-700"
+                                  : "bg-slate-200/70 text-slate-500"
+                              }`}
+                            >
+                              {opt.count}
+                            </span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="ml-auto flex items-center gap-2 flex-wrap">
+                      {selected.length > 0 && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-600 px-2.5 py-1 text-[11px] font-bold text-white shadow-sm">
+                          <CheckCheck size={12} aria-hidden />
+                          {to("orders.selected_shops")}: {selected.length}
+                        </span>
+                      )}
+                      <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-1 text-[11px] font-semibold text-slate-500">
+                        {to("orders.pool_showing", {
+                          shown: filteredPool.length,
+                          total: collection.totalShops,
+                          selected: selected.length,
+                        })}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                {filteredPool.length === 0 ? (
+                  <div className="px-4 py-5">
+                    <OrdersEmptyState
+                      title={
+                        q
+                          ? to("orders.no_search_results")
+                          : poolFilter !== "all" || cityFilters.length > 0
+                            ? to("orders.no_filter_results")
+                            : to("orders.pool_summary", {
+                                collected: collection.totalShops,
+                                assigned: collection.assignedShops,
+                                available: 0,
+                              })
+                      }
+                    />
+                  </div>
+                ) : (
+                  <>
+                    <div className="overflow-x-auto">
+                      <table
+                        className={`w-full min-w-[980px] ${ORDERS_TABLE_FONT_CLASS}`}
+                      >
+                        <thead>
+                          <tr className={opsTableHeadRowClass}>
+                            <th className={`${opsTableThClass} w-14`}>
+                              {to("orders.select_col")}
+                            </th>
+                            <th className={`${opsTableThClass} w-14`}>
+                              {to("orders.col_sno")}
+                            </th>
+                            <th className={opsTableThClass}>
+                              {to("orders.col_shop_name")}
+                            </th>
+                            <th className={opsTableThClass}>
+                              {to("orders.col_village")}
+                            </th>
+                            <th
+                              className={`${opsTableThClass} w-24 text-right`}
+                            >
+                              {to("orders.col_birds")}
+                            </th>
+                            <th
+                              className={`${opsTableThClass} w-28 text-right`}
+                            >
+                              {to("orders.ordered_boxes")}
+                            </th>
+                            <th
+                              className={`${opsTableThClass} w-24 text-right`}
+                            >
+                              {to("orders.weight")}
+                            </th>
+                          </tr>
+                        </thead>
+                        <tbody className={opsTableDivideClass}>
+                          {pageAvailable.map((row, index) => {
+                            const checked = selectedIds.has(row.shopId);
+                            const isLockedRow = row.kind === "assigned";
+                            // Two-tone rows; a checked row's emerald state colour wins.
+                            const tone =
+                              checked && !isLockedRow
+                                ? "bg-emerald-50/50"
+                                : ordersZebraTone(index);
+                            return (
+                              <tr
+                                key={row.shopId}
+                                className={`${opsTableRowClass} ${tone} ${
+                                  isLockedRow
+                                    ? "cursor-default opacity-60"
+                                    : "cursor-pointer"
+                                }`}
+                                onClick={() => {
+                                  if (!isLockedRow)
+                                    toggleShop(
+                                      row,
+                                      !checked,
+                                      row.assignedElsewhere,
+                                    );
+                                }}
+                              >
+                                <td
+                                  className={opsTableTdClass}
+                                  onClick={(e) => e.stopPropagation()}
+                                >
+                                  <input
+                                    type="checkbox"
+                                    checked={checked}
+                                    disabled={isLockedRow}
+                                    onChange={(e) =>
+                                      toggleShop(
+                                        row,
+                                        e.target.checked,
+                                        row.assignedElsewhere,
+                                      )
+                                    }
+                                    aria-label={`${to("orders.select_col")} — ${row.shopName}`}
+                                    className={`h-4 w-4 accent-emerald-600 ${
+                                      isLockedRow
+                                        ? "cursor-not-allowed opacity-40"
+                                        : "cursor-pointer"
+                                    }`}
+                                  />
+                                </td>
+                                <td className={opsTableTdClass}>
+                                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 text-[12px] font-semibold text-slate-600">
+                                    {availableStartIndex + index + 1}
+                                  </span>
+                                </td>
+                                <td
+                                  className={`${opsTableTdClass} font-semibold text-slate-800`}
+                                >
+                                  {row.shopName || "—"}
+                                </td>
+                                <td className={opsTableTdClass}>
+                                  {villageOf(
+                                    row.shopId,
+                                    row.shopName,
+                                    shopDirectory,
+                                  ) || "—"}
+                                </td>
+                                <td
+                                  className={`${opsTableTdClass} text-right font-medium`}
+                                >
+                                  {formatCount(Number(row.birds) || 0)}
+                                </td>
+                                <td
+                                  className={`${opsTableTdClass} text-right font-semibold text-emerald-800`}
+                                >
+                                  {formatCount(
+                                    Math.max(1, Number(row.boxNo) || 0),
+                                  )}
+                                </td>
+                                <td
+                                  className={`${opsTableTdClass} text-right text-slate-500`}
+                                >
+                                  {orderWeightBasis
+                                    ? formatKg(
+                                        weightForBirds(
+                                          Number(row.birds) || 0,
+                                          orderWeightBasis,
+                                        ),
+                                      )
+                                    : "—"}
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
+                    <Pagination
+                      page={safeAvailablePage}
+                      pageSize={availablePageSize}
+                      totalItems={filteredPool.length}
+                      onPageChange={setAvailablePage}
+                      onPageSizeChange={(size) => {
+                        setAvailablePageSize(size);
+                        setAvailablePage(1);
+                      }}
+                    />
+                  </>
+                )}
+
+                {/* 2 — Selected shops → select vehicle → sequence & boxes */}
+                {selected.length === 0 && (
+                  <div className="border-t border-slate-100 bg-slate-50/40 px-4 py-4">
+                    <p className="text-[11px] font-bold uppercase tracking-wider text-slate-500">
+                      {to("orders.selected_shops")}: <b>0</b>
+                    </p>
+                    <p className="mt-1 text-[11px] font-semibold text-slate-400">
+                      {to("orders.sequence_empty_hint")}
+                    </p>
+                  </div>
+                )}
+                {selected.length > 0 && (
+                  <>
+                    <div className="border-t border-slate-200 bg-emerald-50/60 px-4 py-2.5 flex items-center gap-3 flex-wrap">
+                      <span className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">
+                        {to("orders.selected_shops")}: <b>{selected.length}</b>
+                      </span>
+                      <span className="text-[11px] font-semibold text-slate-400">
+                        {to("orders.assign_hint")}
+                      </span>
+                      {/* One-click sequence sorting — with ~45 shops on a vehicle,
+                sorting the list beats dragging it row by row. */}
+                      <span className="inline-flex items-center gap-1">
+                        <span className="text-[11px] font-semibold text-slate-400">
+                          {to("orders.sequence_sort")}:
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => sortSelected("shop_az")}
+                          disabled={busy || selected.length < 2}
+                          className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-600 transition-colors hover:border-emerald-300 hover:text-emerald-700 disabled:opacity-40"
                         >
-                          <td className={opsTableTdClass}>
-                            <div className="flex items-center gap-1.5">
-                              {/* Drag handle (the whole row drags as well) */}
-                              <GripVertical
-                                size={14}
-                                aria-label={to("orders.drag_handle")}
-                                className="shrink-0 cursor-grab text-slate-300 active:cursor-grabbing"
-                              />
-                              <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-[12px] font-semibold text-emerald-700">
-                                {index + 1}
-                              </span>
-                              {/* ↑ ↓ step one place · ⤒ ⤓ jump to first / last */}
-                              <div className="grid grid-cols-2 -my-1.5">
-                                <button
-                                  type="button"
-                                  onClick={() => moveRow(row.clientKey, -1)}
-                                  disabled={index === 0 || busy}
-                                  aria-label={`${to("orders.col_sequence")} ↑ ${row.shopName}`}
-                                  className="h-5 w-5 rounded text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 disabled:opacity-25 flex items-center justify-center"
+                          {to("orders.seq_shop_az")}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => sortSelected("village_az")}
+                          disabled={busy || selected.length < 2}
+                          className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-600 transition-colors hover:border-emerald-300 hover:text-emerald-700 disabled:opacity-40"
+                        >
+                          {to("orders.seq_village_az")}
+                        </button>
+                      </span>
+                      {/* The vehicle comes from the › row above — no second selector. */}
+                      <span className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-[11px] font-bold text-emerald-700">
+                        {vehicle
+                          ? `${vehicle.trip.tripNo} · ${vehicle.trip.vehicleNo || "—"}`
+                          : "—"}
+                      </span>
+                    </div>
+
+                    {vehicle && (
+                      <>
+                        {/* Live capacity only — the truck's static facts already sit in
+                  the sheet header, so they are never repeated here. */}
+                        <div className="border-t border-slate-100 bg-slate-50/50 px-4 py-3">
+                          <div className="flex items-center gap-4 flex-wrap rounded-lg border border-slate-200 bg-white px-3.5 py-2 text-xs font-semibold text-slate-600">
+                            <span>
+                              {to("orders.vehicle_box_capacity")}:{" "}
+                              <b className="text-slate-800">{capacity}</b>
+                            </span>
+                            <span>
+                              {to("orders.col_assigned")}:{" "}
+                              <b className="text-slate-800">
+                                {alreadyAssignedOther + requested}
+                              </b>
+                            </span>
+                            <span>
+                              {to("orders.available_boxes")}:{" "}
+                              <b
+                                className={
+                                  remaining < 0
+                                    ? "text-rose-600"
+                                    : "text-emerald-700"
+                                }
+                              >
+                                {remaining}
+                              </b>
+                            </span>
+                            <span>
+                              {to("orders.col_shops")}:{" "}
+                              <b className="text-slate-800">
+                                {selected.length}
+                              </b>
+                            </span>
+                            <span className="ml-auto text-[11px] text-slate-400">
+                              {to("orders.collection_summary", {
+                                shops: totals.totalShops,
+                                boxes: totals.totalBoxes,
+                                birds: totals.totalBirds,
+                              })}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Assignment table: editable sequence — drag a row, ↑/↓ one
+                  step, ⤒/⤓ first/last, or sort the whole list — + boxes. */}
+                        <div className="border-t border-slate-100 bg-slate-50/40 px-4 py-1.5 text-[11px] font-semibold text-slate-400">
+                          {to("orders.drag_hint")}
+                        </div>
+                        <div className="max-h-80 overflow-y-auto">
+                          <table
+                            className={`w-full min-w-[900px] ${ORDERS_TABLE_FONT_CLASS}`}
+                          >
+                            <thead>
+                              <tr className={opsTableHeadRowClass}>
+                                <th className={`${opsTableThClass} w-20`}>
+                                  {to("orders.col_sequence")}
+                                </th>
+                                <th className={opsTableThClass}>
+                                  {to("orders.col_shop_name")}
+                                </th>
+                                <th className={opsTableThClass}>
+                                  {to("orders.col_village")}
+                                </th>
+                                <th
+                                  className={`${opsTableThClass} w-24 text-right`}
                                 >
-                                  <ArrowUp size={12} />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => moveRowTo(row.clientKey, 0)}
-                                  disabled={index === 0 || busy}
-                                  title={to("orders.move_first")}
-                                  aria-label={`${to("orders.move_first")} — ${row.shopName}`}
-                                  className="h-5 w-5 rounded text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 disabled:opacity-25 flex items-center justify-center"
+                                  {to("orders.ordered_birds")}
+                                </th>
+                                <th
+                                  className={`${opsTableThClass} w-24 text-right`}
                                 >
-                                  <ChevronsUp size={12} />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => moveRow(row.clientKey, 1)}
-                                  disabled={index === selected.length - 1 || busy}
-                                  aria-label={`${to("orders.col_sequence")} ↓ ${row.shopName}`}
-                                  className="h-5 w-5 rounded text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 disabled:opacity-25 flex items-center justify-center"
+                                  {to("orders.ordered_boxes")}
+                                </th>
+                                <th
+                                  className={`${opsTableThClass} w-28 text-right`}
                                 >
-                                  <ArrowDown size={12} />
-                                </button>
-                                <button
-                                  type="button"
-                                  onClick={() => moveRowTo(row.clientKey, selected.length - 1)}
-                                  disabled={index === selected.length - 1 || busy}
-                                  title={to("orders.move_last")}
-                                  aria-label={`${to("orders.move_last")} — ${row.shopName}`}
-                                  className="h-5 w-5 rounded text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 disabled:opacity-25 flex items-center justify-center"
+                                  {to("orders.assigned_boxes")}
+                                </th>
+                                <th
+                                  className={`${opsTableThClass} w-24 text-right`}
                                 >
-                                  <ChevronsDown size={12} />
-                                </button>
-                              </div>
-                            </div>
-                          </td>
-                          <td className={`${opsTableTdClass} font-semibold text-slate-800`}>
-                            {row.shopName || "—"}
-                          </td>
-                          <td className={opsTableTdClass}>{row.village || "—"}</td>
-                          <td className={`${opsTableTdClass} text-right font-medium`}>
-                            {formatCount(row.orderedBirds)}
-                          </td>
-                          <td className={`${opsTableTdClass} text-right font-semibold text-emerald-800`}>
-                            {formatCount(row.orderedBoxes)}
-                          </td>
-                          <td className={opsTableTdClass}>
-                            {/* PARTIAL ASSIGNMENT: send part of a shop's order on
+                                  {to("orders.weight")}
+                                </th>
+                                <th className={`${opsTableThClass} w-12`} />
+                              </tr>
+                            </thead>
+                            <tbody className={opsTableDivideClass}>
+                              {selected.map((row, index) => {
+                                const lifted = dragKey === row.clientKey;
+                                const isDropTarget =
+                                  dropIndex === index && !!dragKey && !lifted;
+                                return (
+                                  <tr
+                                    key={row.clientKey}
+                                    draggable={!busy}
+                                    onDragStart={(e) => {
+                                      setDragKey(row.clientKey);
+                                      setDropIndex(index);
+                                      e.dataTransfer.effectAllowed = "move";
+                                      try {
+                                        e.dataTransfer.setData(
+                                          "text/plain",
+                                          row.clientKey,
+                                        );
+                                      } catch {
+                                        /* dataTransfer is read-only in some browsers */
+                                      }
+                                    }}
+                                    onDragOver={(e) => {
+                                      if (!dragKey) return;
+                                      e.preventDefault();
+                                      e.dataTransfer.dropEffect = "move";
+                                      if (dropIndex !== index)
+                                        setDropIndex(index);
+                                    }}
+                                    onDrop={(e) => {
+                                      e.preventDefault();
+                                      const from =
+                                        dragKey ||
+                                        e.dataTransfer.getData("text/plain");
+                                      if (from) moveRowTo(from, index);
+                                      setDragKey(null);
+                                      setDropIndex(null);
+                                    }}
+                                    onDragEnd={() => {
+                                      setDragKey(null);
+                                      setDropIndex(null);
+                                    }}
+                                    className={`${opsTableRowClass} align-middle ${
+                                      isDropTarget
+                                        ? "bg-emerald-50/50"
+                                        : ordersZebraTone(index)
+                                    } ${lifted ? "opacity-40" : ""} ${
+                                      isDropTarget
+                                        ? "border-t-2 border-t-emerald-500"
+                                        : ""
+                                    }`}
+                                  >
+                                    <td className={opsTableTdClass}>
+                                      <div className="flex items-center gap-1.5">
+                                        {/* Drag handle (the whole row drags as well) */}
+                                        <GripVertical
+                                          size={14}
+                                          aria-label={to("orders.drag_handle")}
+                                          className="shrink-0 cursor-grab text-slate-300 active:cursor-grabbing"
+                                        />
+                                        <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-emerald-50 text-[12px] font-semibold text-emerald-700">
+                                          {index + 1}
+                                        </span>
+                                        {/* ↑ ↓ step one place · ⤒ ⤓ jump to first / last */}
+                                        <div className="grid grid-cols-2 -my-1.5">
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              moveRow(row.clientKey, -1)
+                                            }
+                                            disabled={index === 0 || busy}
+                                            aria-label={`${to("orders.col_sequence")} ↑ ${row.shopName}`}
+                                            className="h-5 w-5 rounded text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 disabled:opacity-25 flex items-center justify-center"
+                                          >
+                                            <ArrowUp size={12} />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              moveRowTo(row.clientKey, 0)
+                                            }
+                                            disabled={index === 0 || busy}
+                                            title={to("orders.move_first")}
+                                            aria-label={`${to("orders.move_first")} — ${row.shopName}`}
+                                            className="h-5 w-5 rounded text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 disabled:opacity-25 flex items-center justify-center"
+                                          >
+                                            <ChevronsUp size={12} />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              moveRow(row.clientKey, 1)
+                                            }
+                                            disabled={
+                                              index === selected.length - 1 ||
+                                              busy
+                                            }
+                                            aria-label={`${to("orders.col_sequence")} ↓ ${row.shopName}`}
+                                            className="h-5 w-5 rounded text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 disabled:opacity-25 flex items-center justify-center"
+                                          >
+                                            <ArrowDown size={12} />
+                                          </button>
+                                          <button
+                                            type="button"
+                                            onClick={() =>
+                                              moveRowTo(
+                                                row.clientKey,
+                                                selected.length - 1,
+                                              )
+                                            }
+                                            disabled={
+                                              index === selected.length - 1 ||
+                                              busy
+                                            }
+                                            title={to("orders.move_last")}
+                                            aria-label={`${to("orders.move_last")} — ${row.shopName}`}
+                                            className="h-5 w-5 rounded text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 disabled:opacity-25 flex items-center justify-center"
+                                          >
+                                            <ChevronsDown size={12} />
+                                          </button>
+                                        </div>
+                                      </div>
+                                    </td>
+                                    <td
+                                      className={`${opsTableTdClass} font-semibold text-slate-800`}
+                                    >
+                                      {row.shopName || "—"}
+                                    </td>
+                                    <td className={opsTableTdClass}>
+                                      {row.village || "—"}
+                                    </td>
+                                    <td
+                                      className={`${opsTableTdClass} text-right font-medium`}
+                                    >
+                                      {formatCount(row.orderedBirds)}
+                                    </td>
+                                    <td
+                                      className={`${opsTableTdClass} text-right font-semibold text-emerald-800`}
+                                    >
+                                      {formatCount(row.orderedBoxes)}
+                                    </td>
+                                    <td className={opsTableTdClass}>
+                                      {/* PARTIAL ASSIGNMENT: send part of a shop's order on
                                 this truck — the balance stays pending for another
                                 vehicle. The cap is the shop's REMAINING balance
                                 (ordered − boxes already on other vehicles), so
                                 splitting 40 into 20 + 20 works while 20 + 40
                                 is impossible. */}
-                            <div className="flex items-center gap-2">
-                              <input
-                                type="number"
-                                min={1}
-                                max={maxAssignable(row)}
-                                value={row.assigned === 0 ? "" : row.assigned}
-                                placeholder="0"
-                                aria-label={`${to("orders.assigned_boxes")} — ${row.shopName}`}
-                                onChange={(e) => setAssigned(row.clientKey, e.target.value)}
-                                onWheel={onOrdersNumberWheel}
-                                className={`${ORDERS_NO_SPINNER} h-8 w-24 rounded-lg border px-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 ${
-                                  row.assigned === 0
-                                    ? "border-amber-300 bg-amber-50/60 text-amber-800"
-                                    : "border-emerald-300/70 bg-emerald-50/50 text-emerald-900"
-                                }`}
-                              />
-                              <span className="whitespace-nowrap text-[11px] font-semibold text-slate-400">
-                                / {formatCount(maxAssignable(row))}
-                                {row.assignedElsewhere > 0 && (
-                                  <span
-                                    className="ml-1.5 text-slate-500"
-                                    title={to("orders.on_other_vehicles", { boxes: row.assignedElsewhere })}
-                                  >
-                                    ({to("orders.on_other_vehicles", { boxes: row.assignedElsewhere })})
-                                  </span>
-                                )}
-                                {row.assigned > 0 && row.assigned < maxAssignable(row) && (
-                                  <span className="ml-1.5 font-semibold text-amber-600">
-                                    {to("orders.part_assign_left", {
-                                      boxes: maxAssignable(row) - row.assigned,
-                                    })}
-                                  </span>
-                                )}
-                              </span>
-                            </div>
-                          </td>
-                          <td className={`${opsTableTdClass} text-right text-slate-500`}>
-                            {orderWeightBasis
-                              ? formatKg(weightForBirds(assignedBirdsFor(row), orderWeightBasis))
-                              : "—"}
-                          </td>
-                          <td className={opsTableTdClass}>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setSelected((prev) => prev.filter((r) => r.clientKey !== row.clientKey))
-                              }
-                              disabled={busy}
-                              aria-label={`${to("orders.close")} — ${row.shopName}`}
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200/80 bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-colors disabled:opacity-30"
-                            >
-                              <X size={13} />
-                            </button>
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                                      <div className="flex items-center gap-2">
+                                        <input
+                                          type="number"
+                                          min={1}
+                                          max={maxAssignable(row)}
+                                          value={
+                                            row.assigned === 0
+                                              ? ""
+                                              : row.assigned
+                                          }
+                                          placeholder="0"
+                                          aria-label={`${to("orders.assigned_boxes")} — ${row.shopName}`}
+                                          onChange={(e) =>
+                                            setAssigned(
+                                              row.clientKey,
+                                              e.target.value,
+                                            )
+                                          }
+                                          onWheel={onOrdersNumberWheel}
+                                          className={`${ORDERS_NO_SPINNER} h-8 w-24 rounded-lg border px-2 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-emerald-500/30 focus:border-emerald-500 ${
+                                            row.assigned === 0
+                                              ? "border-amber-300 bg-amber-50/60 text-amber-800"
+                                              : "border-emerald-300/70 bg-emerald-50/50 text-emerald-900"
+                                          }`}
+                                        />
+                                        <span className="whitespace-nowrap text-[11px] font-semibold text-slate-400">
+                                          / {formatCount(maxAssignable(row))}
+                                          {row.assignedElsewhere > 0 && (
+                                            <span
+                                              className="ml-1.5 text-slate-500"
+                                              title={to(
+                                                "orders.on_other_vehicles",
+                                                {
+                                                  boxes: row.assignedElsewhere,
+                                                },
+                                              )}
+                                            >
+                                              (
+                                              {to("orders.on_other_vehicles", {
+                                                boxes: row.assignedElsewhere,
+                                              })}
+                                              )
+                                            </span>
+                                          )}
+                                          {row.assigned > 0 &&
+                                            row.assigned <
+                                              maxAssignable(row) && (
+                                              <span className="ml-1.5 font-semibold text-amber-600">
+                                                {to("orders.part_assign_left", {
+                                                  boxes:
+                                                    maxAssignable(row) -
+                                                    row.assigned,
+                                                })}
+                                              </span>
+                                            )}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td
+                                      className={`${opsTableTdClass} text-right text-slate-500`}
+                                    >
+                                      {orderWeightBasis
+                                        ? formatKg(
+                                            weightForBirds(
+                                              assignedBirdsFor(row),
+                                              orderWeightBasis,
+                                            ),
+                                          )
+                                        : "—"}
+                                    </td>
+                                    <td className={opsTableTdClass}>
+                                      <button
+                                        type="button"
+                                        onClick={() =>
+                                          setSelected((prev) =>
+                                            prev.filter(
+                                              (r) =>
+                                                r.clientKey !== row.clientKey,
+                                            ),
+                                          )
+                                        }
+                                        disabled={busy}
+                                        aria-label={`${to("orders.close")} — ${row.shopName}`}
+                                        className="inline-flex h-7 w-7 items-center justify-center rounded-lg border border-slate-200/80 bg-white text-slate-400 hover:text-rose-600 hover:bg-rose-50 hover:border-rose-200 transition-colors disabled:opacity-30"
+                                      >
+                                        <X size={13} />
+                                      </button>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
               </div>
 
-            </>
-          )}
-        </>
-      )}
-
-            </div>
-
-            {/* ── Footer: the message, then the actions ── */}
-            <div className="border-t border-slate-200 bg-slate-50/70 px-5 py-3.5 flex items-center justify-between flex-wrap gap-3">
-          <div className="flex items-center gap-2">
-            {isDirty && (
-              <span className="text-[11px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1">
-                {to("orders.unsaved_changes")}
-              </span>
-            )}
-            {selected.length === 0 && savedOnVehicle > 0 && (
-              <span className="text-[11px] font-semibold text-slate-500 bg-white border border-slate-200 rounded-full px-2.5 py-1">
-                {to("orders.saved_on_vehicle")}: <b>{savedOnVehicle}</b>
-              </span>
-            )}
-          </div>
-          <div className="flex items-center gap-2.5">
-            {/* WhatsApp — real brand icon + green treatment. Opens the CHECK
+              {/* ── Footer: the message, then the actions ── */}
+              <div className="border-t border-slate-200 bg-slate-50/70 px-5 py-3.5 flex items-center justify-between flex-wrap gap-3">
+                <div className="flex items-center gap-2">
+                  {isDirty && (
+                    <span className="text-[11px] font-semibold text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1">
+                      {to("orders.unsaved_changes")}
+                    </span>
+                  )}
+                  {selected.length === 0 && savedOnVehicle > 0 && (
+                    <span className="text-[11px] font-semibold text-slate-500 bg-white border border-slate-200 rounded-full px-2.5 py-1">
+                      {to("orders.saved_on_vehicle")}: <b>{savedOnVehicle}</b>
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2.5">
+                  {/* WhatsApp — real brand icon + green treatment. Opens the CHECK
                 POPUP first (message text + branded sheet PDF); the send itself
                 happens on the popup's "Confirm & Send". */}
-            <button
-              type="button"
-              onClick={() => setWaPopupOpen(true)}
-              disabled={waBusy || !vehicle || waSheetRows.length === 0}
-              title={to("orders.wa_check_title")}
-              aria-label={to("orders.whatsapp")}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-600/40 bg-emerald-500 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {waBusy ? <Loader2 size={14} className="animate-spin" /> : <WhatsAppIcon size={14} />}
-              {waProgress ? `${to("orders.whatsapp")} · ${waProgress}` : to("orders.whatsapp")}
-            </button>
-            <button
-              type="button"
-              onClick={() => void handleSave()}
-              disabled={busy || !vehicle || selected.length === 0}
-              className={`${opsSecondaryButtonClass} border-emerald-300 text-emerald-700 hover:bg-emerald-50`}
-            >
-              {saving || conflictChecking ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : (
-                <Save size={14} />
-              )}
-              {saving ? to("orders.saving") : to("orders.save_progress")}
-            </button>
+                  <button
+                    type="button"
+                    onClick={() => setWaPopupOpen(true)}
+                    disabled={waBusy || !vehicle || waSheetRows.length === 0}
+                    title={to("orders.wa_check_title")}
+                    aria-label={to("orders.whatsapp")}
+                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-600/40 bg-emerald-500 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {waBusy ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <WhatsAppIcon size={14} />
+                    )}
+                    {waProgress
+                      ? `${to("orders.whatsapp")} · ${waProgress}`
+                      : to("orders.whatsapp")}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleSave()}
+                    disabled={busy || !vehicle || selected.length === 0}
+                    className={`${opsSecondaryButtonClass} border-emerald-300 text-emerald-700 hover:bg-emerald-50`}
+                  >
+                    {saving || conflictChecking ? (
+                      <Loader2 size={14} className="animate-spin" />
+                    ) : (
+                      <Save size={14} />
+                    )}
+                    {saving ? to("orders.saving") : to("orders.save_progress")}
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
-        </div>
-          </div>
-        </div>
-        )}
+        }
       </section>
 
       {/* Capacity-exceeded block (clean modal with the exact numbers) */}
       {capacityExceeded && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30" role="dialog" aria-modal="true">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/30"
+          role="dialog"
+          aria-modal="true"
+        >
           <div className="bg-white rounded-2xl shadow-2xl max-w-md w-full mx-4 overflow-hidden border border-rose-200">
             <div className="bg-gradient-to-br from-rose-50 to-amber-50 p-6">
               <div className="flex items-start gap-4">
@@ -1637,13 +2194,27 @@ function AssignmentEditor({
                   </h3>
                   <dl className="mt-2 rounded-lg border border-rose-100 bg-white/80 divide-y divide-rose-50 text-sm">
                     {[
-                      [to("orders.vehicle_box_capacity"), capacityExceeded.capacity],
-                      [to("orders.already_assigned"), capacityExceeded.assigned],
-                      [to("orders.available_boxes"), capacityExceeded.available],
+                      [
+                        to("orders.vehicle_box_capacity"),
+                        capacityExceeded.capacity,
+                      ],
+                      [
+                        to("orders.already_assigned"),
+                        capacityExceeded.assigned,
+                      ],
+                      [
+                        to("orders.available_boxes"),
+                        capacityExceeded.available,
+                      ],
                       [to("orders.requested"), capacityExceeded.requested],
                     ].map(([label, value]) => (
-                      <div key={label} className="flex items-center justify-between gap-6 px-3 py-1.5">
-                        <dt className="font-semibold text-slate-500">{label}</dt>
+                      <div
+                        key={label}
+                        className="flex items-center justify-between gap-6 px-3 py-1.5"
+                      >
+                        <dt className="font-semibold text-slate-500">
+                          {label}
+                        </dt>
                         <dd className="font-bold text-slate-800">{value}</dd>
                       </div>
                     ))}
