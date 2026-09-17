@@ -35,7 +35,6 @@ import {
   PackageCheck,
   GripVertical,
   Loader2,
-  RotateCcw,
   ArrowUpDown,
   Calendar,
   MapPin,
@@ -54,7 +53,6 @@ import {
   opsFilterCardClass,
   opsFilterLabelClass,
   opsInputClass,
-  opsSecondaryButtonClass,
   opsSectionTitleClass,
   opsTableCardClass,
   opsTableDivideClass,
@@ -64,7 +62,7 @@ import {
   opsTableThClass,
   opsTableRowClass,
 } from "../../../shared/ui/operationsStyles";
-import { BrandRefreshButton, Pagination } from "../../../ui";
+import { BrandRefreshButton, FilterResetButton, Pagination } from "../../../ui";
 import { formatVehicleNumber } from "../../../utils/format";
 import { uiActionIconMotionClass } from "../../../shared/ui/uiTokens";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
@@ -847,20 +845,10 @@ function OrderAssignmentPage({
             </div>
           </div>
           <div className="flex flex-wrap items-center justify-end gap-2 lg:col-span-4">
-            <button
-              type="button"
+            <FilterResetButton
+              count={activeChips.length}
               onClick={resetFilters}
-              className={`group relative ${opsSecondaryButtonClass}`}
-              aria-label={to("common.reset")}
-            >
-              <RotateCcw size={14} className={uiActionIconMotionClass.reset} />
-              {to("common.reset")}
-              {hasFilters && (
-                <span className="ml-1 inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-emerald-600 px-1.5 text-[10px] font-bold tabular-nums text-white motion-safe:animate-[var(--animate-pop-in)]">
-                  {activeChips.length}
-                </span>
-              )}
-            </button>
+            />
             <BrandRefreshButton onClick={onRefresh} loading={refreshing} />
           </div>
         </div>

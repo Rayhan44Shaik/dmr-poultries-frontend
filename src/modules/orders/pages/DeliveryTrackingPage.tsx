@@ -23,7 +23,7 @@ import {
   opsTableThClass,
 } from "../../../shared/ui/operationsStyles";
 
-import { Pagination } from "../../../ui";
+import { FilterResetButton, Pagination, countActiveFilters } from "../../../ui";
 import {
   deliveryProgressPct,
   formatCount,
@@ -625,11 +625,26 @@ function DeliveryTrackingPage({
   if (loading) return <OrdersTableSkeleton rows={5} />;
 
   const actionProps = { pdfBusyId, onPdf, onView };
-  const filtersActive =
-    sortMode !== "newest" ||
-    q !== "" ||
-    deliveryFilter !== "all" ||
-    differenceFilter !== "all";
+  const defaultFrom = today ? addLocalDays(today, -6) : "";
+  const rangeChanged =
+    Boolean(today) &&
+    ((completedFrom || defaultFrom) !== defaultFrom ||
+      (completedTo || today) !== today);
+  const activeFilterCount = countActiveFilters(
+    sortMode !== "newest",
+    q !== "",
+    deliveryFilter !== "all",
+    differenceFilter !== "all",
+    rangeChanged,
+  );
+  const resetFilters = () => {
+    setQuery("");
+    setSortMode("newest");
+    setDeliveryFilter("all");
+    setDifferenceFilter("all");
+    setCompletedFrom(defaultFrom);
+    setCompletedTo(today);
+  };
   const supervisorOf = (ot: OrdersTrip) =>
     supervisorMobileOf(ot.trip, supervisorDirectory);
 
@@ -667,20 +682,7 @@ function DeliveryTrackingPage({
           ariaLabel={to("orders.filter_difference")}
           widthClass="w-40"
         />
-        {filtersActive && (
-          <button
-            type="button"
-            onClick={() => {
-              setQuery("");
-              setSortMode("newest");
-              setDeliveryFilter("all");
-              setDifferenceFilter("all");
-            }}
-            className="h-9 rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-bold text-slate-500 hover:bg-slate-50"
-          >
-            {to("orders.clear_filters")}
-          </button>
-        )}
+        <FilterResetButton count={activeFilterCount} onClick={resetFilters} />
         <OrdersIconButton
           className="ml-auto"
           label={`${to("orders.refresh")} — ${to("orders.refresh_tracking")}`}
@@ -701,7 +703,7 @@ function DeliveryTrackingPage({
           <OrdersEmptyState
             compact
             title={
-              filtersActive && active.length > 0
+              activeFilterCount > 0 && active.length > 0
                 ? to("orders.no_search_results")
                 : to("orders.no_pending_deliveries")
             }
@@ -786,7 +788,7 @@ function DeliveryTrackingPage({
           <OrdersEmptyState
             compact
             title={
-              filtersActive && completed.length > 0
+              activeFilterCount > 0 && completed.length > 0
                 ? to("orders.no_search_results")
                 : to("orders.no_completed_window")
             }

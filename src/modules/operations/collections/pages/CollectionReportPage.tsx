@@ -46,6 +46,7 @@ import {
   opsEmptyStateClass,
 } from "../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../i18n";
+import { FilterResetButton, countActiveFilters } from "../../../../ui";
 import { getQuarterSampleInfo } from "../../../../sample/quarterSample";
 
 const formatCurrency = (amount: number) =>
@@ -59,11 +60,10 @@ const formatCurrency = (amount: number) =>
 // Reset (light red) — consistent shell, tone differs per action.
 const searchButtonClass =
   "inline-flex items-center justify-center gap-1.5 rounded-xl border border-emerald-200 bg-emerald-100 px-3.5 py-2.5 text-xs font-semibold text-emerald-700 transition-all hover:bg-emerald-200 active:scale-95 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed";
+const retryButtonClass =
+  "inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-100 px-3.5 py-2.5 text-xs font-semibold text-rose-700 transition-all hover:bg-rose-200 active:scale-95 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed";
 const exportButtonClass =
   "inline-flex items-center justify-center gap-1.5 rounded-xl border border-sky-200 bg-sky-100 px-3.5 py-2.5 text-xs font-semibold text-sky-700 transition-all hover:bg-sky-200 active:scale-95 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed";
-const resetButtonClass =
-  "inline-flex items-center justify-center gap-1.5 rounded-xl border border-rose-200 bg-rose-100 px-3.5 py-2.5 text-xs font-semibold text-rose-700 transition-all hover:bg-rose-200 active:scale-95 whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed";
-
 // Chart palette: stable brand colors for the known modes, hashed fallback
 // for any other mode the backend returns.
 const MODE_CHART_COLORS: Record<string, string> = {
@@ -603,7 +603,7 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
                 void loadWeekBounds();
               }
             }}
-            className={resetButtonClass}
+            className={retryButtonClass}
           >
             <RotateCcw size={14} /> {t("common.retry")}
           </button>
@@ -734,14 +734,17 @@ export default function CollectionReportPage({ embedded: _embedded = false }: Pr
               )}
             </div>
 
-            <button
-              type="button"
+            <FilterResetButton
+              count={countActiveFilters(
+                shopName !== "",
+                collector !== "",
+                paymentMode !== "",
+                Boolean(defaultBounds.from) &&
+                  (fromDate !== defaultBounds.from || toDate !== defaultBounds.to),
+              )}
               onClick={resetFilters}
               disabled={loading}
-              className={resetButtonClass}
-            >
-              <RotateCcw size={14} /> {t("common.reset")}
-            </button>
+            />
           </div>
         </div>
       </div>

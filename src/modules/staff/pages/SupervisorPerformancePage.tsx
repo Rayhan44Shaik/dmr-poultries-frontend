@@ -597,6 +597,14 @@ const SupervisorPerformancePage = () => {
         onChange={updateDraft}
         onApply={handleApply}
         onClear={handleClear}
+        activeFilterCount={
+          (draft.search.trim() !== "" ? 1 : 0) +
+          (draft.personId !== perf.defaultFilters.personId ? 1 : 0) +
+          (draft.fromDate !== perf.defaultFilters.fromDate ||
+          draft.toDate !== perf.defaultFilters.toDate
+            ? 1
+            : 0)
+        }
         onRefresh={handleRefresh}
         personOptions={directory.options}
         personOptionsLoading={directory.loading}

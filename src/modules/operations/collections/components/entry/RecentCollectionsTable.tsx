@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from "react";
 import {
-  Search, X, History, CheckCircle, Clock, AlertCircle, Eye, Pencil, RotateCcw,
+  Search, X, History, CheckCircle, Clock, AlertCircle, Eye, Pencil,
   Hash, FileText, Calendar, Store, UserCog, IndianRupee, Activity, Settings2,
 } from "lucide-react";
 import TripPagination from "../../../vehicle-trips/components/TripPagination";
@@ -9,7 +9,7 @@ import { useI18n } from "../../../../../i18n";
 import { localizeTripViewText } from "../../../vehicle-trips/utils/tripViewLocalization";
 import { formatTripListDay } from "../../../vehicle-trips/utils/formatTripListDay";
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
-import { opsSecondaryButtonClass } from "../../../../../shared/ui/operationsStyles";
+import { FilterResetButton, countActiveFilters } from "../../../../../ui";
 import { BrandRefreshButton } from "../../../../../ui";
 import { collectionStatusKey, collectionStatusLabel } from "../../utils/collectionStatusLabel";
 import {
@@ -368,17 +368,10 @@ export default function RecentCollectionsTable({
             )}
           </div>
 
-          <button
-            type="button"
+          <FilterResetButton
+            count={countActiveFilters(searchQuery.trim() !== "")}
             onClick={resetTable}
-            className={`group relative ${opsSecondaryButtonClass}`}
-            aria-label={t("common.reset")}
-          >
-            <span className={`inline-flex ${uiActionIconMotionClass.reset}`}>
-              <RotateCcw size={14} />
-            </span>
-            {t("common.reset")}
-          </button>
+          />
 
           {onRefresh && (
             <BrandRefreshButton

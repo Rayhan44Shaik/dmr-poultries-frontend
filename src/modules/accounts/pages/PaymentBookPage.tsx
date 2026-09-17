@@ -10,6 +10,7 @@ import type { Payment, PaymentWritePayload } from '../types/payment.types';
 import { DatePicker } from '../../../components/common/DatePicker';
 import { canEditItem, canDeleteItem } from '../../../utils/dateUtils';
 import { weekRange } from '../../../utils/businessDate';
+import { FilterResetButton, countActiveFilters } from '../../../ui';
 import { usePendingDelete } from '../../../hooks/usePendingDelete';
 import { ConfirmDialog } from '../../../ui/ConfirmDialog';
 import { Modal } from '../../../ui/Modal';
@@ -319,7 +320,18 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
         <div className="mt-2 flex flex-wrap items-center justify-end gap-1.5 border-t border-slate-100 pt-2">
             <Button variant="custom" size="lg" className="border border-indigo-200 bg-indigo-50 text-indigo-800 shadow-sm hover:bg-indigo-100 hover:border-indigo-300 focus-visible:ring-indigo-400/30" icon={<Plus size={16} className="transition-transform duration-200 hover:scale-125 active:scale-90" />} onClick={() => setIsNewModalOpen(true)}>New Payment</Button>
             <Button size="lg" icon={<Search size={16} className={`transition-transform duration-300 hover:-translate-y-1 ${filterAction === 'search' ? 'animate-[bounce_0.6s_ease-in-out_1]' : ''}`} />} onClick={applyFilters} disabled={invalidRange}>Search</Button>
-            <Button variant="secondary" size="lg" icon={<RotateCcw size={15} className={`transition-transform duration-500 hover:rotate-180 ${filterAction === 'clear' ? 'animate-[spin_0.6s_ease-in-out_1]' : ''}`} />} aria-label="Clear filters" onClick={clearFilters}>Clear</Button>
+            <FilterResetButton
+              className="h-10"
+              count={countActiveFilters(
+                filters.search.trim() !== '',
+                filters.type !== '',
+                filters.mode !== '',
+                filters.from !== weekRange().from || filters.to !== weekRange().to,
+                status !== 'pending',
+              )}
+              aria-label="Clear filters"
+              onClick={clearFilters}
+            />
             <Button variant="custom" size="lg" iconOnly aria-label="Refresh" title="Refresh records" className={uiActionToneClass.refresh} disabled={spinning} onClick={handleRefresh}>
               <RefreshCw size={16} strokeWidth={2} aria-hidden="true" className={`transition-transform duration-500 hover:rotate-180 ${spinning ? 'animate-[spin_0.6s_ease-in-out_1]' : ''}`} />
             </Button>

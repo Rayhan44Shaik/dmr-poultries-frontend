@@ -25,7 +25,6 @@ import {
   ListChecks,
   Loader2,
   LoaderCircle,
-  RotateCcw,
   Scale,
   Search,
   Square,
@@ -40,14 +39,13 @@ import { onShopDataChanged } from "../../../shared/events/shopDataEvents";
 import { useI18n } from "../../../i18n";
 import { DatePicker } from "../../../components/common/DatePicker";
 import { apiPost } from "../../../api";
-import { BrandRefreshButton, Pagination } from "../../../ui";
+import { BrandRefreshButton, FilterResetButton, Pagination, countActiveFilters } from "../../../ui";
 import MasterDropdown, { type MasterDropdownOption } from "../../masters/components/MasterDropdown";
 import {
   opsFilterCardClass,
   opsFilterLabelClass,
   opsInputClass,
   opsPrimaryButtonClass,
-  opsSecondaryButtonClass,
   opsPdfButtonClass,
   opsExcelButtonClass,
 } from "../../../shared/ui/operationsStyles";
@@ -1810,10 +1808,16 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
               <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-search)]"><Search size={15} /></span>
               {t("common.search")}
             </button>
-            <button type="button" onClick={handleReset} className={`group relative ${opsSecondaryButtonClass}`} aria-label={t("common.reset")}>
-              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>
-              {t("common.reset")}
-            </button>
+            <FilterResetButton
+              count={countActiveFilters(
+                searchValue.trim() !== "",
+                selectedShop !== "All Shops",
+                reportType !== "all",
+                dateFrom !== toWeekAgoDefault() || dateTo !== toDateDefault(),
+                !(sortBy === "date" && sortDir === "desc"),
+              )}
+              onClick={handleReset}
+            />
             <BrandRefreshButton onClick={handleRefresh} loading={ledgerRefreshing} />
             <button
               type="button"

@@ -55,7 +55,6 @@ import {
   Loader2,
   Lock,
   MapPin,
-  RotateCcw,
   Save,
   Scale,
   Store,
@@ -70,7 +69,12 @@ import {
   opsTableDivideClass,
   opsTableHeadRowClass,
 } from "../../../shared/ui/operationsStyles";
-import { BrandRefreshButton, Pagination } from "../../../ui";
+import {
+  BrandRefreshButton,
+  FilterResetButton,
+  Pagination,
+  countActiveFilters,
+} from "../../../ui";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
 import { usePendingDelete } from "../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../components/common/PendingDeleteNotification";
@@ -442,6 +446,13 @@ function OrderCollectionPage(props: Props) {
     setShopFilters([]);
     if (day !== today) onDaySelect(today);
   };
+  const activeFilterCount = countActiveFilters(
+    query.trim() !== "",
+    sortMode !== "collected",
+    cityFilters.length > 0,
+    shopFilters.length > 0,
+    day !== today,
+  );
 
   // One 12-column grid, two rows, every control filling its cell: day · city ·
   // shop · sort across the first line, then the search (8) with the day's
@@ -541,17 +552,7 @@ function OrderCollectionPage(props: Props) {
           />
         </div>
         <div className="flex flex-wrap items-center gap-2 sm:justify-end lg:col-span-4">
-          <button
-            type="button"
-            className={`group relative ${opsSecondaryButtonClass}`}
-            onClick={resetFilters}
-            aria-label={to("common.reset")}
-          >
-            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]">
-              <RotateCcw size={14} />
-            </span>
-            {to("common.reset")}
-          </button>
+          <FilterResetButton count={activeFilterCount} onClick={resetFilters} />
           <BrandRefreshButton onClick={onRefresh} loading={refreshing} />
         </div>
       </div>

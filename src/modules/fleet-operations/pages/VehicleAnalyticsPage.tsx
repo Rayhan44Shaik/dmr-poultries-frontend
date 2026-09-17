@@ -1,6 +1,7 @@
 import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 import Select from 'react-select';
 import { useI18n } from '../../../i18n';
+import { FilterResetButton, countActiveFilters } from '../../../ui';
 import { useAnalyticsData } from '../hooks/useAnalyticsData';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 import ExpenseBreakdownDonut from '../components/analytics/ExpenseBreakdownDonut';
@@ -17,7 +18,6 @@ import {
   Gauge,
   IndianRupee,
   RefreshCw,
-  RotateCcw,
   Search,
   TrendingUp,
   Truck,
@@ -132,6 +132,7 @@ const VehicleAnalyticsPage = ({ embedded = false, active = true }: VehicleAnalyt
     vehicleOptions,
     vehiclesLoading,
     clearFilters,
+    defaultRange,
     loading,
     refreshing,
     error,
@@ -287,10 +288,15 @@ const VehicleAnalyticsPage = ({ embedded = false, active = true }: VehicleAnalyt
 
             {/* Actions: Search, Reset, Refresh */}
             <div className="flex items-center gap-2 shrink-0">
-              <button type="button" onClick={onReset} className={controlClass} title={t('fleet.analytics.reset_filters')}>
-                <RotateCcw size={13} className="text-slate-400" />
-                <span className="hidden sm:inline">{t('common.reset')}</span>
-              </button>
+              <FilterResetButton
+                className="h-9"
+                count={countActiveFilters(
+                  selectedVehicleId !== null,
+                  fromDate !== defaultRange.fromDate || toDate !== defaultRange.toDate,
+                )}
+                onClick={onReset}
+                title={t('fleet.analytics.reset_filters')}
+              />
               <button
                 type="button"
                 onClick={refresh}

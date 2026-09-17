@@ -1,14 +1,12 @@
 import React, { useMemo } from "react";
-import { AlertTriangle, ArrowUpDown, Calendar, RotateCcw, Search, Store } from "lucide-react";
+import { AlertTriangle, ArrowUpDown, Calendar, Search, Store } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import {
   opsFilterCardClass,
   opsFilterLabelClass,
   opsInputClass,
-  opsSecondaryButtonClass,
 } from "../../../../shared/ui/operationsStyles";
-import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
-import { BrandRefreshButton } from "../../../../ui";
+import { BrandRefreshButton, FilterResetButton, countActiveFilters } from "../../../../ui";
 import MasterDropdown, { type MasterDropdownOption } from "../../../masters/components/MasterDropdown";
 import { cleanDeliveryShopName } from "../../vehicle-trips/utils/shopDisplayName";
 import { useI18n } from "../../../../i18n";
@@ -180,10 +178,15 @@ function ShopSalesFilters({
         )}
 
         <div className={`flex flex-wrap items-center justify-end gap-2 ${hasAssignmentNotice ? "lg:col-span-4" : "lg:col-span-7"}`}>
-          <button type="button" onClick={onReset} className={`group relative ${opsSecondaryButtonClass}`} aria-label="Reset shop sales filters">
-            <span className={`inline-flex ${uiActionIconMotionClass.reset}`}><RotateCcw size={14} /></span>
-            Reset
-          </button>
+          <FilterResetButton
+            count={countActiveFilters(
+              searchQuery.trim() !== "",
+              shopName !== "",
+              sortBy !== "latest",
+              fromDate !== "" || toDate !== "",
+            )}
+            onClick={onReset}
+          />
           <BrandRefreshButton onClick={onRefresh} loading={refreshing} ariaLabel="Refresh shop sales">
             Refresh
           </BrandRefreshButton>

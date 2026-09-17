@@ -19,7 +19,7 @@ import LeaveRejectDialog from '../components/leave/LeaveRejectDialog';
 import Pagination from '../components/common/Pagination';
 import TableLoading from '../components/common/TableLoading';
 import type { LeaveRequest } from '../types/staffDashboard';
-import type { LeaveFilters as LeaveFilterState } from '../hooks/useLeaveManagement';
+import { countActiveLeaveFilters, type LeaveFilters as LeaveFilterState } from '../hooks/useLeaveManagement';
 import { personNameLabel } from '../utils/leaveDisplay';
 
 const REFRESH_TOAST_DURATION = 5000;
@@ -242,6 +242,7 @@ function LeaveManagementPage() {
         onFilterChange={handleFilterChange}
         onSearch={handleSearch}
         onReset={handleReset}
+        activeFilterCount={countActiveLeaveFilters(filters)}
         onRefresh={handleRefresh}
         onNewRequest={() => setShowForm(!showForm)}
         loading={loading}

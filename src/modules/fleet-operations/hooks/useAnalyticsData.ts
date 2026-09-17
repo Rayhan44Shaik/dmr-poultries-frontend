@@ -174,6 +174,15 @@ export function useAnalyticsData(active = true) {
     setSelectedVehicleIdState((current) => (current === value ? current : value));
   }, []);
 
+  /** The range Reset restores — sample quarter when demo data is on, else this week. */
+  const defaultRange = useMemo(() => {
+    const { start, end } = getCurrentWeekRange();
+    return {
+      fromDate: sampleRange?.fromDate ?? dateString(start),
+      toDate: sampleRange?.toDate ?? dateString(end),
+    };
+  }, [sampleRange]);
+
   const clearFilters = useCallback(() => {
     const { start, end } = getCurrentWeekRange();
     setSelectedVehicleIdState(null);
@@ -301,6 +310,7 @@ export function useAnalyticsData(active = true) {
     vehicleOptions,
     vehiclesLoading,
     clearFilters,
+    defaultRange,
     loading,
     refreshing,
     error,

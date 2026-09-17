@@ -7,7 +7,6 @@ import {
   Truck,
   User,
   Layers,
-  RotateCcw,
   ArrowUpDown,
   Plus,
 } from "lucide-react";
@@ -16,13 +15,12 @@ import {
   opsFilterCardClass,
   opsFilterLabelClass,
   opsInputClass,
-  opsSecondaryButtonClass,
   opsPrimaryButtonClass,
   opsPdfButtonClass,
   opsExcelButtonClass,
 } from "../../../../shared/ui/operationsStyles";
 import { useI18n } from "../../../../i18n";
-import { BrandRefreshButton } from "../../../../ui";
+import { BrandRefreshButton, FilterResetButton, countActiveFilters } from "../../../../ui";
 import MasterDropdown, { type MasterDropdownOption } from "../../../masters/components/MasterDropdown";
 import type { FuelSortKey } from "../types/fuelExpense";
 import { localizeTripViewText } from "../../vehicle-trips/utils/tripViewLocalization";
@@ -258,17 +256,17 @@ function FuelFilters({
       {/* ── Action Toolbar: Order = Reset, Refresh, Add Fuel Bill, PDF, Excel ── */}
       <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-slate-100 flex-wrap">
         {/* 1. Reset Filters */}
-        <button
-          type="button"
+        <FilterResetButton
+          count={countActiveFilters(
+            search.trim() !== "",
+            !/^all\b/i.test(vehicle.trim()) && vehicle !== "",
+            !/^all\b/i.test(driver.trim()) && driver !== "",
+            !/^all$/i.test(sourceType.trim()) && sourceType !== "",
+            fromDate !== "" || toDate !== "",
+            sortBy !== null,
+          )}
           onClick={onReset}
-          className={`group relative ${opsSecondaryButtonClass}`}
-          aria-label={t("common.reset")}
-        >
-          <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]">
-            <RotateCcw size={14} />
-          </span>
-          <span>{t("common.reset")}</span>
-        </button>
+        />
 
         {/* 2. Refresh */}
         {onRefresh && <BrandRefreshButton onClick={onRefresh} />}

@@ -22,6 +22,7 @@ import autoTable from "jspdf-autotable";
 import BulkImportDialog from "../../components/bulk-import/BulkImportDialog";
 import { buildShopBulkImportConfig } from "../bulkImportConfig";
 import { useI18n } from "../../../../i18n";
+import { FilterResetButton, countActiveFilters } from "../../../../ui";
 
 type ShopsPageProps = { embedded?: boolean };
 
@@ -391,16 +392,13 @@ function ShopsPage({ embedded = false }: ShopsPageProps) {
             disabled={loading}
             className="w-full sm:w-56"
           />
-          {(search !== "" || cityFilter !== "") && (
-            <button
-              type="button"
-              onClick={handleResetFilters}
-              disabled={loading}
-              className="h-9 rounded-xl border border-slate-200 bg-white px-3 text-xs font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
-            >
-              {t("masters.shops.filter.reset")}
-            </button>
-          )}
+          <FilterResetButton
+            count={countActiveFilters(search.trim() !== "", cityFilter !== "")}
+            onClick={handleResetFilters}
+            disabled={loading}
+          >
+            {t("masters.shops.filter.reset")}
+          </FilterResetButton>
         </MasterListToolbar>
 
         {/* Status Counter Bar */}

@@ -35,19 +35,17 @@ import {
   ClipboardCheck,
   FileText,
   Plus,
-  RotateCcw,
   Search,
   Send,
   UserRound,
 } from "lucide-react";
-import { BrandRefreshButton, Button, ConfirmDialog, EmptyState } from "../../../ui";
+import { BrandRefreshButton, Button, ConfirmDialog, EmptyState, FilterResetButton, countActiveFilters } from "../../../ui";
 import MasterDropdown from "../../masters/components/MasterDropdown";
 import { uiButton } from "../../../shared/ui/uiTokens";
 import {
   opsFilterCardClass,
   opsFilterLabelClass,
   opsInputClass,
-  opsSecondaryButtonClass,
 } from "../../../shared/ui/operationsStyles";
 import TableLoading from "../components/common/TableLoading";
 import { useI18n, type Language } from "../../../i18n";
@@ -751,16 +749,19 @@ function SalaryRegisterPage() {
           </div>
 
           <div className="md:col-span-2 xl:col-span-7 flex items-center gap-1.5 justify-end flex-nowrap">
-            <button
-              type="button"
+            <FilterResetButton
+              count={countActiveFilters(
+                month !== getCurrentYearMonth(),
+                department !== "",
+                employeeName !== "",
+                searchQuery.trim() !== "",
+                sortKey !== "name-asc",
+                filter !== "All",
+              )}
               onClick={handleClearFilters}
               disabled={loading}
-              className={`group relative shrink-0 ${opsSecondaryButtonClass}`}
-              aria-label={t("common.reset")}
-            >
-              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>
-              {t("common.reset")}
-            </button>
+              className="shrink-0"
+            />
             <BrandRefreshButton onClick={handleRefresh} loading={refreshing} disabled={saving} className="shrink-0" />
             <button
               type="button"

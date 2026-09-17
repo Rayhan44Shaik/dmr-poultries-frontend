@@ -7,7 +7,8 @@ import Select, {
   type OptionProps,
   type StylesConfig,
 } from 'react-select';
-import { Check, ChevronDown, FilterX, RefreshCw, Search, X } from 'lucide-react';
+import { Check, ChevronDown, RefreshCw, Search, X } from 'lucide-react';
+import { FilterResetButton, countActiveFilters } from '../../../../ui';
 import { translateStatus, useI18n } from '../../../../i18n';
 import type { EmiOverview } from '../../types';
 
@@ -115,7 +116,6 @@ function EmiFilterBar({
 }: EmiFilterBarProps) {
   const { t } = useI18n();
   const id = useId();
-  const hasFilters = search.trim() !== '' || status !== 'all';
   const statusOptions = useMemo<StatusOption[]>(() => [
     { value: 'all', label: t('fleet.emi.all_statuses') },
     { value: 'PENDING', label: translateStatus(t, 'PENDING') },
@@ -196,16 +196,12 @@ function EmiFilterBar({
 
           {/* 40px so this row shares one control height with the search field. */}
         <div className="ml-auto flex h-10 shrink-0 items-center gap-2">
-            <button
-              type="button"
+            <FilterResetButton
+              count={countActiveFilters(search.trim() !== '', status !== 'all')}
               onClick={onReset}
-              disabled={!hasFilters}
-              className={`${actionClass} w-9 justify-center`}
               aria-label={t('fleet.emi.clear_filters')}
               title={t('fleet.emi.clear_filters')}
-            >
-              <FilterX size={15} aria-hidden="true" />
-            </button>
+            />
             <button
               type="button"
               onClick={onRefresh}
