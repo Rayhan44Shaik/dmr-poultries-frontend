@@ -14,6 +14,7 @@ import PaymentRegisterChart from "../components/PaymentRegisterChart";
 import ActiveCounts from "../components/ActiveCounts";
 import CollectionPerformanceChart from "../components/CollectionPerformanceChart";
 import PendingApprovalsPanel from "../components/PendingApprovalsPanel";
+import QuarterOperationsMap from "../components/QuarterOperationsMap";
 import {
   Calendar,
   CalendarClock,
@@ -27,7 +28,12 @@ import {
 } from "lucide-react";
 import { DatePicker } from "../../../../components/common/DatePicker";
 import { useI18n } from "../../../../i18n";
-import { getQuarterSampleInfo, type SampleQuarter } from "../../../../sample/quarterSample";
+import {
+  getOperationsSampleCounts,
+  getQuarterSampleInfo,
+  type QuarterOperationsCounts,
+  type SampleQuarter,
+} from "../../../../sample/quarterSample";
 import { weekRange } from "../../../../utils/businessDate";
 import { FIXED_DASHBOARD_GREETING } from "../../../settings/services";
 import { kickApprovalSnapshot } from "../../../approvals/services/approvalSnapshot";
@@ -615,6 +621,12 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
   const [browserAnchor] = useState<Date>(() => todayMidnight());
   const initialRange = getDefaultWeekRange(browserAnchor);
   const [sampleQuarter, setSampleQuarter] = useState<SampleQuarter | null>(null);
+  /**
+   * The quarter file's own per-page mapping (`moduleCounts`) — the numbers
+   * the Quarter Operations Map tiles show. `null` until the sample server
+   * has reported them; a missing count is shown as "—", never estimated.
+   */
+  const [sampleCounts, setSampleCounts] = useState<QuarterOperationsCounts | null>(null);
   const [startDate, setStartDate] = useState<Date | undefined>(initialRange.startDate);
   const [endDate, setEndDate] = useState<Date | undefined>(initialRange.endDate);
   const rangeTouchedRef = useRef(false);
@@ -656,6 +668,23 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
       window.clearTimeout(failsafe);
     };
   }, []);
+
+  // The Quarter Operations Map reads the quarter file's own per-page mapping
+  // (the `moduleCounts` block the sample server publishes), so its tiles can
+  // never drift from the registers they index. Fetched only once a quarter
+  // is known; a failed probe simply leaves the card unrendered.
+  useEffect(() => {
+    if (!sampleQuarter) return;
+    let active = true;
+    void getOperationsSampleCounts()
+      .catch(() => null)
+      .then((counts) => {
+        if (active && counts) setSampleCounts(counts);
+      });
+    return () => {
+      active = false;
+    };
+  }, [sampleQuarter]);
 
   const { data, previousData, isLoading, error, refetch } = useDashboardData(
     startDate ?? null,
@@ -943,6 +972,12 @@ function OperationsDashboardPage({ embedded = false }: { embedded?: boolean }) {
           rangeDays={rangeDays}
         />
       </div>
+
+      {/* The quarter file's own index of the sample quarter: one linked tile
+          per Operations register, each showing the exact number that register
+          renders. Against a real backend the quarter file resolves null and
+          this card does not exist. */}
+      <QuarterOperationsMap quarter={dashboardQuarter} counts={sampleCounts} />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0 xl:h-[33.125rem]">
