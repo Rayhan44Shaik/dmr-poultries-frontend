@@ -29,14 +29,15 @@ import {
 import { useI18n } from '../../../i18n';
 import { applyDemoWrite, createDemoPayments, resetDemoPayments } from '../utils/paymentRegisterDemo';
 import { EmptyState } from '../../../ui/EmptyState';
+import HenIcon from '../../../ui/icons/HenIcon';
 import { BrandRefreshButton, Pagination } from '../../../ui';
 import { filterPayments, PAYMENT_TYPES, PAYMENT_MODES, paymentCurrency, paymentNoDisplay } from '../utils/paymentRegister';
 
 type PaymentView = 'pending' | 'approved' | 'deleted';
 const PAYMENT_VIEWS: { value: PaymentView; label: string; selectedClass: string }[] = [
-  { value: 'pending', label: 'Pending', selectedClass: 'bg-orange-100 text-orange-700 shadow-sm' },
-  { value: 'approved', label: 'Approved', selectedClass: 'bg-emerald-100 text-emerald-700 shadow-sm' },
-  { value: 'deleted', label: 'Deleted', selectedClass: 'bg-rose-100 text-rose-700 shadow-sm' },
+  { value: 'pending', label: 'Pending', selectedClass: 'bg-orange-50/80 text-orange-500 shadow-sm' },
+  { value: 'approved', label: 'Approved', selectedClass: 'bg-emerald-50/80 text-emerald-500 shadow-sm' },
+  { value: 'deleted', label: 'Deleted', selectedClass: 'bg-rose-50/80 text-rose-500 shadow-sm' },
 ];
 
 export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
@@ -427,28 +428,33 @@ export function PaymentBookPage({ embedded = false }: { embedded?: boolean }) {
           card, gradient header bar with icon tile + title, table, global
           pagination at the foot. */}
       <section ref={tableRef} aria-label="Payment records" aria-busy={loading} className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden text-xs md:text-sm">
-        {/* Header — same treatment at top as the Trip List header. */}
-        <div className="flex flex-wrap items-center justify-between gap-3 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-blue-50/60 via-white to-blue-50/40">
-          <div className="flex items-center gap-3">
-            <div className="h-9 w-9 rounded-xl bg-blue-50/70 border border-blue-100 flex items-center justify-center text-blue-500 shadow-inner">
-              <Wallet className="w-5 h-5" />
+        {/* Header — the Trip Entry (Recent Trip Activity) header: the logo tile
+            + heading, the count beside them, and the status toggle immediately
+            beside the heading and count — then the toggle, in that order. */}
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-slate-50">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-3">
+              <div className="h-9 w-9 rounded-xl bg-blue-50/70 border border-blue-100 flex items-center justify-center shadow-inner">
+                <HenIcon size={22} />
+              </div>
+              <h3 className="text-base font-bold text-slate-800 tracking-tight">{t('accounts.payment.register_title')}</h3>
             </div>
-            <h3 className="text-base font-bold text-slate-800 tracking-tight">{t('accounts.payment.register_title')}</h3>
-            <span aria-live="polite" className="inline-flex items-center justify-center rounded-full border border-slate-200/80 bg-slate-100 px-2.5 py-0.5 text-xs font-semibold text-slate-600 shadow-sm">
+            <span aria-live="polite" className="inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 rounded-full shadow-sm tabular-nums">
               {loading ? 'Updating…' : status === 'deleted' ? '—' : filtered.length}
             </span>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <div ref={statusGroupRef} role="group" aria-label="Payment status" className="flex items-center overflow-hidden rounded-lg border border-slate-200/80 bg-slate-50 p-0.5 shadow-sm">
+            {/* Status toggle — exactly beside the heading and count, then the
+                toggle: the same order and spacing (ml-2) as trip entry. */}
+            <div ref={statusGroupRef} role="group" aria-label="Payment status" className="flex items-center p-0.5 ml-2 border border-slate-200/80 rounded-lg overflow-hidden bg-slate-50 shadow-sm">
               {PAYMENT_VIEWS.map(item => <Button key={item.value} variant="custom" size="sm" aria-pressed={status === item.value}
-                className={`h-auto rounded-md px-3 py-1.5 text-xs font-semibold ${status === item.value ? item.selectedClass : 'bg-transparent text-slate-500 hover:bg-slate-200/50 hover:text-slate-800'}`}
+                className={`h-auto rounded-md px-5 py-1.5 text-xs font-semibold ${status === item.value ? item.selectedClass : 'bg-transparent text-slate-500 hover:text-slate-800 hover:bg-slate-200/50'}`}
                 onClick={() => { setSelectedId(null); setStatus(item.value); setPage(1); }}>
                 {item.label}
               </Button>)}
             </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
             {/* Row actions appear only once a row is selected — the same
-                pattern as the Trip List's View button. No hover tooltips:
-                the buttons state their meaning in label and colour. */}
+                pattern as the trip entry table's Edit/Delete beside search. */}
             {selectedPayment && (
               <div role="group" aria-label="Selected payment actions" className="flex flex-wrap items-center gap-2">
                 <Button variant="secondary" size="sm" icon={<Pencil size={14} />} aria-label="Edit selected payment" disabled={!canEditSelected}
