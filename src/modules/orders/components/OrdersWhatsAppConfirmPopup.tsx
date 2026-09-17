@@ -350,12 +350,12 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
 
         <div className="flex min-h-0 flex-1">
           {/* ── Left: ONLY the shops, in delivery order (re-orderable) ── */}
-          <aside className="flex w-[22rem] shrink-0 flex-col border-r border-slate-100 bg-white/80">
+          <aside className="flex w-[25rem] shrink-0 flex-col border-r border-slate-100 bg-white/80">
             <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-              <p className="text-[10px] font-extrabold uppercase tracking-wide text-slate-500">
+              <p className="text-xs font-extrabold uppercase tracking-wide text-slate-600">
                 {t("orders.shops_to_deliver")}
               </p>
-              <span className="inline-flex items-center justify-center rounded-full border border-slate-200/80 bg-slate-100 px-2 py-0.5 text-[11px] font-bold tabular-nums text-slate-600">
+              <span className="inline-flex items-center justify-center rounded-full border border-slate-200/80 bg-slate-100 px-2.5 py-0.5 text-xs font-bold tabular-nums text-slate-600">
                 {orderedRows.length}
               </span>
             </div>
@@ -363,7 +363,7 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
               {numberedRows.map((row, i) => (
                 <li
                   key={row.shopId}
-                  className="flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white px-2 py-1.5 transition-all hover:border-emerald-200 hover:shadow-sm motion-safe:animate-[var(--animate-fade-in-up)]"
+                  className="flex items-center gap-2.5 rounded-xl border border-slate-200/80 bg-white px-2.5 py-2 transition-all hover:border-emerald-200 hover:shadow-sm motion-safe:animate-[var(--animate-fade-in-up)]"
                   style={{ animationDelay: `${Math.min(i, 12) * 25}ms` }}
                 >
                   <OrderNumberInput
@@ -382,21 +382,21 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
                   />
                   <div className="min-w-0 flex-1">
                     <p
-                      className="truncate text-[11px] font-bold text-slate-700"
+                      className="truncate text-[13px] font-bold text-slate-800"
                       title={row.shopName}
                     >
                       {row.shopName}
                     </p>
-                    <p className="truncate text-[10px] font-semibold text-slate-400">
+                    <p className="truncate text-[11.5px] font-semibold text-slate-500">
                       {row.village || "—"}
                       {row.mobile ? ` · ${row.mobile}` : ""}
                     </p>
                   </div>
                   <div className="shrink-0 text-right">
-                    <p className="text-[11px] font-bold tabular-nums text-emerald-700">
+                    <p className="text-[13px] font-bold tabular-nums text-emerald-700">
                       {formatCount(row.boxes)} {t("orders.boxes_short")}
                     </p>
-                    <p className="text-[10px] font-semibold tabular-nums text-slate-400">
+                    <p className="text-[11.5px] font-semibold tabular-nums text-slate-500">
                       {row.birds > 0
                         ? `${formatCount(row.birds)} ${t("orders.birds_short")}`
                         : "—"}
@@ -585,9 +585,9 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
               type="button"
               onClick={() => void handleSubmitAssignment()}
               disabled={!canSubmit}
-              className={`group relative inline-flex items-center gap-2 rounded-2xl bg-slate-900 px-5 py-2.5 text-xs font-bold text-white shadow-md transition-all hover:-translate-y-0.5 hover:bg-slate-800 hover:shadow-lg active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 ${
+              className={`group relative inline-flex items-center gap-2 rounded-2xl bg-gradient-to-b from-violet-500 to-indigo-600 px-5 py-2.5 text-xs font-bold text-white shadow-md shadow-indigo-500/25 ring-1 ring-indigo-700/30 transition-all hover:-translate-y-0.5 hover:from-violet-400 hover:to-indigo-600 hover:shadow-lg hover:shadow-indigo-500/35 active:translate-y-0 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 ${
                 canSubmit
-                  ? "motion-safe:animate-[var(--animate-pop-in)] ring-2 ring-emerald-400/60 ring-offset-2"
+                  ? "motion-safe:animate-[var(--animate-pop-in)] ring-2 ring-violet-300/70 ring-offset-2"
                   : ""
               }`}
             >
@@ -659,7 +659,7 @@ function OrderNumberInput({
         }
       }}
       onWheel={onOrdersNumberWheel}
-      className={`${ORDERS_NO_SPINNER} h-7 w-10 shrink-0 rounded-lg border border-emerald-200 bg-emerald-50 text-center text-[11px] font-bold tabular-nums text-emerald-700 transition-all focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 disabled:opacity-50 ${
+      className={`${ORDERS_NO_SPINNER} h-8 w-11 shrink-0 rounded-lg border border-emerald-200 bg-emerald-50 text-center text-[12.5px] font-bold tabular-nums text-emerald-700 transition-all focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/30 disabled:opacity-50 ${
         draft !== null ? "border-amber-300 bg-amber-50 text-amber-800" : ""
       }`}
     />
