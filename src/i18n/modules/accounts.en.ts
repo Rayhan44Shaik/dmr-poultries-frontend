@@ -10,12 +10,8 @@ export default {
   'accounts.payment.new': 'New Payment',
   'accounts.payment.invalid_range': 'The "from" date is after the "to" date — fix the dates before searching.',
   // Page shell, top preview row, header
-  'accounts.payment.loading': 'Loading payment register…',
+  'accounts.payment.loading': 'Loading payment records…',
   'accounts.payment.updating': 'Updating…',
-  'accounts.payment.sample_badge': 'Sample data',
-  'accounts.payment.preview_sample': 'Preview sample data',
-  'accounts.payment.back_real': 'Back to real payments',
-  'accounts.payment.reset_rows': 'Reset sample rows',
   'accounts.payment.filters_aria': 'Payment filters',
   'accounts.payment.records_aria': 'Payment records',
   'accounts.payment.status_aria': 'Payment status',
@@ -26,16 +22,11 @@ export default {
   'accounts.payment.deleted_desc': 'The current payment API does not provide deleted records. Cancelled payments are not treated as deleted.',
   // Notifications
   'accounts.payment.notif_load_error': 'Unable to load payments. Please try refreshing.',
-  'accounts.payment.notif_demo_fresh': 'Sample data is up to date. No server request was made.',
   'accounts.payment.notif_filters_cleared': 'Filters cleared. Showing the current week.',
-  'accounts.payment.notif_sample_updated': 'Sample row updated — saved in this preview only.',
   'accounts.payment.notif_saved': 'Payment saved successfully',
-  'accounts.payment.notif_sample_removed': 'Sample row removed — this preview only.',
   'accounts.payment.notif_deleted': 'Payment deleted successfully',
   'accounts.payment.notif_delete_failed': 'Failed to delete payment',
-  'accounts.payment.notif_sample_approved': 'Sample row approved — this preview only.',
   'accounts.payment.notif_approved': 'Payment approved successfully',
-  'accounts.payment.notif_rows_rebuilt': 'Sample rows rebuilt. Nothing was sent to the server.',
   // Delete + approve dialogs
   'accounts.payment.delete_pending_title': 'Payment deletion pending',
   'accounts.payment.deleting': 'Deleting payment…',
@@ -47,7 +38,6 @@ export default {
   'accounts.payment.approve_failed_default': 'Unable to approve payment. Please try again.',
   'accounts.payment.approve_error_stale': 'This payment is no longer eligible for approval. Refresh the register and try again.',
   'accounts.payment.edit_hint': 'Payments older than 10 days cannot be edited.',
-  'accounts.payment.edit_hint_busy': 'Another action on this payment is still running.',
   // Table
   'accounts.payment.col_payment_no': 'Payment No',
   'accounts.payment.col_date': 'Date',
@@ -69,7 +59,6 @@ export default {
   // View modal
   'accounts.payment.view_title': 'Payment Details',
   'accounts.payment.no_payment_no': 'Payment number not assigned',
-  'accounts.payment.sample_banner': 'Sample payment · preview data. Edits stay in this browser and are never sent to the server.',
   'accounts.payment.amount_paid': 'Amount paid',
   'accounts.payment.field_category': 'Category',
   'accounts.payment.payee_heading': 'Payee & reference',
