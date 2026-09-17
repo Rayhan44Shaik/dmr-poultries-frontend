@@ -299,7 +299,7 @@ try {
 //    with the running cumulative and the grand total, and no paid/balance.
 try {
   const { loadAnalysisSnapshot, createAnalysisService } = await server.ssrLoadModule("/src/modules/accounts/services/analysisService.ts");
-  const { SummaryFarmTable, SummaryFarmCard } = await server.ssrLoadModule("/src/modules/accounts/components/Summary/SummaryFarmViewer.tsx");
+  const { SummaryFarmTable, SummaryFarmCard, SummaryFarmBadge } = await server.ssrLoadModule("/src/modules/accounts/components/Summary/SummaryFarmViewer.tsx");
   const { weekRange } = await server.ssrLoadModule("/src/modules/accounts/utils/periodRanges.ts");
   const { I18nProvider } = await server.ssrLoadModule("/src/i18n/index.tsx");
   const snapshot = await loadAnalysisSnapshot();
@@ -317,6 +317,7 @@ try {
     const payable = rows.reduce((sum, row) => sum + row.farm.amount, 0);
     const { formatINR, formatINRExact } = await server.ssrLoadModule("/src/modules/accounts/components/farm-payment/farmPaymentFormat.ts");
     const withProvider = (node) => renderToString(React.createElement(I18nProvider, null, node));
+    const badgeHtml = withProvider(React.createElement(SummaryFarmBadge, { payable, trips: rows.length, onClick: () => {} }));
     const cardHtml = withProvider(React.createElement(SummaryFarmCard, { rows, spanLabel: "2026-09-14 - 2026-09-20", onOpen: () => {} }));
     const html = withProvider(React.createElement(SummaryFarmTable, { rows, spanLabel: "2026-09-14 - 2026-09-20", onOpenTrip: () => {} }));
     const shown = rows.filter(({ trip }) => html.includes(trip.tripNo)).length;
@@ -333,6 +334,11 @@ try {
       noPaidOrBalance: !/Paid \(₹\)/.test(html) && !/Balance \(₹\)/.test(html),
       tripLinkIsButton: /<button[^>]*>\s*<!-- -->TRP-|<button[^>]*>TRP-/.test(html),
       tripLinkOpensFarmDetail: /title="View farm &amp; pickup details"/.test(html),
+      // The Farm Payment expense row carries the cumulative of these very rows
+      // and says where it comes from — not the Payment Register.
+      badgeIsButton: /^<button[^>]*type="button"/.test(badgeHtml),
+      badgeShowsCumulative: badgeHtml.includes(`>${formatINR(payable)}</span>`) && badgeHtml.includes(`${rows.length}`),
+      badgeNotRegister: /not the Payment Register/.test(badgeHtml),
       // The card itself is the trigger: the farm payment figure sits inside a
       // <button>, so pressing the number opens the pop-up.
       cardIsButton: /^<button[^>]*type="button"/.test(cardHtml),

@@ -122,6 +122,18 @@ try {
     assert(Math.abs(rowPayable - expenses.farm) < .01, `${name}: rows total = Farm Payment expense row`);
     assert(Math.abs(farmTotals.paid + farmTotals.balance - farmTotals.payable) < .01, `${name}: farm paid + balance = payable`);
     assert(Math.abs(farmWeightKg - metrics.weight) < .01, `${name}: table pickup weight = Birds in KG of the same trips`);
+    // The expense table prints one Farm Payment figure per week plus a Total.
+    // Each week's figure is that week's trips' farm payment, so the columns must
+    // add up to the span's farm expense — the same number the farm payment view
+    // calls its cumulative.
+    const weeklyFarm = groups.reduce((sum, g) => {
+      const weekTrips = service.getCompletedTripsByDateRange(g.start, g.end);
+      return sum + service.computeEffectiveExpenses(weekTrips, g.start, g.end).farm;
+    }, 0);
+    assert(Math.abs(weeklyFarm - expenses.farm) < .01, `${name}: weekly Farm Payment columns add up to the span's farm expense`);
+    assert(Math.abs(weeklyFarm - rowPayable) < .01, `${name}: Farm Payment row = cumulative of the per-trip farm rows`);
+    const registerFarmInSpan = snapshot.payments.filter(p => p.status === 'Approved' && paymentExpenseSector(p.paymentType, p.category) === 'farm').reduce((sum, p) => sum + Number(p.amount), 0);
+    assert(registerFarmInSpan === 0 || Math.abs(weeklyFarm - registerFarmInSpan) > .01, `${name}: Farm Payment row is not the Payment Register's farmer settlements (${registerFarmInSpan})`);
     const spanNetProfit = metrics.sales - Object.values(expenses).reduce((sum, value) => sum + value, 0);
     console.log('PASS farm payment per trip', name, JSON.stringify({rows:farmRows.length, pickupWeightKg:Math.round(farmWeightKg*100)/100, payable:farmTotals.payable, paid:farmTotals.paid, balance:farmTotals.balance, netProfit:Math.round(spanNetProfit*100)/100, firstRow:{tripNo:farmRows[0]?.trip.tripNo, weight:farmRows[0]?.farm.dcWeight, rate:farmRows[0]?.farm.rate, amount:farmRows[0]?.farm.amount}}));
     console.log('PASS reconciliation', name, toBusinessDate(range.start), toBusinessDate(range.end), JSON.stringify({metrics,expenses,...(name === 'This week' ? {trips:analysis.map(t=>({id:t.id,tripNo:t.tripNo,date:t.tripDate,status:t.status}))} : {})}));

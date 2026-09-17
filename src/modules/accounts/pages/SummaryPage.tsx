@@ -32,7 +32,7 @@ import { opsFilterCardClass, opsSecondaryButtonClass } from '../../../shared/ui/
 import { DatePicker } from '../../../components/common/DatePicker';
 import { exportPDF, exportExcel } from '../components/Summary';
 import SummaryTripViewer from '../components/Summary/SummaryTripViewer';
-import SummaryFarmViewer, { SummaryFarmCard } from '../components/Summary/SummaryFarmViewer';
+import SummaryFarmViewer, { SummaryFarmBadge, SummaryFarmCard } from '../components/Summary/SummaryFarmViewer';
 import { FarmPaymentTripViewModal } from '../components/farm-payment/FarmPaymentTripViewModal';
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
 import type { WeeklyMetrics, ExpenseBreakdown } from '../types/summary.types';
@@ -1884,13 +1884,33 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                 { key: 'office', label: t('accounts.summary.expense_rows.office') },
               ].map((item) => {
                 const total = weeklyExpenses.reduce((a, b) => a + ((b[item.key as keyof ExpenseBreakdown] as number) || 0), 0);
+                /* Farm Payment is the one expense that is not a Payment Register
+                   total: it is the farm bill of exactly these trips (pickup
+                   weight × farm rate). It gets its own highlight and carries the
+                   cumulative of the per-trip rows below it. */
+                const isFarm = item.key === 'farm';
                 return (
                   <tr
                   key={item.key}
-                  className="group/row border-b border-slate-100 transition-colors duration-150 hover:bg-emerald-50/70 dark:border-slate-800 dark:hover:bg-emerald-500/10"
+                  className={`group/row border-b transition-colors duration-150 ${
+                    isFarm
+                      ? 'border-lime-100 bg-lime-50/70 hover:bg-lime-100/70 dark:border-lime-900 dark:bg-lime-500/10 dark:hover:bg-lime-500/15'
+                      : 'border-slate-100 hover:bg-emerald-50/70 dark:border-slate-800 dark:hover:bg-emerald-500/10'
+                  }`}
                 >
-                    <td className="relative w-56 px-4 py-2.5 before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-emerald-500 before:opacity-0 before:transition-opacity before:content-[''] group-hover/row:before:opacity-100">
+                    <td className={`relative w-56 px-4 py-2.5 before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:transition-opacity before:content-[''] ${
+                      isFarm
+                        ? 'before:bg-lime-500 before:opacity-100'
+                        : "before:bg-emerald-500 before:opacity-0 group-hover/row:before:opacity-100"
+                    }`}>
                       <SummaryRowLabel color={EXPENSE_ROW_DOT[item.key]} label={item.label} />
+                      {isFarm && (
+                        <SummaryFarmBadge
+                          payable={totalExpenses.farm}
+                          trips={farmRows.length}
+                          onClick={() => setFarmViewerOpen(true)}
+                        />
+                      )}
                     </td>
                     {comparePrevious && period === 'week' ? (
                       <>

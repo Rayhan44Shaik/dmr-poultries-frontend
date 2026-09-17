@@ -233,6 +233,44 @@ export function SummaryFarmTable({ rows, spanLabel, onOpenTrip }: TableProps) {
   );
 }
 
+/**
+ * The highlighted chip under the expense table's Farm Payment row. That row is
+ * the only expense that is not a Payment Register total — it is the farm bill of
+ * exactly the trips in the span — so the chip states the cumulative and opens
+ * the per-trip view that proves it.
+ */
+export function SummaryFarmBadge({
+  payable,
+  trips,
+  onClick,
+}: {
+  payable: number;
+  trips: number;
+  onClick: () => void;
+}) {
+  const { t } = useI18n();
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title={t('accounts.summary.farm_row.source')}
+      aria-label={`${t('accounts.summary.farm_row.source')} — ${formatINRExact(payable)}`}
+      className="mt-1.5 inline-flex max-w-full items-center gap-1.5 rounded-full border border-lime-300 bg-white px-2 py-0.5 text-[10px] font-bold text-lime-800 shadow-sm outline-none transition hover:border-lime-400 hover:bg-lime-50 focus-visible:ring-2 focus-visible:ring-emerald-500 active:scale-[0.98] dark:border-lime-700 dark:bg-slate-800 dark:text-lime-300 dark:hover:bg-lime-500/10"
+    >
+      <Sprout size={11} aria-hidden="true" />
+      <span className="truncate">
+        {t('accounts.summary.farm_table.cumulative')}{' '}
+        <span className="tabular-nums" title={formatINRExact(payable)}>
+          {formatINR(payable)}
+        </span>
+        {' · '}
+        <span className="tabular-nums">{formatCount(trips)}</span>{' '}
+        {t('accounts.summary.farm_table.trips').toLowerCase()}
+      </span>
+    </button>
+  );
+}
+
 type ViewerProps = TableProps & {
   open: boolean;
   onClose: () => void;
