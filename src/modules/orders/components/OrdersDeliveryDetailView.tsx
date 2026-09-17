@@ -20,7 +20,13 @@
 //   the VISIBLE rows and never mix ordered vs delivered quantities).
 
 import React, { useMemo, useState } from "react";
-import { Check, FileText, Loader2, Truck, X } from "lucide-react";
+import { Check, FileText, Loader2, ShieldCheck, Truck, X } from "lucide-react";
+import { formatVehicleNumber } from "../../../utils/format";
+import AppShellModal from "../../../ui/AppShellModal";
+import { ViewLanguageToggle } from "../../../ui/ViewLanguageToggle";
+import { ActionTooltip } from "../../../ui/ActionTooltip";
+import { ScopedI18nProvider, useI18n } from "../../../i18n";
+import { uiActionIconMotionClass } from "../../../shared/ui/uiTokens";
 import {
   opsTableCardClass,
   opsTableDivideClass,
@@ -239,7 +245,8 @@ function OrdersDeliveryDetailView({
   onSaveProgress,
   onSubmitTrip,
 }: Props) {
-  const { to } = useOrdersI18n();
+  const { to, language } = useOrdersI18n();
+  const { toggleLanguage } = useI18n();
   const { trip, progress, originalShopIds } = orderTrip;
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<ReportStatusFilter>("all");
@@ -410,39 +417,53 @@ function OrdersDeliveryDetailView({
     [to("orders.driver"), trip.driverName || "—"],
   ];
 
-  return (
-    <div
-      className="fixed inset-0 z-50 overflow-y-auto"
-      role="dialog"
-      aria-modal="true"
-    >
-      {/* Backdrop (click to close) */}
-      <div
-        className="fixed inset-0 bg-black/40"
-        onClick={onClose}
-        aria-hidden
-      />
+  const isCompleted = status === "Completed";
 
-      <div className="relative min-h-full flex items-start justify-center p-3 md:p-8">
-        <div className="relative bg-slate-100 w-full max-w-6xl rounded-2xl shadow-2xl border border-slate-200 overflow-hidden">
-          {/* Modal header — ONE concise title (the trip number), no
-              duplicated Orders/Tracking/Assignment page headers. */}
-          <div className="px-5 py-3.5 border-b border-slate-200 bg-white flex items-center justify-between flex-wrap gap-3">
-            <div className="flex items-center gap-2.5 flex-wrap min-w-0">
-              <h2 className="text-lg font-bold text-slate-900 leading-tight">
-                {to("orders.pdf_report_title")}
-              </h2>
-              <span className="text-sm font-semibold text-emerald-700">
-                {trip.tripNo}
-              </span>
-              <OrdersStatusBadge status={status} label={statusLabel} />
-              {notListedCount > 0 && (
-                <span className="inline-flex items-center rounded-full bg-amber-50 border border-amber-200 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">
-                  {to("orders.additional_count", { n: notListedCount })}
-                </span>
-              )}
+  return (
+    <AppShellModal open onClose={onClose} panelClassName="bg-white">
+      <div className="flex h-full w-full flex-col overflow-hidden rounded-2xl bg-white">
+        {/* Header — the Trip View header, verbatim: emerald tile, trip number,
+            status pill, language toggle and the round close. */}
+        <div className="rounded-t-2xl border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/80">
+          <div className="flex flex-col gap-4 px-6 py-4 sm:flex-row sm:items-center sm:justify-between md:px-8">
+            <div className="flex min-w-0 flex-1 items-center gap-4 sm:flex-none">
+              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-teal-400 text-white shadow-lg shadow-emerald-400/20">
+                <Truck className="h-6 w-6" />
+              </div>
+              <div className="min-w-0">
+                <div className="flex min-w-0 flex-wrap items-center gap-2">
+                  <h2 className="truncate text-lg font-bold tracking-tight text-slate-800 md:text-xl">
+                    {trip.tripNo || to("orders.pdf_report_title")}
+                  </h2>
+                  <span className="hidden items-center rounded-full border border-slate-200 bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 sm:inline-flex">
+                    {to("orders.pdf_report_title")} •{" "}
+                    {language === "te" ? "తెలుగు" : "EN"}
+                  </span>
+                </div>
+                <div className="mt-1.5 flex flex-wrap items-center gap-2">
+                  {isCompleted ? (
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-emerald-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-white">
+                      <ShieldCheck size={11} /> {statusLabel}
+                    </span>
+                  ) : (
+                    <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-amber-100 bg-amber-50/80 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-500">
+                      {statusLabel}
+                    </span>
+                  )}
+                  {notListedCount > 0 && (
+                    <span className="inline-flex items-center rounded-full border border-amber-200 bg-amber-50 px-2.5 py-0.5 text-[11px] font-bold text-amber-700">
+                      {to("orders.additional_count", { n: notListedCount })}
+                    </span>
+                  )}
+                  <span className="text-xs font-medium text-slate-400">
+                    {trip.vehicleNo ? formatVehicleNumber(trip.vehicleNo) : ""}
+                    {trip.supervisorName ? ` · ${trip.supervisorName}` : ""}
+                  </span>
+                </div>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
+
+            <div className="flex w-full shrink-0 flex-wrap items-center justify-end gap-2 sm:w-auto">
               {/* Check the report in a popup first — it holds the download
                   and the send, so what you verify is what goes out. */}
               <OrdersIconButton
@@ -452,17 +473,36 @@ function OrdersDeliveryDetailView({
               >
                 <FileText size={15} />
               </OrdersIconButton>
+              <ViewLanguageToggle
+                language={language}
+                onToggle={toggleLanguage}
+                tone="emerald"
+                labelMode="target"
+                ariaLabel={to("ops.trip.popup_language_toggle")}
+                tooltip={
+                  <ActionTooltip
+                    label={to("ops.trip.popup_language_tooltip")}
+                    side="bottom"
+                  />
+                }
+              />
               <button
                 type="button"
                 onClick={onClose}
-                className="inline-flex h-9 w-9 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-500 hover:bg-slate-50 hover:text-slate-800 transition-colors active:scale-95"
-                aria-label={to("orders.close")}
+                className="group relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:-translate-y-0.5 hover:border-red-100 hover:bg-red-50 hover:text-red-500 active:scale-95"
+                aria-label={to("ops.trip.close_view")}
               >
-                <X size={16} />
+                <span
+                  className={`inline-flex ${uiActionIconMotionClass.close}`}
+                >
+                  <X size={16} />
+                </span>
               </button>
             </div>
           </div>
+        </div>
 
+        <div className="flex-1 overflow-y-auto bg-slate-100">
           <div className="p-3 md:p-4 space-y-3 md:space-y-4">
             {orderTrip.assignmentIncomplete && (
               <div className="rounded-xl border border-orange-200 bg-orange-50 px-4 py-2.5 text-xs font-semibold text-orange-800">
@@ -1047,8 +1087,18 @@ function OrdersDeliveryDetailView({
           onClose={() => setPdfOpen(false)}
         />
       )}
-    </div>
+    </AppShellModal>
   );
 }
 
-export default React.memo(OrdersDeliveryDetailView);
+/** Scoped language: the toggle in the header changes only this view. */
+function ScopedOrdersDeliveryDetailView(props: Props) {
+  const { language } = useI18n();
+  return (
+    <ScopedI18nProvider initialLanguage={language}>
+      <OrdersDeliveryDetailView {...props} />
+    </ScopedI18nProvider>
+  );
+}
+
+export default React.memo(ScopedOrdersDeliveryDetailView);
