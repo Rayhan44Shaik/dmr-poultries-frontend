@@ -8,7 +8,7 @@
  *
  *   field           guessed (manifest)   the page actually renders
  *   ─────────────   ─────────────────    ─────────────────────────
- *   tripRecords     640 (all trips)      632 (ORD-* containers are not trips)
+ *   tripRecords     640 (all trips)      526 (Completed vehicle trips = Trip List rows)
  *   rateEntries      92 (rate days)       79 (trips awaiting rate entry)
  *   pendingShops    200 (all shops)      197 (shops with an outstanding balance)
  *   mortalityTrips  640 (all trips)      526 (completed trips with losses)
@@ -75,7 +75,7 @@ const DASHBOARD = {
   totalTrips: 623,
   totalSales: 54233402.42,
   moduleCounts: {
-    tripRecords: 632,
+    tripRecords: 526,
     rateEntries: 79,
     shopSales: 6905,
     collections: 4773,
@@ -148,7 +148,7 @@ test("mapOperationsCounts maps every Operations page from moduleCounts", () => {
   assert.ok(manifest);
   const counts = mapOperationsCounts(DASHBOARD, manifest);
   assert.ok(counts);
-  assert.equal(counts.tripRecords, 632, "Trip List total");
+  assert.equal(counts.tripRecords, 526, "Trip List total");
   assert.equal(counts.rateEntries, 79, "Rates Entry queue");
   assert.equal(counts.shopSales, 6905, "Shop Sales lines");
   assert.equal(counts.collections, 4773, "Collection Entry rows");
@@ -183,14 +183,14 @@ test("mapOperationsCounts reports missing counts as missing", () => {
   assert.equal(mapOperationsCounts({ totalTrips: 1 }, manifest), null);
   assert.equal(mapOperationsCounts(null, manifest), null);
 
-  const partial = mapOperationsCounts({ moduleCounts: { tripRecords: 632 } }, manifest);
+  const partial = mapOperationsCounts({ moduleCounts: { tripRecords: 526 } }, manifest);
   assert.ok(partial);
-  assert.equal(partial.tripRecords, 632);
+  assert.equal(partial.tripRecords, 526);
   assert.equal(partial.mortalityTrips, undefined);
   assert.equal(partial.orders, undefined);
   // Junk values are dropped rather than coerced.
   const junk = mapOperationsCounts(
-    { moduleCounts: { tripRecords: "632", orders: -1, fuelBills: Number.NaN } },
+    { moduleCounts: { tripRecords: "526", orders: -1, fuelBills: Number.NaN } },
     manifest
   );
   assert.ok(junk);
@@ -199,16 +199,18 @@ test("mapOperationsCounts reports missing counts as missing", () => {
   assert.equal(junk.fuelBills, undefined);
 });
 
-test("tripRecords + orders covers the trip manifest exactly", () => {
+test("tripRecords + orders never exceed the trip manifest", () => {
   const manifest = mapSampleManifest(MANIFEST);
   assert.ok(manifest);
   const counts = mapOperationsCounts(DASHBOARD, manifest);
   assert.ok(counts);
-  assert.equal(
-    (counts.tripRecords ?? 0) + (counts.orders ?? 0),
-    manifest.counts.trips,
-    "every trip row is either a Trip List row or an Orders day container"
+  // Trip List renders Completed vehicle trips only; Draft / Pending / Deleted
+  // audit rows live in the manifest total but on no Operations page table.
+  assert.ok(
+    (counts.tripRecords ?? 0) + (counts.orders ?? 0) <= manifest.counts.trips,
+    "Trip List rows + Orders day containers fit inside the trip manifest"
   );
+  assert.equal(counts.tripRecords, counts.mortalityTrips, "Trip List and Mortality read the same completed trips");
 });
 
 test("probes stay off outside a dev build", async () => {
