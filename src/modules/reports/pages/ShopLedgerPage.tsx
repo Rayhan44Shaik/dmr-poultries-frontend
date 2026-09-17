@@ -290,7 +290,18 @@ async function fetchAllLedgerPages(filters: {
 }): Promise<ShopLedgerResponse> {
   const first = await fetchShopLedger({ ...filters, page: 1, limit: 500 });
   const totalPages = Math.max(1, first.meta?.totalPages ?? 1);
-  if (totalPages <= 1) return first;
+  const dedupeRows = (rows: ShopLedgerRow[]): ShopLedgerRow[] => {
+    const seen = new Set<string>();
+    return rows.filter((row) => {
+      const key = row.id > 0
+        ? `${row.type}:id:${row.id}`
+        : `${row.shopId}:${row.type}:${row.referenceType}:${row.referenceId}:${row.date}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  };
+  if (totalPages <= 1) return { ...first, data: dedupeRows(first.data) };
   const rest = await Promise.all(
     Array.from({ length: totalPages - 1 }, (_, index) =>
       fetchShopLedger({ ...filters, page: index + 2, limit: 500 }),
@@ -298,7 +309,10 @@ async function fetchAllLedgerPages(filters: {
   );
   return {
     ...first,
-    data: [...first.data, ...rest.flatMap((page) => page.data)],
+    data: dedupeRows([
+      ...first.data,
+      ...rest.flatMap((page) => page.data),
+    ]),
   };
 }
 
@@ -516,6 +530,10 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
    *  without refetching data (no spinner flicker on language change). */
   const [ledgerError, setLedgerError] = useState<string | null>(null);
   const refreshNotifyRef = useRef(false);
+  const ledgerNotificationRef = useRef({ showNotification, t });
+  useEffect(() => {
+    ledgerNotificationRef.current = { showNotification, t };
+  }, [showNotification, t]);
 
   const selectedShopId = useMemo(() => {
     return appliedSelectedShop === "All Shops"
@@ -617,7 +635,11 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           setLedgerData(tx);
           if (refreshNotifyRef.current) {
             refreshNotifyRef.current = false;
-            showNotification(t("notification.data_refreshed"), "success");
+            const notification = ledgerNotificationRef.current;
+            notification.showNotification(
+              notification.t("notification.data_refreshed"),
+              "success",
+            );
           }
         }
       })
@@ -641,8 +663,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     selectedShopId,
     buildLedger,
     refreshNonce,
-    showNotification,
-    t,
     shops.length,
   ]);
 
@@ -2273,6 +2293,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
              Closing statement for the selected dates + shop. Report Type and
              Search narrow the table below; they never blank these cards, and
              date/shop changes visibly move Opening and Closing. ─────────── */}
+      {appliedSelectedShop !== "All Shops" && (
       <div>
         <div className="flex items-end justify-between gap-3 mb-2.5">
           <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-500">
@@ -2358,6 +2379,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           </div>
         </div>
       </div>
+      )}
 
       {/* ── TABLE — same card & header treatment as the Trip List ────────── */}
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden text-xs md:text-sm">
@@ -2573,13 +2595,13 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                       </tr>
                     );
                   })}
-                  {visibleRows.length > 1 && (
+                  {visibleRows.length > 0 && (
                     <tr className="bg-slate-100/80 font-bold border-t-2 border-slate-300">
                       <td
                         className="px-4 py-3 text-xs text-slate-700"
                         colSpan={3}
                       >
-                        {t("shop_ledger.total_row")}
+                        {t("shop_ledger.closing_balance")}
                       </td>
                       <td className="px-4 py-3 text-center text-xs text-slate-800">
                         {summary.totalBirds}
