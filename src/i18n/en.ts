@@ -252,6 +252,8 @@ export default {
   'common.items': 'Items',
   'common.records': 'Records',
   'common.entries': 'Entries',
+  'common.metric': 'Metric',
+  'common.value': 'Value',
   'common.entry': 'Entry',
   'common.results': 'Results',
   'common.found': 'Found',

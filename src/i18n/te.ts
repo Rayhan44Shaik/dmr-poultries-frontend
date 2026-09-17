@@ -247,6 +247,8 @@ export default {
   'common.items': 'అంశాలు',
   'common.records': 'రికార్డులు',
   'common.entries': 'నమోదులు',
+  'common.metric': 'కొలమానం',
+  'common.value': 'విలువ',
   'common.entry': 'నమోదు',
   'common.results': 'ఫలితాలు',
   'common.found': 'కనుగొనబడ్డాయి',

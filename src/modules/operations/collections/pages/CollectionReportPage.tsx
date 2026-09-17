@@ -802,7 +802,8 @@ export default function CollectionReportPage({ embedded = false }: Props) {
             className={`group relative ${opsSecondaryButtonClass}`}
             aria-label={t("common.reset")}
           >
-            <RotateCcw size={14} /> {t("common.reset")}
+            <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reset)]"><RotateCcw size={14} /></span>
+            {t("common.reset")}
           </button>
           <BrandRefreshButton onClick={handleRefresh} loading={loading} />
           <button
@@ -812,7 +813,8 @@ export default function CollectionReportPage({ embedded = false }: Props) {
             className={`group relative ${opsPdfButtonClass}`}
             aria-label="PDF"
           >
-            <FileText size={15} /> PDF
+            <span className={`inline-flex ${!report || report.totalCount === 0 || loading ? "" : "motion-safe:group-hover:animate-[var(--animate-action-pdf)]"}`}><FileText size={15} /></span>
+            PDF
           </button>
           <button
             type="button"
@@ -821,7 +823,8 @@ export default function CollectionReportPage({ embedded = false }: Props) {
             className={`group relative ${opsExcelButtonClass}`}
             aria-label="Excel"
           >
-            <FileSpreadsheet size={15} /> Excel
+            <span className={`inline-flex ${!report || report.totalCount === 0 || loading ? "" : "motion-safe:group-hover:animate-[var(--animate-action-excel)]"}`}><FileSpreadsheet size={15} /></span>
+            Excel
           </button>
         </div>
       </div>
