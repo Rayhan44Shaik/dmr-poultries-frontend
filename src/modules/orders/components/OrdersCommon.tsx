@@ -387,11 +387,18 @@ export function OrdersDateControl({
 // ─── WhatsApp brand icon (proper logo, not a generic chat bubble) ──────────
 
 /** Official WhatsApp logo path (24×24, fill = currentColor). */
-export function WhatsAppIcon({ size = 16 }: { size?: number }) {
+export function WhatsAppIcon({
+  size = 16,
+  className,
+}: {
+  size?: number;
+  className?: string;
+}) {
   return (
     <svg
       width={size}
       height={size}
+      className={className}
       viewBox="0 0 24 24"
       fill="currentColor"
       aria-hidden="true"

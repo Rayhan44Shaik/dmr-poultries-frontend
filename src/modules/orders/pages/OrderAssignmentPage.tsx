@@ -1946,17 +1946,26 @@ function AssignmentEditor({
                   <>
                     <div className="overflow-x-auto">
                       <table
-                        className={`w-full min-w-[980px] ${ORDERS_TABLE_FONT_CLASS}`}
+                        className={`w-full min-w-[760px] table-fixed ${ORDERS_TABLE_FONT_CLASS}`}
                       >
+                        {/* Fixed column plan — Shop and City share the
+                            remaining width equally, so there is never a wide
+                            gap between them; numeric columns are equal too. */}
+                        <colgroup>
+                          <col className="w-16" />
+                          <col />
+                          <col />
+                          <col className="w-[13%]" />
+                          <col className="w-[13%]" />
+                          <col className="w-[13%]" />
+                        </colgroup>
                         <thead>
                           <tr className={opsTableHeadRowClass}>
+                            {/* S.No doubles as the selector: a ticked number
+                                = selected shop (no separate checkbox column). */}
                             <th
-                              className={`${opsTableThClass} w-14 text-center`}
-                            >
-                              {to("orders.select_col")}
-                            </th>
-                            <th
-                              className={`${opsTableThClass} w-14 text-center`}
+                              className={`${opsTableThClass} text-center`}
+                              title={to("orders.select_col")}
                             >
                               {to("orders.col_sno")}
                             </th>
@@ -1966,19 +1975,13 @@ function AssignmentEditor({
                             <th className={`${opsTableThClass} text-left`}>
                               {to("orders.col_village")}
                             </th>
-                            <th
-                              className={`${opsTableThClass} w-24 text-right`}
-                            >
+                            <th className={`${opsTableThClass} text-right`}>
                               {to("orders.col_birds")}
                             </th>
-                            <th
-                              className={`${opsTableThClass} w-28 text-right`}
-                            >
+                            <th className={`${opsTableThClass} text-right`}>
                               {to("orders.ordered_boxes")}
                             </th>
-                            <th
-                              className={`${opsTableThClass} w-24 text-right`}
-                            >
+                            <th className={`${opsTableThClass} text-right`}>
                               {to("orders.weight")}
                             </th>
                           </tr>
@@ -2016,31 +2019,36 @@ function AssignmentEditor({
                                   className={`${opsTableTdClass} text-center`}
                                   onClick={(e) => e.stopPropagation()}
                                 >
-                                  <input
-                                    type="checkbox"
-                                    checked={checked}
+                                  {/* S.No chip IS the selector: number when
+                                      idle, tick when selected, lock-dim when
+                                      the shop is already fully assigned. */}
+                                  <button
+                                    type="button"
+                                    role="checkbox"
+                                    aria-checked={checked}
                                     disabled={isLockedRow}
-                                    onChange={(e) =>
+                                    onClick={() =>
                                       toggleShop(
                                         row,
-                                        e.target.checked,
+                                        !checked,
                                         row.assignedElsewhere,
                                       )
                                     }
                                     aria-label={`${to("orders.select_col")} — ${row.shopName}`}
-                                    className={`h-4 w-4 accent-emerald-600 ${
-                                      isLockedRow
-                                        ? "cursor-not-allowed opacity-40"
-                                        : "cursor-pointer"
+                                    className={`inline-flex h-7 w-8 items-center justify-center rounded-lg border text-[12px] font-semibold tabular-nums transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-emerald-500/30 ${
+                                      checked
+                                        ? "border-emerald-600 bg-emerald-600 text-white shadow-sm motion-safe:animate-[var(--animate-pop-in)]"
+                                        : isLockedRow
+                                          ? "cursor-not-allowed border-slate-200 bg-slate-50 text-slate-400"
+                                          : "border-slate-200 bg-white text-slate-600 hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-700"
                                     }`}
-                                  />
-                                </td>
-                                <td
-                                  className={`${opsTableTdClass} text-center`}
-                                >
-                                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-slate-50 text-[12px] font-semibold tabular-nums text-slate-600">
-                                    {availableStartIndex + index + 1}
-                                  </span>
+                                  >
+                                    {checked ? (
+                                      <CheckCheck size={14} aria-hidden />
+                                    ) : (
+                                      availableStartIndex + index + 1
+                                    )}
+                                  </button>
                                 </td>
                                 <td
                                   className={`${opsTableTdClass} font-semibold text-slate-800`}
@@ -2199,13 +2207,21 @@ function AssignmentEditor({
                         </div>
                         <div className="max-h-80 overflow-y-auto">
                           <table
-                            className={`w-full min-w-[900px] ${ORDERS_TABLE_FONT_CLASS}`}
+                            className={`w-full min-w-[880px] table-fixed ${ORDERS_TABLE_FONT_CLASS}`}
                           >
+                            <colgroup>
+                              <col className="w-24" />
+                              <col />
+                              <col />
+                              <col className="w-[11%]" />
+                              <col className="w-[11%]" />
+                              <col className="w-[18%]" />
+                              <col className="w-[11%]" />
+                              <col className="w-12" />
+                            </colgroup>
                             <thead>
                               <tr className={opsTableHeadRowClass}>
-                                <th
-                                  className={`${opsTableThClass} w-20 text-left`}
-                                >
+                                <th className={`${opsTableThClass} text-left`}>
                                   {to("orders.col_sequence")}
                                 </th>
                                 <th className={`${opsTableThClass} text-left`}>
@@ -2214,27 +2230,19 @@ function AssignmentEditor({
                                 <th className={`${opsTableThClass} text-left`}>
                                   {to("orders.col_village")}
                                 </th>
-                                <th
-                                  className={`${opsTableThClass} w-24 text-right`}
-                                >
+                                <th className={`${opsTableThClass} text-right`}>
                                   {to("orders.ordered_birds")}
                                 </th>
-                                <th
-                                  className={`${opsTableThClass} w-24 text-right`}
-                                >
+                                <th className={`${opsTableThClass} text-right`}>
                                   {to("orders.ordered_boxes")}
                                 </th>
-                                <th
-                                  className={`${opsTableThClass} w-40 text-left`}
-                                >
+                                <th className={`${opsTableThClass} text-left`}>
                                   {to("orders.assigned_boxes")}
                                 </th>
-                                <th
-                                  className={`${opsTableThClass} w-24 text-right`}
-                                >
+                                <th className={`${opsTableThClass} text-right`}>
                                   {to("orders.weight")}
                                 </th>
-                                <th className={`${opsTableThClass} w-12`} />
+                                <th className={opsTableThClass} />
                               </tr>
                             </thead>
                             <tbody className={opsTableDivideClass}>
@@ -2509,13 +2517,20 @@ function AssignmentEditor({
                     disabled={waBusy || !vehicle || waSheetRows.length === 0}
                     title={to("orders.wa_check_title")}
                     aria-label={to("orders.whatsapp")}
-                    className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-600/40 bg-emerald-500 px-3.5 py-2 text-xs font-bold text-white shadow-sm transition-colors hover:bg-emerald-600 disabled:cursor-not-allowed disabled:opacity-50"
+                    className="group inline-flex h-10 items-center gap-2 rounded-xl bg-gradient-to-b from-emerald-500 to-emerald-600 pl-1.5 pr-4 text-xs font-bold text-white shadow-md shadow-emerald-600/20 ring-1 ring-emerald-700/30 transition-all duration-200 hover:-translate-y-px hover:from-emerald-400 hover:to-emerald-600 hover:shadow-lg hover:shadow-emerald-600/30 active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-md"
                   >
-                    {waBusy ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <WhatsAppIcon size={14} />
-                    )}
+                    {/* Brand tile — the WhatsApp glyph sits in its own white
+                        badge so the button reads as a branded action. */}
+                    <span className="inline-flex h-7 w-7 items-center justify-center rounded-lg bg-white text-[#25D366] shadow-sm ring-1 ring-black/5">
+                      {waBusy ? (
+                        <Loader2 size={15} className="animate-spin" />
+                      ) : (
+                        <WhatsAppIcon
+                          size={15}
+                          className={uiActionIconMotionClass.whatsapp}
+                        />
+                      )}
+                    </span>
                     {waProgress
                       ? `${to("orders.whatsapp")} · ${waProgress}`
                       : to("orders.whatsapp")}
@@ -2524,14 +2539,35 @@ function AssignmentEditor({
                     type="button"
                     onClick={() => void handleSave()}
                     disabled={busy || !vehicle || selected.length === 0}
-                    className={`${opsSecondaryButtonClass} border-emerald-300 text-emerald-700 hover:bg-emerald-50`}
+                    className={`group inline-flex h-10 items-center gap-2 rounded-xl border bg-white pl-1.5 pr-4 text-xs font-bold shadow-sm transition-all duration-200 hover:-translate-y-px hover:shadow-md active:translate-y-0 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-sm ${
+                      isDirty
+                        ? "border-emerald-400 text-emerald-700 hover:bg-emerald-50 motion-safe:animate-[var(--animate-pop-in)]"
+                        : "border-slate-200 text-slate-600 hover:border-emerald-300 hover:bg-emerald-50/60 hover:text-emerald-700"
+                    }`}
                   >
-                    {saving || conflictChecking ? (
-                      <Loader2 size={14} className="animate-spin" />
-                    ) : (
-                      <Save size={14} />
-                    )}
+                    <span
+                      className={`inline-flex h-7 w-7 items-center justify-center rounded-lg shadow-inner transition-colors ${
+                        isDirty
+                          ? "bg-emerald-600 text-white"
+                          : "bg-emerald-50 text-emerald-600 group-hover:bg-emerald-600 group-hover:text-white"
+                      }`}
+                    >
+                      {saving || conflictChecking ? (
+                        <Loader2 size={15} className="animate-spin" />
+                      ) : (
+                        <Save
+                          size={15}
+                          className={uiActionIconMotionClass.edit}
+                        />
+                      )}
+                    </span>
                     {saving ? to("orders.saving") : to("orders.save_progress")}
+                    {isDirty && !saving && (
+                      <span
+                        aria-hidden
+                        className="ml-0.5 h-2 w-2 rounded-full bg-amber-400 ring-2 ring-amber-100 motion-safe:animate-pulse"
+                      />
+                    )}
                   </button>
                 </div>
               </div>
