@@ -40,6 +40,7 @@ import { onShopDataChanged } from "../../../shared/events/shopDataEvents";
 import { useI18n } from "../../../i18n";
 import { DatePicker } from "../../../components/common/DatePicker";
 import { apiPost } from "../../../api";
+import { getQuarterSampleRange } from "../../../sample/quarterSample";
 import { BrandRefreshButton, Pagination } from "../../../ui";
 import MasterDropdown, { type MasterDropdownOption } from "../../masters/components/MasterDropdown";
 import {
@@ -433,6 +434,21 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
    *  without refetching data (no spinner flicker on language change). */
   const [ledgerError, setLedgerError] = useState<string | null>(null);
   const [refreshToast, setRefreshToast] = useState(false);
+
+  // Keep the report's initial scope identical to the active sample quarter.
+  // This only runs when the dev sample API identifies itself; production keeps
+  // the normal Monday-to-today ledger window.
+  useEffect(() => {
+    let cancelled = false;
+    getQuarterSampleRange().then((range) => {
+      if (cancelled || !range) return;
+      setDateFrom(range.fromDate);
+      setDateTo(range.toDate);
+      setAppliedDateFrom(range.fromDate);
+      setAppliedDateTo(range.toDate);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   const selectedShopId = useMemo(() => {
     return appliedSelectedShop === "All Shops"

@@ -8,6 +8,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { loadVehicleReportSources } from "../services/vehicleReportService";
 import { deriveVehicleReport } from "../utils/vehicleReportUtils";
 import { defaultDateWindow } from "../utils/vehicleReportDates";
+import { getQuarterSampleRange } from "../../../../sample/quarterSample";
 import type {
   VehicleReportFilters,
   VehicleReportResult,
@@ -49,6 +50,25 @@ export function useVehicleReport(): VehicleReportState {
   const [draftFilters, setDraftFilters] = useState<VehicleReportFilters>(defaultFilters);
   const [appliedFilters, setAppliedFilters] = useState<VehicleReportFilters>(defaultFilters);
   const [loadToken, setLoadToken] = useState(0);
+
+  // The sample backend advertises its rolling quarter. Use that exact window
+  // so Vehicle Report totals reconcile with Operations and Fleet Analytics;
+  // real backends retain the regular current-month default.
+  useEffect(() => {
+    let cancelled = false;
+    getQuarterSampleRange().then((range) => {
+      if (cancelled || !range) return;
+      const quarterFilters: VehicleReportFilters = {
+        vehicleId: "all",
+        preset: "custom",
+        fromDate: range.fromDate,
+        toDate: range.toDate,
+      };
+      setDraftFilters(quarterFilters);
+      setAppliedFilters(quarterFilters);
+    });
+    return () => { cancelled = true; };
+  }, []);
 
   // Load all sources once per mount / explicit refresh. A stale settle cannot
   // overwrite a newer load thanks to the effect cleanup.

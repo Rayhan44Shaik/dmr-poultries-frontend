@@ -3,16 +3,17 @@
 // Vehicle Report data-loading layer. Exactly one request per source — no N+1:
 //   vehicles      GET /api/masters/vehicles        (PostgreSQL)
 //   trips         GET /api/trips                   (PostgreSQL)
-//   fuel          operations fuel-expense store    (local store; no backend endpoint yet)
-//   maintenance   fleet maintenance store          (local store; no backend endpoint yet)
-// Each source reports its own status so a backend failure is surfaced as
+//   fuel          GET /api/operations/fuel-expenses
+//   maintenance   GET /api/fleet/maintenance
+// Each source uses the same backend register as its Operations/Fleet page and
+// reports its own status so a backend failure is surfaced as
 // "N/A / unable to load", never as zero.
 // -----------------------------------------------------------------------------
 
 import { loadVehicles } from "../../../masters/vehicles/services/vehicleService";
 import { listTrips } from "../../../operations/vehicle-trips/services/tripHeaderApiService";
 import { fuelExpenseService } from "../../../operations/fuel-expenses/services/fuelExpenseService";
-import { getMaintenance } from "../../../fleet-operations/services/storage";
+import { maintenanceApi, mapMaintenanceToEvent } from "../../../fleet-operations/services/maintenanceApi";
 import type { Vehicle } from "../../../masters/vehicles/types/vehicle";
 import type { Trip } from "../../../operations/vehicle-trips/types/trip";
 import type { FuelExpense } from "../../../operations/fuel-expenses/types/fuelExpense";
@@ -72,9 +73,19 @@ export async function loadVehicleReportSources(
   await Promise.all([
     loadSource<Vehicle>("Vehicles", () => loadVehicles(), (s) => setSource("vehicles", s)),
     loadSource<Trip>("Trips", () => listTrips(), (s) => setSource("trips", s)),
-    loadSource<FuelExpense>("Fuel expenses", () => Promise.resolve(fuelExpenseService.getAll()), (s) => setSource("fuel", s)),
-    loadSource<MaintenanceEvent>("Maintenance records", () => Promise.resolve(getMaintenance() as MaintenanceEvent[]), (s) =>
-      setSource("maintenance", s)
+    loadSource<FuelExpense>(
+      "Fuel expenses",
+      async () => (await fuelExpenseService.list({ page: 1, limit: 10000 })).data,
+      (s) => setSource("fuel", s),
+    ),
+    loadSource<MaintenanceEvent>(
+      "Maintenance records",
+      async () => {
+        const payload = await maintenanceApi.list({ includeDeleted: false });
+        const rows = Array.isArray(payload) ? payload : (payload as { data?: unknown[] })?.data ?? [];
+        return rows.map(mapMaintenanceToEvent);
+      },
+      (s) => setSource("maintenance", s),
     ),
   ]);
 

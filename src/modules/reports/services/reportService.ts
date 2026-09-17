@@ -1,269 +1,206 @@
-import { isWithinInterval } from 'date-fns';
+import { apiGet } from '../../../api';
+import { listTrips } from '../../operations/vehicle-trips/services/tripHeaderApiService';
+import { listShopSales } from '../../operations/shop-sales/services/shopSalesApiService';
+import { fuelExpenseService } from '../../operations/fuel-expenses/services/fuelExpenseService';
+import { maintenanceApi, mapMaintenanceToEvent } from '../../fleet-operations/services/maintenanceApi';
+import type { CollectionApiEntry } from '../../operations/collections/types/collection';
+import type { MaintenanceEvent } from '../../fleet-operations/types';
 import type { ReportFilters, ReportType, ReportData } from '../types/reportTypes';
 
-// ========== HELPERS ==========
-const filterByDateRange = <T extends Record<string, any>>(
-  items: T[],
-  dateField: string,
-  from: string,
-  to: string
-): T[] => {
-  if (!from || !to || !Array.isArray(items)) return items || [];
-  return items.filter((item) => {
-    try {
-      const d = new Date(item[dateField]);
-      return isWithinInterval(d, { start: new Date(from), end: new Date(to) });
-    } catch {
-      return false;
-    }
+/**
+ * Reports read the same API-backed registers as Operations and Fleet.  Do not
+ * read their old localStorage mirrors here: those caches can be empty until a
+ * user has visited the source page and therefore made reports disagree with
+ * the quarter dataset.
+ */
+
+type Row = Record<string, unknown>;
+
+const safeNumber = (value: unknown): number => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
+const inWindow = (value: unknown, filters: ReportFilters): boolean => {
+  const date = String(value ?? '').slice(0, 10);
+  return Boolean(date && date >= filters.dateFrom && date <= filters.dateTo);
+};
+
+const groupAndSum = (items: Row[], groupKey: string, sumKeys: string[]): Row[] => {
+  const grouped = new Map<string, Row>();
+  for (const item of items) {
+    const key = String(item[groupKey] || 'Unknown');
+    const target = grouped.get(key) ?? { [groupKey]: key };
+    for (const sumKey of sumKeys) target[sumKey] = safeNumber(target[sumKey]) + safeNumber(item[sumKey]);
+    grouped.set(key, target);
+  }
+  return [...grouped.values()];
+};
+
+interface ReportSources {
+  trips: Row[];
+  sales: Row[];
+  collections: CollectionApiEntry[];
+  fuel: Row[];
+  maintenance: MaintenanceEvent[];
+}
+
+async function loadCollections(filters: ReportFilters): Promise<CollectionApiEntry[]> {
+  const { data } = await apiGet<CollectionApiEntry[] | { data?: CollectionApiEntry[] }>(
+    '/operations/collection-entry',
+    { params: { fromDate: filters.dateFrom, toDate: filters.dateTo, includeDeleted: false } },
+  );
+  return Array.isArray(data) ? data : data.data ?? [];
+}
+
+async function loadMaintenance(filters: ReportFilters): Promise<MaintenanceEvent[]> {
+  const payload = await maintenanceApi.list({
+    fromDate: filters.dateFrom,
+    toDate: filters.dateTo,
+    includeDeleted: false,
   });
-};
+  const rows = Array.isArray(payload) ? payload : (payload as { data?: unknown[] })?.data ?? [];
+  return rows.map(mapMaintenanceToEvent);
+}
 
-const groupAndSum = <T extends Record<string, any>>(
-  items: T[],
-  groupKey: string,
-  sumKeys: string[]
-): Record<string, any>[] => {
-  if (!Array.isArray(items)) return [];
-  const map = new Map<string, any>();
-  items.forEach((item) => {
-    const key = item[groupKey] || 'Unknown';
-    if (!map.has(key)) {
-      map.set(key, { [groupKey]: key });
-      sumKeys.forEach((sk) => (map.get(key)[sk] = 0));
-    }
-    const entry = map.get(key);
-    sumKeys.forEach((sk) => {
-      entry[sk] += Number(item[sk] || 0);
-    });
-  });
-  return Array.from(map.values());
-};
+async function loadSources(filters: ReportFilters): Promise<ReportSources> {
+  const [trips, sales, collections, fuelResult, maintenance] = await Promise.all([
+    listTrips(),
+    listShopSales({ fromDate: filters.dateFrom, toDate: filters.dateTo }),
+    loadCollections(filters),
+    fuelExpenseService.list({ fromDate: filters.dateFrom, toDate: filters.dateTo, page: 1, limit: 10000 }),
+    loadMaintenance(filters),
+  ]);
+  return {
+    trips: trips as unknown as Row[],
+    sales: sales as unknown as Row[],
+    collections,
+    fuel: fuelResult.data as unknown as Row[],
+    maintenance,
+  };
+}
 
-const safeNumber = (val: any): number => {
-  const num = Number(val);
-  return isNaN(num) ? 0 : num;
-};
+function completedTrips(rows: Row[], filters: ReportFilters): Row[] {
+  return rows.filter((trip) =>
+    inWindow(trip.tripDate, filters) &&
+    String(trip.status).toLowerCase() === 'completed' &&
+    trip.deleted !== true
+  );
+}
 
-// ========== REPORT COMPUTATIONS ==========
+function approvedCollections(rows: CollectionApiEntry[]): CollectionApiEntry[] {
+  return rows.filter((row) => row.status === 'Approved' && !row.deleted && row.isFinancial !== false);
+}
 
-const computeWeeklyReport = (trips: any[], sales: any[], collections: any[], fuel: any[], filters: ReportFilters): ReportData => {
-  const filteredTrips = filterByDateRange(trips, 'tripDate', filters.dateFrom, filters.dateTo);
-  const filteredSales = filterByDateRange(sales, 'tripDate', filters.dateFrom, filters.dateTo);
-  const filteredCollections = filterByDateRange(collections, 'collectionDate', filters.dateFrom, filters.dateTo);
-  const filteredFuel = filterByDateRange(fuel, 'date', filters.dateFrom, filters.dateTo);
+function computeWeeklyReport(sources: ReportSources, filters: ReportFilters): ReportData {
+  const trips = completedTrips(sources.trips, filters);
+  const sales = sources.sales.filter((sale) => inWindow(sale.saleDate ?? sale.tripDate, filters));
+  const collections = approvedCollections(sources.collections).filter((row) => inWindow(row.collectionDate, filters));
+  const fuel = sources.fuel.filter((row) => inWindow(row.date ?? row.billDate, filters));
+  const maintenance = sources.maintenance.filter((row) => inWindow(row.date, filters) && !row.deletedAt);
 
-  const totalTrips = filteredTrips.length;
-  const totalBirds = filteredTrips.reduce((sum, t) => sum + safeNumber(t.totalBirds), 0);
-  const totalWeight = filteredTrips.reduce((sum, t) => sum + safeNumber(t.totalWeight), 0);
-  const totalMortality = filteredTrips.reduce((sum, t) => sum + safeNumber(t.totalMortality), 0);
-  const totalSales = filteredSales.reduce((sum, s) => sum + safeNumber(s.amount), 0);
-  const totalCollections = filteredCollections.filter(c => c.status === 'Approved').reduce((sum, c) => sum + safeNumber(c.amount), 0);
-  const totalFuelExpense = filteredFuel.reduce((sum, f) => sum + safeNumber(f.amount), 0);
-  const totalTripExpense = filteredTrips.reduce((sum, t) => sum + safeNumber(t.expense), 0);
-  const totalExpenses = totalFuelExpense + totalTripExpense;
-  const profit = totalSales - totalCollections - totalExpenses;
+  const totalSales = sales.reduce((sum, row) => sum + safeNumber(row.amount), 0);
+  const totalCollections = collections.reduce((sum, row) => sum + safeNumber(row.amountCollected ?? row.amount), 0);
+  const fuelExpense = fuel.reduce((sum, row) => sum + safeNumber(row.amount), 0);
+  const maintenanceExpense = maintenance.reduce((sum, row) => sum + safeNumber(row.totalCost), 0);
+  const otherTripExpense = trips.reduce((sum, row) => sum + safeNumber(row.expense), 0);
+  const totalExpenses = fuelExpense + maintenanceExpense + otherTripExpense;
+  const totalBirds = trips.reduce((sum, row) => sum + safeNumber(row.totalBirds), 0);
+  const totalWeight = trips.reduce((sum, row) => sum + safeNumber(row.totalWeight ?? row.farmWeight), 0);
+  const mortality = trips.reduce((sum, row) => sum + safeNumber(row.totalMortality), 0);
 
   return {
     title: 'Weekly Report',
     summary: {
-      'Total Trips': totalTrips,
+      'Total Trips': trips.length,
       'Total Birds': totalBirds,
       'Total Weight (KG)': totalWeight,
-      'Total Mortality': totalMortality,
+      'Total Mortality': mortality,
       'Total Sales': totalSales,
       'Total Collections': totalCollections,
+      'Outstanding': totalSales - totalCollections,
+      'Fuel Expense': fuelExpense,
+      'Maintenance Expense': maintenanceExpense,
       'Total Expenses': totalExpenses,
-      'Profit / Loss': profit,
+      'Operating Result': totalSales - totalExpenses,
     },
-    details: filteredTrips.map(t => ({
-      tripNo: t.tripNo || 'N/A',
-      date: t.tripDate || 'N/A',
-      vehicle: t.vehicleNo || 'N/A',
-      shops: safeNumber(t.totalShops),
-      birds: safeNumber(t.totalBirds),
-      weight: safeNumber(t.totalWeight),
-      mortality: safeNumber(t.totalMortality),
-      expense: safeNumber(t.expense),
+    details: trips.map((trip) => ({
+      tripNo: trip.tripNo || 'N/A',
+      date: trip.tripDate || 'N/A',
+      vehicle: trip.vehicleNo || 'N/A',
+      shops: safeNumber(trip.totalShops),
+      birds: safeNumber(trip.totalBirds),
+      weight: safeNumber(trip.totalWeight ?? trip.farmWeight),
+      mortality: safeNumber(trip.totalMortality),
+      expense: safeNumber(trip.expense),
     })),
     total: {
-      trips: totalTrips,
+      trips: trips.length,
       birds: totalBirds,
       weight: totalWeight,
-      mortality: totalMortality,
+      mortality,
       sales: totalSales,
       collections: totalCollections,
       expenses: totalExpenses,
-      profit: profit,
+      profit: totalSales - totalExpenses,
     },
-    isEmpty: filteredTrips.length === 0,
+    isEmpty: trips.length === 0 && sales.length === 0 && collections.length === 0,
   };
-};
+}
 
-const computeVehicleReport = (trips: any[], fuel: any[], filters: ReportFilters): ReportData => {
-  const filteredTrips = filterByDateRange(trips, 'tripDate', filters.dateFrom, filters.dateTo);
-  const filteredFuel = filterByDateRange(fuel, 'date', filters.dateFrom, filters.dateTo);
-
-  const vehicleGroups = groupAndSum(filteredTrips, 'vehicleNo', ['totalBirds', 'totalWeight', 'totalMortality', 'expense']);
-  const vehicleDetails = vehicleGroups.map((vg) => {
-    const vehicleTrips = filteredTrips.filter(t => t.vehicleNo === vg.vehicleNo);
-    const totalKm = vehicleTrips.reduce((sum, t) => sum + safeNumber(t.totalKm), 0);
-    const fuelForVehicle = filteredFuel.filter(f => f.vehicleNo === vg.vehicleNo);
-    const totalFuelLitres = fuelForVehicle.reduce((sum, f) => sum + safeNumber(f.litres), 0);
-    const totalFuelAmount = fuelForVehicle.reduce((sum, f) => sum + safeNumber(f.amount), 0);
-    return {
-      vehicle: vg.vehicleNo || 'Unknown',
-      trips: vehicleTrips.length,
-      totalKm,
-      birds: safeNumber(vg.totalBirds),
-      weight: safeNumber(vg.totalWeight),
-      mortality: safeNumber(vg.totalMortality),
-      fuelLitres: totalFuelLitres,
-      fuelAmount: totalFuelAmount,
-      expense: safeNumber(vg.expense),
-    };
-  });
-
-  const isEmpty = vehicleDetails.length === 0;
-
-  return {
-    title: 'Vehicle Report',
-    summary: isEmpty ? {} : {
-      'Total Vehicles': vehicleDetails.length,
-      'Total Trips': filteredTrips.length,
-      'Total KM': vehicleDetails.reduce((s, v) => s + v.totalKm, 0),
-      'Total Fuel (Ltrs)': vehicleDetails.reduce((s, v) => s + v.fuelLitres, 0),
-      'Total Fuel Expense': vehicleDetails.reduce((s, v) => s + v.fuelAmount, 0),
-    },
-    details: vehicleDetails,
-    total: {
-      trips: filteredTrips.length,
-      km: vehicleDetails.reduce((s, v) => s + v.totalKm, 0),
-      fuelLitres: vehicleDetails.reduce((s, v) => s + v.fuelLitres, 0),
-      fuelAmount: vehicleDetails.reduce((s, v) => s + v.fuelAmount, 0),
-    },
-    isEmpty,
-  };
-};
-
-const computeShopSalesReport = (sales: any[], _trips: any[], filters: ReportFilters): ReportData => {
-  const filteredSales = filterByDateRange(sales, 'tripDate', filters.dateFrom, filters.dateTo);
-  const shopGroups = groupAndSum(filteredSales, 'shopName', ['amount', 'birds', 'weight', 'boxes']);
-  const topShops = [...shopGroups].sort((a, b) => safeNumber(b.amount) - safeNumber(a.amount)).slice(0, 5);
-  const isEmpty = shopGroups.length === 0;
-
+function computeShopSalesReport(sources: ReportSources, filters: ReportFilters): ReportData {
+  let sales = sources.sales.filter((sale) => inWindow(sale.saleDate ?? sale.tripDate, filters));
+  if (filters.shop && filters.shop !== 'All Shops') sales = sales.filter((sale) => sale.shopName === filters.shop);
+  const groups = groupAndSum(sales, 'shopName', ['amount', 'birds', 'weight', 'boxes']);
+  const topShops = [...groups].sort((a, b) => safeNumber(b.amount) - safeNumber(a.amount)).slice(0, 5);
+  const total = (field: string) => groups.reduce((sum, row) => sum + safeNumber(row[field]), 0);
   return {
     title: 'Shop Sales Report',
-    summary: isEmpty ? {} : {
-      'Total Shops': shopGroups.length,
-      'Total Sales': shopGroups.reduce((s, g) => s + safeNumber(g.amount), 0),
-      'Total Birds': shopGroups.reduce((s, g) => s + safeNumber(g.birds), 0),
-      'Total Weight (KG)': shopGroups.reduce((s, g) => s + safeNumber(g.weight), 0),
-    },
-    details: shopGroups,
-    total: {
-      shops: shopGroups.length,
-      amount: shopGroups.reduce((s, g) => s + safeNumber(g.amount), 0),
-      birds: shopGroups.reduce((s, g) => s + safeNumber(g.birds), 0),
-      weight: shopGroups.reduce((s, g) => s + safeNumber(g.weight), 0),
-      boxes: shopGroups.reduce((s, g) => s + safeNumber(g.boxes), 0),
-    },
-    charts: topShops.map(s => ({ name: s.shopName || 'Unknown', value: safeNumber(s.amount) })),
-    isEmpty,
+    summary: groups.length ? {
+      'Total Shops': groups.length,
+      'Sale Lines': sales.length,
+      'Total Sales': total('amount'),
+      'Total Birds': total('birds'),
+      'Total Weight (KG)': total('weight'),
+    } : {},
+    details: groups,
+    total: { shops: groups.length, amount: total('amount'), birds: total('birds'), weight: total('weight'), boxes: total('boxes') },
+    charts: topShops.map((row) => ({ name: String(row.shopName), value: safeNumber(row.amount) })),
+    isEmpty: groups.length === 0,
   };
-};
+}
 
-const computeShopLedger = (sales: any[], collections: any[], filters: ReportFilters): ReportData => {
-  const filteredSales = filterByDateRange(sales, 'tripDate', filters.dateFrom, filters.dateTo);
-  const filteredCollections = filterByDateRange(collections, 'collectionDate', filters.dateFrom, filters.dateTo);
-
-  const shopSet = new Set<string>();
-  filteredSales.forEach(s => shopSet.add(s.shopName));
-  filteredCollections.forEach(c => shopSet.add(c.shopName));
-  const shops = Array.from(shopSet);
-
-  const ledgerEntries = shops.map(shop => {
-    const salesForShop = filteredSales.filter(s => s.shopName === shop);
-    const collectionsForShop = filteredCollections.filter(c => c.shopName === shop && c.status === 'Approved');
-    const totalSales = salesForShop.reduce((sum, s) => sum + safeNumber(s.amount), 0);
-    const totalCollections = collectionsForShop.reduce((sum, c) => sum + safeNumber(c.amount), 0);
-    const outstanding = totalSales - totalCollections;
-    return {
-      shop,
-      totalSales,
-      totalCollections,
-      outstanding,
-      salesCount: salesForShop.length,
-      collectionCount: collectionsForShop.length,
-    };
-  });
-
-  const isEmpty = ledgerEntries.length === 0;
-
-  return {
-    title: 'Shop Ledger',
-    summary: isEmpty ? {} : {
-      'Total Shops': shops.length,
-      'Total Sales': ledgerEntries.reduce((s, l) => s + l.totalSales, 0),
-      'Total Collections': ledgerEntries.reduce((s, l) => s + l.totalCollections, 0),
-      'Total Outstanding': ledgerEntries.reduce((s, l) => s + l.outstanding, 0),
-    },
-    details: ledgerEntries,
-    total: {
-      sales: ledgerEntries.reduce((s, l) => s + l.totalSales, 0),
-      collections: ledgerEntries.reduce((s, l) => s + l.totalCollections, 0),
-      outstanding: ledgerEntries.reduce((s, l) => s + l.outstanding, 0),
-    },
-    isEmpty,
-  };
-};
-
-const computeExpensesReport = (fuel: any[], filters: ReportFilters): ReportData => {
-  const filteredFuel = filterByDateRange(fuel, 'date', filters.dateFrom, filters.dateTo);
-  const categories = ['Fuel', 'Maintenance', 'Fastag', 'Office', 'Insurance & Permit'];
-  const expenseGroups = categories.map(cat => ({
-    category: cat,
-    amount: filteredFuel.filter(f => f.category === cat).reduce((s, f) => s + safeNumber(f.amount), 0),
-  }));
-  const total = expenseGroups.reduce((s, g) => s + g.amount, 0);
-  const isEmpty = total === 0;
-
+function computeExpensesReport(sources: ReportSources, filters: ReportFilters): ReportData {
+  const fuel = sources.fuel
+    .filter((row) => inWindow(row.date ?? row.billDate, filters))
+    .reduce((sum, row) => sum + safeNumber(row.amount), 0);
+  const maintenance = sources.maintenance
+    .filter((row) => inWindow(row.date, filters) && !row.deletedAt)
+    .reduce((sum, row) => sum + safeNumber(row.totalCost), 0);
+  const tripOther = completedTrips(sources.trips, filters).reduce((sum, row) => sum + safeNumber(row.expense), 0);
+  const details = [
+    { category: 'Fuel', amount: fuel },
+    { category: 'Maintenance', amount: maintenance },
+    { category: 'Trip / Other', amount: tripOther },
+  ];
+  const total = details.reduce((sum, row) => sum + row.amount, 0);
   return {
     title: 'Expenses Report',
-    summary: isEmpty ? {} : {
-      'Total Expense': total,
-      'Categories': expenseGroups.filter(g => g.amount > 0).length,
-    },
-    details: expenseGroups,
+    summary: total ? { 'Total Expense': total, 'Fuel Expense': fuel, 'Maintenance Expense': maintenance, 'Trip / Other Expense': tripOther } : {},
+    details,
     total: { total },
-    isEmpty,
+    isEmpty: total === 0,
   };
-};
+}
 
-// ========== MAIN EXPORT ==========
-export function getReportData(type: ReportType, filters: ReportFilters): ReportData | null {
-  try {
-    const trips = JSON.parse(localStorage.getItem('vehicleTrips') || '[]');
-    const sales = JSON.parse(localStorage.getItem('shopSales') || '[]');
-    const collections = JSON.parse(localStorage.getItem('dmr-collections') || '[]');
-    const fuelExpenses = JSON.parse(localStorage.getItem('dmr-fuel-expenses') || '[]');
-
-    switch (type) {
-      case 'weekly':
-        return computeWeeklyReport(trips, sales, collections, fuelExpenses, filters);
-      case 'vehicle':
-        return computeVehicleReport(trips, fuelExpenses, filters);
-      case 'shopSales':
-        return computeShopSalesReport(sales, trips, filters);
-      case 'shopLedger':
-        return computeShopLedger(sales, collections, filters);
-      case 'expenses':
-        return computeExpensesReport(fuelExpenses, filters);
-      default:
-        return null;
-    }
-  } catch (error) {
-    console.error('Report data error:', error);
-    return null;
+/** Load and derive a report from the live registers used by Operations. */
+export async function getReportData(type: ReportType, filters: ReportFilters): Promise<ReportData | null> {
+  if (type === 'shopLedger' || type === 'vehicle') return null;
+  const sources = await loadSources(filters);
+  switch (type) {
+    case 'weekly': return computeWeeklyReport(sources, filters);
+    case 'shopSales': return computeShopSalesReport(sources, filters);
+    case 'expenses': return computeExpensesReport(sources, filters);
+    default: return null;
   }
 }

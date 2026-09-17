@@ -307,7 +307,11 @@ a live carried-balance count, matching the Pending Collections KPI.
 
 | Tab | Route | Checks |
 |---|---|---|
-| Shop Ledger | `?tab=shopLedger` | Pick any of the 200 shops → chronological sale (debit) and collection (credit) rows with a **running balance** that ends exactly at the shop's current balance in Masters. Opening balance shown for the range. Try "all shops" and a custom Jul→Sep range. |
+| Daily / Weekly | `?tab=weekly` | Opens on the advertised sample quarter and derives trips, birds, weight, mortality, sales, approved collections, outstanding, fuel and maintenance from the same live Operations/Fleet registers. |
+| Shop Sales | `?tab=shopSales` | All shop totals are grouped from the same `/operations/shop-sales` lines shown by Operations; shop and date filters use `saleDate`. |
+| Vehicle Report | `?tab=vehicle` | Vehicle-wise completed trips, distance, fuel and maintenance come from the API-backed Trip List, Fuel Expenses and Fleet Maintenance registers (never an unprimed browser cache). |
+| Expenses | `?tab=expenses` | Fuel, maintenance and trip/other categories use their live source registers for the selected range. |
+| Shop Ledger | `?tab=shopLedger` | Opens on the advertised sample quarter. Pick any of the 200 shops → chronological sale (debit) and collection (credit) rows with a **running balance** that ends exactly at the shop's current balance in Masters. Opening balance shown for the range. |
 | Collection Report | `/operations?tab=collection-report` | As in Operations above. |
 | Vehicle Analytics | `/fleet?tab=analytics` | As in Fleet above. |
 

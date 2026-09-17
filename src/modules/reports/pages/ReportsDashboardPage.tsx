@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { format, subDays } from 'date-fns';
-import type { ReportFilters, ReportType } from '../types/reportTypes';
+import { CircleAlert, Loader2 } from 'lucide-react';
+import type { ReportData, ReportFilters, ReportType } from '../types/reportTypes';
 import { getReportData } from '../services/reportService';
+import { getQuarterSampleRange } from '../../../sample/quarterSample';
 import ReportFiltersComponent from '../components/ReportFilters';
 import ReportCard from '../components/ReportCard';
 import ShopLedgerPage from './ShopLedgerPage';
@@ -76,8 +78,9 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
 
   // Tab resolution: query param first, then the /reports/vehicle path alias.
   const activeTab = useMemo<ReportType>(() => {
-    const tab = searchParams.get('tab') as ReportType | null;
-    if (tab) return tab;
+    const tab = searchParams.get('tab');
+    const validTabs: ReportType[] = ['weekly', 'vehicle', 'shopSales', 'shopLedger', 'expenses'];
+    if (tab && validTabs.includes(tab as ReportType)) return tab as ReportType;
     if (location.pathname === '/reports/vehicle' || location.pathname.startsWith('/reports/vehicle/')) {
       return 'vehicle';
     }
@@ -91,6 +94,21 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
   const { shops } = useShops();
 
   const [filters, setFilters] = useState<ReportFilters>(() => getDefaultFilters(activeTab));
+  const [reportData, setReportData] = useState<ReportData | null>(null);
+  const [reportLoading, setReportLoading] = useState(false);
+  const [reportError, setReportError] = useState<string | null>(null);
+
+  // In demo mode, open report filters on the exact quarter advertised by the
+  // sample API. Production keeps the normal rolling seven-day default.
+  useEffect(() => {
+    let cancelled = false;
+    getQuarterSampleRange().then((range) => {
+      if (!cancelled && range) {
+        setFilters((current) => ({ ...current, dateFrom: range.fromDate, dateTo: range.toDate }));
+      }
+    });
+    return () => { cancelled = true; };
+  }, [activeTab]);
 
   // Redirect bare /reports to the default tab. Path aliases such as
   // /reports/vehicle resolve through activeTab and are left untouched.
@@ -140,17 +158,34 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
     [shops]
   );
 
-  const reportData = useMemo(() => {
-    // The new Vehicle Report page owns its data pipeline; the legacy card
-    // flow is only used for the remaining report types.
-    if (activeTab === 'shopLedger' || activeTab === 'vehicle') return null;
-    try {
-      return getReportData(activeTab, filters);
-    } catch (error) {
-      console.error('Error generating report:', error);
-      return null;
+  useEffect(() => {
+    // Shop Ledger and Vehicle Report own independent live-data pipelines.
+    if (activeTab === 'shopLedger' || activeTab === 'vehicle') {
+      setReportData(null);
+      setReportLoading(false);
+      setReportError(null);
+      return;
     }
-  }, [activeTab, filters]);
+    let cancelled = false;
+    setReportLoading(true);
+    setReportError(null);
+    const queryFilters: ReportFilters = {
+      ...getDefaultFilters(activeTab),
+      dateFrom: filters.dateFrom,
+      dateTo: filters.dateTo,
+      shop: filters.shop,
+    };
+    getReportData(activeTab, queryFilters)
+      .then((data) => { if (!cancelled) setReportData(data); })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        console.error('Error loading report:', error);
+        setReportData(null);
+        setReportError(error instanceof Error ? error.message : 'Unable to load report data.');
+      })
+      .finally(() => { if (!cancelled) setReportLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeTab, filters.dateFrom, filters.dateTo, filters.shop]);
 
   const isDataAvailable = useMemo(() => {
     if (!reportData) return false;
@@ -206,14 +241,28 @@ const ReportsDashboardPage: React.FC<ReportsDashboardPageProps> = React.memo(({ 
               driverOptions={driverOptions}
               shopOptions={shopOptions}
             />
-            <ReportCard
-              title={REPORT_LABELS[activeTab]}
-              description={REPORT_DESCRIPTIONS[activeTab]}
-              includeList={REPORT_INCLUDES[activeTab]}
-              onDownloadPDF={() => handleExport('PDF')}
-              onDownloadExcel={() => handleExport('Excel')}
-              isDataAvailable={isDataAvailable}
-            />
+            {reportError && (
+              <div className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                <CircleAlert size={16} className="mt-0.5 shrink-0" />
+                <span>Unable to load this report from Operations: {reportError}</span>
+              </div>
+            )}
+            {reportLoading && (
+              <div className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-10 text-sm font-medium text-slate-500">
+                <Loader2 size={17} className="animate-spin" /> Reading live Operations data…
+              </div>
+            )}
+            {!reportLoading && (
+              <ReportCard
+                title={REPORT_LABELS[activeTab]}
+                description={REPORT_DESCRIPTIONS[activeTab]}
+                includeList={REPORT_INCLUDES[activeTab]}
+                onDownloadPDF={() => handleExport('PDF')}
+                onDownloadExcel={() => handleExport('Excel')}
+                isDataAvailable={isDataAvailable}
+                summary={reportData?.summary}
+              />
+            )}
           </>
         )}
       </div>
