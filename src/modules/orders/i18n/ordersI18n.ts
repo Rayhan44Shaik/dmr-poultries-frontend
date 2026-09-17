@@ -64,6 +64,9 @@ const EN: Record<string, string> = {
   "orders.collection_summary": "{shops} shops · {boxes} boxes · {birds} birds",
   // Collection's cumulative line under the table: shops lead, rest is muted.
   "orders.collection_summary_shops": "Orders taken in {shops} shops",
+  "orders.collection_footer_cities": "{cities} cities",
+  "orders.collection_footer_on_vehicles": "{count} on vehicles",
+  "orders.collection_footer_awaiting": "{count} awaiting assignment",
   "orders.add_at_least_one_shop":
     "Enter at least one shop order (birds + boxes)",
   "orders.save_progress": "Save Progress",
@@ -505,6 +508,9 @@ const TE: Record<string, string> = {
   "orders.collection_summary":
     "{shops} షాప్‌లు · {boxes} బాక్స్‌లు · {birds} పక్షులు",
   "orders.collection_summary_shops": "{shops} షాప్‌లకు ఆర్డర్ నమోదు అయింది",
+  "orders.collection_footer_cities": "{cities} సిటీలు",
+  "orders.collection_footer_on_vehicles": "{count} వాహనాలపై",
+  "orders.collection_footer_awaiting": "{count} కేటాయింపు కోసం వేచి",
   "orders.add_at_least_one_shop":
     "కనీసం ఒక షాప్ ఆర్డర్ నమోదు చేయండి (పక్షులు + బాక్స్‌లు)",
   "orders.save_progress": "ప్రగతి సేవ్ చేయండి",

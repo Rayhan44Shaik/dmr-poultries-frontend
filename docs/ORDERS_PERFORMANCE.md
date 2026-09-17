@@ -83,7 +83,7 @@ This is approximately **89% less processing time**, not a measurement of total b
   column, at the trip table's spacing; header and body words sit at **14px** (`ORDERS_TABLE_TH_CLASS` /
   `ORDERS_TABLE_TD_CLASS`), a step above the shared 12px.
 - The three number boxes go the other way and stay deliberately small: **24px tall and no wider than
-  104px** (`ORDERS_RISE_INPUT_CLASS`), so they read as fields for a number and not as bars filling the
+  72px** (`ORDERS_RISE_INPUT_CLASS`), so they read as fields for a number and not as bars filling the
   row — the words above them are what should be large. Each is tinted to its own header glyph (birds
   emerald, boxes violet, weight teal) and carries a small rise: a soft shadow at rest, lifting a pixel on
   hover.
@@ -105,8 +105,13 @@ deliver`) rather than inside it, so an equal-width column cannot be pushed over.
 - **No tooltips on this screen.** The row state is the badge, the deadline is the chip — nothing needs a
   hover to be understood, so every `title` attribute was removed from the page (pinned by
   `npm run test:e2e:orders`: "no tooltip is left on the collection screen").
-- The day total is one cumulative line **below** the table (`Orders taken in N shops`, with birds ·
-  boxes · kg muted beside it) instead of a KPI in the header bar.
+- The day's cumulative is a **totals row inside the table** — the Salary Register's shape, one cell per
+  column: `Orders taken in N shops` under Shop Name, the number of cities under City, birds · boxes · kg
+  under their own columns in those columns' own colours, and `N on vehicles · M awaiting assignment` under
+  Status. A total sits where it is looked for instead of being narrated underneath, and every figure comes
+  from the same `entered` rows the table renders (`footerStats` shares that memo's inputs), so the footer
+  and the body cannot disagree. An empty day renders no footer at all, and the wording exists once — the
+  sentence that used to sit below the table is gone rather than duplicated beside the row.
 - **Actions animate on the shared tokens**, not on one-off keyframes: the hover motion is
   `uiActionIconMotionClass` (`delete` for the eraser, `approve` for Save Progress), Save Progress lifts a
   pixel and flashes a popping `Check` plus a 2px emerald bar for 1.4s after a save, the eraser keeps

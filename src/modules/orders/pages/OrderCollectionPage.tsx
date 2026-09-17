@@ -59,6 +59,7 @@ import {
   Save,
   Scale,
   Store,
+  Truck,
 } from "lucide-react";
 import type { Shop } from "../../masters/shops/types/shop";
 import type { Trip } from "../../../shared/trip";
@@ -862,6 +863,24 @@ function CollectionEntries({
     return { ...base, totalWeight: Number(weight.toFixed(2)) };
   }, [entered, rowWeightKg]);
 
+  // The footer needs two things the totals object does not carry: how many
+  // different cities today's orders cover, and how many of the entered shops are
+  // already placed on a vehicle. Both come from the same rows the totals sum, so
+  // the footer and the table can never disagree.
+  const footerStats = useMemo(() => {
+    const cities = new Set<string>();
+    let onVehicles = 0;
+    for (const row of entered) {
+      if (row.village) cities.add(row.village);
+      if (collection?.shops.has(row.shopId)) onVehicles += 1;
+    }
+    return {
+      cities: cities.size,
+      onVehicles,
+      awaiting: entered.length - onVehicles,
+    };
+  }, [entered, collection]);
+
   // The day's own average bird weight comes from the collection container, so
   // an ordered row shows its weight before it is assigned to a vehicle (the
   // vehicle's own average takes over once the row has an assignment).
@@ -1624,41 +1643,85 @@ function CollectionEntries({
                 </tr>
               )}
             </tbody>
+            {entered.length > 0 ? (
+              /* Cumulative detail, one cell per column — the totals row the Salary
+                 Register ends with, rather than a sentence under the table. A number
+                 sitting under its own heading is read where it is looked for, and it
+                 moves as the day is typed: birds, boxes, kg and city counts all come
+                 from the rows above, never from a second calculation. */
+              <tfoot>
+                <tr className="border-t-2 border-slate-200 bg-slate-50">
+                  <td className="px-4 py-4" aria-hidden="true">
+                    <Hash size={13} className="text-slate-300" />
+                  </td>
+                  <th
+                    scope="row"
+                    className="px-4 py-4 text-left text-[13px] font-bold whitespace-nowrap text-slate-800"
+                  >
+                    <span className="inline-flex items-center gap-2">
+                      <span className="flex h-6 w-6 items-center justify-center rounded-lg border border-sky-100 bg-sky-50 text-sky-600">
+                        <Store size={12} aria-hidden />
+                      </span>
+                      {to("orders.collection_summary_shops", {
+                        shops: totals.totalShops,
+                      })}
+                    </span>
+                  </th>
+                  <td className="px-4 py-4 text-[13px] font-bold whitespace-nowrap text-amber-700 tabular-nums">
+                    {to("orders.collection_footer_cities", {
+                      cities: footerStats.cities,
+                    })}
+                  </td>
+                  <td className="px-4 py-4 text-[13px] font-bold whitespace-nowrap text-emerald-700 tabular-nums">
+                    {totals.totalBirds}{" "}
+                    <span className="text-[11px] font-semibold text-emerald-600/80">
+                      {to("orders.word_birds")}
+                    </span>
+                  </td>
+                  <td className="px-4 py-4 text-[13px] font-bold whitespace-nowrap text-violet-700 tabular-nums">
+                    {totals.totalBoxes}{" "}
+                    <span className="text-[11px] font-semibold text-violet-600/80">
+                      {to("orders.word_boxes")}
+                    </span>
+                  </td>
+                  <td className="px-4 py-4 text-[13px] font-bold whitespace-nowrap text-teal-700 tabular-nums">
+                    {formatKg(totals.totalWeight, false)}{" "}
+                    <span className="text-[11px] font-semibold text-teal-600/80">
+                      kg
+                    </span>
+                  </td>
+                  <td className="px-4 py-4 text-center">
+                    <span className="inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5 text-[11px] font-semibold text-slate-500">
+                      <span className="inline-flex items-center gap-1 whitespace-nowrap tabular-nums">
+                        <Truck
+                          size={12}
+                          className="text-indigo-500"
+                          aria-hidden
+                        />
+                        {to("orders.collection_footer_on_vehicles", {
+                          count: footerStats.onVehicles,
+                        })}
+                      </span>
+                      <span className="text-slate-300" aria-hidden>
+                        ·
+                      </span>
+                      <span className="inline-flex items-center gap-1 whitespace-nowrap tabular-nums">
+                        <Clock
+                          size={12}
+                          className="text-slate-400"
+                          aria-hidden
+                        />
+                        {to("orders.collection_footer_awaiting", {
+                          count: footerStats.awaiting,
+                        })}
+                      </span>
+                    </span>
+                  </td>
+                  <td className="px-4 py-4" />
+                </tr>
+              </tfoot>
+            ) : null}
           </table>
-        </div>
-
-        {/* Cumulative line — BELOW the table, not a KPI row: how many shops
-            this day actually took orders (the number that matters), with the
-            birds / boxes / weight kept quiet beside it. */}
-        <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-slate-100 bg-slate-50/50 px-6 py-3">
-          <span className="inline-flex items-center gap-2 text-[13px] font-bold text-slate-800">
-            <span className="flex h-7 w-7 items-center justify-center rounded-lg border border-sky-100 bg-sky-50 text-sky-600">
-              <Store size={14} aria-hidden />
-            </span>
-            {to("orders.collection_summary_shops", {
-              shops: totals.totalShops,
-            })}
-          </span>
-          <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] font-semibold text-slate-400">
-            <span className="inline-flex items-center gap-1">
-              <Bird size={13} className="flex-shrink-0" aria-hidden />
-              {totals.totalBirds} {to("orders.word_birds")}
-            </span>
-            <span className="text-slate-200" aria-hidden>
-              ·
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <Boxes size={13} className="flex-shrink-0" aria-hidden />
-              {totals.totalBoxes} {to("orders.word_boxes")}
-            </span>
-            <span className="text-slate-200" aria-hidden>
-              ·
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <Scale size={13} className="flex-shrink-0" aria-hidden />
-              {formatKg(totals.totalWeight)}
-            </span>
-          </span>
         </div>
 
         {/* Global pagination (existing component) */}

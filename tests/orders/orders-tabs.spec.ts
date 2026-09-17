@@ -274,7 +274,7 @@ test("two columns are measured, the six between them are equal, and the number b
   for (const box of fields) {
     // Tall enough to hit comfortably, narrow enough to look like a number field.
     expect(Math.round(box!.height)).toBe(32);
-    expect(box!.width).toBeLessThanOrEqual(106);
+    expect(box!.width).toBeLessThanOrEqual(74);
   }
 });
 
@@ -343,18 +343,51 @@ test("the status column sits in the middle of its share, as a chip should", asyn
   expect(Math.round(pill!.height)).toBeGreaterThanOrEqual(30);
 });
 
-test("the day total is a cumulative line below the table, not a header KPI", async ({
+test("the day's totals sit in the column they belong to — a totals row, not a sentence", async ({
   page,
 }) => {
   await page.goto(`${ORDERS}/collection`);
   const panel = page.locator("#orders-panel-collection");
-  const cumulative = panel.getByText(/^Orders taken in \d+ shops$/);
-  await expect(cumulative).toBeVisible();
-  const total = await cumulative.boundingBox();
-  const table = await panel.locator("table").first().boundingBox();
-  expect(total && table && total.y > table.y + table.height - 8).toBe(true);
-  // The old header summary ("N shops · N boxes · N birds") is gone from here —
-  // that wording now belongs to the Assignment page only.
+  const row = panel.locator("table tfoot tr");
+  await expect(row).toBeVisible();
+  const cells = row.locator("th, td");
+  await expect(cells).toHaveCount(8);
+
+  const text = async (index: number) =>
+    (await cells.nth(index).textContent())?.replace(/\s+/g, " ").trim() ?? "";
+  const [shops, cities, birds, boxes, weight, status] = await Promise.all([
+    text(1),
+    text(2),
+    text(3),
+    text(4),
+    text(5),
+    text(6),
+  ]);
+  expect(shops).toMatch(/^Orders taken in \d+ shops$/);
+  expect(cities).toMatch(/^\d+ cities$/);
+  expect(birds).toMatch(/^\d+ birds$/);
+  expect(boxes).toMatch(/^\d+ boxes$/);
+  expect(weight).toMatch(/^[\d,.]+ kg$/);
+  expect(status).toMatch(/on vehicles.*awaiting assignment/);
+  // The wording lives once, inside the footer — no duplicate sentence under the table.
+  await expect(panel.getByText(/Orders taken in \d+ shops/)).toHaveCount(1);
+
+  // And the row shares the header's grid exactly: a total is only "the column's
+  // own detail" if it sits in that column, so every cell must line up with its
+  // heading. (colSpan shortcuts — the easy way to write a footer — fail this.)
+  const heads = await Promise.all(
+    (await panel.locator("thead th").all()).map((cell) => cell.boundingBox()),
+  );
+  const boxes2 = await Promise.all(
+    (await cells.all()).map((cell) => cell.boundingBox()),
+  );
+  for (let index = 0; index < 8; index++) {
+    expect(Math.abs(heads[index]!.x - boxes2[index]!.x)).toBeLessThanOrEqual(1);
+    expect(
+      Math.abs(heads[index]!.width - boxes2[index]!.width),
+    ).toBeLessThanOrEqual(1);
+  }
+  // The old header-style summary is still not how this page opens.
   await expect(panel.getByText(/\d+ shops · \d+ boxes/)).toHaveCount(0);
 });
 
