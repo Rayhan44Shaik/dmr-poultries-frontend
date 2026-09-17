@@ -156,6 +156,60 @@ const getPreviousRange = (start: Date, end: Date): { start: Date; end: Date } =>
 const sumExpenseBreakdown = (expense: ExpenseBreakdown): number =>
   Object.values(expense).reduce((a, b) => a + b, 0);
 
+/** Zero-valued breakdown: keeps net profit arithmetic total when a period has
+ * no expense row of its own yet. */
+const EMPTY_EXPENSES: ExpenseBreakdown = { farm: 0, fuel: 0, trip: 0, salary: 0, maintenance: 0, office: 0 };
+
+const netProfitOfPeriod = (
+  metrics: WeeklyMetrics,
+  expenses: ExpenseBreakdown | undefined
+): number => metrics.sales - sumExpenseBreakdown(expenses ?? EMPTY_EXPENSES);
+
+/**
+ * Net-profit cells for the Month / Quarter / Custom comparison columns. The
+ * last column is the current period, so it also carries the swing against the
+ * period before it — the same treatment the expense rows give their current
+ * column. Shared by all three comparison modes so they cannot drift apart.
+ */
+const netProfitComparisonCells = (
+  rows: { metrics: WeeklyMetrics; expenses: ExpenseBreakdown }[]
+) =>
+  rows.map((row, idx) => {
+    const value = netProfitOfPeriod(row.metrics, row.expenses);
+    const isCurrent = idx === rows.length - 1;
+    const tone = value >= 0 ? 'text-emerald-800 dark:text-emerald-200' : 'text-rose-700 dark:text-rose-300';
+    if (!isCurrent) {
+      return (
+        <td
+          key={idx}
+          title={formatCurrencyExact(value)}
+          className={`w-28 px-3 py-2.5 text-center font-bold bg-amber-50/40 border-l border-amber-100 group-hover/row:bg-amber-100/60 dark:group-hover/row:bg-amber-500/15 ${tone}`}
+        >
+          {formatCurrency(value)}
+        </td>
+      );
+    }
+    const previous = rows[rows.length - 2];
+    const prevValue = previous ? netProfitOfPeriod(previous.metrics, previous.expenses) : 0;
+    const diff = value - prevValue;
+    const pct = prevValue !== 0 ? (diff / Math.abs(prevValue)) * 100 : null;
+    return (
+      <td
+        key={idx}
+        title={formatCurrencyExact(value)}
+        className="w-28 px-3 py-2.5 text-center font-bold bg-emerald-50/40 border-l border-emerald-100 group-hover/row:bg-emerald-100/60 dark:group-hover/row:bg-emerald-500/15"
+      >
+        <div className={tone}>{formatCurrency(value)}</div>
+        {(prevValue !== 0 || value !== 0) && (
+          <div className={`text-[9px] font-semibold leading-none mt-0.5 ${diff >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>
+            {formatSignedCurrency(diff)}
+            {pct == null ? '' : ` (${formatSignedPercent(pct)})`}
+          </div>
+        )}
+      </td>
+    );
+  });
+
 const getTripDistanceKm = (trip: Trip): number => {
   const totalKm = Number(trip.totalKm || 0);
   if (totalKm > 0) return totalKm;
@@ -193,6 +247,7 @@ const EXPENSE_ROW_DOT: Record<string, string> = {
   salary: 'bg-violet-500',
   maintenance: 'bg-cyan-600',
   office: 'bg-slate-400',
+  netProfit: 'bg-emerald-600',
   total: 'bg-slate-500 dark:bg-slate-400',
 };
 
@@ -752,6 +807,30 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
 
   const totalExpenseValue = useMemo(() => sumExpenseBreakdown(totalExpenses), [totalExpenses]);
   const previousExpenseValue = useMemo(() => sumExpenseBreakdown(previousExpenses), [previousExpenses]);
+
+  /* ── Farm payments and net profit ──────────────────────────────────────────
+     Net profit = shop sales − farm payment − every other expense. The farm
+     payment is already the `farm` sector of the expense breakdown (see
+     createAnalysisService.computeEffectiveExpenses), so subtracting the expense
+     total subtracts it exactly once — never zero times, never twice.
+     `farmTotals` splits that same figure into what has been settled and what is
+     still owed to farmers, which the expense total deliberately ignores. */
+  const farmTotals = useMemo(() => summaryService.farmTotalsForTrips(trips), [summaryService, trips]);
+
+  const totalNetProfit = totalMetrics.sales - totalExpenseValue;
+  const previousNetProfit = previousMetrics.sales - previousExpenseValue;
+
+  const weeklyNetProfit = useMemo(
+    () => weeklyMetrics.map((metrics, index) => netProfitOfPeriod(metrics, weeklyExpenses[index])),
+    [weeklyMetrics, weeklyExpenses]
+  );
+  const previousWeeklyNetProfit = useMemo(
+    () =>
+      previousWeeklyMetrics.map((metrics, index) =>
+        netProfitOfPeriod(metrics, previousWeeklyExpenses[index])
+      ),
+    [previousWeeklyMetrics, previousWeeklyExpenses]
+  );
 
   const totalDistanceKm = useMemo(() => trips.reduce((sum, trip) => sum + getTripDistanceKm(trip), 0), [trips]);
   const previousDistanceKm = useMemo(() => previousTrips.reduce((sum, trip) => sum + getTripDistanceKm(trip), 0), [previousTrips]);
@@ -1322,6 +1401,74 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
               </div>
             )}
           </div>
+        </div>
+      </div>
+
+      {/* Net profit — the one figure the whole analysis exists for:
+          shop sales − farm payment − every other expense. */}
+      <div className="group relative overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-sm transition-all duration-200 hover:border-emerald-300 dark:border-emerald-900 dark:bg-slate-900 dark:hover:border-emerald-800">
+        <span aria-hidden="true" className="absolute inset-x-0 top-0 h-[3px] bg-gradient-to-r from-emerald-500 to-emerald-300/30" />
+        <div className="p-5 sm:p-6">
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-emerald-50 border border-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:border-emerald-900 dark:text-emerald-300">
+              {totalNetProfit >= 0 ? <TrendingUp size={20} strokeWidth={2} /> : <TrendingDown size={20} strokeWidth={2} />}
+            </div>
+            <div className="min-w-0">
+              <p className="text-[13px] font-bold tracking-wide text-slate-700 dark:text-slate-200">{t('accounts.summary.net_profit.title')}</p>
+              <p className="text-[13px] leading-relaxed text-slate-500 dark:text-slate-400 mt-1">
+                {t('accounts.summary.net_profit.formula')}
+              </p>
+            </div>
+            {comparePrevious && (
+              <span className="ml-auto shrink-0 rounded-full border border-slate-200 bg-slate-100 px-2.5 py-1 text-[12px] font-semibold tracking-wide text-slate-600 dark:border-slate-700">
+                {t('accounts.summary.vs_previous')} {formatCurrency(previousNetProfit)}
+              </span>
+            )}
+          </div>
+
+          <div className="mt-5 flex flex-wrap items-baseline gap-2.5">
+            <p
+              title={formatCurrencyExact(totalNetProfit)}
+              className={`text-[32px] font-bold tabular-nums tracking-tight leading-tight ${totalNetProfit >= 0 ? 'text-emerald-700 dark:text-emerald-300' : 'text-rose-700 dark:text-rose-300'}`}
+            >
+              {formatCurrency(totalNetProfit)}
+            </p>
+            {comparePrevious && previousNetProfit !== 0 && (
+              <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[12px] font-semibold ${totalNetProfit >= previousNetProfit ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : 'border-rose-100 bg-rose-50 text-rose-700'}`}>
+                {totalNetProfit >= previousNetProfit ? <TrendingUp size={11} /> : <TrendingDown size={11} />}
+                {formatSignedCurrency(totalNetProfit - previousNetProfit)}
+                {` (${formatSignedPercent(((totalNetProfit - previousNetProfit) / Math.abs(previousNetProfit)) * 100)})`}
+              </span>
+            )}
+          </div>
+
+          {/* The three figures that make it up, so the number is auditable. */}
+          <dl className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
+            <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800">
+              <dt className="text-[11px] font-semibold tracking-widest text-slate-500 dark:text-slate-400">{t('accounts.summary.net_profit.sales')}</dt>
+              <dd className="mt-1 text-[15px] font-bold tabular-nums text-slate-800 dark:text-slate-100" title={formatCurrencyExact(totalMetrics.sales)}>{formatCurrency(totalMetrics.sales)}</dd>
+            </div>
+            <div className="rounded-xl border border-lime-200 bg-lime-50/70 px-3 py-2.5 dark:border-lime-900 dark:bg-lime-500/10">
+              <dt className="text-[11px] font-semibold tracking-widest text-lime-700 dark:text-lime-300">{t('accounts.summary.expense_rows.farm')}</dt>
+              <dd className="mt-1 text-[15px] font-bold tabular-nums text-lime-800 dark:text-lime-200" title={formatCurrencyExact(totalExpenses.farm)}>− {formatCurrency(totalExpenses.farm)}</dd>
+              <p className="mt-1 text-[11px] text-lime-700/80 dark:text-lime-300/80">
+                {formatNumber(farmTotals.trips)} {t('accounts.summary.net_profit.trips_with_farm_payment')}
+              </p>
+            </div>
+            <div className="rounded-xl border border-slate-200 bg-slate-50/70 px-3 py-2.5 dark:border-slate-700 dark:bg-slate-800">
+              <dt className="text-[11px] font-semibold tracking-widest text-slate-500 dark:text-slate-400">{t('accounts.summary.net_profit.other_expenses')}</dt>
+              <dd className="mt-1 text-[15px] font-bold tabular-nums text-slate-800 dark:text-slate-100" title={formatCurrencyExact(totalExpenseValue - totalExpenses.farm)}>− {formatCurrency(totalExpenseValue - totalExpenses.farm)}</dd>
+            </div>
+          </dl>
+
+          {/* Cash position of the same farm cost: settled vs still owed. */}
+          <p className="mt-3 text-[12px] text-slate-500 dark:text-slate-400">
+            {t('accounts.summary.net_profit.farm_settled')}{' '}
+            <strong className="font-semibold text-slate-700 dark:text-slate-200" title={formatCurrencyExact(farmTotals.paid)}>{formatCurrency(farmTotals.paid)}</strong>
+            {' · '}
+            {t('accounts.summary.net_profit.farm_balance')}{' '}
+            <strong className={`font-semibold ${farmTotals.balance > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-slate-700 dark:text-slate-200'}`} title={formatCurrencyExact(farmTotals.balance)}>{formatCurrency(farmTotals.balance)}</strong>
+          </p>
         </div>
       </div>
 
@@ -2020,6 +2167,73 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
                 )}
               </tr>
 
+              {/* Net profit: shop sales − farm payment − every other expense. */}
+              <tr className="group/row border-b border-emerald-200 bg-emerald-50/70 transition-colors duration-150 hover:bg-emerald-50 dark:border-emerald-900 dark:bg-emerald-500/10 dark:hover:bg-emerald-500/15">
+                <td className="relative w-56 px-4 py-2.5 before:absolute before:inset-y-0 before:left-0 before:w-[3px] before:bg-emerald-600 before:opacity-0 before:transition-opacity before:content-[''] group-hover/row:before:opacity-100">
+                  <SummaryRowLabel
+                    color={EXPENSE_ROW_DOT.netProfit}
+                    label={t('accounts.summary.expense_rows.net_profit')}
+                    className="font-bold text-emerald-800 dark:text-emerald-200"
+                  />
+                </td>
+                {comparePrevious && period === 'week' ? (
+                  <>
+                    {previousWeeklyNetProfit.map((value, idx) => (
+                      <td
+                        key={`prev-${idx}`}
+                        title={formatCurrencyExact(value)}
+                        className="w-24 px-3 py-2.5 text-center font-bold bg-amber-50/40 border-l border-amber-100 group-hover/row:bg-amber-100/60 dark:group-hover/row:bg-amber-500/15"
+                      >
+                        {formatCurrency(value)}
+                      </td>
+                    ))}
+                    {weeklyNetProfit.map((value, idx) => {
+                      const prevValue = previousWeeklyNetProfit[previousWeeklyNetProfit.length - 1] ?? 0;
+                      const diff = value - prevValue;
+                      const pct = prevValue !== 0 ? (diff / Math.abs(prevValue)) * 100 : null;
+                      return (
+                        <td
+                          key={`curr-${idx}`}
+                          title={formatCurrencyExact(value)}
+                          className="w-24 px-3 py-2.5 text-center font-bold bg-emerald-50/40 border-l border-emerald-100 group-hover/row:bg-emerald-100/60 dark:group-hover/row:bg-emerald-500/15"
+                        >
+                          <div className={value >= 0 ? 'text-emerald-800 dark:text-emerald-200' : 'text-rose-700 dark:text-rose-300'}>{formatCurrency(value)}</div>
+                          {(prevValue !== 0 || value !== 0) && (
+                            <div className={`text-[9px] font-semibold leading-none mt-0.5 ${diff >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{formatSignedCurrency(diff)}{pct == null ? '' : ` (${formatSignedPercent(pct)})`}</div>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </>
+                ) : comparePrevious && period === 'month' && monthComparisonData ? (
+                  <>{netProfitComparisonCells(monthComparisonData)}</>
+                ) : comparePrevious && period === 'quarter' && quarterComparisonData ? (
+                  <>{netProfitComparisonCells(quarterComparisonData)}</>
+                ) : comparePrevious && period === 'custom' && customComparisonData ? (
+                  <>{netProfitComparisonCells(customComparisonData)}</>
+                ) : (
+                  weeklyNetProfit.map((value, idx) => (
+                    <td
+                      key={idx}
+                      title={formatCurrencyExact(value)}
+                      className={`w-24 px-3 py-2.5 text-center font-bold ${value >= 0 ? 'text-emerald-800 dark:text-emerald-200' : 'text-rose-700 dark:text-rose-300'}`}
+                    >
+                      {formatCurrency(value)}
+                    </td>
+                  ))
+                )}
+                {period !== 'week' && !comparePrevious && (
+                  <td
+                    title={formatCurrencyExact(totalNetProfit)}
+                    className="w-20 px-3 py-2.5 text-center font-bold bg-emerald-100 border-l border-emerald-200 dark:border-emerald-900 group-hover/row:bg-emerald-200/70 dark:group-hover/row:bg-emerald-500/20"
+                  >
+                    <span className={totalNetProfit >= 0 ? 'text-emerald-900 dark:text-emerald-200' : 'text-rose-700 dark:text-rose-300'}>
+                      {formatCurrency(totalNetProfit)}
+                    </span>
+                  </td>
+                )}
+              </tr>
+
             </tbody>
           </table>
         </div>
@@ -2028,7 +2242,7 @@ export default function SummaryPage({ embedded = false }: SummaryPageProps) {
       </div>
       </div>
 
-      {tripViewerOpen && <SummaryTripViewer open trips={tripViewerTrips} groupLabel={tripViewerLabel} onClose={closeTripViewer} />}
+      {tripViewerOpen && <SummaryTripViewer open trips={tripViewerTrips} groupLabel={tripViewerLabel} farmPayments={snapshot.farmPayments} onClose={closeTripViewer} />}
 
       <div className="text-xs text-slate-400 text-center border-t border-slate-200 dark:border-slate-700 pt-4 mt-2">
         {t('accounts.summary.disclaimer')}

@@ -1215,8 +1215,26 @@ export default {
   'accounts.summary.expense_rows.maintenance': 'వాహన మరమ్మతు (₹)',
   'accounts.summary.expense_rows.office': 'ఆఫీస్ ఖర్చులు (₹)',
   'accounts.summary.expense_rows.total': 'మొత్తం ఖర్చులు (₹)',
-  'accounts.summary.expense_rows.net_profit': 'నికర నగదు లాభం (₹)',
-  'accounts.summary.disclaimer': 'ఖర్చులు: పేమెంట్ రిజిస్టర్\u200cలో ఆమోదించిన రికార్డులు మాత్రమే. పెండింగ్ కలెక్షన్ = ఎంచుకున్న తేదీల అమ్మకాలు − కలెక్షన్లు (కనీసం 0). ఇది మొత్తం షాప్ బకాయి కాదు.',
+  'accounts.summary.expense_rows.net_profit': 'నికర లాభం (₹)',
+
+  // నికర లాభం కార్డ్ + దానికి ఆధారమైన ట్రిప్ ఫారం చెల్లింపు.
+  'accounts.summary.net_profit.title': 'నికర లాభం',
+  'accounts.summary.net_profit.formula': 'షాప్ అమ్మకాలు − ఫారం చెల్లింపు − ఖర్చులు',
+  'accounts.summary.net_profit.sales': 'షాప్ అమ్మకాలు (₹)',
+  'accounts.summary.net_profit.other_expenses': 'ఇతర ఖర్చులు (₹)',
+  'accounts.summary.net_profit.trips_with_farm_payment': 'ఫారం చెల్లింపు ఉన్న ట్రిప్పులు',
+  'accounts.summary.net_profit.farm_settled': 'ఫారం చెల్లించింది:',
+  'accounts.summary.net_profit.farm_balance': 'ఫారం బకాయి:',
+  'accounts.summary.farm_payment.title': 'ఫారం చెల్లింపు',
+  'accounts.summary.farm_payment.payable': 'చెల్లించవలసినది',
+  'accounts.summary.farm_payment.paid': 'చెల్లించింది',
+  'accounts.summary.farm_payment.balance': 'బకాయి',
+  'accounts.summary.farm_payment.status': 'స్థితి',
+  'accounts.summary.farm_payment.status_paid': 'చెల్లించారు',
+  'accounts.summary.farm_payment.status_partially_paid': 'పాక్షికంగా చెల్లించారు',
+  'accounts.summary.farm_payment.status_pending': 'పెండింగ్',
+  'accounts.summary.farm_payment.group_total': 'గ్రూప్ ఫారం చెల్లింపు',
+  'accounts.summary.disclaimer': 'ఫారం చెల్లింపు అనేది ఎంచుకున్న తేదీల్లోని ట్రిప్పుల ఫారం ఖర్చు (dcWeight × రేటు) — ఫార్మర్ పేమెంట్స్ నుండి తీసుకున్నది; పేమెంట్ రిజిస్టర్ ఫార్మర్ చెల్లింపులు అదే ఖర్చుకు నగదు రూపం కాబట్టి వాటిని మళ్లీ కలపలేదు. మిగిలిన ఖర్చులన్నీ ఆమోదించిన పేమెంట్ రిజిస్టర్ రికార్డులే. నికర లాభం = షాప్ అమ్మకాలు − మొత్తం ఖర్చులు. పెండింగ్ కలెక్షన్ = ఎంచుకున్న తేదీల అమ్మకాలు − కలెక్షన్లు (కనీసం 0). ఇది మొత్తం షాప్ బకాయి కాదు.',
 
   // Reports Dashboard
   'reports.dashboard.title': 'నివేదికల డ్యాష్‌బోర్డ్',

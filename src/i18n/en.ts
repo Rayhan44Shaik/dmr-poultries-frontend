@@ -1210,8 +1210,26 @@ export default {
   'accounts.summary.expense_rows.maintenance': 'Vehicle Maintenance (₹)',
   'accounts.summary.expense_rows.office': 'Office & Other Expenses (₹)',
   'accounts.summary.expense_rows.total': 'Total Expenses (₹)',
-  'accounts.summary.expense_rows.net_profit': 'Net Cash Profit (₹)',
-  'accounts.summary.disclaimer': 'Expenses: Approved Payment Register records only. Pending Collection = max(Sales − Collections, 0) for the selected dates; it is not an all-time shop balance.',
+  'accounts.summary.expense_rows.net_profit': 'Net Profit (₹)',
+
+  // Net profit card + the per-trip farm payment it is built from.
+  'accounts.summary.net_profit.title': 'Net Profit',
+  'accounts.summary.net_profit.formula': 'Shop Sales − Farm Payment − Expenses',
+  'accounts.summary.net_profit.sales': 'Shop Sales (₹)',
+  'accounts.summary.net_profit.other_expenses': 'Other Expenses (₹)',
+  'accounts.summary.net_profit.trips_with_farm_payment': 'trips with a farm payment',
+  'accounts.summary.net_profit.farm_settled': 'Farm settled:',
+  'accounts.summary.net_profit.farm_balance': 'Farm balance owed:',
+  'accounts.summary.farm_payment.title': 'Farm Payment',
+  'accounts.summary.farm_payment.payable': 'Payable',
+  'accounts.summary.farm_payment.paid': 'Paid',
+  'accounts.summary.farm_payment.balance': 'Balance',
+  'accounts.summary.farm_payment.status': 'Status',
+  'accounts.summary.farm_payment.status_paid': 'Paid',
+  'accounts.summary.farm_payment.status_partially_paid': 'Partially Paid',
+  'accounts.summary.farm_payment.status_pending': 'Pending',
+  'accounts.summary.farm_payment.group_total': 'Group farm payment',
+  'accounts.summary.disclaimer': 'Farm Payment is the trip-linked farm cost from Farmer Payments (dcWeight × rate) for the trips in the selected dates; Payment Register farmer settlements are the cash side of the same cost and are not added again. Every other expense is an Approved Payment Register record. Net Profit = Shop Sales − Total Expenses. Pending Collection = max(Sales − Collections, 0) for the selected dates; it is not an all-time shop balance.',
 
   // Reports Dashboard
   'reports.dashboard.title': 'Reports Dashboard',

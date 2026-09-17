@@ -1,21 +1,59 @@
 // Account Analysis only: trip navigation lives inside the read-only modal.
 // No floating controls over the app header and no changes to Trip List views.
-import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { ChevronLeft, ChevronRight, PanelLeftOpen, PanelLeftClose, Truck, Calendar } from 'lucide-react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ChevronLeft, ChevronRight, PanelLeftOpen, PanelLeftClose, Truck, Calendar, Sprout } from 'lucide-react';
 import type { Trip } from '../../../operations/vehicle-trips/types/trip';
 import { TripHistoryViewModal } from '../../../operations/vehicle-trips/components/TripViewModal';
 import { useShops } from '../../../masters/shops/hooks/useShops';
 import { useBirdTypes } from '../../../masters/bird-types/hooks/useBirdTypes';
 import { useI18n } from '../../../../i18n';
 import { getTripNavigationIndex } from '../../utils/tripNavigation';
+import { indexFarmPaymentsByTrip } from '../../services/farmPaymentApiService';
+import { formatINR, formatINRExact } from '../farm-payment/farmPaymentFormat';
+import type { TripFarmPayment } from '../../types/farmPayment.types';
 import AppShellModal from '../../../../ui/AppShellModal';
 
-type Props = { open: boolean; trips: Trip[]; groupLabel: string; onClose: () => void };
+type Props = {
+  open: boolean;
+  trips: Trip[];
+  groupLabel: string;
+  /** Trip-linked farm payments, so each trip in this group can show its own. */
+  farmPayments?: readonly TripFarmPayment[];
+  onClose: () => void;
+};
 
-function SummaryTripViewer({ open, trips, groupLabel, onClose }: Props) {
+/** One money figure in the farm-payment strip: caption over value, with the
+ * exact rupees in the hover tip. */
+function FarmFigure({ label, value, tone }: { label: string; value: number; tone: string }) {
+  return (
+    <span className="inline-flex min-w-0 flex-col" title={formatINRExact(value)}>
+      <span className="text-[9px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">{label}</span>
+      <span className={`text-[13px] font-bold tabular-nums ${tone}`}>{formatINR(value)}</span>
+    </span>
+  );
+}
+
+function SummaryTripViewer({ open, trips, groupLabel, farmPayments, onClose }: Props) {
   const { shops } = useShops();
   const { birdTypes } = useBirdTypes();
   const { t } = useI18n();
+  const farmByTrip = useMemo(() => indexFarmPaymentsByTrip(farmPayments ?? []), [farmPayments]);
+  /** Farm cost of this whole group — the same trips the strip lists. */
+  const groupFarm = useMemo(() => {
+    let payable = 0;
+    let paid = 0;
+    let balance = 0;
+    let count = 0;
+    for (const trip of trips) {
+      const row = farmByTrip.get(String(trip.id));
+      if (!row) continue;
+      count += 1;
+      payable += row.amount;
+      paid += row.paidAmount;
+      balance += row.balance;
+    }
+    return { payable, paid, balance, count };
+  }, [trips, farmByTrip]);
   const [index, setIndex] = useState(0);
   const [sideOpen, setSideOpen] = useState(false);
   const toggleRef = useRef<HTMLButtonElement>(null);
@@ -65,6 +103,9 @@ function SummaryTripViewer({ open, trips, groupLabel, onClose }: Props) {
     </div>
   </AppShellModal>;
 
+  /** Farm payment of the trip on screen, if that trip has one. */
+  const currentFarm = current ? farmByTrip.get(String(current.id)) : undefined;
+
   const navigation = <div className="relative z-20 shrink-0 border-b border-emerald-100 bg-emerald-50/60 dark:border-slate-700 dark:bg-slate-800">
     <div className="flex flex-wrap items-center gap-3 px-4 py-3">
       <button ref={toggleRef} type="button" onClick={() => { focusSelectedTrip.current = !sideOpen; setSideOpen(value => !value); }} aria-expanded={sideOpen} aria-controls="analysis-trip-sidebar"
@@ -78,17 +119,52 @@ function SummaryTripViewer({ open, trips, groupLabel, onClose }: Props) {
         <button type="button" onClick={next} disabled={safeIndex === trips.length - 1} aria-label={t('common.next')} className="grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 disabled:opacity-40 focus-visible:ring-2 focus-visible:ring-emerald-500"><ChevronRight size={18} /></button>
       </div>
     </div>
+    {/* The farm payment of the trip being viewed — the same figure the Analysis
+        net profit charges to it — with the group's own farm total beside it. */}
+    {currentFarm && (
+      <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-t border-emerald-100 bg-white/70 px-4 py-2.5 dark:border-slate-700 dark:bg-slate-900/60">
+        <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-lime-700 dark:text-lime-300">
+          <Sprout size={13} />{t('accounts.summary.farm_payment.title')}
+        </span>
+        <FarmFigure label={t('accounts.summary.farm_payment.payable')} value={currentFarm.amount} tone="text-slate-800 dark:text-slate-100" />
+        <FarmFigure label={t('accounts.summary.farm_payment.paid')} value={currentFarm.paidAmount} tone="text-emerald-700 dark:text-emerald-300" />
+        <FarmFigure label={t('accounts.summary.farm_payment.balance')} value={currentFarm.balance} tone={currentFarm.balance > 0 ? 'text-rose-700 dark:text-rose-300' : 'text-slate-500 dark:text-slate-400'} />
+        <span
+          className="ml-auto min-w-0 truncate text-[11px] text-slate-500 dark:text-slate-400"
+          title={`${currentFarm.farmName ?? ''} · ${currentFarm.totalBirds ?? 0} birds · ${currentFarm.dcWeight ?? 0} kg @ ₹${currentFarm.rate ?? 0}`}
+        >
+          {currentFarm.farmName} · {t('accounts.summary.farm_payment.status')}: {t(`accounts.summary.farm_payment.status_${currentFarm.status.toLowerCase().replace(/\s+/g, '_')}`)}
+        </span>
+        {groupFarm.count > 1 && (
+          <span className="w-full text-[11px] text-slate-500 dark:text-slate-400 sm:w-auto" title={formatINRExact(groupFarm.payable)}>
+            {t('accounts.summary.farm_payment.group_total')}: <strong className="font-semibold text-slate-700 dark:text-slate-200">{formatINR(groupFarm.payable)}</strong>
+            {' · '}{groupFarm.count} {t('accounts.summary.net_profit.trips_with_farm_payment')}
+          </span>
+        )}
+      </div>
+    )}
     {sideOpen && <nav ref={sidebarRef} id="analysis-trip-sidebar" aria-label={t('accounts.summary.trip_navigation')}
       onKeyDown={event => { if (event.key === 'Escape') { event.stopPropagation(); setSideOpen(false); toggleRef.current?.focus(); } }}
       className="absolute left-0 top-full max-h-[65vh] w-80 max-w-[calc(100vw-4rem)] overflow-y-auto rounded-br-xl border border-slate-200 bg-white p-2 shadow-xl dark:border-slate-700 dark:bg-slate-900">
-      {trips.map((trip, idx) => <button key={trip.id} id={`analysis-trip-${idx}`} type="button" tabIndex={idx === safeIndex ? 0 : -1} onClick={() => setIndex(idx)} aria-keyshortcuts="ArrowUp ArrowDown Home End" aria-current={idx === safeIndex ? 'true' : undefined}
-        className={`mb-1 flex w-full items-start gap-3 rounded-lg border px-3 py-3 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${idx === safeIndex ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-transparent text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'}`}>
-        <span className="min-w-6 font-bold tabular-nums">{idx + 1}</span>
-        <span className="min-w-0"><span className="block truncate font-semibold">{trip.tripNo}</span>
-          <span className="mt-1 flex items-center gap-1.5 text-xs"><Calendar size={12} />{trip.tripDate}</span>
-          <span className="mt-1 flex items-center gap-1.5 text-xs"><Truck size={12} />{trip.vehicleNo}</span>
-        </span>
-      </button>)}
+      {trips.map((trip, idx) => {
+        const farm = farmByTrip.get(String(trip.id));
+        return (
+          <button key={trip.id} id={`analysis-trip-${idx}`} type="button" tabIndex={idx === safeIndex ? 0 : -1} onClick={() => setIndex(idx)} aria-keyshortcuts="ArrowUp ArrowDown Home End" aria-current={idx === safeIndex ? 'true' : undefined}
+            className={`mb-1 flex w-full items-start gap-3 rounded-lg border px-3 py-3 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-emerald-500 ${idx === safeIndex ? 'border-emerald-300 bg-emerald-50 text-emerald-900' : 'border-transparent text-slate-700 hover:bg-slate-50 dark:text-slate-200 dark:hover:bg-slate-800'}`}>
+            <span className="min-w-6 font-bold tabular-nums">{idx + 1}</span>
+            <span className="min-w-0"><span className="block truncate font-semibold">{trip.tripNo}</span>
+              <span className="mt-1 flex items-center gap-1.5 text-xs"><Calendar size={12} />{trip.tripDate}</span>
+              <span className="mt-1 flex items-center gap-1.5 text-xs"><Truck size={12} />{trip.vehicleNo}</span>
+              {/* That trip's own farm payment — the figure the Analysis charges to it. */}
+              {farm && (
+                <span className="mt-1 flex items-center gap-1.5 text-xs font-semibold text-lime-700 dark:text-lime-300" title={formatINRExact(farm.amount)}>
+                  <Sprout size={12} />{formatINR(farm.amount)}
+                </span>
+              )}
+            </span>
+          </button>
+        );
+      })}
     </nav>}
   </div>;
 

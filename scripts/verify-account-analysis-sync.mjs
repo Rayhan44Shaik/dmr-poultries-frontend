@@ -28,18 +28,48 @@ try {
  for (const category of ['farm','fuel','trip','salary','maintenance','office']) assert(expenses[category] > 0, category);
  console.log('PASS live Account Analysis: ', JSON.stringify({ trips: trips.length, metrics, expenses }));
  const { paymentExpenseSector } = await server.ssrLoadModule('/src/modules/accounts/utils/paymentRegister.ts');
- const ledgerOnly = createAnalysisService({ trips: [], collections: [], payments: snapshot.payments }).computeEffectiveExpenses([], start, end);
+ // Register-only view: no trips, so no trip-linked farm cost — every category
+ // here is purely the Approved Payment Register.
+ const ledgerOnly = createAnalysisService({ trips: [], collections: [], payments: snapshot.payments, farmPayments: [] }).computeEffectiveExpenses([], start, end);
  for (const category of Object.keys(ledgerOnly)) {
+   // Farm is no longer register-sourced: with no trips its value is 0 by
+   // construction, so the "mapped once from the register" rule cannot apply.
+   if (category === 'farm') continue;
    const expected = snapshot.payments.filter(p => p.status === 'Approved' && paymentExpenseSector(p.paymentType, p.category) === category && p.paymentDate >= fromDate && p.paymentDate <= toDate).reduce((sum,p)=>sum+Number(p.amount),0);
    assert(Math.abs(expected-ledgerOnly[category]) < .01, `${category}: ledger mapped once`);
  }
- assert.deepEqual(expenses, ledgerOnly, 'No direct farm/trip expenses added to Payment Register');
- console.log('PASS every approved ledger category is counted exactly once');
+ assert.equal(ledgerOnly.farm, 0, 'with no trips there is no trip-linked farm cost');
+ // Every category except farm must still be exactly the Payment Register.
+ for (const category of Object.keys(ledgerOnly)) {
+   if (category === 'farm') continue;
+   assert(Math.abs(expenses[category] - ledgerOnly[category]) < .01, `${category}: register is the sole source`);
+ }
+ // Farm Payment is the one category that is NOT the register: it is the
+ // trip-linked farm cost (dcWeight × rate) of exactly the trips being analysed,
+ // because that is what each trip actually cost and it can be attributed to it.
+ const farmTripLinked = snapshot.farmPayments
+   .filter(row => trips.some(trip => String(trip.id) === String(row.tripId)))
+   .reduce((sum, row) => sum + Number(row.amount), 0);
+ assert(Math.abs(expenses.farm - farmTripLinked) < .01, 'farm expense = trip-linked farm cost of the analysed trips');
+ for (const trip of trips) {
+   assert(snapshot.farmPayments.some(row => String(row.tripId) === String(trip.id)), `${trip.tripNo}: carries its farm payment`);
+ }
+ // The register's "Farmer Payment" rows are the cash settlement of that same
+ // cost. They must NOT be added on top, or every farmer rupee counts twice.
+ const registerFarmer = snapshot.payments.filter(p => p.status === 'Approved' && paymentExpenseSector(p.paymentType, p.category) === 'farm' && p.paymentDate >= fromDate && p.paymentDate <= toDate).reduce((sum,p)=>sum+Number(p.amount),0);
+ assert(registerFarmer > 0, 'the register holds farmer settlements for this audit to exclude');
+ assert(Math.abs(expenses.farm - (farmTripLinked + registerFarmer)) > .01, 'register farmer settlements must not be double-counted');
+ const netProfit = metrics.sales - Object.values(expenses).reduce((sum, value) => sum + value, 0);
+ console.log('PASS every approved ledger category is counted exactly once; farm is trip-linked', JSON.stringify({ farmTripLinked, registerFarmerSettlementsExcluded: registerFarmer, sales: metrics.sales, totalExpenses: Object.values(expenses).reduce((sum, value) => sum + value, 0), netProfit }));
  const { loadPaymentRegisterSummary } = await server.ssrLoadModule('/src/modules/operations/dashboard/services/paymentRegisterSummary.ts');
  const dashboardPayments = await loadPaymentRegisterSummary(fromDate, toDate);
- const settledLedgerTotal = Object.values(ledgerOnly).reduce((sum, value) => sum + value, 0);
- assert(Math.abs(dashboardPayments.totalAmount - settledLedgerTotal) < .01, 'Dashboard payments match Analysis ledger');
- console.log('PASS dashboard payments match expense ledger', dashboardPayments.totalAmount, dashboardPayments.totalCount);
+ // The dashboard counts EVERY approved register payment — farmer settlements
+ // included. The Analysis expense breakdown deliberately leaves those out of
+ // the farm sector (the trip-linked cost already carries them), so the two
+ // figures differ by exactly the farmer settlements and nothing else.
+ const settledLedgerTotal = Object.values(ledgerOnly).reduce((sum, value) => sum + value, 0) + registerFarmer;
+ assert(Math.abs(dashboardPayments.totalAmount - settledLedgerTotal) < .01, 'Dashboard payments match the full Approved Payment Register');
+ console.log('PASS dashboard payments match expense ledger', dashboardPayments.totalAmount, dashboardPayments.totalCount, '· farmer settlements held outside the farm sector:', registerFarmer);
 
  const { listCompletedTrips } = await server.ssrLoadModule('/src/modules/operations/vehicle-trips/services/tripHeaderApiService.ts');
  const { filterTripListTrips } = await server.ssrLoadModule('/src/modules/operations/vehicle-trips/utils/filterTripList.ts');
