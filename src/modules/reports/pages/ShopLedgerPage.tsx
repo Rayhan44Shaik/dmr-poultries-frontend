@@ -40,8 +40,8 @@ import { onShopDataChanged } from "../../../shared/events/shopDataEvents";
 import { useI18n } from "../../../i18n";
 import { DatePicker } from "../../../components/common/DatePicker";
 import { apiPost } from "../../../api";
-import { getQuarterSampleRange } from "../../../sample/quarterSample";
-import { BrandRefreshButton, Pagination } from "../../../ui";
+import { AppShellModal, BrandRefreshButton, Pagination } from "../../../ui";
+import ViewLanguageToggle from "../../../ui/ViewLanguageToggle";
 import MasterDropdown, { type MasterDropdownOption } from "../../masters/components/MasterDropdown";
 import {
   opsFilterCardClass,
@@ -87,8 +87,6 @@ interface WhatsAppSendPayload {
 }
 
 interface PdfPreviewState {
-  combinedUrl: string;
-  combinedFilename: string;
   files: { shop: string; url: string | null; filename: string }[];
   selectedIndex: number;
   selectedShops: string[];
@@ -190,15 +188,15 @@ function mondayOf(date: Date): Date {
 }
 
 /**
- * Default ledger window — the CURRENT week, Monday → TODAY.
- *
- * From = this week's Monday; To = today. When today IS Sunday the range is
- * the complete Monday → Sunday week; on any other day it runs from Monday up
- * to the present moment, so the statement always starts on a week boundary.
+ * Default ledger window — the complete CURRENT week, Monday → Sunday.
+ * Future days naturally contain no transactions, while keeping the filter,
+ * PDF and WhatsApp statement period on one consistent business week.
  */
 function defaultWeekRange(): { from: string; to: string } {
   const now = new Date();
-  return { from: format(mondayOf(now), "yyyy-MM-dd"), to: format(now, "yyyy-MM-dd") };
+  const monday = mondayOf(now);
+  const sunday = new Date(monday.getFullYear(), monday.getMonth(), monday.getDate() + 6);
+  return { from: format(monday, "yyyy-MM-dd"), to: format(sunday, "yyyy-MM-dd") };
 }
 
 const toDateDefault = () => defaultWeekRange().to;
@@ -223,14 +221,6 @@ const weekdayOf = (value: string, language: "en" | "te" = "en"): string => {
   const [year, month, day] = parts;
   const dow = new Date(year, month - 1, day).getDay();
   return (language === "te" ? WEEKDAY_SHORT_TE : WEEKDAY_SHORT)[dow];
-};
-
-/** Shift a yyyy-MM-dd date by N days on the local calendar. */
-const shiftDateIso = (value: string, days: number): string => {
-  const parts = value.split("-").map(Number);
-  if (parts.length !== 3 || parts.some((n) => !Number.isFinite(n))) return value;
-  const [year, month, day] = parts;
-  return format(new Date(year, month - 1, day + days), "yyyy-MM-dd");
 };
 
 const round2 = (value: number): number => Math.round(value * 100) / 100;
@@ -392,7 +382,7 @@ function buildWhatsAppMessage(
 }
 
 const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
-  const { t, language } = useI18n();
+  const { t, language, toggleLanguage } = useI18n();
   const { showNotification } = useSafeNotification();
   const { shops } = useShops();
 
@@ -435,21 +425,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   const [ledgerError, setLedgerError] = useState<string | null>(null);
   const [refreshToast, setRefreshToast] = useState(false);
 
-  // Keep the report's initial scope identical to the active sample quarter.
-  // This only runs when the dev sample API identifies itself; production keeps
-  // the normal Monday-to-today ledger window.
-  useEffect(() => {
-    let cancelled = false;
-    getQuarterSampleRange().then((range) => {
-      if (cancelled || !range) return;
-      setDateFrom(range.fromDate);
-      setDateTo(range.toDate);
-      setAppliedDateFrom(range.fromDate);
-      setAppliedDateTo(range.toDate);
-    });
-    return () => { cancelled = true; };
-  }, []);
-
   const selectedShopId = useMemo(() => {
     return appliedSelectedShop === "All Shops"
       ? undefined
@@ -470,35 +445,26 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
         openingTotal = Number(res.openingBalance) || 0;
         body = res.data.map(mapRowToTx);
       } else {
-        // ALL SHOPS — the backend's combined ledger mixes balances across
-        // shops, so rebuild the TRUE per-shop running balances client-side.
-        // Each shop's opening at `from` = its master opening + its own net
-        // activity before `from`, so for every shop the previous period's
-        // closing carries forward as this period's opening.
-        const history = await fetchAllLedgerPages({
-          fromDate: shiftDateIso(from, -365),
-          toDate: shiftDateIso(from, -1),
-        });
-        const preNetByShop = new Map<number, number>();
-        for (const row of history.data) {
+        // ALL SHOPS — derive each opening from the live Shop Master balance
+        // minus activity since `from`. For the normal Monday→Sunday window,
+        // the already-loaded period rows are sufficient: no second historical
+        // download. Historical custom ranges need only one bulk catch-up read.
+        const today = format(new Date(), "yyyy-MM-dd");
+        const balanceRows = to >= today
+          ? res.data
+          : (await fetchAllLedgerPages({ fromDate: from, toDate: today })).data;
+        const netSinceFrom = new Map<number, number>();
+        for (const row of balanceRows) {
           const sid = Number(row.shopId ?? 0);
-          preNetByShop.set(sid, (preNetByShop.get(sid) ?? 0) + row.debit - row.credit);
+          netSinceFrom.set(sid, (netSinceFrom.get(sid) ?? 0) + row.debit - row.credit);
         }
         const openingByShop = new Map<number, number>();
         let aggregateOpening = 0;
         for (const shop of shops) {
-          const opening = (Number(shop.openingBalance) || 0) + (preNetByShop.get(shop.id) ?? 0);
+          const opening = round2((Number(shop.currentBalance) || 0) - (netSinceFrom.get(shop.id) ?? 0));
           openingByShop.set(shop.id, opening);
           aggregateOpening += opening;
         }
-        // Defensive: shops with pre-range activity missing from the master.
-        for (const [sid, net] of preNetByShop) {
-          if (!openingByShop.has(sid)) {
-            openingByShop.set(sid, net);
-            aggregateOpening += net;
-          }
-        }
-        // Rows arrive chronologically — thread each shop's own balance.
         const running = new Map<number, number>(openingByShop);
         body = res.data.map((row) => {
           const sid = Number(row.shopId ?? 0);
@@ -689,6 +655,87 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     [shopMasterMap, buildLedger],
   );
 
+  // One bulk ledger request can build every shop statement because each row
+  // already carries its backend-authoritative per-shop running balance. This
+  // replaces the old N+1 flow (up to 200 sequential requests) that made PDF
+  // preview take minutes. Failed promises are evicted so Retry is honest.
+  const bulkPdfLedgerCacheRef = useRef<Map<string, Promise<ShopLedgerPdfEntry[]>>>(new Map());
+  const getBulkPdfLedgers = useCallback((from: string, to: string): Promise<ShopLedgerPdfEntry[]> => {
+    const key = `${refreshNonce}|${from}|${to}`;
+    const cached = bulkPdfLedgerCacheRef.current.get(key);
+    if (cached) return cached;
+
+    // A shop's current master balance minus its net activity from `from`
+    // through today is its exact opening balance at `from`. One bulk read can
+    // therefore reconstruct every per-shop statement without trusting the
+    // all-shops endpoint's mixed running-balance column.
+    const today = format(new Date(), "yyyy-MM-dd");
+    const balanceThrough = to > today ? to : today;
+    const request = fetchAllLedgerPages({ fromDate: from, toDate: balanceThrough })
+      .then((response) => {
+        const allRowsByShop = new Map<string, ShopLedgerRow[]>();
+        const seenRows = new Set<string>();
+        for (const row of response.data) {
+          if (!row.shopName) continue;
+          const identity = `${row.shopId ?? row.shopName}:${row.type}:${row.id}`;
+          if (seenRows.has(identity)) continue;
+          seenRows.add(identity);
+          const rows = allRowsByShop.get(row.shopName) ?? [];
+          rows.push(row);
+          allRowsByShop.set(row.shopName, rows);
+        }
+
+        return [...allRowsByShop.entries()]
+          .map(([shop, allRows]) => [shop, allRows.filter((row) => row.date <= to)] as const)
+          .filter(([, periodRows]) => periodRows.length > 0)
+          .sort(([a], [b]) => a.localeCompare(b, "en", { sensitivity: "base" }))
+          .map(([shop, periodRows]) => {
+            const master = shopMasterMap.get(shop);
+            const allRows = allRowsByShop.get(shop) ?? [];
+            const activitySinceFrom = allRows.reduce((sum, row) => sum + row.debit - row.credit, 0);
+            const openingBalance = round2((Number(master?.currentBalance) || 0) - activitySinceFrom);
+            periodRows.sort((a, b) => a.date.localeCompare(b.date) || a.id - b.id);
+            let running = openingBalance;
+            const transactions = periodRows.map((row) => {
+              running = round2(running + row.debit - row.credit);
+              const transaction = mapRowToTx(row);
+              transaction.balance = running;
+              return transaction;
+            });
+            const opening: LedgerTransaction = {
+              date: from,
+              particulars: "Opening Balance",
+              birds: 0,
+              weight: 0,
+              rate: 0,
+              debit: 0,
+              credit: 0,
+              balance: openingBalance,
+              type: "sale",
+            };
+            return {
+              shop,
+              data: [opening, ...transactions],
+              ownerName: master?.ownerName || undefined,
+              mobile: master?.phoneNumber || undefined,
+              city: master?.city || undefined,
+            };
+          });
+      })
+      .catch((error) => {
+        bulkPdfLedgerCacheRef.current.delete(key);
+        throw error;
+      });
+
+    bulkPdfLedgerCacheRef.current.set(key, request);
+    while (bulkPdfLedgerCacheRef.current.size > 4) {
+      const oldest = bulkPdfLedgerCacheRef.current.keys().next().value;
+      if (oldest === undefined) break;
+      bulkPdfLedgerCacheRef.current.delete(oldest);
+    }
+    return request;
+  }, [refreshNonce, shopMasterMap]);
+
   // ─── PDF preview modal state ────────────────────────────────
   const [pdfPreview, setPdfPreview] = useState<PdfPreviewState | null>(null);
   const [pdfShopSearch, setPdfShopSearch] = useState("");
@@ -699,6 +746,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   // race because both clicks read the same render's state.
   const pdfGeneratingRef = useRef(false);
   const pdfDownloadBusyRef = useRef(false);
+  const ensureShopPdfRef = useRef<((shop: string) => Promise<string | null>) | null>(null);
   // Per-shop PDFs are generated on demand — this tracks in-flight shops and
   // the one to show a spinner for.
   const perShopBusyRef = useRef<Set<string>>(new Set());
@@ -713,9 +761,21 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     pdfPreviewRef.current = pdfPreview;
   }, [pdfPreview]);
 
+  // Warm the viewer and immutable letterhead while the browser is idle. This
+  // keeps the table interactive and removes their network/canvas cost from the
+  // user's first PDF click.
+  useEffect(() => {
+    const warm = () => {
+      prefetchPdfJs();
+      void prepareShopLedgerPdfAssets().catch(() => undefined);
+    };
+    const id = window.setTimeout(warm, 500);
+    return () => window.clearTimeout(id);
+  }, []);
+
   const revokePdfUrls = (state: PdfPreviewState | null) => {
     if (!state) return;
-    const urls = new Set<string>([state.combinedUrl]);
+    const urls = new Set<string>();
     state.files.forEach((file) => {
       if (file.url) urls.add(file.url);
     });
@@ -728,126 +788,63 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     pdfGeneratingRef.current = true;
 
     const session = ++exportSessionRef.current;
-    const createdUrls: string[] = [];
 
     try {
       setPdfGenerating(true);
 
-      let shopNames: string[] = [];
-
-      if (appliedSelectedShop === "All Shops") {
-        const all = await fetchShopLedger({ fromDate: appliedDateFrom, toDate: appliedDateTo });
-        const names = new Set<string>();
-        all.data.forEach((r) => {
-          if (r.shopName) names.add(r.shopName);
-        });
-        shopNames = Array.from(names);
-      } else {
-        shopNames = [appliedSelectedShop];
-      }
-
-      if (shopNames.length === 0) {
-        showNotification(t("shop_ledger.no_shops_in_range"), "error");
-        return;
-      }
-
-      // Statements are presented in clean alphabetical shop order.
-      shopNames.sort((a, b) => a.localeCompare(b, "en", { sensitivity: "base" }));
-
-      const allLedgers: ShopLedgerPdfEntry[] = [];
-      const shopData: Record<string, LedgerTransaction[]> = {};
-      for (const shop of shopNames) {
-        const ledger = await getCachedLedger(appliedDateFrom, appliedDateTo, shop);
-        if (ledger && ledger.length > 1) {
-          const master = shopMasterMap.get(shop);
-          allLedgers.push({
-            shop,
-            data: ledger,
-            ownerName: master?.ownerName || undefined,
-            mobile: master?.phoneNumber || undefined,
-            city: master?.city || undefined,
-          });
-          shopData[shop] = ledger;
-        }
-      }
+      // All Shops is one paginated bulk read, not one request per shop. For a
+      // single shop, reuse the same filter-keyed cache as the visible table.
+      const allLedgers: ShopLedgerPdfEntry[] = appliedSelectedShop === "All Shops"
+        ? await getBulkPdfLedgers(appliedDateFrom, appliedDateTo)
+        : await (async () => {
+            const ledger = await getCachedLedger(appliedDateFrom, appliedDateTo, appliedSelectedShop);
+            if (!ledger || ledger.length <= 1) return [];
+            const master = shopMasterMap.get(appliedSelectedShop);
+            return [{
+              shop: appliedSelectedShop,
+              data: ledger,
+              ownerName: master?.ownerName || undefined,
+              mobile: master?.phoneNumber || undefined,
+              city: master?.city || undefined,
+            }];
+          })();
 
       if (allLedgers.length === 0) {
         showNotification(t("shop_ledger.no_export_data"), "error");
         return;
       }
 
-      // Revoke object URLs from any previous preview before replacing them.
+      if (exportSessionRef.current !== session) return;
+
       revokePdfUrls(pdfPreviewRef.current);
-      pdfPreviewRef.current = null;
-
-      // Warm the PDF viewer in parallel with generation so the modal's
-      // first paint never waits on the pdf.js download.
-      prefetchPdfJs();
-
-      // Prepare the branded letterhead hen once and reuse it for the
-      // combined PDF and every per-shop PDF in this batch.
-      const letterheadAssets = await prepareShopLedgerPdfAssets();
-
-      // Only the combined document is generated up-front — that is what the
-      // modal opens on. Per-shop PDFs are built on demand when a shop is
-      // clicked or downloaded, so the modal appears in a fraction of the time
-      // (one document instead of fifty-one).
-      const combined = await generateShopLedgerPDF(
-        allLedgers,
-        appliedDateFrom,
-        appliedDateTo,
-        appliedSelectedShop,
-        letterheadAssets,
-        (done, total) => {
-          setPdfProgress(total > 1 ? `${done}/${total}` : null);
-        },
-      );
-      createdUrls.push(combined.url);
-
-      const files: { shop: string; url: string | null; filename: string }[] = allLedgers.map(
-        ({ shop }) => ({
-          shop,
-          url: allLedgers.length === 1 ? combined.url : null,
-          filename: `WeeklyStatement_${shop.replace(/\s+/g, "_")}_${formatDisplayDate(appliedDateFrom)}_to_${formatDisplayDate(appliedDateTo)}.pdf`,
-        }),
-      );
-
-      if (exportSessionRef.current !== session) {
-        // The modal was closed (or a newer export started) while this run
-        // was generating — discard this run's files instead of flashing a
-        // stale preview back open.
-        createdUrls.forEach((url) => URL.revokeObjectURL(url));
-        return;
-      }
-
+      const shopData = Object.fromEntries(allLedgers.map((entry) => [entry.shop, entry.data]));
+      const files = allLedgers.map(({ shop }) => ({
+        shop,
+        url: null,
+        filename: `WeeklyStatement_${shop.replace(/\s+/g, "_")}_${formatDisplayDate(appliedDateFrom)}_to_${formatDisplayDate(appliedDateTo)}.pdf`,
+      }));
       const nextState: PdfPreviewState = {
-        combinedUrl: combined.url,
-        combinedFilename: combined.filename,
         files,
-        // Multi-shop exports open on the combined "All Shops" PDF with
-        // nothing selected — the user explicitly picks the shops they want
-        // before any selection-based download. A single-shop export opens
-        // directly on that shop's PDF (already selected by definition).
-        selectedIndex: files.length > 1 ? -1 : 0,
-        selectedShops: files.length > 1 ? [] : files.map((file) => file.shop),
+        selectedIndex: 0,
+        selectedShops: files.length === 1 ? [files[0].shop] : [],
         shopData,
       };
       pdfPreviewRef.current = nextState;
       setPdfPreview(nextState);
       setPdfShopSearch("");
-      showNotification(
-        t("shop_ledger.pdf_ready_hint"),
-        "success",
-      );
+
+      // Paint the modal immediately, then prepare/render only its first shop.
+      // A combined PDF is generated only after the user chooses shops.
+      prefetchPdfJs();
+      window.setTimeout(() => void ensureShopPdfRef.current?.(files[0].shop), 0);
     } catch {
-      createdUrls.forEach((url) => URL.revokeObjectURL(url));
       showNotification(t("shop_ledger.load_failed"), "error");
     } finally {
       pdfGeneratingRef.current = false;
       setPdfGenerating(false);
       setPdfProgress(null);
     }
-  }, [appliedSelectedShop, appliedDateFrom, appliedDateTo, showNotification, shopMasterMap, getCachedLedger, t]);
+  }, [appliedSelectedShop, appliedDateFrom, appliedDateTo, showNotification, shopMasterMap, getCachedLedger, getBulkPdfLedgers, t]);
 
   const closePdfPreview = useCallback(() => {
     // Invalidate any in-flight export so it cannot re-open this modal.
@@ -865,11 +862,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     return pdfPreview.files.filter((file) => file.shop.toLowerCase().includes(needle));
   }, [pdfPreview, pdfShopSearch]);
 
-  const activePdfFile = pdfPreview
-    ? pdfPreview.selectedIndex >= 0 && pdfPreview.files[pdfPreview.selectedIndex]
-      ? pdfPreview.files[pdfPreview.selectedIndex]
-      : { shop: "All Shops", url: pdfPreview.combinedUrl, filename: pdfPreview.combinedFilename }
-    : null;
+  const activePdfFile = pdfPreview?.files[pdfPreview.selectedIndex] ?? null;
 
   /**
    * Generate (and cache) a shop's PDF the first time it is needed — preview
@@ -900,6 +893,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           (await getCachedLedger(appliedDateFrom, appliedDateTo, shop)) ??
           [];
         const master = shopMasterMap.get(shop);
+        const assets = await prepareShopLedgerPdfAssets();
         const generated = await generateShopLedgerPDF(
           [{
             shop,
@@ -911,6 +905,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
           appliedDateFrom,
           appliedDateTo,
           shop,
+          assets,
         );
         if (exportSessionRef.current !== sessionAtStart || !pdfPreviewRef.current) {
           // The modal was closed (or a new export started) — discard.
@@ -944,6 +939,10 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
     },
     [appliedDateFrom, appliedDateTo, shopMasterMap, getCachedLedger],
   );
+
+  useEffect(() => {
+    ensureShopPdfRef.current = ensureShopPdf;
+  }, [ensureShopPdf]);
 
   const setActivePdfShop = (index: number, shop?: string) => {
     setPdfPreview((prev) => (prev ? { ...prev, selectedIndex: index } : prev));
@@ -1024,7 +1023,8 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
       return;
     }
     const label = ledgers.length === 1 ? ledgers[0].shop : "All Shops";
-    const generated = await generateShopLedgerPDF(ledgers, appliedDateFrom, appliedDateTo, label);
+    const assets = await prepareShopLedgerPdfAssets();
+    const generated = await generateShopLedgerPDF(ledgers, appliedDateFrom, appliedDateTo, label, assets);
     downloadFile(generated.url, generated.filename);
     window.setTimeout(() => URL.revokeObjectURL(generated.url), 10_000);
     showNotification(`Combined PDF with ${ledgers.length} shop(s) downloaded.`, "success");
@@ -1227,6 +1227,20 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
   // Lock background scroll while a modal is open (with scrollbar-width
   // compensation) so the page never jumps or scrolls behind the overlay.
   const anyModalOpen = whatsappOpen || pdfPreview !== null;
+
+  // Route changes must release every object URL even when a modal was not
+  // explicitly closed. This prevents PDF/attachment blobs accumulating in a
+  // long-running production session.
+  useEffect(() => () => {
+    exportSessionRef.current += 1;
+    revokePdfUrls(pdfPreviewRef.current);
+    pdfPreviewRef.current = null;
+    if (waAttachmentUrlRef.current) {
+      URL.revokeObjectURL(waAttachmentUrlRef.current);
+      waAttachmentUrlRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
     if (!anyModalOpen) return;
     const scrollbarWidth = window.innerWidth - document.documentElement.clientWidth;
@@ -2146,8 +2160,13 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
       {/* ── PDF PREVIEW MODAL ──────────────────────────────── */}
       {pdfPreview && activePdfFile && (
-        <div className="fixed inset-0 z-[110] flex items-center justify-center bg-slate-900/40 p-3 md:p-6">
-          <div className="flex h-full max-h-[92vh] w-full max-w-6xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <AppShellModal
+          open
+          onClose={closePdfPreview}
+          zIndex={110}
+          ariaLabelledBy="shop-ledger-pdf-title"
+          panelClassName="h-full bg-white"
+        >
             {/* Header */}
             <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
               <div className="flex min-w-0 items-center gap-2">
@@ -2156,6 +2175,7 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                 </span>
                 <div className="min-w-0">
                   <h3
+                    id="shop-ledger-pdf-title"
                     className="truncate text-sm font-bold uppercase tracking-wide text-slate-800"
                     title={activePdfFile.filename}
                   >
@@ -2166,14 +2186,23 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   </p>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={closePdfPreview}
-                aria-label={t("shop_ledger.pdf_close")}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-              >
-                <X size={16} />
-              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                <ViewLanguageToggle
+                  language={language}
+                  onToggle={toggleLanguage}
+                  tone="emerald"
+                  labelMode="target"
+                  ariaLabel="Switch PDF view language"
+                />
+                <button
+                  type="button"
+                  onClick={closePdfPreview}
+                  aria-label={t("shop_ledger.pdf_close")}
+                  className="group inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:-translate-y-0.5 hover:border-red-100 hover:bg-red-50 hover:text-red-500 active:scale-95"
+                >
+                  <X size={16} className="transition-transform duration-200 group-hover:rotate-90" />
+                </button>
+              </div>
             </div>
 
             {/* Body */}
@@ -2266,39 +2295,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
 
                   {/* Shop list */}
                   <div className="min-h-0 flex-1 overflow-y-auto px-2.5 py-2.5">
-                    {/* Combined view card */}
-                    <button
-                      type="button"
-                      onClick={() => setActivePdfShop(-1)}
-                      className={`mb-1.5 flex w-full items-center gap-2.5 rounded-xl border px-2.5 py-2 text-left shadow-sm transition ${
-                        pdfPreview.selectedIndex === -1
-                          ? "border-red-200 bg-red-50 ring-1 ring-red-300"
-                          : "border-slate-200/80 bg-white hover:border-slate-300"
-                      }`}
-                    >
-                      <span
-                        className={`flex h-7 w-7 shrink-0 items-center justify-center rounded-lg text-white shadow-sm ${
-                          pdfPreview.selectedIndex === -1
-                            ? "bg-gradient-to-br from-red-500 to-rose-600"
-                            : "bg-gradient-to-br from-slate-500 to-slate-700"
-                        }`}
-                      >
-                        <Layers size={13} />
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span
-                          className={`block truncate text-xs ${
-                            pdfPreview.selectedIndex === -1 ? "font-bold text-red-700" : "font-semibold text-slate-700"
-                          }`}
-                        >
-                          All Shops
-                        </span>
-                        <span className="block text-[10px] text-slate-400">
-                          Combined statement · {pdfPreview.files.length} shops
-                        </span>
-                      </span>
-                    </button>
-
                     <div className="space-y-0.5">
                       {pdfFilteredFiles.map((file) => {
                         const fileIndex = pdfPreview.files.findIndex((f) => f.shop === file.shop);
@@ -2364,27 +2360,6 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     )}
                   </div>
 
-                  {/* Actions */}
-                  <div className="space-y-2 border-t border-slate-100 bg-white/70 px-3.5 py-3">
-                    <button
-                      type="button"
-                      onClick={() => void handleDownloadSelectedShops()}
-                      disabled={pdfPreview.selectedShops.length === 0}
-                      className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg bg-gradient-to-br from-red-500 to-rose-600 text-xs font-semibold text-white shadow-sm transition hover:from-red-600 hover:to-rose-700 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:from-red-500 disabled:hover:to-rose-600"
-                    >
-                      <Download size={13} />
-                      Download selected ({pdfPreview.selectedShops.length})
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => void handleDownloadSelectedCombined()}
-                      disabled={pdfPreview.selectedShops.length === 0}
-                      className="flex h-9 w-full items-center justify-center gap-1.5 rounded-lg border border-slate-200 bg-white text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-slate-800 disabled:cursor-not-allowed disabled:opacity-50"
-                    >
-                      <FileStack size={13} />
-                      Download selected as one PDF
-                    </button>
-                  </div>
                 </aside>
               )}
 
@@ -2394,33 +2369,53 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                 ) : (
                   <div className="flex h-full flex-col items-center justify-center gap-2 text-xs font-medium text-slate-500">
                     <Loader2 size={16} className="animate-spin text-red-500" />
-                    Generating preview for {activePdfFile.shop}…
+                    {t("shop_ledger.pdf_generating_shop", { shop: activePdfFile.shop })}
                   </div>
                 )}
               </div>
             </div>
 
             {/* Footer */}
-            <div className="flex items-center justify-between gap-2 border-t border-slate-100 px-5 py-3">
+            <div className="flex flex-wrap items-center justify-end gap-2 border-t border-slate-100 bg-white px-5 py-3">
+              <button
+                type="button"
+                onClick={() => void handleDownloadSelectedShops()}
+                disabled={pdfPreview.selectedShops.length === 0}
+                className="group inline-flex h-9 items-center justify-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3.5 text-xs font-semibold text-red-700 transition-all hover:-translate-y-0.5 hover:bg-red-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+              >
+                <Download size={13} className="transition-transform group-hover:translate-y-0.5" />
+                {t("shop_ledger.pdf_download_selected", { count: pdfPreview.selectedShops.length })}
+              </button>
+              <button
+                type="button"
+                onClick={() => void handleDownloadSelectedCombined()}
+                disabled={pdfPreview.selectedShops.length === 0}
+                className="group inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-gradient-to-br from-red-500 to-rose-600 px-3.5 text-xs font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:from-red-600 hover:to-rose-700 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0"
+              >
+                <FileStack size={13} className="transition-transform group-hover:-translate-y-0.5" />
+                {t("shop_ledger.pdf_download_combined")}
+              </button>
               <button
                 type="button"
                 onClick={closePdfPreview}
-                className="h-9 rounded-lg border border-slate-200 bg-white px-3.5 text-[13px] font-medium text-slate-600 hover:bg-slate-50"
+                className="group inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 text-[13px] font-medium text-slate-600 transition-all hover:bg-slate-50 active:scale-95"
               >
-                Close
+                <X size={14} className="transition-transform duration-200 group-hover:rotate-90" />
+                {t("common.close")}
               </button>
-              <p className="text-[11px] font-medium text-slate-400">
-                Use the shop panel to download selected shops or one combined PDF.
-              </p>
             </div>
-          </div>
-        </div>
+        </AppShellModal>
       )}
 
       {/* ── WHATSAPP MODAL ─────────────────────────────────── */}
       {whatsappOpen && (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/40 p-3 md:p-6">
-          <div className="flex h-full max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-2xl">
+        <AppShellModal
+          open
+          onClose={closeWhatsApp}
+          zIndex={100}
+          ariaLabelledBy="shop-ledger-whatsapp-title"
+          panelClassName="h-full bg-white"
+        >
             {/* Header */}
             <div className="flex items-center justify-between gap-3 border-b border-slate-100 px-5 py-3">
               <div className="flex items-center gap-2">
@@ -2428,17 +2423,26 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                   <ShopLedgerWhatsAppIcon size={16} />
                 </span>
                 <div>
-                  <h3 className="text-sm font-bold text-slate-800">{t("shop_ledger.wa.title")}</h3>
+                  <h3 id="shop-ledger-whatsapp-title" className="text-sm font-bold text-slate-800">{t("shop_ledger.wa.title")}</h3>
                 </div>
               </div>
-              <button
-                type="button"
-                onClick={closeWhatsApp}
-                aria-label={t("shop_ledger.wa.close")}
-                className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-              >
-                <X size={16} />
-              </button>
+              <div className="flex shrink-0 items-center gap-2">
+                <ViewLanguageToggle
+                  language={language}
+                  onToggle={toggleLanguage}
+                  tone="emerald"
+                  labelMode="target"
+                  ariaLabel="Switch WhatsApp view language"
+                />
+                <button
+                  type="button"
+                  onClick={closeWhatsApp}
+                  aria-label={t("shop_ledger.wa.close")}
+                  className="group inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:-translate-y-0.5 hover:border-emerald-100 hover:bg-emerald-50 hover:text-emerald-600 active:scale-95"
+                >
+                  <X size={16} className="transition-transform duration-200 group-hover:rotate-90" />
+                </button>
+              </div>
             </div>
 
             {/* Top bar — same dropdown chrome as the page toolbar */}
@@ -2760,15 +2764,15 @@ const ShopLedgerPage: React.FC<ShopLedgerProps> = ({ embedded = false }) => {
                     type="button"
                     onClick={closeWhatsApp}
                     disabled={waSending}
-                    className="h-9 rounded-lg border border-slate-200 bg-white px-3.5 text-[13px] font-medium text-slate-600 hover:bg-slate-50 disabled:opacity-50"
+                    className="group inline-flex h-9 items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-3.5 text-[13px] font-medium text-slate-600 transition-all hover:bg-slate-50 active:scale-95 disabled:opacity-50"
                   >
-                    Close
+                    <X size={14} className="transition-transform duration-200 group-hover:rotate-90" />
+                    {t("common.close")}
                   </button>
                 </div>
               </div>
             </div>
-          </div>
-        </div>
+        </AppShellModal>
       )}
     </div>
   );

@@ -307,7 +307,7 @@ a live carried-balance count, matching the Pending Collections KPI.
 
 | Tab | Route | Checks |
 |---|---|---|
-| Shop Ledger | `?tab=shopLedger` | Opens on the advertised sample quarter. Pick any of the 200 shops → chronological sale (debit) and collection (credit) rows with a **running balance** that ends exactly at the shop's current balance in Masters. Opening balance shown for the range. |
+| Shop Ledger | `?tab=shopLedger` | Opens on the current Monday→Sunday business week. Pick any of the 200 shops → chronological sale (debit) and collection (credit) rows with a **running balance** that ends exactly at the shop's current balance in Masters. PDF preview uses one deduplicated bulk ledger read, then renders only the active/selected shops on demand. |
 | Collection Report | `/operations?tab=collection-report` | Opens the single Collection Report implementation in Operations. |
 | Analysis | `/accounts?tab=summary` | Opens the single live business Analysis implementation in Accounts. |
 
