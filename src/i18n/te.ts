@@ -1223,8 +1223,6 @@ export default {
   'accounts.summary.net_profit.trips_with_farm_payment': 'ఫారం చెల్లింపు ఉన్న ట్రిప్పులు',
 
   // ఫారం చెల్లింపు పాప్-అప్: ఈ కాలంలోని ప్రతి ట్రిప్‌కు దాని బిల్లు.
-  'accounts.summary.farm_table.title': 'ఫారం చెల్లింపు — ట్రిప్ వారీగా',
-  'accounts.summary.farm_table.subtitle': 'ఈ కాలంలోని ట్రిప్పులు మాత్రమే · పికప్ బరువు × ఫారం రేటు',
   'accounts.summary.farm_table.view_trip': 'ఫారం & పికప్ వివరాలు చూడండి',
   'accounts.summary.farm_row.open': 'ఈ మొత్తం వెనుక ఉన్న ఫారం చెల్లింపు చూడండి',
   'accounts.summary.farm_row.tip_trips': '{trips} ట్రిప్పులు · {weight} kg పికప్',

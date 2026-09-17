@@ -300,7 +300,7 @@ try {
 try {
   const { loadAnalysisSnapshot, createAnalysisService } = await server.ssrLoadModule("/src/modules/accounts/services/analysisService.ts");
   const { SummaryFarmTable, SummaryFarmAmount } = await server.ssrLoadModule("/src/modules/accounts/components/Summary/SummaryFarmViewer.tsx");
-  const { weekRange } = await server.ssrLoadModule("/src/modules/accounts/utils/periodRanges.ts");
+  const { weekRange, quarterRange } = await server.ssrLoadModule("/src/modules/accounts/utils/periodRanges.ts");
   const { I18nProvider } = await server.ssrLoadModule("/src/i18n/index.tsx");
   const snapshot = await loadAnalysisSnapshot();
   if (!snapshot.farmPayments.length) {
@@ -324,16 +324,17 @@ try {
     const html = withProvider(React.createElement(SummaryFarmTable, { rows, spanLabel: "2026-09-14 - 2026-09-20", onOpenTrip: () => {} }));
     const shown = rows.filter(({ trip }) => html.includes(trip.tripNo)).length;
     const weight = rows[0].farm.dcWeight ?? rows[0].trip.dcWeight ?? 0;
-    // The cumulative column must run up to the grand total in the footer.
-    const running = rows.reduce((acc, row) => (acc.push((acc[acc.length - 1] ?? 0) + row.farm.amount), acc), []);
     const checks = {
       tripsRendered: shown === rows.length,
       pickupWeight: html.includes(String(weight)),
       farmRate: html.includes(String(rows[0].farm.rate)),
-      cumulativeColumn: running.every((value, i) => i === running.length - 1 || html.includes(formatINR(value))),
+      // The running cumulative column is gone; the grand total still shows.
+      noCumulativeColumn: !/<th[^>]*>[^<]*Cumulative/.test(html),
       grandTotal: html.includes(formatINR(payable)) && html.includes(formatINRExact(payable)),
-      headers: /Trip No/.test(html) && /Pickup Weight/.test(html) && /Cumulative/.test(html) && /Bird Type/.test(html),
+      headers: /Trip No/.test(html) && /Pickup Weight/.test(html) && /Bird Type/.test(html),
       noPaidOrBalance: !/Paid \(₹\)/.test(html) && !/Balance \(₹\)/.test(html),
+      // Global pagination renders its "Showing 1–3 of 3" summary.
+      pagination: html.includes("Showing") && html.includes(`of ${rows.length}`),
       tripLinkIsButton: /<button[^>]*>\s*<!-- -->TRP-|<button[^>]*>TRP-/.test(html),
       tripLinkOpensFarmDetail: /title="View farm &amp; pickup details"/.test(html),
       amountIsButton: /^<button[^>]*type="button"/.test(amountHtml) && (amountHtml.match(/<button/g) ?? []).length === 1,
@@ -352,6 +353,20 @@ try {
       // No chip, pill or card of its own — the figure reads like any other cell.
       amountNoChip: !/rounded-full|bg-white|shadow-sm|border-lime/.test(amountHtml),
     };
+    // 500+ trips must paginate cleanly: page 1 shows exactly one page of rows,
+    // the summary names the whole set, and the pager shows a windowed last page.
+    const q = quarterRange(new Date("2026-09-17T12:00:00"));
+    const allRows = service
+      .getCompletedTripsByDateRange(q.start, q.end)
+      .map((trip) => ({ trip, farm: service.getFarmPaymentForTrip(trip.id) }))
+      .filter((row) => row.farm)
+      .sort((a, b) => String(b.trip.tripDate).localeCompare(String(a.trip.tripDate)) || b.trip.id - a.trip.id);
+    const bigHtml = withProvider(React.createElement(SummaryFarmTable, { rows: allRows, spanLabel: "Quarter", onOpenTrip: () => {} }));
+    const shownBig = allRows.filter(({ trip }) => bigHtml.includes(trip.tripNo)).length;
+    checks.bigSetPaginates =
+      allRows.length > 100 && shownBig === 20 && bigHtml.includes(`of ${allRows.length}`) && bigHtml.includes("\u2026");
+    checks.bigSetGrandTotal = bigHtml.includes(formatINR(allRows.reduce((sum, r) => sum + r.farm.amount, 0)));
+
     // The trip picked in that view opens the Farm Payment page's own detail
     // (Step 2 Farm Details + Step 3 Pickup Details) — render it for a real
     // analysis trip to prove the wiring has something to show.

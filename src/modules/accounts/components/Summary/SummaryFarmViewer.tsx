@@ -6,14 +6,20 @@
 // Deliberately money-only: this is the cost the trips incurred (what the Farm
 // Payment expense row charges). How much of it has been settled lives on the
 // Farm Payment page, not here.
-import React, { useMemo } from 'react';
-import { Sprout, X } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { CalendarDays, Sprout } from 'lucide-react';
 import type { Trip } from '../../../operations/vehicle-trips/types/trip';
 import { useI18n } from '../../../../i18n';
 import { formatCount, formatINR, formatINRExact } from '../farm-payment/farmPaymentFormat';
 import type { TripFarmPayment } from '../../types/farmPayment.types';
 import AppShellModal from '../../../../ui/AppShellModal';
 import ActionTooltip from '../../../../ui/ActionTooltip';
+import { Pagination } from '../../../../ui';
+import {
+  PAGINATION_DEFAULT_PAGE_SIZE,
+  clampPage,
+  computeTotalPages,
+} from '../../../../shared/ui/paginationStyles';
 
 /** Weight and rate: Indian grouping, up to two decimals, no trailing zeros. */
 const quantity = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 2 });
@@ -67,35 +73,46 @@ type TableProps = {
 };
 
 /**
- * The farm payment table itself — cumulative strip, one row per trip, and a
- * cumulative totals row. Exported so the smoke test can render it directly
- * (AppShellModal portals, which the server renderer cannot do).
+ * The farm payment table itself — a grand-total strip, one row per trip of the
+ * current page, a sticky totals row for the WHOLE span, and the app's global
+ * pagination so a 500-trip quarter stays readable. Exported so the smoke test
+ * can render it directly (AppShellModal portals, which the server renderer
+ * cannot do).
  */
-export function SummaryFarmTable({ rows, spanLabel, onOpenTrip }: TableProps) {
+export function SummaryFarmTable({ rows, onOpenTrip }: TableProps) {
   const { t } = useI18n();
-  // Derived from the rows themselves, never passed in: a total cannot then
-  // disagree with the column it totals.
-  const { weightKg, payable, cumulative } = useMemo(() => {
+  // The viewer mounts fresh each time it opens, so `page` starts at 1 per span;
+  // clamping here (rather than in an effect) keeps a narrowed list from ever
+  // showing an empty page.
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(PAGINATION_DEFAULT_PAGE_SIZE);
+  const totalPages = computeTotalPages(rows.length, pageSize);
+  const safePage = clampPage(page, totalPages);
+  const pageRows = useMemo(
+    () => rows.slice((safePage - 1) * pageSize, safePage * pageSize),
+    [rows, safePage, pageSize]
+  );
+  // Grand totals over the WHOLE span, never just the page — so the totals row
+  // and the strip always say the same thing whatever page you are on.
+  const { weightKg, payable } = useMemo(() => {
     let weight = 0;
     let total = 0;
-    const running: number[] = [];
     for (const row of rows) {
       weight += row.farm.dcWeight ?? row.trip.dcWeight ?? 0;
       total += row.farm.amount;
-      running.push(total);
     }
-    return { weightKg: weight, payable: total, cumulative: running };
+    return { weightKg: weight, payable: total };
   }, [rows]);
   const headCell =
     'px-3 py-2.5 text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400';
 
   return (
     <>
-      {/* Cumulative strip — the whole span at a glance, above the trips. */}
+      {/* Grand-total strip — the whole span at a glance, above the trips. */}
       <div className="flex flex-wrap items-center gap-x-5 gap-y-2 border-b border-emerald-100 bg-white/70 px-4 py-2.5 dark:border-slate-700 dark:bg-slate-900/60">
         <span className="inline-flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-wider text-lime-700 dark:text-lime-300">
           <Sprout size={13} />
-          {t('accounts.summary.farm_table.title')}
+          {t('accounts.summary.farm_payment.title')}
         </span>
         <Figure label={t('accounts.summary.farm_table.trips')} value={formatCount(rows.length)} />
         <Figure
@@ -109,11 +126,6 @@ export function SummaryFarmTable({ rows, spanLabel, onOpenTrip }: TableProps) {
           exact={formatINRExact(payable)}
           tone="text-slate-800 dark:text-slate-100"
         />
-        {spanLabel && (
-          <span className="ml-auto min-w-0 truncate text-[11px] text-slate-500 dark:text-slate-400" title={spanLabel}>
-            {spanLabel}
-          </span>
-        )}
       </div>
 
       {rows.length === 0 ? (
@@ -121,114 +133,116 @@ export function SummaryFarmTable({ rows, spanLabel, onOpenTrip }: TableProps) {
           {t('accounts.summary.farm_table.empty')}
         </p>
       ) : (
-        <div className="min-h-0 flex-1 overflow-auto">
-          <table className="w-full min-w-[60rem] border-collapse text-[13px] leading-normal">
-            <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-800">
-              <tr>
-                <th className={`${headCell} text-left`}>{t('accounts.summary.farm_table.trip_no')}</th>
-                <th className={`${headCell} text-left`}>{t('accounts.summary.farm_table.date')}</th>
-                <th className={`${headCell} text-left`}>{t('accounts.summary.farm_table.farm')}</th>
-                <th className={`${headCell} text-left`}>{t('accounts.summary.farm_table.bird_type')}</th>
-                <th className={`${headCell} text-right`}>{t('accounts.summary.farm_table.birds')}</th>
-                <th className={`${headCell} text-right`}>{t('accounts.summary.farm_table.pickup_weight')}</th>
-                <th className={`${headCell} text-right`}>{t('accounts.summary.farm_table.rate')}</th>
-                <th className={`${headCell} text-right`}>{t('accounts.summary.farm_table.total')}</th>
-                <th className={`${headCell} text-right`}>{t('accounts.summary.farm_table.cumulative')}</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(({ trip, farm }, index) => {
-                const weight = farm.dcWeight ?? trip.dcWeight ?? 0;
-                return (
-                  <tr
-                    key={trip.id}
-                    className="border-b border-slate-100 transition-colors duration-150 hover:bg-lime-50/70 dark:border-slate-800 dark:hover:bg-lime-500/10"
+        <>
+          <div className="min-h-0 flex-1 overflow-auto">
+            <table className="w-full min-w-[56rem] border-collapse text-[13px] leading-normal">
+              <thead className="sticky top-0 z-10 bg-slate-50 dark:bg-slate-800">
+                <tr>
+                  <th className={`${headCell} text-left`}>{t('accounts.summary.farm_table.trip_no')}</th>
+                  <th className={`${headCell} text-left`}>{t('accounts.summary.farm_table.date')}</th>
+                  <th className={`${headCell} text-left`}>{t('accounts.summary.farm_table.farm')}</th>
+                  <th className={`${headCell} text-left`}>{t('accounts.summary.farm_table.bird_type')}</th>
+                  <th className={`${headCell} text-right`}>{t('accounts.summary.farm_table.birds')}</th>
+                  <th className={`${headCell} text-right`}>{t('accounts.summary.farm_table.pickup_weight')}</th>
+                  <th className={`${headCell} text-right`}>{t('accounts.summary.farm_table.rate')}</th>
+                  <th className={`${headCell} text-right`}>{t('accounts.summary.farm_table.total')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {pageRows.map(({ trip, farm }) => {
+                  const weight = farm.dcWeight ?? trip.dcWeight ?? 0;
+                  return (
+                    <tr
+                      key={trip.id}
+                      className="border-b border-slate-100 transition-colors duration-150 hover:bg-lime-50/70 dark:border-slate-800 dark:hover:bg-lime-500/10"
+                    >
+                      <td className="px-3 py-2 whitespace-nowrap font-semibold">
+                        {onOpenTrip ? (
+                          <button
+                            type="button"
+                            onClick={() => onOpenTrip(trip)}
+                            title={t('accounts.summary.farm_table.view_trip')}
+                            aria-label={`${t('accounts.summary.farm_table.view_trip')} — ${trip.tripNo}`}
+                            className="rounded text-emerald-700 underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-emerald-500 dark:text-emerald-300"
+                          >
+                            {trip.tripNo}
+                          </button>
+                        ) : (
+                          <span className="text-emerald-700 dark:text-emerald-300">{trip.tripNo}</span>
+                        )}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-slate-600 dark:text-slate-300">{trip.tripDate}</td>
+                      <td
+                        className="max-w-[16rem] truncate px-3 py-2 text-slate-600 dark:text-slate-300"
+                        title={farm.farmName ?? ''}
+                      >
+                        {farm.farmName ?? '—'}
+                      </td>
+                      <td className="px-3 py-2 whitespace-nowrap text-slate-600 dark:text-slate-300">
+                        {farm.birdType || '—'}
+                      </td>
+                      <td className="px-3 py-2 text-right tabular-nums text-slate-600 dark:text-slate-300">
+                        {formatCount(farm.totalBirds ?? trip.totalBirds ?? 0)}
+                      </td>
+                      <td
+                        className="px-3 py-2 text-right tabular-nums text-slate-600 dark:text-slate-300"
+                        title={`${formatQuantity(weight)} kg`}
+                      >
+                        {formatQuantity(weight)}
+                      </td>
+                      <td
+                        className="px-3 py-2 text-right tabular-nums text-slate-600 dark:text-slate-300"
+                        title={`₹${formatQuantity(farm.rate ?? 0)} / kg`}
+                      >
+                        {formatQuantity(farm.rate ?? 0)}
+                      </td>
+                      <td
+                        className="px-3 py-2 text-right font-semibold tabular-nums text-slate-800 dark:text-slate-100"
+                        title={formatINRExact(farm.amount)}
+                      >
+                        {formatINR(farm.amount)}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              <tfoot className="sticky bottom-0 bg-slate-50 dark:bg-slate-800">
+                <tr className="border-t border-slate-200 dark:border-slate-700">
+                  <td colSpan={4} className="px-3 py-2.5 text-left font-bold text-slate-700 dark:text-slate-200">
+                    {t('accounts.summary.farm_table.totals')}
+                    <span className="ml-1.5 font-medium text-slate-500 dark:text-slate-400">
+                      {formatCount(rows.length)} {t('accounts.summary.farm_table.trips').toLowerCase()}
+                    </span>
+                  </td>
+                  <td className="px-3 py-2.5" />
+                  <td className="px-3 py-2.5 text-right font-bold tabular-nums text-slate-700 dark:text-slate-200">
+                    {formatQuantity(weightKg)}
+                  </td>
+                  <td className="px-3 py-2.5" />
+                  <td
+                    className="px-3 py-2.5 text-right font-bold tabular-nums text-slate-800 dark:text-slate-100"
+                    title={formatINRExact(payable)}
                   >
-                    <td className="px-3 py-2 whitespace-nowrap font-semibold">
-                      {onOpenTrip ? (
-                        <button
-                          type="button"
-                          onClick={() => onOpenTrip(trip)}
-                          title={t('accounts.summary.farm_table.view_trip')}
-                          aria-label={`${t('accounts.summary.farm_table.view_trip')} — ${trip.tripNo}`}
-                          className="rounded text-emerald-700 underline-offset-2 outline-none hover:underline focus-visible:ring-2 focus-visible:ring-emerald-500 dark:text-emerald-300"
-                        >
-                          {trip.tripNo}
-                        </button>
-                      ) : (
-                        <span className="text-emerald-700 dark:text-emerald-300">{trip.tripNo}</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap text-slate-600 dark:text-slate-300">{trip.tripDate}</td>
-                    <td
-                      className="max-w-[16rem] truncate px-3 py-2 text-slate-600 dark:text-slate-300"
-                      title={farm.farmName ?? ''}
-                    >
-                      {farm.farmName ?? '—'}
-                    </td>
-                    <td className="px-3 py-2 whitespace-nowrap text-slate-600 dark:text-slate-300">
-                      {farm.birdType || '—'}
-                    </td>
-                    <td className="px-3 py-2 text-right tabular-nums text-slate-600 dark:text-slate-300">
-                      {formatCount(farm.totalBirds ?? trip.totalBirds ?? 0)}
-                    </td>
-                    <td
-                      className="px-3 py-2 text-right tabular-nums text-slate-600 dark:text-slate-300"
-                      title={`${formatQuantity(weight)} kg`}
-                    >
-                      {formatQuantity(weight)}
-                    </td>
-                    <td
-                      className="px-3 py-2 text-right tabular-nums text-slate-600 dark:text-slate-300"
-                      title={`₹${formatQuantity(farm.rate ?? 0)} / kg`}
-                    >
-                      {formatQuantity(farm.rate ?? 0)}
-                    </td>
-                    <td
-                      className="px-3 py-2 text-right font-semibold tabular-nums text-slate-800 dark:text-slate-100"
-                      title={formatINRExact(farm.amount)}
-                    >
-                      {formatINR(farm.amount)}
-                    </td>
-                    <td
-                      className="px-3 py-2 text-right tabular-nums text-slate-500 dark:text-slate-400"
-                      title={formatINRExact(cumulative[index])}
-                    >
-                      {formatINR(cumulative[index])}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot className="sticky bottom-0 bg-slate-50 dark:bg-slate-800">
-              <tr className="border-t border-slate-200 dark:border-slate-700">
-                <td colSpan={4} className="px-3 py-2.5 text-left font-bold text-slate-700 dark:text-slate-200">
-                  {t('accounts.summary.farm_table.totals')}
-                  <span className="ml-1.5 font-medium text-slate-500 dark:text-slate-400">
-                    {formatCount(rows.length)} {t('accounts.summary.farm_table.trips').toLowerCase()}
-                  </span>
-                </td>
-                <td className="px-3 py-2.5" />
-                <td className="px-3 py-2.5 text-right font-bold tabular-nums text-slate-700 dark:text-slate-200">
-                  {formatQuantity(weightKg)}
-                </td>
-                <td className="px-3 py-2.5" />
-                <td
-                  className="px-3 py-2.5 text-right font-bold tabular-nums text-slate-800 dark:text-slate-100"
-                  title={formatINRExact(payable)}
-                >
-                  {formatINR(payable)}
-                </td>
-                <td
-                  className="px-3 py-2.5 text-right font-bold tabular-nums text-slate-800 dark:text-slate-100"
-                  title={formatINRExact(payable)}
-                >
-                  {formatINR(payable)}
-                </td>
-              </tr>
-            </tfoot>
-          </table>
-        </div>
+                    {formatINR(payable)}
+                  </td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+          <div className="shrink-0 border-t border-slate-200 bg-white/80 px-3 py-2 dark:border-slate-700 dark:bg-slate-900/80">
+            <Pagination
+              page={safePage}
+              pageSize={pageSize}
+              totalItems={rows.length}
+              onPageChange={setPage}
+              onPageSizeChange={(size) => {
+                setPageSize(size);
+                setPage(1);
+              }}
+              ariaLabel={t('accounts.summary.farm_payment.title')}
+            />
+          </div>
+        </>
       )}
     </>
   );
@@ -303,32 +317,29 @@ function SummaryFarmViewer({ open, rows, spanLabel, onClose, onOpenTrip }: Viewe
       <div className="flex min-h-0 max-h-[calc(100vh-64px-2rem)] flex-col">
         <div className="shrink-0 border-b border-emerald-100 bg-emerald-50/60 dark:border-slate-700 dark:bg-slate-800">
           <div className="flex flex-wrap items-center gap-3 px-4 py-3">
-            <span
-              aria-hidden="true"
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-lime-600 text-white shadow-sm"
-            >
-              <Sprout size={17} strokeWidth={2.2} />
+            {/* Animated logo — the sprout pops in over a breathing halo. */}
+            <span aria-hidden="true" className="relative grid h-10 w-10 shrink-0 place-items-center">
+              <span className="absolute inset-0 rounded-xl bg-lime-400/50 blur-[6px] animate-farm-halo" />
+              <span className="relative grid h-10 w-10 place-items-center rounded-xl bg-gradient-to-br from-lime-500 to-emerald-600 text-white shadow-md animate-farm-logo">
+                <Sprout size={19} strokeWidth={2.2} />
+              </span>
             </span>
             <h2
               id="analysis-farm-viewer-title"
               className="text-sm font-bold tracking-wide text-slate-800 dark:text-slate-100"
             >
-              {t('accounts.summary.farm_table.title')}
+              {t('accounts.summary.farm_payment.title')}
             </h2>
-            <span className="min-w-0 flex-1 truncate text-sm font-medium text-slate-600 dark:text-slate-200">
-              {t('accounts.summary.farm_table.subtitle')}
-            </span>
-            <button
-              type="button"
-              onClick={onClose}
-              aria-label={t('common.close')}
-              className="grid h-10 w-10 place-items-center rounded-lg border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-emerald-500 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-200"
-            >
-              <X size={18} />
-            </button>
+            {/* The span, as a highlighted chip on the right. */}
+            {spanLabel && (
+              <span className="ml-auto inline-flex min-w-0 max-w-full items-center gap-1.5 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-[12px] font-bold text-emerald-800 shadow-sm dark:border-emerald-800 dark:bg-emerald-500/10 dark:text-emerald-200">
+                <CalendarDays size={13} aria-hidden="true" />
+                <span className="truncate" title={spanLabel}>{spanLabel}</span>
+              </span>
+            )}
           </div>
         </div>
-        <SummaryFarmTable rows={rows} spanLabel={spanLabel} onOpenTrip={onOpenTrip} />
+        <SummaryFarmTable rows={rows} onOpenTrip={onOpenTrip} />
       </div>
     </AppShellModal>
   );
