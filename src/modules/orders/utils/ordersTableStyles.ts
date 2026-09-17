@@ -52,7 +52,7 @@ export const ORDERS_FILTER_LABEL_CLASS =
  * Each column passes its own tone classes so the box matches its header glyph.
  */
 export const ORDERS_RISE_INPUT_CLASS =
-  "h-6 w-full max-w-[196px] rounded-md border px-2 text-[13px] font-semibold shadow-[0_1px_2px_rgba(15,23,42,0.06)] transition-[box-shadow,border-color,transform] duration-150 ease-out hover:shadow-[0_3px_8px_-3px_rgba(15,23,42,0.3)] motion-safe:hover:-translate-y-px focus:outline-none focus:ring-2 focus:ring-slate-400/30";
+  "h-8 w-full max-w-[104px] rounded-lg border px-2 text-[13px] font-semibold shadow-[0_1px_2px_rgba(15,23,42,0.06)] transition-[box-shadow,border-color,transform] duration-150 ease-out hover:shadow-[0_3px_8px_-3px_rgba(15,23,42,0.3)] motion-safe:hover:-translate-y-px focus:outline-none focus:ring-2 focus:ring-slate-400/30";
 
 /**
  * The same head, allowed to wrap. Every Collection column but S.No and Action is

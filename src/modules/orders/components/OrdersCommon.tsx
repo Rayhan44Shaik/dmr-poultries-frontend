@@ -76,15 +76,26 @@ const STATUS_TONES: Record<string, string> = {
 export function OrdersStatusBadge({
   status,
   label,
+  size = "sm",
 }: {
   status: string;
   label: string;
+  /**
+   * "md" is the taller pill Collection uses: its number boxes are 32px, and a
+   * 20px badge floating beside them read like a footnote rather than a status.
+   * The other Orders tables keep "sm" so their density is untouched.
+   */
+  size?: "sm" | "md";
 }) {
   const tone =
     STATUS_TONES[status] ?? "bg-slate-100 text-slate-600 border-slate-200";
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold whitespace-nowrap ${tone}`}
+      className={`inline-flex items-center gap-1 rounded-full border whitespace-nowrap font-semibold ${
+        size === "md"
+          ? "px-3.5 py-1.5 text-[12px]"
+          : "px-2.5 py-0.5 text-[11px]"
+      } ${tone}`}
     >
       {label}
     </span>

@@ -138,7 +138,7 @@ function StatusWithNote({
 }) {
   return (
     <span className="inline-flex max-w-full flex-wrap items-center gap-x-1.5 gap-y-0.5">
-      <OrdersStatusBadge status={status} label={label} />
+      <OrdersStatusBadge size="md" status={status} label={label} />
       <span className="text-[10.5px] font-bold tabular-nums text-amber-600">
         {note}
       </span>
@@ -685,10 +685,11 @@ function CollectionTableHead() {
             tone="text-teal-600"
           />
         </th>
-        <th className={ORDERS_TABLE_TH_WRAP_CLASS}>
+        <th className={`${ORDERS_TABLE_TH_WRAP_CLASS} text-center`}>
           <ColHead
             icon={Activity}
             label={to("orders.col_status")}
+            align="center"
             tone="text-indigo-600"
           />
         </th>
@@ -1373,6 +1374,7 @@ function CollectionEntries({
 
                   let statusNode: React.ReactNode = (
                     <OrdersStatusBadge
+                      size="md"
                       status="Not Collected"
                       label={to("orders.status_not_collected")}
                     />
@@ -1382,6 +1384,7 @@ function CollectionEntries({
                       // Order collected but not yet on any vehicle.
                       statusNode = (
                         <OrdersStatusBadge
+                          size="md"
                           status="Collected"
                           label={to("orders.status_collected")}
                         />
@@ -1411,6 +1414,7 @@ function CollectionEntries({
                       // Step 4 confirmed this shop was delivered → GREEN.
                       statusNode = (
                         <OrdersStatusBadge
+                          size="md"
                           status="Delivered"
                           label={to("orders.status_delivered")}
                         />
@@ -1436,6 +1440,7 @@ function CollectionEntries({
                       // reads "Assigned"; everything else reads pending/part.
                       statusNode = (
                         <OrdersStatusBadge
+                          size="md"
                           status="Assigned"
                           label={to("orders.status_assigned")}
                         />
@@ -1538,7 +1543,12 @@ function CollectionEntries({
                         {/* A gutter after the pill: the status column and the Action
                             column share the sheet's last two cells, and without room
                             of its own the badge reads as if it is being cut off. */}
-                        <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 pr-5">
+                        {/* Centred in its own column: the pill is the one piece of
+                            data in this table that is a chip and not a value, so it
+                            reads best sitting in the middle of its share instead of
+                            starting a third edge, and centring it keeps it clear of
+                            the eraser without a hand-made gutter. */}
+                        <div className="flex min-w-0 flex-wrap items-center justify-center gap-x-2.5 gap-y-1">
                           {statusNode}
                         </div>
                       </td>

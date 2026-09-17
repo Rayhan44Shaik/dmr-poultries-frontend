@@ -83,11 +83,15 @@ This is approximately **89% less processing time**, not a measurement of total b
   column, at the trip table's spacing; header and body words sit at **14px** (`ORDERS_TABLE_TH_CLASS` /
   `ORDERS_TABLE_TD_CLASS`), a step above the shared 12px.
 - The three number boxes go the other way and stay deliberately small: **24px tall and no wider than
-  196px** (`ORDERS_RISE_INPUT_CLASS`), so they read as fields for a number and not as bars filling the
+  104px** (`ORDERS_RISE_INPUT_CLASS`), so they read as fields for a number and not as bars filling the
   row — the words above them are what should be large. Each is tinted to its own header glyph (birds
   emerald, boxes violet, weight teal) and carries a small rise: a soft shadow at rest, lifting a pixel on
   hover.
-- **One left edge for the whole sheet.** Weight and Action were right-aligned while the columns beside
+- **The status column is the one centred block.** The pill is a chip rather than a value, so it sits in
+  the middle of its share (heading included) instead of starting a fourth left edge, and it grows to
+  `size="md"` — 30px+ of border-radius and padding against the 32px boxes beside it, because a 20px badge
+  read as a footnote. Centring it also replaces the hand-made gutter it used to need before the eraser.
+- **One left edge for the rest of the sheet.** Weight and Action were right-aligned while the columns beside
   them were left-aligned, and that — not the column widths — is what made the spacing look wrong: the air
   landed in a different place in every column, so Boxes seemed stranded from Weight and Weight was
   crammed against Status. Every column now starts its data at its own `padding-left`, so each cell begins

@@ -272,8 +272,9 @@ test("two columns are measured, the six between them are equal, and the number b
   );
   expect(fields).toHaveLength(3); // birds · boxes · weight
   for (const box of fields) {
-    expect(Math.round(box!.height)).toBe(24);
-    expect(box!.width).toBeLessThanOrEqual(198);
+    // Tall enough to hit comfortably, narrow enough to look like a number field.
+    expect(Math.round(box!.height)).toBe(32);
+    expect(box!.width).toBeLessThanOrEqual(106);
   }
 });
 
@@ -295,7 +296,9 @@ test("every column starts its data under its own heading — one left edge, not 
       return ths.map((th, index) => {
         const head = th.firstElementChild ?? th;
         const td = tds[index];
-        // Plain-text cells (shop name, city) have no child element to measure.
+        // Plain-text cells (shop name, city) have no child element to measure, and
+        // the status column is centred on purpose — it is measured separately below.
+        if (index === 6) return null;
         const data = td?.querySelector("input, button, span");
         if (!td || !data) return null;
         return {
@@ -307,13 +310,37 @@ test("every column starts its data under its own heading — one left edge, not 
   const measured = offsets.filter(
     (entry): entry is { head: number; data: number } => entry !== null,
   );
-  // S.No · birds · boxes · weight · status · action
+  // S.No · birds · boxes · weight · action
   expect(measured.length).toBeGreaterThanOrEqual(5);
   for (const { head, data } of measured) {
     // A right-aligned cell put its data tens of pixels away from its heading, which
     // is what made the columns look unevenly spaced even while their widths matched.
     expect(Math.abs(data - head)).toBeLessThanOrEqual(2);
   }
+});
+
+test("the status column sits in the middle of its share, as a chip should", async ({
+  page,
+}) => {
+  await page.goto(`${ORDERS}/collection`);
+  const row = page
+    .locator("#orders-panel-collection tbody tr")
+    .filter({ has: page.locator("input") })
+    .first();
+  const statusCell = row.locator("td").nth(6);
+  const [cell, pill] = await Promise.all([
+    statusCell.boundingBox(),
+    statusCell.locator("span").first().boundingBox(),
+  ]);
+  const cellMid = cell!.x + cell!.width / 2;
+  const pillMid = pill!.x + pill!.width / 2;
+  expect(Math.abs(cellMid - pillMid)).toBeLessThanOrEqual(3);
+  // The heading follows the data, so the column reads as one centred block.
+  await expect(
+    page.locator("#orders-panel-collection thead th").nth(6),
+  ).toHaveClass(/text-center/);
+  // And the pill grew to match the 32px boxes beside it.
+  expect(Math.round(pill!.height)).toBeGreaterThanOrEqual(30);
 });
 
 test("the day total is a cumulative line below the table, not a header KPI", async ({
