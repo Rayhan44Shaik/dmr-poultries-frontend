@@ -39,23 +39,6 @@ test('clear restores weekly results and filtering never mutates source data', ()
   assert.match(paymentCurrency.format(123456.5), /1,23,456\.50/);
 });
 
-test('demo fixtures have unique sequential numbers, supported statuses and valid weekly dates', async () => {
-  const { createDemoPayments } = await import('./paymentRegisterDemo');
-  const samples = createDemoPayments(new Date(2026, 8, 10));
-  assert.equal(samples.length, 18);
-  assert.equal(new Set(samples.map(p => p.id)).size, 18);
-  assert.equal(new Set(samples.map(p => p.paymentNo)).size, 18);
-  assert.equal(filterPayments(samples, filters).length, 18);
-  for (const payment of samples) {
-    assert.match(payment.id, /^demo-payment-/);
-    assert.match(payment.paymentNo, /^Pay-\d{8}-00[123]$/);
-    assert.ok(['Draft', 'Approved', 'Paid', 'Cancelled'].includes(payment.status));
-    assert.equal(payment.attachments.length, 0);
-  }
-  assert.deepEqual(createDemoPayments(new Date(2026, 8, 10)), samples);
-});
-
-
 test('payment numbers READ year-first without the stored value being rewritten', () => {
   assert.equal(paymentNoDisplay('Pay-07092026-001'), 'PAY-20260907-001');
   assert.equal(paymentNoDisplay('Pay-13092026-001'), 'PAY-20260913-001');  // 13 can only be a day

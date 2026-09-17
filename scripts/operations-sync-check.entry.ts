@@ -17,6 +17,7 @@ import { isOrderContainer } from "../src/modules/orders/utils/ordersUtils";
 import {
   getOperationsSampleCounts,
   getQuarterSampleInfo,
+  type QuarterOperationsCounts,
 } from "../src/sample/quarterSample";
 
 // Harness-only redirect: Node has no same-origin /api reverse proxy, so the
@@ -340,6 +341,98 @@ export async function runOperationsSyncCheck(): Promise<void> {
       false,
       String(err)
     );
+  }
+
+  // ── 14. Quarter Operations Map — the overview card renders the mapping ────
+  // The component the Operations Overview mounts (QuarterOperationsMap) must
+  // print the quarter file's numbers verbatim: all eight tile counts, all
+  // eight register links, the quarter window and the reference masters.
+  // Check 13 proves counts === each page's endpoint total, so a faithful
+  // render here closes the loop: page endpoint → quarter file → map tile.
+  try {
+    const [mapInfo, mapCounts] = await Promise.all([
+      getQuarterSampleInfo(),
+      getOperationsSampleCounts(),
+    ]);
+    if (!mapInfo || !mapCounts) throw new Error("sample quarter probe resolved null (is DEV on?)");
+
+    const React = (await import("react")).default;
+    const { renderToString } = await import("react-dom/server");
+    const { MemoryRouter } = await import("react-router-dom");
+    const { I18nProvider } = await import("../src/i18n");
+    const { default: QuarterOperationsMap } = await import(
+      "../src/modules/operations/dashboard/components/QuarterOperationsMap"
+    );
+
+    const html = renderToString(
+      React.createElement(
+        I18nProvider,
+        null,
+        React.createElement(
+          MemoryRouter,
+          null,
+          React.createElement(QuarterOperationsMap, {
+            quarter: mapInfo.quarter,
+            counts: mapCounts,
+          }),
+        ),
+      ),
+    );
+
+    const missing: string[] = [];
+    const expect = (needle: string, what: string) => {
+      if (!html.includes(needle)) missing.push(what);
+    };
+
+    // All eight tile counts, formatted exactly the component formats them.
+    const tileFields: { field: keyof QuarterOperationsCounts; what: string }[] = [
+      { field: "tripRecords", what: "Trip List count" },
+      { field: "rateEntries", what: "Rate Entry count" },
+      { field: "shopSales", what: "Shop Sales count" },
+      { field: "collections", what: "Collections count" },
+      { field: "pendingShops", what: "Pending Shops count" },
+      { field: "mortalityTrips", what: "Mortality count" },
+      { field: "fuelBills", what: "Fuel count" },
+      { field: "orders", what: "Orders count" },
+    ];
+    for (const { field, what } of tileFields) {
+      const value = mapCounts[field];
+      if (typeof value !== "number") {
+        missing.push(`${what} (quarter file reported none)`);
+      } else {
+        expect(value.toLocaleString("en-IN"), what);
+      }
+    }
+    // Every tile links to its register.
+    for (const tab of [
+      "trip-list",
+      "rate-entry",
+      "shop-sales",
+      "collection",
+      "pending-collections",
+      "mortality",
+      "fuel-expenses",
+      "orders",
+    ]) {
+      expect(`/operations?tab=${tab}`, `link to ?tab=${tab}`);
+    }
+    // Quarter identity + reference masters.
+    expect(mapInfo.quarter.label, `quarter label "${mapInfo.quarter.label}"`);
+    for (const field of ["shops", "farms", "vehicles", "employees"] as const) {
+      const value = mapCounts[field];
+      if (typeof value === "number") expect(value.toLocaleString("en-IN"), `${field} reference count`);
+    }
+
+    record(
+      "overview-map",
+      "QuarterOperationsMap renders the quarter file's mapping",
+      missing.length === 0,
+      missing.length > 0
+        ? `missing from markup: ${missing.join("; ")}`
+        : `8 tiles (${mapCounts.tripRecords}/${mapCounts.rateEntries}/${mapCounts.shopSales}/${mapCounts.collections}/${mapCounts.pendingShops}/${mapCounts.mortalityTrips}/${mapCounts.fuelBills}/${mapCounts.orders}) · 8 register links · ${mapInfo.quarter.label} · ${html.length} chars`,
+    );
+  } catch (err) {
+    record("overview-map", "QuarterOperationsMap renders the quarter file's mapping", false, String(err));
   }
 
   const failed = results.filter((r) => !r.ok);
