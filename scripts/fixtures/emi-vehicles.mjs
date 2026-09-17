@@ -44,3 +44,54 @@ export function buildSampleEmiVehicles(asOf = new Date()) {
     _mock: true,
   }));
 }
+
+const daysInMonth = (year, month) =>
+  month === 2
+    ? (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0) ? 29 : 28)
+    : [4, 6, 9, 11].includes(month) ? 30 : 31;
+
+/**
+ * Convert Vehicle-Master style fixture rows into the `GET /api/fleet/emis`
+ * DTO the EMI page consumes today. Completion follows the same due-date rule
+ * the original master-driven pipeline used (an installment counts as paid
+ * once its due day in the current month has passed), so the sample KPIs stay
+ * 12 total / 3 completed / 9 pending at the fixed test date.
+ */
+export function vehiclesToEmiLoans(vehicles, asOf = new Date()) {
+  const year = asOf.getFullYear();
+  const month = asOf.getMonth() + 1;
+  const monthIndex = year * 12 + month - 1;
+  const day = asOf.getDate();
+
+  return vehicles.map((vehicle) => {
+    const start = String(vehicle.emiStartDate || vehicle.purchaseDate || "").slice(0, 10);
+    const [startYear, startMonth] = start.split("-").map(Number);
+    const totalEMIs = Number(vehicle.totalEMIs);
+    const emiDay = Number(vehicle.emiDay);
+    const elapsedMonths = monthIndex - (startYear * 12 + startMonth - 1);
+    const dueDay = Math.min(emiDay, daysInMonth(year, month));
+    const paidEMIs = Math.max(0, Math.min(totalEMIs, elapsedMonths + (day >= dueDay ? 1 : 0)));
+    const pendingEMIs = totalEMIs - paidEMIs;
+    const endMonthIndex = (startYear * 12 + startMonth - 1) + Math.max(0, totalEMIs - 1);
+    const endDate = `${String(Math.floor(endMonthIndex / 12)).padStart(4, "0")}-${String((endMonthIndex % 12) + 1).padStart(2, "0")}-01`;
+
+    return {
+      id: vehicle.id,
+      vehicleId: vehicle.id,
+      vehicleNo: String(vehicle.vehicleNumber),
+      financeCompany: "Sample Finance",
+      loanAmount: vehicle.purchaseAmount,
+      emiAmount: Math.round(vehicle.purchaseAmount / totalEMIs),
+      startDate: start,
+      endDate,
+      nextEMIDate: null,
+      status: pendingEMIs === 0 ? "paid" : "active",
+      paidEMIs,
+      pendingEMIs,
+      totalEMIs,
+      createdBy: "sample",
+      createdAt: null,
+      updatedAt: null,
+    };
+  });
+}

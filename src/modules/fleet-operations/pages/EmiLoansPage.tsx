@@ -1,5 +1,5 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, Search, Truck } from 'lucide-react';
+import { memo, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { AlertTriangle, ArrowDown, ArrowUp, ArrowUpDown, BadgeCheck, Calendar, CheckCircle2, Clock3, IndianRupee, Layers, Search, Truck } from 'lucide-react';
 import { useI18n, translateStatus } from '../../../i18n';
 import ErrorBoundary from '../components/common/ErrorBoundary';
 import EmiFilterBar from '../components/emi/EmiFilterBar';
@@ -8,6 +8,7 @@ import EmiRefreshToast from '../components/emi/EmiRefreshToast';
 import EmiVehicleMark from '../components/emi/EmiVehicleMark';
 import { useEmiData } from '../hooks/useEmiData';
 import { EMI_TIME_ZONE, normalizeEmiSearch, sortEmiOverview, type EmiSortKey, type EmiSortDirection } from '../services/emiModel';
+import { formatVehicleNumber } from '../../../utils/format';
 import type { EmiOverview } from '../types';
 
 interface EmiLoansPageProps {
@@ -18,14 +19,18 @@ interface EmiLoansPageProps {
 const PAGE_SIZE = 10;
 const currencyFormatter = new Intl.NumberFormat('en-IN', { maximumFractionDigits: 0 });
 const money = (value: number | null) => value != null && Number.isFinite(value) ? `₹${currencyFormatter.format(value)}` : '—';
-const COLUMNS: { key: EmiSortKey; label: string; align: 'left' | 'right' | 'center'; width?: string }[] = [
-  { key: 'vehicleNumber', label: 'fleet.emi.col_vehicle_no', align: 'left', width: '160px' },
-  { key: 'purchaseAmount', label: 'fleet.emi.col_purchase_amount', align: 'center', width: '180px' },
-  { key: 'totalEMIs', label: 'fleet.emi.col_total_emi', align: 'center' },
-  { key: 'completedEMIs', label: 'fleet.emi.col_completed', align: 'center' },
-  { key: 'pendingEMIs', label: 'fleet.emi.col_pending', align: 'center' },
-  { key: 'emiStartDate', label: 'fleet.emi.col_emi_date', align: 'center' },
-  { key: 'status', label: 'common.status', align: 'center' },
+// Each column header carries its own glyph — the same icon-label language as
+// the Trip List's master table. S.No is plain and centred, like the Trip
+// List's leading serial column.
+const COLUMNS: { key: EmiSortKey | 'sno'; label: string; align: 'left' | 'right' | 'center'; icon?: ReactNode }[] = [
+  { key: 'sno', label: 'table.s_no', align: 'center' },
+  { key: 'vehicleNumber', label: 'fleet.emi.col_vehicle_no', align: 'left', icon: <Truck size={14} aria-hidden="true" className="text-indigo-500 flex-shrink-0" /> },
+  { key: 'purchaseAmount', label: 'fleet.emi.col_purchase_amount', align: 'center', icon: <IndianRupee size={14} aria-hidden="true" className="text-orange-500 flex-shrink-0" /> },
+  { key: 'totalEMIs', label: 'fleet.emi.col_total_emi', align: 'center', icon: <Layers size={14} aria-hidden="true" className="text-violet-500 flex-shrink-0" /> },
+  { key: 'completedEMIs', label: 'fleet.emi.col_completed', align: 'center', icon: <CheckCircle2 size={14} aria-hidden="true" className="text-emerald-500 flex-shrink-0" /> },
+  { key: 'pendingEMIs', label: 'fleet.emi.col_pending', align: 'center', icon: <Clock3 size={14} aria-hidden="true" className="text-amber-500 flex-shrink-0" /> },
+  { key: 'emiStartDate', label: 'fleet.emi.col_emi_date', align: 'center', icon: <Calendar size={14} aria-hidden="true" className="text-blue-500 flex-shrink-0" /> },
+  { key: 'status', label: 'common.status', align: 'center', icon: <BadgeCheck size={14} aria-hidden="true" className="text-amber-500 flex-shrink-0" /> },
 ];
 
 const StatusBadge = memo(function StatusBadge({ status }: { status: EmiOverview['status'] }) {
@@ -119,12 +124,18 @@ const EmiLoansPage = ({ embedded = false, active = true }: EmiLoansPageProps) =>
           kpis={kpis}
         />
 
-        <div className="rounded-xl border border-slate-200 bg-white shadow-xs">
-          <div className="border-b border-slate-200 px-4 py-3">
+        {/* The table card — the exact shell the Trip List uses: white
+            rounded-2xl card, gradient header bar with the logo tile + title
+            + live count badge, table, pagination at the foot. */}
+        <div className="rounded-2xl border border-slate-200/80 bg-white shadow-sm overflow-hidden">
+          <div className="border-b border-slate-100 bg-gradient-to-r from-blue-50/60 via-white to-blue-50/40 px-6 py-3">
             <div className="flex h-10 items-center justify-between gap-3">
-              <div className="flex shrink-0 items-center gap-2.5">
+              <div className="flex shrink-0 items-center gap-3">
                 <EmiVehicleMark />
-                <h3 className="text-base font-semibold tracking-tight text-slate-800">{t('fleet.emi.schedule_title')}</h3>
+                <h3 className="text-base font-bold tracking-tight text-slate-800">{t('fleet.emi.schedule_title')}</h3>
+                <span aria-live="polite" className="inline-flex items-center justify-center px-2.5 py-0.5 text-xs font-semibold text-slate-600 bg-slate-100 border border-slate-200/80 rounded-full shadow-sm tabular-nums">
+                  {loading ? '…' : filtered.length}
+                </span>
                 <span className="hidden rounded-md bg-slate-50 px-2 py-1 text-[11px] font-semibold text-slate-500 sm:inline">{t('fleet.emi.read_only')}</span>
               </div>
             </div>
@@ -138,29 +149,37 @@ const EmiLoansPage = ({ embedded = false, active = true }: EmiLoansPageProps) =>
           {/* Fixed columns and a reserved ten-row viewport prevent loading,
               shorter pages and refreshes from moving the toolbar/footer. */}
           <div className="min-h-[530px] overflow-x-auto" data-emi-table-frame>
-            <table aria-label={t('fleet.emi.schedule_title')} aria-busy={loading || refreshing} className="w-full min-w-[1040px] table-fixed divide-y divide-slate-100">
-              <colgroup>{COLUMNS.map((column) => <col key={column.key} style={{ width: column.width }} />)}</colgroup>
-              <thead className="sticky top-0 z-10 bg-slate-50">
-                <tr className="h-12">
+            {/* Auto layout + nowrap cells (not fixed pixel columns) so the
+                table survives the 150% font scale without clipping the
+                registrations — the same approach as the Trip List table. */}
+            <table aria-label={t('fleet.emi.schedule_title')} aria-busy={loading || refreshing} className="w-full min-w-[1080px] divide-y divide-slate-100">
+              {/* The Trip List's header language: slate-50 band, bold uppercase
+                  tracked labels, a colour glyph beside every column name. */}
+              <thead className="sticky top-0 z-10 bg-slate-50/80 border-b border-slate-200 text-slate-600">
+                <tr className="h-12 whitespace-nowrap">
                   {COLUMNS.map((column) => (
                     <th
                       key={column.key}
                       scope="col"
-                      aria-sort={column.key !== 'vehicleNumber' && sortKey === column.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
+                      aria-sort={column.key !== 'sno' && column.key !== 'vehicleNumber' && sortKey === column.key ? (sortDir === 'asc' ? 'ascending' : 'descending') : undefined}
                       className={`px-3 py-2 ${column.align === 'right' ? 'text-right' : column.align === 'center' ? 'text-center' : 'text-left'}`}
                     >
-                      {column.key === 'vehicleNumber' ? (
-                        <span className="text-xs font-bold uppercase tracking-wide text-slate-600">{t(column.label)}</span>
+                      {column.key === 'sno' || column.key === 'vehicleNumber' ? (
+                        <div className={`flex items-center gap-1.5 text-[12px] font-bold uppercase tracking-wider ${column.align === 'center' ? 'justify-center' : ''}`}>
+                          {column.icon}
+                          <span>{t(column.label)}</span>
+                        </div>
                       ) : (
                         <button
                           type="button"
-                          onClick={() => toggleSort(column.key)}
-                          title={`${t(column.label)} · ${t(nextSortDirection(column.key) === 'asc' ? 'common.ascending' : 'common.descending')}`}
-                          className={`inline-flex min-h-6 items-center gap-1.5 whitespace-nowrap rounded-md px-1.5 py-1 text-xs font-bold uppercase tracking-wide transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 ${sortKey === column.key ? 'bg-emerald-50 text-emerald-700' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-800'}`}
+                          onClick={() => toggleSort(column.key as EmiSortKey)}
+                          title={`${t(column.label)} · ${t(nextSortDirection(column.key as EmiSortKey) === 'asc' ? 'common.ascending' : 'common.descending')}`}
+                          className={`inline-flex min-h-6 items-center gap-1.5 whitespace-nowrap rounded-md px-1.5 py-1 text-[12px] font-bold uppercase tracking-wider transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 ${sortKey === column.key ? 'bg-emerald-50 text-emerald-700' : 'hover:bg-slate-100 hover:text-slate-800'}`}
                         >
+                          {column.icon}
                           <span>{t(column.label)}</span>
                           {sortKey === column.key ? (
-                            sortDir === 'asc' ? <ArrowUp size={13} aria-hidden="true" className="shrink-0" /> : <ArrowDown size={13} aria-hidden="true" className="shrink-0" />
+                            sortDir === 'asc' ? <ArrowUp size={13} aria-hidden="true" className="shrink-0 text-emerald-600" /> : <ArrowDown size={13} aria-hidden="true" className="shrink-0 text-emerald-600" />
                           ) : <ArrowUpDown size={13} aria-hidden="true" className="shrink-0 text-slate-400" />}
                         </button>
                       )}
@@ -169,11 +188,18 @@ const EmiLoansPage = ({ embedded = false, active = true }: EmiLoansPageProps) =>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100 bg-white">
-                {loading ? Array.from({ length: PAGE_SIZE }, (_, index) => (
-                  <tr key={`loading-${index}`} className="h-12" aria-hidden="true">
-                    {COLUMNS.map((column) => <td key={column.key} className="px-3"><div className="h-3 w-3/4 rounded bg-slate-100" /></td>)}
+                {loading ? (
+                  /* The Trip List's loading contract: one spinner row with the
+                     register's own sentence, not a skeleton shimmer. */
+                  <tr>
+                    <td colSpan={COLUMNS.length} className="h-[480px] px-6 text-center" role="status">
+                      <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-400">
+                        <span className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600" aria-hidden="true" />
+                        {t('fleet.emi.loading_records')}
+                      </span>
+                    </td>
                   </tr>
-                )) : !hasSnapshot && error ? (
+                ) : !hasSnapshot && error ? (
                   <tr><td colSpan={COLUMNS.length} className="h-[480px] px-6 text-center">
                     <AlertTriangle size={32} aria-hidden="true" className="mx-auto mb-3 text-amber-400" />
                     <p className="text-sm font-semibold text-slate-700">{t(error === 'access' ? 'fleet.emi.access_denied' : 'fleet.emi.load_failed')}</p>
@@ -187,16 +213,21 @@ const EmiLoansPage = ({ embedded = false, active = true }: EmiLoansPageProps) =>
                       <button type="button" onClick={reset} className="mt-3 rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/30">{t('fleet.emi.clear_filters')}</button>
                     )}
                   </td></tr>
-                ) : paged.map((record) => (
-                  <tr key={record.vehicleId} data-vehicle-id={record.vehicleId} className="h-12 transition-colors hover:bg-slate-50/70">
-                    <td className="px-3 text-[13px] font-semibold text-slate-900">
-                      <span className="block truncate" title={record.vehicleNumber}>{record.vehicleNumber || '—'}</span>
+                ) : paged.map((record, index) => (
+                  /* The Trip List's row language: zebra striping, S.No leading
+                     the row, the identifier in bold emerald. Vehicle numbers
+                     display in their spaced form (TS 07 EB 1111) but keep the
+                     stored value for search/sort untouched. */
+                  <tr key={record.vehicleId} data-vehicle-id={record.vehicleId} className={`h-12 transition-colors duration-150 hover:bg-slate-50/60 ${index % 2 === 0 ? 'bg-white' : 'bg-slate-50/20'}`}>
+                    <td className="whitespace-nowrap px-3 text-center text-[13px] font-medium tabular-nums text-slate-500">{(safePage - 1) * pageSize + index + 1}</td>
+                    <td className="whitespace-nowrap px-3 text-[13px] font-bold text-emerald-600">
+                      <span title={formatVehicleNumber(record.vehicleNumber)}>{formatVehicleNumber(record.vehicleNumber)}</span>
                     </td>
-                    <td title={money(record.purchaseAmount)} className="truncate px-3 text-center text-[13px] tabular-nums text-slate-700">{money(record.purchaseAmount)}</td>
-                    <td title={String(record.totalEMIs ?? '—')} className="truncate px-3 text-center text-[13px] tabular-nums text-slate-700">{record.totalEMIs ?? '—'}</td>
+                    <td title={money(record.purchaseAmount)} className="whitespace-nowrap px-3 text-center text-[13px] font-semibold tabular-nums text-slate-700">{money(record.purchaseAmount)}</td>
+                    <td title={String(record.totalEMIs ?? '—')} className="whitespace-nowrap px-3 text-center text-[13px] font-bold tabular-nums text-blue-600">{record.totalEMIs ?? '—'}</td>
                     <td className="whitespace-nowrap px-3 text-center"><CompletedCell completed={record.completedEMIs} total={record.totalEMIs} /></td>
-                    <td title={String(record.pendingEMIs)} className="truncate px-3 text-center text-[13px] font-semibold tabular-nums text-slate-700">{record.pendingEMIs}</td>
-                    <td className="whitespace-nowrap px-3 text-center text-[13px] tabular-nums text-slate-600">{formatDate(record.emiStartDate)}</td>
+                    <td title={String(record.pendingEMIs)} className="whitespace-nowrap px-3 text-center text-[13px] font-bold tabular-nums text-amber-600">{record.pendingEMIs}</td>
+                    <td className="whitespace-nowrap px-3 text-center text-[13px] font-medium tabular-nums text-slate-600">{formatDate(record.emiStartDate)}</td>
                     <td className="whitespace-nowrap px-3 text-center"><StatusBadge status={record.status} /></td>
                   </tr>
                 ))}
