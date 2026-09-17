@@ -27,6 +27,7 @@ import { uiActionIconMotionClass } from "../../../shared/ui/uiTokens";
 import { formatVehicleNumber } from "../../../utils/format";
 import {
   ORDERS_NO_SPINNER,
+  SequenceArrows,
   WhatsAppIcon,
   onOrdersNumberWheel,
 } from "./OrdersCommon";
@@ -359,6 +360,13 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
                       disabled={sending}
                       label={`${t("orders.col_sequence")} — ${row.shopName}`}
                       onCommit={(pos) => moveRowTo(i, pos - 1)}
+                    />
+                    <SequenceArrows
+                      index={i}
+                      count={numberedRows.length}
+                      disabled={sending}
+                      label={row.shopName}
+                      onMove={(dir) => moveRowTo(i, i + dir)}
                     />
                     <div className="min-w-0 flex-1">
                       <p

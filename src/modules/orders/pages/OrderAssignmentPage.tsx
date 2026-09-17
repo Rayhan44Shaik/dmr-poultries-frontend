@@ -113,6 +113,7 @@ import {
   OrdersTableSkeleton,
   OrdersDateControl,
   OrdersDropdown,
+  SequenceArrows,
   WhatsAppIcon,
   onOrdersNumberWheel,
 } from "../components/OrdersCommon";
@@ -1055,6 +1056,58 @@ function AssignmentEditor({
   );
   const isDirty = selectionSnapshot(vehicleTripId, selected) !== savedSnapshot;
 
+  // CONTINUE where the truck was left: opening a vehicle loads the shops
+  // already SAVED on it for this day (in their saved delivery order, with
+  // their saved box shares) instead of an empty sheet — so a second visit
+  // adds to the earlier work rather than starting over. Delivered rows are
+  // locked history and stay out of the editable list.
+  const hydrateFromVehicle = useCallback(
+    (tripId: number | null): SelectedRow[] => {
+      if (tripId == null) return [];
+      const trip = eligibleVehicles.find((v) => v.trip.id === tripId)?.trip;
+      if (!trip) return [];
+      const rows: SelectedRow[] = [];
+      for (const row of orderRowsOnTrip(trip, orderTrip.tripNo)) {
+        if (isCapturedRow(row)) continue;
+        const shopId = Number(row.shopId);
+        if (!shopId || rows.some((r) => r.shopId === shopId)) continue;
+        const orderRow = collection.rows.find((r) => r.shopId === shopId);
+        const a = collection.shops.get(shopId);
+        const orderedBoxes = Math.max(
+          1,
+          Number(orderRow?.boxNo) || rowBoxes(row) || 0,
+        );
+        const here = rowBoxes(row) || 0;
+        const elsewhere = Math.max(0, (a?.assignedBoxesTotal ?? here) - here);
+        rows.push({
+          clientKey: newClientKey(),
+          shopId,
+          shopName: row.shopName || orderRow?.shopName || "—",
+          village: villageOf(
+            shopId,
+            row.shopName || orderRow?.shopName || "",
+            shopDirectory,
+          ),
+          orderedBirds: Number(orderRow?.birds ?? row.birds) || 0,
+          orderedBoxes,
+          assignedElsewhere: elsewhere,
+          assigned: Math.max(1, Math.min(here, orderedBoxes - elsewhere)),
+        });
+      }
+      return rows;
+    },
+    [eligibleVehicles, orderTrip.tripNo, collection, shopDirectory],
+  );
+  const openVehicle = useCallback(
+    (tripId: number | null) => {
+      const rows = hydrateFromVehicle(tripId);
+      setVehicleTripId(tripId);
+      setSelected(rows);
+      setSavedSnapshot(selectionSnapshot(tripId, rows));
+    },
+    [hydrateFromVehicle],
+  );
+
   const [saving, setSaving] = useState(false);
   const [waBusy, setWaBusy] = useState(false);
   const [waProgress, setWaProgress] = useState<string | null>(null);
@@ -1180,11 +1233,11 @@ function AssignmentEditor({
   useEffect(() => {
     if (vehicleTripId == null) return;
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") setVehicleTripId(null);
+      if (e.key === "Escape") openVehicle(null);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [vehicleTripId]);
+  }, [vehicleTripId, openVehicle]);
 
   /** Shops already saved on a truck — shown in the vehicle list. A shop
       split over two vehicles counts once for EACH of them. */
@@ -1790,7 +1843,7 @@ function AssignmentEditor({
                     >
                       <button
                         type="button"
-                        onClick={() => setVehicleTripId(v.trip.id)}
+                        onClick={() => openVehicle(v.trip.id)}
                         aria-label={`${to("orders.assign_shops")} — ${v.trip.vehicleNo || "—"} · ${v.trip.tripNo}`}
                         aria-current={selectedCard ? "true" : undefined}
                         className={`w-full border-l-[3px] px-3.5 py-3 text-left transition-colors ${
@@ -1938,7 +1991,7 @@ function AssignmentEditor({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setVehicleTripId(null)}
+                  onClick={() => openVehicle(null)}
                   aria-label={to("orders.close")}
                   className="group self-end rounded-lg p-1.5 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 lg:self-auto"
                 >
@@ -2253,7 +2306,7 @@ function AssignmentEditor({
                             className={`w-full min-w-[880px] table-fixed ${ORDERS_TABLE_FONT_CLASS}`}
                           >
                             <colgroup>
-                              <col className="w-24" />
+                              <col className="w-32" />
                               <col />
                               <col />
                               <col className="w-[10%]" />
@@ -2358,6 +2411,18 @@ function AssignmentEditor({
                                           label={`${to("orders.col_sequence")} — ${row.shopName}`}
                                           onCommit={(pos) =>
                                             moveRowTo(row.clientKey, pos - 1)
+                                          }
+                                        />
+                                        <SequenceArrows
+                                          index={index}
+                                          count={selected.length}
+                                          disabled={busy}
+                                          label={row.shopName}
+                                          onMove={(dir) =>
+                                            moveRowTo(
+                                              row.clientKey,
+                                              index + dir,
+                                            )
                                           }
                                         />
                                       </div>

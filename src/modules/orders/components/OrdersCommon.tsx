@@ -9,6 +9,8 @@ import React, { useEffect, useId, useMemo, useRef, useState } from "react";
 import { uiSearchInputWithClearClass } from "../../../shared/ui/uiTokens";
 import {
   AlertTriangle,
+  ArrowDown,
+  ArrowUp,
   Check,
   ChevronDown,
   CloudOff,
@@ -785,3 +787,44 @@ export function OrdersMultiSelect({
 }
 
 export type { OrdersT };
+
+/** ↑ ↓ step one place — sits beside the typed position so both quick nudges
+ *  and long jumps are one gesture away. */
+export function SequenceArrows({
+  index,
+  count,
+  disabled,
+  label,
+  onMove,
+}: {
+  index: number;
+  count: number;
+  disabled: boolean;
+  label: string;
+  onMove: (dir: -1 | 1) => void;
+}) {
+  const btn =
+    "flex h-3.5 w-5 items-center justify-center rounded text-slate-400 transition-all hover:bg-emerald-50 hover:text-emerald-600 active:scale-90 disabled:cursor-not-allowed disabled:opacity-25 disabled:hover:bg-transparent";
+  return (
+    <div className="flex shrink-0 flex-col -space-y-px">
+      <button
+        type="button"
+        onClick={() => onMove(-1)}
+        disabled={disabled || index === 0}
+        aria-label={`↑ ${label}`}
+        className={btn}
+      >
+        <ArrowUp size={11} />
+      </button>
+      <button
+        type="button"
+        onClick={() => onMove(1)}
+        disabled={disabled || index >= count - 1}
+        aria-label={`↓ ${label}`}
+        className={btn}
+      >
+        <ArrowDown size={11} />
+      </button>
+    </div>
+  );
+}
