@@ -1,6 +1,6 @@
 // src/modules/collections/pages/CollectionReportPage.tsx
 
-import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import { useState, useEffect, useMemo, useCallback, useLayoutEffect, useRef } from "react";
 import { collectionService } from "../services/collectionService";
 import type { CollectionApiEntry, CollectionReportSummary } from "../types/collection";
 import { useShops } from "../../../masters/shops/hooks/useShops";
@@ -187,6 +187,8 @@ export default function CollectionReportPage({ embedded = false }: Props) {
   const [paymentMode, setPaymentMode] = useState("");
   const requestSequenceRef = useRef(0);
   const initialLoadStartedRef = useRef(false);
+  const paymentSummaryCardRef = useRef<HTMLDivElement>(null);
+  const modeShareCardRef = useRef<HTMLDivElement>(null);
   const appliedFiltersRef = useRef({
     fromDate: "",
     toDate: "",
@@ -610,6 +612,24 @@ export default function CollectionReportPage({ embedded = false }: Props) {
     });
   }, [loading, loadReport, showNotification, t]);
 
+  // The payment table is the height authority for this row. Keep the compact
+  // mode-share card pixel-aligned with it at every viewport and font scale,
+  // so both cards finish immediately after the Total row.
+  useLayoutEffect(() => {
+    const paymentCard = paymentSummaryCardRef.current;
+    const shareCard = modeShareCardRef.current;
+    if (!paymentCard || !shareCard) return;
+
+    const matchHeight = () => {
+      shareCard.style.height = `${paymentCard.getBoundingClientRect().height}px`;
+    };
+    matchHeight();
+
+    const observer = new ResizeObserver(matchHeight);
+    observer.observe(paymentCard);
+    return () => observer.disconnect();
+  }, [report?.totalCount]);
+
   if (loading && !report)
     return (
       <div className="flex min-h-[40vh] items-center justify-center">
@@ -785,8 +805,11 @@ export default function CollectionReportPage({ embedded = false }: Props) {
       ) : (
       <>
         {/* Row 1 — Payment Mode Summary: table with its mode-share chart */}
-        <div className={`grid grid-cols-1 gap-6 lg:grid-cols-2 transition-opacity duration-200 ${loading ? "pointer-events-none opacity-50" : ""}`}>
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+        <div className={`grid grid-cols-1 items-start gap-6 lg:grid-cols-2 transition-opacity duration-200 ${loading ? "pointer-events-none opacity-50" : ""}`}>
+          <div
+            ref={paymentSummaryCardRef}
+            className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm"
+          >
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
               <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
                 <span className="rounded-lg bg-blue-50 p-1.5 text-blue-600">
@@ -838,7 +861,10 @@ export default function CollectionReportPage({ embedded = false }: Props) {
             </div>
           </div>
 
-          <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
+          <div
+            ref={modeShareCardRef}
+            className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm"
+          >
             <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
               <h4 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
                 <span className="rounded-lg bg-sky-50 p-1.5 text-sky-600">
