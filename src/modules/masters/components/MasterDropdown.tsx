@@ -183,7 +183,10 @@ export default function MasterDropdown({
     if (!allowCustomValue || !searchable) return null;
     const raw = query.trim();
     if (!raw) return null;
-    if (items.some((o) => o.label.toLocaleLowerCase() === raw.toLocaleLowerCase())) return null;
+    if (
+      items.some((o) => o.label.toLocaleLowerCase() === raw.toLocaleLowerCase())
+    )
+      return null;
     return validateCustom ? validateCustom(raw) : raw;
   })();
 
@@ -398,7 +401,8 @@ export default function MasterDropdown({
                     option.label.toLocaleLowerCase().includes(keyword) ||
                     option.searchText?.toLocaleLowerCase().includes(keyword) ||
                     option.value.toLocaleLowerCase().includes(keyword) ||
-                    (option.keywords?.toLocaleLowerCase().includes(keyword) ?? false),
+                    (option.keywords?.toLocaleLowerCase().includes(keyword) ??
+                      false),
                 );
                 setActive(
                   matches.findIndex(
@@ -441,9 +445,9 @@ export default function MasterDropdown({
             }}
             className={`flex h-9 w-full shrink-0 items-center gap-2 px-3 text-left text-xs font-medium disabled:cursor-not-allowed disabled:opacity-40 ${
               kind === "select" && option.value === value
-                // Selected row: light-green brand treatment for All Vehicles /
-                // All Supervisors and normal options; visible but not harsh.
-                ? "bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-200"
+                ? // Selected row: light-green brand treatment for All Vehicles /
+                  // All Supervisors and normal options; visible but not harsh.
+                  "bg-emerald-50 text-emerald-800 ring-1 ring-inset ring-emerald-200"
                 : index === active
                   ? "bg-emerald-100/70 text-emerald-800"
                   : "text-slate-700 hover:bg-emerald-50 hover:text-emerald-800"

@@ -1,7 +1,11 @@
-import MasterListToolbar from "../../components/MasterListToolbar";
-import MasterListSummary from "../../components/MasterListSummary";
-import MasterPagination from "../../components/MasterPagination";
 import "../../styles/masters.css";
+import { Truck } from "lucide-react";
+import { countActiveFilters } from "../../../../ui";
+import {
+  MasterDirectoryFilters,
+  MasterDirectoryCard,
+} from "../../components/MasterDirectory";
+import { useI18n } from "../../../../i18n";
 // D:\Development\DMR-Poultries-ERP\frontend\dmr-poultries-web\src\modules\masters\vehicles\pages\MasterVehiclesPage.tsx
 
 import React, { useState, useMemo } from "react";
@@ -15,7 +19,6 @@ import { exportToPDF, exportToExcel } from "../../../../utils/exportUtils";
 import { logAuditEvent } from "../../../../utils/securityUtils";
 import { handleApiError } from "../services/vehicleService";
 import type { Vehicle } from "../types/vehicle";
-import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import BulkImportDialog from "../../components/bulk-import/BulkImportDialog";
 import { buildVehicleBulkImportConfig } from "../bulkImportConfig";
 
@@ -29,6 +32,7 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
   const [showDialog, setShowDialog] = useState(false);
   const [showBulkImport, setShowBulkImport] = useState(false);
   const [editingVehicle, setEditingVehicle] = useState<Vehicle | null>(null);
+  const { t } = useI18n();
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [sortOrder, setSortOrder] = useState("number");
@@ -47,8 +51,16 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
     addVehiclesBulk,
     editVehicle,
     removeVehicle,
-    total, page: serverPage, exportRows,
-  } = useVehicles({ page: currentPage, pageSize: pageSize, search, status: statusFilter, sort: sortOrder });
+    total,
+    page: serverPage,
+    exportRows,
+  } = useVehicles({
+    page: currentPage,
+    pageSize: pageSize,
+    search,
+    status: statusFilter,
+    sort: sortOrder,
+  });
 
   const vehicleBulkImportConfig = useMemo(
     () => buildVehicleBulkImportConfig({ addVehiclesBulk, reload }),
@@ -61,7 +73,6 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
     setCurrentPage(1);
   };
 
-  const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const safePage = serverPage;
   const paginatedVehicles = vehicles;
 
@@ -69,68 +80,70 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
     try {
       const filteredVehicles = await exportRows();
 
-    if (filteredVehicles.length === 0) {
-      showNotification("No data to export.", "error");
-      return;
+      if (filteredVehicles.length === 0) {
+        showNotification("No data to export.", "error");
+        return;
+      }
+      const headers = [
+        "Vehicle No",
+        "Vehicle Number",
+        "Type",
+        "Boxes",
+        "Bird Capacity",
+        "Status",
+      ];
+      const rows = filteredVehicles.map((v) => [
+        v.vehicleNo?.toString() || "",
+        v.vehicleNumber || "",
+        v.vehicleType || "",
+        v.noOfBoxes?.toString() || "0",
+        v.birdCapacity?.toString() || "0",
+        v.status || "",
+      ]);
+      const filename = `Vehicles_${new Date().toISOString().split("T")[0]}`;
+      exportToPDF("Vehicles - Master List", headers, rows, filename);
+      logAuditEvent("EXPORT_PDF", "Vehicles", undefined, {
+        count: filteredVehicles.length,
+      });
+      showNotification("PDF exported successfully!", "success");
+    } catch (err) {
+      showNotification(handleApiError(err), "error");
     }
-    const headers = [
-      "Vehicle No",
-      "Vehicle Number",
-      "Type",
-      "Boxes",
-      "Bird Capacity",
-      "Status",
-    ];
-    const rows = filteredVehicles.map((v) => [
-      v.vehicleNo?.toString() || "",
-      v.vehicleNumber || "",
-      v.vehicleType || "",
-      v.noOfBoxes?.toString() || "0",
-      v.birdCapacity?.toString() || "0",
-      v.status || "",
-    ]);
-    const filename = `Vehicles_${new Date().toISOString().split("T")[0]}`;
-    exportToPDF("Vehicles - Master List", headers, rows, filename);
-    logAuditEvent("EXPORT_PDF", "Vehicles", undefined, {
-      count: filteredVehicles.length,
-    });
-    showNotification("PDF exported successfully!", "success");
-  
-    } catch (err) { showNotification(handleApiError(err), "error"); }
   };
 
   const handleExportExcel = async () => {
     try {
       const filteredVehicles = await exportRows();
 
-    if (filteredVehicles.length === 0) {
-      showNotification("No data to export.", "error");
-      return;
+      if (filteredVehicles.length === 0) {
+        showNotification("No data to export.", "error");
+        return;
+      }
+      const headers = [
+        "Vehicle No",
+        "Vehicle Number",
+        "Type",
+        "Boxes",
+        "Bird Capacity",
+        "Status",
+      ];
+      const rows = filteredVehicles.map((v) => [
+        v.vehicleNo?.toString() || "",
+        v.vehicleNumber || "",
+        v.vehicleType || "",
+        v.noOfBoxes?.toString() || "0",
+        v.birdCapacity?.toString() || "0",
+        v.status || "",
+      ]);
+      const filename = `Vehicles_${new Date().toISOString().split("T")[0]}`;
+      exportToExcel("Vehicles - Master List", headers, rows, filename);
+      logAuditEvent("EXPORT_EXCEL", "Vehicles", undefined, {
+        count: filteredVehicles.length,
+      });
+      showNotification("Excel exported successfully!", "success");
+    } catch (err) {
+      showNotification(handleApiError(err), "error");
     }
-    const headers = [
-      "Vehicle No",
-      "Vehicle Number",
-      "Type",
-      "Boxes",
-      "Bird Capacity",
-      "Status",
-    ];
-    const rows = filteredVehicles.map((v) => [
-      v.vehicleNo?.toString() || "",
-      v.vehicleNumber || "",
-      v.vehicleType || "",
-      v.noOfBoxes?.toString() || "0",
-      v.birdCapacity?.toString() || "0",
-      v.status || "",
-    ]);
-    const filename = `Vehicles_${new Date().toISOString().split("T")[0]}`;
-    exportToExcel("Vehicles - Master List", headers, rows, filename);
-    logAuditEvent("EXPORT_EXCEL", "Vehicles", undefined, {
-      count: filteredVehicles.length,
-    });
-    showNotification("Excel exported successfully!", "success");
-  
-    } catch (err) { showNotification(handleApiError(err), "error"); }
   };
 
   const validateVehicle = (
@@ -251,120 +264,81 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
     }
   };
 
+  const handleResetFilters = () => {
+    setSearch("");
+    setStatusFilter("");
+    setSortOrder("number");
+    setCurrentPage(1);
+  };
+  const activeFilterCount = countActiveFilters(
+    search.trim() !== "",
+    statusFilter !== "",
+    sortOrder !== "number",
+  );
+
   const content = (
-    <div className="master-page w-full min-w-0 space-y-3 font-sans text-slate-700">
-      {/* Main Container - Removed overflow-hidden so dropdowns overlay properly */}
-      <div className="w-full bg-white rounded-xl border border-slate-200/90 shadow-sm">
-        {/* Toolbar - Search on LEFT, Buttons on RIGHT in same line */}
-        <MasterListToolbar
-          onRefresh={() => { void reload().catch(() => {}); }}
-          status={statusFilter}
-          onStatusChange={(value) => { setStatusFilter(value); setCurrentPage(1); }}
-          sort={sortOrder}
-          onSortChange={(value) => { setSortOrder(value); setCurrentPage(1); }}
-          search={search}
-          onSearchChange={handleSearchChange}
-          searchPlaceholder="Search Vehicle..."
-          addLabel="Add Vehicle"
-          onAdd={() => {
-            setEditingVehicle(null);
-            setShowDialog(true);
-          }}
-          onExportPDF={handleExportPDF}
-          onExportExcel={handleExportExcel}
-          loading={loading}
-          saving={saving}
-          onImport={() => setShowBulkImport(true)}
+    <div className="master-page w-full min-w-0 space-y-4 font-sans text-slate-700">
+      <MasterDirectoryFilters
+        ariaLabel={t("masters.dir.vehicles_title")}
+        searchId="vehicles-search"
+        search={search}
+        onSearchChange={handleSearchChange}
+        searchPlaceholder={t("masters.dir.search_vehicle")}
+        status={statusFilter}
+        onStatusChange={(value) => {
+          setStatusFilter(value);
+          setCurrentPage(1);
+        }}
+        sort={sortOrder}
+        onSortChange={(value) => {
+          setSortOrder(value);
+          setCurrentPage(1);
+        }}
+        onReset={handleResetFilters}
+        onRefresh={() => {
+          void reload().catch(() => {});
+        }}
+        addLabel={t("masters.dir.add_vehicle")}
+        onAdd={() => {
+          setEditingVehicle(null);
+          setShowDialog(true);
+        }}
+        onImport={() => setShowBulkImport(true)}
+        onExportPDF={handleExportPDF}
+        onExportExcel={handleExportExcel}
+        hasRows={paginatedVehicles.length > 0}
+        loading={loading}
+        saving={saving}
+      />
+
+      <MasterDirectoryCard
+        icon={Truck}
+        title={t("masters.dir.vehicles_title")}
+        total={total}
+        error={error}
+        loading={loading}
+        onRetry={() => {
+          void reload().catch(() => undefined);
+        }}
+        retryLabel={t("masters.dir.retry")}
+        page={safePage}
+        pageSize={pageSize}
+        onPageChange={setCurrentPage}
+        onPageSizeChange={(next) => {
+          setPageSize(next);
+          setCurrentPage(1); // a new page size invalidates the current page
+        }}
+      >
+        <VehicleTable
+          vehicles={paginatedVehicles}
+          onEdit={handleEditVehicle}
+          onDelete={handleDeleteVehicle}
+          loading={loading || deletingId !== null}
+          emptyMessage={
+            activeFilterCount > 0 ? t("masters.dir.no_records") : undefined
+          }
         />
-
-        {/* Status Counter Bar */}
-        <MasterListSummary
-          title="Vehicles Directory"
-          total={total}
-          shown={paginatedVehicles.length}
-          page={safePage}
-          totalPages={totalPages}
-          loading={loading}
-          saving={saving}
-          deleting={deletingId !== null}
-        />
-
-        {error && !loading && (
-          <div className="mx-4 mt-3 px-3 py-2 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg flex items-center justify-between gap-3">
-            <span>{error}</span>
-            <button
-              type="button"
-              onClick={() => {
-                void reload().catch(() => undefined);
-              }}
-              className="shrink-0 text-xs font-semibold text-red-700 underline"
-            >
-              Retry
-            </button>
-          </div>
-        )}
-
-        {/* Table Content */}
-        <div className="p-0 relative min-h-[120px]">
-          {loading && vehicles.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-3">
-              <svg
-                className="animate-spin h-8 w-8 text-blue-600"
-                xmlns="http://www.w3.org/2000/svg"
-                fill="none"
-                viewBox="0 0 24 24"
-              >
-                <circle
-                  className="opacity-25"
-                  cx="12"
-                  cy="12"
-                  r="10"
-                  stroke="currentColor"
-                  strokeWidth="4"
-                />
-                <path
-                  className="opacity-75"
-                  fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-                />
-              </svg>
-              <p className="text-sm font-medium">Loading vehicles...</p>
-            </div>
-          ) : !loading && vehicles.length === 0 && !error ? (
-            <div className="flex flex-col items-center justify-center py-16 text-slate-500 gap-2">
-              <p className="text-sm font-medium text-slate-700">
-                No vehicles found.
-              </p>
-              <p className="text-xs text-slate-500">
-                Add a vehicle to get started.
-              </p>
-            </div>
-          ) : (
-            <VehicleTable
-              vehicles={paginatedVehicles}
-              onEdit={handleEditVehicle}
-              onDelete={handleDeleteVehicle}
-              emptyMessage={
-                search.trim() ? "No vehicles matching your search." : undefined
-              }
-            />
-          )}
-        </div>
-
-        {shouldShowPagination(total) && (
-          <MasterPagination
-            page={safePage}
-            totalPages={totalPages}
-            onPageChange={setCurrentPage}
-            disabled={loading}
-            pageSize={pageSize}
-            onPageSizeChange={(next) => {
-              setPageSize(next);
-              setCurrentPage(1); // a new page size invalidates the current page
-            }}
-          />
-        )}
-      </div>
+      </MasterDirectoryCard>
 
       {/* Modal Dialog */}
       <VehicleDialog

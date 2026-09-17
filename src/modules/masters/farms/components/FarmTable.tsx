@@ -1,116 +1,186 @@
 import MasterStatusBadge from "../../components/MasterStatusBadge";
-import { Pencil, Trash2 } from "lucide-react";
+import {
+  Hash,
+  MapPin,
+  Phone,
+  Settings2,
+  ToggleLeft,
+  User,
+  UserCog,
+  Warehouse,
+} from "lucide-react";
 import type { Farm } from "../types/farm";
 import { usePendingDelete } from "../../../../hooks/usePendingDelete";
 import { PendingDeleteNotification } from "../../../../components/common/PendingDeleteNotification";
+import { useI18n } from "../../../../i18n";
+import { localizeTripViewText } from "../../../operations/vehicle-trips/utils/tripViewLocalization";
+import {
+  MasterTable,
+  MasterThead,
+  MasterTh,
+  MasterLoadingRow,
+  MasterEmptyRow,
+  MasterEditButton,
+  MasterDeleteButton,
+} from "../../components/MasterDirectory";
+import {
+  masterTdClass,
+  masterNameTdClass,
+  masterRowClass,
+  masterRowStyle,
+  masterHeadTint as tint,
+} from "../../components/masterTableStyles";
 
 type FarmTableProps = {
   farms: Farm[];
-  onEdit: (farm: Farm) => void;
+  onEdit: (item: Farm) => void;
   onDelete: (id: number) => void;
-  /** Message shown when the list is empty (e.g. active search with no matches). */
   emptyMessage?: string;
+  loading?: boolean;
 };
 
-function FarmTable({ farms, onEdit, onDelete, emptyMessage }: FarmTableProps) {
+const COLS = 8;
+
+function FarmTable({
+  farms,
+  onEdit,
+  onDelete,
+  emptyMessage,
+  loading = false,
+}: FarmTableProps) {
+  const { t, language } = useI18n();
   const { requestDelete, cancel, pendingItems } = usePendingDelete(onDelete);
+  // Telugu reaches the record text too; stored values stay untouched.
+  const shown = (value: string | null | undefined) =>
+    localizeTripViewText(value ?? "", language);
+  const showLoadingRow = loading && farms.length === 0;
+  const rows = [...farms].sort((a, b) => (a.farmNo > b.farmNo ? 1 : -1));
+
   return (
-    <div className="master-table">
-      <table className="min-w-full divide-y divide-slate-200">
-        <thead className="bg-slate-50">
-          <tr>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-              Farm No
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-              Farm Name
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-              Owner
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-              Supervisor
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-              Village
-            </th>
-            <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
-              Phone
-            </th>
-            <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
-              Status
-            </th>
-            <th className="px-4 py-3 text-center text-xs font-medium uppercase tracking-wider text-slate-500">
-              Actions
-            </th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-200 bg-white">
-          {[...farms]
-            .sort((a, b) => (a.farmNo > b.farmNo ? 1 : -1))
-            .map((farm) => (
-              <tr key={farm.id} className="hover:bg-slate-50 transition-colors">
-                <td className="px-4 py-3 text-sm text-slate-600">
-                  {farm.farmNo}
-                </td>
-                <td className="px-4 py-3 text-sm font-semibold text-slate-800">
-                  {farm.farmName}
-                </td>
-                <td className="px-4 py-3 text-sm text-slate-600">
-                  {farm.ownerName}
-                </td>
-                <td className="px-4 py-3 text-sm text-slate-600">
-                  {farm.supervisorName}
-                </td>
-                <td className="px-4 py-3 text-sm text-slate-600">
-                  {farm.village}
-                </td>
-                <td className="px-4 py-3 text-sm text-slate-600">
-                  {farm.phoneNumber}
-                </td>
-                <td className="px-4 py-3 text-center">
-                  <MasterStatusBadge status={farm.status} />
-                </td>
-                <td className="px-4 py-3 text-center">
-                  <div className="flex items-center justify-center gap-2">
-                    <button
-                      onClick={() => onEdit(farm)}
-                      className="rounded p-1 text-blue-600 hover:bg-blue-50 transition-colors"
-                      title="Edit Farm"
-                      aria-label={`Edit farm ${farm.farmName}`}
-                    >
-                      <Pencil size={16} />
-                    </button>
-                    <button
-                      onClick={() =>
-                        requestDelete(farm.id, {
-                          label: `Deleting Farm "${farm.farmName}"`,
-                        })
-                      }
-                      className="rounded p-1 text-red-600 hover:bg-red-50 transition-colors"
-                      title="Delete Farm"
-                      aria-label={`Delete farm ${farm.farmName}`}
-                    >
-                      <Trash2 size={16} />
-                    </button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          {farms.length === 0 && (
-            <tr>
+    <>
+      <MasterTable minWidth="min-w-[64rem]">
+        <colgroup>
+          <col className="w-[3.5rem]" />
+          <col className="w-[13rem]" />
+          <col className="w-[10rem]" />
+          <col className="w-[10rem]" />
+          <col className="w-[9rem]" />
+          <col className="w-[8rem]" />
+          <col className="w-[6.5rem]" />
+          <col className="w-[6.5rem]" />
+        </colgroup>
+        <MasterThead>
+          <MasterTh
+            icon={Hash}
+            iconClass={tint.number}
+            label={t("masters.dir.farm_no")}
+            align="center"
+          />
+          <MasterTh
+            icon={Warehouse}
+            iconClass={tint.name}
+            label={t("masters.dir.farm_name")}
+          />
+          <MasterTh
+            icon={User}
+            iconClass={tint.person}
+            label={t("masters.dir.owner")}
+          />
+          <MasterTh
+            icon={UserCog}
+            iconClass={tint.tag}
+            label={t("masters.dir.supervisor")}
+          />
+          <MasterTh
+            icon={MapPin}
+            iconClass={tint.place}
+            label={t("masters.dir.village")}
+          />
+          <MasterTh
+            icon={Phone}
+            iconClass={tint.phone}
+            label={t("masters.dir.phone")}
+          />
+          <MasterTh
+            icon={ToggleLeft}
+            iconClass={tint.status}
+            label={t("masters.dir.status")}
+            align="center"
+          />
+          <MasterTh
+            icon={Settings2}
+            iconClass={tint.action}
+            label={t("masters.dir.actions")}
+            align="center"
+          />
+        </MasterThead>
+        <tbody className="divide-y divide-slate-100">
+          {showLoadingRow && (
+            <MasterLoadingRow colSpan={COLS} label={t("masters.dir.loading")} />
+          )}
+          {!showLoadingRow && rows.length === 0 && (
+            <MasterEmptyRow
+              colSpan={COLS}
+              label={emptyMessage ?? t("masters.dir.no_records")}
+            />
+          )}
+          {rows.map((f, index) => (
+            <tr
+              key={f.id}
+              className={masterRowClass(index, loading)}
+              style={masterRowStyle(index)}
+            >
               <td
-                colSpan={8}
-                className="px-4 py-6 text-center text-sm text-slate-500"
+                className={`${masterTdClass} text-center tabular-nums text-slate-500`}
               >
-                {emptyMessage ?? "No farms found."}
+                {f.farmNo}
+              </td>
+              <td className={masterNameTdClass}>
+                <span className="block truncate">{shown(f.farmName)}</span>
+              </td>
+              <td className={masterTdClass}>
+                <span className="block truncate">
+                  {shown(f.ownerName) || "—"}
+                </span>
+              </td>
+              <td className={masterTdClass}>
+                <span className="block truncate">
+                  {shown(f.supervisorName) || "—"}
+                </span>
+              </td>
+              <td className={masterTdClass}>
+                <span className="block truncate">
+                  {shown(f.village) || "—"}
+                </span>
+              </td>
+              <td className={`${masterTdClass} whitespace-nowrap tabular-nums`}>
+                {f.phoneNumber || "—"}
+              </td>
+              <td className={`${masterTdClass} text-center`}>
+                <MasterStatusBadge status={f.status} />
+              </td>
+              <td className={`${masterTdClass} text-center`}>
+                <div className="inline-flex items-center gap-2">
+                  <MasterEditButton
+                    onClick={() => onEdit(f)}
+                    ariaLabel={`Edit farm ${f.farmName}`}
+                  />
+                  <MasterDeleteButton
+                    onClick={() =>
+                      requestDelete(f.id, {
+                        label: `Deleting Farm "${f.farmName}"`,
+                      })
+                    }
+                    ariaLabel={`Delete farm ${f.farmName}`}
+                  />
+                </div>
               </td>
             </tr>
-          )}
+          ))}
         </tbody>
-      </table>
+      </MasterTable>
       <PendingDeleteNotification items={pendingItems} onCancel={cancel} />
-    </div>
+    </>
   );
 }
 

@@ -1061,7 +1061,7 @@ export default {
   'masters.shops.table.association': 'Association',
   'masters.shops.table.association_type': 'Association Type',
   'masters.shops.table.paper_rate': 'Paper Rate',
-  'masters.shops.table.opening_balance': 'Opening Balance',
+  'masters.shops.table.opening_balance': 'Week Opening Balance',
   'masters.shops.table.balance': 'Balance',
   'masters.shops.table.current_balance': 'Current Balance',
   'masters.shops.table.opening_short': 'Opening',

@@ -55,7 +55,7 @@ export default function BulkImportDialog<T, E>({
 
   const validCount = useMemo(
     () => rows.filter((r) => r.errors.length === 0).length,
-    [rows]
+    [rows],
   );
 
   const reset = useCallback(() => {
@@ -95,7 +95,7 @@ export default function BulkImportDialog<T, E>({
   };
 
   const handleConfirmImport = async () => {
-    if (step === "progress" || rows.some(r => r.errors.length > 0)) return;
+    if (step === "progress" || rows.some((r) => r.errors.length > 0)) return;
     const validRows = rows;
     if (validRows.length === 0) return;
 
@@ -105,7 +105,7 @@ export default function BulkImportDialog<T, E>({
     let res: CreateManyResult;
     try {
       res = await config.createMany(validRows, (done, total) =>
-        setProgress({ done, total })
+        setProgress({ done, total }),
       );
     } catch (err) {
       res = {
@@ -131,7 +131,12 @@ export default function BulkImportDialog<T, E>({
   if (!open) return null;
 
   return (
-    <MasterDialog label={config.title} onClose={handleClose} isSaving={step === "progress"} width="wide">
+    <MasterDialog
+      label={config.title}
+      onClose={handleClose}
+      isSaving={step === "progress"}
+      width="wide"
+    >
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[90vh] flex flex-col animate-in fade-in zoom-in duration-200">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4 border-b border-slate-200 shrink-0">
@@ -140,8 +145,13 @@ export default function BulkImportDialog<T, E>({
               {config.icon ?? <Upload size={20} />}
             </div>
             <div>
-              <h2 className="text-lg font-bold text-slate-800">{config.title}</h2>
-              <p className="text-xs text-slate-500">{config.subtitle}. All rows must be valid; any server failure rolls back the entire batch.</p>
+              <h2 className="text-lg font-bold text-slate-800">
+                {config.title}
+              </h2>
+              <p className="text-xs text-slate-500">
+                {config.subtitle}. All rows must be valid; any server failure
+                rolls back the entire batch.
+              </p>
             </div>
           </div>
           <button
@@ -155,45 +165,55 @@ export default function BulkImportDialog<T, E>({
 
         {/* Stepper */}
         <div className="px-6 pt-4 flex items-center gap-1.5 text-[11px] font-medium text-slate-500 shrink-0">
-          {(["upload", "preview", "progress", "result"] as Step[]).map((s, i) => {
-            const labels: Record<Step, string> = {
-              upload: "Upload",
-              preview: "Preview",
-              progress: "Import",
-              result: "Result",
-            };
-            const active =
-              (step === "result" && s === "result") ||
-              step === s ||
-              (s === "result" && step === "progress");
-            const doneOrder =
-              (step === "preview" && i < 1) ||
-              (step === "progress" && i <= 2) ||
-              step === "result";
-            return (
-              <div key={s} className="flex items-center gap-1.5">
-                <span
-                  className={`inline-flex items-center gap-1 transition-colors ${
-                    active ? "text-blue-700" : doneOrder ? "text-emerald-600" : "text-slate-400"
-                  }`}
-                >
+          {(["upload", "preview", "progress", "result"] as Step[]).map(
+            (s, i) => {
+              const labels: Record<Step, string> = {
+                upload: "Upload",
+                preview: "Preview",
+                progress: "Import",
+                result: "Result",
+              };
+              const active =
+                (step === "result" && s === "result") ||
+                step === s ||
+                (s === "result" && step === "progress");
+              const doneOrder =
+                (step === "preview" && i < 1) ||
+                (step === "progress" && i <= 2) ||
+                step === "result";
+              return (
+                <div key={s} className="flex items-center gap-1.5">
                   <span
-                    className={`w-5 h-5 rounded-full inline-flex items-center justify-center text-[10px] font-bold border ${
+                    className={`inline-flex items-center gap-1 transition-colors ${
                       active
-                        ? "bg-blue-600 text-white border-blue-600"
+                        ? "text-blue-700"
                         : doneOrder
-                          ? "bg-emerald-100 text-emerald-700 border-emerald-200"
-                          : "bg-slate-100 text-slate-500 border-slate-200"
+                          ? "text-emerald-600"
+                          : "text-slate-400"
                     }`}
                   >
-                    {doneOrder && !active ? <CheckCircle2 size={12} /> : i + 1}
+                    <span
+                      className={`w-5 h-5 rounded-full inline-flex items-center justify-center text-[10px] font-bold border ${
+                        active
+                          ? "bg-blue-600 text-white border-blue-600"
+                          : doneOrder
+                            ? "bg-emerald-100 text-emerald-700 border-emerald-200"
+                            : "bg-slate-100 text-slate-500 border-slate-200"
+                      }`}
+                    >
+                      {doneOrder && !active ? (
+                        <CheckCircle2 size={12} />
+                      ) : (
+                        i + 1
+                      )}
+                    </span>
+                    {labels[s]}
                   </span>
-                  {labels[s]}
-                </span>
-                {s !== "result" && <span className="w-5 h-px bg-slate-300" />}
-              </div>
-            );
-          })}
+                  {s !== "result" && <span className="w-5 h-px bg-slate-300" />}
+                </div>
+              );
+            },
+          )}
         </div>
 
         {/* Body */}
@@ -211,7 +231,8 @@ export default function BulkImportDialog<T, E>({
                       Step 1: Download the template
                     </p>
                     <p className="text-xs text-slate-500">
-                      Use the template to format your data. Required columns are marked with *.
+                      Use the template to format your data. Required columns are
+                      marked with *.
                     </p>
                   </div>
                 </div>
@@ -264,22 +285,30 @@ export default function BulkImportDialog<T, E>({
               {fileName && !parseError && (
                 <div className="flex items-center gap-2 text-sm text-slate-600 bg-blue-50 border border-blue-200 rounded-lg px-3 py-2">
                   <Loader2 size={14} className="text-blue-500 animate-spin" />
-                  Parsing <span className="font-medium text-blue-700">{fileName}</span>...
+                  Parsing{" "}
+                  <span className="font-medium text-blue-700">{fileName}</span>
+                  ...
                 </div>
               )}
 
               {parseError && (
                 <div className="flex items-start gap-3 bg-red-50 border border-red-200 rounded-xl p-4">
-                  <AlertTriangle size={18} className="text-red-600 shrink-0 mt-0.5" />
+                  <AlertTriangle
+                    size={18}
+                    className="text-red-600 shrink-0 mt-0.5"
+                  />
                   <div>
-                    <p className="text-sm font-medium text-red-700">{parseError}</p>
+                    <p className="text-sm font-medium text-red-700">
+                      {parseError}
+                    </p>
                     {missing.length > 0 && (
                       <p className="text-xs text-red-600 mt-1">
                         Missing: {missing.join(", ")}
                       </p>
                     )}
                     <p className="text-xs text-slate-500 mt-1">
-                      Download the template to see the exact column names, then try again.
+                      Download the template to see the exact column names, then
+                      try again.
                     </p>
                   </div>
                 </div>
@@ -295,10 +324,12 @@ export default function BulkImportDialog<T, E>({
                   Total rows <span className="font-bold">{rows.length}</span>
                 </span>
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-full text-xs font-medium text-emerald-700">
-                  <CheckCircle2 size={14} /> Valid <span className="font-bold">{validCount}</span>
+                  <CheckCircle2 size={14} /> Valid{" "}
+                  <span className="font-bold">{validCount}</span>
                 </span>
                 <span className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-50 border border-red-200 rounded-full text-xs font-medium text-red-700">
-                  <XCircle size={14} /> Invalid <span className="font-bold">{rows.length - validCount}</span>
+                  <XCircle size={14} /> Invalid{" "}
+                  <span className="font-bold">{rows.length - validCount}</span>
                 </span>
               </div>
 
@@ -343,18 +374,23 @@ export default function BulkImportDialog<T, E>({
                                   className="px-4 py-2.5 text-slate-700 whitespace-nowrap max-w-[220px] truncate"
                                   title={String(value ?? "")}
                                 >
-                                  {String(value ?? "") || <span className="text-slate-300">—</span>}
+                                  {String(value ?? "") || (
+                                    <span className="text-slate-300">—</span>
+                                  )}
                                 </td>
                               );
                             })}
                             <td className="px-4 py-2.5">
                               {invalid ? (
                                 <div className="space-y-0.5">
-                                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-medium">
-                                        <XCircle size={12} /> Invalid
-                                      </span>
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-red-100 text-red-700 text-xs font-medium">
+                                    <XCircle size={12} /> Invalid
+                                  </span>
                                   {row.errors.map((e) => (
-                                    <p key={e} className="text-[11px] text-red-600 leading-tight">
+                                    <p
+                                      key={e}
+                                      className="text-[11px] text-red-600 leading-tight"
+                                    >
                                       {e}
                                     </p>
                                   ))}
@@ -426,7 +462,8 @@ export default function BulkImportDialog<T, E>({
                         : `Imported ${result.imported} of ${result.attempted} ${config.nounPlural}`}
                   </p>
                   <p className="text-xs text-slate-500 mt-1">
-                    {result.failed} row{result.failed === 1 ? "" : "s"} failed · {result.total} row
+                    {result.failed} row{result.failed === 1 ? "" : "s"} failed ·{" "}
+                    {result.total} row
                     {result.total === 1 ? "" : "s"} imported
                   </p>
                 </div>
@@ -435,7 +472,9 @@ export default function BulkImportDialog<T, E>({
               {result.errors.length > 0 && (
                 <div className="border border-red-200 rounded-xl overflow-hidden">
                   <div className="px-4 py-2 bg-red-50 border-b border-red-200">
-                    <p className="text-sm font-semibold text-red-700">Failed rows</p>
+                    <p className="text-sm font-semibold text-red-700">
+                      Failed rows
+                    </p>
                   </div>
                   <div className="max-h-[30vh] overflow-y-auto divide-y divide-slate-100">
                     {result.errors.map((err, i) => (

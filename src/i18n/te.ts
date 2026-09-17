@@ -1059,7 +1059,7 @@ export default {
   'masters.shops.table.association': 'అసోసియేషన్',
   'masters.shops.table.association_type': 'అసోసియేషన్ రకం',
   'masters.shops.table.paper_rate': 'పేపర్ రేటు',
-  'masters.shops.table.opening_balance': 'ప్రారంభ నిల్వ',
+  'masters.shops.table.opening_balance': 'వారం ప్రారంభ నిల్వ',
   'masters.shops.table.balance': 'బ్యాలెన్స్',
   'masters.shops.table.current_balance': 'ప్రస్తుత బ్యాలెన్స్',
   'masters.shops.table.opening_short': 'ప్రారంభ',

@@ -8,7 +8,12 @@ import type { BulkImportConfig } from "../components/bulk-import/bulkImportTypes
 import type { Shop } from "./types/shop";
 import type { ShopInput } from "./services/shopService";
 
-const ASSOCIATION_TYPES = ["Vencob Vij", "Vencob Gun", "Ass Vij", "Ass Gun"] as const;
+const ASSOCIATION_TYPES = [
+  "Vencob Vij",
+  "Vencob Gun",
+  "Ass Vij",
+  "Ass Gun",
+] as const;
 
 export type ShopBulkRow = {
   shopNumber: string;
@@ -60,15 +65,21 @@ function validateShopRow(row: ShopBulkRow, existing: Shop[]): string[] {
   const paperRate = row.paperRate;
 
   if (!shopName) errors.push("Shop Name is required.");
-  else if (shopName.length < 3) errors.push("Shop Name must contain at least 3 characters.");
+  else if (shopName.length < 3)
+    errors.push("Shop Name must contain at least 3 characters.");
 
   if (!ownerName) errors.push("Owner Name is required.");
-  else if (ownerName.length < 3) errors.push("Owner Name must contain at least 3 characters.");
+  else if (ownerName.length < 3)
+    errors.push("Owner Name must contain at least 3 characters.");
 
   if (!phoneNumber) errors.push("Mobile Number is required.");
-  else if (!/^[0-9]{10}$/.test(phoneNumber)) errors.push("Mobile Number must be exactly 10 digits.");
+  else if (!/^[0-9]{10}$/.test(phoneNumber))
+    errors.push("Mobile Number must be exactly 10 digits.");
 
-  if (secondaryPhoneNumber !== "" && !/^[0-9]{10}$/.test(secondaryPhoneNumber)) {
+  if (
+    secondaryPhoneNumber !== "" &&
+    !/^[0-9]{10}$/.test(secondaryPhoneNumber)
+  ) {
     errors.push("Secondary Mobile Number must be exactly 10 digits.");
   }
 
@@ -96,20 +107,27 @@ function validateShopRow(row: ShopBulkRow, existing: Shop[]): string[] {
     errors.push("Paper Rate must be an integer between 1 and 30.");
   }
 
-  if (!row.associationType.trim() || !ASSOCIATION_TYPES.includes(row.associationType as typeof ASSOCIATION_TYPES[number])) {
-    errors.push(`Association Type must be one of: ${ASSOCIATION_TYPES.join(", ")}`);
+  if (
+    !row.associationType.trim() ||
+    !ASSOCIATION_TYPES.includes(
+      row.associationType as (typeof ASSOCIATION_TYPES)[number],
+    )
+  ) {
+    errors.push(
+      `Association Type must be one of: ${ASSOCIATION_TYPES.join(", ")}`,
+    );
   }
 
   // Check for duplicate shop name in existing data
   const duplicate = existing.some(
-    (s) => s.shopName.trim().toLowerCase() === shopName.toLowerCase()
+    (s) => s.shopName.trim().toLowerCase() === shopName.toLowerCase(),
   );
   if (duplicate) errors.push("Shop Name already exists.");
 
   // Check for duplicate shop number in existing data
   if (shopNumber) {
     const duplicateNumber = existing.some(
-      (s) => s.shopNumber.trim().toLowerCase() === shopNumber.toLowerCase()
+      (s) => s.shopNumber.trim().toLowerCase() === shopNumber.toLowerCase(),
     );
     if (duplicateNumber) errors.push("Shop Number already exists.");
   }
@@ -139,11 +157,28 @@ export function buildShopBulkImportConfig({
       { key: "Shop Number", sample: "SHOP-000001" },
       { key: "Shop Name", required: true, sample: "Ramesh Chicken Shop" },
       { key: "Owner Name", required: true, sample: "Ramesh Kumar" },
-      { key: "Phone", aliases: ["Mobile Number", "Phone Number"], required: true, sample: "9876543210" },
-      { key: "Secondary Phone", aliases: ["Secondary Mobile", "Secondary Mobile Number"], sample: "9876543211" },
-      { key: "Email", aliases: ["Email ID", "email"], sample: "shop@example.com" },
+      {
+        key: "Phone",
+        aliases: ["Mobile Number", "Phone Number"],
+        required: true,
+        sample: "9876543210",
+      },
+      {
+        key: "Secondary Phone",
+        aliases: ["Secondary Mobile", "Secondary Mobile Number"],
+        sample: "9876543211",
+      },
+      {
+        key: "Email",
+        aliases: ["Email ID", "email"],
+        sample: "shop@example.com",
+      },
       { key: "City", required: true, sample: "Bhimavaram" },
-      { key: "Address", sample: "Main Road, 2nd Lane, Bhimavaram, West Godavari, Andhra Pradesh" },
+      {
+        key: "Address",
+        sample:
+          "Main Road, 2nd Lane, Bhimavaram, West Godavari, Andhra Pradesh",
+      },
       { key: "Latitude", sample: "16.544123" },
       { key: "Longitude", sample: "81.523456" },
       { key: "Paper Rate", required: true, sample: "5" },
@@ -166,7 +201,8 @@ export function buildShopBulkImportConfig({
         longitude: String(record["Longitude"] ?? "").trim(),
         paperRate: parseInt(String(record["Paper Rate"] ?? "1"), 10) || 1,
         associationType: String(record["Association Type"] ?? "").trim(),
-        openingBalance: parseFloat(String(record["Opening Balance"] ?? "0")) || 0,
+        openingBalance:
+          parseFloat(String(record["Opening Balance"] ?? "0")) || 0,
         status: status === "Inactive" ? "Inactive" : "Active",
       };
     },
@@ -180,7 +216,13 @@ export function buildShopBulkImportConfig({
       try {
         await addShopsBulk(payloads);
         onProgress(total, total);
-        return { total, attempted: total, imported: total, failed: 0, errors: [] };
+        return {
+          total,
+          attempted: total,
+          imported: total,
+          failed: 0,
+          errors: [],
+        };
       } catch (err) {
         onProgress(total, total);
         return {
@@ -188,10 +230,13 @@ export function buildShopBulkImportConfig({
           attempted: total,
           imported: 0,
           failed: total,
-          errors: [{
-            row: 0,
-            message: err instanceof Error ? err.message : "Shop import failed.",
-          }],
+          errors: [
+            {
+              row: 0,
+              message:
+                err instanceof Error ? err.message : "Shop import failed.",
+            },
+          ],
         };
       }
     },
