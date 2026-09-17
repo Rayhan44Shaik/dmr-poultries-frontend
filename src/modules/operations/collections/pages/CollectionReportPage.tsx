@@ -630,42 +630,6 @@ export default function CollectionReportPage({ embedded = false }: Props) {
     return () => observer.disconnect();
   }, [report?.totalCount]);
 
-  if (loading && !report)
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <div className="flex flex-col items-center gap-3 rounded-2xl border border-slate-200/80 bg-white px-10 py-8 shadow-sm">
-          <Loader2 size={28} className="animate-spin text-emerald-600" />
-          <span className="text-sm font-medium text-slate-500">{t("common.loading")}</span>
-        </div>
-      </div>
-    );
-  if (reportError && !report) {
-    return (
-      <div className="flex min-h-[40vh] items-center justify-center">
-        <div className="flex max-w-md flex-col items-center gap-3 rounded-2xl border border-rose-100 bg-rose-50/60 px-10 py-8 text-center shadow-sm">
-          <span className="rounded-full bg-rose-100 p-3 text-rose-600">
-            <AlertTriangle size={22} />
-          </span>
-          <p className="text-sm font-semibold text-rose-700">{reportError}</p>
-          <button
-            onClick={() => {
-              setReportError(null);
-              if (appliedFiltersRef.current.fromDate && appliedFiltersRef.current.toDate) {
-                void loadReport(appliedFiltersRef.current);
-              } else {
-                setLoading(true);
-                void loadWeekBounds();
-              }
-            }}
-            className={opsSecondaryButtonClass}
-          >
-            <RotateCcw size={14} /> {t("common.retry")}
-          </button>
-        </div>
-      </div>
-    );
-  }
-
   // Content matching the precise structural layout and spacing of RatesEntryPage
   const content = (
     <div className="w-full space-y-5" data-embedded={embedded || undefined}>
@@ -792,9 +756,42 @@ export default function CollectionReportPage({ embedded = false }: Props) {
         </div>
       </div>
 
-      {/* Tables — friendly empty state when the period has no collections;
-          dimmed + non-interactive while a refresh is in flight */}
-      {(report?.totalCount ?? 0) === 0 ? (
+      {/* Tables — the filter bar above always stays constant. Loading, error
+          and empty states render inline here (never a full-page takeover),
+          exactly like the Trip List table surface. */}
+      {loading && !report ? (
+        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-slate-200/80 bg-white py-16 shadow-sm">
+          <span className="inline-flex items-center gap-2 text-sm font-medium text-slate-500">
+            <span
+              className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600"
+              aria-hidden="true"
+            />
+            {t("ops.collection.loading_report")}
+          </span>
+        </div>
+      ) : reportError && !report ? (
+        <div className="flex flex-col items-center justify-center gap-3 rounded-2xl border border-rose-100 bg-rose-50/50 py-14 text-center shadow-sm">
+          <span className="rounded-full bg-rose-100 p-3 text-rose-600">
+            <AlertTriangle size={22} />
+          </span>
+          <p className="text-sm font-semibold text-rose-700">{reportError}</p>
+          <button
+            type="button"
+            onClick={() => {
+              setReportError(null);
+              if (appliedFiltersRef.current.fromDate && appliedFiltersRef.current.toDate) {
+                void loadReport(appliedFiltersRef.current);
+              } else {
+                setLoading(true);
+                void loadWeekBounds();
+              }
+            }}
+            className={opsSecondaryButtonClass}
+          >
+            <RotateCcw size={14} /> {t("common.retry")}
+          </button>
+        </div>
+      ) : (report?.totalCount ?? 0) === 0 ? (
         <div className={`${opsEmptyStateClass} flex flex-col items-center gap-2 py-14`}>
           <span className="rounded-full bg-slate-100 p-3 text-slate-400">
             <Inbox size={22} />
@@ -876,7 +873,7 @@ export default function CollectionReportPage({ embedded = false }: Props) {
                 {t("common.total")}: {formatCurrency(totalCollections)}
               </span>
             </div>
-            <div className="flex p-4">
+            <div className="flex h-full items-center justify-center px-5 py-4">
               <CollectionsPie
                 data={modeChartData.map((row) => ({ name: row.name, value: row.value }))}
                 animationKey={report?.totalCount ?? 0}
