@@ -514,7 +514,6 @@ export const NAV_SECTIONS: NavSection[] = [
     labelKey: "nav.reports",
     icon: FileText,
     children: [
-      //{ label: "Reports Hub", path: "/reports", icon: BarChart3, keywords: "reports hub" },
       {
         label: "Shop Ledger",
         labelKey: "nav.shopLedger",
@@ -535,11 +534,11 @@ export const NAV_SECTIONS: NavSection[] = [
       },
       {
         label: "Vehicle Analytics",
-        labelKey: "nav.analytics",
+        labelKey: "nav.vehicleAnalytics",
         path: "/fleet?tab=analytics",
         icon: BarChart3,
-        tone: "violet",
-        keywords: "vehicle analytics performance fleet",
+        tone: "indigo",
+        keywords: "vehicle analytics fleet performance expenses trips mileage",
       },
     ],
   },

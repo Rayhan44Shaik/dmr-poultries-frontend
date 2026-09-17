@@ -85,6 +85,9 @@ export default {
   'shop_ledger.pdf_close': 'Close PDF preview',
   'shop_ledger.pdf_bytes_error': 'Unable to read PDF bytes.',
   'shop_ledger.pdf_select_shops': 'Select at least one shop to download.',
+  'shop_ledger.pdf_download_selected': 'Download selected ({count})',
+  'shop_ledger.pdf_download_combined': 'Download selected as one PDF',
+  'shop_ledger.pdf_generating_shop': 'Generating preview for {shop}…',
   'shop_ledger.pdf_check': 'Check PDF',
   'shop_ledger.pdf_hide': 'Hide',
 

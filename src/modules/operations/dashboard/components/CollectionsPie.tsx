@@ -30,6 +30,10 @@ function lighten(hex: string, amt = 0.22): string {
 interface CollectionsPieProps {
   data: { name: string; value: number }[];
   animationKey?: number;
+  /** Compact report-card layout; the dashboard keeps the full-size default. */
+  compact?: boolean;
+  /** Hide the KPI stat footer beneath the donut (the table serves as legend). */
+  hideStats?: boolean;
 }
 
 interface EnrichedMode {
@@ -103,7 +107,12 @@ function CollectionStat({
  * Payment-mode donut with stable bank/cash colours, direct amount/share
  * callouts, a selected-period total, and the existing KPI summary beneath it.
  */
-export default function CollectionsPie({ data, animationKey = 0 }: CollectionsPieProps) {
+export default function CollectionsPie({
+  data,
+  animationKey = 0,
+  compact = false,
+  hideStats = false,
+}: CollectionsPieProps) {
   const { t } = useI18n();
   const chartData = useMemo(() => data ?? [], [data]);
 
@@ -169,7 +178,7 @@ export default function CollectionsPie({ data, animationKey = 0 }: CollectionsPi
     <div
       key={`kpi-${dataSignature}`}
       aria-label={t("ops.dashboard.collection_streams")}
-      className="mt-3 grid w-full shrink-0 grid-cols-2 gap-2 border-t border-slate-100 pt-3 sm:grid-cols-3"
+      className={`${compact ? "mt-1 gap-1.5 pt-2" : "mt-3 gap-2 pt-3"} grid w-full shrink-0 grid-cols-2 border-t border-slate-100 sm:grid-cols-3`}
     >
       {enrichedData.map((d) => (
         <CollectionStat key={d.name} {...d} />
@@ -218,22 +227,27 @@ export default function CollectionsPie({ data, animationKey = 0 }: CollectionsPi
           </div>
           </div>
         </div>
-        <div className="mt-3 grid w-full shrink-0 grid-cols-2 gap-2 border-t border-slate-100 pt-3 sm:grid-cols-3">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="h-[3.25rem] animate-pulse rounded-xl bg-slate-100/80" />
-          ))}
-        </div>
+        {!hideStats && (
+          <div className="mt-3 grid w-full shrink-0 grid-cols-2 gap-2 border-t border-slate-100 pt-3 sm:grid-cols-3">
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="h-[3.25rem] animate-pulse rounded-xl bg-slate-100/80" />
+            ))}
+          </div>
+        )}
       </div>
     );
   }
 
   return (
     <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
-      <div className="relative min-h-[21.25rem] w-full flex-1" style={{ minHeight: "21.25rem" }}>
+      <div
+        className={`relative w-full flex-1 ${compact ? "min-h-32" : "min-h-[21.25rem]"}`}
+        style={{ minHeight: compact ? "8rem" : "21.25rem" }}
+      >
         <div className="absolute inset-0 flex items-center justify-center">
           <div
             key={dataSignature}
-            className="cs-pie-spin relative aspect-square w-full max-w-[20rem] animate-fade-in"
+            className={`cs-pie-spin relative aspect-square w-full animate-fade-in ${compact ? "max-w-32" : "max-w-[20rem]"}`}
             style={{ aspectRatio: "1 / 1" }}
           >
             <svg viewBox="0 0 400 400" className="absolute inset-0 h-full w-full" aria-hidden="true">
@@ -287,14 +301,16 @@ export default function CollectionsPie({ data, animationKey = 0 }: CollectionsPi
               <span className="text-[9px] font-bold uppercase tracking-[0.16em] text-slate-400">
                 {t("ops.dashboard.collection_streams_total")}
               </span>
-              <span className="mt-1 text-[24px] font-black leading-none tracking-tight text-slate-800 tabular-nums">
+              <span
+                className={`${compact ? "mt-0.5 text-[17px]" : "mt-1 text-[24px]"} font-black leading-none tracking-tight text-slate-800 tabular-nums`}
+              >
                 {formatINRCompact(animatedTotal)}
               </span>
             </div>
           </div>
         </div>
 
-        {enrichedData.slice(0, 3).map((mode, index) => {
+        {!compact && enrichedData.slice(0, 3).map((mode, index) => {
           const onLeft = index === 1;
           const position = index === 0
             ? "right-0 top-[16%]"
@@ -323,7 +339,7 @@ export default function CollectionsPie({ data, animationKey = 0 }: CollectionsPi
           );
         })}
       </div>
-      {modeKpis}
+      {!hideStats && modeKpis}
     </div>
   );
 }
