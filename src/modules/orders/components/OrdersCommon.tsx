@@ -693,7 +693,9 @@ export function OrdersMultiSelect({
           className={`absolute right-0 z-30 mt-1 max-h-64 min-w-full overflow-auto rounded-xl border border-slate-200 bg-white py-1 shadow-lg ${widthClass}`}
         >
           {searchable ? (
-            <li className="px-2 pb-1.5 pt-1">
+            // role="none" so the listbox's child contract holds: the box is
+            // chrome around the options, not an option itself.
+            <li role="none" className="px-2 pb-1.5 pt-1">
               <input
                 ref={pickRef}
                 type="text"
