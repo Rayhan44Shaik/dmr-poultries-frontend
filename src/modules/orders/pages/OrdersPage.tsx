@@ -716,7 +716,7 @@ const OrdersPage: React.FC = () => {
                   </React.Suspense>
                 </section>
               )}
-              {visited.includes("tracking") && !dataPending && (
+              {visited.includes("tracking") && (
                 <section
                   id="orders-panel-tracking"
                   hidden={activeTab !== "tracking"}
@@ -728,8 +728,8 @@ const OrdersPage: React.FC = () => {
                 >
                   <React.Suspense fallback={<OrdersTableSkeleton rows={5} />}>
                     <DeliveryTrackingPage
-                      trips={data.tracking}
-                      loading={false}
+                      trips={data?.tracking ?? []}
+                      loading={dataPending}
                       today={today}
                       shopDirectory={shopDirectory}
                       supervisorDirectory={supervisorDirectory}

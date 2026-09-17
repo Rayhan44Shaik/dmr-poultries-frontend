@@ -251,7 +251,8 @@ const EN: Record<string, string> = {
   "orders.day_prev": "Previous Day",
   "orders.day_next": "Next Day",
   "orders.locked": "LOCKED",
-  "orders.row_locked_assigned": "Assigned to a vehicle — edit from Order Assignment",
+  "orders.row_locked_assigned":
+    "Assigned to a vehicle — edit from Order Assignment",
   "orders.closed_day": "CLOSED",
   "orders.read_only_note": "This operational day is closed — view only.",
   "orders.auto_closed_note":
@@ -345,8 +346,10 @@ const EN: Record<string, string> = {
   "orders.word_birds": "birds",
 
   // Delivery tracking: two-table layout
-  "orders.tracking_active_title": "PENDING & IN PROGRESS",
-  "orders.tracking_completed_title": "COMPLETED",
+  "orders.tracking_active_title": "Pending & In Progress",
+  "orders.tracking_filters": "Delivery tracking filters",
+  "orders.loading_records": "Loading {table} records…",
+  "orders.tracking_completed_title": "Completed",
   "orders.col_progress": "Progress",
   "orders.col_completed_at": "Completed At",
   "orders.status_complete": "COMPLETE",
@@ -701,7 +704,8 @@ const TE: Record<string, string> = {
   "orders.day_prev": "మునుపటి రోజు",
   "orders.day_next": "తర్వాత రోజు",
   "orders.locked": "లాక్",
-  "orders.row_locked_assigned": "వాహనానికి కేటాయించారు — ఆర్డర్ అసైన్‌మెంట్ నుండి మార్చండి",
+  "orders.row_locked_assigned":
+    "వాహనానికి కేటాయించారు — ఆర్డర్ అసైన్‌మెంట్ నుండి మార్చండి",
   "orders.closed_day": "మూసి వేయబడింది",
   "orders.read_only_note": "ఈ పని రోజు మూసి వేయబడింది — చూడటం మాత్రమే.",
   "orders.auto_closed_note":
@@ -797,6 +801,8 @@ const TE: Record<string, string> = {
 
   // Delivery tracking: two-table layout
   "orders.tracking_active_title": "పెండింగ్ & ప్రగతిలో",
+  "orders.tracking_filters": "డెలివరీ ట్రాకింగ్ ఫిల్టర్లు",
+  "orders.loading_records": "{table} నమోదులు లోడ్ అవుతున్నాయి…",
   "orders.tracking_completed_title": "పూర్తయినవి",
   "orders.col_progress": "ప్రగతి",
   "orders.col_completed_at": "పూర్తయిన సమయం",

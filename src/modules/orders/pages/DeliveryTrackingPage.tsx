@@ -15,15 +15,45 @@
 // Each table paginates 10 rows (existing TripPagination) with "Showing X–Y of Z".
 
 import React, { useMemo, useState } from "react";
-import { CalendarRange, Eye, FileText, RefreshCw } from "lucide-react";
 import {
+  ArrowUpDown,
+  Bird,
+  Box,
+  Calendar,
+  CheckCircle2,
+  ClipboardCheck,
+  Eye,
+  FileText,
+  Hash,
+  Hourglass,
+  PackageCheck,
+  Route,
+  Scale,
+  Search,
+  Settings2,
+  ShoppingBag,
+  SlidersHorizontal,
+  Truck,
+  User,
+  UserCog,
+} from "lucide-react";
+import {
+  opsFilterCardClass,
+  opsFilterLabelClass,
+  opsInputClass,
   opsTableDivideClass,
   opsTableHeadRowClass,
   opsTableTdClass,
   opsTableThClass,
 } from "../../../shared/ui/operationsStyles";
 
-import { FilterResetButton, Pagination, countActiveFilters } from "../../../ui";
+import {
+  BrandRefreshButton,
+  FilterResetButton,
+  Pagination,
+  countActiveFilters,
+} from "../../../ui";
+import MasterDropdown from "../../masters/components/MasterDropdown";
 import {
   deliveryProgressPct,
   formatCount,
@@ -32,6 +62,7 @@ import {
   trackingSearchHaystack,
 } from "../utils/ordersUtils";
 import { addLocalDays } from "../utils/ordersUtils";
+import { formatVehicleNumber } from "../../../utils/format";
 import {
   paginate,
   shopNumberOf,
@@ -48,13 +79,9 @@ import {
   ordersTableZebraRow,
 } from "../utils/ordersTableStyles";
 import {
-  OrdersDropdown,
-  OrdersEmptyState,
   OrdersIconButton,
   OrdersLabelButton,
-  OrdersSearchInput,
   OrdersStatusBadge,
-  OrdersTableSkeleton,
 } from "../components/OrdersCommon";
 
 const PAGE_SIZE = 10;
@@ -223,16 +250,99 @@ function ProgressBar({ ot }: { ot: OrdersTrip }) {
   );
 }
 
-function SectionTitle({ label, note }: { label: string; note?: string }) {
+/** Table heading — icon tile + title + count, the Collection / Assignment anatomy. */
+function SectionTitle({
+  label,
+  note,
+  tone,
+  children,
+}: {
+  label: string;
+  note?: string;
+  tone: "amber" | "emerald";
+  children?: React.ReactNode;
+}) {
+  const tile =
+    tone === "amber"
+      ? "border-amber-100 bg-amber-50 text-amber-600"
+      : "border-emerald-100 bg-emerald-50 text-emerald-600";
+  const bar = tone === "amber" ? "bg-amber-50/40" : "bg-emerald-50/40";
+  const Icon = tone === "amber" ? Hourglass : CheckCircle2;
   return (
-    <div className="px-5 py-3 border-b border-slate-200 bg-slate-50/60 flex items-center justify-between flex-wrap gap-2">
-      <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
+    <div
+      className={`flex flex-wrap items-center gap-3 border-b border-slate-100 px-6 py-3 ${bar}`}
+    >
+      <span
+        className={`flex h-9 w-9 items-center justify-center rounded-xl border shadow-inner ${tile}`}
+      >
+        <Icon size={20} aria-hidden />
+      </span>
+      <h3 className="text-base font-bold tracking-tight text-slate-800">
         {label}
       </h3>
       {note ? (
-        <span className="text-[11px] font-semibold text-slate-400">{note}</span>
+        <span className="inline-flex items-center rounded-full border border-slate-200 bg-white px-2.5 py-0.5 text-[11px] font-bold tabular-nums text-slate-600">
+          {note}
+        </span>
+      ) : null}
+      {children ? (
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {children}
+        </div>
       ) : null}
     </div>
+  );
+}
+
+/** Column head with the Trip List's coloured glyph. */
+function Th({
+  icon,
+  label,
+  className = "",
+  align = "left",
+}: {
+  icon?: React.ReactNode;
+  label: string;
+  className?: string;
+  align?: "left" | "right" | "center";
+}) {
+  const just =
+    align === "right"
+      ? "justify-end text-right"
+      : align === "center"
+        ? "justify-center text-center"
+        : "";
+  return (
+    <th className={`${opsTableThClass} ${className}`}>
+      <span className={`inline-flex items-center gap-1.5 ${just}`}>
+        {icon}
+        <span>{label}</span>
+      </span>
+    </th>
+  );
+}
+
+/** Spinner row shown INSIDE the table while its rows load / refresh. */
+function TableLoadingRow({
+  label,
+  colSpan,
+}: {
+  label: string;
+  colSpan: number;
+}) {
+  const { to } = useOrdersI18n();
+  return (
+    <tr>
+      <td colSpan={colSpan} className="px-4 py-14 text-center">
+        <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-slate-400">
+          <span
+            className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600"
+            aria-hidden="true"
+          />
+          {to("orders.loading_records", { table: label })}
+        </span>
+      </td>
+    </tr>
   );
 }
 
@@ -242,6 +352,9 @@ function TrackingTable({
   pageSlice,
   safePage,
   refreshing,
+  loading = false,
+  label,
+  emptyTitle,
   onPageChange,
   pageSize,
   onPageSizeChange,
@@ -253,6 +366,12 @@ function TrackingTable({
   safePage: number;
   totalPages: number;
   refreshing: boolean;
+  /** First load — the frame is drawn, rows say "Loading …". */
+  loading?: boolean;
+  /** Table name spoken by the loading row. */
+  label: string;
+  /** Empty-state copy when there are no rows to show. */
+  emptyTitle: string;
   onPageChange: (p: number) => void;
   pageSize: number;
   onPageSizeChange?: (pageSize: number) => void;
@@ -269,47 +388,90 @@ function TrackingTable({
       <table className={`w-full min-w-[92.5rem] ${ORDERS_TABLE_FONT_CLASS}`}>
         <thead>
           <tr className={opsTableHeadRowClass}>
-            <th className={`${opsTableThClass} w-14`}>
-              {to("orders.col_sno")}
-            </th>
-            <th className={opsTableThClass}>{to("orders.col_trip_no")}</th>
-            <th className={`${opsTableThClass} w-24`}>
-              {to("orders.col_date")}
-            </th>
-            <th className={opsTableThClass}>{to("orders.col_vehicle_no")}</th>
-            <th className={opsTableThClass}>{to("orders.supervisor")}</th>
-            <th className={opsTableThClass}>{to("orders.driver")}</th>
-            <th className={`${opsTableThClass} w-32`}>
-              {to("orders.col_total_shops")}
-            </th>
-            <th className={`${opsTableThClass} w-24 text-right`}>
-              {to("orders.total_boxes")}
-            </th>
-            <th className={`${opsTableThClass} w-24 text-right`}>
-              {to("orders.col_delivered_boxes")}
-            </th>
-            <th className={`${opsTableThClass} w-24 text-right`}>
-              {to("orders.delivered_birds")}
-            </th>
-            <th className={`${opsTableThClass} w-28 text-right`}>
-              {to("orders.delivered_weight")}
-            </th>
-            <th className={`${opsTableThClass} w-24 text-right`}>
-              {to("orders.pending_boxes")}
-            </th>
-            <th className={`${opsTableThClass} w-28`}>
-              {to("orders.col_delivery_status")}
-            </th>
-            <th className={`${opsTableThClass} w-36`}>
-              {to("orders.col_action")}
-            </th>
+            <Th className="w-14" label={to("orders.col_sno")} />
+            <Th
+              icon={<Hash size={14} className="shrink-0 text-slate-400" />}
+              label={to("orders.col_trip_no")}
+            />
+            <Th
+              className="w-24"
+              icon={<Calendar size={14} className="shrink-0 text-blue-500" />}
+              label={to("orders.col_date")}
+            />
+            <Th
+              icon={<Truck size={14} className="shrink-0 text-indigo-500" />}
+              label={to("orders.col_vehicle_no")}
+            />
+            <Th
+              icon={<UserCog size={14} className="shrink-0 text-purple-500" />}
+              label={to("orders.supervisor")}
+            />
+            <Th
+              icon={<User size={14} className="shrink-0 text-emerald-500" />}
+              label={to("orders.driver")}
+            />
+            <Th
+              className="w-32"
+              icon={
+                <ShoppingBag size={14} className="shrink-0 text-cyan-500" />
+              }
+              label={to("orders.col_total_shops")}
+            />
+            <Th
+              className="w-24"
+              align="right"
+              icon={<Box size={14} className="shrink-0 text-emerald-600" />}
+              label={to("orders.total_boxes")}
+            />
+            <Th
+              className="w-24"
+              align="right"
+              icon={
+                <PackageCheck size={14} className="shrink-0 text-teal-500" />
+              }
+              label={to("orders.col_delivered_boxes")}
+            />
+            <Th
+              className="w-24"
+              align="right"
+              icon={<Bird size={14} className="shrink-0 text-blue-500" />}
+              label={to("orders.delivered_birds")}
+            />
+            <Th
+              className="w-28"
+              align="right"
+              icon={<Scale size={14} className="shrink-0 text-orange-500" />}
+              label={to("orders.delivered_weight")}
+            />
+            <Th
+              className="w-24"
+              align="right"
+              icon={<Hourglass size={14} className="shrink-0 text-amber-500" />}
+              label={to("orders.pending_boxes")}
+            />
+            <Th
+              className="w-28"
+              icon={
+                <ClipboardCheck size={14} className="shrink-0 text-rose-500" />
+              }
+              label={to("orders.col_delivery_status")}
+            />
+            <Th
+              className="w-36"
+              icon={<Settings2 size={14} className="shrink-0 text-slate-400" />}
+              label={to("orders.col_action")}
+            />
           </tr>
         </thead>
         <tbody className={opsTableDivideClass}>
-          {refreshing ? (
+          {loading || refreshing ? (
+            <TableLoadingRow label={label} colSpan={14} />
+          ) : pageSlice.length === 0 ? (
             <tr>
-              <td colSpan={14}>
-                <OrdersTableSkeleton rows={5} />
+              <td colSpan={14} className="px-4 py-10 text-center">
+                <span className="text-[13px] font-medium text-slate-400">
+                  {emptyTitle}
+                </span>
               </td>
             </tr>
           ) : (
@@ -346,7 +508,11 @@ function TrackingTable({
                   >
                     {formatDayShort(trip.tripDate)}
                   </td>
-                  <td className={opsTableTdClass}>{trip.vehicleNo || "—"}</td>
+                  <td
+                    className={`${opsTableTdClass} font-semibold tabular-nums text-slate-800 whitespace-nowrap`}
+                  >
+                    {trip.vehicleNo ? formatVehicleNumber(trip.vehicleNo) : "—"}
+                  </td>
                   <td className={opsTableTdClass}>
                     <span className="inline-flex flex-col leading-tight">
                       <span>{trip.supervisorName || "—"}</span>
@@ -427,14 +593,16 @@ function TrackingTable({
           )}
         </tbody>
       </table>
-      <Pagination
-        page={safePage}
-        pageSize={pageSize}
-        totalItems={trips.length}
-        onPageChange={onPageChange}
-        onPageSizeChange={onPageSizeChange}
-        disabled={refreshing}
-      />
+      {trips.length > 0 && (
+        <Pagination
+          page={safePage}
+          pageSize={pageSize}
+          totalItems={trips.length}
+          onPageChange={onPageChange}
+          onPageSizeChange={onPageSizeChange}
+          disabled={refreshing || loading}
+        />
+      )}
     </div>
   );
 }
@@ -509,6 +677,15 @@ function DeliveryTrackingPage({
       { value: "short", label: to("orders.short_delivery") },
       { value: "extra", label: to("orders.extra_delivery") },
       { value: "not_listed", label: to("orders.status_not_listed") },
+    ],
+    [to],
+  );
+
+  const sortOptions = useMemo(
+    () => [
+      { value: "newest", label: to("orders.sort_newest") },
+      { value: "oldest", label: to("orders.sort_oldest") },
+      { value: "vehicle", label: to("orders.sort_vehicle_trip") },
     ],
     [to],
   );
@@ -622,8 +799,6 @@ function DeliveryTrackingPage({
     setCompletedPage,
   ] = usePaged(completedFiltered, pageSize, filterKey);
 
-  if (loading) return <OrdersTableSkeleton rows={5} />;
-
   const actionProps = { pdfBusyId, onPdf, onView };
   const defaultFrom = today ? addLocalDays(today, -6) : "";
   const rangeChanged =
@@ -650,100 +825,19 @@ function DeliveryTrackingPage({
 
   return (
     <div className="space-y-4">
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm px-5 py-2.5 flex items-center gap-3 flex-wrap">
-        <OrdersSearchInput
-          value={query}
-          onChange={setQuery}
-          placeholder={to("orders.search_tracking")}
-          ariaLabel={to("orders.search_tracking")}
-          className="w-full sm:w-64"
-        />
-        <OrdersDropdown
-          value={sortMode}
-          onChange={setSortMode}
-          ariaLabel={to("orders.sort")}
-          options={[
-            { value: "newest", label: to("orders.sort_newest") },
-            { value: "oldest", label: to("orders.sort_oldest") },
-            { value: "vehicle", label: to("orders.sort_vehicle_trip") },
-          ]}
-        />
-        <OrdersDropdown
-          value={deliveryFilter}
-          onChange={(v) => setDeliveryFilter(v as DeliveryFilter)}
-          options={deliveryOptions}
-          ariaLabel={to("orders.filter_delivery_status")}
-          widthClass="w-40"
-        />
-        <OrdersDropdown
-          value={differenceFilter}
-          onChange={(v) => setDifferenceFilter(v as DifferenceFilter)}
-          options={differenceOptions}
-          ariaLabel={to("orders.filter_difference")}
-          widthClass="w-40"
-        />
-        <FilterResetButton count={activeFilterCount} onClick={resetFilters} />
-        <OrdersIconButton
-          className="ml-auto"
-          label={`${to("orders.refresh")} — ${to("orders.refresh_tracking")}`}
-          onClick={onRefresh}
-          busy={refreshing}
-        >
-          <RefreshCw size={14} />
-        </OrdersIconButton>
-      </div>
-
-      {/* ── TABLE 1 — PENDING & IN PROGRESS (all open trips, not day-scoped) */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        <SectionTitle
-          label={to("orders.tracking_active_title")}
-          note={to("orders.trips_count", { x: activeFiltered.length })}
-        />
-        {activeFiltered.length === 0 ? (
-          <OrdersEmptyState
-            compact
-            title={
-              activeFilterCount > 0 && active.length > 0
-                ? to("orders.no_search_results")
-                : to("orders.no_pending_deliveries")
-            }
-          />
-        ) : (
-          <TrackingTable
-            refreshing={refreshing}
-            trips={activeFiltered}
-            pageSlice={activePage}
-            safePage={safeActivePage}
-            totalPages={activeTotalPages}
-            onPageChange={setActivePage}
-            pageSize={pageSize}
-            onPageSizeChange={(size) => {
-              setPageSize(size);
-              setActivePage(1);
-              setCompletedPage(1);
-            }}
-            supervisorOf={supervisorOf}
-            actionProps={actionProps}
-          />
-        )}
-      </div>
-
-      {/* ── TABLE 2 — COMPLETED (lifecycle-completed trips) */}
-      <div className="bg-white rounded-2xl border border-slate-200/80 shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-200 bg-slate-50/60 space-y-3">
-          <div className="flex items-center justify-between flex-wrap gap-2">
-            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">
-              {to("orders.tracking_completed_title")}
-            </h3>
-            <span className="text-[11px] font-semibold text-slate-400">
-              {to("orders.trips_count", { x: completedFiltered.length })}
-            </span>
-          </div>
-          <div className="flex items-center gap-3 flex-wrap">
-            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-slate-500">
-              <CalendarRange size={13} aria-hidden />
-              {to("orders.from_date")}
-            </span>
+      {/* Filter card — the Trip List / Order Assignment anatomy: From · To ·
+          Delivery Status · Difference on row 1; Sort · Search · Reset · Refresh
+          on row 2. It never unmounts while the tables load. */}
+      <section
+        className={`${opsFilterCardClass} motion-safe:animate-[var(--animate-fade-in-up)]`}
+        aria-label={to("orders.tracking_filters")}
+      >
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <label className={opsFilterLabelClass}>
+              <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
+              <span>{to("orders.from_date")}</span>
+            </label>
             <DatePicker
               value={completedFrom}
               onChange={(v) => {
@@ -755,62 +849,197 @@ function DeliveryTrackingPage({
               hideThisWeek
               hideClear
               hideToday
-              className="w-44"
+              className="w-full text-xs font-medium"
               data-testid="orders-completed-from"
             />
-            <span
-              className="text-[11px] font-semibold text-slate-400"
-              aria-hidden
-            >
-              →
-            </span>
-            <span className="text-[11px] font-semibold text-slate-500">
-              {to("orders.to_date")}
-            </span>
+          </div>
+          <div>
+            <label className={opsFilterLabelClass}>
+              <Calendar size={17} className="text-emerald-500 flex-shrink-0" />
+              <span>{to("orders.to_date")}</span>
+            </label>
             <DatePicker
               value={completedTo}
               onChange={(v) => {
-                if (v && v >= (completedFrom || addLocalDays(today, -6)))
-                  setCompletedTo(v);
+                if (v && v >= (completedFrom || defaultFrom)) setCompletedTo(v);
               }}
-              minDate={completedFrom || addLocalDays(today, -6)}
+              minDate={completedFrom || defaultFrom}
               maxDate={today}
               placeholder="DD/MM/YYYY"
               hideThisWeek
               hideClear
               hideToday
-              className="w-44"
+              className="w-full text-xs font-medium"
               data-testid="orders-completed-to"
             />
           </div>
+          <div>
+            <label className={opsFilterLabelClass}>
+              <ClipboardCheck
+                size={17}
+                className="text-sky-500 flex-shrink-0"
+              />
+              <span>{to("orders.filter_delivery_status")}</span>
+            </label>
+            <MasterDropdown
+              hideLabel
+              label={to("orders.filter_delivery_status")}
+              value={deliveryFilter === "all" ? "" : deliveryFilter}
+              options={deliveryOptions.filter((o) => o.value !== "all")}
+              onChange={(next) =>
+                setDeliveryFilter((next as DeliveryFilter) || "all")
+              }
+              placeholder={to("orders.all")}
+              allowClear
+              className="w-full"
+              triggerClassName="h-10 rounded-lg text-[13px]"
+            />
+          </div>
+          <div>
+            <label className={opsFilterLabelClass}>
+              <SlidersHorizontal
+                size={17}
+                className="text-amber-500 flex-shrink-0"
+              />
+              <span>{to("orders.filter_difference")}</span>
+            </label>
+            <MasterDropdown
+              hideLabel
+              label={to("orders.filter_difference")}
+              value={differenceFilter === "all" ? "" : differenceFilter}
+              options={differenceOptions.filter((o) => o.value !== "all")}
+              onChange={(next) =>
+                setDifferenceFilter((next as DifferenceFilter) || "all")
+              }
+              placeholder={to("orders.all")}
+              allowClear
+              className="w-full"
+              triggerClassName="h-10 rounded-lg text-[13px]"
+            />
+          </div>
         </div>
-        {completedFiltered.length === 0 ? (
-          <OrdersEmptyState
-            compact
-            title={
-              activeFilterCount > 0 && completed.length > 0
-                ? to("orders.no_search_results")
-                : to("orders.no_completed_window")
-            }
-          />
-        ) : (
-          <TrackingTable
-            refreshing={refreshing}
-            trips={completedFiltered}
-            pageSlice={completedPage}
-            safePage={safeCompletedPage}
-            totalPages={completedTotalPages}
-            onPageChange={setCompletedPage}
-            pageSize={pageSize}
-            onPageSizeChange={(size) => {
-              setPageSize(size);
-              setActivePage(1);
-              setCompletedPage(1);
-            }}
-            supervisorOf={supervisorOf}
-            actionProps={actionProps}
-          />
-        )}
+
+        <div className="grid grid-cols-1 gap-3.5 items-end pt-1 lg:grid-cols-12">
+          <div className="lg:col-span-3">
+            <label className={opsFilterLabelClass}>
+              <ArrowUpDown
+                size={17}
+                className="text-violet-500 flex-shrink-0"
+              />
+              <span>{to("orders.sort")}</span>
+            </label>
+            <MasterDropdown
+              hideLabel
+              label={to("orders.sort")}
+              value={sortMode}
+              options={sortOptions}
+              onChange={(next) => setSortMode(next || "newest")}
+              placeholder={to("orders.sort_newest")}
+              className="w-full"
+              triggerClassName="h-10 rounded-lg text-[13px]"
+            />
+          </div>
+          <div className="lg:col-span-5">
+            <label className={opsFilterLabelClass}>
+              <Search size={17} className="text-slate-400 flex-shrink-0" />
+              <span>{to("orders.search_label")}</span>
+            </label>
+            <div className="group relative">
+              <Search
+                size={18}
+                className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 transition-colors group-focus-within:text-emerald-500"
+              />
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder={to("orders.search_tracking")}
+                aria-label={to("orders.search_tracking")}
+                className={`${opsInputClass} pl-10`}
+              />
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center justify-end gap-2 lg:col-span-4">
+            <FilterResetButton
+              count={activeFilterCount}
+              onClick={resetFilters}
+            />
+            <BrandRefreshButton
+              onClick={onRefresh}
+              loading={refreshing}
+              ariaLabel={to("orders.refresh")}
+            />
+          </div>
+        </div>
+      </section>
+
+      {/* ── TABLE 1 — PENDING & IN PROGRESS (all open trips, not day-scoped) */}
+      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+        <SectionTitle
+          tone="amber"
+          label={to("orders.tracking_active_title")}
+          note={to("orders.trips_count", { x: activeFiltered.length })}
+        />
+        <TrackingTable
+          loading={loading}
+          refreshing={refreshing}
+          label={to("orders.tracking_active_title")}
+          emptyTitle={
+            activeFilterCount > 0 && active.length > 0
+              ? to("orders.no_search_results")
+              : to("orders.no_pending_deliveries")
+          }
+          trips={activeFiltered}
+          pageSlice={activePage}
+          safePage={safeActivePage}
+          totalPages={activeTotalPages}
+          onPageChange={setActivePage}
+          pageSize={pageSize}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setActivePage(1);
+            setCompletedPage(1);
+          }}
+          supervisorOf={supervisorOf}
+          actionProps={actionProps}
+        />
+      </div>
+
+      {/* ── TABLE 2 — COMPLETED (lifecycle-completed trips in [From → To]) */}
+      <div className="overflow-hidden rounded-2xl border border-slate-200/80 bg-white shadow-sm">
+        <SectionTitle
+          tone="emerald"
+          label={to("orders.tracking_completed_title")}
+          note={to("orders.trips_count", { x: completedFiltered.length })}
+        >
+          <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-[11px] font-bold text-emerald-700">
+            <Route size={13} aria-hidden />
+            {formatDayShort(completedFrom || defaultFrom)} →{" "}
+            {formatDayShort(completedTo || today)}
+          </span>
+        </SectionTitle>
+        <TrackingTable
+          loading={loading}
+          refreshing={refreshing}
+          label={to("orders.tracking_completed_title")}
+          emptyTitle={
+            activeFilterCount > 0 && completed.length > 0
+              ? to("orders.no_search_results")
+              : to("orders.no_completed_window")
+          }
+          trips={completedFiltered}
+          pageSlice={completedPage}
+          safePage={safeCompletedPage}
+          totalPages={completedTotalPages}
+          onPageChange={setCompletedPage}
+          pageSize={pageSize}
+          onPageSizeChange={(size) => {
+            setPageSize(size);
+            setActivePage(1);
+            setCompletedPage(1);
+          }}
+          supervisorOf={supervisorOf}
+          actionProps={actionProps}
+        />
       </div>
 
       {activeFiltered.length + completedFiltered.length > 0 && (

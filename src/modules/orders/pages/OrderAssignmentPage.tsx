@@ -199,7 +199,6 @@ function selectionSnapshot(
 }
 
 /** Status facet of the filter card — same vocabulary as the pool toggle. */
-type AssignmentStatusFilter = "all" | "pending" | "assigned";
 
 type Props = {
   loading: boolean;
@@ -312,7 +311,6 @@ function AssignmentHistory({
   cityFilters,
   vehicleFilter,
   supervisorFilter,
-  statusFilter,
   shopDirectory,
   resetVersion,
 }: {
@@ -323,7 +321,6 @@ function AssignmentHistory({
   cityFilters: string[];
   vehicleFilter: string;
   supervisorFilter: string;
-  statusFilter: AssignmentStatusFilter;
   shopDirectory: ShopDirectory;
   resetVersion: number;
 }) {
@@ -343,9 +340,6 @@ function AssignmentHistory({
             supervisorFilter
         )
           return false;
-        // History rows are all assigned; "pending" here = not yet delivered.
-        if (statusFilter === "pending" && row.delivered) return false;
-        if (statusFilter === "assigned" && !row.delivered) return false;
         return (
           (!cityFilters.length || cityFilters.includes(city)) &&
           [
@@ -382,10 +376,9 @@ function AssignmentHistory({
     cityFilters,
     vehicleFilter,
     supervisorFilter,
-    statusFilter,
     shopDirectory,
   ]);
-  const resetKey = `${query}|${sortMode}|${pageSize}|${cityFilters.join(",")}|${vehicleFilter}|${supervisorFilter}|${statusFilter}|${resetVersion}`;
+  const resetKey = `${query}|${sortMode}|${pageSize}|${cityFilters.join(",")}|${vehicleFilter}|${supervisorFilter}|${resetVersion}`;
   const [lastKey, setLastKey] = useState(resetKey);
   if (lastKey !== resetKey) {
     setLastKey(resetKey);
@@ -510,11 +503,9 @@ function OrderAssignmentPage({
   // Sorting applies to the full matching pool before pagination.
   const [sortMode, setSortMode] = useState<AssignmentSort>("pending");
   const [cityFilters, setCityFilters] = useState<string[]>([]);
-  // Trip-List-style facets: one vehicle trip, one supervisor, one status.
+  // Trip-List-style facets: one vehicle trip, one supervisor.
   const [vehicleFilterState, setVehicleFilter] = useState("");
   const [supervisorFilterState, setSupervisorFilter] = useState("");
-  const [statusFilter, setStatusFilter] =
-    useState<AssignmentStatusFilter>("all");
   const [resetVersion, setResetVersion] = useState(0);
   const cityOptions = useMemo(() => {
     const rows =
@@ -569,13 +560,6 @@ function OrderAssignmentPage({
       .sort((a, b) => a[1].localeCompare(b[1]))
       .map(([value, label]) => ({ value, label }));
   }, [day, today, dayVehicleViews, eligibleVehicles]);
-  const statusOptions = useMemo<MasterDropdownOption[]>(
-    () => [
-      { value: "pending", label: to("orders.pool_filter_pending") },
-      { value: "assigned", label: to("orders.pool_filter_assigned") },
-    ],
-    [to],
-  );
   // A pick that left the option list (truck finished / day changed) is
   // treated as cleared, so a stale id can never hide every row. Derived, not
   // an effect: the raw state is kept and simply ignored while invalid.
@@ -626,7 +610,6 @@ function OrderAssignmentPage({
     setCityFilters([]);
     setVehicleFilter("");
     setSupervisorFilter("");
-    setStatusFilter("all");
     setResetVersion((value) => value + 1);
     // Reset to today. Today's mounted editor is not remounted, so picks survive.
     if (day !== today) onDaySelect(today);
@@ -656,12 +639,6 @@ function OrderAssignmentPage({
         label: supLabel,
         clear: () => setSupervisorFilter(""),
       });
-    if (statusFilter !== "all")
-      chips.push({
-        key: "status",
-        label: to(`orders.pool_filter_${statusFilter}`),
-        clear: () => setStatusFilter("all"),
-      });
     for (const city of cityFilters)
       chips.push({
         key: `city:${city}`,
@@ -689,13 +666,11 @@ function OrderAssignmentPage({
     vehicleOptions,
     supervisorFilter,
     supervisorOptions,
-    statusFilter,
     cityFilters,
     q,
     query,
     sortMode,
     sortOptions,
-    to,
   ]);
   const hasFilters = activeChips.length > 0;
 
@@ -705,8 +680,8 @@ function OrderAssignmentPage({
         className={`${opsFilterCardClass} motion-safe:animate-[var(--animate-fade-in-up)]`}
         aria-label={to("orders.assignment_filters")}
       >
-        {/* Row 1 — Date · Vehicle · Supervisor · Status · City (Trip List grid) */}
-        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-5">
+        {/* Row 1 — Date · Vehicle · Supervisor · City (Trip List grid) */}
+        <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             {/* No Calendar glyph on the label: the date field carries its own, and that one is the button you click. */}
             <label className={opsFilterLabelClass}>
@@ -754,28 +729,6 @@ function OrderAssignmentPage({
               onChange={setSupervisorFilter}
               placeholder={to("orders.all")}
               searchable
-              allowClear
-              className="w-full"
-              triggerClassName="h-10 rounded-lg text-[13px]"
-            />
-          </div>
-          <div>
-            <label className={opsFilterLabelClass}>
-              <SlidersHorizontal
-                size={17}
-                className="text-sky-500 flex-shrink-0"
-              />
-              <span>{to("orders.filter_status")}</span>
-            </label>
-            <MasterDropdown
-              hideLabel
-              label={to("orders.filter_status")}
-              value={statusFilter === "all" ? "" : statusFilter}
-              options={statusOptions}
-              onChange={(next) =>
-                setStatusFilter((next as AssignmentStatusFilter) || "all")
-              }
-              placeholder={to("orders.all")}
               allowClear
               className="w-full"
               triggerClassName="h-10 rounded-lg text-[13px]"
@@ -928,7 +881,6 @@ function OrderAssignmentPage({
             cityFilters={cityFilters}
             vehicleFilter={vehicleFilter}
             supervisorFilter={supervisorFilter}
-            statusFilter={statusFilter}
             shopDirectory={shopDirectory}
             resetVersion={resetVersion}
           />
@@ -957,7 +909,6 @@ function OrderAssignmentPage({
                 cityFilters={cityFilters}
                 vehicleFilter={vehicleFilter}
                 supervisorFilter={supervisorFilter}
-                statusFilter={statusFilter}
                 resetVersion={resetVersion}
                 onChanged={onChanged}
                 onFinished={onFinished}
@@ -1031,7 +982,6 @@ function AssignmentEditor({
   cityFilters,
   vehicleFilter,
   supervisorFilter,
-  statusFilter,
   resetVersion,
   onChanged,
   onFinished,
@@ -1046,7 +996,6 @@ function AssignmentEditor({
   cityFilters: string[];
   vehicleFilter: string;
   supervisorFilter: string;
-  statusFilter: AssignmentStatusFilter;
   resetVersion: number;
   onChanged: () => void;
   /** Assignment finished — page moves to Tab 3. */
@@ -1795,9 +1744,7 @@ function AssignmentEditor({
       if (poolFilter === "pending" && item.kind === "assigned") return;
       if (poolFilter === "assigned" && item.kind !== "assigned") return;
       if (poolFilter === "this_vehicle" && !item.onThisVehicle) return;
-      // Filter-card facets (status / vehicle / supervisor) narrow further.
-      if (statusFilter === "pending" && item.kind === "assigned") return;
-      if (statusFilter === "assigned" && item.kind !== "assigned") return;
+      // Filter-card facets (vehicle / supervisor) narrow further.
       if (
         vehicleFilter &&
         !parts.some((p) => p.tripNo === filterTripNo) &&
@@ -1846,7 +1793,6 @@ function AssignmentEditor({
     vehicleFilter,
     supervisorFilter,
     supervisorOfTrip,
-    statusFilter,
     shopDirectory,
     sortMode,
     orderWeightBasis,
@@ -1861,7 +1807,7 @@ function AssignmentEditor({
   }
 
   const [availablePageSize, setAvailablePageSize] = useState(10);
-  const availableKey = `${q}|${poolFilter}|${cityFilters.join(",")}|${vehicleFilter}|${supervisorFilter}|${statusFilter}|${sortMode}|${availablePageSize}`;
+  const availableKey = `${q}|${poolFilter}|${cityFilters.join(",")}|${vehicleFilter}|${supervisorFilter}|${sortMode}|${availablePageSize}`;
   const [lastAvailableKey, setLastAvailableKey] = useState(availableKey);
   if (lastAvailableKey !== availableKey) {
     setLastAvailableKey(availableKey);
