@@ -35,6 +35,8 @@ import {
   PackageCheck,
   GripVertical,
   Loader2,
+  ArrowDown,
+  ArrowUp,
   ArrowUpDown,
   Calendar,
   MapPin,
@@ -970,6 +972,54 @@ function OrderAssignmentPage({
 
 // ─── Assignment editor (one day → one vehicle at a time) ────────────────────
 
+/** Sortable column head for the Selected Shops table (A→Z ⇄ Z→A). */
+function SelectedSortTh({
+  label,
+  active,
+  dir,
+  disabled,
+  onClick,
+}: {
+  label: string;
+  active: boolean;
+  dir?: "asc" | "desc";
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  const ariaSort = active
+    ? dir === "asc"
+      ? "ascending"
+      : "descending"
+    : "none";
+  return (
+    <th className={`${opsTableThClass} text-left`} aria-sort={ariaSort}>
+      <button
+        type="button"
+        onClick={onClick}
+        disabled={disabled}
+        title={`${label} — ${active && dir === "asc" ? "Z→A" : "A→Z"}`}
+        className={`group inline-flex items-center gap-1 rounded transition-colors hover:text-emerald-700 disabled:cursor-default disabled:hover:text-inherit ${
+          active ? "text-emerald-700" : ""
+        }`}
+      >
+        <span>{label}</span>
+        {active ? (
+          dir === "asc" ? (
+            <ArrowUp size={12} className="shrink-0" />
+          ) : (
+            <ArrowDown size={12} className="shrink-0" />
+          )
+        ) : (
+          <ArrowUpDown
+            size={12}
+            className="shrink-0 text-slate-300 transition-colors group-hover:text-emerald-500"
+          />
+        )}
+      </button>
+    </th>
+  );
+}
+
 function AssignmentEditor({
   day,
   collection,
@@ -1147,10 +1197,18 @@ function AssignmentEditor({
     [shopDirectory],
   );
 
+  // Column sort on the Selected Shops table: click Shop Name / City to sort the
+  // delivery sequence A→Z, click again for Z→A. Manual reorder (drag / arrows /
+  // typed position) clears the indicator, since the list is then hand-ordered.
+  const [selectedSort, setSelectedSort] = useState<{
+    key: "shop" | "village";
+    dir: "asc" | "desc";
+  } | null>(null);
   // ── Sequence editing (a vehicle can carry ~45 shops, so stepping with ↑/↓
   //     is never the only way): drag a row, jump it to first/last, or sort the
   //     whole sequence in one click. All three go through moveInSequence.
   const moveRowTo = useCallback((clientKey: string, to: number) => {
+    setSelectedSort(null);
     setSelected((prev) => {
       const from = prev.findIndex((r) => r.clientKey === clientKey);
       if (from < 0) return prev;
@@ -1158,18 +1216,30 @@ function AssignmentEditor({
     });
   }, []);
 
-  const sortSelected = useCallback((mode: "shop_az" | "village_az") => {
-    setSelected((prev) => {
-      const next = [...prev];
-      next.sort((a, b) =>
-        mode === "shop_az"
-          ? (a.shopName || "").localeCompare(b.shopName || "")
-          : (a.village || "").localeCompare(b.village || "") ||
-            (a.shopName || "").localeCompare(b.shopName || ""),
-      );
-      return next;
-    });
-  }, []);
+  const sortSelected = useCallback(
+    (key: "shop" | "village") => {
+      const dir =
+        selectedSort?.key === key && selectedSort.dir === "asc"
+          ? "desc"
+          : "asc";
+      const sign = dir === "asc" ? 1 : -1;
+      setSelectedSort({ key, dir });
+      setSelected((rows) => {
+        const next = [...rows];
+        next.sort((a, b) => {
+          const primary =
+            key === "shop"
+              ? (a.shopName || "").localeCompare(b.shopName || "")
+              : (a.village || "").localeCompare(b.village || "");
+          return (
+            sign * primary || (a.shopName || "").localeCompare(b.shopName || "")
+          );
+        });
+        return next;
+      });
+    },
+    [selectedSort],
+  );
 
   // Drag state — which row is lifted, and where it would land.
   const [dragKey, setDragKey] = useState<string | null>(null);
@@ -2259,29 +2329,6 @@ function AssignmentEditor({
                       <span className="text-[11px] font-semibold text-slate-400">
                         {to("orders.assign_hint")}
                       </span>
-                      {/* One-click sequence sorting — with ~45 shops on a vehicle,
-                sorting the list beats dragging it row by row. */}
-                      <span className="inline-flex items-center gap-1">
-                        <span className="text-[11px] font-semibold text-slate-400">
-                          {to("orders.sequence_sort")}:
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => sortSelected("shop_az")}
-                          disabled={busy || selected.length < 2}
-                          className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-600 transition-colors hover:border-emerald-300 hover:text-emerald-700 disabled:opacity-40"
-                        >
-                          {to("orders.seq_shop_az")}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => sortSelected("village_az")}
-                          disabled={busy || selected.length < 2}
-                          className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-[11px] font-bold text-slate-600 transition-colors hover:border-emerald-300 hover:text-emerald-700 disabled:opacity-40"
-                        >
-                          {to("orders.seq_village_az")}
-                        </button>
-                      </span>
                       {/* The vehicle comes from the › row above — no second selector. */}
                       <span className="ml-auto inline-flex items-center gap-1.5 rounded-lg border border-emerald-200 bg-white px-3 py-1.5 text-[11px] font-bold text-emerald-700">
                         {vehicle
@@ -2365,16 +2412,20 @@ function AssignmentEditor({
                                     >
                                       {to("orders.col_sequence")}
                                     </th>
-                                    <th
-                                      className={`${opsTableThClass} text-left`}
-                                    >
-                                      {to("orders.col_shop_name")}
-                                    </th>
-                                    <th
-                                      className={`${opsTableThClass} text-left`}
-                                    >
-                                      {to("orders.col_village")}
-                                    </th>
+                                    <SelectedSortTh
+                                      label={to("orders.col_shop_name")}
+                                      active={selectedSort?.key === "shop"}
+                                      dir={selectedSort?.dir}
+                                      disabled={busy || selected.length < 2}
+                                      onClick={() => sortSelected("shop")}
+                                    />
+                                    <SelectedSortTh
+                                      label={to("orders.col_village")}
+                                      active={selectedSort?.key === "village"}
+                                      dir={selectedSort?.dir}
+                                      disabled={busy || selected.length < 2}
+                                      onClick={() => sortSelected("village")}
+                                    />
                                     <th
                                       className={`${opsTableThClass} text-right`}
                                     >
@@ -2493,23 +2544,30 @@ function AssignmentEditor({
                                             />
                                           </div>
                                         </td>
+                                        {/* Full shop name, never clipped — long
+                                            names wrap onto a second line. */}
                                         <td
-                                          className={`${opsTableTdClass} font-semibold text-slate-800`}
+                                          className={`${opsTableTdClass} whitespace-normal break-words font-bold leading-snug text-slate-950`}
+                                          title={row.shopName}
                                         >
                                           {row.shopName || "—"}
                                         </td>
-                                        <td className={opsTableTdClass}>
+                                        <td
+                                          className={`${opsTableTdClass} whitespace-normal break-words font-medium text-slate-700`}
+                                        >
                                           {row.village || "—"}
                                         </td>
                                         <td
-                                          className={`${opsTableTdClass} text-right tabular-nums font-medium`}
+                                          className={`${opsTableTdClass} text-right tabular-nums font-semibold text-slate-800`}
                                         >
                                           {formatCount(row.orderedBirds)}
                                         </td>
                                         <td
-                                          className={`${opsTableTdClass} text-right tabular-nums font-semibold text-emerald-800`}
+                                          className={`${opsTableTdClass} text-right`}
                                         >
-                                          {formatCount(row.orderedBoxes)}
+                                          <span className="inline-flex min-w-9 items-center justify-center rounded-md bg-emerald-50 px-1.5 py-0.5 text-[13px] font-extrabold tabular-nums text-emerald-600 ring-1 ring-emerald-200/80">
+                                            {formatCount(row.orderedBoxes)}
+                                          </span>
                                         </td>
                                         <td className={opsTableTdClass}>
                                           {/* PARTIAL ASSIGNMENT: send part of a shop's order on
