@@ -195,8 +195,10 @@ function WeightDiffCell({ value, show }: { value: number; show: boolean }) {
 }
 
 /** Report table geometry — same anatomy as the Trip List table. */
+/* Heads may wrap to two lines (Telugu / 150% font scale) instead of
+   overflowing their fixed column; cells stay vertically centred. */
 const reportThClass =
-  "px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider whitespace-nowrap";
+  "px-4 py-3.5 text-[11px] font-bold uppercase tracking-wider leading-tight align-middle break-words";
 const reportTdClass =
   "px-4 py-3.5 text-[13px] text-slate-700 align-middle border-b border-slate-100";
 
@@ -224,7 +226,7 @@ function CountCell({
 }
 
 const statusPillBase =
-  "inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider whitespace-nowrap transition-transform duration-200 animate-pop-in";
+  "inline-flex max-w-full items-center gap-1.5 rounded-full border px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider leading-tight text-left transition-transform duration-200 animate-pop-in";
 
 /** Delivery Status cell for the report — animated pill with a state dot. */
 function DeliveryStatusCell({
@@ -851,7 +853,7 @@ function OrdersDeliveryDetailView({
                               : "—"}
                           </td>
                           <td
-                            className={`${reportTdClass} whitespace-nowrap text-[12px] font-semibold text-slate-600 tabular-nums`}
+                            className={`${reportTdClass} text-[12px] font-semibold leading-tight text-slate-600 tabular-nums`}
                           >
                             {formatDeliveredAtLabel(row.deliveredAt)}
                           </td>
