@@ -25,8 +25,9 @@ interface LatestMaintenanceTableProps {
   vehicles: any[];
   viewMode: ViewMode;
   onView: (record: MaintenanceEvent) => void;
-  onDelete: (record: MaintenanceEvent) => void;
-  onApprove: (record: MaintenanceEvent) => void;
+  /** Optional: entry-only roles never receive approve/delete affordances. */
+  onDelete?: (record: MaintenanceEvent) => void;
+  onApprove?: (record: MaintenanceEvent) => void;
   /** Refresh the records from the API — BrandRefreshButton beside the search. */
   onRefresh?: () => void;
   /** True while the API load/refresh is in flight → spinner row, frozen pager. */
@@ -62,7 +63,7 @@ const LatestMaintenanceTable = ({
 
   const { requestDelete, cancel, isPending, pendingItems } = usePendingDelete<string>(async (id) => {
     const record = records.find((item) => item.id === id);
-    if (record) await Promise.resolve(onDelete(record));
+    if (record) await Promise.resolve(onDelete?.(record));
   });
 
   const validRecords = records.filter((r): r is MaintenanceEvent & { id: string } => !!r.id);
@@ -158,7 +159,7 @@ const LatestMaintenanceTable = ({
   };
 
   // Column count for the empty-state row.
-  const colCount = 9 + (viewMode === 'deleted' ? 1 : 0) + (viewMode === 'pending' ? 1 : 0);
+  const colCount = 9 + (viewMode === 'deleted' ? 1 : 0) + (viewMode === 'pending' && (onDelete || onApprove) ? 1 : 0);
 
   return (
     <div ref={tableRef} className="bg-white border border-slate-200/80 rounded-2xl shadow-xl shadow-slate-100 overflow-hidden">
@@ -466,26 +467,30 @@ const LatestMaintenanceTable = ({
                       {/* Row actions — Pending only: Approve + Delete (10s undo).
                           Approved rows: no actions at all — clicking the row
                           opens the full view. */}
-                      {viewMode === 'pending' && (
+                      {viewMode === 'pending' && (onDelete || onApprove) && (
                         <td className="px-4 py-3 text-center whitespace-nowrap" onClick={(e) => { e.stopPropagation(); e.preventDefault(); }}>
                           <span className="inline-flex items-center justify-center gap-1">
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); e.preventDefault(); onApprove(rec); }}
-                              aria-label={t('common.approve')}
-                              className="group relative h-8 w-8 rounded-xl flex items-center justify-center transition-all shadow-sm bg-emerald-50/70 hover:bg-emerald-500 text-emerald-600 hover:text-white border border-emerald-200/60 active:scale-95"
-                            >
-                              <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-approve)]"><CheckCircle2 size={14} /></span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={(e) => { e.stopPropagation(); e.preventDefault(); if (rec.id) requestDelete(rec.id, { label: t('fleet.maintenance_table.deleting', { vehicle: resolveVehicleNumber(rec) }) }); }}
-                              disabled={!rec.id || isPending(rec.id)}
-                              aria-label={t('common.delete')}
-                              className="group relative h-8 w-8 rounded-xl flex items-center justify-center transition-all shadow-sm bg-rose-50/70 hover:bg-rose-500 text-rose-500 hover:text-white border border-rose-200/60 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
-                            >
-                              <span className={`inline-flex ${!isPending(rec.id) ? uiActionIconMotionClass.delete : ''}`}><Trash2 size={14} /></span>
-                            </button>
+                            {onApprove && (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); e.preventDefault(); onApprove(rec); }}
+                                aria-label={t('common.approve')}
+                                className="group relative h-8 w-8 rounded-xl flex items-center justify-center transition-all shadow-sm bg-emerald-50/70 hover:bg-emerald-500 text-emerald-600 hover:text-white border border-emerald-200/60 active:scale-95"
+                              >
+                                <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-approve)]"><CheckCircle2 size={14} /></span>
+                              </button>
+                            )}
+                            {onDelete && (
+                              <button
+                                type="button"
+                                onClick={(e) => { e.stopPropagation(); e.preventDefault(); if (rec.id) requestDelete(rec.id, { label: t('fleet.maintenance_table.deleting', { vehicle: resolveVehicleNumber(rec) }) }); }}
+                                disabled={!rec.id || isPending(rec.id)}
+                                aria-label={t('common.delete')}
+                                className="group relative h-8 w-8 rounded-xl flex items-center justify-center transition-all shadow-sm bg-rose-50/70 hover:bg-rose-500 text-rose-500 hover:text-white border border-rose-200/60 active:scale-95 disabled:opacity-40 disabled:cursor-not-allowed"
+                              >
+                                <span className={`inline-flex ${!isPending(rec.id) ? uiActionIconMotionClass.delete : ''}`}><Trash2 size={14} /></span>
+                              </button>
+                            )}
                           </span>
                         </td>
                       )}

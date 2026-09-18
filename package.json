@@ -7,7 +7,7 @@
     "node": ">=22 <26"
   },
   "scripts": {
-    "dev": "npm run dev:web",
+    "dev": "concurrently -n sample-api,web -c magenta,cyan \"npm:dev:sample-api\" \"npm:dev:web\"",
     "dev:web": "vite --config vite.config.ts",
     "dev:sample-api": "node scripts/quarter-sample-data.mjs",
     "build": "tsc -b && vite build --config vite.config.ts",
@@ -37,6 +37,7 @@
     "test:payslip": "tsx tests/payslip/payslip-pdf.smoke.mjs",
     "test:e2e:emi": "playwright test --config tests/emi/playwright.config.ts",
     "test:i18n": "tsx --test tests/i18n/context.test.ts",
+    "test:auth": "tsx --test tests/auth/permissions.test.ts",
     "test:collections": "tsx --test src/modules/operations/collections/services/collectionService.contract.test.ts src/modules/operations/collections/services/collectionBalance.ui.test.ts",
     "test:sample-quarter": "tsx --test src/sample/quarterSample.test.ts",
     "test:collection-balances": "node --test scripts/verify-collection-balances.mjs",

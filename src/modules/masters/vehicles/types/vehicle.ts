@@ -36,4 +36,6 @@ export type Vehicle = {
   /** Master-record status — the persisted backend contract is Active/Inactive only. */
   status: "Active" | "Inactive";
 
+  /** Read-only marker from the opt-in demo API; never included in save payloads. */
+  isSample?: boolean;
 };

@@ -24,8 +24,9 @@ interface Props {
   isLoading?: boolean;
   statusFilter: "Pending" | "Approved" | "Deleted";
   onStatusChange: (status: "Pending" | "Approved" | "Deleted") => void;
-  onApprove: (id: string) => void;
-  onReject: (id: string) => void;
+  /** Optional: roles without approve rights simply never receive it. */
+  onApprove?: (id: string) => void;
+  onReject?: (id: string) => void;
   onEdit: (collection: RecentCollection) => void;
   onViewShop: (shopName: string) => void;
   /**
@@ -537,29 +538,29 @@ export default function RecentCollectionsTable({
                         * No title attributes — the page is tooltip-free, so each
                         * control carries an aria-label for assistive tech only. */}
                       <div className="flex items-center justify-center gap-1.5">
-                        {isPending && (
-                          <>
-                            <button
-                              type="button"
-                              onClick={() => onApprove(col.id)}
-                              aria-label={t("common.approve")}
-                              className="group h-8 w-8 rounded-xl bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95"
-                            >
-                              <span className={`inline-flex ${uiActionIconMotionClass.approve}`}>
-                                <CheckCircle size={14} />
-                              </span>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => onEdit(col)}
-                              aria-label={t("common.edit")}
-                              className="group h-8 w-8 rounded-xl bg-blue-50 hover:bg-blue-500 text-blue-600 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95"
-                            >
-                              <span className={`inline-flex ${uiActionIconMotionClass.edit}`}>
-                                <Pencil size={14} />
-                              </span>
-                            </button>
-                          </>
+                        {isPending && onApprove && (
+                          <button
+                            type="button"
+                            onClick={() => onApprove(col.id)}
+                            aria-label={t("common.approve")}
+                            className="group h-8 w-8 rounded-xl bg-emerald-50 hover:bg-emerald-500 text-emerald-600 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95"
+                          >
+                            <span className={`inline-flex ${uiActionIconMotionClass.approve}`}>
+                              <CheckCircle size={14} />
+                            </span>
+                          </button>
+                        )}
+                        {isPending && onEdit && (
+                          <button
+                            type="button"
+                            onClick={() => onEdit(col)}
+                            aria-label={t("common.edit")}
+                            className="group h-8 w-8 rounded-xl bg-blue-50 hover:bg-blue-500 text-blue-600 hover:text-white flex items-center justify-center transition-all shadow-sm active:scale-95"
+                          >
+                            <span className={`inline-flex ${uiActionIconMotionClass.edit}`}>
+                              <Pencil size={14} />
+                            </span>
+                          </button>
                         )}
 
                         {/* View is an approved-only affordance. A pending row

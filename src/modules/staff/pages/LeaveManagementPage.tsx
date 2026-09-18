@@ -16,6 +16,7 @@ import LeaveTable from '../components/leave/LeaveTable';
 import LeaveTableHeader from '../components/leave/LeaveTableHeader';
 import LeaveHistoryModal from '../components/leave/LeaveHistoryModal';
 import LeaveRejectDialog from '../components/leave/LeaveRejectDialog';
+import { CAPABILITIES, useCan } from '../../auth/permissions';
 import Pagination from '../components/common/Pagination';
 import TableLoading from '../components/common/TableLoading';
 import type { LeaveRequest } from '../types/staffDashboard';
@@ -25,6 +26,8 @@ import { personNameLabel } from '../utils/leaveDisplay';
 const REFRESH_TOAST_DURATION = 5000;
 
 function LeaveManagementPage() {
+  // Leaves for entry-only roles: add requests, never approve/reject/delete them.
+  const can = useCan();
   const { t, language } = useI18n();
   const { showNotification } = useSafeNotification();
   const [searchParams] = useSearchParams();
@@ -249,9 +252,9 @@ function LeaveManagementPage() {
         showForm={showForm}
         selected={selectedLeave}
         onViewSelected={handleViewSelected}
-        onApproveSelected={handleApproveSelected}
-        onRejectSelected={handleRejectSelected}
-        onDeleteSelected={handleDeleteSelected}
+        onApproveSelected={can(CAPABILITIES.LEAVE_APPROVE) ? handleApproveSelected : undefined}
+        onRejectSelected={can(CAPABILITIES.LEAVE_REJECT) ? handleRejectSelected : undefined}
+        onDeleteSelected={can(CAPABILITIES.LEAVE_DELETE) ? handleDeleteSelected : undefined}
       />
 
       {/* New request form */}

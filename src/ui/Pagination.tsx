@@ -148,7 +148,7 @@ export function Pagination({
   return (
     <div className={cn(uiPaginationBarClass, className)}>
       {showSummary ? (
-        <p data-master-summary className={uiPaginationSummaryClass} aria-live="polite">
+        <p className={uiPaginationSummaryClass} aria-live="polite">
           {totalItems === 0
             ? t("common.no_records", "No records")
             : `${t("common.showing", "Showing")} ${from}\u2013${to} ${t("common.of", "of")} ${totalItems}`}

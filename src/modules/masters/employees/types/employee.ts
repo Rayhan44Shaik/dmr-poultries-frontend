@@ -11,5 +11,5 @@ export type Employee = {
   aadharNumber?: string;
   licenseNumber?: string;
   salary: number; // <-- must be present
-  status: "Active" | "Inactive" | "Suspended";
+  status: "Active" | "Inactive";
 };

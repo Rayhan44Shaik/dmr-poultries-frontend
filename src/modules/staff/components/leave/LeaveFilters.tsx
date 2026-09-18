@@ -58,9 +58,10 @@ interface LeaveFiltersProps {
   /** Selected table row — the actions for it appear beside Reset. */
   selected: LeaveRequest | null;
   onViewSelected: () => void;
-  onApproveSelected: () => void;
-  onRejectSelected: () => void;
-  onDeleteSelected: () => void;
+  /** Optional: roles that may not approve/reject/delete simply never get them. */
+  onApproveSelected?: () => void;
+  onRejectSelected?: () => void;
+  onDeleteSelected?: () => void;
 }
 
 /**
@@ -416,7 +417,7 @@ function LeaveFilters({
               >
                 <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-view)]"><Eye /></span>
               </button>
-              {selected.status === 'Pending' && (
+              {selected.status === 'Pending' && onApproveSelected && (
                 <>
                   <button
                     type="button"
@@ -428,6 +429,7 @@ function LeaveFilters({
                   >
                     <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-approve)]"><CheckCircle /></span>
                   </button>
+                  {onRejectSelected && (
                   <button
                     type="button"
                     onClick={onRejectSelected}
@@ -438,6 +440,8 @@ function LeaveFilters({
                   >
                     <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-reject)]"><XCircle /></span>
                   </button>
+                  )}
+                  {onDeleteSelected && (
                   <button
                     type="button"
                     onClick={onDeleteSelected}
@@ -448,6 +452,7 @@ function LeaveFilters({
                   >
                     <span className="inline-flex motion-safe:group-hover:animate-[var(--animate-action-delete)]"><Trash2 /></span>
                   </button>
+                  )}
                 </>
               )}
             </div>

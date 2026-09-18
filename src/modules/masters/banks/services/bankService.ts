@@ -38,19 +38,13 @@ function clearLegacyBankStorage(): void {
 }
 
 function normalizeStatus(status: unknown): Bank["status"] {
-  if (status === "Active" || status === "Inactive") return status;
-  throw new Error("Invalid Bank Master status in API response.");
+  return status === "Active" ? "Active" : "Inactive";
 }
 
 export function mapBank(raw: Record<string, unknown>): Bank {
-  const id = Number(raw.id);
-  const bankNo = Number(raw.bankNo ?? raw.bank_no);
-  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(bankNo) || bankNo <= 0) {
-    throw new Error("Invalid Bank Master identity in API response.");
-  }
   return {
-    id,
-    bankNo,
+    id: Number(raw.id),
+    bankNo: Number(raw.bankNo ?? raw.bank_no ?? 0),
     bankName: String(raw.bankName ?? raw.bank_name ?? ""),
     branch: String(raw.branch ?? ""),
     accountNumber: String(raw.accountNumber ?? raw.account_number ?? ""),
@@ -73,10 +67,7 @@ function toPayload(input: BankInput | Partial<Bank>): Record<string, unknown> {
 }
 
 function setCacheFromApi(rows: Record<string, unknown>[] | null | undefined): Bank[] {
-  if (!Array.isArray(rows) || rows.some((row) => !row || typeof row !== "object" || Array.isArray(row))) {
-    throw new Error("Bank list response must be an array of records.");
-  }
-  banksCache = rows.map(mapBank);
+  banksCache = Array.isArray(rows) ? rows.map(mapBank) : [];
   return banksCache;
 }
 

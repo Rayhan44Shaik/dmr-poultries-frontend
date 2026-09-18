@@ -50,3 +50,6 @@ Duty-Planner-*.xlsx
 # Payslip smoke-test artefact (sample PDF for manual inspection)
 tests/payslip/out/
 .scratch/
+
+# Sample-server session signing keys (never commit)
+.auth-session/

@@ -18,9 +18,12 @@ import type { MaintenanceEvent } from '../types';
 import { RotateCcw, Save, Wrench, X, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { opsSecondaryButtonClass } from '../../../shared/ui/operationsStyles';
 import { PAGINATION_DEFAULT_PAGE_SIZE } from '../../../shared/ui/uiTokens';
+import { CAPABILITIES, useCan } from '../../auth/permissions';
 
 const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
   const { t } = useI18n();
+  // Entry-only roles (supervisor) record maintenance without approve/delete rights.
+  const can = useCan();
   const { employees } = useEmployees();
   const { showNotification } = useSafeNotification();
   const { vehicles, maintenance, approvedMaintenance, deletedRecords, loading: recordsLoading, error: recordsError, refresh: refreshMaintenance } = useMaintenanceData('entry');
@@ -386,8 +389,8 @@ const MaintenanceEntryPage = (_props: { embedded?: boolean }) => {
           vehicles={vehicles}
           viewMode={viewMode}
           onView={handleView}
-          onDelete={startDeletion}
-          onApprove={handleApprove}
+          onDelete={can(CAPABILITIES.MAINTENANCE_DELETE) ? startDeletion : undefined}
+          onApprove={can(CAPABILITIES.MAINTENANCE_APPROVE) ? handleApprove : undefined}
           isLoading={recordsLoading}
           onRefresh={refreshMaintenance}
           currentPage={currentPage}

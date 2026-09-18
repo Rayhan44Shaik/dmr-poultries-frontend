@@ -39,19 +39,13 @@ function clearLegacyBirdTypeStorage(): void {
 }
 
 function normalizeStatus(status: unknown): BirdType["status"] {
-  if (status === "Active" || status === "Inactive") return status;
-  throw new Error("Invalid Bird Type Master status in API response.");
+  return status === "Active" ? "Active" : "Inactive";
 }
 
 export function mapBirdType(raw: Record<string, unknown>): BirdType {
-  const id = Number(raw.id);
-  const birdTypeNo = Number(raw.birdTypeNo ?? raw.bird_type_no);
-  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(birdTypeNo) || birdTypeNo <= 0) {
-    throw new Error("Invalid Bird Type Master identity in API response.");
-  }
   return {
-    id,
-    birdTypeNo,
+    id: Number(raw.id),
+    birdTypeNo: Number(raw.birdTypeNo ?? raw.bird_type_no ?? 0),
     birdType: String(raw.birdType ?? raw.bird_type ?? raw.name ?? ""),
     averageWeight: Number(raw.averageWeight ?? raw.average_weight ?? 0),
     description: String(raw.description ?? ""),
@@ -70,10 +64,7 @@ function toPayload(input: BirdTypeInput | Partial<BirdType>): Record<string, unk
 }
 
 function setCacheFromApi(rows: Record<string, unknown>[] | null | undefined): BirdType[] {
-  if (!Array.isArray(rows) || rows.some((row) => !row || typeof row !== "object" || Array.isArray(row))) {
-    throw new Error("Bird Type list response must be an array of records.");
-  }
-  birdTypesCache = rows.map(mapBirdType);
+  birdTypesCache = Array.isArray(rows) ? rows.map(mapBirdType) : [];
   return birdTypesCache;
 }
 

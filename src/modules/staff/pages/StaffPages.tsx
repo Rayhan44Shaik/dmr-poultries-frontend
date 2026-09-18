@@ -3,6 +3,8 @@
 import React, { useEffect, useMemo } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
+import { firstAllowedTab } from "../../auth/permissions";
+import { useAuth } from "../../../providers/authContext";
 import DutyPlannerPage from "./DutyPlannerPage";
 import LeaveManagementPage from "./LeaveManagementPage";
 import SalaryRegisterPage from "./SalaryRegisterPage";
@@ -22,8 +24,13 @@ const tabComponents: Record<string, React.ComponentType<{ embedded?: boolean }>>
 function StaffPages() {
   const location = useLocation();
   const navigate = useNavigate();
+  const { user } = useAuth();
 
   const searchParams = useMemo(() => new URLSearchParams(location.search), [location.search]);
+
+  // Default tab is role-aware: the supervisor's only Staff page is Leaves,
+  // so a bare /staff lands there instead of Duty Planner.
+  const defaultTab = firstAllowedTab(user?.role, "staff") ?? "duty-planner";
 
   // Read active tab from ?tab= query string
   const activeTab = useMemo(() => {
@@ -36,19 +43,19 @@ function StaffPages() {
     if (pathname.includes("salary-sheet")) return "salary-sheet";
     if (pathname.includes("leaves") || pathname.includes("leave")) return "leaves";
 
-    return "duty-planner"; // Default tab
-  }, [location.pathname, searchParams]);
+    return defaultTab;
+  }, [location.pathname, searchParams, defaultTab]);
 
-  // Redirect to ?tab=duty-planner when visiting /staff without parameters
+  // Redirect to the role's default tab when visiting /staff without parameters
   useEffect(() => {
     if (location.pathname === "/staff" && !searchParams.get("tab")) {
-      navigate("/staff?tab=duty-planner", { replace: true });
+      navigate(`/staff?tab=${defaultTab}`, { replace: true });
     }
-  }, [location.pathname, searchParams, navigate]);
+  }, [location.pathname, searchParams, navigate, defaultTab]);
 
   const ActiveComponent = useMemo(() => {
-    return tabComponents[activeTab] ?? DutyPlannerPage;
-  }, [activeTab]);
+    return tabComponents[activeTab] ?? tabComponents[defaultTab] ?? DutyPlannerPage;
+  }, [activeTab, defaultTab]);
 
   // Same page gutter and content width as the Trip List, so the staff filter
   // boxes line up identically with the operations ones.

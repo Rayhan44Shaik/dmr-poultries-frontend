@@ -64,7 +64,6 @@ function VehicleForm({
   const [fastagBank, setFastagBank] = useState(vehicle?.fastagBank ?? "");
   const [purchaseDate, setPurchaseDate] = useState(vehicle?.purchaseDate ?? "");
   const [purchaseAmount, setPurchaseAmount] = useState<number | "">(vehicle?.purchaseAmount ?? "");
-  const [emiStartDate, setEmiStartDate] = useState(vehicle?.emiStartDate ?? "");
   const [emiDay, setEmiDay] = useState<number | "">(model?.emiDay ?? "");
   const [totalEMIs, setTotalEMIs] = useState<number | "">(model?.totalEMIs ?? "");
   const [engineNumber, setEngineNumber] = useState(vehicle?.engineNumber ?? "");
@@ -202,7 +201,6 @@ function VehicleForm({
       purchaseDate,
       purchaseAmount:
         purchaseAmount === "" ? undefined : Number(purchaseAmount),
-      emiStartDate,
       emiDay: emiDay === "" ? undefined : Number(emiDay),
       totalEMIs: totalEMIs === "" ? undefined : Number(totalEMIs),
       engineNumber,
@@ -412,16 +410,6 @@ function VehicleForm({
                 }
               />
             </div>
-          </div>
-
-          <div className="relative">
-            {fieldLabel("EMI Start Date")}
-            <DatePicker
-              id={fieldId("EMI Start Date")}
-              value={emiStartDate}
-              onChange={setEmiStartDate}
-              placeholder="Select date"
-            />
           </div>
 
           <div className="relative">

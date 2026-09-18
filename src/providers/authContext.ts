@@ -5,7 +5,12 @@ export interface AuthContextValue {
   isAuthenticated: boolean;
   loading: boolean;
   user: AuthenticatedUser | null;
-  login: (username: string, password: string) => Promise<void>;
+  /** Resolves with the signed-in user, so callers can route by role. */
+  login: (username: string, password: string) => Promise<AuthenticatedUser>;
+  /** Bring an already-authenticated user into the app IN this document —
+   *  used right after a direct API sign-in, so no reload can lose the
+   *  session (storage-blocked browsers would bounce back to sign-in). */
+  adoptSession: (user: AuthenticatedUser) => void;
   logout: () => Promise<void>;
 }
 

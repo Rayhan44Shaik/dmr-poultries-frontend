@@ -96,9 +96,7 @@ export function computeEmiOverview(vehicles: readonly Vehicle[], asOfDate = getE
       emiDay: loan.emiDay,
       emiStartDate: loan.start.key,
       status: pending === 0 ? 'COMPLETED' : 'PENDING',
-      // Sample-origin metadata is accepted only from the explicit sample API
-      // adapter; it is not part of, or persisted by, Vehicle Master.
-      isSample: (vehicle as Vehicle & { isSample?: boolean }).isSample === true,
+      isSample: vehicle.isSample === true,
     };
     const previous = records.get(row.vehicleId);
     if (previous && JSON.stringify(previous) !== JSON.stringify(row)) {

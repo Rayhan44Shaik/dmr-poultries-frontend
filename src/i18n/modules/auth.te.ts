@@ -1,6 +1,21 @@
 // src/i18n/modules/auth.te.ts
 // Sign-in screen copy — Telugu.
 export default {
+  'auth.login.role_owner_title': 'యజమాని',
+  'auth.login.role_owner_desc': 'పూర్తి ప్రవేశం — అన్ని పేజీలు, అన్ని చర్యలు',
+  'auth.login.role_supervisor_title': 'సూపర్‌వైజర్',
+  'auth.login.role_supervisor_desc': 'ట్రిప్పులు, వసూళ్లు, ఇంధనం & సెలవు ఎంట్రీ',
+  'auth.login.or_manual': 'లేదా మాన్యువల్‌గా సైన్ ఇన్ చేయండి',
+  'auth.signout': 'సైన్ అవుట్',
+  'auth.restoring_session': 'మీ సెషన్ తనిఖీ చేస్తోంది',
+  'auth.session.expired': 'మీ సెషన్ గడువు ముగిసింది. దయచేసి మళ్లీ సైన్ ఇన్ చేయండి.',
+  'auth.access.denied_toast': 'ఈ పేజీ మీ పాత్రకు అందుబాటులో లేదు.',
+  'auth.idle.warning': 'ఏ కార్యాచరణ లేదు — {seconds} సెకన్లలో మిమ్మల్ని సైన్ అవుట్ చేస్తాం.',
+  'auth.idle.stay': 'సైన్ ఇన్‌తో కొనసాగండి',
+  'auth.idle.signed_out': '10 నిమిషాలు కార్యాచరణ లేకపోవడంతో మిమ్మల్ని సైన్ అవుట్ చేయడమైంది. దయచేసి మళ్లీ సైన్ ఇన్ చేయండి.',
+  'role.owner': 'యజమాని',
+  'role.supervisor': 'సూపర్‌వైజర్',
+  'role.senior_account': 'సీనియర్ అకౌంటెంట్',
   'auth.login.tagline_title': 'మీ పౌల్ట్రీ వ్యాపారాన్ని పూర్తి స్పష్టతతో నడపండి.',
   'auth.login.tagline_text':
     'ట్రిప్పులు, డెలివరీలు, వసూళ్లు, ఫ్లీట్ మరియు అకౌంట్స్ — యజమానులు, అకౌంటెంట్లు, సూపర్‌వైజర్లు మరియు కలెక్షన్ టీమ్ కోసం ఒకే అనుసంధాన వ్యవస్థ.',

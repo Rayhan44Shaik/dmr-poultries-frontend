@@ -8,6 +8,7 @@ import { FuelBillTable } from "../components/FuelBillTable";
 import { FuelViewModal } from "../components/FuelViewModal";
 import FuelFilters from "../components/FuelFilters";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
+import { CAPABILITIES, useCan } from "../../../auth/permissions";
 import { Pagination } from "../../../../ui";
 import { PAGINATION_DEFAULT_PAGE_SIZE } from "../../../../shared/ui/uiTokens";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
@@ -36,6 +37,8 @@ const ALL_DRIVERS = "All Drivers";
 function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
   const { t, language } = useI18n();
   const { showNotification } = useSafeNotification();
+  // Entry-only roles (supervisor) can add fuel bills but never approve/delete.
+  const can = useCan();
   const { vehicles: masterVehicles } = useVehicles();
   const { employees: masterEmployees } = useEmployees();
 
@@ -511,8 +514,8 @@ function FuelExpensesPage({ embedded = false }: FuelExpensesPageProps) {
           onSelect={setSelectedId}
           onView={handleView}
           onEdit={handleEdit}
-          onDelete={handleDelete}
-          onApprove={handleApprove}
+          onDelete={can(CAPABILITIES.FUEL_DELETE) ? handleDelete : undefined}
+          onApprove={can(CAPABILITIES.FUEL_APPROVE) ? handleApprove : undefined}
           startIndex={(currentPage - 1) * pageSize}
           sortBy={sortBy}
           sortDir={sortDir}

@@ -20,6 +20,7 @@ import { Pagination } from "../../../../ui";
 import { shouldShowPagination } from "../../../../shared/ui/paginationStyles";
 import { todayBusinessDate, weekRange } from "../../../../utils/businessDate";
 import { useI18n } from "../../../../i18n";
+import { CAPABILITIES, useCan } from "../../../auth/permissions";
 
 /**
  * The default window: THIS week, Monday → Sunday.
@@ -56,6 +57,8 @@ interface PendingReportRow {
 }
 
 export default function PendingCollectionsPage() {
+  // Entry-only roles (supervisor) view pending balances without delete rights.
+  const can = useCan();
   const { t } = useI18n();
   const toast = useToast();
 
@@ -585,6 +588,7 @@ export default function PendingCollectionsPage() {
           canGoNext={shopPosition >= 0 && shopPosition < filteredData.length - 1}
           shopIndex={shopPosition >= 0 ? shopPosition + 1 : undefined}
           shopTotal={filteredData.length}
+          allowDelete={can(CAPABILITIES.COLLECTION_DELETE)}
         />
       )}
     </div>

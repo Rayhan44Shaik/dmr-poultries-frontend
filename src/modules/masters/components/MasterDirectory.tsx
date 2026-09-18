@@ -112,7 +112,6 @@ export function MasterDirectoryFilters({
   const cols = extraFilter ? "lg:grid-cols-4" : "lg:grid-cols-3";
   return (
     <section
-      data-master-toolbar
       className={`${opsFilterCardClass} motion-safe:animate-[var(--animate-fade-in-up)]`}
       aria-label={ariaLabel}
     >
@@ -129,7 +128,7 @@ export function MasterDirectoryFilters({
             />
             <input
               id={searchId}
-              type="search"
+              type="text"
               value={search}
               onChange={(e) => onSearchChange(e.target.value)}
               placeholder={searchPlaceholder}

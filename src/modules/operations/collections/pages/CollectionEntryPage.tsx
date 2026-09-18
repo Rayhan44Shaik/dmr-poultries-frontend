@@ -10,6 +10,7 @@ import type { Collection, RecentCollection } from "../types/collection";
 import { EditCollectionModal } from "../components/pending/EditCollectionModal";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { useI18n } from "../../../../i18n";
+import { CAPABILITIES, useCan } from "../../../auth/permissions";
 
 type Props = {
   embedded?: boolean;
@@ -19,6 +20,8 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
   const { t } = useI18n();
   const vm = useCollectionEntry();
   const { showNotification } = useSafeNotification();
+  // Entry-only roles (supervisor) never receive approve / delete affordances.
+  const can = useCan();
 
   const [selectedShop, setSelectedShop] = useState<string | null>(null);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -132,8 +135,8 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
         isLoading={vm.loading}
         statusFilter={vm.statusFilter}
         onStatusChange={vm.changeStatusFilter}
-        onApprove={vm.approveCollection}
-        onReject={vm.rejectCollection}
+        onApprove={can(CAPABILITIES.COLLECTION_APPROVE) ? vm.approveCollection : undefined}
+        onReject={can(CAPABILITIES.COLLECTION_REJECT) ? vm.rejectCollection : undefined}
         onEdit={vm.editCollection}
         onViewShop={handleViewShop}
         onRefresh={vm.reloadCollections}
@@ -149,6 +152,7 @@ export default function CollectionEntryPage({ embedded: _embedded = false }: Pro
         allCollections={vm.allCollections || []}
         collection={selectedCollection}
         onRefresh={vm.refreshPage}
+        allowDelete={can(CAPABILITIES.COLLECTION_DELETE)}
       />
     </div>
   );

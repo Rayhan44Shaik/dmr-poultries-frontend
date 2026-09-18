@@ -6,7 +6,7 @@ interface MasterFormProps {
   title: string;
   subtitle: string;
   icon: ReactNode;
-  status: "Active" | "Inactive" | "Suspended";
+  status: "Active" | "Inactive";
   onStatusChange: (status: "Active" | "Inactive") => void;
   onSubmit: () => void;
   onCancel: () => void;
@@ -81,7 +81,7 @@ export default function MasterForm({
             />
           </button>
           <span
-            className={`min-w-12 text-xs font-semibold ${status === "Active" ? "text-emerald-700" : status === "Suspended" ? "text-amber-700" : "text-slate-500"}`}
+            className={`min-w-12 text-xs font-semibold ${status === "Active" ? "text-emerald-700" : "text-slate-500"}`}
           >
             {translateStatus(t, status)}
           </span>
