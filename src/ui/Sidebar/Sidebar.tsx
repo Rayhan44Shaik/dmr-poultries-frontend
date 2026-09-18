@@ -14,13 +14,16 @@
 import {
   Fragment,
   useEffect,
+  useMemo,
   useRef,
   type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent as ReactMouseEvent,
 } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { PanelLeftClose, PanelLeftOpen, X } from "lucide-react";
-import { NAV_CHILD_GROUPS, NAV_SECTIONS, NAV_TONE_CLASS, type NavChild } from "../../routes/navigation";
+import { NAV_CHILD_GROUPS, NAV_TONE_CLASS, navSectionsForRole, type NavChild } from "../../routes/navigation";
+import { useAuth } from "../../providers/authContext";
+import { hasCapability, CAPABILITIES } from "../../modules/auth/permissions";
 import { useI18n } from "../../i18n";
 import BrandMark from "../BrandMark";
 import { usePendingApprovals } from "../../modules/approvals/hooks/usePendingApprovals";
@@ -99,7 +102,12 @@ export default function Sidebar({ open, onClose, mode, onModeChange }: SidebarPr
   const pathname = location.pathname;
   const search = location.search;
   const { t } = useI18n();
+  const { user } = useAuth();
   const pendingApprovals = usePendingApprovals();
+
+  // Role-scoped navigation: a supervisor sees only the pages the role may open.
+  const navSections = useMemo(() => navSectionsForRole(user?.role), [user?.role]);
+  const canApproveAnything = hasCapability(user?.role, CAPABILITIES.COLLECTION_APPROVE);
 
   // Close the popup on route change.
   useEffect(() => {
@@ -201,7 +209,7 @@ export default function Sidebar({ open, onClose, mode, onModeChange }: SidebarPr
           } scrollbar-thin`
         }
       >
-        {NAV_SECTIONS.map((section) => {
+        {navSections.map((section) => {
           const SectionIcon = section.icon;
           return (
             <div key={section.id} className={collapsed ? "mb-5" : "mb-6"}>
@@ -227,7 +235,9 @@ export default function Sidebar({ open, onClose, mode, onModeChange }: SidebarPr
                   const groupLabel = groupMeta ? (groupMeta.labelKey ? t(groupMeta.labelKey) : groupMeta.label) : "";
                   const label = child.labelKey ? t(child.labelKey) : child.label;
                   const tone = NAV_TONE_CLASS[child.tone ?? "slate"];
-                  const badgeCount = navApprovalBadge(child.path, pendingApprovals);
+                  // Approval-queue badges only make sense for roles that can
+                  // actually approve — the supervisor sees clean rows.
+                  const badgeCount = canApproveAnything ? navApprovalBadge(child.path, pendingApprovals) : 0;
 
                   // The glyph (and only the glyph) carries the motion: the row
                   // is the `group`, so hovering/focusing anywhere on it starts

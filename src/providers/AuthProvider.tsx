@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { currentUserRequest, loginRequest, logoutRequest, type AuthenticatedUser } from '../modules/auth/authApi';
+import { currentUserRequest, loginRequest, logoutRequest, storeToken, type AuthenticatedUser } from '../modules/auth/authApi';
 import { AuthContext } from './authContext';
 
 interface AuthProviderProps {
@@ -27,9 +27,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   useEffect(() => {
     if (demoMode) return undefined;
     let active = true;
-    currentUserRequest().then((value) => { if (active) setUser(value); }).catch(() => undefined)
-      .finally(() => { if (active) setLoading(false); });
-    const expired = () => setUser(null);
+    // Restores the session from the stored bearer token; a missing/expired
+    // token answers 401 and the app starts on the sign-in screen.
+    currentUserRequest().then((value) => { if (active) setUser(value); }).catch(() => {
+      storeToken(null);
+      if (active) setUser(null);
+    }).finally(() => { if (active) setLoading(false); });
+    const expired = () => {
+      storeToken(null);
+      setUser(null);
+    };
     window.addEventListener('dmr:auth-expired', expired);
     return () => { active = false; window.removeEventListener('dmr:auth-expired', expired); };
   }, []);
@@ -39,6 +46,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   const login = useCallback(async (username: string, password: string) => {
     const session = await loginRequest(username, password);
     setUser(session.user);
+    return session.user;
   }, []);
 
   const logout = useCallback(async () => {
@@ -53,4 +61,3 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     </AuthContext.Provider>
   );
 };
-

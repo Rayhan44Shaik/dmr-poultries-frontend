@@ -6,6 +6,8 @@ import {
   getApprovalSnapshot,
   subscribeApprovalSnapshot,
 } from '../services/approvalSnapshot';
+import { hasCapability, CAPABILITIES } from '../../auth/permissions';
+import { useAuth } from '../../../providers/authContext';
 
 const ALERT_KEY = 'dmr:approval-alert:v1';
 
@@ -18,9 +20,15 @@ const ALERT_KEY = 'dmr:approval-alert:v1';
 export function ApprovalAlertToaster() {
   const { showNotification } = useSafeNotification();
   const { t } = useI18n();
+  const { user } = useAuth();
   const firedRef = useRef(false);
 
+  // Approval prompts belong to roles that can actually approve — the
+  // supervisor (entry-only) never gets "N items waiting for sign-off" nags.
+  const canApproveAnything = hasCapability(user?.role, CAPABILITIES.COLLECTION_APPROVE);
+
   useEffect(() => {
+    if (!canApproveAnything) return undefined;
     let done = false;
 
     const consider = () => {
@@ -86,7 +94,7 @@ export function ApprovalAlertToaster() {
       done = true;
       unsubscribe();
     };
-  }, [showNotification, t]);
+  }, [showNotification, t, canApproveAnything]);
 
   return null;
 }

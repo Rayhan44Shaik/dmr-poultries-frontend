@@ -43,6 +43,8 @@ import {
   ReceiptText,
 } from "lucide-react";
 import { ORDERS_PAGES } from "../modules/orders/routes/ordersRoutes";
+import type { AppRole } from "../modules/auth/authApi";
+import { canAccessNavPath } from "../modules/auth/permissions";
 
 /** Accent used by the sidebar icon + active row for this item. */
 export type NavTone =
@@ -707,4 +709,30 @@ export function resolveRoute(pathname: string): {
   }
 
   return {};
+}
+
+// ── Role-scoped navigation ──────────────────────────────────────────────────
+// The sidebar, command palette, header quick actions and breadcrumbs all read
+// through these helpers, so a role that cannot open a page never sees it
+// anywhere. The underlying tables stay untouched for the Owner.
+
+function childAllowed(role: AppRole | undefined | null, child: NavChild): boolean {
+  return canAccessNavPath(role, child.path);
+}
+
+/** Navigation sections filtered down to what `role` may open. */
+export function navSectionsForRole(role: AppRole | undefined | null): NavSection[] {
+  return NAV_SECTIONS
+    .map((section) => ({ ...section, children: section.children.filter((child) => childAllowed(role, child)) }))
+    .filter((section) => section.children.length > 0);
+}
+
+/** Flat navigation entries the role may open (command palette). */
+export function flatNavForRole(role: AppRole | undefined | null): FlatNavEntry[] {
+  return FLAT_NAV.filter((entry) => canAccessNavPath(role, entry.path));
+}
+
+/** Quick actions the role may open (header + palette). */
+export function quickActionsForRole(role: AppRole | undefined | null): QuickAction[] {
+  return QUICK_ACTIONS.filter((action) => canAccessNavPath(role, action.path));
 }

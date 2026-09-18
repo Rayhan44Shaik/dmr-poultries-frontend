@@ -24,6 +24,7 @@ import { useShops } from "../../../masters/shops/hooks/useShops";
 import { useBirdTypes } from "../../../masters/bird-types/hooks/useBirdTypes";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { useI18n } from "../../../../i18n";
+import { CAPABILITIES, useCan } from "../../../auth/permissions";
 import { getQuarterSampleInfo } from "../../../../sample/quarterSample";
 
 // --- Utils ---
@@ -82,6 +83,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   const { birdTypes } = useBirdTypes();
 
   const { showNotification } = useSafeNotification();
+  const can = useCan();
   const { allTrips, isLoading: tripsLoading, refreshTrips, deleteTrip, changeStatus } = useTrips(showNotification, {
     includeDeleted: true,
   });
@@ -734,7 +736,7 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
         onView={handleView}
         onEdit={handleEdit}
         onResume={handleResume}
-        onDelete={(trip, reason) => deleteTrip(trip.id, reason)}
+        onDelete={can(CAPABILITIES.TRIP_DELETE) ? (trip, reason) => deleteTrip(trip.id, reason) : undefined}
         onStatusChange={handleStatusChange}
       />
 

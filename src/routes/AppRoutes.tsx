@@ -2,6 +2,9 @@ import React, { Suspense } from "react";
 import { Navigate, Routes, Route } from "react-router-dom";
 import { useI18n } from "../i18n";
 import { lazyWithRetry } from "./lazyWithRetry";
+import RequireAccess from "./RequireAccess";
+import { useAuth } from "../providers/authContext";
+import { landingPathForRole } from "../modules/auth/permissions";
 
 /* ------------------------------------------------------------------ */
 /* Route-level code splitting                                         */
@@ -98,6 +101,7 @@ function PageLoading() {
 
 function NotFoundPage() {
   const { t } = useI18n();
+  const { user } = useAuth();
   return (
     <div className="flex h-screen items-center justify-center bg-slate-50">
       <div className="text-center">
@@ -108,7 +112,7 @@ function NotFoundPage() {
           {t("error.page_not_found")}
         </p>
         <a
-          href="/dashboard"
+          href={landingPathForRole(user?.role)}
           className="mt-4 inline-block rounded-lg bg-brand-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-brand-700"
         >
           {t("error.go_dashboard")}
@@ -118,10 +122,16 @@ function NotFoundPage() {
   );
 }
 
+/** `/` sends each role to the first page it is allowed to open. */
+function RoleLanding() {
+  const { user } = useAuth();
+  return <Navigate to={landingPathForRole(user?.role)} replace />;
+}
+
 function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<Navigate to="/dashboard" replace />} />
+      <Route path="/" element={<RoleLanding />} />
 
       {/* ============ SUPERVISOR MOBILE — Trip Entry Steps 1–5 only ============ */}
       <Route
@@ -145,9 +155,11 @@ function AppRoutes() {
       <Route
         path="/dashboard"
         element={
-          <Suspense fallback={<PageLoading />}>
-            <pages.dashboard />
-          </Suspense>
+          <RequireAccess>
+            <Suspense fallback={<PageLoading />}>
+              <pages.dashboard />
+            </Suspense>
+          </RequireAccess>
         }
       />
 
@@ -155,57 +167,71 @@ function AppRoutes() {
       <Route
         path="/masters"
         element={
-          <Suspense fallback={<PageLoading />}>
-            <pages.masters />
-          </Suspense>
+          <RequireAccess>
+            <Suspense fallback={<PageLoading />}>
+              <pages.masters />
+            </Suspense>
+          </RequireAccess>
         }
       />
       <Route
         path="/masters/shops"
         element={
-          <Suspense fallback={<PageLoading />}>
-            <pages.mastersShops />
-          </Suspense>
+          <RequireAccess>
+            <Suspense fallback={<PageLoading />}>
+              <pages.mastersShops />
+            </Suspense>
+          </RequireAccess>
         }
       />
       <Route
         path="/masters/farms"
         element={
-          <Suspense fallback={<PageLoading />}>
-            <pages.mastersFarms />
-          </Suspense>
+          <RequireAccess>
+            <Suspense fallback={<PageLoading />}>
+              <pages.mastersFarms />
+            </Suspense>
+          </RequireAccess>
         }
       />
       <Route
         path="/masters/vehicles"
         element={
-          <Suspense fallback={<PageLoading />}>
-            <pages.mastersVehicles />
-          </Suspense>
+          <RequireAccess>
+            <Suspense fallback={<PageLoading />}>
+              <pages.mastersVehicles />
+            </Suspense>
+          </RequireAccess>
         }
       />
       <Route
         path="/masters/employees"
         element={
-          <Suspense fallback={<PageLoading />}>
-            <pages.mastersEmployees />
-          </Suspense>
+          <RequireAccess>
+            <Suspense fallback={<PageLoading />}>
+              <pages.mastersEmployees />
+            </Suspense>
+          </RequireAccess>
         }
       />
       <Route
         path="/masters/banks"
         element={
-          <Suspense fallback={<PageLoading />}>
-            <pages.mastersBanks />
-          </Suspense>
+          <RequireAccess>
+            <Suspense fallback={<PageLoading />}>
+              <pages.mastersBanks />
+            </Suspense>
+          </RequireAccess>
         }
       />
       <Route
         path="/masters/bird-types"
         element={
-          <Suspense fallback={<PageLoading />}>
-            <pages.mastersBirdTypes />
-          </Suspense>
+          <RequireAccess>
+            <Suspense fallback={<PageLoading />}>
+              <pages.mastersBirdTypes />
+            </Suspense>
+          </RequireAccess>
         }
       />
 
@@ -219,9 +245,11 @@ function AppRoutes() {
       <Route
         path="/operations/*"
         element={
-          <Suspense fallback={<PageLoading />}>
-            <pages.operations />
-          </Suspense>
+          <RequireAccess>
+            <Suspense fallback={<PageLoading />}>
+              <pages.operations />
+            </Suspense>
+          </RequireAccess>
         }
       />
 
@@ -229,17 +257,21 @@ function AppRoutes() {
       <Route
         path="/accounts"
         element={
-          <Suspense fallback={<PageLoading />}>
-            <pages.accounts />
-          </Suspense>
+          <RequireAccess>
+            <Suspense fallback={<PageLoading />}>
+              <pages.accounts />
+            </Suspense>
+          </RequireAccess>
         }
       />
       <Route
         path="/accounts/*"
         element={
-          <Suspense fallback={<PageLoading />}>
-            <pages.accounts />
-          </Suspense>
+          <RequireAccess>
+            <Suspense fallback={<PageLoading />}>
+              <pages.accounts />
+            </Suspense>
+          </RequireAccess>
         }
       />
 
@@ -247,17 +279,21 @@ function AppRoutes() {
       <Route
         path="/fleet"
         element={
-          <Suspense fallback={<PageLoading />}>
-            <pages.fleet />
-          </Suspense>
+          <RequireAccess>
+            <Suspense fallback={<PageLoading />}>
+              <pages.fleet />
+            </Suspense>
+          </RequireAccess>
         }
       />
       <Route
         path="/fleet/*"
         element={
-          <Suspense fallback={<PageLoading />}>
-            <pages.fleet />
-          </Suspense>
+          <RequireAccess>
+            <Suspense fallback={<PageLoading />}>
+              <pages.fleet />
+            </Suspense>
+          </RequireAccess>
         }
       />
 
@@ -265,17 +301,21 @@ function AppRoutes() {
       <Route
         path="/staff"
         element={
-          <Suspense fallback={<PageLoading />}>
-            <pages.staff />
-          </Suspense>
+          <RequireAccess>
+            <Suspense fallback={<PageLoading />}>
+              <pages.staff />
+            </Suspense>
+          </RequireAccess>
         }
       />
       <Route
         path="/staff/*"
         element={
-          <Suspense fallback={<PageLoading />}>
-            <pages.staff />
-          </Suspense>
+          <RequireAccess>
+            <Suspense fallback={<PageLoading />}>
+              <pages.staff />
+            </Suspense>
+          </RequireAccess>
         }
       />
 
@@ -283,17 +323,21 @@ function AppRoutes() {
       <Route
         path="/reports"
         element={
-          <Suspense fallback={<PageLoading />}>
-            <pages.reports />
-          </Suspense>
+          <RequireAccess>
+            <Suspense fallback={<PageLoading />}>
+              <pages.reports />
+            </Suspense>
+          </RequireAccess>
         }
       />
       <Route
         path="/reports/*"
         element={
-          <Suspense fallback={<PageLoading />}>
-            <pages.reports />
-          </Suspense>
+          <RequireAccess>
+            <Suspense fallback={<PageLoading />}>
+              <pages.reports />
+            </Suspense>
+          </RequireAccess>
         }
       />
 
@@ -303,17 +347,21 @@ function AppRoutes() {
       <Route
         path="/settings"
         element={
-          <Suspense fallback={<PageLoading />}>
-            <pages.settings />
-          </Suspense>
+          <RequireAccess>
+            <Suspense fallback={<PageLoading />}>
+              <pages.settings />
+            </Suspense>
+          </RequireAccess>
         }
       />
       <Route
         path="/settings/*"
         element={
-          <Suspense fallback={<PageLoading />}>
-            <pages.settings />
-          </Suspense>
+          <RequireAccess>
+            <Suspense fallback={<PageLoading />}>
+              <pages.settings />
+            </Suspense>
+          </RequireAccess>
         }
       />
 

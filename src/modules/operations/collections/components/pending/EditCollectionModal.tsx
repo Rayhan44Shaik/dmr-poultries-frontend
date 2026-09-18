@@ -45,6 +45,8 @@ interface EditCollectionModalProps {
   /** The specific collection this modal was opened for (view/edit target). */
   collection?: Collection | null;
   onRefresh: () => void;
+  /** Roles without delete rights render the modal without the delete affordance. */
+  allowDelete?: boolean;
 }
 
 export function EditCollectionModal({
@@ -55,6 +57,7 @@ export function EditCollectionModal({
   allCollections,
   collection,
   onRefresh,
+  allowDelete = true,
 }: EditCollectionModalProps) {
   const { t, language } = useI18n();
   const panelRef = useRef<HTMLDivElement>(null);
@@ -412,7 +415,7 @@ export function EditCollectionModal({
     selected?.status,
   );
   const isPendingEntry = String(selected?.status ?? "").toLowerCase().startsWith("pending");
-  const canDelete = Boolean(selected) && deleteWindow.canDelete && selected?.status !== "Deleted";
+  const canDelete = allowDelete && Boolean(selected) && deleteWindow.canDelete && selected?.status !== "Deleted";
 
   /**
    * Deletion goes through the shared delayed-delete UX — the same compact pop

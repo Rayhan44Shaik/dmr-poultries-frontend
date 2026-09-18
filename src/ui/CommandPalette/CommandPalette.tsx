@@ -4,7 +4,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowRight, CornerDownLeft, Search } from "lucide-react";
-import { FLAT_NAV, QUICK_ACTIONS, type FlatNavEntry } from "../../routes/navigation";
+import { flatNavForRole, quickActionsForRole, type FlatNavEntry } from "../../routes/navigation";
+import { useAuth } from "../../providers/authContext";
 import { useI18n } from "../../i18n";
 
 interface CommandPaletteProps {
@@ -25,31 +26,38 @@ function fuzzyMatch(entry: FlatNavEntry, query: string): number {
 export default function CommandPalette({ open, onOpen, onClose }: CommandPaletteProps) {
   const navigate = useNavigate();
   const { t } = useI18n();
+  const { user } = useAuth();
   const [query, setQuery] = useState("");
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
   const listRef = useRef<HTMLDivElement>(null);
+
+  // Only pages the signed-in role may open are searchable — the palette can
+  // never become a way around the sidebar's role filter.
+  const quickActions = useMemo(() => quickActionsForRole(user?.role), [user?.role]);
+  const flatNav = useMemo(() => flatNavForRole(user?.role).filter((e) => !e.soon), [user?.role]);
 
   const results = useMemo(() => {
     const q = query.trim();
     if (!q) {
       // Top hits: quick actions first, then navigation.
       return [
-        ...QUICK_ACTIONS.map((a) => ({
+        ...quickActions.map((a) => ({
           section: t("command.quickActions"),
           label: a.labelKey ? t(a.labelKey) : a.label,
           path: a.path,
           icon: a.icon,
           keywords: a.descriptionKey ? t(a.descriptionKey) : a.description,
         })),
-        ...FLAT_NAV.filter((e) => !e.soon).map((e) => ({
+        ...flatNav.map((e) => ({
           ...e,
           section: e.sectionKey ? t(e.sectionKey) : e.section,
           label: e.labelKey ? t(e.labelKey) : e.label,
         })),
       ];
     }
-    return FLAT_NAV.filter((e) => !e.soon)
+    return flatNav
+      .slice()
       .map((e) => ({ entry: e, score: fuzzyMatch(e, q) }))
       .filter((r) => r.score >= 0)
       .sort((a, b) => a.score - b.score)
@@ -59,8 +67,7 @@ export default function CommandPalette({ open, onOpen, onClose }: CommandPalette
         section: e.sectionKey ? t(e.sectionKey) : e.section,
         label: e.labelKey ? t(e.labelKey) : e.label,
       }));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [query, t]);
+  }, [query, t, quickActions, flatNav]);
 
   // Reset the input whenever the palette is closed, and focus when it opens.
   const close = useCallback(() => {

@@ -63,6 +63,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import http from "node:http";
+import { randomUUID } from "node:crypto";
 
 const PORT = Number(process.env.PORT ?? process.env.MOCK_BACKEND_PORT ?? 4000);
 
@@ -4745,13 +4746,58 @@ function createMasterRow(kind, body) {
 // 14. HTTP SERVER — every endpoint the frontend calls
 // ═══════════════════════════════════════════════════════════════════════════
 
-const USER = {
-  id: 1,
-  username: "owner",
-  name: "DMR Owner",
-  role: "Owner",
-  permissions: ["*"],
+// ── Sign-in roles ──────────────────────────────────────────────────────────
+// Two desktop roles:
+//   • owner      → OWNER       — full access to every page and action.
+//   • supervisor → SUPERVISOR  — field-entry role: trip entry/list, collections
+//                  (entry only), fuel expenses (entry only), maintenance
+//                  (entry only) and leave requests (add only). The frontend
+//                  hides approve/delete and blocks every other section for it.
+// Passwords are accepted as-is (any non-empty password) — this is SAMPLE data.
+const USERS = {
+  owner: {
+    id: 1,
+    username: "owner",
+    displayName: "DMR Owner",
+    role: "OWNER",
+    employeeId: null,
+    permissions: ["*"],
+  },
+  supervisor: {
+    id: 2,
+    username: "supervisor",
+    displayName: "Field Supervisor",
+    role: "SUPERVISOR",
+    employeeId: null,
+    permissions: [
+      "trip.entry", "trip.list",
+      "collection.entry", "collection.view",
+      "fuel.entry",
+      "maintenance.entry",
+      "leave.add",
+    ],
+  },
 };
+
+/** Issued bearer tokens → username. Fresh per server start (like any
+ *  in-memory session store); a token that stops resolving answers 401. */
+const SESSIONS = new Map();
+
+function issueToken(username) {
+  const token = `sample-${username}-${randomUUID()}`;
+  SESSIONS.set(token, username);
+  return token;
+}
+
+function sessionUserFromRequest(req) {
+  const header = String(req.headers.authorization ?? "");
+  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+  if (!token || !SESSIONS.has(token)) return null;
+  return USERS[SESSIONS.get(token)] ?? null;
+}
+
+// Back-compat: the desktop bootstrap flow still reads a single USER shape.
+const USER = USERS.owner;
 
 // ── Supervisor Mobile: session + durable-sync contracts ────────────────────
 // The mobile workspace (src/modules/supervisor-mobile) speaks a stricter
@@ -5047,21 +5093,38 @@ const server = http.createServer(async (req, res) => {
       });
     if (p === "/api/auth/login" && method === "POST") {
       const body = await readBody(req);
+      const username = String(body?.username ?? "").trim().toLowerCase();
+      const password = String(body?.password ?? "");
+      // Sample data: any non-empty password works for the two known roles.
+      if (!password.trim() || !USERS[username]) {
+        return send(401, { error: "invalid_credentials", message: "Unknown username. Try owner or supervisor." });
+      }
+      const account = USERS[username];
+      const token = issueToken(username);
       // `user` serves the desktop gate, `supervisor` serves the mobile
       // provider — both are read from the same response object.
-      const session = mobileSession(body?.username);
+      const session = mobileSession(username);
       return send(200, {
-        user: USER,
-        token: "sample-quarter-token",
+        user: account,
+        token,
         expiresAt: session.expiresAt,
         supervisor: session.supervisor,
       });
     }
     if (p === "/api/auth/me") {
-      const session = mobileSession(null);
-      return send(200, { user: USER, supervisor: session.supervisor, expiresAt: session.expiresAt });
+      const account = sessionUserFromRequest(req);
+      if (!account) {
+        return send(401, { error: "unauthenticated", message: "Sign in to continue." });
+      }
+      const session = mobileSession(account.username);
+      return send(200, { user: account, supervisor: session.supervisor, expiresAt: session.expiresAt });
     }
-    if (p === "/api/auth/logout") return send(200, { ok: true });
+    if (p === "/api/auth/logout" && method === "POST") {
+      const header = String(req.headers.authorization ?? "");
+      const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+      if (token) SESSIONS.delete(token);
+      return send(200, { ok: true });
+    }
     if (p === "/api/bootstrap")
       return send(200, {
         user: USER,

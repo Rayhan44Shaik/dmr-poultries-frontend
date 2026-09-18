@@ -1,6 +1,21 @@
 // src/i18n/modules/auth.en.ts
 // Sign-in screen copy.
 export default {
+  'auth.login.role_owner_title': 'Owner',
+  'auth.login.role_owner_desc': 'Full access — every page, every action',
+  'auth.login.role_supervisor_title': 'Supervisor',
+  'auth.login.role_supervisor_desc': 'Trips, collections, fuel & leave entry',
+  'auth.login.or_manual': 'or sign in manually',
+  'auth.signout': 'Sign out',
+  'auth.restoring_session': 'Checking your session…',
+  'auth.session.expired': 'Your session expired. Please sign in again.',
+  'auth.access.denied_toast': 'This page is not available for your role.',
+  'auth.idle.warning': "No activity detected — you'll be signed out in {seconds}s.",
+  'auth.idle.stay': 'Stay signed in',
+  'auth.idle.signed_out': 'You were signed out after 10 minutes of inactivity. Please sign in again.',
+  'role.owner': 'Owner',
+  'role.supervisor': 'Supervisor',
+  'role.senior_account': 'Senior Accountant',
   'auth.login.tagline_title': 'Run your poultry business with total clarity.',
   'auth.login.tagline_text':
     'Trips, deliveries, collections, fleet and accounts — one connected system for owners, accountants, supervisors and the collection team.',

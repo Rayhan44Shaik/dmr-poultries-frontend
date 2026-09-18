@@ -17,6 +17,7 @@ import {
   ChevronDown,
   ChevronRight,
   Clock3,
+  LogOut,
   Menu,
   Moon,
   Plus,
@@ -29,7 +30,9 @@ import {
   UserRound,
   Wrench,
 } from "lucide-react";
-import { NAV_CHILD_GROUPS, QUICK_ACTIONS, resolveRoute } from "../../routes/navigation";
+import { NAV_CHILD_GROUPS, quickActionsForRole, resolveRoute } from "../../routes/navigation";
+import { useAuth } from "../../providers/authContext";
+import { canAccessNavPath, hasCapability, CAPABILITIES } from "../../modules/auth/permissions";
 import { useTheme } from "../../providers/ThemeProvider";
 import { SHOW_THEME_CONTROLS } from "../../providers/themeControls";
 import { translateRole, useI18n } from "../../i18n";
@@ -43,7 +46,6 @@ import { startApprovalPolling } from "../../modules/approvals/services/approvalS
 import { PENDING_LEAVES_PATH } from "../../modules/staff/utils/leaveDeepLink";
 import { tripService } from "../../modules/operations/vehicle-trips/services/tripService";
 import { getDocuments } from "../../modules/fleet-operations/services/storage";
-import { getCurrentUser } from "../../modules/settings/services";
 import { formatINR, formatRelativeTime } from "../../utils/format";
 
 interface HeaderProps {
@@ -155,16 +157,24 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
   const viewOpen = useViewLayerOpen();
   const { theme, toggleTheme } = useTheme();
   const { language, t } = useI18n();
+  const { user, logout } = useAuth();
   const roleLabel = (role: string) => translateRole(t, role);
 
   const route = useMemo(() => resolveRoute(location.pathname + location.search), [location.pathname, location.search]);
 
-  const user = getCurrentUser();
-  /* The account chip follows the language too: the demo account is the Owner,
-     so the name reads యజమాని in Telugu and the avatar initial follows it. */
-  const displayName = personNameLabel(t, language, "Owner");
-  const displayRole = "Owner";
+  /* The account chip shows the signed-in identity; before the session arrives
+     (or in demos without one) it falls back to the owner account. */
+  const displayName = user ? personNameLabel(t, language, user.displayName) : personNameLabel(t, language, "Owner");
+  const displayRole = user?.role ?? "OWNER";
   const initials = displayName.charAt(0).toUpperCase();
+
+  // Quick actions and the profile-menu Settings entry follow the role's access.
+  const quickActions = useMemo(() => quickActionsForRole(user?.role), [user?.role]);
+  const settingsAllowed = canAccessNavPath(user?.role, "/settings?tab=profile");
+  const canApproveAnything = hasCapability(user?.role, CAPABILITIES.COLLECTION_APPROVE);
+  const handleSignOut = useCallback(() => {
+    void logout();
+  }, [logout]);
 
   /* ----- Browser/page title from route metadata (translated) ----- */
   useEffect(() => {
@@ -344,15 +354,20 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
     return items;
   }, [pendingApprovals]);
 
-  // Approval alerts lead the bell; operational alerts follow.
+  // Approval alerts lead the bell; operational alerts follow. Every row must
+  // also lead somewhere the signed-in role may open — a supervisor never sees
+  // "waiting for approval" nudges or links into blocked sections.
   const allNotifications = useMemo(
-    () => [...approvalNotifications, ...notifications],
-    [approvalNotifications, notifications]
+    () =>
+      [...approvalNotifications, ...notifications]
+        .filter((n) => canAccessNavPath(user?.role, n.path)),
+    [approvalNotifications, notifications, user?.role]
   );
-  // Bell badge counts every waiting record (not just the grouped rows).
-  const notificationBadge = pendingApprovals.loaded
+  // Bell badge counts every waiting record (not just the grouped rows) for
+  // approvers; other roles count only the operational rows they can open.
+  const notificationBadge = pendingApprovals.loaded && canApproveAnything
     ? pendingApprovals.total + notifications.length
-    : notifications.length;
+    : allNotifications.length;
 
   // Every level falls back through its i18n key first: a section-level match
   // (no page) must still read its translated label, never the raw English one.
@@ -548,7 +563,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
             <p className="px-2.5 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-wide text-slate-400">
               {t("header.quickActions")}
             </p>
-            {QUICK_ACTIONS.map((action) => (
+            {quickActions.map((action) => (
               <Link
                 key={action.label}
                 to={action.path}
@@ -606,7 +621,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
               </span>
               <span className="min-w-0">
                 <span className="block truncate text-sm font-semibold text-slate-800 dark:text-slate-100">{displayName}</span>
-                <span className="block truncate text-xs text-slate-400">{user.email}</span>
+                <span className="block truncate text-xs text-slate-400">{user?.username ? `@${user.username}` : ""}</span>
               </span>
             </div>
             <div className="mx-2.5 my-1.5 flex items-center gap-1.5 rounded-md bg-slate-50 px-2.5 py-1.5 dark:bg-slate-700/40">
@@ -617,13 +632,25 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
               </span>
             </div>
             <div className="my-1.5 h-px bg-slate-100 dark:bg-slate-700" />
-            <Link
-              to="/settings?tab=profile"
-              onClick={close}
-              className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium text-slate-600 transition-colors hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700/50"
+            {settingsAllowed && (
+              <Link
+                to="/settings?tab=profile"
+                onClick={close}
+                className="flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium text-slate-600 transition-colors hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700/50"
+              >
+                <Settings size={15} /> {t("header.settings")}
+              </Link>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                close();
+                handleSignOut();
+              }}
+              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-semibold text-rose-600 transition-colors hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
             >
-              <Settings size={15} /> {t("header.settings")}
-            </Link>
+              <LogOut size={15} /> {t("auth.signout")}
+            </button>
           </div>
         )}
       </Dropdown>

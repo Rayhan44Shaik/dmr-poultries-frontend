@@ -5,7 +5,8 @@ export interface AuthContextValue {
   isAuthenticated: boolean;
   loading: boolean;
   user: AuthenticatedUser | null;
-  login: (username: string, password: string) => Promise<void>;
+  /** Resolves with the signed-in user, so callers can route by role. */
+  login: (username: string, password: string) => Promise<AuthenticatedUser>;
   logout: () => Promise<void>;
 }
 

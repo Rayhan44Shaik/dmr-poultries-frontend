@@ -135,6 +135,8 @@ interface ShopCollectionDetailModalProps {
   /** 1-based position of this shop in the list, for the `3 / 200` read-out. */
   shopIndex?: number;
   shopTotal?: number;
+  /** Roles without delete rights see the history without the delete affordance. */
+  allowDelete?: boolean;
 }
 
 function ShopCollectionDetailView({
@@ -149,6 +151,7 @@ function ShopCollectionDetailView({
   canGoNext = false,
   shopIndex,
   shopTotal,
+  allowDelete = true,
 }: ShopCollectionDetailModalProps) {
   const { t, language, toggleLanguage } = useI18n();
   const { showNotification } = useSafeNotification();
@@ -670,7 +673,7 @@ function ShopCollectionDetailView({
                           ? collectionStatusLabel(col.status, t)
                           : translatedStatus;
                         const deleteWindow = getDeleteWindowForStatus(col.collectionDate, col.status);
-                        const canDelete = Boolean(col.canDelete) && deleteWindow.canDelete && !col.deleted;
+                        const canDelete = allowDelete && Boolean(col.canDelete) && deleteWindow.canDelete && !col.deleted;
                         const deleteHint = deleteHintFor(col);
                         const isCommitting = pendingDelete.isCommitting(String(col.id));
                         const isCounting = pendingDelete.isPending(String(col.id));

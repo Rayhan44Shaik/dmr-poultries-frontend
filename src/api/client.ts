@@ -6,6 +6,7 @@ import axios, {
 import { logger } from "../logger/logger";
 import { API_CONFIG } from "./config";
 import { toApiError } from "./errors";
+import { getStoredToken } from "../modules/auth/tokenStore";
 
 declare module "axios" {
   export interface InternalAxiosRequestConfig {
@@ -33,9 +34,9 @@ apiClient.interceptors.request.use(
   (config: InternalAxiosRequestConfig) => {
     config.metadata = { startTime: Date.now() };
 
-    // Placeholder for future auth token:
-    // const token = localStorage.getItem("dmr-auth-token");
-    // if (token) config.headers.Authorization = `Bearer ${token}`;
+    // Bearer token issued by POST /auth/login (see modules/auth/authApi.ts).
+    const token = getStoredToken();
+    if (token) config.headers.Authorization = `Bearer ${token}`;
 
     if (import.meta.env?.DEV) {
       logger.debug(
@@ -45,12 +46,7 @@ apiClient.interceptors.request.use(
 
     return config;
   },
-  (error) => {
-    if (error?.response?.status === 401 && !String(error?.config?.url ?? "").includes("/auth/login")) {
-      window.dispatchEvent(new Event("dmr:auth-expired"));
-    }
-    return Promise.reject(toApiError(error));
-  }
+  (error) => Promise.reject(toApiError(error))
 );
 
 /** Response interceptor — normalize success logging and error shape */
@@ -67,7 +63,12 @@ apiClient.interceptors.response.use(
 
     return response;
   },
-  (error) => Promise.reject(toApiError(error))
+  (error) => {
+    if (error?.response?.status === 401 && !String(error?.config?.url ?? "").includes("/auth/login")) {
+      window.dispatchEvent(new Event("dmr:auth-expired"));
+    }
+    return Promise.reject(toApiError(error));
+  }
 );
 
 export default apiClient;
