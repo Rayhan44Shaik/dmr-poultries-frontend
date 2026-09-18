@@ -23,14 +23,14 @@ interface Account {
 }
 
 const ACCOUNTS: readonly Account[] = [
-  { id: 1, username: "owner", displayName: "DMR Owner", role: "OWNER", employeeId: null, password: "owner123" },
+  { id: 1, username: "owner", displayName: "DMR Owner", role: "OWNER", employeeId: null, password: "dmr@owner1414" },
   {
     id: 2,
     username: "supervisor",
     displayName: "Field Supervisor",
     role: "SUPERVISOR",
     employeeId: null,
-    password: "supervisor123",
+    password: "dmr@supervisor",
   },
 ];
 

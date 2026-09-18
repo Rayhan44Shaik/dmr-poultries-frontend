@@ -68,7 +68,7 @@ const React = (await import("react")).default;
 // the guarded cases skip exactly as they did when it was unreachable.
 try {
   const { loginRequest } = await server.ssrLoadModule("/src/modules/auth/authApi.ts");
-  await loginRequest("owner", "owner123");
+  await loginRequest("owner", "dmr@owner1414");
 } catch {
   console.log("SKIP auth  (sample server not reachable — guarded cases will skip)");
 }

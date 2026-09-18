@@ -4756,7 +4756,17 @@ function createMasterRow(kind, body) {
 //                  (entry only), fuel expenses (entry only), maintenance
 //                  (entry only) and leave requests (add only). The frontend
 //                  hides approve/delete and blocks every other section for it.
-// Passwords are accepted as-is (any non-empty password) — this is SAMPLE data.
+/**
+ * Sign-in passwords are EXACT (owner → "dmr@owner1414",
+ * supervisor → "dmr@supervisor"): simple password like owner123 sit in public
+ * data-breach lists and Chrome's Password Manager pops a "change your
+ * password" warning on every sign-in with them.
+ */
+const PASSWORDS = {
+  owner: "dmr@owner1414",
+  supervisor: "dmr@supervisor",
+};
+
 const USERS = {
   owner: {
     id: 1,
@@ -5221,9 +5231,9 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const username = String(body?.username ?? "").trim().toLowerCase();
       const password = String(body?.password ?? "");
-      // Sample data: any non-empty password works for the two known roles.
-      if (!password.trim() || !USERS[username]) {
-        return send(401, { error: "invalid_credentials", message: "Unknown username. Try owner or supervisor." });
+      // Exact passwords (see PASSWORDS) — anything else is rejected.
+      if (!password || !USERS[username] || PASSWORDS[username] !== password) {
+        return send(401, { error: "invalid_credentials", message: "Incorrect username or password." });
       }
       const account = USERS[username];
       const token = issueToken(username);
