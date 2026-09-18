@@ -5231,9 +5231,19 @@ const server = http.createServer(async (req, res) => {
       const body = await readBody(req);
       const username = String(body?.username ?? "").trim().toLowerCase();
       const password = String(body?.password ?? "");
-      // Exact passwords (see PASSWORDS) — anything else is rejected.
-      if (!password || !USERS[username] || PASSWORDS[username] !== password) {
-        return send(401, { error: "invalid_credentials", message: "Incorrect username or password." });
+      // Exact passwords (see PASSWORDS). The note tells the user WHICH part
+      // was wrong — unknown username vs wrong password.
+      if (!USERS[username]) {
+        return send(401, {
+          error: "invalid_credentials",
+          message: "No account with this username. Check the username and try again.",
+        });
+      }
+      if (PASSWORDS[username] !== password) {
+        return send(401, {
+          error: "invalid_credentials",
+          message: `Wrong password for '${username}'. Try again.`,
+        });
       }
       const account = USERS[username];
       const token = issueToken(username);

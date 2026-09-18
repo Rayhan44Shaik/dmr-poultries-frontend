@@ -96,11 +96,23 @@ authRouter.post(
   asyncHandler(async (req, res) => {
     const username = String((req.body as { username?: string } | undefined)?.username ?? "").trim().toLowerCase();
     const password = String((req.body as { password?: string } | undefined)?.password ?? "");
-    const account = ACCOUNTS.find((a) => a.username === username && a.password === password);
-    if (!account) {
-      res.status(401).json({ error: "invalid_credentials", message: "Incorrect username or password." });
+    const known = ACCOUNTS.find((a) => a.username === username);
+    if (!username || !known) {
+      // Tell the user WHICH part failed, so the note is actionable.
+      res.status(401).json({
+        error: "invalid_credentials",
+        message: "No account with this username. Check the username and try again.",
+      });
       return;
     }
+    if (known.password !== password) {
+      res.status(401).json({
+        error: "invalid_credentials",
+        message: "Wrong password for this username. Try again.",
+      });
+      return;
+    }
+    const account = known;
     const token = newToken();
     sessions.set(token, { username: account.username, expiresAt: Date.now() + SESSION_TTL_MS });
     const { password: _password, ...user } = account;

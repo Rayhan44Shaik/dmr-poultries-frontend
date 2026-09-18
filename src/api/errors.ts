@@ -33,8 +33,10 @@ export class ApiError extends AppError {
 function messageFromBody(body: unknown): string | null {
   if (!body || typeof body !== "object") return null;
   const data = body as ApiErrorBody;
-  if (typeof data.error === "string" && data.error.trim()) return data.error;
+  // The HUMAN message travels in `message`; `error` is the machine code
+  // (e.g. "invalid_credentials") — never show the code to the user.
   if (typeof data.message === "string" && data.message.trim()) return data.message;
+  if (typeof data.error === "string" && data.error.trim()) return data.error;
   return null;
 }
 
