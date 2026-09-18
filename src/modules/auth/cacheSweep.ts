@@ -25,6 +25,9 @@ const KEEP = new Set([
 /** localStorage key remembering the most recent signed-in username. */
 export const LAST_USERNAME_KEY = "dmr-last-username";
 
+/** Session artefacts the sweep must never touch (the auth flow owns these). */
+const SESSION_KEYS = new Set(["dmr-auth-token", "dmr-auth-user", LAST_USERNAME_KEY]);
+
 export function getLastUsername(): string | null {
   try {
     return localStorage.getItem(LAST_USERNAME_KEY);
@@ -48,9 +51,9 @@ export function sweepWorkspaceCaches(): void {
     for (let i = 0; i < localStorage.length; i += 1) {
       const key = localStorage.key(i);
       if (key == null || KEEP.has(key)) continue;
-      // The bearer token is handled by the auth flow itself; everything else
-      // that is not an explicit UI preference is data and must go.
-      if (key === "dmr-auth-token" || key === LAST_USERNAME_KEY) continue;
+      // Session artefacts are handled by the auth flow itself; everything
+      // else that is not an explicit UI preference is data and must go.
+      if (SESSION_KEYS.has(key)) continue;
       dead.push(key);
     }
     dead.forEach((key) => localStorage.removeItem(key));

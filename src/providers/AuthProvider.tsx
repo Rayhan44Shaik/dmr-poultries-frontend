@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { currentUserRequest, loginRequest, logoutRequest, storeToken, type AuthenticatedUser } from '../modules/auth/authApi';
-import { getStoredToken } from '../modules/auth/tokenStore';
+import { currentUserRequest, loginRequest, logoutRequest, type AuthenticatedUser } from '../modules/auth/authApi';
+import { clearSession, getCachedUser, getStoredToken, setCachedUser } from '../modules/auth/tokenStore';
 import { sweepWorkspaceCaches } from '../modules/auth/cacheSweep';
 import { AuthContext } from './authContext';
 
@@ -30,6 +30,14 @@ function hardNavigate(to: string): void {
   }
 }
 
+/** A 401/403 means the session is definitively gone; anything else is a
+ *  transient failure (proxy hiccup, timeout, server restart) that must NEVER
+ *  bounce a signed-in user back to the sign-in screen. */
+function isSessionInvalid(cause: unknown): boolean {
+  const status = (cause as { status?: number } | null)?.status;
+  return status === 401 || status === 403;
+}
+
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   // Development-only preview bypass. It can be enabled for this server with
   // VITE_DEMO_MODE=1, or per URL with ?demo=1. Production always uses auth.
@@ -37,28 +45,51 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     import.meta.env.VITE_DEMO_MODE === '1' ||
     new URLSearchParams(window.location.search).get('demo') === '1'
   );
-  const [user, setUser] = useState<AuthenticatedUser | null>(demoMode ? DEMO_USER : null);
-  const [loading, setLoading] = useState(!demoMode);
+
+  // INSTANT restore: token + cached user → the app boots straight into the
+  // session with no network and no splash. The /auth/me revalidation below
+  // quietly corrects the record (role changes, revoked sessions).
+  const [user, setUser] = useState<AuthenticatedUser | null>(() => {
+    if (demoMode) return DEMO_USER;
+    return getStoredToken() ? getCachedUser() : null;
+  });
+  // The splash only ever shows when a token exists but no cached user —
+  // i.e. a browser that signed in before this optimisation existed.
+  const [loading, setLoading] = useState(() => {
+    if (demoMode) return false;
+    return !!getStoredToken() && !getCachedUser();
+  });
 
   useEffect(() => {
     if (demoMode) return undefined;
-    // No stored token → there is no session to restore. Skip the network
-    // round-trip entirely so the sign-in screen appears the moment the app
-    // boots (the branded splash only shows when a session may exist).
-    if (!getStoredToken()) {
-      setLoading(false);
-      return undefined;
-    }
+    // No token → `loading` already initialised false; nothing to restore.
+    if (!getStoredToken()) return undefined;
     let active = true;
-    // Restores the session from the stored bearer token; an expired token
-    // answers 401 and the app starts on the sign-in screen.
-    currentUserRequest().then((value) => { if (active) setUser(value); }).catch(() => {
-      storeToken(null);
-      if (active) setUser(null);
-    }).finally(() => { if (active) setLoading(false); });
+    currentUserRequest()
+      .then((value) => {
+        if (!active) return;
+        setUser(value);
+        setCachedUser(value);
+      })
+      .catch((cause) => {
+        if (!active) return;
+        if (isSessionInvalid(cause)) {
+          // Definitive: the server rejected this session.
+          clearSession();
+          setUser(null);
+        } else if (!getCachedUser()) {
+          // No cached identity to keep showing — sign-in it is, but the
+          // token is KEPT so a hiccup right after login doesn't loop.
+          setUser(null);
+        }
+        // With a cached user: stay signed in; retry on the next boot.
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
     const expired = () => {
-      storeToken(null);
-      // A dead session mid-app: hard-navigate so no fetched data lingers.
+      clearSession();
+      setUser(null);
       hardNavigate('/');
     };
     window.addEventListener('dmr:auth-expired', expired);
@@ -69,6 +100,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   const login = useCallback(async (username: string, password: string) => {
     const session = await loginRequest(username, password);
+    setCachedUser(session.user);
     setUser(session.user);
     return session.user;
   }, []);
@@ -77,6 +109,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     try {
       await logoutRequest();
     } finally {
+      clearSession();
       setUser(null);
       // Wipe every cached business dataset before the sign-in screen returns,
       // so the next identity — whoever it is — starts with nothing of this

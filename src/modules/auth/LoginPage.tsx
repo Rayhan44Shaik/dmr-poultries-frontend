@@ -8,8 +8,9 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { ArrowRight, Building2, Eye, EyeOff, Info, Lock, ShieldCheck, Truck, User } from "lucide-react";
 import BrandMark from "../../ui/BrandMark";
-import { useAuth } from "../../providers/authContext";
 import { useI18n } from "../../i18n";
+import { loginRequest } from "./authApi";
+import { setCachedUser } from "./tokenStore";
 import { landingPathForRole } from "./permissions";
 import { IDLE_SIGNOUT_KEY } from "./IdleSessionGuard";
 import { getLastUsername, setLastUsername, sweepWorkspaceCaches } from "./cacheSweep";
@@ -18,7 +19,6 @@ const inputClass =
   "w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-10 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
 
 export default function LoginPage() {
-  const { login } = useAuth();
   const { t } = useI18n();
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -51,17 +51,20 @@ export default function LoginPage() {
     setBusy(true);
     setError("");
     try {
-      const signedIn = await login(user, pass);
+      // Direct API login (no provider state change): the page stays exactly
+      // as it is — no intermediate app render, no loading screen — until the
+      // hard navigation below takes over.
+      const signedIn = await loginRequest(user, pass);
       // Cross-user isolation: when the identity changes on this machine,
       // every cached business dataset is swept BEFORE the (full-page) landing
       // navigation rebuilds all module caches under the new session.
       const previous = getLastUsername();
-      if (previous !== signedIn.username) sweepWorkspaceCaches();
-      setLastUsername(signedIn.username);
-      // Full navigation (not SPA route change): every module-level cache —
-      // approval snapshot, collection snapshot, trip service — starts clean
-      // for this role, so no data can leak across sessions via devtools.
-      window.location.replace(landingPathForRole(signedIn.role));
+      if (previous !== signedIn.user.username) sweepWorkspaceCaches();
+      setLastUsername(signedIn.user.username);
+      // Cached identity → after this reload the app boots STRAIGHT into the
+      // workspace (no splash, no /auth/me wait).
+      setCachedUser(signedIn.user);
+      window.location.replace(landingPathForRole(signedIn.user.role));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t("auth.login.failed"));
       setBusy(false);
