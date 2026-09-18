@@ -3,6 +3,7 @@ import { Navigate, Routes, Route } from "react-router-dom";
 import { useI18n } from "../i18n";
 import { lazyWithRetry } from "./lazyWithRetry";
 import RequireAccess from "./RequireAccess";
+import BrandSplash from "./BrandSplash";
 import { useAuth } from "../providers/authContext";
 import { landingPathForRole } from "../modules/auth/permissions";
 
@@ -89,14 +90,9 @@ const pages = {
 
 function PageLoading() {
   const { t } = useI18n();
-  return (
-    <div
-      className="flex h-dvh items-center justify-center bg-slate-100 text-sm font-semibold text-slate-500"
-      aria-busy="true"
-    >
-      {t("common.loading")}
-    </div>
-  );
+  // The branded splash — identical to the boot/session screens, so page chunk
+  // loads read as one continuous wait rather than a different, plainer screen.
+  return <BrandSplash label={t("common.loading")} />;
 }
 
 function NotFoundPage() {

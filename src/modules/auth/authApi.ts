@@ -54,7 +54,10 @@ export async function loginRequest(username: string, password: string) {
 }
 
 export async function currentUserRequest(): Promise<AuthenticatedUser> {
-  const response = await apiClient.get<{ user: RawUser }>("/auth/me");
+  // Session restore should never hold the splash hostage: 8s is plenty for a
+  // LAN/localhost backend — a hung one fails into the sign-in screen instead
+  // of spinning for the full 30s default.
+  const response = await apiClient.get<{ user: RawUser }>("/auth/me", { timeout: 8000 });
   return normalizeUser(response.data?.user);
 }
 

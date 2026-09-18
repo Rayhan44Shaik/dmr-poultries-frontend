@@ -140,9 +140,18 @@ export default defineConfig({
     // Allow the sandbox preview host (e.g. <port>-<id>.e2b.app) to connect.
     allowedHosts: ['.e2b.app', 'localhost'],
     // Pre-transform the entry graph at startup so the first request is fast
-    // instead of paying for the whole module graph cold.
+    // instead of paying for the whole module graph cold. The auth chain is
+    // included on purpose: the sign-in screen is always the first thing a
+    // browser needs, and the splash → login handoff must be immediate.
     warmup: {
-      clientFiles: ['./index.html', './src/main.tsx'],
+      clientFiles: [
+        './index.html',
+        './src/main.tsx',
+        './src/App.tsx',
+        './src/routes/AuthGate.tsx',
+        './src/providers/AuthProvider.tsx',
+        './src/modules/auth/LoginPage.tsx',
+      ],
     },
     // Also covers the relative /api/mobile URLs used by mobile code.
     proxy: API_PROXY,

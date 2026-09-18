@@ -68,57 +68,98 @@
     <style>
       html {
         font-size: calc(100% * var(--dmr-font-scale, 1));
-        background: #f8fafc;
+        background: #064e3b;
       }
-      body { background: #f8fafc; }
+      body { background: #064e3b; }
       #root { background: #f8fafc; min-height: 100vh; }
     </style>
     <!-- Inter is bundled locally via @fontsource/inter (src/index.css) — no
          external font request; the app is self-contained and deterministic. -->
     <style>
-      /* Static splash: visible instantly, replaced when React mounts. */
+      /* Static boot splash — visible on FIRST paint, identical to the
+         AuthGate splash that replaces it, so loading is one continuous
+         branded screen (never a white flash with a bare spinner). */
       #app-splash {
-        min-height: 100vh;
+        min-height: 100dvh;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        gap: calc(14px * var(--dmr-font-scale, 1));
+        background: linear-gradient(135deg, #065f46 0%, #064e3b 45%, #020617 100%);
         font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-        color: #475569;
+        color: #ffffff;
       }
-      #app-splash .splash-spinner {
-        width: calc(34px * var(--dmr-font-scale, 1));
-        height: calc(34px * var(--dmr-font-scale, 1));
-        border-radius: 50%;
-        border: calc(3px * var(--dmr-font-scale, 1)) solid #d1fae5;
-        border-top-color: #059669;
-        animation: splash-spin 0.8s linear infinite;
+      #app-splash .splash-hen {
+        width: calc(112px * var(--dmr-font-scale, 1));
+        height: calc(112px * var(--dmr-font-scale, 1));
+        object-fit: contain;
+        animation: splash-bob 1.9s ease-in-out infinite;
       }
       #app-splash .splash-title {
-        font-size: calc(15px * var(--dmr-font-scale, 1));
+        margin-top: calc(24px * var(--dmr-font-scale, 1));
+        font-size: calc(30px * var(--dmr-font-scale, 1));
         font-weight: 700;
-        letter-spacing: -0.01em;
-        color: #0f172a;
+        letter-spacing: -0.02em;
+        color: #ffffff;
+      }
+      #app-splash .splash-track {
+        margin-top: calc(24px * var(--dmr-font-scale, 1));
+        width: 176px;
+        height: 4px;
+        border-radius: 999px;
+        background: rgba(255, 255, 255, 0.15);
+        overflow: hidden;
+      }
+      #app-splash .splash-bar {
+        width: 33%;
+        height: 100%;
+        border-radius: 999px;
+        background: linear-gradient(to right, #6ee7b7, #99f6e4);
+        animation: splash-bar 1.5s cubic-bezier(0.45, 0, 0.55, 1) infinite;
       }
       #app-splash .splash-sub {
-        font-size: calc(12px * var(--dmr-font-scale, 1));
-        color: #94a3b8;
+        margin-top: calc(16px * var(--dmr-font-scale, 1));
+        font-size: calc(14px * var(--dmr-font-scale, 1));
+        font-weight: 500;
+        color: rgba(209, 250, 229, 0.8);
       }
-      @keyframes splash-spin {
-        to { transform: rotate(360deg); }
+      #app-splash .splash-dots span {
+        display: inline-block;
+        animation: splash-dot 1.4s ease-in-out infinite;
+      }
+      #app-splash .splash-dots span:nth-child(2) { animation-delay: 0.2s; }
+      #app-splash .splash-dots span:nth-child(3) { animation-delay: 0.4s; }
+      @keyframes splash-bob {
+        0%, 100% { transform: translateY(0) rotate(0deg); }
+        50% { transform: translateY(-12px) rotate(-2.5deg); }
+      }
+      @keyframes splash-bar {
+        0% { transform: translateX(-110%); }
+        100% { transform: translateX(340%); }
+      }
+      @keyframes splash-dot {
+        0%, 80%, 100% { opacity: 0.25; transform: translateY(0); }
+        40% { opacity: 1; transform: translateY(-3px); }
       }
       @media (prefers-reduced-motion: reduce) {
-        #app-splash .splash-spinner { animation-duration: 2s; }
+        #app-splash .splash-hen,
+        #app-splash .splash-bar,
+        #app-splash .splash-dots span { animation: none; }
       }
     </style>
   </head>
   <body>
     <div id="root">
       <div id="app-splash" aria-busy="true">
-        <div class="splash-spinner" aria-hidden="true"></div>
+        <img class="splash-hen" src="./dmr-hen.png" alt="" aria-hidden="true" />
         <div class="splash-title">DMR Poultries</div>
-        <div class="splash-sub">Loading…</div>
+        <div class="splash-track" aria-hidden="true">
+          <div class="splash-bar"></div>
+        </div>
+        <div class="splash-sub">
+          Checking your session
+          <span class="splash-dots" aria-hidden="true"><span>.</span><span>.</span><span>.</span></span>
+        </div>
       </div>
     </div>
     <script type="module" src="/src/main.tsx"></script>

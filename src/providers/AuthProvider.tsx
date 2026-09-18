@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { currentUserRequest, loginRequest, logoutRequest, storeToken, type AuthenticatedUser } from '../modules/auth/authApi';
+import { getStoredToken } from '../modules/auth/tokenStore';
 import { sweepWorkspaceCaches } from '../modules/auth/cacheSweep';
 import { AuthContext } from './authContext';
 
@@ -41,9 +42,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   useEffect(() => {
     if (demoMode) return undefined;
+    // No stored token → there is no session to restore. Skip the network
+    // round-trip entirely so the sign-in screen appears the moment the app
+    // boots (the branded splash only shows when a session may exist).
+    if (!getStoredToken()) {
+      setLoading(false);
+      return undefined;
+    }
     let active = true;
-    // Restores the session from the stored bearer token; a missing/expired
-    // token answers 401 and the app starts on the sign-in screen.
+    // Restores the session from the stored bearer token; an expired token
+    // answers 401 and the app starts on the sign-in screen.
     currentUserRequest().then((value) => { if (active) setUser(value); }).catch(() => {
       storeToken(null);
       if (active) setUser(null);
