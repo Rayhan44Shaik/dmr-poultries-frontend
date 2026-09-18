@@ -58,10 +58,15 @@ const VehiclePerformanceChart = ({ stats, metricKey = 'distance' }: VehiclePerfo
           No data for the selected filters.
         </div>
       ) : (
-        <div className="h-80 w-full">
+        <div className="h-96 w-full">
           <div className="h-full w-full rounded-lg border border-slate-100 bg-white p-3">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={rows} layout="vertical" margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
+              <BarChart
+                data={rows}
+                layout="vertical"
+                barCategoryGap="34%"
+                margin={{ top: 8, right: 16, left: 0, bottom: 8 }}
+              >
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" horizontal={false} vertical={true} />
                 <XAxis
                   type="number"
@@ -78,10 +83,10 @@ const VehiclePerformanceChart = ({ stats, metricKey = 'distance' }: VehiclePerfo
                   dataKey="vehicle"
                   width={140}
                   interval={0}
-                  tick={{ fontSize: 12, fill: '#94a3b8', fontWeight: 600 }}
-                  axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
+                  tick={{ fontSize: 12, fill: '#475569', fontWeight: 600 }}
+                  axisLine={false}
                   tickLine={false}
-                  tickMargin={8}
+                  tickMargin={10}
                 />
                 <Tooltip
                   cursor={{ fill: '#f8fafc', stroke: '#e2e8f0', strokeWidth: 1 }}
@@ -98,8 +103,12 @@ const VehiclePerformanceChart = ({ stats, metricKey = 'distance' }: VehiclePerfo
                 <Bar
                   dataKey="value"
                   fill={metric.color}
-                  radius={[0, 4, 4, 0]}
-                  maxBarSize={20}
+                  fillOpacity={0.28}
+                  stroke={metric.color}
+                  strokeOpacity={0.55}
+                  strokeWidth={1}
+                  radius={[0, 6, 6, 0]}
+                  maxBarSize={16}
                   isAnimationActive={false}
                 />
               </BarChart>

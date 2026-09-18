@@ -5,7 +5,7 @@ import type { jsPDF } from 'jspdf';
 import { useI18n } from '../../../i18n';
 import { useAnalyticsData } from '../hooks/useAnalyticsData';
 import ErrorBoundary from '../components/common/ErrorBoundary';
-import ExpenseBreakdownDonut from '../components/analytics/ExpenseBreakdownDonut';
+import ExpenseBreakdownChart from '../components/analytics/ExpenseBreakdownChart';
 import VehiclePerformanceChart from '../components/analytics/VehiclePerformanceChart';
 import {
   METRICS as PERFORMANCE_METRICS,
@@ -779,7 +779,7 @@ const VehicleAnalyticsPage = ({ embedded = false, active = true }: VehicleAnalyt
                   tile="border-rose-100 bg-rose-50 text-rose-500"
                 />
                 <div className="p-4">
-                  <ExpenseBreakdownDonut data={expenseBreakdown} height={320} />
+                  <ExpenseBreakdownChart data={expenseBreakdown} height={320} />
                 </div>
               </div>
             </div>
