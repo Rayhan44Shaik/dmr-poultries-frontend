@@ -6,8 +6,9 @@
 // category pill. Ring, tiles and pills all read from the same items slice,
 // so every figure on the card stays in perfect sync with the data.
 // ---------------------------------------------------------------------------
-import { memo, useMemo, type CSSProperties } from 'react';
+import { memo, useMemo } from 'react';
 import { formatCurrencyCompact } from '../../utils/formatters';
+import ShareRing from './ShareRing';
 
 interface ExpenseData {
   name: string;
@@ -51,78 +52,6 @@ const TONE_BY_CATEGORY: Record<string, CategoryTone> = {
 
 const FALLBACK_TONE: CategoryTone = TONE_BY_CATEGORY.Other;
 
-const EXPENSE_BREAKDOWN_ANIMATION_STYLES = `
-@keyframes expense-share-card-in {
-  0% { opacity: 0; transform: translateY(14px) scale(0.965); }
-  55% { opacity: 1; transform: translateY(2px) scale(1.01); }
-  100% { opacity: 1; transform: translateY(0) scale(1); }
-}
-@keyframes expense-ring-draw {
-  from { stroke-dashoffset: var(--expense-ring-circumference); }
-  to { stroke-dashoffset: var(--expense-ring-dashoffset); }
-}
-.expense-share-card {
-  animation: expense-share-card-in 760ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-.expense-ring-progress {
-  animation: expense-ring-draw 1250ms cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-@media (prefers-reduced-motion: reduce) {
-  .expense-share-card,
-  .expense-ring-progress {
-    animation: none !important;
-  }
-}
-`;
-
-function ShareRing({ value, color, size = 56 }: { value: number; color: string; size?: number }) {
-  const pct = Math.min(100, Math.max(0, Number.isFinite(value) ? value : 0));
-  const radius = 20.4;
-  const strokeWidth = 4.1;
-  const circumference = 2 * Math.PI * radius;
-  const dashOffset = circumference * (1 - pct / 100);
-  const roundedPct = Math.round(pct);
-  const isWidePercent = roundedPct >= 100;
-  const numberFontSize = Math.max(12, Math.round(size * (isWidePercent ? 0.25 : 0.31) * 10) / 10);
-  const percentFontSize = Math.max(8.5, Math.round(size * (isWidePercent ? 0.16 : 0.2) * 10) / 10);
-  const progressStyle = {
-    strokeDasharray: circumference,
-    strokeDashoffset: dashOffset,
-    '--expense-ring-circumference': circumference,
-    '--expense-ring-dashoffset': dashOffset,
-  } as CSSProperties;
-
-  return (
-    <span
-      className="relative grid shrink-0 place-items-center rounded-full bg-white shadow-sm ring-1 ring-inset ring-slate-200/80"
-      style={{ width: size, height: size }}
-      aria-hidden="true"
-    >
-      <svg className="absolute inset-0" viewBox="0 0 48 48">
-        <circle cx="24" cy="24" r={radius} fill="none" stroke="#e2e8f0" strokeWidth={strokeWidth} />
-        <circle
-          cx="24"
-          cy="24"
-          r={radius}
-          fill="none"
-          stroke={color}
-          strokeWidth={strokeWidth}
-          strokeLinecap={pct >= 99.5 ? 'butt' : 'round'}
-          className="expense-ring-progress"
-          style={progressStyle}
-          transform="rotate(-90 24 24)"
-        />
-      </svg>
-      <span className="expense-ring-value relative flex max-w-[78%] items-center justify-center overflow-visible whitespace-nowrap font-black leading-none tabular-nums tracking-[-0.08em] text-slate-800">
-        <span style={{ fontSize: numberFontSize, lineHeight: 1 }}>{roundedPct}</span>
-        <span className="ml-px tracking-normal" style={{ fontSize: percentFontSize, lineHeight: 1 }}>
-          %
-        </span>
-      </span>
-    </span>
-  );
-}
-
 const ExpenseBreakdownChart = ({ data, height = 320 }: ExpenseBreakdownChartProps) => {
   const items = useMemo(() => {
     if (!Array.isArray(data)) return [];
@@ -157,8 +86,6 @@ const ExpenseBreakdownChart = ({ data, height = 320 }: ExpenseBreakdownChartProp
 
   return (
     <div className="flex h-full w-full flex-col" style={{ minHeight: `${height / 16}rem` }}>
-      <style>{EXPENSE_BREAKDOWN_ANIMATION_STYLES}</style>
-
       <div className="grid grid-cols-3 gap-1.5">
         {rows.map((row) => (
           <div
@@ -182,7 +109,7 @@ const ExpenseBreakdownChart = ({ data, height = 320 }: ExpenseBreakdownChartProp
         {rows.map((row, index) => (
           <article
             key={row.name}
-            className="expense-share-card group relative min-w-0 rounded-xl border border-slate-100 bg-gradient-to-r from-white to-slate-50/60 px-2.5 py-1.5 shadow-xs transition-colors duration-150 hover:from-slate-50/70 hover:to-white"
+            className="share-card-in group relative min-w-0 rounded-xl border border-slate-100 bg-gradient-to-r from-white to-slate-50/60 px-2.5 py-1.5 shadow-xs transition-colors duration-150 hover:from-slate-50/70 hover:to-white"
             style={{ animationDelay: `${index * 80}ms` }}
             title={`${row.name}: ${formatCurrencyCompact(row.value)} of ${formatCurrencyCompact(total)} (${row.percentage.toFixed(1)}%)`}
           >
