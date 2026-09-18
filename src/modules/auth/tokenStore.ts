@@ -16,26 +16,56 @@ import type { AuthenticatedUser } from "./authApi";
 export const AUTH_TOKEN_KEY = "dmr-auth-token";
 export const AUTH_USER_KEY = "dmr-auth-user";
 
-/** Fallback bag when localStorage throws (blocked / partitioned storage). */
+/** Fallback bag when neither storage is writable (most hostile frames). */
 const memoryBag = new Map<string, string>();
 
+/** sessionStorage — second layer: survives reloads even when localStorage is
+ *  blocked (common in preview iframes / private windows). */
 function readBag(key: string): string | null {
   try {
-    return localStorage.getItem(key);
+    const value = localStorage.getItem(key);
+    if (value != null) return value;
   } catch {
-    return memoryBag.get(key) ?? null;
+    // localStorage blocked — next layer
   }
+  try {
+    const value = sessionStorage.getItem(key);
+    if (value != null) return value;
+  } catch {
+    // sessionStorage blocked too — last layer
+  }
+  return memoryBag.get(key) ?? null;
 }
 
 function writeBag(key: string, value: string | null): void {
-  try {
-    if (value == null) localStorage.removeItem(key);
-    else localStorage.setItem(key, value);
-  } catch {
-    // Storage refused the write — keep the value for THIS document only.
-    if (value == null) memoryBag.delete(key);
-    else memoryBag.set(key, value);
+  if (value == null) {
+    // Removal must clear EVERY layer (the key may exist in several).
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // blocked
+    }
+    try {
+      sessionStorage.removeItem(key);
+    } catch {
+      // blocked
+    }
+    memoryBag.delete(key);
+    return;
   }
+  try {
+    localStorage.setItem(key, value);
+    return;
+  } catch {
+    // blocked — try the next layer
+  }
+  try {
+    sessionStorage.setItem(key, value);
+    return;
+  } catch {
+    // blocked — keep it for THIS document only
+  }
+  memoryBag.set(key, value);
 }
 
 export function getStoredToken(): string | null {

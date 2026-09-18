@@ -62,13 +62,15 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   });
 
   // The `dmr:auth-expired` listener is ALWAYS on for the life of the document:
-  // a 401 from any endpoint (a genuinely dead session) ends it and lands on a
-  // fresh sign-in document. It NEVER overwrites the idle-signout reason — an
-  // in-flight request 401ing right after the idle logout must not replace the
-  // "signed out after 10 minutes of inactivity" note with "session expired".
+  // a 401 from any endpoint lands here. Before evicting the user, the session
+  // is RE-CHECKED against /auth/me — only a confirmed rejection ends it. A
+  // lone 401 (preview-tunnel flap, restart race) keeps you signed in, which
+  // kills the last "bounces back to sign-in" path. The idle note is never
+  // overwritten by a later expiry note.
   useEffect(() => {
     if (demoMode) return undefined;
-    const expired = () => {
+    let probing = false;
+    const evict = () => {
       try {
         if (sessionStorage.getItem(IDLE_SIGNOUT_KEY) !== "idle") {
           sessionStorage.setItem(IDLE_SIGNOUT_KEY, "expired");
@@ -79,6 +81,29 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       clearSession();
       setUser(null);
       hardNavigate('/');
+    };
+    const expired = () => {
+      const token = getStoredToken();
+      if (!token) {
+        // Session already ended deliberately (logout / idle) — just land on
+        // the fresh sign-in document.
+        setUser(null);
+        hardNavigate('/');
+        return;
+      }
+      if (probing) return;
+      probing = true;
+      currentUserRequest()
+        .then(() => {
+          // Server confirms the session is ALIVE — the 401 was transient.
+        })
+        .catch((cause) => {
+          if (isSessionInvalid(cause)) evict();
+          // Anything else (network junk) — stay signed in.
+        })
+        .finally(() => {
+          probing = false;
+        });
     };
     window.addEventListener('dmr:auth-expired', expired);
     return () => window.removeEventListener('dmr:auth-expired', expired);

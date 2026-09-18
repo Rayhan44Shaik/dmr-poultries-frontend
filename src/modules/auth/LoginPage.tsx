@@ -7,7 +7,7 @@
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowRight, AlertCircle, Building2, Eye, EyeOff, Info, Lock, ShieldCheck, Truck, User } from "lucide-react";
+import { ArrowRight, AlertCircle, Building2, Eye, EyeOff, Info, Lock, ShieldCheck, Truck, User, X } from "lucide-react";
 import BrandMark from "../../ui/BrandMark";
 import { useI18n } from "../../i18n";
 import { useAuth } from "../../providers/authContext";
@@ -187,7 +187,15 @@ export default function LoginPage() {
                   className="flex items-start gap-2 rounded-lg border border-rose-200 bg-rose-50 px-3 py-2.5 text-xs font-medium leading-relaxed text-rose-700"
                 >
                   <AlertCircle size={14} className="mt-0.5 shrink-0 text-rose-500" aria-hidden="true" />
-                  <span>{error}</span>
+                  <span className="flex-1">{error}</span>
+                  <button
+                    type="button"
+                    onClick={() => setError("")}
+                    aria-label={t("common.close")}
+                    className="shrink-0 rounded p-0.5 text-rose-400 transition-colors hover:bg-rose-100 hover:text-rose-700"
+                  >
+                    <X size={14} aria-hidden="true" />
+                  </button>
                 </div>
               )}
 
