@@ -787,7 +787,7 @@ export function DatePicker({
             aria-label={copy.open}
             tabIndex={-1}
           >
-            {icon || <CalendarIcon size={18} className="text-emerald-600" />}
+            {icon || <CalendarIcon size={15} className="text-emerald-600" />}
           </button>
         </div>
       </div>

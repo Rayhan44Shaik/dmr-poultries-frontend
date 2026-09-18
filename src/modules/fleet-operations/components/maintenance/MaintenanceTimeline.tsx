@@ -1,6 +1,6 @@
 import { memo, useMemo, useState, type ReactNode } from 'react';
 import { format } from 'date-fns';
-import { Wrench, Battery, Disc, Settings, Droplets, Wind, CircleDot, Milestone, Activity, Hash, Paperclip, Calendar, FilterX, Route, Fuel, Truck } from 'lucide-react';
+import { Wrench, Battery, Disc, Settings, Droplets, Wind, CircleDot, Gauge, Target, Activity, Hash, Paperclip, Calendar, FilterX, Route, Fuel, Truck } from 'lucide-react';
 import type { MaintenanceEvent } from '../../types';
 import type { Vehicle } from '../../../masters/vehicles/types/vehicle';
 import { formatVehicleNumber } from '../../../../utils/format';
@@ -48,31 +48,36 @@ interface TimelineNode {
   classes: string;
 }
 
+/** One simple, calm tone for every approved-maintenance node — the glyph
+ * still tells the service kind apart, but the feed no longer rains colour. */
+const SIMPLE_NODE_CLASSES =
+  'border-emerald-200 bg-emerald-50 text-emerald-600';
+
 const getTimelineNode = (event: MaintenanceEvent): TimelineNode => {
   const check = `${event.serviceType || ''} ${event.maintenanceType || ''}`.toLowerCase();
 
   if (check.includes('battery')) {
-    return { icon: <Battery className="w-3.5 h-3.5" />, classes: 'border-amber-200 bg-amber-50 text-amber-600' };
+    return { icon: <Battery className="w-3.5 h-3.5" />, classes: SIMPLE_NODE_CLASSES };
   }
   if (check.includes('tyre') || check.includes('tire') || check.includes('wheel') || check.includes('alignment') || check.includes('balancing')) {
-    return { icon: <Disc className="w-3.5 h-3.5" />, classes: 'border-indigo-200 bg-indigo-50 text-indigo-600' };
+    return { icon: <Disc className="w-3.5 h-3.5" />, classes: SIMPLE_NODE_CLASSES };
   }
   if (check.includes('brake')) {
-    return { icon: <CircleDot className="w-3.5 h-3.5" />, classes: 'border-red-200 bg-red-50 text-red-600' };
+    return { icon: <CircleDot className="w-3.5 h-3.5" />, classes: SIMPLE_NODE_CLASSES };
   }
   if (check.includes('coolant')) {
-    return { icon: <Droplets className="w-3.5 h-3.5" />, classes: 'border-cyan-200 bg-cyan-50 text-cyan-600' };
+    return { icon: <Droplets className="w-3.5 h-3.5" />, classes: SIMPLE_NODE_CLASSES };
   }
   if (check.includes('filter')) {
-    return { icon: <Wind className="w-3.5 h-3.5" />, classes: 'border-teal-200 bg-teal-50 text-teal-600' };
+    return { icon: <Wind className="w-3.5 h-3.5" />, classes: SIMPLE_NODE_CLASSES };
   }
   if (check.includes('clutch')) {
-    return { icon: <Settings className="w-3.5 h-3.5" />, classes: 'border-violet-200 bg-violet-50 text-violet-600' };
+    return { icon: <Settings className="w-3.5 h-3.5" />, classes: SIMPLE_NODE_CLASSES };
   }
   if (check.includes('breakdown') || check.includes('repair')) {
-    return { icon: <Wrench className="w-3.5 h-3.5" />, classes: 'border-red-200 bg-red-50 text-red-600' };
+    return { icon: <Wrench className="w-3.5 h-3.5" />, classes: SIMPLE_NODE_CLASSES };
   }
-  return { icon: <Wrench className="w-3.5 h-3.5" />, classes: 'border-blue-200 bg-blue-50 text-blue-600' };
+  return { icon: <Wrench className="w-3.5 h-3.5" />, classes: SIMPLE_NODE_CLASSES };
 };
 
 type TimelineRow =
@@ -94,12 +99,34 @@ const VehicleRegistration = ({ value }: { value?: string | number }) => {
   const registration = formatVehicleNumber(rawValue);
   if (!rawValue || registration === '—') return null;
   return (
-    <span className="inline-flex items-center gap-1 rounded-md border border-sky-100 bg-sky-50 px-1.5 py-0.5 text-xs font-bold tracking-wide text-sky-700">
-      <Truck className="h-3 w-3 shrink-0 text-sky-500" aria-hidden="true" />
+    <span className="inline-flex items-center gap-1 rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-xs font-bold tracking-wide text-slate-600">
+      <Truck className="h-3 w-3 shrink-0 text-slate-400" aria-hidden="true" />
       {registration}
     </span>
   );
 };
+
+/** Animated placeholder rows shown while the approved timeline loads — the
+ * same silhouette as a live row (node on the connector + card), so the page
+ * fills in place exactly like the Trip List / Order Assignment loaders. */
+export const MaintenanceTimelineSkeleton = ({ rows = 4 }: { rows?: number }) => (
+  <div role="status" aria-busy="true" className="relative pl-2 pr-3">
+    <div className="absolute left-5 top-2 bottom-2 w-px bg-slate-200" aria-hidden="true" />
+    {Array.from({ length: rows }).map((_, i) => (
+      <div key={i} className={`relative pl-14 animate-pulse ${i === rows - 1 ? 'pb-1' : 'pb-6'}`}>
+        <div className="absolute left-5 -translate-x-1/2 top-1 z-10 h-8 w-8 rounded-full border border-slate-200 bg-slate-100" />
+        <div className="rounded-xl border border-slate-200/70 bg-white p-4">
+          <div className="flex items-start justify-between gap-3">
+            <div className="h-4 w-44 rounded bg-slate-100" />
+            <div className="h-7 w-20 rounded-lg bg-slate-100" />
+          </div>
+          <div className="mt-3 h-6 w-28 rounded-lg bg-slate-100" />
+          <div className="mt-2.5 h-4 w-64 max-w-full rounded bg-slate-100" />
+        </div>
+      </div>
+    ))}
+  </div>
+);
 
 const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, vehicleHistory = [], hasActiveFilters = false, sortDirection = 'desc', onClearFilters }: MaintenanceTimelineProps) => {
   const [selectedRecord, setSelectedRecord] = useState<MaintenanceEvent | null>(null);
@@ -233,8 +260,12 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, vehicleHistor
             const tripVehicleNo = tripVehicle?.vehicleNumber || tripVehicle?.vehicleNo || '';
             const tripDate = trip.startEvent?.eventDate || trip.endEvent?.eventDate || '';
             return (
-              <div key={`trip-${trip.ref}`} className={`relative pl-14 ${isLast ? 'pb-1' : 'pb-6'}`}>
-                <div className={`absolute left-5 -translate-x-1/2 top-1 z-10 w-8 h-8 rounded-full border flex items-center justify-center shadow-sm border-sky-200 bg-sky-50 text-sky-600`}>
+              <div
+                key={`trip-${trip.ref}`}
+                className={`relative pl-14 animate-fade-in-up ${isLast ? 'pb-1' : 'pb-6'}`}
+                style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}
+              >
+                <div className="absolute left-5 -translate-x-1/2 top-1 z-10 w-8 h-8 rounded-full border flex items-center justify-center shadow-sm border-slate-200 bg-slate-50 text-slate-500">
                   <Route className="w-3.5 h-3.5" />
                 </div>
                 <div className="bg-white hover:bg-slate-50/50 border border-slate-200/70 rounded-xl p-4 shadow-sm hover:shadow-md hover:border-slate-300 transition-all">
@@ -255,14 +286,14 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, vehicleHistor
 
                   <div className="mt-3">
                     <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
-                      <Calendar className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />
+                      <Calendar className="h-3 w-3 text-emerald-500" aria-hidden="true" />
                       {tripDate ? format(safeDate(tripDate), 'dd MMM yyyy') : '—'}
                     </span>
                   </div>
 
                   <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-gray-500">
                     <span className="inline-flex items-center gap-1 font-semibold text-gray-600">
-                      <Milestone className="w-3.5 h-3.5 text-gray-400" />
+                      <Gauge className="w-3.5 h-3.5 text-gray-400" />
                       Start → End:{' '}
                       <span className="font-bold text-gray-700">
                         {startMeter != null ? startMeter.toLocaleString('en-IN') : '—'} →{' '}
@@ -283,13 +314,15 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, vehicleHistor
             const m = row.data;
             const isFuel = m.sourceType === 'FUEL';
             const icon = isFuel ? <Fuel className="w-3.5 h-3.5" /> : <Route className="w-3.5 h-3.5" />;
-            const classes = isFuel
-              ? 'border-orange-200 bg-orange-50 text-orange-600'
-              : 'border-sky-200 bg-sky-50 text-sky-600';
+            const classes = 'border-slate-200 bg-slate-50 text-slate-500';
             const meterVehicle = vehicles.find((v) => String(v.id) === String(m.vehicleId));
             const meterVehicleNo = meterVehicle?.vehicleNumber || meterVehicle?.vehicleNo || '';
             return (
-              <div key={`meter-${m.sourceType}-${m.recordId}`} className={`relative pl-14 ${isLast ? 'pb-1' : 'pb-6'}`}>
+                <div
+                  key={`meter-${m.sourceType}-${m.recordId}`}
+                  className={`relative pl-14 animate-fade-in-up ${isLast ? 'pb-1' : 'pb-6'}`}
+                  style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}
+                >
                 <div className={`absolute left-5 -translate-x-1/2 top-1 z-10 w-8 h-8 rounded-full border flex items-center justify-center shadow-sm ${classes}`}>
                   {icon}
                 </div>
@@ -310,7 +343,7 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, vehicleHistor
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
-                      <Calendar className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />
+                      <Calendar className="h-3 w-3 text-emerald-500" aria-hidden="true" />
                       {format(safeDate(m.eventDate), 'dd MMM yyyy')}
                     </span>
                     {m.diffFromPrevious != null && (
@@ -335,7 +368,11 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, vehicleHistor
           const docCount = Array.isArray(event.documents) ? event.documents.length : 0;
 
           return (
-            <div key={event.id} className={`relative pl-14 ${isLast ? 'pb-1' : 'pb-6'}`}>
+            <div
+              key={event.id}
+              className={`relative pl-14 animate-fade-in-up ${isLast ? 'pb-1' : 'pb-6'}`}
+              style={{ animationDelay: `${Math.min(index, 12) * 40}ms` }}
+            >
               {/* Timeline node centred exactly on the connector line */}
               <div className={`absolute left-5 -translate-x-1/2 top-1 z-10 w-8 h-8 rounded-full border flex items-center justify-center shadow-sm ${node.classes}`}>
                 {node.icon}
@@ -353,7 +390,7 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, vehicleHistor
                   }
                 }}
                 aria-label={`View approved maintenance ${event.billNumber || event.maintenanceType}`}
-                className="group cursor-pointer rounded-xl border border-slate-200/70 bg-white p-4 text-left shadow-sm transition-all hover:border-sky-200 hover:bg-sky-50/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400 focus-visible:ring-offset-2"
+                className="group cursor-pointer rounded-xl border border-slate-200/70 bg-white p-4 text-left shadow-sm transition-all hover:border-emerald-200 hover:bg-emerald-50/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-emerald-400 focus-visible:ring-offset-2"
               >
                 {/* Top row: title, badges, documents, amount */}
                 <div className="flex items-start justify-between gap-3">
@@ -362,7 +399,7 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, vehicleHistor
                       <h4 className="font-bold text-gray-900 text-sm tracking-wide">{title}</h4>
 
                       {showTypeBadge && (
-                        <span className="px-2 py-0.5 bg-blue-50 border border-blue-200 text-blue-700 text-[10px] font-bold uppercase tracking-wider rounded-md">
+                        <span className="px-2 py-0.5 bg-slate-50 border border-slate-200 text-slate-600 text-[10px] font-bold uppercase tracking-wider rounded-md">
                           {typeBadge}
                         </span>
                       )}
@@ -392,7 +429,7 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, vehicleHistor
                   </div>
 
                   <div className="text-right shrink-0">
-                    <span className="inline-flex items-center gap-0.5 px-2.5 py-1 bg-blue-50 border border-blue-200 rounded-lg text-sm font-bold text-blue-600 shadow-sm">
+                    <span className="inline-flex items-center gap-0.5 px-2.5 py-1 bg-emerald-50 border border-emerald-200 rounded-lg text-sm font-bold text-emerald-700 shadow-sm">
                       ₹{event.totalCost.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </span>
                   </div>
@@ -401,23 +438,29 @@ const MaintenanceTimeline = ({ events, meterEvents = [], vehicles, vehicleHistor
                 {/* Second row: actual maintenance date */}
                 <div className="mt-3">
                   <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-100 bg-emerald-50 px-2 py-1 text-xs font-semibold text-emerald-700">
-                    <Calendar className="h-3.5 w-3.5 text-emerald-500" aria-hidden="true" />
+                    <Calendar className="h-3 w-3 text-emerald-500" aria-hidden="true" />
                     {format(safeDate(event.date), 'dd MMM yyyy')}
                   </span>
                 </div>
 
                 {/* Third row: operational information */}
                 <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[11px] text-gray-500">
-                  <span className="inline-flex items-center gap-1.5 rounded-lg border border-violet-100 bg-violet-50 px-2 py-1 font-semibold text-violet-700">
-                    <Milestone className="h-3.5 w-3.5 text-violet-500" aria-hidden="true" />
+                  {/* Log Profile reads as one neat, compact chip. */}
+                  {/* Log Profile and Next Target share one matched tone. */}
+                  <span className="inline-flex items-center gap-1 rounded-md border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700">
+                    <Gauge className="h-3 w-3 text-emerald-500" aria-hidden="true" />
                     <span>Log Profile</span>
-                    <strong className="tabular-nums text-violet-800">
+                    <strong className="tabular-nums text-emerald-800">
                       {event.currentKM.toLocaleString('en-IN')} KM
                     </strong>
                   </span>
                   {event.nextServiceKM > 0 && (
-                    <span className="inline-flex items-center gap-1 rounded-lg border border-cyan-100 bg-cyan-50 px-2 py-1 font-semibold text-cyan-700">
-                      Next Target: {event.nextServiceKM.toLocaleString('en-IN')} KM
+                    <span className="inline-flex items-center gap-1 rounded-md border border-emerald-100 bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-700">
+                      <Target className="h-3 w-3 text-emerald-500" aria-hidden="true" />
+                      Next Target:{' '}
+                      <strong className="tabular-nums text-emerald-800">
+                        {event.nextServiceKM.toLocaleString('en-IN')} KM
+                      </strong>
                     </span>
                   )}
                   {event.garage && (

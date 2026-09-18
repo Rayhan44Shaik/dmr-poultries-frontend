@@ -14,6 +14,7 @@ import {
   Banknote,
   CalendarDays,
   CheckCircle2,
+  ClipboardCheck,
   FileWarning,
   ReceiptText,
   Truck,
@@ -227,28 +228,57 @@ export default function PendingApprovalsPanel({
           })
       : t(stat.tipKey);
 
+  const pendingTotal = stats.reduce((sum, s) => sum + s.count, 0);
+
   return (
     <section
       aria-label={t("ops.dashboard.approvals.title")}
-      className="relative z-30 flex flex-wrap items-center gap-x-1 gap-y-1.5 rounded-xl border border-slate-200/70 bg-white px-3 py-2.5 shadow-sm"
+      className="relative z-30 rounded-2xl border border-amber-200/60 bg-white p-5 shadow-sm transition-shadow hover:shadow-md"
     >
-      {loading ? (
-        <div className="flex items-center gap-4 px-1">
-          {[0, 1, 2, 3, 4, 5, 6].map((i) => (
+      {/* ── Header: logo + title left, the calendar / refresh actions right ── */}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+        <div className="flex min-w-0 items-center gap-3">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-50 text-amber-600 ring-1 ring-inset ring-amber-200/70">
+            <ClipboardCheck size={18} strokeWidth={2.2} />
+          </span>
+          <div className="min-w-0">
+            <h3 className="truncate text-sm font-black text-slate-800">
+              {t("ops.dashboard.approvals.title")}
+            </h3>
+            <span
+              aria-hidden="true"
+              className="mt-1 block h-0.5 w-10 rounded-full bg-amber-400"
+            />
+            <p className="mt-1 truncate text-[10.5px] font-semibold tabular-nums text-slate-400">
+              {loading
+                ? t("ops.dashboard.syncing")
+                : t("ops.dashboard.approvals.subtitle", {
+                    count: pendingTotal,
+                  })}
+            </p>
+          </div>
+        </div>
+        {actions && (
+          <div className="ml-auto flex items-center gap-2 pl-2">{actions}</div>
+        )}
+      </div>
+
+      {/* ── One map-style tile per queue, same links / tooltips as before ── */}
+      <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-7">
+        {loading ? (
+          [0, 1, 2, 3, 4, 5, 6].map((i) => (
             <div
               key={i}
-              className="h-8 w-24 animate-pulse rounded-md bg-slate-100"
+              className="h-28 animate-pulse rounded-xl border border-slate-200/60 bg-slate-100/70"
             />
-          ))}
-        </div>
-      ) : allClear ? (
-        <p className="flex items-center gap-1.5 px-1 text-[12px] font-semibold text-emerald-600">
-          <CheckCircle2 size={14} strokeWidth={2.4} className="shrink-0" />
-          {t("ops.dashboard.approvals.all_clear")}
-        </p>
-      ) : (
-        <div className="flex flex-wrap items-center gap-x-1 gap-y-1">
-          {stats.map((stat) => {
+          ))
+        ) : allClear ? (
+          <p className="col-span-full flex items-center gap-1.5 rounded-xl border border-emerald-200/70 bg-emerald-50/60 px-4 py-3 text-[12px] font-semibold text-emerald-600">
+            <CheckCircle2 size={14} strokeWidth={2.4} className="shrink-0" />
+            {t("ops.dashboard.approvals.all_clear")}
+          </p>
+        ) : (
+          stats.map((stat) => {
             const Icon = stat.icon;
             const empty = stat.count === 0;
             return (
@@ -262,21 +292,24 @@ export default function PendingApprovalsPanel({
                   count: stat.count,
                   label: t(stat.labelKey),
                 })}
-                className={`group/tile relative flex items-center gap-2 rounded-lg px-2.5 py-1.5 transition-all duration-150 active:scale-[0.96] sm:px-3 motion-reduce:transition-none motion-reduce:active:scale-100 ${stat.hover} ${
-                  empty ? "opacity-40 hover:bg-transparent" : ""
+                className={`group/tile relative flex flex-col gap-2 rounded-xl border border-slate-200/80 bg-slate-50/40 p-3 transition-all duration-150 hover:-translate-y-0.5 hover:border-amber-300 hover:bg-amber-50/50 hover:shadow-md active:scale-[0.98] motion-reduce:transition-none motion-reduce:active:scale-100 ${
+                  empty ? "opacity-40 hover:bg-slate-50/40" : ""
                 }`}
               >
                 <span
-                  className={`flex h-7 w-7 shrink-0 origin-center items-center justify-center rounded-lg transition-transform duration-200 ease-out group-hover/tile:scale-110 group-active/tile:scale-75 group-active/tile:-rotate-12 motion-reduce:transform-none motion-reduce:transition-none ${stat.chip}`}
+                  className={`flex h-8 w-8 shrink-0 origin-center items-center justify-center rounded-lg shadow-sm ring-1 ring-inset ring-slate-200/70 transition-transform duration-200 ease-out group-hover/tile:scale-110 group-active/tile:scale-75 group-active/tile:-rotate-12 motion-reduce:transform-none motion-reduce:transition-none ${stat.chip}`}
                 >
-                  <Icon size={14} strokeWidth={2.2} />
+                  <Icon size={15} strokeWidth={2.2} />
                 </span>
-                <span className="flex items-baseline gap-1.5 leading-none">
-                  <span className="text-[15px] font-extrabold tabular-nums text-slate-900">
+                <span className="min-w-0">
+                  <span className="block truncate text-[10.5px] font-extrabold uppercase tracking-[0.06em] text-slate-400 transition-colors duration-150 group-hover/tile:text-amber-700">
+                    {t(stat.labelKey)}
+                  </span>
+                  <span className="mt-0.5 block text-lg font-black leading-tight tabular-nums text-slate-800">
                     {stat.count}
                   </span>
-                  <span className="text-[12px] font-semibold text-slate-500">
-                    {t(stat.labelKey)}
+                  <span className="block truncate text-[10px] font-semibold text-slate-400">
+                    {t("ops.dashboard.approvals.pending_unit")}
                   </span>
                 </span>
 
@@ -305,13 +338,9 @@ export default function PendingApprovalsPanel({
                 </span>
               </Link>
             );
-          })}
-        </div>
-      )}
-
-      {actions && (
-        <div className="ml-auto flex items-center gap-2 pl-2">{actions}</div>
-      )}
+          })
+        )}
+      </div>
     </section>
   );
 }

@@ -21,12 +21,12 @@ import PaymentRegisterChart from "../components/PaymentRegisterChart";
 import ActiveCounts from "../components/ActiveCounts";
 import CollectionPerformanceChart from "../components/CollectionPerformanceChart";
 import PendingApprovalsPanel from "../components/PendingApprovalsPanel";
-import QuarterOperationsMap from "../components/QuarterOperationsMap";
 import {
   Calendar,
   CalendarClock,
   CalendarDays,
   CalendarRange,
+  Check,
   ChevronDown,
   Layers,
   ArrowUpRight,
@@ -36,9 +36,7 @@ import {
 import { DatePicker } from "../../../components/common/DatePicker";
 import { useI18n } from "../../../i18n";
 import {
-  getOperationsSampleCounts,
   getQuarterSampleInfo,
-  type QuarterOperationsCounts,
   type SampleQuarter,
 } from "../../../sample/quarterSample";
 import { weekRange } from "../../../utils/businessDate";
@@ -408,12 +406,17 @@ function RangeDatePicker({
 
       {isOpen && (
         <div
-          className={`absolute right-0 z-50 w-[min(24rem,calc(100vw-2rem))] animate-scale-in rounded-2xl border border-slate-200/70 bg-white/95 p-5 shadow-xl shadow-slate-900/10 backdrop-blur-xl ring-1 ring-emerald-500/10 ${dropdownPositionClass}`}
+          className={`absolute right-0 z-50 w-[min(25rem,calc(100vw-2rem))] animate-scale-in rounded-2xl border border-slate-200 bg-white p-5 shadow-2xl shadow-slate-900/15 ring-1 ring-slate-900/5 ${dropdownPositionClass}`}
         >
           <div className="space-y-4">
             {/* Quick-range segmented toggle with a sliding indicator */}
-            <div>
-              <span className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+            <div className="rounded-xl bg-slate-50/80 p-3 ring-1 ring-inset ring-slate-200/60">
+              <span className="mb-2 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                <CalendarRange
+                  size={12}
+                  strokeWidth={2.4}
+                  className="text-slate-300"
+                />
                 {t("ops.dashboard.quick_date_range")}
               </span>
               <div
@@ -473,7 +476,7 @@ function RangeDatePicker({
                 })}
               </div>
               {/* Live description of the PENDING draft — commit needs Done. */}
-              <p className="mt-2 flex items-center justify-center gap-1.5 text-[11.5px] font-semibold text-slate-500">
+              <p className="mt-2.5 flex items-center justify-center gap-1.5 rounded-lg bg-white/80 px-2 py-1.5 text-[11.5px] font-semibold text-slate-500 ring-1 ring-inset ring-slate-200/50">
                 <span
                   className="h-1.5 w-1.5 rounded-full transition-colors duration-200"
                   style={{
@@ -506,9 +509,14 @@ function RangeDatePicker({
             {/* Stacked full-width fields: the shared DatePicker reserves right
                 space for its clear/calendar icons, so two narrow columns clip
                 the DD/MM/YYYY value. */}
-            <div className="grid grid-cols-1 gap-3.5">
+            <div className="grid grid-cols-1 gap-3.5 rounded-xl bg-slate-50/80 p-3 ring-1 ring-inset ring-slate-200/60">
               <div>
-                <label className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                  <CalendarDays
+                    size={12}
+                    strokeWidth={2.4}
+                    className="text-slate-300"
+                  />
                   {t("ops.dashboard.start_date")}
                 </label>
                 <DatePicker
@@ -520,7 +528,12 @@ function RangeDatePicker({
                 />
               </div>
               <div>
-                <label className="mb-1.5 block text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-extrabold uppercase tracking-wider text-slate-400">
+                  <Calendar
+                    size={12}
+                    strokeWidth={2.4}
+                    className="text-slate-300"
+                  />
                   {t("ops.dashboard.end_date")}
                 </label>
                 <DatePicker
@@ -540,12 +553,13 @@ function RangeDatePicker({
                 disabled={!draftValid}
                 title={t("ops.dashboard.done_title")}
                 aria-label={t("ops.dashboard.done")}
-                className="rounded-lg px-5 py-2 text-[13px] font-bold text-white shadow-sm transition-all duration-200 hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 rounded-xl px-6 py-2.5 text-[13px] font-extrabold text-white shadow-sm transition-all duration-200 hover:brightness-110 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50"
                 style={{
                   backgroundImage: `linear-gradient(to bottom right, ${draftTheme.from}, ${draftTheme.to})`,
                   boxShadow: `0 2px 8px -2px ${draftTheme.from}80`,
                 }}
               >
+                <Check size={14} strokeWidth={2.8} />
                 {t("ops.dashboard.done")}
               </button>
             </div>
@@ -717,12 +731,6 @@ function DashboardPage({ embedded = false }: { embedded?: boolean }) {
   const [sampleQuarter, setSampleQuarter] = useState<SampleQuarter | null>(
     null,
   );
-  /**
-   * The quarter file's own per-page mapping (`moduleCounts`) — the numbers
-   * the Quarter Operations Map tiles show. `null` until the sample server
-   * has reported them; a missing count is shown as "—", never estimated.
-   */
-  const [sampleCounts, setSampleCounts] = useState<QuarterOperationsCounts | null>(null);
   const [startDate, setStartDate] = useState<Date | undefined>(
     initialRange.startDate,
   );
@@ -770,23 +778,6 @@ function DashboardPage({ embedded = false }: { embedded?: boolean }) {
       window.clearTimeout(failsafe);
     };
   }, []);
-
-  // The Quarter Operations Map reads the quarter file's own per-page mapping
-  // (the `moduleCounts` block the sample server publishes), so its tiles can
-  // never drift from the registers they index. Fetched only once a quarter
-  // is known; a failed probe simply leaves the card unrendered.
-  useEffect(() => {
-    if (!sampleQuarter) return;
-    let active = true;
-    void getOperationsSampleCounts()
-      .catch(() => null)
-      .then((counts) => {
-        if (active && counts) setSampleCounts(counts);
-      });
-    return () => {
-      active = false;
-    };
-  }, [sampleQuarter]);
 
   const { data, previousData, isLoading, error, refetch } = useDashboardData(
     startDate ?? null,
@@ -1110,12 +1101,6 @@ function DashboardPage({ embedded = false }: { embedded?: boolean }) {
           rangeDays={rangeDays}
         />
       </div>
-
-      {/* The quarter file's own index of the sample quarter: one linked tile
-          per Operations register, each showing the exact number that register
-          renders. Against a real backend the quarter file resolves null and
-          this card does not exist. */}
-      <QuarterOperationsMap quarter={dashboardQuarter} counts={sampleCounts} />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch">
         <div className="lg:col-span-7 bg-white rounded-2xl border border-slate-200/60 p-5 shadow-sm hover:shadow-md transition-shadow flex flex-col justify-start gap-4 w-full min-w-0 xl:min-h-[33.125rem]">

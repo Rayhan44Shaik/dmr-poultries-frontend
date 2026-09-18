@@ -104,7 +104,7 @@ function MaintenanceFilters({
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         <div>
           <label className={opsFilterLabelClass}>
-            <Calendar size={17} className="shrink-0 text-emerald-500" />
+            <Calendar size={14} className="shrink-0 text-emerald-500" />
             <span>{t("common.from")}</span>
           </label>
           <DatePicker
@@ -118,7 +118,7 @@ function MaintenanceFilters({
         </div>
         <div>
           <label className={opsFilterLabelClass}>
-            <Calendar size={17} className="shrink-0 text-emerald-500" />
+            <Calendar size={14} className="shrink-0 text-emerald-500" />
             <span>{t("common.to")}</span>
           </label>
           <DatePicker
@@ -132,7 +132,7 @@ function MaintenanceFilters({
         </div>
         <div>
           <label className={opsFilterLabelClass}>
-            <Truck size={17} className="shrink-0 text-emerald-500" />
+            <Truck size={14} className="shrink-0 text-emerald-500" />
             <span>{t("common.vehicle")}</span>
           </label>
           <MasterDropdown
@@ -149,7 +149,7 @@ function MaintenanceFilters({
         </div>
         <div>
           <label className={opsFilterLabelClass}>
-            <User size={17} className="shrink-0 text-emerald-500" />
+            <User size={14} className="shrink-0 text-emerald-500" />
             <span>{t("common.driver")}</span>
           </label>
           <MasterDropdown
@@ -169,7 +169,7 @@ function MaintenanceFilters({
       <div className="grid grid-cols-1 items-end gap-3 border-t border-slate-100 pt-3 sm:grid-cols-2 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_minmax(0,1.4fr)]">
         <div>
           <label className={opsFilterLabelClass}>
-            <Wrench size={17} className="shrink-0 text-violet-500" />
+            <Wrench size={14} className="shrink-0 text-emerald-500" />
             <span>{t("operations.maintenance_type")}</span>
           </label>
           <MasterDropdown
@@ -186,7 +186,7 @@ function MaintenanceFilters({
         </div>
         <div>
           <label className={opsFilterLabelClass}>
-            <ArrowUpDown size={17} className="shrink-0 text-violet-500" />
+            <ArrowUpDown size={14} className="shrink-0 text-emerald-500" />
             <span>{t("common.sort_by")}</span>
           </label>
           <MasterDropdown
@@ -202,7 +202,7 @@ function MaintenanceFilters({
         </div>
         <div>
           <label className={opsFilterLabelClass}>
-            <Search size={17} className="shrink-0 text-slate-400" />
+            <Search size={14} className="shrink-0 text-slate-400" />
             <span>{t("common.search")}</span>
           </label>
           <div className="relative">

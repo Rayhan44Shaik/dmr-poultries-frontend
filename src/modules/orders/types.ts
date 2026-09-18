@@ -17,10 +17,13 @@
 //     (POST /trips/:id/steps/deliveries). ONE container per operational day.
 //   - "COLLECTED/finished" = the container trip's startStepSubmitted flag.
 //   - Assignment writes the collection's rows (with an order reference
-//     marker) onto the chosen vehicle trip; finishing sets
-//     deliveryStepSubmitted (existing contract). The container is NEVER
-//     deleted — it remains the day's collection record, so the collection
-//     table can always show trip number / vehicle / sequence / status.
+//     marker) onto the chosen vehicle trip. FINISHING tags the vehicle trip's
+//     remarks with `order:<tripNo>` — that tag is the "assignment finished"
+//     marker. It never submits Trip Entry Step 4: the assignment only SEEDS
+//     Step 4 with the shops assigned here, and the delivery is captured
+//     there. The container is NEVER deleted — it remains the day's collection
+//     record, so the collection table can always show trip number / vehicle /
+//     sequence / status.
 //   - Rows written by the Orders module carry the marker `[ORDER]` in
 //     `remarks` (+ ` O:<orderTripNo>` reference) so the original order can
 //     be told apart from shops added later in Step 4.

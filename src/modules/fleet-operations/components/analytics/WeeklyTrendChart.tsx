@@ -42,21 +42,21 @@ const WeeklyTrendChart = ({ data }: WeeklyTrendChartProps) => {
           No weekly activity for the selected filters.
         </div>
       ) : (
-        <div className="h-60 w-full">
+        <div className="h-80 w-full">
           <div className="h-full w-full rounded-lg border border-slate-100 bg-white p-3">
             <ResponsiveContainer width="100%" height="100%">
               <ComposedChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 8 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} horizontal={true} />
                 <XAxis
                   dataKey="weekLabel"
-                  tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }}
+                  tick={{ fontSize: 12, fill: '#94a3b8', fontWeight: 600 }}
                   axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
                   tickLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
                   tickMargin={8}
                 />
                 <YAxis
                   yAxisId="distance"
-                  tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }}
+                  tick={{ fontSize: 12, fill: '#94a3b8', fontWeight: 600 }}
                   tickFormatter={axisCompact}
                   axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
                   tickLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
@@ -66,7 +66,7 @@ const WeeklyTrendChart = ({ data }: WeeklyTrendChartProps) => {
                 <YAxis
                   yAxisId="fuel"
                   orientation="right"
-                  tick={{ fontSize: 10, fill: '#94a3b8', fontWeight: 600 }}
+                  tick={{ fontSize: 12, fill: '#94a3b8', fontWeight: 600 }}
                   tickFormatter={axisCompact}
                   axisLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}
                   tickLine={{ stroke: '#e2e8f0', strokeWidth: 1 }}

@@ -2,6 +2,7 @@ import { memo, useMemo } from 'react';
 import { AlertTriangle, CheckCircle2, Fuel, Gauge, Wrench, Truck } from 'lucide-react';
 import type { AnalyticsVehicleStat } from '../../types/analytics';
 import { formatCurrencyCompact } from '../../utils/formatters';
+import { formatVehicleNumber } from '../../../../utils/format';
 
 interface AttentionItem {
   id: string;
@@ -34,7 +35,7 @@ const AttentionSection = ({ stats }: AttentionSectionProps) => {
         icon: Truck,
         tone: 'border-slate-200 bg-slate-50',
         title: `${idle.length} vehicle${idle.length === 1 ? '' : 's'} with no trips`,
-        detail: idle.map((row) => row.vehicleNumber).join(', '),
+        detail: idle.map((row) => formatVehicleNumber(row.vehicleNumber)).join(', '),
         value: 'No activity',
       });
     }
@@ -56,7 +57,7 @@ const AttentionSection = ({ stats }: AttentionSectionProps) => {
           icon: Gauge,
           tone: 'border-amber-200 bg-amber-50',
           title: `${low.length} vehicle${low.length === 1 ? '' : 's'} below fleet-average mileage`,
-          detail: `${low.map((row) => row.vehicleNumber).join(', ')} (fleet avg ${fleetAvg.toFixed(2)} km/l)`,
+          detail: `${low.map((row) => formatVehicleNumber(row.vehicleNumber)).join(', ')} (fleet avg ${fleetAvg.toFixed(2)} km/l)`,
           value: 'Efficiency',
         });
       }
@@ -73,7 +74,7 @@ const AttentionSection = ({ stats }: AttentionSectionProps) => {
         icon: Fuel,
         tone: 'border-sky-200 bg-sky-50',
         title: 'Highest fuel spend',
-        detail: highFuel.map((row) => `${row.vehicleNumber} (${formatCurrencyCompact(row.fuelCost)})`).join(', '),
+        detail: highFuel.map((row) => `${formatVehicleNumber(row.vehicleNumber)} (${formatCurrencyCompact(row.fuelCost)})`).join(', '),
         value: formatCurrencyCompact(highFuel[0].fuelCost),
       });
     }
@@ -89,7 +90,7 @@ const AttentionSection = ({ stats }: AttentionSectionProps) => {
         icon: Wrench,
         tone: 'border-violet-200 bg-violet-50',
         title: 'Highest maintenance cost',
-        detail: highMaint.map((row) => `${row.vehicleNumber} (${formatCurrencyCompact(row.maintenanceCost)})`).join(', '),
+        detail: highMaint.map((row) => `${formatVehicleNumber(row.vehicleNumber)} (${formatCurrencyCompact(row.maintenanceCost)})`).join(', '),
         value: formatCurrencyCompact(highMaint[0].maintenanceCost),
       });
     }

@@ -264,6 +264,9 @@ export default {
   'ops.dashboard.payment.no_data': 'No payment data in this period',
   'ops.dashboard.payment.no_data_hint': 'Change the dashboard date range or refresh the dashboard to sync payment totals.',
   'ops.dashboard.approvals.title': 'Pending approvals',
+  'ops.dashboard.approvals.subtitle':
+    '{count} pending — tap a tile to open its register',
+  'ops.dashboard.approvals.pending_unit': 'pending',
   'ops.dashboard.approvals.tile_aria': '{count} {label} pending — open {label}',
   'ops.dashboard.approvals.all_clear': 'Nothing pending — all approvals clear and documents valid',
   'ops.dashboard.approvals.empty_tip': 'No {label} pending right now',

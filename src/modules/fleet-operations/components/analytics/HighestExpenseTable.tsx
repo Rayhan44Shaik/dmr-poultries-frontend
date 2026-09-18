@@ -1,5 +1,6 @@
 // src/modules/fleet-operations/components/analytics/HighestExpenseTable.tsx
 import { memo } from 'react';
+import { formatVehicleNumber } from '../../../../utils/format';
 
 interface ExpenseRow {
   id: string | number;
@@ -44,7 +45,7 @@ const HighestExpenseTable = ({ expenses }: HighestExpenseTableProps) => {
                 <td className="px-4 py-3.5 whitespace-nowrap">
                   <div className="flex items-center gap-2">
                     <span className="w-1.5 h-6 rounded-r bg-rose-500 -ml-4 opacity-0 group-hover:opacity-100 transition-opacity" />
-                    <span className="font-bold text-slate-800 tracking-wide text-sm">{expense.vehicleNumber}</span>
+                    <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] font-bold tracking-wide text-slate-600">{formatVehicleNumber(expense.vehicleNumber)}</span>
                   </div>
                 </td>
                 <td className="px-4 py-3.5 text-right whitespace-nowrap">
