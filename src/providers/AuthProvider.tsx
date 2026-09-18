@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { currentUserRequest, loginRequest, logoutRequest, type AuthenticatedUser } from '../modules/auth/authApi';
 import { clearSession, getCachedUser, getStoredToken, setCachedUser } from '../modules/auth/tokenStore';
 import { sweepWorkspaceCaches } from '../modules/auth/cacheSweep';
@@ -40,6 +40,9 @@ function isSessionInvalid(cause: unknown): boolean {
 }
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
+  // When the user last signed in IN this document (for the eviction guard:
+  // "session expired" seconds after a fresh sign-in is always a lie).
+  const lastAdoptedAtRef = useRef(0);
   // Development-only preview bypass. It can be enabled for this server with
   // VITE_DEMO_MODE=1, or per URL with ?demo=1. Production always uses auth.
   const demoMode = import.meta.env.DEV && (
@@ -71,12 +74,17 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     if (demoMode) return undefined;
     let probing = false;
     const evict = () => {
-      try {
-        if (sessionStorage.getItem(IDLE_SIGNOUT_KEY) !== "idle") {
-          sessionStorage.setItem(IDLE_SIGNOUT_KEY, "expired");
+      // Seconds after a successful sign-in the note would be nonsense — the
+      // user just authenticated. Land on a CLEAN sign-in screen instead.
+      const justSignedIn = Date.now() - lastAdoptedAtRef.current < 30_000;
+      if (!justSignedIn) {
+        try {
+          if (sessionStorage.getItem(IDLE_SIGNOUT_KEY) !== "idle") {
+            sessionStorage.setItem(IDLE_SIGNOUT_KEY, "expired");
+          }
+        } catch {
+          // storage blocked — the notice is cosmetic
         }
-      } catch {
-        // storage blocked — the notice is cosmetic
       }
       clearSession();
       setUser(null);
@@ -159,6 +167,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
    *  document (no reload) — the session cannot be lost in transit, even when
    *  the browser refuses to persist the token. */
   const adoptSession = useCallback((value: AuthenticatedUser) => {
+    lastAdoptedAtRef.current = Date.now();
     setCachedUser(value); // no-op-safe when storage is blocked (memory bag)
     setUser(value);
   }, []);
