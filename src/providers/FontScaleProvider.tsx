@@ -34,9 +34,10 @@ function initialFontScale(): FontScale {
 }
 
 /**
- * One source of truth for the six supported UI scales. Applying the CSS custom
- * property is synchronous and does not remount the router or application tree;
- * only the header/settings controls consume this context and re-render.
+ * One source of truth for the supported UI scales (see FONT_SCALE_LEVELS).
+ * Applying the CSS custom property is synchronous and does not remount the
+ * router or application tree; only the header/settings controls consume this
+ * context and re-render.
  */
 export function FontScaleProvider({ children }: FontScaleProviderProps) {
   const [scale, setScaleState] = useState<FontScale>(initialFontScale);

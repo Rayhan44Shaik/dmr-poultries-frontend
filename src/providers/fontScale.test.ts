@@ -25,7 +25,7 @@ function memoryStorage(seed: Record<string, string> = {}): FontScaleStorage & { 
   };
 }
 
-test("all six supported font levels remain exact", () => {
+test("every supported font level remains exact", () => {
   for (const level of FONT_SCALE_LEVELS) {
     assert.equal(normalizeFontScale(String(level)), level);
     assert.equal(formatFontScale(level), `${Math.round(level * 100)}%`);
@@ -33,10 +33,13 @@ test("all six supported font levels remain exact", () => {
 });
 
 test("finite unsupported values clamp and snap to a supported level", () => {
-  assert.equal(normalizeFontScale("90%"), 1);
+  assert.equal(normalizeFontScale("90%"), 0.9);
   assert.equal(normalizeFontScale("126%"), 1.3);
   assert.equal(normalizeFontScale(1.46), 1.5);
   assert.equal(normalizeFontScale(8), 1.5);
+  // Below the 70% floor and above the 150% ceiling both snap back inside it.
+  assert.equal(normalizeFontScale("50%"), 0.7);
+  assert.equal(normalizeFontScale(0.1), 0.7);
 });
 
 test("malformed persisted values safely fall back to 100%", () => {
