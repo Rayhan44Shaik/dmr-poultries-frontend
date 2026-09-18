@@ -120,19 +120,25 @@ export function isActiveCollection(trip: Trip): boolean {
 
 /**
  * A vehicle trip eligible for order assignment: Step 2 (farm) submitted,
- * Step 4 (deliveries) NOT submitted, vehicle set.
+ * vehicle set, Step 4 not submitted, and no FINISHED assignment yet.
  *
- * Trips that already carry PARTIAL order rows stay eligible (their
- * `alreadyAssigned` boxes are deducted from the available capacity, and the
- * assignment editor resumes on them). Fully finished assignments set
- * deliveryStepSubmitted and are therefore excluded here — a vehicle that
- * already delivered an order is locked.
+ * Trips that already carry PARTIAL order rows (Save Progress) stay eligible —
+ * their `alreadyAssigned` boxes are deducted from the available capacity, and
+ * the assignment editor resumes on them. A FINISHED assignment is locked out
+ * by the `order:<tripNo>` remarks tag, because Finish Assignment no longer
+ * submits Step 4 and so no longer leaves `deliveryStepSubmitted` behind.
  */
 export function isEligibleVehicleTrip(trip: Trip): boolean {
   return (
     trip.deleted !== true &&
     trip.farmStepSubmitted === true &&
+    // A trip whose Step 4 was genuinely submitted in Trip Entry is done
+    // delivering — it takes no new order.
     trip.deliveryStepSubmitted !== true &&
+    // A FINISHED assignment locks the vehicle too. It can no longer be keyed
+    // off deliveryStepSubmitted (assignment never submits Step 4), so the
+    // `order:<tripNo>` tag Finish Assignment writes is the signal.
+    !hasOrderTag(trip) &&
     (trip.vehicleId != null && trip.vehicleId > 0)
   );
 }
@@ -150,16 +156,22 @@ export function hasOrderTag(trip: Trip): boolean {
 
 /**
  * A trip with an assigned order whose delivery progress is tracked (Tab 3).
- * Requires Finish Assignment (`deliveryStepSubmitted`) — never a premature
- * row — plus either the `[ORDER]` plan rows or the `order:` remarks tag
- * (so a missing shop list still shows, never hides).
+ *
+ * The gate is the `order:<tripNo>` remarks tag — the marker Finish Assignment
+ * writes, and ONLY Finish Assignment writes. Save Progress persists rows
+ * without the tag, so a half-finished assignment never opens a tracking row.
+ *
+ * It is deliberately NOT `deliveryStepSubmitted`: assignment must never
+ * submit Trip Entry Step 4, so that flag stays false for a freshly assigned
+ * trip that has delivered nothing yet — and it is exactly those trips
+ * (status "Assigned") the tracking table exists to show. The
+ * `deliveryStepSubmitted && hasOrderRows` branch is kept so trips finished
+ * under the older contract (which set both) keep tracking.
  */
 export function isTrackingTrip(trip: Trip): boolean {
-  return (
-    trip.deleted !== true &&
-    trip.deliveryStepSubmitted === true &&
-    (hasOrderRows(trip) || hasOrderTag(trip))
-  );
+  if (trip.deleted === true) return false;
+  if (hasOrderTag(trip)) return true;
+  return trip.deliveryStepSubmitted === true && hasOrderRows(trip);
 }
 
 /** Next collection container tripNo for today (ORD-YYYYMMDD-NN). */

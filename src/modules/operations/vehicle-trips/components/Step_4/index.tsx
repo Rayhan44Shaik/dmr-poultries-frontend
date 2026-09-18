@@ -16,7 +16,17 @@ import { generateShopPDF } from "../../utils/generateShopPDF";
 import { generatePickupReportPDF } from "../../utils/generatePickupPDF";
 import { generateAssignmentSheetPdf } from "../../../../orders/pdf/generateAssignmentSheetPdf";
 import type { AssignmentSheetRow } from "../../../../orders/utils/ordersUtils";
-import { pendingBoxesFromRows, shopIdsFromRows } from "./remainingBoxes";
+import { hasOrderTag } from "../../../../orders/utils/ordersUtils";
+import {
+  assignedShopOrderFromRows,
+  buildDeliveredShopKeys,
+  captureRemarksFor,
+  isDeliveredRow,
+  orderAssignedShops,
+  pendingBoxesFromRows,
+  sortShopsAssignedFirst,
+  step4ShopsCount,
+} from "./remainingBoxes";
 import { computeDeliveryKpiTotals } from "./deliveryKpis";
 import { formatIstStamp } from "../../services/tripHeaderApiService";
 import { formatTripViewStamp, localizeTripViewText } from "../../utils/tripViewLocalization";
@@ -140,36 +150,6 @@ function ConfirmationModal({
 
 // ─── Balance Mismatch Panel ─────────────────────────────────────
 
-/** A delivery row is "captured / delivered" once it stops being a pending
- *  `[ORDER]` assignment row and carries actual delivery data (selected boxes,
- *  birds, weight), or the backend already recorded its capture time. */
-function isDeliveredRow(row: ShopDelivery): boolean {
-  const extra = row as ShopDelivery & { autoCaptureTime?: string };
-  if (extra.autoCaptureTime) return true;
-  const remarks = String(row.remarks ?? "").trim();
-  if (remarks.startsWith("[ORDER]")) return false;
-  const boxes = Array.isArray(row.selectedBoxIds) ? row.selectedBoxIds.length : 0;
-  return boxes > 0 || Number(row.birds) > 0 || Number(row.weight) > 0;
-}
-
-/** Delivered-shop identity keyed by BOTH shop id and shop name, so a row whose
- *  id does not resolve still matches by name (and vice versa). */
-function buildDeliveredShopKeys(rows: ShopDelivery[]): {
-  ids: Set<number>;
-  names: Set<string>;
-} {
-  const ids = new Set<number>();
-  const names = new Set<string>();
-  rows.forEach((row) => {
-    if (!isDeliveredRow(row)) return;
-    const id = Number(row.shopId);
-    if (id > 0) ids.add(id);
-    const name = String(row.shopName ?? "").trim().toLowerCase();
-    if (name) names.add(name);
-  });
-  return { ids, names };
-}
-
 /** Pending (not-yet-delivered) shops in DELIVERY order — the same order the
  *  dropdown shows (priority route first, then alphabetical) — mapped to
  *  AssignmentSheetRow so the Step 4 "Shops" PDF is EXACTLY the Order
@@ -180,16 +160,13 @@ function buildPendingAssignmentRows(
   rows: ShopDelivery[]
 ): AssignmentSheetRow[] {
   const { ids, names } = buildDeliveredShopKeys(rows);
-  const { ids: assignedIds, order: assignedOrder } = shopIdsFromRows(rows);
+  // Same source as the dropdown's "assigned shops on top" ordering, so the
+  // sheet and the dropdown can never disagree about the route order.
+  const assignedOrder = assignedShopOrderFromRows(rows);
 
   // Only order-assignment shops belong on the sheet. When a trip has no
   // assignment rows yet (plain manual trip), fall back to the full list.
-  const source =
-    assignedIds.size > 0
-      ? (shops || []).filter((shop: any) =>
-          assignedIds.has(Number(shop.id ?? shop.shopId ?? 0))
-        )
-      : (shops || []);
+  const source = orderAssignedShops(shops ?? [], rows);
 
   const isDelivered = (shop: any) => {
     const id = Number(shop.id ?? shop.shopId ?? 0);
@@ -422,25 +399,22 @@ export default function UnLoadingTable({
   // ─── Filter Pending Boxes ───────────────────────────────────────
   // Live route counts for the header buttons: Shops = still-to-deliver shops,
   // Boxes = still-available pickup boxes. Both shrink as deliveries are made.
-  const pendingShopsCount = useMemo(() => {
-    if (!safeShops || safeShops.length === 0) return 0;
-    const { ids, names } = buildDeliveredShopKeys(safeRows);
-    const { ids: assignedIds } = shopIdsFromRows(safeRows);
-    // Only order-assignment shops are counted. When there are no assignment
-    // rows yet, fall back to the full master list.
-    const source =
-      assignedIds.size > 0
-        ? safeShops.filter((shop: any) =>
-            assignedIds.has(Number(shop.id ?? shop.shopId ?? 0))
-          )
-        : safeShops;
-    return source.filter((shop: any) => {
-      const id = Number(shop.id ?? shop.shopId ?? 0);
-      const name = String(shop.shopName ?? shop.name ?? "").trim().toLowerCase();
-      const delivered = (id > 0 && ids.has(id)) || (Boolean(name) && names.has(name));
-      return !delivered;
-    }).length;
-  }, [safeShops, safeRows, language]);
+  //
+  // The assigned-shop count exists ONLY once the Order Assignment for this
+  // vehicle has actually been SUBMITTED — Finish Assignment tags the trip
+  // remarks with `order:<tripNo>`, Save Progress does not. Before that, Step 4
+  // has nothing assigned to count, so counting the `[ORDER]` plan rows a Save
+  // Progress left behind would advertise shops the driver never received
+  // (the "Shops (11) before I submitted anything" bug).
+  const assignmentSubmitted = useMemo(
+    () => hasOrderTag((safeTrip ?? {}) as Trip),
+    [safeTrip]
+  );
+
+  const pendingShopsCount = useMemo(
+    () => step4ShopsCount(safeShops, safeRows, assignmentSubmitted),
+    [safeShops, safeRows, assignmentSubmitted]
+  );
 
   const remainingBoxesCount = useMemo(
     () => pendingBoxesFromRows(safeBoxDetails, safeRows).length,
@@ -801,7 +775,9 @@ export default function UnLoadingTable({
       birds: finalBirds,
       weight: finalWeight,
       mortality: formData.mortality,
-      remarks: formData.remarks || "",
+      // A capture for a shop Order Assignment put on this trip keeps that
+      // shop's `[ORDER]` marker, so Delivery Tracking counts it as delivered.
+      remarks: captureRemarksFor(safeRows, formData.shopId, formData.remarks),
       rate: 0,
       amount: 0,
       deliveryMode: mode,
@@ -839,26 +815,12 @@ export default function UnLoadingTable({
     if (!safeShops || safeShops.length === 0) {
       return [{ value: 0, label: t("ops.trip.no_shops_available"), isDisabled: true }];
     }
-    // Delivered shops are matched by BOTH shop id and shop name.
-    const { ids: deliveredIds, names: deliveredNames } = buildDeliveredShopKeys(safeRows);
-    const { ids: assignedIds, order: assignedOrder } = shopIdsFromRows(safeRows);
+    // The route order of the shops Order Assignment put on this vehicle.
+    const assignedOrder = assignedShopOrderFromRows(safeRows);
 
-    // Only the ORDER-ASSIGNMENT shops are offered — not the whole master list.
-    // Fall back to all shops when there are no assignment rows yet.
-    const source =
-      assignedIds.size > 0
-        ? safeShops.filter((shop: any) =>
-            assignedIds.has(Number(shop.id ?? shop.shopId ?? 0))
-          )
-        : safeShops;
-
-    const isDeliveredShop = (shop: any) => {
-      const id = Number(shop.id ?? shop.shopId ?? 0);
-      const name = String(shop.shopName ?? shop.name ?? "").trim().toLowerCase();
-      return (id > 0 && deliveredIds.has(id)) || (Boolean(name) && deliveredNames.has(name));
-    };
-
-    const opts = source
+    // EVERY shop is offered. The Order Assignment decides what floats to the
+    // TOP of the list — it never hides the rest of the shop master.
+    const opts = safeShops
       .filter((shop: any) => {
         const status = String(shop.status ?? "Active");
         const id = shop.id ?? shop.shopId ?? 0;
@@ -873,38 +835,9 @@ export default function UnLoadingTable({
       })
       .filter((opt: { value: number; label: string; isDisabled: boolean }) => opt.value > 0);
 
-    // Delivery queue ordering: pending assignment shops first in their route
-    // (`serialNo`) order; then already-delivered shops (kept selectable so a
-    // shop can be captured again in the other mode), sorted ALPHABETICALLY.
-    const isPendingPriority = (o: { value: number; label: string }) => {
-      const id = Number(o.value);
-      const shop = source.find((s: any) => Number(s.id ?? s.shopId ?? 0) === id);
-      if (!shop) return false;
-      return assignedOrder.has(id) && !isDeliveredShop(shop);
-    };
-    const orderOf = (o: { value: number; label: string }) =>
-      assignedOrder.get(Number(o.value));
-    opts.sort(
-      (
-        a: { value: number; label: string; isDisabled: boolean },
-        b: { value: number; label: string; isDisabled: boolean }
-      ) => {
-        const aPrio = isPendingPriority(a);
-        const bPrio = isPendingPriority(b);
-        if (aPrio !== bPrio) return aPrio ? -1 : 1;
-        // Only PENDING shops follow route order; completed shops fall back to
-        // a stable alphabetical order below.
-        if (aPrio && bPrio) {
-          const aOrder = orderOf(a);
-          const bOrder = orderOf(b);
-          if (aOrder !== undefined && bOrder !== undefined && aOrder !== bOrder) {
-            return aOrder - bOrder;
-          }
-        }
-        return a.label.localeCompare(b.label);
-      }
-    );
-    return opts;
+    // ORDER: the assigned shops FIRST, in their route (`serialNo`) order —
+    // exactly the "Shops (N)" list — then every remaining shop ALPHABETICALLY.
+    return sortShopsAssignedFirst(opts, assignedOrder);
   }, [safeShops, safeRows, language]);
 
   const birdOptions = useMemo(() => {

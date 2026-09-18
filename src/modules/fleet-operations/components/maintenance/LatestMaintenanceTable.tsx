@@ -1,7 +1,7 @@
 import { memo, useState, useMemo, useEffect, useRef } from 'react';
 import {
   Trash2, CheckCircle2,
-  Search, Paperclip, Hash, Calendar, Wrench, Store, User, Gauge, Clock, Wallet, History, X, RotateCcw
+  Search, Paperclip, Hash, Calendar, Wrench, Store, User, Gauge, Clock, Wallet, History, X, RotateCcw, ListOrdered
 } from 'lucide-react';
 import { useI18n, translateStatus } from '../../../../i18n';
 import MasterDropdown from '../../../masters/components/MasterDropdown';
@@ -158,8 +158,10 @@ const LatestMaintenanceTable = ({
     return t('fleet.maintenance_table.no_deleted');
   };
 
-  // Column count for the empty-state row.
-  const colCount = 9 + (viewMode === 'deleted' ? 1 : 0) + (viewMode === 'pending' && (onDelete || onApprove) ? 1 : 0);
+  // Column count for the empty-state row (S.No + the nine data/action cols;
+  // the pending action col only exists when a handler was passed).
+  const colCount =
+    10 + (viewMode === 'deleted' ? 1 : 0) + (viewMode === 'pending' && (onDelete || onApprove) ? 1 : 0);
 
   return (
     <div ref={tableRef} className="bg-white border border-slate-200/80 rounded-2xl shadow-xl shadow-slate-100 overflow-hidden">
@@ -290,6 +292,13 @@ const LatestMaintenanceTable = ({
             <table className="min-w-full text-sm text-left border-collapse">
               <thead className="bg-slate-50/75 border-b border-slate-200 text-slate-600">
                 <tr>
+                  {/* Serial number leads every view — pending, approved, deleted. */}
+                  <th className="px-4 py-3 text-left text-sm font-bold uppercase tracking-wider whitespace-nowrap">
+                    <div className="flex items-center gap-1.5">
+                      <ListOrdered size={13} className="text-slate-400 shrink-0" />
+                      <span>{t('fleet.maintenance_table.sno')}</span>
+                    </div>
+                  </th>
                   <th className="px-4 py-3 text-left text-sm font-bold uppercase tracking-wider whitespace-nowrap">
                     <div className="flex items-center gap-1.5">
                       <Hash size={13} className="text-slate-400 shrink-0" />
@@ -393,6 +402,13 @@ const LatestMaintenanceTable = ({
                       className="cursor-pointer outline-none transition-colors duration-150 hover:bg-slate-50/80 border-l-4 border-l-transparent focus-visible:border-l-blue-400 focus-visible:bg-blue-50/40"
                       onClick={() => onView(rec)}
                     >
+                      {/* Serial continues across pages so row 11 on page 2 reads 11. */}
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="inline-flex h-6 min-w-6 items-center justify-center rounded-md border border-slate-200 bg-slate-50 px-1.5 text-[11px] font-bold tabular-nums text-slate-500">
+                          {(currentPage - 1) * pageSize + index + 1}
+                        </span>
+                      </td>
+
                       <td className="px-4 py-3 whitespace-nowrap">
                         <span className={`inline-flex items-center gap-1.5 text-xs font-bold rounded-md px-2 py-0.5 border ${
                           isDeleted

@@ -88,6 +88,50 @@ export function pendingShopsFromRows(rows: ShopDelivery[]): number {
   return pending;
 }
 
+/**
+ * The `[ORDER]` remarks marker on a shop's assignment plan row, or "" when
+ * this trip carries no assignment plan for that shop.
+ */
+export function orderRemarksForShop(rows: ShopDelivery[], shopId: number): string {
+  const target = Number(shopId);
+  for (const row of rows ?? []) {
+    if (Number(row.shopId) !== target) continue;
+    const remarks = String(row.remarks ?? "").trim();
+    if (remarks.startsWith("[ORDER]")) return remarks;
+  }
+  return "";
+}
+
+/**
+ * The remarks a Step 4 capture MUST be saved with.
+ *
+ * A delivery captured for a shop that Order Assignment put on this trip has to
+ * carry that shop's `[ORDER] O:<tripNo>` marker: Delivery Tracking identifies
+ * a shop's delivered rows by it (`isOrderPlanRow(row) && isCapturedRow(row)`),
+ * so a capture saved without the marker leaves the tracking table's
+ * "N shops / M delivered" count stuck at 0 no matter how many shops the driver
+ * delivers and saves.
+ *
+ * Any note the driver typed is preserved, appended after the marker. An edit
+ * loads the row's own remarks into the field, so an existing marker is stripped
+ * from the note first — re-saving can never duplicate it.
+ */
+export function captureRemarksFor(
+  rows: ShopDelivery[],
+  shopId: number,
+  typed: string
+): string {
+  const marker = orderRemarksForShop(rows, shopId);
+  const note = String(typed ?? "")
+    .replace(/\[ORDER\]\s*O:[^\s|]+/g, "")
+    .split("|")
+    .map((part) => part.trim())
+    .filter(Boolean)
+    .join(" | ");
+  if (!marker) return note;
+  return note ? `${marker} | ${note}` : marker;
+}
+
 /** Shop ids present on the assignment plan (`[ORDER]` rows). */
 export function assignedShopIdsFromRows(rows: ShopDelivery[]): Set<number> {
   const ids = new Set<number>();
@@ -97,6 +141,117 @@ export function assignedShopIdsFromRows(rows: ShopDelivery[]): Set<number> {
     if (String(row.remarks ?? "").trim().startsWith("[ORDER]")) ids.add(shopId);
   }
   return ids;
+}
+
+/**
+ * The route order of the shops on the assignment plan (`[ORDER]` rows), keyed
+ * shopId → `serialNo`. This is the "Shops (N)" list — the shops Order
+ * Assignment put on this vehicle — and it is what floats them to the TOP of
+ * the Step 4 shop dropdown. Shops added later in Step 4 are not part of it.
+ */
+export function assignedShopOrderFromRows(rows: ShopDelivery[]): Map<number, number> {
+  const order = new Map<number, number>();
+  for (const row of rows) {
+    const shopId = Number(row.shopId);
+    if (!Number.isFinite(shopId) || shopId <= 0) continue;
+    if (!String(row.remarks ?? "").trim().startsWith("[ORDER]")) continue;
+    const serial = Number(row.serialNo) || 0;
+    const prev = order.get(shopId);
+    if (prev === undefined || serial < prev) order.set(shopId, serial);
+  }
+  return order;
+}
+
+/**
+ * Order the Step 4 shop dropdown: the shops on the assignment plan FIRST, in
+ * their route (`serialNo`) order — exactly the "Shops (N)" list — then EVERY
+ * remaining shop ALPHABETICALLY.
+ *
+ * The whole shop master is always offered; the Order Assignment only decides
+ * what floats to the top, it never hides the rest. Input is not mutated.
+ */
+export function sortShopsAssignedFirst<T extends { value: number; label: string }>(
+  options: readonly T[],
+  assignedOrder: Map<number, number>
+): T[] {
+  const rankOf = (o: T) => assignedOrder.get(Number(o.value));
+  return [...options].sort((a, b) => {
+    const aRank = rankOf(a);
+    const bRank = rankOf(b);
+    const aAssigned = aRank !== undefined;
+    const bAssigned = bRank !== undefined;
+    // Assigned shops outrank everything else.
+    if (aAssigned !== bAssigned) return aAssigned ? -1 : 1;
+    // Among themselves they keep the assignment's route order.
+    if (aAssigned && bAssigned && aRank !== bRank) return aRank! - bRank!;
+    // Everyone else — and any assigned tie — is alphabetical.
+    return a.label.localeCompare(b.label);
+  });
+}
+
+/** A delivery row is "captured / delivered" once it stops being a pending
+ *  `[ORDER]` assignment row and carries actual delivery data (selected boxes,
+ *  birds, weight), or the backend already recorded its capture time. */
+export function isDeliveredRow(row: ShopDelivery): boolean {
+  const extra = row as ShopDelivery & { autoCaptureTime?: string };
+  if (extra.autoCaptureTime) return true;
+  const remarks = String(row.remarks ?? "").trim();
+  if (remarks.startsWith("[ORDER]")) return false;
+  const boxes = Array.isArray(row.selectedBoxIds) ? row.selectedBoxIds.length : 0;
+  return boxes > 0 || Number(row.birds) > 0 || Number(row.weight) > 0;
+}
+
+/** Delivered-shop identity keyed by BOTH shop id and shop name, so a row whose
+ *  id does not resolve still matches by name (and vice versa). */
+export function buildDeliveredShopKeys(rows: ShopDelivery[]): {
+  ids: Set<number>;
+  names: Set<string>;
+} {
+  const ids = new Set<number>();
+  const names = new Set<string>();
+  rows.forEach((row) => {
+    if (!isDeliveredRow(row)) return;
+    const id = Number(row.shopId);
+    if (id > 0) ids.add(id);
+    const name = String(row.shopName ?? "").trim().toLowerCase();
+    if (name) names.add(name);
+  });
+  return { ids, names };
+}
+
+/**
+ * The Step 4 header "Shops (N)" count.
+ *
+ * It exists ONLY once the Order Assignment for this vehicle has actually been
+ * SUBMITTED — Finish Assignment tags the trip remarks with `order:<tripNo>`,
+ * Save Progress does not. Before that the button reads 0, because:
+ *
+ *   • counting the `[ORDER]` plan rows a Save Progress left behind advertises
+ *     shops the driver never received — the reported "Shops (11) on
+ *     TS07UB1111 and I haven't submitted anything yet";
+ *   • falling back to the shop master advertises every shop in the system;
+ *   • counting the trip's own delivery rows shows a number nobody assigned
+ *     and that has nothing to do with the order.
+ *
+ * There is no assignment sheet to count until the assignment is submitted, so
+ * 0 is the honest answer.
+ */
+export function step4ShopsCount(
+  shops: readonly unknown[],
+  rows: ShopDelivery[],
+  assignmentSubmitted: boolean
+): number {
+  if (!assignmentSubmitted) return 0;
+  if (!shops || shops.length === 0) return 0;
+  const { ids, names } = buildDeliveredShopKeys(rows ?? []);
+  const source = orderAssignedShops(shops, rows ?? []);
+  return source.filter((shop) => {
+    const s = (shop ?? {}) as { id?: unknown; shopId?: unknown; shopName?: unknown; name?: unknown };
+    const id = Number(s.id ?? s.shopId ?? 0);
+    const name = String(s.shopName ?? s.name ?? "").trim().toLowerCase();
+    const delivered = (id > 0 && ids.has(id)) || (Boolean(name) && names.has(name));
+    return !delivered;
+  }).length;
 }
 
 /** Order-assignment shops = every shop present in the delivery rows (pending
@@ -117,6 +272,30 @@ export function shopIdsFromRows(
     if (prev === undefined || serial < prev) order.set(shopId, serial);
   }
   return { ids, order };
+}
+
+/** Shop id off either of the two master shapes the trip pages pass around. */
+function shopIdOf(shop: unknown): number {
+  const s = (shop ?? {}) as { id?: unknown; shopId?: unknown };
+  return Number(s.id ?? s.shopId ?? 0);
+}
+
+/**
+ * The shops a Step 4 delivery may address: ONLY the shops this trip carries
+ * in its delivery rows — i.e. exactly the shops Order Assignment assigned to
+ * this vehicle — never the whole shop master.
+ *
+ * This is what keeps the header "Shops (N)" count, the Add-Shop dropdown and
+ * the assignment-sheet PDF equal to the number of shops that were assigned:
+ * assign 1 shop and Step 4 offers 1 shop. A plain manual trip (no delivery
+ * rows at all) falls back to the full master list, so Step 4 still works when
+ * the trip was never assigned from Orders.
+ */
+export function orderAssignedShops<T>(shops: readonly T[], rows: ShopDelivery[]): T[] {
+  const list = shops ?? [];
+  const { ids } = shopIdsFromRows(rows ?? []);
+  if (ids.size === 0) return [...list];
+  return list.filter((shop) => ids.has(shopIdOf(shop)));
 }
 
 /** Remaining map keyed by boxNo (mirrors `pendingBoxesFromRows` shape). */

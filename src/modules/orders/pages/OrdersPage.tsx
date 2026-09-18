@@ -33,6 +33,9 @@ import {
 import { ORDERS_PAGES } from "../routes/ordersRoutes";
 import { DatabaseZap } from "lucide-react";
 import { useI18n } from "../../../i18n";
+// The SAME modal shell the Trip List view uses, so the Pending/Completed view
+// opens identically — the panel scales in small→full instead of a plain box.
+import AppShellModal from "../../../ui/AppShellModal";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
 import type { Trip } from "../../../shared/trip";
 import { ORDERS_SAMPLE_DATA_ENABLED } from "../services/sampleOrdersData";
@@ -758,15 +761,22 @@ const OrdersPage: React.FC = () => {
       {viewing && (
         <React.Suspense
           fallback={
-            <div
-              role="status"
-              aria-busy="true"
-              className="fixed inset-0 z-50 grid place-items-center bg-slate-900/20"
+            // The SAME shell the loaded view uses (and that the Trip List view
+            // uses), so opening is identical: the panel scales in small→full and
+            // the skeleton simply fills it once the chunk lands — no separate,
+            // differently-shaped loading box.
+            <AppShellModal
+              open
+              onClose={() => {
+                /* nothing to dismiss yet — the real view owns close */
+              }}
+              closeOnOverlay={false}
+              panelClassName="bg-white"
             >
-              <div className="rounded-xl bg-white p-4">
+              <div role="status" aria-busy="true" className="p-6">
                 <OrdersTableSkeleton rows={3} />
               </div>
-            </div>
+            </AppShellModal>
           }
         >
           <OrdersDeliveryDetailView

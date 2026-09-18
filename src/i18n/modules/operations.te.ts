@@ -264,6 +264,9 @@ export default {
   'ops.dashboard.payment.no_data': 'ఈ కాలావధిలో పేమెంట్ డేటా లేదు',
   'ops.dashboard.payment.no_data_hint': 'డ్యాష్‌బోర్డ్ తేదీ పరిధిని మార్చండి లేదా పేమెంట్ మొత్తాలను సింక్ చేయడానికి డ్యాష్‌బోర్డ్‌ను రిఫ్రెష్ చేయండి.',
   'ops.dashboard.approvals.title': 'పెండింగ్ అప్రూవల్స్',
+  'ops.dashboard.approvals.subtitle':
+    '{count} పెండింగ్ — టైల్ నొక్కితే ఆ రిజిస్టర్ తెరుచుకుంటుంది',
+  'ops.dashboard.approvals.pending_unit': 'పెండింగ్',
   'ops.dashboard.approvals.tile_aria': '{label}: {count} పెండింగ్ — తెరవండి {label}',
   'ops.dashboard.approvals.all_clear': 'పెండింగ్ ఏమీ లేదు — అన్ని అప్రూవల్స్ క్లియర్, డాక్యుమెంట్లు చెల్లుబాటులో ఉన్నాయి',
   'ops.dashboard.approvals.empty_tip': 'ఇప్పుడు {label} పెండింగ్‌లో లేవు',

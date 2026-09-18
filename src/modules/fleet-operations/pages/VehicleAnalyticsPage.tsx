@@ -1,25 +1,34 @@
-import { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { memo, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import * as XLSX from 'xlsx';
 import autoTable from 'jspdf-autotable';
 import type { jsPDF } from 'jspdf';
 import { useI18n } from '../../../i18n';
 import { useAnalyticsData } from '../hooks/useAnalyticsData';
 import ErrorBoundary from '../components/common/ErrorBoundary';
-import ExpenseBreakdownDonut from '../components/analytics/ExpenseBreakdownDonut';
+import ExpenseBreakdownChart from '../components/analytics/ExpenseBreakdownChart';
 import VehiclePerformanceChart from '../components/analytics/VehiclePerformanceChart';
+import {
+  METRICS as PERFORMANCE_METRICS,
+  type VehicleMetricKey,
+} from '../components/analytics/vehiclePerformanceMetrics';
 import WeeklyTrendChart from '../components/analytics/WeeklyTrendChart';
 import VehiclePerformanceTable from '../components/analytics/VehiclePerformanceTable';
 import AttentionSection from '../components/analytics/AttentionSection';
 import { DatePicker } from '../../../components/common/DatePicker';
 import {
   Activity,
+  BarChart3,
   Calendar,
+  CalendarRange,
   FileSpreadsheet,
   FileText,
   Fuel,
   IndianRupee,
+  Lightbulb,
+  PieChart,
   RotateCcw,
   Search,
+  Table,
   Truck,
 } from 'lucide-react';
 import { formatCurrencyCompact, formatNumberCompact } from '../utils/formatters';
@@ -48,6 +57,8 @@ interface VehicleAnalyticsPageProps {
 interface KpiSubMetric {
   label: string;
   value: string;
+  /** Plain-language tooltip — what this figure counts. */
+  tip?: string;
 }
 
 interface KpiGroup {
@@ -56,6 +67,8 @@ interface KpiGroup {
   headline: string;
   icon: typeof Truck;
   tone: KpiTone;
+  /** Plain-language tooltip for the headline figure. */
+  tip: string;
   subs: KpiSubMetric[];
 }
 
@@ -70,14 +83,17 @@ const groupToneClasses: Record<KpiTone, { icon: string; value: string; glow: str
 };
 
 /** A single grouped KPI card: headline metric on top, related figures nested. */
-function KpiGroupCard({ group }: { group: KpiGroup }) {
+function KpiGroupCard({ group, className = '' }: { group: KpiGroup; className?: string }) {
   const tone = groupToneClasses[group.tone];
   const Icon = group.icon;
   return (
-    <div className="group relative isolate flex flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white p-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md">
+    <div
+      title={group.tip}
+      className={`group relative isolate flex flex-col overflow-hidden rounded-xl border border-slate-200/80 bg-white p-3 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-slate-300 hover:shadow-md ${className}`}
+    >
       <span className={`pointer-events-none absolute -right-5 -top-5 h-16 w-16 rounded-full ${tone.glow}`} aria-hidden="true" />
       <span className={`absolute inset-x-0 bottom-0 h-[0.1875rem] ${tone.accent}`} aria-hidden="true" />
-      <div className="relative flex items-center justify-between gap-2">
+      <div className="relative mb-2 flex items-center justify-between gap-2">
         <div className="min-w-0">
           <p className="text-[10px] font-bold uppercase tracking-wide text-slate-500">{group.title}</p>
           <p className={`mt-0.5 text-lg font-extrabold leading-none tracking-tight tabular-nums ${tone.value}`}>
@@ -89,11 +105,24 @@ function KpiGroupCard({ group }: { group: KpiGroup }) {
         </span>
       </div>
       {group.subs.length > 0 && (
-        <dl className="relative mt-2 space-y-1 border-t border-slate-100 pt-2">
+        /* Detail metrics as small crisp mini-tiles in the same visual language
+           as the KPI itself: tone dot + tiny uppercase label on top, the
+           tone-coloured bold tabular value beneath — side-by-side, wrapping
+           when the card is narrow. */
+        <dl className="relative mt-auto flex flex-wrap gap-2 border-t border-slate-100 pt-2">
           {group.subs.map((sub) => (
-            <div key={sub.label} className="flex items-center justify-between gap-2 text-[11px]">
-              <dt className="truncate font-medium text-slate-500">{sub.label}</dt>
-              <dd className="shrink-0 font-bold tabular-nums text-slate-800">{sub.value}</dd>
+            <div
+              key={sub.label}
+              title={sub.tip}
+              className="flex min-w-[5.75rem] flex-1 flex-col gap-1 rounded-lg border border-slate-200/70 bg-slate-50/60 px-2.5 py-1.5"
+            >
+              <dt className="flex items-center gap-1 truncate text-[9px] font-extrabold uppercase tracking-[0.08em] text-slate-400">
+                <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${tone.accent}`} aria-hidden="true" />
+                {sub.label}
+              </dt>
+              <dd className={`text-[13px] font-extrabold leading-none tabular-nums ${tone.value}`}>
+                {sub.value}
+              </dd>
             </div>
           ))}
         </dl>
@@ -102,23 +131,71 @@ function KpiGroupCard({ group }: { group: KpiGroup }) {
   );
 }
 
-const SkeletonKpis = () => (
-  <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-    {Array.from({ length: 4 }).map((_, index) => (
-      <div key={index} className="animate-pulse rounded-xl border border-slate-200 bg-white p-3">
-        <div className="flex items-center justify-between">
-          <div className="w-2/3">
-            <div className="h-2.5 w-3/4 rounded bg-slate-100" />
-            <div className="mt-2 h-5 w-1/2 rounded bg-slate-100" />
-          </div>
-          <div className="h-8 w-8 rounded-lg bg-slate-100" />
+/** Trip-List-style header for every analytics card: gradient bar, logo tile,
+ * bold title — the same chrome the registers use. */
+function ChartHeader({
+  icon,
+  title,
+  tile,
+  actions,
+}: {
+  icon: ReactNode;
+  title: string;
+  tile: string;
+  /** Optional controls (e.g. the metric switch) on the right of the bar. */
+  actions?: ReactNode;
+}) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-slate-50 px-4 py-3">
+      <div className="flex items-center gap-2.5">
+        <div className={`flex h-8 w-8 items-center justify-center rounded-lg border shadow-inner ${tile}`}>
+          {icon}
         </div>
-        <div className="mt-3 space-y-1.5 border-t border-slate-100 pt-2">
-          <div className="h-2.5 w-full rounded bg-slate-100" />
-          <div className="h-2.5 w-4/5 rounded bg-slate-100" />
-        </div>
+        <h3 className="text-sm font-bold tracking-tight text-slate-800">{title}</h3>
       </div>
-    ))}
+      {actions}
+    </div>
+  );
+}
+
+const SkeletonKpis = () => (
+  /* Same silhouette as the live layout: three cards top-and-down on the left,
+     one tall Fleet Cost card on the right. */
+  <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:col-span-2">
+      {Array.from({ length: 3 }).map((_, index) => (
+        <div
+          key={index}
+          className={`animate-pulse rounded-xl border border-slate-200 bg-white p-3 ${index === 2 ? 'sm:col-span-2' : ''}`}
+        >
+          <div className="flex items-center justify-between">
+            <div className="w-2/3">
+              <div className="h-2.5 w-3/4 rounded bg-slate-100" />
+              <div className="mt-2 h-5 w-1/2 rounded bg-slate-100" />
+            </div>
+            <div className="h-8 w-8 rounded-lg bg-slate-100" />
+          </div>
+          <div className="mt-3 flex gap-2 border-t border-slate-100 pt-2">
+            <div className="h-9 flex-1 rounded-lg bg-slate-100" />
+            <div className="h-9 flex-1 rounded-lg bg-slate-100" />
+          </div>
+        </div>
+      ))}
+    </div>
+    <div className="animate-pulse rounded-xl border border-slate-200 bg-white p-3">
+      <div className="flex items-center justify-between">
+        <div className="w-2/3">
+          <div className="h-2.5 w-3/4 rounded bg-slate-100" />
+          <div className="mt-2 h-5 w-1/2 rounded bg-slate-100" />
+        </div>
+        <div className="h-8 w-8 rounded-lg bg-slate-100" />
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 border-t border-slate-100 pt-2">
+        {Array.from({ length: 5 }).map((_, index) => (
+          <div key={index} className="h-9 rounded-lg bg-slate-100" />
+        ))}
+      </div>
+    </div>
   </div>
 );
 
@@ -200,8 +277,10 @@ const VehicleAnalyticsPage = ({ embedded = false, active = true }: VehicleAnalyt
         headline: formatNumberCompact(stats.totalTrips),
         icon: Truck,
         tone: 'blue',
+        tip: t('fleet.analytics.tip.operations'),
         subs: [
-          { label: t('fleet.analytics.total_distance'), value: `${formatNumberCompact(stats.totalDistance)} km` },
+          { label: t('fleet.analytics.vehicles'), value: String(utilization.active), tip: t('fleet.analytics.tip.util_active') },
+          { label: t('fleet.analytics.total_distance'), value: `${formatNumberCompact(stats.totalDistance)} km`, tip: t('fleet.analytics.tip.total_distance') },
         ],
       },
       {
@@ -210,9 +289,12 @@ const VehicleAnalyticsPage = ({ embedded = false, active = true }: VehicleAnalyt
         headline: `${formatNumberCompact(stats.totalFuelLitres)} L`,
         icon: Fuel,
         tone: 'amber',
+        tip: t('fleet.analytics.tip.fuel'),
+        /* Litres lead the card (headline), then cost, then mileage — the order
+           the reader asked for. */
         subs: [
-          { label: t('fleet.analytics.avg_mileage'), value: stats.averageMileage > 0 ? `${stats.averageMileage.toFixed(2)} km/l` : '—' },
-          { label: t('fleet.analytics.fuel_cost'), value: formatCurrencyCompact(stats.fuelCost) },
+          { label: t('fleet.analytics.fuel_cost'), value: formatCurrencyCompact(stats.fuelCost), tip: t('fleet.analytics.tip.fuel_cost') },
+          { label: t('fleet.analytics.avg_mileage'), value: stats.averageMileage > 0 ? `${stats.averageMileage.toFixed(2)} km/l` : '—', tip: t('fleet.analytics.tip.avg_mileage') },
         ],
       },
       {
@@ -221,12 +303,13 @@ const VehicleAnalyticsPage = ({ embedded = false, active = true }: VehicleAnalyt
         headline: formatCurrencyCompact(stats.totalExpense),
         icon: IndianRupee,
         tone: 'rose',
+        tip: t('fleet.analytics.tip.fleet_cost'),
         subs: [
-          { label: t('fleet.analytics.maint_cost'), value: formatCurrencyCompact(stats.maintenanceCost) },
-          { label: t('fleet.analytics.fuel_cost'), value: formatCurrencyCompact(stats.fuelCost) },
-          { label: t('fleet.analytics.toll_cost'), value: formatCurrencyCompact(stats.tollCost) },
-          { label: t('fleet.analytics.emi_cost'), value: formatCurrencyCompact(stats.emiDue) },
-          { label: t('fleet.analytics.other_cost'), value: formatCurrencyCompact(stats.otherCost) },
+          { label: t('fleet.analytics.maint_cost'), value: formatCurrencyCompact(stats.maintenanceCost), tip: t('fleet.analytics.tip.maint_cost') },
+          { label: t('fleet.analytics.fuel_cost'), value: formatCurrencyCompact(stats.fuelCost), tip: t('fleet.analytics.tip.fuel_cost') },
+          { label: t('fleet.analytics.toll_cost'), value: formatCurrencyCompact(stats.tollCost), tip: t('fleet.analytics.tip.toll_cost') },
+          { label: t('fleet.analytics.emi_cost'), value: formatCurrencyCompact(stats.emiDue), tip: t('fleet.analytics.tip.emi_cost') },
+          { label: t('fleet.analytics.other_cost'), value: formatCurrencyCompact(stats.otherCost), tip: t('fleet.analytics.tip.other_cost') },
         ],
       },
       {
@@ -235,14 +318,20 @@ const VehicleAnalyticsPage = ({ embedded = false, active = true }: VehicleAnalyt
         headline: `${utilization.pct}%`,
         icon: Activity,
         tone: 'cyan',
+        tip: t('fleet.analytics.tip.utilization'),
         subs: [
-          { label: t('fleet.analytics.util_active'), value: `${utilization.active} / ${utilization.total}` },
-          { label: t('fleet.analytics.util_idle'), value: String(utilization.idle) },
-          { label: t('fleet.analytics.cost_per_km'), value: costPerKm },
+          { label: t('fleet.analytics.util_active'), value: `${utilization.active} / ${utilization.total}`, tip: t('fleet.analytics.tip.util_active') },
+          { label: t('fleet.analytics.util_idle'), value: String(utilization.idle), tip: t('fleet.analytics.tip.util_idle') },
+          { label: t('fleet.analytics.cost_per_km'), value: costPerKm, tip: t('fleet.analytics.tip.cost_per_km') },
         ],
       },
     ];
   }, [stats, utilization, t]);
+
+  // Layout: Trips / Fuel / Utilization flow top-and-down on the left, while
+  // Fleet Cost owns the right side at the full height of the KPI block.
+  const fleetCostGroup = kpiGroups.find((group) => group.id === 'fleet-cost');
+  const sideGroups = kpiGroups.filter((group) => group.id !== 'fleet-cost');
 
   // Flat list retained for the PDF/Excel exports (one row per metric).
   const kpis = useMemo<{ label: string; value: string }[]>(
@@ -257,6 +346,9 @@ const VehicleAnalyticsPage = ({ embedded = false, active = true }: VehicleAnalyt
   const hasAnyData = stats.totalTrips > 0 || stats.totalDistance > 0 || stats.totalExpense > 0;
 
   const { showNotification } = useSafeNotification();
+
+  // The performance chart's metric switch sits on the card heading.
+  const [perfMetric, setPerfMetric] = useState<VehicleMetricKey>('distance');
 
   // Vehicle picker rebuilt on the shared MasterDropdown (id-backed options), so
   // Analytics uses the exact same searchable/clearable control as the Trip List
@@ -620,63 +712,114 @@ const VehicleAnalyticsPage = ({ embedded = false, active = true }: VehicleAnalyt
           </div>
         ) : (
           <div className="space-y-5">
-            {/* Grouped KPI summary — each card leads with a headline figure and
-                nests the related metrics beneath it (Trips → distance; Fuel →
-                mileage + fuel cost; Fleet Cost → maintenance/fuel/FASTag/EMI/
-                other; Utilization → active vs idle + cost per km). */}
+            {/* Grouped KPI summary — Trips, Fuel and Utilization flow
+                top-and-down on the left; Fleet Cost owns the right side at the
+                full height of the block, its five splits filling the taller
+                card. */}
             <section
-              className="grid grid-cols-2 gap-3 lg:grid-cols-4"
+              className="grid grid-cols-1 gap-3 lg:grid-cols-3"
               aria-label={t('fleet.analytics.vehicle_performance')}
               aria-live="polite"
             >
-              {kpiGroups.map((group) => (
-                <KpiGroupCard key={group.id} group={group} />
-              ))}
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:col-span-2">
+                {sideGroups.map((group) => (
+                  <KpiGroupCard
+                    key={group.id}
+                    group={group}
+                    className={group.id === 'utilization' ? 'sm:col-span-2' : ''}
+                  />
+                ))}
+              </div>
+              {fleetCostGroup && (
+                <KpiGroupCard group={fleetCostGroup} className="h-full" />
+              )}
             </section>
 
-            {/* Analytics Section */}
+            {/* Analytics Section — every card wears the Trip-List chrome:
+                gradient bar + logo tile + bold title. */}
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
               {/* Vehicle Performance */}
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs lg:col-span-2">
-                <div className="mb-3">
-                  <h3 className="text-base font-semibold text-slate-900">{t('fleet.analytics.vehicle_performance')}</h3>
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs lg:col-span-2">
+                <ChartHeader
+                  icon={<BarChart3 className="h-4 w-4" />}
+                  title={t('fleet.analytics.vehicle_performance')}
+                  tile="border-blue-100 bg-blue-50 text-blue-500"
+                  actions={
+                    /* Metric switch rides the heading row, Recent-Trip-Activity
+                       chrome, instead of eating chart space below it. */
+                    <div className="flex items-center overflow-hidden rounded-lg border border-slate-200/80 bg-slate-50 p-0.5 shadow-sm">
+                      {PERFORMANCE_METRICS.map((m) => (
+                        <button
+                          key={m.key}
+                          type="button"
+                          onClick={() => setPerfMetric(m.key)}
+                          aria-pressed={perfMetric === m.key}
+                          className={`inline-flex items-center rounded-md px-3 py-1.5 text-[11px] font-semibold transition-all ${
+                            perfMetric === m.key
+                              ? 'bg-emerald-50/80 text-emerald-600 shadow-sm'
+                              : 'bg-transparent text-slate-500 hover:bg-slate-200/50 hover:text-slate-800'
+                          }`}
+                        >
+                          {m.label}
+                        </button>
+                      ))}
+                    </div>
+                  }
+                />
+                <div className="p-4">
+                  <VehiclePerformanceChart stats={vehicleStats} metricKey={perfMetric} />
                 </div>
-                <VehiclePerformanceChart stats={vehicleStats} />
               </div>
 
               {/* Cost Analysis */}
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
-                <div className="mb-3">
-                  <h3 className="text-base font-semibold text-slate-900">{t('fleet.analytics.cost_analysis')}</h3>
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+                <ChartHeader
+                  icon={<PieChart className="h-4 w-4" />}
+                  title={t('fleet.analytics.cost_analysis')}
+                  tile="border-rose-100 bg-rose-50 text-rose-500"
+                />
+                <div className="p-4">
+                  <ExpenseBreakdownChart data={expenseBreakdown} height={320} />
                 </div>
-                <ExpenseBreakdownDonut data={expenseBreakdown} height={280} />
               </div>
             </div>
 
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
               {/* Weekly Activity */}
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs lg:col-span-2">
-                <div className="mb-3">
-                  <h3 className="text-base font-semibold text-slate-900">{t('fleet.analytics.weekly_activity')}</h3>
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs lg:col-span-2">
+                <ChartHeader
+                  icon={<CalendarRange className="h-4 w-4" />}
+                  title={t('fleet.analytics.weekly_activity')}
+                  tile="border-amber-100 bg-amber-50 text-amber-500"
+                />
+                <div className="p-4">
+                  <WeeklyTrendChart data={weeklyData} />
                 </div>
-                <WeeklyTrendChart data={weeklyData} />
               </div>
 
               {/* Fleet Insights */}
-              <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
-                <div className="mb-3">
-                  <h3 className="text-base font-semibold text-slate-900">{t('fleet.analytics.fleet_insights')}</h3>
+              <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+                <ChartHeader
+                  icon={<Lightbulb className="h-4 w-4" />}
+                  title={t('fleet.analytics.fleet_insights')}
+                  tile="border-violet-100 bg-violet-50 text-violet-500"
+                />
+                <div className="p-4">
+                  <AttentionSection stats={vehicleStats} />
                 </div>
-                <AttentionSection stats={vehicleStats} />
               </div>
             </div>
 
             {/* Vehicle performance table */}
-            <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-xs">
-              <div className="mb-3">
-                <h3 className="text-base font-semibold text-slate-900">{t('fleet.analytics.vehicle_details')}</h3>
+            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-xs">
+              <ChartHeader
+                icon={<Table className="h-4 w-4" />}
+                title={t('fleet.analytics.vehicle_details')}
+                tile="border-emerald-100 bg-emerald-50 text-emerald-600"
+              />
+              <div className="p-4">
+                <VehiclePerformanceTable stats={filteredVehicleStats} statusById={vehicleStatusById} />
               </div>
-              <VehiclePerformanceTable stats={filteredVehicleStats} statusById={vehicleStatusById} />
             </div>
           </div>
         )}

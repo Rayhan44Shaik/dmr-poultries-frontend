@@ -3,6 +3,7 @@ import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
 import type { AnalyticsVehicleStat } from '../../types/analytics';
 import Pagination from '../common/Pagination';
 import { formatCurrencyCompact, formatNumberCompact } from '../../utils/formatters';
+import { formatVehicleNumber } from '../../../../utils/format';
 
 type SortKey =
   | 'vehicleNumber'
@@ -134,7 +135,8 @@ const VehiclePerformanceTable = ({ stats, statusById }: VehiclePerformanceTableP
                 <tr key={row.vehicleId} className="transition-colors hover:bg-slate-50/70">
                   <td className="whitespace-nowrap px-3 py-2.5">
                     <div className="flex items-center gap-2">
-                      <span className="text-xs font-bold text-slate-800">{row.vehicleNumber}</span>
+                      {/* Registration reads as a light, neat chip. */}
+                      <span className="rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[11px] font-bold tracking-wide text-slate-600">{formatVehicleNumber(row.vehicleNumber)}</span>
                       {isInactive && (
                         <span className="rounded-full border border-slate-200 bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-slate-500">
                           Inactive

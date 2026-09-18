@@ -1,5 +1,5 @@
 import { memo, useEffect, useMemo, useRef, useState } from "react";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, CalendarClock, History } from "lucide-react";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
 import { useI18n } from "../../../i18n";
 import { apiGet } from "../../../api";
@@ -9,6 +9,7 @@ import MaintenanceFilters, {
 } from "../components/maintenance/MaintenanceFilters";
 import MaintenanceKPICards from "../components/maintenance/MaintenanceKPICards";
 import MaintenanceTimeline, {
+  MaintenanceTimelineSkeleton,
   type VehicleMeterEvent,
 } from "../components/maintenance/MaintenanceTimeline";
 import UpcomingServices from "../components/maintenance/UpcomingServices";
@@ -310,6 +311,33 @@ const MaintenanceHistoryPage = ({
     data.refresh();
   };
 
+  /* Trip-List-style section heading: gradient bar + logo tile + bold title,
+     so the Approved Timeline reads like the Trip List / Order registers. */
+  const approvedHeader = (
+    <div className="flex items-center border-b border-slate-100 bg-gradient-to-r from-emerald-50/60 via-white to-emerald-50/40 px-5 py-3">
+      <div className="flex items-center gap-3">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-600 shadow-inner">
+          <History className="h-4 w-4" />
+        </div>
+        <h2 className="text-base font-bold tracking-tight text-slate-800">
+          {t("fleet.maintenance_history.approved_timeline")}
+        </h2>
+      </div>
+    </div>
+  );
+  const upcomingHeader = (
+    <div className="flex items-center border-b border-slate-100 bg-gradient-to-r from-emerald-50/60 via-white to-emerald-50/40 px-5 py-3">
+      <div className="flex items-center gap-3">
+        <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-100 bg-emerald-50 text-emerald-600 shadow-inner">
+          <CalendarClock className="h-4 w-4" />
+        </div>
+        <h2 className="text-base font-bold tracking-tight text-slate-800">
+          {t("fleet.maintenance_history.upcoming_service")}
+        </h2>
+      </div>
+    </div>
+  );
+
   return (
     <ErrorBoundary>
       <div
@@ -354,7 +382,23 @@ const MaintenanceHistoryPage = ({
         />
 
 
-        {resultsReady ? <MaintenanceKPICards {...timelineStats} /> : null}
+        {resultsReady ? (
+          <MaintenanceKPICards {...timelineStats} />
+        ) : !data.historyError && !data.error ? (
+          /* The KPI row loads in place with the same pulse as the Trip List. */
+          <div
+            className="grid grid-cols-1 gap-4 sm:grid-cols-3"
+            role="status"
+            aria-busy="true"
+          >
+            {[0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="h-24 animate-pulse rounded-2xl border border-slate-200 bg-white shadow-sm"
+              />
+            ))}
+          </div>
+        ) : null}
 
         {data.historyError || data.error ? (
           <div className="flex items-center justify-between gap-3 rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700">
@@ -375,11 +419,7 @@ const MaintenanceHistoryPage = ({
         {resultsReady ? (
           <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-2">
-              <div className="border-b border-slate-100 px-5 py-4">
-                <h2 className="text-sm font-bold text-slate-800">
-                  {t("fleet.maintenance_history.approved_timeline")}
-                </h2>
-              </div>
+              {approvedHeader}
               <div className="p-5">
                 <MaintenanceTimeline
                   events={timelineEvents}
@@ -397,13 +437,44 @@ const MaintenanceHistoryPage = ({
               </div>
             </section>
             <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-              <div className="border-b border-slate-100 px-5 py-4">
-                <h2 className="text-sm font-bold text-slate-800">
-                  {t("fleet.maintenance_history.upcoming_service")}
-                </h2>
-              </div>
+              {upcomingHeader}
               <div className="p-5">
                 <UpcomingServices services={visibleUpcoming} />
+              </div>
+            </section>
+          </div>
+        ) : !data.historyError && !data.error ? (
+          /* While the history loads, the very same shells show animated
+             skeleton rows — exactly how the Trip List / Order Assignment
+             registers fill in place. */
+          <div className="grid grid-cols-1 gap-5 xl:grid-cols-3">
+            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm xl:col-span-2">
+              {approvedHeader}
+              <div className="p-5">
+                <MaintenanceTimelineSkeleton rows={4} />
+                <p className="pt-2 text-center text-sm font-medium text-slate-400">
+                  <span className="inline-flex items-center gap-2">
+                    <span
+                      className="h-4 w-4 animate-spin rounded-full border-2 border-slate-300 border-t-emerald-600"
+                      aria-hidden="true"
+                    />
+                    {t("fleet.maintenance_history.loading_timeline")}
+                  </span>
+                </p>
+              </div>
+            </section>
+            <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+              {upcomingHeader}
+              <div className="space-y-3 p-5" role="status" aria-busy="true">
+                {[0, 1, 2].map((i) => (
+                  <div
+                    key={i}
+                    className="h-16 animate-pulse rounded-xl border border-slate-200/70 bg-slate-50"
+                  />
+                ))}
+                <p className="pt-1 text-center text-xs font-medium text-slate-400">
+                  {t("fleet.maintenance_history.loading_upcoming")}
+                </p>
               </div>
             </section>
           </div>

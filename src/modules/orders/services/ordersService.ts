@@ -501,11 +501,22 @@ export async function saveAssignment(
 }
 
 /**
- * Finish Assignment (Tab 2) — validated by the caller; marks
- * deliveryStepSubmitted (existing contract) and links order → vehicle in
- * the trip remarks. The collection container is kept — it remains the day's
- * collection record (Trip No / Vehicle / Sequence / Status stay visible in
- * Order Collection), and the same-shop/same-day rule now reads "assigned".
+ * Finish Assignment (Tab 2) — validated by the caller. Persists the assigned
+ * shops as the vehicle trip's Step 4 delivery PLAN and links order → vehicle
+ * in the trip remarks (`order:<tripNo>`), which is the "assignment finished"
+ * marker that opens Delivery Tracking.
+ *
+ * ⚠️ MUST NOT submit Step 4. The shared wizard contract stamps
+ * `deliveryStepSubmitted` for ANY `mode: "submit"` on the `deliveries` step,
+ * so submitting here used to mark Trip Entry Step 4 as done with ZERO
+ * deliveries captured — the step then rendered locked and empty. Assignment
+ * only SEEDS Step 4: the shops assigned here become that step's shop list
+ * (so it offers exactly those shops, in sequence order) and the driver
+ * captures the real delivery there. Hence `mode: "save"`.
+ *
+ * The collection container is kept — it remains the day's collection record
+ * (Trip No / Vehicle / Sequence / Status stay visible in Order Collection),
+ * and the same-shop/same-day rule now reads "assigned".
  */
 export async function finishAssignment(
   vehicleTrip: Trip,
@@ -519,7 +530,7 @@ export async function finishAssignment(
   }
   const { data } = await apiPost<RawTrip>(
     `/trips/${vehicleTrip.id}/steps/deliveries`,
-    { ...toStep4Payload({ deliveries } as unknown as Partial<Trip>), mode: "submit", remarks }
+    { ...toStep4Payload({ deliveries } as unknown as Partial<Trip>), mode: "save", remarks }
   );
   return mapApiTripToTrip(data, vehicleTrip);
 }

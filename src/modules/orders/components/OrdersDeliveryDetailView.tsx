@@ -290,7 +290,6 @@ function OrdersDeliveryDetailView({
   shopDirectory,
   supervisorMobile,
   pdfBusy,
-  whatsappBusy: _whatsappBusy,
   onClose,
   onWhatsApp,
   onSaveProgress,
@@ -459,8 +458,10 @@ function OrdersDeliveryDetailView({
         <div className="rounded-t-2xl border-b border-slate-100 bg-gradient-to-r from-emerald-50/80 via-white to-emerald-50/80">
           <div className="flex flex-col gap-4 px-6 py-4 sm:flex-row sm:items-center sm:justify-between md:px-8">
             <div className="flex min-w-0 flex-1 items-center gap-4 sm:flex-none">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-teal-400 text-white shadow-lg shadow-emerald-400/20">
-                <Truck className="h-6 w-6" />
+              {/* Same logo range as the overview dashboard's pending-approvals
+                  card: h-10 w-10 tile with an ~18-20px glyph. */}
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-emerald-400 to-teal-400 text-white shadow-lg shadow-emerald-400/20">
+                <Truck className="h-5 w-5" />
               </div>
               <div className="min-w-0">
                 <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -681,30 +682,36 @@ function OrdersDeliveryDetailView({
               </div>
               <div className={`${opsTableCardClass} overflow-x-auto`}>
                 <table className="w-full min-w-[72rem] table-fixed text-xs md:text-sm">
+                  {/* One <col> per rendered column (11): S.No, Shop name (with
+                      the Shop Master number beneath it), City, the five box /
+                      bird / weight figures, Time and Delivery status. Widths
+                      keep every figure under its own heading — the shop name
+                      gets the wide column so it reads on one line, and Time
+                      is wide enough to stay on a single line as well. */}
                   <colgroup>
                     <col className="w-[3.5rem]" />
-                    <col className="w-[5.5rem]" />
-                    <col className="w-[15rem]" />
-                    <col className="w-[9rem]" />
-                    <col className="w-[6.25rem]" />
-                    <col className="w-[6.25rem]" />
-                    <col className="w-[6.25rem]" />
-                    <col className="w-[6.5rem]" />
-                    <col className="w-[6.25rem]" />
-                    <col className="w-[6.75rem]" />
-                    <col className="w-[11rem]" />
+                    <col className="w-[14rem]" />
                     <col className="w-[10rem]" />
+                    <col className="w-[6.5rem]" />
+                    <col className="w-[6.5rem]" />
+                    <col className="w-[6.5rem]" />
+                    <col className="w-[6.5rem]" />
+                    <col className="w-[6.5rem]" />
+                    <col className="w-[7rem]" />
+                    <col className="w-[11.5rem]" />
+                    <col className="w-[9.5rem]" />
                   </colgroup>
                   <thead>
                     <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-600">
-                      <th className={reportThClass}>{to("orders.col_sno")}</th>
-                      <th className={reportThClass}>
-                        {to("orders.col_shop_no")}
+                      {/* Text columns read left-aligned so the heading starts at
+                          the very same first letter as the data beneath it. */}
+                      <th className={`${reportThClass} text-left`}>
+                        {to("orders.col_sno")}
                       </th>
-                      <th className={reportThClass}>
+                      <th className={`${reportThClass} text-left`}>
                         {to("orders.col_shop_name")}
                       </th>
-                      <th className={reportThClass}>
+                      <th className={`${reportThClass} text-left`}>
                         {to("orders.col_village")}
                       </th>
                       <th
@@ -744,12 +751,12 @@ function OrdersDeliveryDetailView({
                         {to("orders.th_del_wt")}
                       </th>
                       <th
-                        className={reportThClass}
+                        className={`${reportThClass} text-left`}
                         title={to("orders.delivery_time")}
                       >
                         {to("orders.th_time")}
                       </th>
-                      <th className={reportThClass}>
+                      <th className={`${reportThClass} text-left`}>
                         {to("orders.col_delivery_status")}
                       </th>
                     </tr>
@@ -757,7 +764,7 @@ function OrdersDeliveryDetailView({
                   <tbody className={opsTableDivideClass}>
                     {pageRows.length === 0 && (
                       <tr>
-                        <td className={reportTdClass} colSpan={12}>
+                        <td className={reportTdClass} colSpan={11}>
                           <span className="text-slate-400 text-sm py-4 block text-center">
                             {query || statusFilter !== "all"
                               ? to("orders.no_results")
@@ -798,15 +805,19 @@ function OrdersDeliveryDetailView({
                             </span>
                           </td>
                           <td
-                            className={`${reportTdClass} font-semibold text-slate-700 tabular-nums`}
-                          >
-                            {row.shopNumber || "—"}
-                          </td>
-                          <td
-                            className={`${reportTdClass} font-bold text-slate-900 truncate`}
+                            className={`${reportTdClass} truncate`}
                             title={row.shopName || undefined}
                           >
-                            {row.shopName || "—"}
+                            {/* One row of data: the shop name with its Shop
+                                Master number directly beneath it. */}
+                            <span className="inline-flex flex-col leading-tight">
+                              <span className="font-bold text-slate-900 truncate">
+                                {row.shopName || "—"}
+                              </span>
+                              <span className="text-[10px] font-semibold text-slate-400 tabular-nums">
+                                {row.shopNumber || "—"}
+                              </span>
+                            </span>
                           </td>
                           <td
                             className={`${reportTdClass} font-medium text-slate-700 truncate`}
@@ -853,7 +864,7 @@ function OrdersDeliveryDetailView({
                               : "—"}
                           </td>
                           <td
-                            className={`${reportTdClass} text-[12px] font-semibold leading-tight text-slate-600 tabular-nums`}
+                            className={`${reportTdClass} whitespace-nowrap text-[12px] font-semibold leading-tight text-slate-600 tabular-nums`}
                           >
                             {formatDeliveredAtLabel(row.deliveredAt)}
                           </td>

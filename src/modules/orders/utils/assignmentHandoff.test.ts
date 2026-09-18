@@ -2,6 +2,8 @@
 // Assignment → Tracking → Step 4 submit:
 //   - Save Progress does not open Delivery Tracking
 //   - Finish Assignment is the tracking gate
+//   - Finish Assignment NEVER submits Trip Entry Step 4 — it only seeds that
+//     step's shop list with exactly the shops assigned
 //   - duplicate shops collapse on write
 //   - Tracking View Submit never sets Trip Entry `status = Completed`
 //     and never overwrites `order:` remarks
@@ -25,6 +27,9 @@ import {
   uniqueShopRows,
 } from "./ordersUtils";
 import { ORDER_PLAN_REMARKS, type OrderShopRow } from "../types";
+// Step 4's shop filter lives with the delivery-step helpers, so this asserts
+// the Orders → Step 4 handoff against the SAME code the wizard runs.
+import { orderAssignedShops } from "../../operations/vehicle-trips/components/Step_4/remainingBoxes";
 
 const ORDER_TRIP_NO = "ORD-ASSIGN-01";
 const SHOP_A = 88001;
@@ -110,12 +115,16 @@ test("Save Assignment (no Finish) does not appear in Delivery Tracking", async (
   );
 });
 
-test("Finish Assignment opens Delivery Tracking as Pending — never Completed", async () => {
+test("Finish Assignment opens Delivery Tracking as Pending — never Completed, never submits Step 4", async () => {
   const { vehicle } = await seedAssignment();
   const finished = await finishAssignment(vehicle, [
     { orderTripNo: ORDER_TRIP_NO, rows: [assignedRow(SHOP_A, 10), assignedRow(SHOP_B, 8)] },
   ]);
-  assert.equal(finished.deliveryStepSubmitted, true);
+  assert.equal(
+    finished.deliveryStepSubmitted,
+    false,
+    "Finish Assignment must NOT submit Trip Entry Step 4 — it only seeds that step's shop list"
+  );
   assert.ok(String(finished.remarks).includes(`order:${ORDER_TRIP_NO}`));
   assert.notEqual(finished.status, "Completed");
   assert.equal(isTrackingTrip(finished), true);
@@ -127,6 +136,38 @@ test("Finish Assignment opens Delivery Tracking as Pending — never Completed",
   assert.equal(pending.length, 1);
   assert.equal(completed.length, 0);
   assert.equal(ot!.progress?.status, "Assigned");
+  assert.equal(
+    data.eligibleVehicles.some((v) => v.trip.id === vehicle.id),
+    false,
+    "a finished assignment locks the vehicle even though Step 4 is still open"
+  );
+});
+
+test("Finish Assignment seeds Step 4 with ONLY the assigned shops, leaving it open", async () => {
+  const { vehicle } = await seedAssignment();
+  const finished = await finishAssignment(vehicle, [
+    { orderTripNo: ORDER_TRIP_NO, rows: [assignedRow(SHOP_A, 10)] },
+  ]);
+
+  // The assignment seeded the vehicle's Step 4 delivery plan...
+  const rows = finished.deliveries ?? [];
+  assert.equal(rows.length, 1, "one assigned shop → one Step 4 plan row");
+  assert.equal(Number(rows[0].shopId), SHOP_A);
+  // ...without marking the step submitted (no empty Step 4 "completion").
+  assert.equal(finished.deliveryStepSubmitted, false);
+
+  // Step 4's shop list is the assigned shops only — never the shop master —
+  // so its "Shops (N)" count equals what was assigned (here: 1).
+  const master = [{ id: SHOP_A }, { id: SHOP_B }, { id: 99999 }];
+  const offered = orderAssignedShops(master, rows as ShopDelivery[]);
+  assert.deepEqual(
+    offered.map((shop) => shop.id),
+    [SHOP_A],
+    "Step 4 offers exactly the assigned shop(s)"
+  );
+
+  // A trip with no delivery rows at all keeps the full master (manual trip).
+  assert.equal(orderAssignedShops(master, []).length, 3);
 });
 
 test("duplicate shops on Finish Assignment collapse to one row per shop", async () => {

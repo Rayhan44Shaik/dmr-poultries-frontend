@@ -42,17 +42,29 @@ const UpcomingServices = ({ services }: UpcomingServicesProps) => {
 
   return (
     <div className="space-y-3 max-h-[440px] overflow-y-auto pr-1 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-      {visible.map((item) => {
+      {visible.map((item, index) => {
         const hasPassed = item.dueKM <= 0;
-        
+        // KM validation at a glance: how much of the target the live odometer
+        // has consumed. Overdue clamps to a full bar.
+        const kmProgress =
+          item.nextKM > 0
+            ? Math.min(100, Math.max(0, Math.round((item.liveCurrentKM / item.nextKM) * 100)))
+            : 0;
+        const barTone = hasPassed
+          ? 'bg-rose-500'
+          : item.isDue
+            ? 'bg-amber-500'
+            : 'bg-emerald-500';
+
         return (
           <div
             key={`${item.vehicle.id}-${item.maintenanceType}`}
-            className={`border rounded-2xl p-4 transition-all duration-300 hover:shadow-md ${
+            className={`animate-fade-in-up border rounded-2xl p-4 transition-all duration-300 hover:shadow-md ${
               item.isDue 
                 ? 'border-rose-100 bg-gradient-to-br from-rose-50/30 to-rose-50/70 hover:border-rose-200' 
                 : 'border-slate-100 bg-white hover:border-slate-200'
             }`}
+            style={{ animationDelay: `${Math.min(index, 10) * 45}ms` }}
           >
             <div className="space-y-3">
               {/* Top Row Header Metadata */}
@@ -80,7 +92,7 @@ const UpcomingServices = ({ services }: UpcomingServicesProps) => {
 
               {/* Maintenance type badge — each type has its own service schedule */}
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-100 text-[10px] font-bold uppercase tracking-wider rounded-md">
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-50 text-slate-600 border border-slate-200 text-[10px] font-bold uppercase tracking-wider rounded-md">
                   <Wrench className="w-3 h-3" />
                   {item.maintenanceType || 'General Service'}
                 </span>
@@ -99,6 +111,21 @@ const UpcomingServices = ({ services }: UpcomingServicesProps) => {
                   <span className="font-bold text-slate-700 text-xs">
                     {item.nextKM.toLocaleString()} KM
                   </span>
+                </div>
+              </div>
+
+              {/* KM validation — live odometer consumed vs the target, as a
+                  single calm progress bar that tells the truth of the badge. */}
+              <div>
+                <div className="mb-1 flex items-center justify-between text-[10px] font-semibold text-slate-400">
+                  <span>KM Progress</span>
+                  <span className="tabular-nums">{kmProgress}%</span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100">
+                  <div
+                    className={`h-full rounded-full transition-all duration-500 ${barTone}`}
+                    style={{ width: `${kmProgress}%` }}
+                  />
                 </div>
               </div>
 

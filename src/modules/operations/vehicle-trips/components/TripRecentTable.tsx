@@ -305,7 +305,16 @@ function TripRecentTable({
 
   return (
     <>
-      <div ref={tableRef} className="bg-white rounded-2xl border border-slate-200/80 shadow-xl shadow-slate-100 overflow-hidden mt-8 transition-all duration-300">
+      {/* Search — OUTSIDE the table card, sitting on top of the Recent Trip
+          Activity header. Everything inside the card is unchanged. */}
+      <div className="mt-8">
+        <div className="relative w-full sm:w-72">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+          <input type="text" placeholder={t("ops.trip.search_trips_short")} value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} className="w-full pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-xl bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-400/20 outline-none transition-all" />
+        </div>
+      </div>
+
+      <div ref={tableRef} className="bg-white rounded-2xl border border-slate-200/80 shadow-xl shadow-slate-100 overflow-hidden mt-3 transition-all duration-300">
         {/* Header */}
         <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 px-6 py-3 border-b border-slate-100 bg-gradient-to-r from-slate-50 via-white to-slate-50">
           <div className="flex flex-wrap items-center gap-3">
@@ -358,13 +367,6 @@ function TripRecentTable({
           </div>
 
           <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-            <div className="relative flex-1 sm:flex-none">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
-              <input type="text" placeholder={t("ops.trip.search_trips_short")} value={searchTerm} onChange={(e) => { setSearchTerm(e.target.value); setCurrentPage(1); }} className="w-full sm:w-64 pl-8 pr-3 py-1.5 text-sm border border-slate-200 rounded-xl bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-400/20 outline-none transition-all" />
-            </div>
-
-            <div className="h-5 w-px bg-slate-200 hidden sm:block" />
-
             <div className="flex items-center gap-1">
               <button type="button" onClick={handleEditClick} disabled={!canEdit} className={`group relative h-8 px-2.5 rounded-xl font-medium text-xs flex items-center gap-1 transition-all shadow-sm ${canEdit ? "bg-emerald-50/70 hover:bg-emerald-50/80 text-emerald-500 border border-emerald-200/60 active:scale-95" : "bg-slate-50 text-slate-300 border border-slate-100 cursor-not-allowed"}`} aria-label={t("ops.trip.edit_selected_trip")}>
                 <span className={`inline-flex ${canEdit ? uiActionIconMotionClass.edit : ""}`}><Pencil size={13} /></span>

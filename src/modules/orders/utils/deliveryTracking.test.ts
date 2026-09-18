@@ -5,6 +5,8 @@
 //   - deliveryState is independent of trip lifecycle
 //   - missing `[ORDER]` assignment list still shows (assignmentIncomplete)
 //   - no tracking row before Finish Assignment
+//   - the `order:` tag (not `deliveryStepSubmitted`) is the tracking gate, so
+//     a finished assignment tracks while Trip Entry Step 4 stays open
 // Run: npm run test:mobile
 import test from "node:test";
 import assert from "node:assert/strict";
@@ -15,6 +17,7 @@ import {
   buildShopBreakdown,
   computeOrdersProgress,
   deliveryProgressPct,
+  isEligibleVehicleTrip,
   isTrackingTrip,
   pageRange,
   partitionTrackingTrips,
@@ -64,11 +67,46 @@ function tripOf(over: Partial<Trip>): Trip {
 }
 
 test("isTrackingTrip requires Finish Assignment — no premature rows", () => {
+  // Save Progress persists the `[ORDER]` rows but never writes the `order:`
+  // tag, so a half-finished assignment must not open a tracking row.
   const unsaved = tripOf({
     deliveryStepSubmitted: false,
+    remarks: "",
     deliveries: [plan(1, 10)],
   });
   assert.equal(isTrackingTrip(unsaved), false);
+  assert.equal(isTrackingTrip({ ...unsaved, deliveries: [] }), false);
+});
+
+test("isTrackingTrip tracks a finished assignment while Step 4 is still open", () => {
+  // Finish Assignment writes the `order:` tag and does NOT submit Trip Entry
+  // Step 4 — the tracking row must open anyway, as "Assigned".
+  const assigned = tripOf({
+    deliveryStepSubmitted: false,
+    deliveries: [plan(1, 10)],
+  });
+  assert.equal(isTrackingTrip(assigned), true);
+  assert.equal(computeOrdersProgress(assigned).status, "Assigned");
+
+  // The same trip is locked out of a SECOND assignment.
+  assert.equal(
+    isEligibleVehicleTrip({ ...assigned, farmStepSubmitted: true, vehicleId: 7 }),
+    false,
+    "a finished assignment must not leave the vehicle re-assignable"
+  );
+  // ...while a Step 2-done vehicle with no assignment stays assignable.
+  assert.equal(
+    isEligibleVehicleTrip(
+      tripOf({
+        deliveryStepSubmitted: false,
+        farmStepSubmitted: true,
+        vehicleId: 7,
+        remarks: "",
+        deliveries: [],
+      })
+    ),
+    true
+  );
 });
 
 test("isTrackingTrip keeps a trip whose [ORDER] rows were lost if order: tag remains", () => {
