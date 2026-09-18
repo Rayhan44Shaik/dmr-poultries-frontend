@@ -33,6 +33,7 @@ export const CAPABILITIES = {
   LEAVE_APPROVE: "leave.approve",
   LEAVE_REJECT: "leave.reject",
   LEAVE_DELETE: "leave.delete",
+  DUTY_DELETE: "duty.delete",
 } as const;
 
 export type Capability = (typeof CAPABILITIES)[keyof typeof CAPABILITIES];
@@ -63,9 +64,10 @@ const OWNER_ACCESS: RoleAccess = {
  *   • Collection Entry + Pending Collections (no approve / reject / delete)
  *   • Fuel Expenses           (no approve / delete)
  *   • Maintenance Entry + Timeline (no approve / delete)
- *   • Leaves                  (add only — no approve / reject / delete)
- * No dashboard, masters, accounts, reports, salary register, performance
- * pages, orders, rate entry, shop sales, mortality, permits, EMI or FASTag.
+ *   • Permits & Documents, EMI, FASTag (view + entry)
+ *   • Duty Planner (assign shifts, no removal) + Leaves (add only)
+ * No dashboard, masters, accounts, reports, salary register or performance
+ * pages — and no approve/delete anywhere.
  */
 const SUPERVISOR_ACCESS: RoleAccess = {
   sections: ["operations", "fleet", "staff"],
@@ -77,8 +79,8 @@ const SUPERVISOR_ACCESS: RoleAccess = {
       "pending-collections",
       "fuel-expenses",
     ],
-    fleet: ["entry", "history"],
-    staff: ["leaves"],
+    fleet: ["entry", "history", "permits", "emi", "fastag"],
+    staff: ["leaves", "duty-planner"],
   },
   capabilities: [],
 };

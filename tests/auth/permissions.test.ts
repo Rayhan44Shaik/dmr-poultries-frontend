@@ -39,7 +39,11 @@ describe("SUPERVISOR — entry-only workspace", () => {
       ["/operations", "?tab=fuel-expenses"],
       ["/fleet", "?tab=entry"],
       ["/fleet", "?tab=history"],
+      ["/fleet", "?tab=permits"],
+      ["/fleet", "?tab=emi"],
+      ["/fleet", "?tab=fastag"],
       ["/staff", "?tab=leaves"],
+      ["/staff", "?tab=duty-planner"],
       ["/operations", ""], // tabless hub resolves to trip-entry inside the page
     ] as const;
     for (const [path, search] of allowed) {
@@ -56,11 +60,7 @@ describe("SUPERVISOR — entry-only workspace", () => {
       ["/operations", "?tab=shop-sales"],
       ["/operations", "?tab=mortality"],
       ["/operations/orders/collection", ""],
-      ["/fleet", "?tab=permits"],
-      ["/fleet", "?tab=emi"],
-      ["/fleet", "?tab=fastag"],
       ["/fleet", "?tab=analytics"],
-      ["/staff", "?tab=duty-planner"],
       ["/staff", "?tab=salary-sheet"],
       ["/staff", "?tab=driver-performance"],
       ["/staff", "?tab=supervisor-performance"],
@@ -89,7 +89,15 @@ describe("SUPERVISOR — entry-only workspace", () => {
 
   test("nav paths mirror location access", () => {
     assert.equal(canAccessNavPath("SUPERVISOR", "/operations?tab=trip-entry"), true);
+    assert.equal(canAccessNavPath("SUPERVISOR", "/fleet?tab=permits"), true);
+    assert.equal(canAccessNavPath("SUPERVISOR", "/fleet?tab=emi"), true);
+    assert.equal(canAccessNavPath("SUPERVISOR", "/fleet?tab=fastag"), true);
+    assert.equal(canAccessNavPath("SUPERVISOR", "/staff?tab=duty-planner"), true);
     assert.equal(canAccessNavPath("SUPERVISOR", "/staff?tab=salary-sheet"), false);
     assert.equal(canAccessNavPath("SUPERVISOR", "/accounts?tab=summary"), false);
+  });
+
+  test("landing stays on trip entry with the wider scope", () => {
+    assert.equal(landingPathForRole("SUPERVISOR"), "/operations?tab=trip-entry");
   });
 });
