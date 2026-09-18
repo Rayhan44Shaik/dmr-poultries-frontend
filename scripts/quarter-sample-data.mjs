@@ -63,6 +63,9 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import http from "node:http";
+import { createHmac, randomUUID } from "node:crypto";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
 
 const PORT = Number(process.env.PORT ?? process.env.MOCK_BACKEND_PORT ?? 4000);
 
@@ -4745,13 +4748,185 @@ function createMasterRow(kind, body) {
 // 14. HTTP SERVER — every endpoint the frontend calls
 // ═══════════════════════════════════════════════════════════════════════════
 
-const USER = {
-  id: 1,
-  username: "owner",
-  name: "DMR Owner",
-  role: "Owner",
-  permissions: ["*"],
+// ── Sign-in roles ──────────────────────────────────────────────────────────
+// Two desktop roles:
+//   • owner      → OWNER       — full access to every page and action.
+//   • supervisor → SUPERVISOR  — field-entry role: trip entry/list, collections
+//                  (entry only), fuel expenses (entry only), maintenance
+//                  (entry only) and leave requests (add only). The frontend
+//                  hides approve/delete and blocks every other section for it.
+/**
+ * Sign-in passwords are EXACT (owner → "dmr@owner1414",
+ * supervisor → "dmr@supervisor"): simple password like owner123 sit in public
+ * data-breach lists and Chrome's Password Manager pops a "change your
+ * password" warning on every sign-in with them.
+ */
+const PASSWORDS = {
+  owner: "dmr@owner1414",
+  supervisor: "dmr@supervisor",
 };
+
+const USERS = {
+  owner: {
+    id: 1,
+    username: "owner",
+    displayName: "DMR Owner",
+    role: "OWNER",
+    employeeId: null,
+    permissions: ["*"],
+  },
+  supervisor: {
+    id: 2,
+    username: "supervisor",
+    displayName: "Field Supervisor",
+    role: "SUPERVISOR",
+    employeeId: null,
+    permissions: [
+      "trip.entry", "trip.list",
+      "collection.entry", "collection.view",
+      "fuel.entry",
+      "maintenance.entry",
+      "leave.add",
+    ],
+  },
+};
+
+/**
+ * Stateless signed tokens: `sample.<username>.<hmac>`. They survive server
+ * restarts (dev restarts constantly), so a signed-in user is never bounced
+ * back to the sign-in screen by a redeplo. `randomUUID` was dropped for this;
+ * only logout revocation stays in memory.
+ */
+// Random per install, persisted to the OS temp dir: tokens stay valid across
+// dev-server restarts (the file outlives the process) but are unforgeable.
+// (A fixed secret would make every login mint the SAME token string — which
+// logout revocation would then permanently kill: logout → re-login → still
+// revoked → bounced to the sign-in screen forever. Never do that.)
+// Kept INSIDE the repo workspace (gitignored): unlike /tmp it survives
+// sandbox restarts, so users are never bounced to sign-in by a rotated key.
+const KEY_DIR = path.join(process.cwd(), ".auth-session");
+try {
+  mkdirSync(KEY_DIR, { recursive: true });
+} catch {
+  // unwritable — fall back to the OS temp dir below
+}
+const SECRET_FILE = path.join(KEY_DIR, "token-secret");
+let SAMPLE_TOKEN_SECRET = null;
+try {
+  SAMPLE_TOKEN_SECRET = readFileSync(SECRET_FILE, "utf8").trim() || null;
+} catch {
+  SAMPLE_TOKEN_SECRET = null;
+}
+if (!SAMPLE_TOKEN_SECRET) {
+  SAMPLE_TOKEN_SECRET = randomUUID();
+  try {
+    writeFileSync(SECRET_FILE, SAMPLE_TOKEN_SECRET);
+  } catch {
+    // unwritable temp dir — fall back to a per-boot secret (restarts then
+    // need one fresh sign-in, exactly like a normal backend restart)
+  }
+}
+
+function sign(username, version) {
+  return createHmac("sha256", SAMPLE_TOKEN_SECRET).update(`${username}:${version}`).digest("hex").slice(0, 32);
+}
+
+/**
+ * Per-user session VERSION, persisted next to the secret. The token carries
+ * the version it was issued at; logout bumps the version, which invalidates
+ * every older token — so a re-login mints a fresh, working one. Without this,
+ * deterministic tokens + logout revocation deadlock: the new login returns
+ * the same string the revocation list still rejects (the exact sign-in loop).
+ */
+const VERSIONS_FILE = path.join(KEY_DIR, "session-versions.json");
+const VERSIONS = (() => {
+  try {
+    return JSON.parse(readFileSync(VERSIONS_FILE, "utf8"));
+  } catch {
+    return {};
+  }
+})();
+
+function saveVersions() {
+  try {
+    writeFileSync(VERSIONS_FILE, JSON.stringify(VERSIONS));
+  } catch {
+    // versions then reset on restart — worst case one extra sign-in
+  }
+}
+
+function sessionVersion(username) {
+  return String(VERSIONS[username] ?? 0);
+}
+
+function issueToken(username) {
+  const version = sessionVersion(username);
+  return `sample.${username}.${version}.${sign(username, version)}`;
+}
+
+function sessionUserFromRequest(req) {
+  const header = String(req.headers.authorization ?? "");
+  const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+  if (!token) return null;
+  const parts = token.split(".");
+  if (parts.length !== 4 || parts[0] !== "sample") return null;
+  const username = parts[1];
+  const version = parts[2];
+  if (!USERS[username]) return null;
+  if (sessionVersion(username) !== version) return null; // logged out / superseded
+  if (sign(username, version) !== parts[3]) return null;
+  return USERS[username];
+}
+
+// ── Supervisor API scope (server-side enforcement) ─────────────────────────
+// The UI hides what a supervisor may not do; this matrix makes it absolute.
+// Even with devtools open, a supervisor token cannot read owner data
+// (accounts, salaries, rates, shop sales, dashboards, masters beyond the
+// reference lists) and can never reach a delete / approve / reject route.
+const SUPERVISOR_DENIED_PREFIXES = [
+  "/api/masters/banks", "/api/masters/market-rates", "/api/masters/resolve-location",
+  "/api/operations/dashboard", "/api/operations/rate-entry", "/api/operations/shop-sales",
+  "/api/operations/mortality", "/api/operations/shop-ledger",
+  "/api/operations/collection-entry/report", "/api/operations/collections/report",
+  "/api/accounts/", "/api/fleet/analytics", "/api/fleet/reports", "/api/fleet/dashboard",
+  "/api/reports/", "/api/staff/salaries", "/api/staff/performance", "/api/staff/advances",
+  "/api/staff/dashboard", "/api/quarter-summary", "/api/bootstrap",
+];
+
+const SUPERVISOR_ALLOWED_PREFIXES = [
+  // Reference masters (read-only fuel for their pages' dropdowns).
+  "/api/masters/shops", "/api/masters/employees", "/api/masters/farms",
+  "/api/masters/vehicles", "/api/masters/bird-types",
+  // Trips: entry, list, steps, diesel, status flow.
+  "/api/trips", "/api/operations/trip-list", "/api/operations/vehicle-trips/",
+  // Collections: entry + pending views (no approve/delete routes).
+  "/api/operations/collection-entry", "/api/operations/collections/",
+  // Fuel, maintenance, permits, EMI, FASTag.
+  "/api/operations/fuel-expenses",
+  "/api/fleet/maintenance", "/api/fleet/permits", "/api/fleet/emis", "/api/fleet/fastag",
+  "/api/fleet/vehicles/",
+  // Leaves (add) + Duty planner (assign) + its attendance helper.
+  "/api/staff/leaves", "/api/staff/duty-planner", "/api/staff/attendance/",
+];
+
+function supervisorApiAllowed(method, path) {
+  // 1. Owner-only sections are refused outright.
+  if (SUPERVISOR_DENIED_PREFIXES.some((prefix) => path.startsWith(prefix))) return false;
+  // 2. Only the entry workspace's endpoints exist for this role.
+  if (!SUPERVISOR_ALLOWED_PREFIXES.some((prefix) => path === prefix || path.startsWith(prefix + "/") || (prefix.endsWith("/") && path.startsWith(prefix)))) return false;
+  // 3. Masters are reference data: read-only.
+  if (path.startsWith("/api/masters/") && method !== "GET") return false;
+  // 4. Entry-only: no destructive method anywhere, and no approve/reject.
+  if (method === "DELETE") return false;
+  if (method !== "GET" && /(\/approve|\/reject)$/.test(path)) return false;
+  // Approve/reject of collections and leaves travel as status PATCHes.
+  if (/^\/api\/operations\/collection-entry\/\d+\/status$/.test(path)) return false;
+  if (/^\/api\/staff\/leaves\/[^/]+\/status$/.test(path)) return false;
+  return true;
+}
+
+// Back-compat: the desktop bootstrap flow still reads a single USER shape.
+const USER = USERS.owner;
 
 // ── Supervisor Mobile: session + durable-sync contracts ────────────────────
 // The mobile workspace (src/modules/supervisor-mobile) speaks a stricter
@@ -5002,6 +5177,20 @@ const server = http.createServer(async (req, res) => {
   const m = (re) => p.match(re);
 
   try {
+    // ── Role-scoped API guard ─────────────────────────────────────────────
+    // /api/auth/* and the health probes are open; EVERY other endpoint needs
+    // a valid bearer token, and a supervisor token is held to its whitelist.
+    const authFree = p.startsWith("/api/auth/") || p === "/api/health" || p === "/api/sync/health";
+    if (!authFree) {
+      const account = sessionUserFromRequest(req);
+      if (!account) {
+        return send(401, { error: "unauthenticated", message: "Sign in to continue." });
+      }
+      if (account.role !== "OWNER" && !supervisorApiAllowed(method, p)) {
+        return send(403, { error: "forbidden", message: "Your role cannot access this data." });
+      }
+    }
+
     // ── Meta / auth ────────────────────────────────────────────────────────
     if (p === "/api/health" || p === "/api/sync/health") {
       // Desktop probes this to detect the sample server. Mobile additionally
@@ -5047,21 +5236,52 @@ const server = http.createServer(async (req, res) => {
       });
     if (p === "/api/auth/login" && method === "POST") {
       const body = await readBody(req);
+      const username = String(body?.username ?? "").trim().toLowerCase();
+      const password = String(body?.password ?? "");
+      // Exact passwords (see PASSWORDS). The note tells the user WHICH part
+      // was wrong — unknown username vs wrong password.
+      if (!USERS[username]) {
+        return send(401, {
+          error: "invalid_credentials",
+          message: "No account with this username. Check the username and try again.",
+        });
+      }
+      if (PASSWORDS[username] !== password) {
+        return send(401, {
+          error: "invalid_credentials",
+          message: `Wrong password for '${username}'. Try again.`,
+        });
+      }
+      const account = USERS[username];
+      const token = issueToken(username);
       // `user` serves the desktop gate, `supervisor` serves the mobile
       // provider — both are read from the same response object.
-      const session = mobileSession(body?.username);
+      const session = mobileSession(username);
       return send(200, {
-        user: USER,
-        token: "sample-quarter-token",
+        user: account,
+        token,
         expiresAt: session.expiresAt,
         supervisor: session.supervisor,
       });
     }
     if (p === "/api/auth/me") {
-      const session = mobileSession(null);
-      return send(200, { user: USER, supervisor: session.supervisor, expiresAt: session.expiresAt });
+      const account = sessionUserFromRequest(req);
+      if (!account) {
+        return send(401, { error: "unauthenticated", message: "Sign in to continue." });
+      }
+      const session = mobileSession(account.username);
+      return send(200, { user: account, supervisor: session.supervisor, expiresAt: session.expiresAt });
     }
-    if (p === "/api/auth/logout") return send(200, { ok: true });
+    if (p === "/api/auth/logout" && method === "POST") {
+      const header = String(req.headers.authorization ?? "");
+      const token = header.startsWith("Bearer ") ? header.slice(7) : null;
+      const parts = token ? token.split(".") : [];
+      if (parts.length === 4 && USERS[parts[1]]) {
+        VERSIONS[parts[1]] = Number(parts[2] ?? 0) + 1;
+        saveVersions();
+      }
+      return send(200, { ok: true });
+    }
     if (p === "/api/bootstrap")
       return send(200, {
         user: USER,

@@ -4,6 +4,7 @@ import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useDutyPlanner, isDateLocked, isDefaultDutyFilters } from '../hooks/useDutyPlanner';
 import { countActiveFilters } from '../../../ui';
 import { useSafeNotification } from '../../../hooks/useSafeNotification';
+import { CAPABILITIES, useCan } from '../../auth/permissions';
 import DutyPlannerFilters, { type DutyPlannerView } from '../components/duty-planner/DutyPlannerFilters';
 import DutyPlannerGrid from '../components/duty-planner/DutyPlannerGrid';
 import DutyPlannerReportTable from '../components/duty-planner/DutyPlannerReportTable';
@@ -30,6 +31,8 @@ const initialCustomRange = (): DutyReportRange => ({
 });
 
 function DutyPlannerPage() {
+  // Entry-only roles plan shifts but cannot remove an assignment.
+  const can = useCan();
   const { showNotification } = useSafeNotification();
   const { language, t } = useDutyPlannerText();
   const textRef = useRef(t);
@@ -493,7 +496,11 @@ function DutyPlannerPage() {
           isOpen={showPicker}
           onClose={handleClosePicker}
           onSelect={handleSelectShift}
-          onRemove={getAssignment(selectedCell.employeeId, selectedCell.date)?.id ? handleRemoveDuty : undefined}
+          onRemove={
+            can(CAPABILITIES.DUTY_DELETE) && getAssignment(selectedCell.employeeId, selectedCell.date)?.id
+              ? handleRemoveDuty
+              : undefined
+          }
           currentDuty={getDutyCell(selectedCell.employeeId, selectedCell.date)?.dutyType ?? undefined}
           date={selectedCell.date}
           employeeName={selectedEmployee ? dutyDisplayName(selectedEmployee, language) : ''}

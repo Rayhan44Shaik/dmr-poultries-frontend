@@ -4,7 +4,7 @@
 
 import henCutUrl from "../assets/dmr-hen-cut.png";
 
-export type BrandMarkSize = "xs" | "sm" | "md" | "lg" | "xl";
+export type BrandMarkSize = "xs" | "sm" | "md" | "lg" | "xl" | "2xl";
 export type BrandMarkVariant = "tile" | "plain";
 export type BrandMarkInset = "tight" | "normal" | "roomy";
 
@@ -23,6 +23,8 @@ const SIZES: Record<BrandMarkSize, { box: string; px: number }> = {
   md: { box: "h-11 w-11", px: 44 },
   lg: { box: "h-14 w-14", px: 56 },
   xl: { box: "h-[4.5rem] w-[4.5rem]", px: 72 },
+  // Sign-in hero size — the brand mark alone, big and centred.
+  "2xl": { box: "h-28 w-28", px: 112 },
 };
 
 // Kept for legacy `variant="tile"` callers — now very subtle, no green/black.
