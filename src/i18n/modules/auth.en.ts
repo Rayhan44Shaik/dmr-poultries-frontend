@@ -7,7 +7,7 @@ export default {
   'auth.login.role_supervisor_desc': 'Trips, collections, fuel & leave entry',
   'auth.login.or_manual': 'or sign in manually',
   'auth.signout': 'Sign out',
-  'auth.restoring_session': 'Checking your session…',
+  'auth.restoring_session': 'Checking your session',
   'auth.session.expired': 'Your session expired. Please sign in again.',
   'auth.access.denied_toast': 'This page is not available for your role.',
   'auth.idle.warning': "No activity detected — you'll be signed out in {seconds}s.",

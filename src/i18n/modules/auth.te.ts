@@ -7,7 +7,7 @@ export default {
   'auth.login.role_supervisor_desc': 'ట్రిప్పులు, వసూళ్లు, ఇంధనం & సెలవు ఎంట్రీ',
   'auth.login.or_manual': 'లేదా మాన్యువల్‌గా సైన్ ఇన్ చేయండి',
   'auth.signout': 'సైన్ అవుట్',
-  'auth.restoring_session': 'మీ సెషన్ తనిఖీ చేస్తోంది…',
+  'auth.restoring_session': 'మీ సెషన్ తనిఖీ చేస్తోంది',
   'auth.session.expired': 'మీ సెషన్ గడువు ముగిసింది. దయచేసి మళ్లీ సైన్ ఇన్ చేయండి.',
   'auth.access.denied_toast': 'ఈ పేజీ మీ పాత్రకు అందుబాటులో లేదు.',
   'auth.idle.warning': 'ఏ కార్యాచరణ లేదు — {seconds} సెకన్లలో మిమ్మల్ని సైన్ అవుట్ చేస్తాం.',
