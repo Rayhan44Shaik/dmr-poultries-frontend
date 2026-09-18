@@ -6,11 +6,12 @@
 // toggle on this screen — just the brand mark and the form.
 
 import { useEffect, useState, type FormEvent } from "react";
+import { useNavigate } from "react-router-dom";
 import { ArrowRight, Building2, Eye, EyeOff, Info, Lock, ShieldCheck, Truck, User } from "lucide-react";
 import BrandMark from "../../ui/BrandMark";
 import { useI18n } from "../../i18n";
+import { useAuth } from "../../providers/authContext";
 import { loginRequest } from "./authApi";
-import { setCachedUser } from "./tokenStore";
 import { landingPathForRole } from "./permissions";
 import { IDLE_SIGNOUT_KEY } from "./IdleSessionGuard";
 import { getLastUsername, setLastUsername, sweepWorkspaceCaches } from "./cacheSweep";
@@ -20,6 +21,8 @@ const inputClass =
 
 export default function LoginPage() {
   const { t } = useI18n();
+  const { adoptSession } = useAuth();
+  const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
   const [username, setUsername] = useState("");
@@ -51,20 +54,25 @@ export default function LoginPage() {
     setBusy(true);
     setError("");
     try {
-      // Direct API login (no provider state change): the page stays exactly
-      // as it is — no intermediate app render, no loading screen — until the
-      // hard navigation below takes over.
+      // Direct API login, then adopt the session IN THIS DOCUMENT — no reload
+      // between the form and the workspace. A full-page navigation here is
+      // exactly what storage-restricted browsers (sandboxed preview frames,
+      // private mode) turn into an endless bounce back to the sign-in screen:
+      // the freshly issued token never survives the reload. The router sends
+      // each role to its first allowed page (see AppRoutes RoleLanding); the
+      // branded splash covers the chunk load.
       const signedIn = await loginRequest(user, pass);
       // Cross-user isolation: when the identity changes on this machine,
-      // every cached business dataset is swept BEFORE the (full-page) landing
-      // navigation rebuilds all module caches under the new session.
+      // every cached business dataset is swept before the app mounts.
       const previous = getLastUsername();
       if (previous !== signedIn.user.username) sweepWorkspaceCaches();
       setLastUsername(signedIn.user.username);
-      // Cached identity → after this reload the app boots STRAIGHT into the
-      // workspace (no splash, no /auth/me wait).
-      setCachedUser(signedIn.user);
-      window.location.replace(landingPathForRole(signedIn.user.role));
+      adoptSession(signedIn.user);
+      // Straight to this role's first allowed page — a pure client-side route
+      // change (no document reload), so the fresh session cannot be lost in
+      // transit even when the browser refuses to persist storage. Also rescues
+      // a supervisor who deep-linked onto a page they cannot open.
+      navigate(landingPathForRole(signedIn.user.role), { replace: true });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t("auth.login.failed"));
       setBusy(false);

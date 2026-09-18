@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react
 import { currentUserRequest, loginRequest, logoutRequest, type AuthenticatedUser } from '../modules/auth/authApi';
 import { clearSession, getCachedUser, getStoredToken, setCachedUser } from '../modules/auth/tokenStore';
 import { sweepWorkspaceCaches } from '../modules/auth/cacheSweep';
+import { IDLE_SIGNOUT_KEY } from '../modules/auth/IdleSessionGuard';
 import { AuthContext } from './authContext';
 
 interface AuthProviderProps {
@@ -60,23 +61,50 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return !!getStoredToken() && !getCachedUser();
   });
 
+  // The `dmr:auth-expired` listener is ALWAYS on for the life of the document:
+  // a 401 from any endpoint (a genuinely dead session) ends it and lands on a
+  // fresh sign-in document. A separate effect below (re)starts /auth/me
+  // revalidation whenever a session exists — including one adopted in-SPA
+  // right after sign-in, where the boot effect saw no token yet.
   useEffect(() => {
     if (demoMode) return undefined;
-    // No token → `loading` already initialised false; nothing to restore.
+    const expired = () => {
+      clearSession();
+      setUser(null);
+      hardNavigate('/');
+    };
+    window.addEventListener('dmr:auth-expired', expired);
+    return () => window.removeEventListener('dmr:auth-expired', expired);
+  }, [demoMode]);
+
+  useEffect(() => {
+    if (demoMode) return undefined;
+    // No token → nothing to revalidate (sign-in screen / fresh document).
     if (!getStoredToken()) return undefined;
     let active = true;
     currentUserRequest()
       .then((value) => {
         if (!active) return;
-        setUser(value);
+        // Identity-stable update: re-setting an equivalent user would re-run
+        // this effect (it depends on `user`) and loop /auth/me forever.
+        setUser((prev) => (prev && prev.username === value.username && prev.role === value.role ? prev : value));
         setCachedUser(value);
       })
       .catch((cause) => {
         if (!active) return;
         if (isSessionInvalid(cause)) {
-          // Definitive: the server rejected this session.
+          // Definitive: the server rejected this session. Clear everything and
+          // go to the sign-in screen through a FULL reload — the next sign-in
+          // then starts from a fresh document, so no module cache of this user
+          // can ever be inherited by the next one.
+          try {
+            sessionStorage.setItem(IDLE_SIGNOUT_KEY, "expired");
+          } catch {
+            // storage blocked — the notice is cosmetic
+          }
           clearSession();
           setUser(null);
+          hardNavigate("/");
         } else if (!getCachedUser()) {
           // No cached identity to keep showing — sign-in it is, but the
           // token is KEPT so a hiccup right after login doesn't loop.
@@ -87,14 +115,8 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       .finally(() => {
         if (active) setLoading(false);
       });
-    const expired = () => {
-      clearSession();
-      setUser(null);
-      hardNavigate('/');
-    };
-    window.addEventListener('dmr:auth-expired', expired);
-    return () => { active = false; window.removeEventListener('dmr:auth-expired', expired); };
-  }, [demoMode]);
+    return () => { active = false; };
+  }, [demoMode, user]);
 
   const isAuthenticated = !!user;
 
@@ -103,6 +125,14 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     setCachedUser(session.user);
     setUser(session.user);
     return session.user;
+  }, []);
+
+  /** Sign-in pages call this after a direct API login: the app mounts in THIS
+   *  document (no reload) — the session cannot be lost in transit, even when
+   *  the browser refuses to persist the token. */
+  const adoptSession = useCallback((value: AuthenticatedUser) => {
+    setCachedUser(value); // no-op-safe when storage is blocked (memory bag)
+    setUser(value);
   }, []);
 
   const logout = useCallback(async () => {
@@ -119,7 +149,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }
   }, []);
 
-  const value = useMemo(() => ({ isAuthenticated, loading, user, login, logout }), [isAuthenticated, loading, login, logout, user]);
+  const value = useMemo(() => ({ isAuthenticated, loading, user, login, adoptSession, logout }), [isAuthenticated, loading, login, adoptSession, logout, user]);
 
   return (
     <AuthContext.Provider value={value}>
