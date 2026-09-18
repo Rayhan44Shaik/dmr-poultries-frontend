@@ -50,21 +50,19 @@ function normalizeDate(value: string | null | undefined): string {
 }
 
 function normalizeStatus(status: unknown): Employee["status"] {
-  if (
-    status === true ||
-    status === 1 ||
-    status === "Active" ||
-    status === "active"
-  ) {
-    return "Active";
-  }
-  return "Inactive";
+  if (status === "Active" || status === "Inactive" || status === "Suspended") return status;
+  throw new Error("Invalid Employee Master status in API response.");
 }
 
 export function mapEmployee(raw: Record<string, unknown>): Employee {
+  const id = Number(raw.id);
+  const employeeNo = Number(raw.employeeNo ?? raw.employee_no);
+  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(employeeNo) || employeeNo <= 0) {
+    throw new Error("Invalid Employee Master identity in API response.");
+  }
   return {
-    id: Number(raw.id),
-    employeeNo: Number(raw.employeeNo ?? raw.employee_no ?? 0),
+    id,
+    employeeNo,
     employeeName: String(raw.employeeName ?? raw.employee_name ?? ""),
     department: String(raw.department ?? ""),
     role: String(raw.role ?? ""),
@@ -115,7 +113,10 @@ function toPayload(
 }
 
 function setCacheFromApi(rows: Record<string, unknown>[] | null | undefined): Employee[] {
-  employeesCache = Array.isArray(rows) ? rows.map(mapEmployee) : [];
+  if (!Array.isArray(rows) || rows.some((row) => !row || typeof row !== "object" || Array.isArray(row))) {
+    throw new Error("Employee list response must be an array of records.");
+  }
+  employeesCache = rows.map(mapEmployee);
   return employeesCache;
 }
 

@@ -48,7 +48,8 @@ function clearLegacyVehicleStorage(): void {
 }
 
 function normalizeStatus(status: unknown): Vehicle["status"] {
-  return status === "Active" ? "Active" : "Inactive";
+  if (status === "Active" || status === "Inactive") return status;
+  throw new Error("Invalid Vehicle Master status in API response.");
 }
 
 function toOptionalNumber(value: unknown): number | undefined {
@@ -78,9 +79,14 @@ function toDateOnly(value: unknown): string | undefined {
 export function mapVehicle(raw: Record<string, unknown>): Vehicle {
   const registration = raw.vehicleNumber ?? raw.vehicle_number;
   if (registration != null && typeof registration !== "string") throw new Error("Vehicle registration response must be text.");
+  const id = Number(raw.id);
+  const vehicleNo = Number(raw.vehicleNo ?? raw.vehicle_no);
+  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(vehicleNo) || vehicleNo <= 0) {
+    throw new Error("Invalid Vehicle Master identity in API response.");
+  }
   const mapped: Vehicle & { emiDay?: number; totalEMIs?: number } = {
-    id: Number(raw.id),
-    vehicleNo: Number(raw.vehicleNo ?? raw.vehicle_no ?? 0),
+    id,
+    vehicleNo,
     vehicleNumber: String(raw.vehicleNumber ?? raw.vehicle_number ?? ""),
     vehicleType: String(raw.vehicleType ?? raw.vehicle_type ?? ""),
     noOfBoxes: Number(raw.noOfBoxes ?? raw.no_of_boxes ?? 0),
@@ -98,7 +104,6 @@ export function mapVehicle(raw: Record<string, unknown>): Vehicle {
     emiStartDate: toDateOnly(raw.emiStartDate ?? raw.emi_start_date),
     rcDate: toDateOnly(raw.rcDate ?? raw.rc_date),
     status: normalizeStatus(raw.status),
-    isSample: raw._mock === true,
   };
 
   const emiDay = toOptionalNumber(raw.emiDay ?? raw.emi_day);

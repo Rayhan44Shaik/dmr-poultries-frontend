@@ -30,7 +30,7 @@ export default defineConfig({
   webServer: externalBaseURL
     ? undefined
     : {
-        command: 'npm run dev -- --host 0.0.0.0 --port 5196 --strictPort',
+        command: 'node node_modules/vite/bin/vite.js --config vite.config.ts --host 0.0.0.0 --port 5196 --strictPort',
         cwd: fileURLToPath(new URL('../../', import.meta.url)),
         url: 'http://127.0.0.1:5196',
         env: { VITE_API_BASE_URL: '/api' },

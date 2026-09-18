@@ -50,7 +50,6 @@ import {
   type AmountValues,
 } from "./payslipModel";
 import { loadEmployees } from "../../../masters/employees/services/employeeService";
-import { SAMPLE_EMPLOYEE_LIST } from "../../services/staffSampleData";
 import { salaryDisplayText, salaryMatchesQuery } from "../../utils/salaryDisplay";
 import type { SalaryRecord } from "../../types/staffDashboard";
 
@@ -244,12 +243,7 @@ function SalaryReviewModalBody({
         setContacts(map);
       })
       .catch(() => {
-        if (cancelled) return;
-        const map: Record<number, string> = {};
-        for (const e of SAMPLE_EMPLOYEE_LIST) {
-          if (e.id != null && e.phoneNumber) map[e.id] = e.phoneNumber;
-        }
-        setContacts(map);
+        if (!cancelled) setContacts({});
       });
     return () => {
       cancelled = true;

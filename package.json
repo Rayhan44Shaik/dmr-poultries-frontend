@@ -7,7 +7,7 @@
     "node": ">=22 <26"
   },
   "scripts": {
-    "dev": "concurrently -n sample-api,web -c magenta,cyan \"npm:dev:sample-api\" \"npm:dev:web\"",
+    "dev": "npm run dev:web",
     "dev:web": "vite --config vite.config.ts",
     "dev:sample-api": "node scripts/quarter-sample-data.mjs",
     "build": "tsc -b && vite build --config vite.config.ts",

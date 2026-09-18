@@ -47,7 +47,6 @@ import PdfBlobPreview from "../../../reports/components/PdfBlobPreview";
 import { WhatsAppBrandIcon } from "../../../../ui/WhatsAppBrandIcon";
 import { loadEmployees } from "../../../masters/employees/services/employeeService";
 import { generatePayslipPdf } from "../../services/payslipPdf";
-import { SAMPLE_EMPLOYEE_LIST } from "../../services/staffSampleData";
 import { salaryDisplayText, salaryMatchesQuery } from "../../utils/salaryDisplay";
 import { EMAIL_TEMPLATES, WA_TEMPLATES } from "./payslipMessages";
 import type { SalaryRecord } from "../../types/staffDashboard";
@@ -152,16 +151,8 @@ function SendPayslipsDialog({
       })
       .catch(() => {
         if (cancelled) return;
-        // Backend offline — fall back to the sample employee directory so the
-        // recipients still show contacts for preview / review.
-        const mailMap: Record<number, string> = {};
-        const phoneMap: Record<number, string> = {};
-        for (const e of SAMPLE_EMPLOYEE_LIST) {
-          if (e.id != null && e.email) mailMap[e.id] = e.email;
-          if (e.id != null && e.phoneNumber) phoneMap[e.id] = e.phoneNumber;
-        }
-        setEmails(mailMap);
-        setPhones(phoneMap);
+        setEmails({});
+        setPhones({});
       });
     return () => {
       cancelled = true;

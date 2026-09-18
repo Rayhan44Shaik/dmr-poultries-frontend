@@ -1,7 +1,7 @@
 import { StatusBadge } from "../../../ui";
 
 /**
- * Active / Inactive badge for master records.
+ * Active / Inactive / Suspended badge for master records.
  *
  * Delegates to the global `StatusBadge`, so master lists now use exactly the
  * same badge shape, colour mapping and status vocabulary as every other module
@@ -14,7 +14,7 @@ import { StatusBadge } from "../../../ui";
 export default function MasterStatusBadge({
   status,
 }: {
-  status: "Active" | "Inactive";
+  status: "Active" | "Inactive" | "Suspended";
 }) {
   return <StatusBadge status={status} size="md" />;
 }

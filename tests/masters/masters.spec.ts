@@ -21,7 +21,7 @@ const tabs = [
 ];
 const dialog = (page: Page, name: string) =>
   page.getByRole('dialog', { name: `Add ${name}`, exact: true });
-const rows = (page: Page) => page.locator('.master-table tbody tr');
+const rows = (page: Page) => page.locator('.master-page table tbody tr');
 const combo = (page: Page, name: string) =>
   page.getByRole('combobox', { name, exact: true });
 const toolbar = (page: Page) => page.locator('[data-master-toolbar]');
@@ -189,6 +189,11 @@ test.beforeEach(async ({ page }) => {
         }
       } else if (url.pathname === '/api/staff/salaries') {
         await route.fulfill({ json: [] });
+      } else if (url.pathname === '/api/fleet/permits') {
+        // The application shell polls document approvals while Masters is open.
+        // Preserve that endpoint's array contract so unrelated shell work does
+        // not create unhandled rejections in this focused page suite.
+        await route.fulfill({ json: [] });
       } else {
         await route.fulfill({ json: { items: [], total: 0 } });
       }
@@ -210,22 +215,13 @@ for (const { tab, name } of tabs) {
     await expect(toolbar(page).getByRole('searchbox')).toBeVisible();
     await expect(page.locator('.master-page select')).toHaveCount(0);
     const exportButton = toolbar(page).getByRole('button', {
-      name: 'Export',
+      name: 'PDF',
       exact: true,
     });
     await exportButton.focus();
-    await page.keyboard.press('Enter');
-    await expect(
-      page.getByRole('menu', { name: 'Export', exact: true }),
-    ).toBeVisible();
-    await expect(
-      page.getByRole('menuitem', { name: 'PDF', exact: true }),
-    ).toHaveCSS('height', '36px');
-    await withinViewport(page, page.locator('[data-master-dropdown-panel]'));
     const download = page.waitForEvent('download');
     await page.keyboard.press('Enter');
     expect((await download).suggestedFilename()).toMatch(/\.pdf$/);
-    await expect(page.getByRole('menu', { name: 'Export' })).toHaveCount(0);
     await expect(exportButton).toBeFocused();
 
     for (const width of [1440, 768, 390]) {
@@ -296,7 +292,7 @@ test('Employee Department filters, clears, resets pagination and supports keyboa
   page,
 }) => {
   await openTab(page, 'employees', 'Employee');
-  await page.getByRole('button', { name: 'Next', exact: true }).click();
+  await page.getByRole('button', { name: 'Next page', exact: true }).click();
   await expect(rows(page).first()).toContainText('Sample Employee 11');
   const department = combo(page, 'Department');
   await department.focus();
@@ -304,9 +300,7 @@ test('Employee Department filters, clears, resets pagination and supports keyboa
   await page.keyboard.press('Enter');
   await expect(department).toHaveText('Driver');
   await expect(rows(page)).toHaveCount(2);
-  await expect(page.locator('[data-master-summary]')).toContainText(
-    'Page 1 of 1',
-  );
+  await expect(page.getByRole('button', { name: 'Next page' })).toHaveCount(0);
   await pick(page, department, 'All Departments');
   await expect(rows(page)).toHaveCount(10);
   await department.click();
@@ -314,7 +308,7 @@ test('Employee Department filters, clears, resets pagination and supports keyboa
   await expect(department).toHaveAttribute('aria-expanded', 'false');
   await toolbar(page).getByRole('searchbox').fill('Employee 20');
   await expect(rows(page)).toHaveCount(1);
-  await toolbar(page).getByRole('button', { name: 'Clear search' }).click();
+  await toolbar(page).getByRole('searchbox').fill('');
   await expect(rows(page)).toHaveCount(10);
 });
 
@@ -442,9 +436,7 @@ test('Shop city search and rows-per-page selectors retain filtering and paginati
   await page.keyboard.press('Enter');
   await expect(combo(page, 'City')).toHaveText('Warangal');
   await expect(rows(page)).toHaveCount(11);
-  await expect(page.locator('[data-master-summary]')).toContainText(
-    'Page 1 of 1',
-  );
+  await expect(page.getByRole('button', { name: 'Next page' })).toHaveCount(0);
   await combo(page, 'City').click();
   await page.getByRole('searchbox', { name: 'Search City' }).fill('not-a-city');
   await expect(

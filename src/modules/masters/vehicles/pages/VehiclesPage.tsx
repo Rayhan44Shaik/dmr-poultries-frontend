@@ -212,7 +212,7 @@ function MasterVehiclesPage({ embedded = false }: MasterVehiclesPageProps) {
       fitnessExpiry: editingVehicle?.fitnessExpiry ?? "",
       purchaseDate: vehicle.purchaseDate ?? "",
       purchaseAmount: vehicle.purchaseAmount,
-      emiStartDate: editingVehicle?.emiStartDate,
+      emiStartDate: vehicle.emiStartDate ?? "",
       emiDay: vehicle.emiDay,
       totalEMIs: vehicle.totalEMIs,
       rcDate: vehicle.rcDate ?? "",

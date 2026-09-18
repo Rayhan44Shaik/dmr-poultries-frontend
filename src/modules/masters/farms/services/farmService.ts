@@ -39,13 +39,19 @@ function clearLegacyFarmStorage(): void {
 }
 
 function normalizeStatus(status: unknown): Farm["status"] {
-  return status === "Active" ? "Active" : "Inactive";
+  if (status === "Active" || status === "Inactive") return status;
+  throw new Error("Invalid Farm Master status in API response.");
 }
 
 export function mapFarm(raw: Record<string, unknown>): Farm {
+  const id = Number(raw.id);
+  const farmNo = Number(raw.farmNo ?? raw.farm_no);
+  if (!Number.isInteger(id) || id <= 0 || !Number.isInteger(farmNo) || farmNo <= 0) {
+    throw new Error("Invalid Farm Master identity in API response.");
+  }
   return {
-    id: Number(raw.id),
-    farmNo: Number(raw.farmNo ?? raw.farm_no ?? 0),
+    id,
+    farmNo,
     farmName: String(raw.farmName ?? raw.farm_name ?? ""),
     ownerName: String(raw.ownerName ?? raw.owner_name ?? ""),
     supervisorName: String(raw.supervisorName ?? raw.supervisor_name ?? ""),
@@ -72,7 +78,10 @@ function toPayload(input: FarmInput | Partial<Farm>): Record<string, unknown> {
 }
 
 function setCacheFromApi(rows: Record<string, unknown>[] | null | undefined): Farm[] {
-  farmsCache = Array.isArray(rows) ? rows.map(mapFarm) : [];
+  if (!Array.isArray(rows) || rows.some((row) => !row || typeof row !== "object" || Array.isArray(row))) {
+    throw new Error("Farm list response must be an array of records.");
+  }
+  farmsCache = rows.map(mapFarm);
   return farmsCache;
 }
 

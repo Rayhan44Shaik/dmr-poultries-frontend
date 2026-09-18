@@ -82,7 +82,7 @@ function EmployeeForm({
   const [aadharNumber, setAadharNumber] = useState(employee?.aadharNumber ?? "");
   const [licenseNumber, setLicenseNumber] = useState(employee?.licenseNumber ?? "");
   const [salaryDisplay, setSalaryDisplay] = useState(formatSalary(employee?.salary ?? ""));
-  const [status, setStatus] = useState<"Active" | "Inactive">(employee?.status ?? "Active");
+  const [status, setStatus] = useState<"Active" | "Inactive" | "Suspended">(employee?.status ?? "Active");
 
   const isEditing = !!employee;
 

@@ -10,5 +10,5 @@ const env = (import.meta as ImportMeta & { env?: Record<string, string> }).env ?
 export const API_CONFIG = {
   baseURL: env.VITE_API_BASE_URL ?? "/api",
   timeoutMs: Number(env.VITE_API_TIMEOUT_MS ?? 30_000),
-  withCredentials: false,
+  withCredentials: true,
 } as const;

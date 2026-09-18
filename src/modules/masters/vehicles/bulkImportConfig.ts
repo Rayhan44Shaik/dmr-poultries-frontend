@@ -23,6 +23,8 @@ export type VehicleBulkRow = {
   purchaseDate: string;
   purchaseAmount?: number;
   emiStartDate: string;
+  emiDay?: number;
+  totalEMIs?: number;
   rcDate: string;
   status: "Active" | "Inactive";
 };
@@ -50,6 +52,8 @@ function toVehiclePayload(row: VehicleBulkRow): VehicleInput {
     purchaseDate: row.purchaseDate.trim(),
     purchaseAmount: row.purchaseAmount,
     emiStartDate: row.emiStartDate.trim(),
+    emiDay: row.emiDay,
+    totalEMIs: row.totalEMIs,
     rcDate: row.rcDate.trim(),
     status: row.status,
   };
@@ -65,6 +69,8 @@ function validateVehicleRow(row: VehicleBulkRow, existing: Vehicle[]): string[] 
   const noOfBoxes = Number(row.noOfBoxes);
   const birdCapacity = Number(row.birdCapacity);
   const capacityKg = Number(row.capacityKg);
+  const emiDay = row.emiDay;
+  const totalEMIs = row.totalEMIs;
 
   if (!vehicleNumber) errors.push("Vehicle Number is required.");
   if (!vehicleType) errors.push("Vehicle Type is required.");
@@ -73,6 +79,8 @@ function validateVehicleRow(row: VehicleBulkRow, existing: Vehicle[]): string[] 
   if (Number.isNaN(capacityKg) || capacityKg <= 0) errors.push("Capacity (Kg) must be a positive number.");
   if (!engineNumber) errors.push("Engine Number is required.");
   if (!chassisNumber) errors.push("Chassis Number is required.");
+  if (emiDay !== undefined && (!Number.isInteger(emiDay) || emiDay < 1 || emiDay > 31)) errors.push("EMI Day must be between 1 and 31.");
+  if (totalEMIs !== undefined && (!Number.isInteger(totalEMIs) || totalEMIs < 1 || totalEMIs > 1200)) errors.push("Total EMIs must be between 1 and 1200.");
 
   const duplicate = existing.some(
     (v) => v.vehicleNumber.trim().toLowerCase() === vehicleNumber.toLowerCase()
@@ -116,6 +124,8 @@ export function buildVehicleBulkImportConfig({
       { key: "Purchase Date", sample: "2025-06-01" },
       { key: "Purchase Amount", sample: 1850000 },
       { key: "EMI Start Date", sample: "2025-07-01" },
+      { key: "EMI Day", sample: 15 },
+      { key: "Total EMIs", sample: 36 },
       { key: "RC Date", sample: "2025-07-10" },
       { key: "Status", sample: "Active" },
     ],
@@ -137,6 +147,8 @@ export function buildVehicleBulkImportConfig({
         purchaseDate: String(record["Purchase Date"] ?? "").trim(),
         purchaseAmount: toOptionalNumber(record["Purchase Amount"]),
         emiStartDate: String(record["EMI Start Date"] ?? "").trim(),
+        emiDay: toOptionalNumber(record["EMI Day"]),
+        totalEMIs: toOptionalNumber(record["Total EMIs"]),
         rcDate: String(record["RC Date"] ?? "").trim(),
         status: status === "Inactive" ? "Inactive" : "Active",
       };
