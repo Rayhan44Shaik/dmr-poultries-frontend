@@ -33,11 +33,16 @@
 //   GET  /api/operations/fuel-expenses/:id — the bill the edit form loads.
 //   DELETE /api/fleet/maintenance/:id/documents/:documentId — drops the attachment.
 //
-//   node scripts/quarter-sample-data.mjs          # serves on port 4000
-//   PORT=4100 node scripts/quarter-sample-data.mjs
+// ⚠️  NOT PART OF NORMAL APP RUNTIME
+//   `npm run dev` starts the REAL backend (repo `backend/`) on port 4000.
+//   This file is OPT-IN only via `npm run dev:sample` / `npm run mock:backend`.
 //
-// The Vite dev proxy already targets 127.0.0.1:4000, so simply run this file
-// next to `npm run dev` and open the preview — no config change required.
+//   node scripts/quarter-sample-data.mjs          # serves on port 4100 (default)
+//   PORT=4200 node scripts/quarter-sample-data.mjs
+//
+// Port 4000 is reserved for the real PostgreSQL backend. This sample server
+// refuses to bind 4000 unless SAMPLE_ALLOW_PORT_4000=1 (emergency override).
+// Vite's /api proxy always targets the real backend at 127.0.0.1:4000.
 //
 // ── DATASET DIMENSIONS (as requested) ───────────────────────────────────────
 //   Quarter          Q3 FY2026 — 2026-07-01 .. 2026-09-30 (92 days)
@@ -67,7 +72,16 @@ import { createHmac, randomUUID } from "node:crypto";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
-const PORT = Number(process.env.PORT ?? process.env.MOCK_BACKEND_PORT ?? 4000);
+// Default 4100 — never steal the real backend's port 4000.
+const PORT = Number(process.env.PORT ?? process.env.MOCK_BACKEND_PORT ?? 4100);
+if (PORT === 4000 && process.env.SAMPLE_ALLOW_PORT_4000 !== "1") {
+  console.error(
+    "[quarter-sample-data] REFUSING port 4000 — that port is reserved for the real backend (backend/).\n" +
+      "  Use the default (4100), set PORT=4100, or run `npm run dev` for live data.\n" +
+      "  Override only with SAMPLE_ALLOW_PORT_4000=1 if you intentionally replace the real API."
+  );
+  process.exit(1);
+}
 
 // ═══════════════════════════════════════════════════════════════════════════
 // 0. QUARTER DEFINITION + DETERMINISTIC HELPERS
@@ -6930,14 +6944,14 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-// `npm run dev` starts this server alongside Vite. If a real backend already
-// owns the port, step aside quietly instead of crashing the dev command.
+// Opt-in only (`npm run dev:sample`). If the chosen sample port is taken,
+// exit loudly — never fall through onto the real backend's port.
 server.on("error", (err) => {
   if (err?.code === "EADDRINUSE") {
-    console.log(
-      `[quarter-sample-data] port ${PORT} is already in use — a backend is already running there, so no sample data will be served.`
+    console.error(
+      `[quarter-sample-data] port ${PORT} is already in use. Stop the other process or choose a different PORT.`
     );
-    process.exit(0);
+    process.exit(1);
   }
   console.error("[quarter-sample-data] server error:", err);
   process.exit(1);

@@ -104,3 +104,32 @@ test("weight movement rejects an incomplete paginated response", async () => {
     apiClient.defaults.adapter = originalAdapter;
   }
 });
+
+test("weight movement treats a 404 Not found as an empty period", async () => {
+  const originalAdapter = apiClient.defaults.adapter;
+  apiClient.defaults.adapter = async (config) => {
+    const error = Object.assign(new Error("Request failed with status code 404"), {
+      isAxiosError: true,
+      response: {
+        data: { error: "Not found" },
+        status: 404,
+        statusText: "Not Found",
+        headers: {},
+        config,
+      },
+      config,
+      toJSON: () => ({}),
+    });
+    throw error;
+  };
+
+  try {
+    const result = await fetchOperationalTrends({
+      fromDate: "2026-09-14",
+      toDate: "2026-09-20",
+    });
+    assert.deepEqual(result, { rows: [], totalTrips: 0 });
+  } finally {
+    apiClient.defaults.adapter = originalAdapter;
+  }
+});

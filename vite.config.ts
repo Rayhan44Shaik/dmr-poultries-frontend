@@ -46,9 +46,9 @@ const OPTIMIZE_DEPS = [
 ]
 
 // Browser-facing code uses a relative /api URL (VITE_API_BASE_URL=/api); Vite
-// reaches the backend on this host, never browser localhost. Defined once and
-// shared by the dev server AND `vite preview`, so the production build is
-// verified against exactly the same backend contract as dev.
+// reaches the REAL backend (repo `backend/`, PORT=4000) — never the opt-in
+// quarter sample server (scripts/quarter-sample-data.mjs, default port 4100).
+// Shared by the dev server AND `vite preview`.
 const API_PROXY: Record<string, ProxyOptions> = {
   '/api': {
     target: 'http://127.0.0.1:4000',

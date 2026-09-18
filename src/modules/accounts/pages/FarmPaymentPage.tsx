@@ -5,8 +5,7 @@ import { FarmPaymentTable } from '../components/farm-payment/FarmPaymentTable';
 import { FarmerPaymentFilters } from '../components/farm-payment/FarmerPaymentFilters';
 import { listTrips } from '../../operations/vehicle-trips/services/tripHeaderApiService';
 import { FarmPaymentTripViewModal } from '../components/farm-payment/FarmPaymentTripViewModal';
-import { FarmPaymentService } from '../services/FarmPaymentService';
-import { loadTripFarmPayments } from '../services/farmPaymentApiService';
+import { loadTripFarmPayments, saveTripFarmPayments } from '../services/farmPaymentApiService';
 import type { Trip } from '../../operations/vehicle-trips/types/trip';
 import type { FarmPayment, TripFarmPayment } from '../types/farmPayment.types';
 import { Save, RotateCcw, HandCoins } from 'lucide-react';
@@ -14,6 +13,45 @@ import { formatINR, formatINRExact, formatCount, formatKg } from '../components/
 import Pagination from '../../../ui/Pagination';
 import { shouldShowPagination } from '../../../shared/ui/paginationStyles';
 import { useI18n } from '../../../i18n';
+
+/** Pull a bare reference out of the legacy "Ref …" notes form field. */
+function referenceFromNotes(notes?: string): string | undefined {
+  if (!notes) return undefined;
+  const match = /^Ref\s+(.+)$/i.exec(notes.trim());
+  return match?.[1]?.trim() || undefined;
+}
+
+/** Map one API farm-payment row into the page's in-memory form shape. */
+function formFromApiRow(trip: Trip, apiRow?: TripFarmPayment): Partial<FarmPayment> {
+  const tripId = String(trip.id);
+  if (!apiRow) {
+    return {
+      tripId,
+      totalBirds: trip.totalBirds || 0,
+      dcWeight: trip.dcWeight || 0,
+      paymentStatus: 'Unpaid',
+    };
+  }
+  return {
+    tripId,
+    totalBirds: trip.totalBirds || apiRow.totalBirds || 0,
+    dcWeight: trip.dcWeight || apiRow.dcWeight || 0,
+    ratePerKg: apiRow.rate,
+    totalAmount: apiRow.amount,
+    amountPaid: apiRow.paidAmount,
+    balance: apiRow.balance,
+    // The page's own vocabulary: the backend's "Pending" is "Unpaid".
+    paymentStatus:
+      apiRow.status === 'Paid'
+        ? 'Paid'
+        : apiRow.status === 'Partially Paid'
+          ? 'Partially Paid'
+          : 'Unpaid',
+    paidDate: apiRow.paymentDate ?? undefined,
+    paymentMode: (apiRow.paymentMode as FarmPayment['paymentMode']) ?? undefined,
+    notes: apiRow.referenceNo ? `Ref ${apiRow.referenceNo}` : undefined,
+  };
+}
 
 type FarmerPaymentPageProps = { embedded?: boolean };
 
@@ -73,9 +111,8 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   // Backend farm payments, one row per completed trip (GET /accounts/farm-payments
   // — the same rows the Account Analysis charges to each trip). Held in a ref
   // because syncPaymentData() also runs after save/reset, where re-reading it
-  // from state would risk a stale closure. A locally saved payment still wins:
-  // this is the starting point for a trip nobody has edited here yet, not an
-  // override of work already saved on this machine.
+  // from state would risk a stale closure. API rows are the sole source of
+  // truth for what each trip opens with.
   const apiFarmByTripRef = useRef<Map<string, TripFarmPayment>>(new Map());
 
   // Filter states
@@ -119,7 +156,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   // superseded responses: if a newer load starts while a request is in
   // flight, the stale response can never overwrite the newer state.
 
-  // Rebuild paymentData from persisted payments for the given trips — a pure
+  // Rebuild paymentData from the API ledger for the given trips — a pure
   // local sync with NO network call and NO loading spinner. Used after save
   // and reset (saving payments never changes the trip list, so a full reload
   // would just flash "Loading trips..." for nothing) and by loadCompletedTrips.
@@ -127,47 +164,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
     const savedPayments: Record<string, Partial<FarmPayment>> = {};
     const apiFarm = apiFarmByTripRef.current;
     trips.forEach((trip) => {
-      const tripId = String(trip.id);
-      const existingPayment = FarmPaymentService.getByTripId(tripId);
-
-      if (existingPayment) {
-        savedPayments[tripId] = {
-          ...existingPayment,
-          totalBirds: trip.totalBirds || 0,
-          dcWeight: trip.dcWeight || 0,
-        };
-        return;
-      }
-
-      // No local record: fall back to that trip's own backend farm payment so
-      // the row opens showing what the trip actually cost instead of blanks.
-      const apiRow = apiFarm.get(tripId);
-      savedPayments[tripId] = apiRow
-        ? {
-            tripId,
-            totalBirds: trip.totalBirds || apiRow.totalBirds || 0,
-            dcWeight: trip.dcWeight || apiRow.dcWeight || 0,
-            ratePerKg: apiRow.rate,
-            totalAmount: apiRow.amount,
-            amountPaid: apiRow.paidAmount,
-            balance: apiRow.balance,
-            // The page's own vocabulary: the backend's "Pending" is "Unpaid".
-            paymentStatus:
-              apiRow.status === 'Paid'
-                ? 'Paid'
-                : apiRow.status === 'Partially Paid'
-                  ? 'Partially Paid'
-                  : 'Unpaid',
-            paidDate: apiRow.paymentDate ?? undefined,
-            paymentMode: (apiRow.paymentMode as FarmPayment['paymentMode']) ?? undefined,
-            notes: apiRow.referenceNo ? `Ref ${apiRow.referenceNo}` : undefined,
-          }
-        : {
-            tripId,
-            totalBirds: trip.totalBirds || 0,
-            dcWeight: trip.dcWeight || 0,
-            paymentStatus: 'Unpaid',
-          };
+      savedPayments[String(trip.id)] = formFromApiRow(trip, apiFarm.get(String(trip.id)));
     });
     setPaymentData(savedPayments);
   };
@@ -332,59 +329,30 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
     setSavingPayments(true);
 
     try {
-      let savedCount = 0;
+      const payload = paymentsToSave.map(([tripId, paymentDataItem]) => ({
+        tripId: Number(tripId),
+        rate: paymentDataItem.ratePerKg || 0,
+        paidAmount: paymentDataItem.amountPaid || 0,
+        paymentDate: paymentDataItem.paidDate || toBusinessDate(new Date()),
+        paymentMode: paymentDataItem.paymentMode || 'Cash',
+        referenceNo: referenceFromNotes(paymentDataItem.notes) ?? null,
+      }));
 
-      for (const [tripId, paymentDataItem] of paymentsToSave) {
-        const trip = allTrips.find(t => String(t.id) === tripId);
-        if (!trip) continue;
+      const updated = await saveTripFarmPayments(payload);
 
-        const totalBirdsLoaded = trip.totalBirds || 0;
-        const dcWeight = trip.dcWeight || 0;
-        const ratePerKg = paymentDataItem.ratePerKg || 0;
-        // Weight-based pricing: Rate/Kg × DC weight.
-        const totalAmount = paymentDataItem.totalAmount || dcWeight * ratePerKg;
-
-        const finalPayment: FarmPayment = {
-          ...paymentDataItem,
-          tripId,
-          totalBirds: totalBirdsLoaded,
-          dcWeight: dcWeight,
-          totalAmount,
-          amountPaid: paymentDataItem.amountPaid || 0,
-          balance: totalAmount - (paymentDataItem.amountPaid || 0),
-          // The record keeps whatever status it already had (Payment Book owns
-          // settlements); this page only sets the rate, so it never labels a
-          // row paid/unpaid.
-          paymentStatus: paymentDataItem.paymentStatus || 'Unpaid',
-          paidDate: paymentDataItem.paidDate || toBusinessDate(new Date()),
-          paymentMode: paymentDataItem.paymentMode || 'Cash',
-          createdAt: paymentDataItem.createdAt || new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        };
-
-        const existing = FarmPaymentService.getByTripId(tripId);
-        if (existing) {
-          FarmPaymentService.updatePayment(tripId, finalPayment);
-        } else {
-          FarmPaymentService.createPayment(finalPayment);
-        }
-
-        savedCount++;
-      }
-
-      // Instant local sync — no refetch, no loading spinner. Saving payments
-      // never changes the completed-trip list, so a full reload is unnecessary;
-      // paymentData is rebuilt from the just-persisted FarmPaymentService.
+      // Reload the ledger so the form mirrors the database (API is source of truth).
+      const fresh = await loadTripFarmPayments().catch(() => updated);
+      apiFarmByTripRef.current = new Map(fresh.map((row) => [String(row.tripId), row]));
       syncPaymentData(allTrips);
       clearDirty();
 
+      const savedCount = updated.length || payload.length;
       showNotification(
         savedCount === 1
           ? t('accounts.farmpay.notif_saved_one')
           : t('accounts.farmpay.notif_saved_many', { count: savedCount }),
         'success'
       );
-
     } catch (error) {
       console.error('Failed to save payments:', error);
       showNotification(t('accounts.farmpay.notif_save_failed'), 'error');
@@ -401,7 +369,7 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
       return;
     }
     clearDirty();
-    // Instant local sync from persisted payments — no reload.
+    // Instant local sync from the API ledger — no reload.
     syncPaymentData(allTrips);
     showNotification(t('accounts.farmpay.notif_reset'), 'info');
   };

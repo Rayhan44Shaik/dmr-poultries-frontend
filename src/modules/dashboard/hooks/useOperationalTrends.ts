@@ -46,6 +46,16 @@ function messageOf(err: unknown): string {
   return "Could not load the weight trend";
 }
 
+/** 404 / "Not found" means no trips in range — treat as empty chart data. */
+function isEmptyRangeError(err: unknown): boolean {
+  const status = (err as { status?: number } | null)?.status;
+  if (status === 404) return true;
+  const message = messageOf(err);
+  return /not\s*found|no\s*(completed\s*)?trips|empty/i.test(message);
+}
+
+const EMPTY_TRENDS: OperationalTrends = { rows: [], totalTrips: 0 };
+
 export interface OperationalTrendsState {
   trends: OperationalTrends | null;
   loading: boolean;
@@ -65,8 +75,7 @@ export function useOperationalTrends(
   toDate?: string,
   enabled = true,
 ): OperationalTrendsState {
-  // The first page load waits for the sample manifest's business date. While
-  // paused, do not issue an unbounded request with missing range parameters.
+  // When paused, do not issue an unbounded request with missing range parameters.
   const key = enabled ? keyOf(fromDate, toDate) : "";
   const cached = enabled ? (cache.get(key) ?? null) : null;
 
@@ -109,6 +118,11 @@ export function useOperationalTrends(
         .catch((err: unknown) => {
           if (controller.signal.aborted || requestId !== requestIdRef.current)
             return;
+          if (isEmptyRangeError(err)) {
+            remember(key, EMPTY_TRENDS);
+            setState({ key, trends: EMPTY_TRENDS, loading: false, error: null });
+            return;
+          }
           setState((current) => ({
             ...current,
             loading: false,

@@ -7,7 +7,6 @@
 import type { ReactNode } from 'react';
 import { BadgeCheck, CalendarDays, FileText, IndianRupee, Paperclip, Pencil, ScrollText, UserRound } from 'lucide-react';
 import type { Payment } from '../../types/payment.types';
-import { FarmPaymentService } from '../../services/FarmPaymentService';
 import { Modal } from '../../../../ui/Modal';
 import { Button } from '../../../../ui/Button';
 import { StatusBadge } from '../../../../ui/StatusBadge';
@@ -36,23 +35,9 @@ interface PaymentViewModalProps {
 const statusLabelKey = (status: Payment['status']) =>
   status === 'Approved' ? 'status.approved' : status === 'Cancelled' ? 'status.cancelled' : 'status.pending';
 
-const getTripDetails = (payment: Payment): { tripNo: string; amount: number }[] => {
-  if (!payment.paymentIds || payment.paymentIds.length === 0) {
-    return [];
-  }
-
-  const tripDetails: { tripNo: string; amount: number }[] = [];
-  for (const paymentId of payment.paymentIds) {
-    const farmPayment = FarmPaymentService.getPaymentById(paymentId);
-    if (farmPayment) {
-      tripDetails.push({
-        tripNo: farmPayment.tripId,
-        amount: farmPayment.totalAmount ?? farmPayment.balance ?? 0,
-      });
-    }
-  }
-  return tripDetails;
-};
+/** Linked trip lines used to live in localStorage farm payments; Payment
+ *  Register rows from the API do not carry that join, so the view shows none. */
+const getTripDetails = (_payment: Payment): { tripNo: string; amount: number }[] => [];
 
 const timestamp = (value: string) => {
   const date = new Date(value);

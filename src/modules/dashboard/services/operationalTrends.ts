@@ -12,7 +12,7 @@
 // daily / weekly / monthly never costs another request or drops part of a
 // custom range.
 
-import { apiGet } from "../../../api";
+import { apiGet, ApiError } from "../../../api";
 import type { MortalityRow } from "../../operations/mortality/services/mortalityAnalysisApi";
 
 const BASE = "/operations/mortality-analysis";
@@ -25,6 +25,22 @@ export interface OperationalTrends {
   rows: MortalityRow[];
   /** Server-reported count for the same filtered range. */
   totalTrips: number;
+}
+
+const EMPTY_TRENDS: OperationalTrends = { rows: [], totalTrips: 0 };
+
+/** Endpoint missing or no trips in range → empty chart, not a hard error. */
+function isEmptyRangeFailure(err: unknown): boolean {
+  if (err instanceof ApiError && err.status === 404) return true;
+  const status = (err as { status?: number } | null)?.status;
+  if (status === 404) return true;
+  const message =
+    err instanceof Error
+      ? err.message
+      : typeof err === "string"
+        ? err
+        : "";
+  return /not\s*found|no\s*(completed\s*)?trips|empty/i.test(message);
 }
 
 interface OperationalTrendsPage {
@@ -80,53 +96,64 @@ export async function fetchOperationalTrends(
       {
         params: { ...baseParams, page },
         signal,
+        quiet404: true,
       },
     );
     return data;
   };
 
-  const first = await fetchPage(1);
-  // Older backends may return a bare array. It has no pagination metadata, so
-  // it is necessarily the complete response supplied by that backend.
-  if (Array.isArray(first)) {
-    return { rows: first, totalTrips: first.length };
-  }
+  try {
+    const first = await fetchPage(1);
+    // Older backends may return a bare array. It has no pagination metadata, so
+    // it is necessarily the complete response supplied by that backend.
+    if (Array.isArray(first)) {
+      return { rows: first, totalTrips: first.length };
+    }
 
-  const rows = Array.isArray(first.data) ? [...first.data] : [];
-  const totalTrips = Number(first.meta?.total);
-  const totalPages = Number(first.meta?.totalPages);
-  if (
-    !Number.isSafeInteger(totalTrips) ||
-    totalTrips < 0 ||
-    !Number.isSafeInteger(totalPages) ||
-    totalPages < 1
-  ) {
-    throw new Error(
-      "The completed-trips API did not provide valid pagination metadata",
-    );
-  }
-
-  // Read every page sequentially so an AbortSignal can stop the work between
-  // requests. A chart never presents a partial custom-range total as final.
-  for (let page = 2; page <= totalPages; page += 1) {
-    const result = await fetchPage(page);
-    if (Array.isArray(result)) {
+    const rows = Array.isArray(first.data) ? [...first.data] : [];
+    const totalTrips = Number(first.meta?.total);
+    const totalPages = Number(first.meta?.totalPages);
+    if (
+      !Number.isSafeInteger(totalTrips) ||
+      totalTrips < 0 ||
+      !Number.isSafeInteger(totalPages) ||
+      totalPages < 1
+    ) {
+      // Missing / unimplemented endpoint often returns an empty JSON body with
+      // 200, or a bare 404 — treat both as "no trips in this window".
+      if (rows.length === 0 && (!totalTrips || totalTrips === 0)) {
+        return EMPTY_TRENDS;
+      }
       throw new Error(
-        "The completed-trips API changed its pagination response",
+        "The completed-trips API did not provide valid pagination metadata",
       );
     }
-    if (!Array.isArray(result.data)) {
-      throw new Error("The completed-trips API returned an incomplete page");
+
+    // Read every page sequentially so an AbortSignal can stop the work between
+    // requests. A chart never presents a partial custom-range total as final.
+    for (let page = 2; page <= totalPages; page += 1) {
+      const result = await fetchPage(page);
+      if (Array.isArray(result)) {
+        throw new Error(
+          "The completed-trips API changed its pagination response",
+        );
+      }
+      if (!Array.isArray(result.data)) {
+        throw new Error("The completed-trips API returned an incomplete page");
+      }
+      rows.push(...result.data);
     }
-    rows.push(...result.data);
-  }
 
-  const distinctTrips = new Set(rows.map((row) => row.tripId));
-  if (rows.length !== totalTrips || distinctTrips.size !== totalTrips) {
-    throw new Error("The completed-trips API returned an incomplete range");
-  }
+    const distinctTrips = new Set(rows.map((row) => row.tripId));
+    if (rows.length !== totalTrips || distinctTrips.size !== totalTrips) {
+      throw new Error("The completed-trips API returned an incomplete range");
+    }
 
-  return { rows, totalTrips };
+    return { rows, totalTrips };
+  } catch (err) {
+    if (isEmptyRangeFailure(err)) return EMPTY_TRENDS;
+    throw err;
+  }
 }
 
 /**

@@ -7,6 +7,7 @@ import { logger } from "../logger/logger";
 import { API_CONFIG } from "./config";
 import { toApiError } from "./errors";
 import { getStoredToken } from "../modules/auth/tokenStore";
+import { isSigningOut } from "../modules/auth/signOutGate";
 
 declare module "axios" {
   export interface InternalAxiosRequestConfig {
@@ -68,7 +69,13 @@ apiClient.interceptors.response.use(
     // prefetches etc. after the server invalidated the token) — they must not
     // fire the session-expired event on top of the logout flow.
     const url = String(error?.config?.url ?? "");
-    if (error?.response?.status === 401 && !url.includes("/auth/login") && !url.includes("/auth/logout")) {
+    if (
+      error?.response?.status === 401 &&
+      !isSigningOut() &&
+      !url.includes("/auth/login") &&
+      !url.includes("/auth/logout") &&
+      !url.includes("/auth/change-password")
+    ) {
       window.dispatchEvent(new Event("dmr:auth-expired"));
     }
     return Promise.reject(toApiError(error));

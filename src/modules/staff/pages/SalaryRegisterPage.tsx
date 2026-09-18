@@ -56,7 +56,6 @@ import { SalaryReviewModal } from "../components/salary/SalaryReviewModal";
 import { isSalaryPaid } from "../components/salary/payslipModel";
 import { SendPayslipsModal } from "../components/salary/SendPayslipsModal";
 import { EMAIL_TEMPLATES } from "../components/salary/payslipMessages";
-import { SAMPLE_EMPLOYEE_LIST } from "../services/staffSampleData";
 import type { SalaryRecord } from "../types/staffDashboard";
 
 function formatMonthName(monthStr: string, language: Language = "en"): string {
@@ -210,7 +209,7 @@ function SalaryRegisterPage() {
         if (mounted) setMasterEmployees(data as Array<{ department?: string; employeeName?: string; status?: string }>);
       })
       .catch(() => {
-        if (mounted) setMasterEmployees(SAMPLE_EMPLOYEE_LIST);
+        if (mounted) setMasterEmployees([]);
       });
     return () => {
       mounted = false;

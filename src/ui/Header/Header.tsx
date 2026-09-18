@@ -18,6 +18,7 @@ import {
   ChevronRight,
   Clock3,
   LogOut,
+  KeyRound,
   Menu,
   Moon,
   Plus,
@@ -33,6 +34,7 @@ import {
 import { NAV_CHILD_GROUPS, quickActionsForRole, resolveRoute } from "../../routes/navigation";
 import { useAuth } from "../../providers/authContext";
 import { canAccessNavPath, hasCapability, CAPABILITIES } from "../../modules/auth/permissions";
+import ChangePasswordDialog from "../../modules/auth/ChangePasswordDialog";
 import { useTheme } from "../../providers/ThemeProvider";
 import { SHOW_THEME_CONTROLS } from "../../providers/themeControls";
 import { translateRole, useI18n } from "../../i18n";
@@ -44,8 +46,8 @@ import { useViewLayerOpen } from "../../shared/ui/viewLayer";
 import { usePendingApprovals } from "../../modules/approvals/hooks/usePendingApprovals";
 import { startApprovalPolling } from "../../modules/approvals/services/approvalSnapshot";
 import { PENDING_LEAVES_PATH } from "../../modules/staff/utils/leaveDeepLink";
-import { tripService } from "../../modules/operations/vehicle-trips/services/tripService";
-import { getDocuments } from "../../modules/fleet-operations/services/storage";
+import { listTrips } from "../../modules/operations/vehicle-trips/services/tripHeaderApiService";
+import { permitApi } from "../../modules/fleet-operations/services/permitApi";
 import { formatINR, formatRelativeTime } from "../../utils/format";
 
 interface HeaderProps {
@@ -159,6 +161,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
   const { language, t } = useI18n();
   const { user, logout } = useAuth();
   const roleLabel = (role: string) => translateRole(t, role);
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false);
 
   const route = useMemo(() => resolveRoute(location.pathname + location.search), [location.pathname, location.search]);
 
@@ -213,7 +216,69 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
       .finally(() => { notificationRead.current = false; });
   }, [pendingCollections.loaded]);
 
-  /* ----- Data-driven notifications (existing services only) -----
+  /* ----- Live trip / permit alerts (API only — no localStorage) ----- */
+  const [opsAlerts, setOpsAlerts] = useState<NotificationItem[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    const nowLabel = formatRelativeTime(new Date());
+    void (async () => {
+      const items: NotificationItem[] = [];
+      try {
+        const trips = await listTrips();
+        if (cancelled) return;
+        const inProgress = trips.filter((trip) => {
+          const status = String(trip.status ?? "");
+          return status === "Pending" || status === "Draft" || status === "In Progress";
+        });
+        if (inProgress.length > 0) {
+          items.push({
+            id: "trips-in-progress",
+            icon: Truck,
+            tone: "info",
+            title: t("header.tripsInProgress", { count: inProgress.length }),
+            description:
+              inProgress
+                .slice(0, 2)
+                .map((trip) => trip.vehicleNo)
+                .filter(Boolean)
+                .join(", ") + (inProgress.length > 2 ? " …" : ""),
+            time: nowLabel,
+            path: "/operations?tab=trip-list",
+          });
+        }
+      } catch {
+        /* API unavailable — skip trip alerts */
+      }
+      try {
+        const summary = await permitApi.summary();
+        if (cancelled) return;
+        const expiring = Object.values(summary.byType ?? {}).reduce(
+          (sum, bucket) => sum + (bucket?.expiring ?? 0),
+          0,
+        );
+        if (expiring > 0) {
+          items.push({
+            id: "documents-expiring",
+            icon: ShieldAlert,
+            tone: "warning",
+            title: t("header.documentsExpiring", { count: expiring }),
+            description: `${expiring} document(s) expire within 30 days`,
+            time: nowLabel,
+            path: "/fleet?tab=permits",
+          });
+        }
+      } catch {
+        /* API unavailable — skip permit alerts */
+      }
+      if (!cancelled) setOpsAlerts(items);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.key, language, t]);
+
+  /* ----- Data-driven notifications (collections snapshot + live ops alerts) -----
      Role-scoped: the bell only ever shows items that belong to the signed-in
      role. Approval queues and money summaries (overdue/pending ₹ totals) are
      OWNER business — a supervisor's bell stays limited to their own work
@@ -249,54 +314,12 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
           });
         }
       }
-
-      const trips = tripService.getAll();
-      const inProgress = trips.filter((t) => t.status === "Pending");
-      if (inProgress.length > 0) {
-        items.push({
-          id: "trips-in-progress",
-          icon: Truck,
-          tone: "info",
-          title: t("header.tripsInProgress", { count: inProgress.length }),
-          description: inProgress.slice(0, 2).map((t) => t.vehicleNo).join(", ") + (inProgress.length > 2 ? " …" : ""),
-          time: formatRelativeTime(new Date()),
-          path: "/operations?tab=trip-list",
-        });
-      }
-
-      const docs = getDocuments();
-      const soon = new Date();
-      soon.setDate(soon.getDate() + 30);
-      const parseDocDate = (raw: string): Date | null => {
-        if (!raw) return null;
-        // dd/MM/yyyy (documents store) or ISO
-        const ddMm = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
-        if (ddMm) return new Date(Number(ddMm[3]), Number(ddMm[2]) - 1, Number(ddMm[1]));
-        const date = new Date(raw);
-        return Number.isNaN(date.getTime()) ? null : date;
-      };
-      const expiring = docs.filter((d) => {
-        const date = parseDocDate((d as { expiryDate?: string }).expiryDate ?? "");
-        return date != null && date <= soon && date >= new Date();
-      });
-      if (expiring.length > 0) {
-        items.push({
-          id: "documents-expiring",
-          icon: ShieldAlert,
-          tone: "warning",
-          title: t("header.documentsExpiring", { count: expiring.length }),
-          description: expiring.map((d) => (d as { vehicleNo?: string }).vehicleNo || t("common.vehicle")).join(", "),
-          time: formatRelativeTime(new Date()),
-          path: "/fleet?tab=permits",
-        });
-      }
+      items.push(...opsAlerts);
     } catch {
-      /* storage unavailable — skip notifications */
+      /* snapshot unavailable — skip collection notifications */
     }
     return items;
-    // location.key changes on every navigation — recomputes alerts after data entry.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.key, language, pendingCollections]);
+  }, [language, pendingCollections, canApproveAnything, opsAlerts, t]);
 
   /* ----- Pending-approval notifications (trips · bills · rates · payments · leaves) ----- */
   const approvalNotifications = useMemo<NotificationItem[]>(() => {
@@ -655,6 +678,16 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
               type="button"
               onClick={() => {
                 close();
+                setChangePasswordOpen(true);
+              }}
+              className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium text-slate-600 transition-colors hover:bg-slate-50 dark:text-slate-300 dark:hover:bg-slate-700/50"
+            >
+              <KeyRound size={15} /> {t("auth.password.title")}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                close();
                 handleSignOut();
               }}
               className="flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-semibold text-rose-600 transition-colors hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-500/10"
@@ -665,6 +698,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
         )}
       </Dropdown>
       </div>
+      <ChangePasswordDialog open={changePasswordOpen} onClose={() => setChangePasswordOpen(false)} />
     </header>
   );
 }

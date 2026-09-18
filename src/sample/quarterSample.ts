@@ -1,8 +1,8 @@
 // src/sample/quarterSample.ts
 // -----------------------------------------------------------------------------
 // Detection & mapping layer between the in-repo quarter SAMPLE API
-// (`scripts/quarter-sample-data.mjs`, started by `npm run dev`) and the
-// Operations module pages.
+// (`scripts/quarter-sample-data.mjs`, opt-in via `npm run dev:sample` only —
+// NOT started by normal `npm run dev`) and the Operations module pages.
 //
 // It exists so the UI can tell sample numbers apart from production numbers —
 // it never fabricates, caches or substitutes business data. When the sample

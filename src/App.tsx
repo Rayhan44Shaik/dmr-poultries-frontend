@@ -15,8 +15,8 @@ import AppRoutes from './routes/AppRoutes';
 function App() {
   return (
     <ErrorBoundary>
-      <AuthProvider>
-        <BrowserRouter>
+      <BrowserRouter>
+        <AuthProvider>
           <I18nProvider>
             <ThemeProvider>
               <FontScaleProvider>
@@ -41,8 +41,8 @@ function App() {
               </FontScaleProvider>
             </ThemeProvider>
           </I18nProvider>
-        </BrowserRouter>
-      </AuthProvider>
+        </AuthProvider>
+      </BrowserRouter>
     </ErrorBoundary>
   );
 }

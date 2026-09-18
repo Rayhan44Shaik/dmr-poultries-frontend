@@ -22,8 +22,7 @@ import { inrInWords } from '../../utils/inrInWords';
 import { PaymentGlyphChip } from './PaymentGlyphMarks';
 import { paymentModeGlyph, paymentTypeGlyph } from '../../utils/paymentRegisterGlyphs';
 import type { Payment, PaymentWritePayload } from '../../types/payment.types';
-import { createPayment } from '../../services/paymentApiService';
-import { PaymentService } from '../../services/PaymentService';
+import { createPayment, listPayments } from '../../services/paymentApiService';
 import { getBanks } from '../../../masters/banks/services/bankService';
 import { DatePicker } from '../../../../components/common/DatePicker';
 import { cn } from '../../../../utils/cn';
@@ -127,15 +126,6 @@ function PaymentForm({ isOpen, onClose, onSave, persist }: NewPaymentModalProps)
       newErrors.amount = t('accounts.payment.err_amount_positive');
     }
 
-    if (form.referenceNo.trim()) {
-      const existing = PaymentService.getPayments().filter(
-        (p) => p.referenceNo === form.referenceNo
-      );
-      if (existing.length > 0) {
-        newErrors.referenceNo = t('accounts.payment.err_reference_unique');
-      }
-    }
-
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -166,6 +156,14 @@ function PaymentForm({ isOpen, onClose, onSave, persist }: NewPaymentModalProps)
     };
 
     try {
+      if (form.referenceNo.trim()) {
+        const existing = await listPayments({ search: form.referenceNo.trim() });
+        const clash = existing.some((p) => p.referenceNo === form.referenceNo.trim());
+        if (clash) {
+          setErrors({ referenceNo: t('accounts.payment.err_reference_unique') });
+          return;
+        }
+      }
       const saved = persist ? await persist(paymentData, null) : await createPayment(paymentData);
       onSave(saved);
       onClose();

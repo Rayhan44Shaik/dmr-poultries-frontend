@@ -2,13 +2,14 @@
 // -----------------------------------------------------------------------------
 // Idle auto-logout.
 //
-// While a user is signed in, ANY of these reset a 10-minute timer:
-//   mouse movement, mouse/touch presses, key presses, scrolling, wheel.
+// While a user is signed in, ANY of these reset a fresh 10-minute timer:
+//   mouse movement, mouse/touch presses, key presses, scrolling, wheel,
+//   window focus, tab visibility.
 // If the timer ever completes — i.e. genuinely no input for 10 minutes — the
 // session is ended and the app drops back to the sign-in screen, where a
 // notice explains why. A visible warning banner appears for the final minute
-// with a "Stay signed in" button, so reading a printed sheet next to the
-// screen never ends in a surprise logout without a way back.
+// with a "Stay signed in" button. Moving the cursor during that last minute
+// also restarts the FULL 10-minute clock (not just the warning countdown).
 // -----------------------------------------------------------------------------
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Clock3 } from "lucide-react";
@@ -19,7 +20,7 @@ import { useI18n } from "../../i18n";
 const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 /** How long before the deadline the warning banner appears. */
 const WARNING_BEFORE_MS = 60 * 1000;
-/** Activity events are coalesced to at most one timer reset per second. */
+/** Activity events are coalesced outside the warning window. */
 const RESET_THROTTLE_MS = 1000;
 
 /** sessionStorage flag the LoginPage reads to explain the signed-out state. */
@@ -32,6 +33,7 @@ const ACTIVITY_EVENTS: readonly (keyof WindowEventMap)[] = [
   "wheel",
   "touchstart",
   "scroll",
+  "focus",
 ];
 
 export default function IdleSessionGuard() {
@@ -41,41 +43,48 @@ export default function IdleSessionGuard() {
   // Initialised on mount inside the effect below (Date.now() is impure, so it
   // never belongs in render).
   const lastActivityRef = useRef<number>(0);
+  const warningActiveRef = useRef(false);
   const [warningSecondsLeft, setWarningSecondsLeft] = useState<number | null>(null);
 
   const endSession = useCallback(() => {
-    // The login page reads this to show the "signed out after 10 minutes of
-    // inactivity" notice instead of a bare form.
-    try {
-      sessionStorage.setItem(IDLE_SIGNOUT_KEY, "idle");
-    } catch {
-      // ignore — the notice is cosmetic
-    }
-    void logout();
+    void logout("idle");
   }, [logout]);
 
   useEffect(() => {
     if (!isAuthenticated) return undefined;
 
     // Fresh clock on every sign-in — a stale "last activity" from a previous
-    // session must never log the next one straight back out. (The guard only
-    // mounts while authenticated, so the banner state starts clean too.)
+    // session must never log the next one straight back out.
     lastActivityRef.current = Date.now();
+    warningActiveRef.current = false;
+    setWarningSecondsLeft(null);
 
     let throttled = false;
     const markActivity = () => {
-      if (throttled) return;
-      throttled = true;
-      window.setTimeout(() => {
-        throttled = false;
-      }, RESET_THROTTLE_MS);
+      // During the final warning minute, every movement must restart the FULL
+      // 10-minute timer immediately (no throttle) — that's the product rule.
+      if (!warningActiveRef.current) {
+        if (throttled) return;
+        throttled = true;
+        window.setTimeout(() => {
+          throttled = false;
+        }, RESET_THROTTLE_MS);
+      }
       lastActivityRef.current = Date.now();
+      warningActiveRef.current = false;
       setWarningSecondsLeft(null);
     };
 
-    // capture: input inside iframes-less modals, grids and React portals all
-    // bubbles to window anyway, but capture guarantees nothing stops it.
-    ACTIVITY_EVENTS.forEach((event) => window.addEventListener(event, markActivity, { capture: true, passive: true }));
+    const onVisibility = () => {
+      if (document.visibilityState === "visible") markActivity();
+    };
+
+    // capture: input inside modals, grids and React portals all bubbles to
+    // window anyway, but capture guarantees nothing stops it.
+    ACTIVITY_EVENTS.forEach((event) =>
+      window.addEventListener(event, markActivity, { capture: true, passive: true }),
+    );
+    document.addEventListener("visibilitychange", onVisibility);
 
     // One lightweight interval drives both the deadline check and the
     // warning countdown — cheaper than per-keystroke timer churn.
@@ -86,11 +95,16 @@ export default function IdleSessionGuard() {
         endSession();
         return;
       }
-      setWarningSecondsLeft(remaining <= WARNING_BEFORE_MS ? Math.ceil(remaining / 1000) : null);
+      const inWarning = remaining <= WARNING_BEFORE_MS;
+      warningActiveRef.current = inWarning;
+      setWarningSecondsLeft(inWarning ? Math.ceil(remaining / 1000) : null);
     }, 1000);
 
     return () => {
-      ACTIVITY_EVENTS.forEach((event) => window.removeEventListener(event, markActivity, { capture: true }));
+      ACTIVITY_EVENTS.forEach((event) =>
+        window.removeEventListener(event, markActivity, { capture: true }),
+      );
+      document.removeEventListener("visibilitychange", onVisibility);
       window.clearInterval(tick);
     };
   }, [isAuthenticated, endSession]);
@@ -109,7 +123,9 @@ export default function IdleSessionGuard() {
       <button
         type="button"
         onClick={() => {
+          // Stay signed in → full 10-minute restart from now.
           lastActivityRef.current = Date.now();
+          warningActiveRef.current = false;
           setWarningSecondsLeft(null);
         }}
         className="rounded-lg bg-brand-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:bg-brand-700"

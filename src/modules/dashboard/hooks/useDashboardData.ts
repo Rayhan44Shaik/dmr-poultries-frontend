@@ -95,10 +95,6 @@ export function useDashboardData(
   _fromDate: Date | null,
   _toDate: Date | null,
   _comparisonPeriod: "7d" | "15d" | "30d",
-  /** Gate the first load: callers that need to pin the analysis window first
-   *  (e.g. waiting on the sample quarter's business date) hold this false so
-   *  the dashboard loads ONCE with the final dates instead of loading a
-   *  browser-clock window and immediately throwing it away. */
   _ready = true,
 ) {
   const [data, setData] = useState<DashboardData>(initialData);
@@ -132,11 +128,9 @@ export function useDashboardData(
     try {
       const dashboard = await loadOperationsDashboard(_fromDate, _toDate);
       if (requestId !== requestRef.current) return;
-      // The dev demo is already aggregated for the exact [from,to] window;
-      // real API payloads are trimmed/scaled client-side to match the range.
-      const scoped = import.meta.env.DEV
-        ? dashboard
-        : filterForRange(dashboard, _fromDate, _toDate);
+      // Backend aggregates for the selected window; client filter trims any
+      // series the API still returns outside that range.
+      const scoped = filterForRange(dashboard, _fromDate, _toDate);
       setData(scoped);
     } catch (err) {
       if (requestId !== requestRef.current) return;
@@ -188,9 +182,7 @@ export function useDashboardData(
       ]);
       if (requestId !== requestRef.current) return;
       setPreviousData({
-        ...(import.meta.env.DEV
-          ? baseline
-          : filterForRange(baseline, previousWindow.from, previousWindow.to)),
+        ...filterForRange(baseline, previousWindow.from, previousWindow.to),
         ...baselineBirds,
       });
     } catch {

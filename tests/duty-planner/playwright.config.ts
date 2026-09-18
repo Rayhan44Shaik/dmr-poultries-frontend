@@ -26,7 +26,7 @@ export default defineConfig({
     } : {},
   },
   webServer: {
-    command: 'npm run dev -- --host 0.0.0.0 --port 5198 --strictPort',
+    command: 'npm run dev:web -- --host 0.0.0.0 --port 5198 --strictPort',
     cwd: fileURLToPath(new URL('../../', import.meta.url)),
     url: 'http://127.0.0.1:5198',
     env: { VITE_API_BASE_URL: '/api' },

@@ -62,15 +62,20 @@ const server = await createServer({
 });
 const React = (await import("react")).default;
 
-// Authenticate as the owner against the running sample server so the
-// auth-guarded endpoints (everything outside /api/auth and /api/health)
-// answer 200 for the data-driven cases below. If the server is not running
-// the guarded cases skip exactly as they did when it was unreachable.
+// Authenticate against the REAL backend when credentials are provided.
+// Never hard-code sample passwords here — set SMOKE_AUTH_USERNAME /
+// SMOKE_AUTH_PASSWORD (or rely on an already-running authenticated session).
 try {
   const { loginRequest } = await server.ssrLoadModule("/src/modules/auth/authApi.ts");
-  await loginRequest("owner", "dmr@owner1414");
+  const smokeUser = process.env.SMOKE_AUTH_USERNAME;
+  const smokePass = process.env.SMOKE_AUTH_PASSWORD;
+  if (smokeUser && smokePass) {
+    await loginRequest(smokeUser, smokePass);
+  } else {
+    console.log("SKIP auth  (set SMOKE_AUTH_USERNAME / SMOKE_AUTH_PASSWORD for guarded cases)");
+  }
 } catch {
-  console.log("SKIP auth  (sample server not reachable — guarded cases will skip)");
+  console.log("SKIP auth  (backend not reachable — guarded cases will skip)");
 }
 
 const failed = [];

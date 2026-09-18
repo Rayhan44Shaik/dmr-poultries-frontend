@@ -2,8 +2,8 @@
 // Premium sign-in experience for DMR Poultries ERP.
 //
 // A single sign-in: enter username + password and the signed-in role
-// (Owner / Supervisor) decides which pages open. No role picker, no language
-// toggle on this screen — just the brand mark and the form.
+// (Owner / Supervisor) decides which pages open. Client-side validation runs
+// before the network call; API errors are mapped to clear, safe messages.
 
 import { useEffect, useState, type FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
@@ -15,9 +15,23 @@ import { loginRequest } from "./authApi";
 import { landingPathForRole } from "./permissions";
 import { IDLE_SIGNOUT_KEY } from "./IdleSessionGuard";
 import { getLastUsername, setLastUsername, sweepWorkspaceCaches } from "./cacheSweep";
+import { loginErrorMessage, validateLoginForm } from "./loginValidation";
+import { notify } from "../../ui/notifications/notificationStore";
+
+const REMEMBER_KEY = "dmr-remember-username";
 
 const inputClass =
   "w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-10 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
+const inputErrorClass =
+  "w-full rounded-lg border border-rose-300 bg-white py-2.5 pl-10 pr-10 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-rose-500 focus:ring-2 focus:ring-rose-500/20";
+
+function readRememberedUsername(): string {
+  try {
+    return localStorage.getItem(REMEMBER_KEY) ?? "";
+  } catch {
+    return "";
+  }
+}
 
 export default function LoginPage() {
   const { t } = useI18n();
@@ -25,21 +39,33 @@ export default function LoginPage() {
   const navigate = useNavigate();
   const [showPassword, setShowPassword] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [username, setUsername] = useState("");
+  const remembered = readRememberedUsername();
+  const [username, setUsername] = useState(remembered);
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(Boolean(remembered));
+  const [fieldErrors, setFieldErrors] = useState<{ username?: string; password?: string }>({});
   const [error, setError] = useState("");
   // Why are we on the sign-in screen? Read once at mount: "idle" means the
   // 10-minute inactivity logout brought us here, "expired" a dead session.
-  // (The flag itself is cleared below, in an effect — external cleanup only.)
-  const [noticeReason] = useState<"none" | "idle" | "expired">(() => {
+  const [noticeReason] = useState<"none" | "idle" | "expired" | "password">(() => {
     try {
       const reason = sessionStorage.getItem(IDLE_SIGNOUT_KEY);
-      return reason === "idle" ? "idle" : reason === "expired" ? "expired" : "none";
+      if (reason === "idle") return "idle";
+      if (reason === "expired") return "expired";
+      if (reason === "password") return "password";
+      return "none";
     } catch {
       return "none";
     }
   });
-  const notice = noticeReason === "idle" ? t("auth.idle.signed_out") : noticeReason === "expired" ? t("auth.session.expired") : "";
+  const notice =
+    noticeReason === "idle"
+      ? t("auth.idle.signed_out")
+      : noticeReason === "expired"
+        ? t("auth.session.expired")
+        : noticeReason === "password"
+          ? t("auth.password.signed_out_notice")
+          : "";
 
   useEffect(() => {
     if (noticeReason === "none") return;
@@ -53,35 +79,43 @@ export default function LoginPage() {
   const authenticate = async (user: string, pass: string) => {
     setBusy(true);
     setError("");
+    setFieldErrors({});
     try {
-      // Direct API login, then adopt the session IN THIS DOCUMENT — no reload
-      // between the form and the workspace. A full-page navigation here is
-      // exactly what storage-restricted browsers (sandboxed preview frames,
-      // private mode) turn into an endless bounce back to the sign-in screen:
-      // the freshly issued token never survives the reload. The router sends
-      // each role to its first allowed page (see AppRoutes RoleLanding); the
-      // branded splash covers the chunk load.
       const signedIn = await loginRequest(user, pass);
-      // Cross-user isolation: when the identity changes on this machine,
-      // every cached business dataset is swept before the app mounts.
       const previous = getLastUsername();
       if (previous !== signedIn.user.username) sweepWorkspaceCaches();
       setLastUsername(signedIn.user.username);
+      try {
+        if (rememberMe) localStorage.setItem(REMEMBER_KEY, signedIn.user.username);
+        else localStorage.removeItem(REMEMBER_KEY);
+      } catch {
+        // remember-me is best-effort
+      }
       adoptSession(signedIn.user);
-      // Straight to this role's first allowed page — a pure client-side route
-      // change (no document reload), so the fresh session cannot be lost in
-      // transit even when the browser refuses to persist storage. Also rescues
-      // a supervisor who deep-linked onto a page they cannot open.
+      if (signedIn.previousSessionsEnded) {
+        notify.info(t("auth.login.sessions_replaced"));
+      }
       navigate(landingPathForRole(signedIn.user.role), { replace: true });
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : t("auth.login.failed"));
+      setError(loginErrorMessage(cause, t("auth.login.failed")));
       setBusy(false);
+      setPassword("");
     }
   };
 
   const handleSignIn = (e: FormEvent) => {
     e.preventDefault();
-    void authenticate(username, password);
+    if (busy) return;
+    const checked = validateLoginForm(username, password);
+    if (!checked.ok) {
+      setFieldErrors({
+        username: checked.errors.username,
+        password: checked.errors.password,
+      });
+      setError(checked.errors.form ?? "");
+      return;
+    }
+    void authenticate(checked.username, checked.password);
   };
 
   return (
@@ -132,7 +166,6 @@ export default function LoginPage() {
       <div className="flex flex-1 items-center justify-center p-6">
         <div className="w-full max-w-[400px] animate-fade-in-up">
           <div className="rounded-xl border border-slate-200/80 bg-white p-7 shadow-card-lg">
-            {/* No logo on the card — just the words. */}
             <div className="text-center">
               <h2 className="text-xl font-bold tracking-tight text-slate-900">{t("auth.login.welcome")}</h2>
               <p className="mt-1 text-sm text-slate-400">{t("auth.login.subtitle")}</p>
@@ -145,30 +178,58 @@ export default function LoginPage() {
               </div>
             )}
 
-            <form onSubmit={handleSignIn} className="mt-6 space-y-4">
+            <form onSubmit={handleSignIn} className="mt-6 space-y-4" noValidate>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-slate-600">
+                <label htmlFor="login-username" className="mb-1 block text-xs font-semibold text-slate-600">
                   {t("auth.login.username")}
                 </label>
                 <div className="relative">
                   <User size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
-                  <input type="text" value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required className={inputClass} placeholder={t("auth.login.username_placeholder")} />
+                  <input
+                    id="login-username"
+                    type="text"
+                    value={username}
+                    onChange={(e) => {
+                      setUsername(e.target.value);
+                      if (fieldErrors.username) setFieldErrors((prev) => ({ ...prev, username: undefined }));
+                    }}
+                    autoComplete="username"
+                    autoCapitalize="none"
+                    autoCorrect="off"
+                    spellCheck={false}
+                    maxLength={100}
+                    className={fieldErrors.username ? inputErrorClass : inputClass}
+                    placeholder={t("auth.login.username_placeholder")}
+                    aria-invalid={Boolean(fieldErrors.username)}
+                    aria-describedby={fieldErrors.username ? "login-username-error" : undefined}
+                  />
                 </div>
+                {fieldErrors.username && (
+                  <p id="login-username-error" className="mt-1 text-xs font-medium text-rose-600">
+                    {fieldErrors.username}
+                  </p>
+                )}
               </div>
               <div>
-                <label className="mb-1 block text-xs font-semibold text-slate-600">
+                <label htmlFor="login-password" className="mb-1 block text-xs font-semibold text-slate-600">
                   {t("auth.login.password")}
                 </label>
                 <div className="relative">
                   <Lock size={15} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
                   <input
+                    id="login-password"
                     type={showPassword ? "text" : "password"}
                     value={password}
-                    onChange={(e) => setPassword(e.target.value)}
+                    onChange={(e) => {
+                      setPassword(e.target.value);
+                      if (fieldErrors.password) setFieldErrors((prev) => ({ ...prev, password: undefined }));
+                    }}
                     autoComplete="current-password"
-                    required
-                    className={inputClass}
+                    maxLength={1024}
+                    className={fieldErrors.password ? inputErrorClass : inputClass}
                     placeholder={t("auth.login.password_placeholder")}
+                    aria-invalid={Boolean(fieldErrors.password)}
+                    aria-describedby={fieldErrors.password ? "login-password-error" : undefined}
                   />
                   <button
                     type="button"
@@ -179,6 +240,11 @@ export default function LoginPage() {
                     {showPassword ? <EyeOff size={15} /> : <Eye size={15} />}
                   </button>
                 </div>
+                {fieldErrors.password && (
+                  <p id="login-password-error" className="mt-1 text-xs font-medium text-rose-600">
+                    {fieldErrors.password}
+                  </p>
+                )}
               </div>
 
               {error && (
@@ -201,12 +267,17 @@ export default function LoginPage() {
 
               <div className="flex items-center justify-between text-xs">
                 <label className="flex items-center gap-2 font-medium text-slate-500">
-                  <input type="checkbox" defaultChecked className="h-3.5 w-3.5 rounded border-slate-300 text-brand-600 accent-emerald-600" />
+                  <input
+                    type="checkbox"
+                    checked={rememberMe}
+                    onChange={(e) => setRememberMe(e.target.checked)}
+                    className="h-3.5 w-3.5 rounded border-slate-300 text-brand-600 accent-emerald-600"
+                  />
                   {t("auth.login.remember")}
                 </label>
-                <button type="button" className="font-semibold text-brand-700 transition-colors hover:text-brand-800">
+                <span className="font-medium text-slate-400" title={t("auth.login.forgot_hint")}>
                   {t("auth.login.forgot")}
-                </button>
+                </span>
               </div>
 
               <button

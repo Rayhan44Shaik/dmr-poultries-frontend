@@ -74,7 +74,10 @@ test.beforeEach(async ({ page }) => {
   const backend: Backend = { weeks: new Map(), createWeek: testWeek, leaves: [...TEST_LEAVES], writes: [] };
   backends.set(page, backend);
   await page.clock.setFixedTime(new Date(`${TEST_TODAY}T12:00:00+05:30`));
-  await page.addInitScript(() => localStorage.setItem('dmr_auth_user', JSON.stringify({ id: 'duty-test', name: 'Duty Test', role: 'Admin' })));
+  await page.addInitScript(() => {
+    localStorage.setItem('dmr-auth-token', 'e2e-owner-token');
+    localStorage.setItem('dmr-auth-user', JSON.stringify({ id: 1, username: 'duty-test', displayName: 'Duty Test', role: 'OWNER', employeeId: null }));
+  });
   await page.route((url) => url.pathname.startsWith('/api/'), async (route) => {
     const url = new URL(route.request().url());
     expect(url.origin).toBe('http://127.0.0.1:5198');
@@ -82,7 +85,9 @@ test.beforeEach(async ({ page }) => {
       if (!backend.weeks.has(monday)) backend.weeks.set(monday, backend.createWeek(monday));
       return backend.weeks.get(monday)!;
     };
-    if (url.pathname === '/api/staff/duty-planner' && route.request().method() === 'GET') {
+    if (url.pathname === '/api/auth/me') {
+      await route.fulfill({ json: { user: { id: 1, username: 'duty-test', displayName: 'Duty Test', role: 'OWNER', employeeId: null } } });
+    } else if (url.pathname === '/api/staff/duty-planner' && route.request().method() === 'GET') {
       const monday = url.searchParams.get('weekStart')!;
       if (backend.held?.monday === monday) { backend.held.requested(); await backend.held.wait; }
       if (backend.offline || backend.failWeek === monday) { await route.fulfill({ status: 503, json: { error: 'Test week unavailable' } }); return; }
@@ -98,7 +103,7 @@ test.beforeEach(async ({ page }) => {
       const next = { ...current, assignments: [...current.assignments.filter((item) => item.employeeId !== input.employeeId || item.date !== input.date), assignment] };
       backend.weeks.set(monday, next);
       await route.fulfill({ json: next });
-    } else if (url.pathname === '/api/staff/leaves') {
+    } else if (url.pathname === '/api/staff/leaves' && route.request().method() === 'GET') {
       const items = backend.leaves.filter((leave) => (!url.searchParams.get('status') || leave.status === url.searchParams.get('status')) && (!url.searchParams.get('fromDate') || leave.toDate >= url.searchParams.get('fromDate')!) && (!url.searchParams.get('toDate') || leave.fromDate <= url.searchParams.get('toDate')!));
       await route.fulfill({ json: { items, total: items.length, page: 1, limit: 200, totalPages: 1 } });
     } else if (url.pathname.endsWith('/status') && url.pathname.startsWith('/api/staff/leaves/')) {
@@ -107,7 +112,7 @@ test.beforeEach(async ({ page }) => {
       backend.leaves = backend.leaves.map((leave) => leave.id === id ? updated : leave);
       await route.fulfill({ json: updated });
     } else {
-      await route.fulfill({ json: { items: [], total: 0 } });
+      await route.fulfill({ json: [] });
     }
   });
   await page.goto('/staff?tab=duty-planner');
@@ -118,7 +123,7 @@ test.afterEach(async ({ page }) => { expect(pageErrors.get(page) ?? []).toEqual(
 test('compact filters use one panel, with a short calendar and Download beside Reset', async ({ page }) => {
   const filters = filterBar(page);
   await expect(filters).toHaveCount(1);
-  await expect(filters.getByRole('group', { name: 'Duty Planner actions' }).getByRole('button')).toHaveText(['Reset', 'Download Excel']);
+  await expect(filters.getByRole('group', { name: 'Duty Planner actions' }).getByRole('button')).toHaveText(['Reset', 'Refresh', 'Excel']);
   await expect(page.getByRole('region', { name: 'Duty Planner Excel report' })).toHaveCount(0);
   for (const width of [1440, 1024]) {
     await page.setViewportSize({ width, height: 1000 });

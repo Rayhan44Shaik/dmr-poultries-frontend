@@ -1,7 +1,9 @@
 // src/modules/staff/types/performance.ts
 // Read-only Driver / Supervisor performance view models. The backend computes
-// every figure inside PostgreSQL from the authoritative Fleet sources (trips,
-// fuel_expenses, fleet_maintenance); these types mirror the endpoint payloads
+// every figure inside PostgreSQL from authoritative trip sources. Driver
+// maintenance is the expense explicitly attributed to that trip; general
+// fleet-ledger maintenance is intentionally not assigned to a person without
+// an auditable driver link. These types mirror the endpoint payloads
 // exactly so the browser renders what the API returns.
 
 export interface DriverPerformanceKpis {

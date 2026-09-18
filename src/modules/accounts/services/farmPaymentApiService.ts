@@ -12,8 +12,18 @@
 //
 // Pure mapping helpers are exported separately so they can be unit tested
 // without a server.
-import { apiGet } from '../../../api';
+import { apiGet, apiPut } from '../../../api';
 import type { FarmPaymentTotals, TripFarmPayment } from '../types/farmPayment.types';
+
+/** One row in PUT /api/accounts/farm-payments. */
+export interface TripFarmPaymentSaveInput {
+  tripId: number;
+  rate?: number;
+  paidAmount?: number;
+  paymentDate?: string | null;
+  paymentMode?: string | null;
+  referenceNo?: string | null;
+}
 
 const money = (value: unknown): number => {
   const parsed = Number(value);
@@ -118,5 +128,17 @@ export function indexFarmPaymentsByTrip(
 /** GET /api/accounts/farm-payments — the whole ledger, mapped and de-duplicated. */
 export async function loadTripFarmPayments(): Promise<TripFarmPayment[]> {
   const { data } = await apiGet<unknown>('/accounts/farm-payments');
+  return mapFarmPayments(data);
+}
+
+/**
+ * PUT /api/accounts/farm-payments — persist dirty farmer-payment rows on the
+ * trip (farm_rate / farm_paid_*). Returns the updated ledger rows for those
+ * trips, mapped the same way as the GET.
+ */
+export async function saveTripFarmPayments(
+  payments: TripFarmPaymentSaveInput[]
+): Promise<TripFarmPayment[]> {
+  const { data } = await apiPut<unknown>('/accounts/farm-payments', { payments });
   return mapFarmPayments(data);
 }

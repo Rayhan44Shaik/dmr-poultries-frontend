@@ -35,10 +35,6 @@ import {
 } from "lucide-react";
 import { DatePicker } from "../../../components/common/DatePicker";
 import { useI18n } from "../../../i18n";
-import {
-  getQuarterSampleInfo,
-  type SampleQuarter,
-} from "../../../sample/quarterSample";
 import { weekRange } from "../../../utils/businessDate";
 import { FIXED_DASHBOARD_GREETING } from "../../settings/services";
 import { kickApprovalSnapshot } from "../../approvals/services/approvalSnapshot";
@@ -69,8 +65,8 @@ const todayMidnight = (): Date => {
 };
 
 // The overview always opens on the complete Monday–Sunday business week that
-// contains the business "today" date (from the sample manifest when present).
-// `weekRange` is the shared calendar source used across the app.
+// contains calendar today. `weekRange` is the shared calendar source used across
+// the app.
 const getDefaultWeekRange = (anchor = todayMidnight()) => {
   const { from, to } = weekRange(anchor);
   return {
@@ -107,10 +103,8 @@ interface RangeDatePickerProps {
   startDate: Date | undefined;
   endDate: Date | undefined;
   onRangeChange: (start: Date | undefined, end: Date | undefined) => void;
-  /** The sample API's business date when the quarter is pinned for review. */
+  /** Calendar day used as the end of relative presets (7D / 15D / 1M / QTR). */
   anchorDate?: Date;
-  /** The manifest window, used verbatim by the QTR shortcut when available. */
-  sampleQuarter?: Pick<SampleQuarter, "fromDate" | "toDate"> | null;
   placement?: "top" | "bottom";
   className?: string;
 }
@@ -120,7 +114,6 @@ function RangeDatePicker({
   endDate,
   onRangeChange,
   anchorDate,
-  sampleQuarter,
   placement = "bottom",
   className = "",
 }: RangeDatePickerProps) {
@@ -281,14 +274,9 @@ function RangeDatePicker({
       label: "QTR",
       wordKey: "ops.dashboard.preset_qtr",
       Icon: Layers,
-      // Do not recreate a quarter from the browser clock. The sample API is
-      // authoritative — its manifest can be pinned and its window may not be
-      // a fixed 92 days in a future fixture.
-      start: () =>
-        parseInputDateString(sampleQuarter?.fromDate ?? "") ??
-        addDays(rangeAnchor, -91),
-      end: () =>
-        parseInputDateString(sampleQuarter?.toDate ?? "") ?? rangeAnchor,
+      // Rolling ~92-day window ending on the dashboard anchor (calendar today).
+      start: () => addDays(rangeAnchor, -91),
+      end: () => rangeAnchor,
       theme: {
         from: "#f59e0b",
         to: "#d97706",
@@ -728,9 +716,6 @@ function DashboardPage({ embedded = false }: { embedded?: boolean }) {
   const { showNotification } = useSafeNotification();
   const [browserAnchor] = useState<Date>(() => todayMidnight());
   const initialRange = getDefaultWeekRange(browserAnchor);
-  const [sampleQuarter, setSampleQuarter] = useState<SampleQuarter | null>(
-    null,
-  );
   const [startDate, setStartDate] = useState<Date | undefined>(
     initialRange.startDate,
   );
@@ -740,57 +725,13 @@ function DashboardPage({ embedded = false }: { embedded?: boolean }) {
   const rangeTouchedRef = useRef(false);
   const [comparisonPeriod] = useState<"7d" | "15d" | "30d">("7d");
 
-  // The sample server owns its business date. Resolve it before the first
-  // request so a pinned fixture still opens on its containing Monday–Sunday
-  // week. The manifest keeps its exact endpoints for the QTR shortcut; it no
-  // longer overrides the dashboard's production default range. Holding the
-  // first request prevents a browser-clock warmup and a second repaint.
-  const [sampleResolved, setSampleResolved] = useState(false);
-  useEffect(() => {
-    let active = true;
-    // Never let a dead sample API block the overview: after 1.5 s the rolling
-    // browser window proceeds on its own.
-    const failsafe = window.setTimeout(() => {
-      if (active) setSampleResolved(true);
-    }, 1500);
-    void getQuarterSampleInfo()
-      .catch(() => null)
-      .then((info) => {
-        if (!active) return;
-        if (info) {
-          setSampleQuarter(info.quarter);
-          if (!rangeTouchedRef.current) {
-            // Default to the Monday–Sunday week containing the sample business
-            // date. QTR remains a separate, exact-manifest shortcut in the
-            // picker below.
-            const sampleToday = parseInputDateString(info.quarter.today);
-            if (sampleToday) {
-              const week = getDefaultWeekRange(sampleToday);
-              setStartDate(week.startDate);
-              setEndDate(week.endDate);
-            }
-          }
-        }
-        setSampleResolved(true);
-      });
-    return () => {
-      active = false;
-      window.clearTimeout(failsafe);
-    };
-  }, []);
-
   const { data, previousData, isLoading, error, refetch } = useDashboardData(
     startDate ?? null,
     endDate ?? null,
     comparisonPeriod,
-    sampleResolved,
   );
 
-  const dashboardQuarter = data?.sampleQuarter ?? sampleQuarter;
-  const parsedDashboardAnchor = dashboardQuarter?.today
-    ? parseInputDateString(dashboardQuarter.today)
-    : undefined;
-  const dashboardAnchor = parsedDashboardAnchor ?? browserAnchor;
+  const dashboardAnchor = browserAnchor;
 
   const isRangeSelected = startDate !== undefined && endDate !== undefined;
   const rangeDays = isRangeSelected
@@ -811,7 +752,6 @@ function DashboardPage({ embedded = false }: { embedded?: boolean }) {
     (counterWeekFrom < counterMonthFrom ? counterWeekFrom : counterMonthFrom) ||
       undefined,
     counterToday || undefined,
-    sampleResolved,
   );
 
   const trendCounts = useMemo(() => {
@@ -896,14 +836,11 @@ function DashboardPage({ embedded = false }: { embedded?: boolean }) {
   }, [calendarFrom, calendarTo]);
 
   useEffect(() => {
-    // Same once-only guarantee as the KPI data: wait for the sample window so
-    // the register fetch never runs for the browser-clock warmup range.
-    if (!sampleResolved) return;
     const timer = window.setTimeout(() => {
       void loadPaymentRegister();
     }, 0);
     return () => window.clearTimeout(timer);
-  }, [loadPaymentRegister, sampleResolved]);
+  }, [loadPaymentRegister]);
 
   /* The KPI row never navigates — tiles show the window's totals and the equal
      window before them, and that is all they do. */
@@ -922,7 +859,6 @@ function DashboardPage({ embedded = false }: { embedded?: boolean }) {
   const trendsQuery = useOperationalTrends(
     trendWindow.from || undefined,
     trendWindow.to || undefined,
-    sampleResolved,
   );
   const defaultGranularity = granularityForRange(rangeDays);
   const trendGranularity: Granularity = trendView
@@ -997,7 +933,6 @@ function DashboardPage({ embedded = false }: { embedded?: boolean }) {
       startDate={startDate}
       endDate={endDate}
       anchorDate={dashboardAnchor}
-      sampleQuarter={dashboardQuarter}
       onRangeChange={handleRangeChange}
     />
   );

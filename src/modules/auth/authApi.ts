@@ -44,13 +44,21 @@ function normalizeUser(value: RawUser | null | undefined): AuthenticatedUser {
 }
 
 export async function loginRequest(username: string, password: string) {
-  const response = await apiClient.post<{ user: RawUser; token?: string; expiresAt?: string }>(
-    "/auth/login",
-    { username, password },
-  );
-  // The bearer token drives /auth/me after reloads and every API call.
+  const response = await apiClient.post<{
+    user: RawUser;
+    token?: string;
+    expiresAt?: string;
+    previousSessionsEnded?: boolean;
+  }>("/auth/login", { username, password });
+  // Real backend returns both HttpOnly `dmr_session` cookie and `token` in the
+  // JSON body. The SPA persists Bearer so /api calls through the Vite proxy
+  // (and Electron / cross-origin previews) keep working after reload.
   storeToken(response.data?.token ?? null);
-  return { user: normalizeUser(response.data?.user), expiresAt: response.data?.expiresAt };
+  return {
+    user: normalizeUser(response.data?.user),
+    expiresAt: response.data?.expiresAt,
+    previousSessionsEnded: Boolean(response.data?.previousSessionsEnded),
+  };
 }
 
 export async function currentUserRequest(): Promise<AuthenticatedUser> {
@@ -68,4 +76,8 @@ export async function logoutRequest(): Promise<void> {
     // The session is dead on our side either way.
     storeToken(null);
   }
+}
+
+export async function changePasswordRequest(currentPassword: string, newPassword: string): Promise<void> {
+  await apiClient.post("/auth/change-password", { currentPassword, newPassword });
 }

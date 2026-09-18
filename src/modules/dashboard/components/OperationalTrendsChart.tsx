@@ -5,6 +5,7 @@
 // summary below the plot remains unchanged across chart styles.
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { AlertCircle } from "lucide-react";
 import {
   Area,
   Bar,
@@ -318,6 +319,33 @@ export default function OperationalTrendsChart({
     );
   }
 
+  // 404 / "Not found" means no trips in range (or endpoint not wired yet) —
+  // same soft empty as Collection Streams, never Retry.
+  const softEmptyError =
+    !!error &&
+    /not\s*found|no\s*(completed\s*)?trips|empty|404|requested resource/i.test(
+      error,
+    );
+
+  if (buckets.length === 0 || softEmptyError) {
+    return (
+      <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
+        <div
+          className="flex min-h-[21.25rem] w-full flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-4 text-center"
+          style={{ minHeight: "21.25rem" }}
+        >
+          <AlertCircle className="h-8 w-8 text-slate-300" aria-hidden="true" />
+          <p className="mt-3 text-sm font-black text-slate-700">
+            {t("ops.dashboard.trend.empty")}
+          </p>
+          <p className="mx-auto mt-1 max-w-sm text-xs font-semibold text-slate-500">
+            {t("ops.dashboard.trend.empty_hint")}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
   if (error && !trends) {
     return (
       <div className="flex h-[20.625rem] w-full flex-col items-center justify-center gap-3 text-center">
@@ -331,19 +359,6 @@ export default function OperationalTrendsChart({
             {t("common.retry")}
           </button>
         ) : null}
-      </div>
-    );
-  }
-
-  if (buckets.length === 0) {
-    return (
-      <div className="flex h-[20.625rem] w-full flex-col items-center justify-center gap-1 rounded-xl border border-dashed border-slate-200 bg-slate-50/60 text-center">
-        <p className="text-sm font-semibold text-slate-500">
-          {t("ops.dashboard.trend.empty")}
-        </p>
-        <p className="text-[11.5px] text-slate-400">
-          {t("ops.dashboard.trend.empty_hint")}
-        </p>
       </div>
     );
   }

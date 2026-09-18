@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { currentUserRequest, loginRequest, logoutRequest, type AuthenticatedUser } from '../modules/auth/authApi';
 import { clearSession, getCachedUser, getStoredToken, setCachedUser } from '../modules/auth/tokenStore';
 import { sweepWorkspaceCaches } from '../modules/auth/cacheSweep';
 import { IDLE_SIGNOUT_KEY } from '../modules/auth/IdleSessionGuard';
+import { beginSignOut, endSignOut, isSigningOut } from '../modules/auth/signOutGate';
 import { AuthContext } from './authContext';
 
 interface AuthProviderProps {
@@ -17,20 +19,6 @@ const DEMO_USER: AuthenticatedUser = {
   employeeId: null,
 };
 
-/**
- * End the SPA session by navigating the document. A full load guarantees every
- * module-level cache (approval snapshot, collection snapshot, trip service,
- * master caches) is rebuilt from scratch under the new identity — nothing
- * in-memory can cross from one user's session into the next.
- */
-function hardNavigate(to: string): void {
-  try {
-    window.location.replace(to);
-  } catch {
-    // navigation blocked (sandboxed preview) — SPA fallback below still runs
-  }
-}
-
 /** A 401/403 means the session is definitively gone; anything else is a
  *  transient failure (proxy hiccup, timeout, server restart) that must NEVER
  *  bounce a signed-in user back to the sign-in screen. */
@@ -40,6 +28,7 @@ function isSessionInvalid(cause: unknown): boolean {
 }
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
+  const navigate = useNavigate();
   // When the user last signed in IN this document (for the eviction guard:
   // "session expired" seconds after a fresh sign-in is always a lie).
   const lastAdoptedAtRef = useRef(0);
@@ -64,39 +53,39 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     return !!getStoredToken() && !getCachedUser();
   });
 
+  /** Soft land on the sign-in screen — no full document reload (that caused
+   *  BrandSplash ↔ LoginPage flicker). Caches are swept in-process instead. */
+  const landOnSignIn = useCallback((reason?: "idle" | "expired") => {
+    beginSignOut();
+    clearSession();
+    setLoading(false);
+    setUser(null);
+    if (reason) {
+      try {
+        sessionStorage.setItem(IDLE_SIGNOUT_KEY, reason);
+      } catch {
+        // notice is cosmetic
+      }
+    }
+    sweepWorkspaceCaches();
+    navigate("/", { replace: true });
+    // Release the gate after the route has settled so late 401s stay quiet.
+    window.setTimeout(() => endSignOut(), 1500);
+  }, [navigate]);
+
   // The `dmr:auth-expired` listener is ALWAYS on for the life of the document:
   // a 401 from any endpoint lands here. Before evicting the user, the session
-  // is RE-CHECKED against /auth/me — only a confirmed rejection ends it. A
-  // lone 401 (preview-tunnel flap, restart race) keeps you signed in, which
-  // kills the last "bounces back to sign-in" path. The idle note is never
-  // overwritten by a later expiry note.
+  // is RE-CHECKED against /auth/me — only a confirmed rejection ends it.
   useEffect(() => {
     if (demoMode) return undefined;
     let probing = false;
-    const evict = () => {
-      // Seconds after a successful sign-in the note would be nonsense — the
-      // user just authenticated. Land on a CLEAN sign-in screen instead.
-      const justSignedIn = Date.now() - lastAdoptedAtRef.current < 30_000;
-      if (!justSignedIn) {
-        try {
-          if (sessionStorage.getItem(IDLE_SIGNOUT_KEY) !== "idle") {
-            sessionStorage.setItem(IDLE_SIGNOUT_KEY, "expired");
-          }
-        } catch {
-          // storage blocked — the notice is cosmetic
-        }
-      }
-      clearSession();
-      setUser(null);
-      hardNavigate('/');
-    };
     const expired = () => {
+      if (isSigningOut()) return;
       const token = getStoredToken();
       if (!token) {
-        // Session already ended deliberately (logout / idle) — just land on
-        // the fresh sign-in document.
+        // Session already ended deliberately — stay on the sign-in screen.
+        setLoading(false);
         setUser(null);
-        hardNavigate('/');
         return;
       }
       if (probing) return;
@@ -106,8 +95,10 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
           // Server confirms the session is ALIVE — the 401 was transient.
         })
         .catch((cause) => {
-          if (isSessionInvalid(cause)) evict();
-          // Anything else (network junk) — stay signed in.
+          if (isSigningOut()) return;
+          if (!isSessionInvalid(cause)) return;
+          const justSignedIn = Date.now() - lastAdoptedAtRef.current < 30_000;
+          landOnSignIn(justSignedIn ? undefined : "expired");
         })
         .finally(() => {
           probing = false;
@@ -115,32 +106,28 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     };
     window.addEventListener('dmr:auth-expired', expired);
     return () => window.removeEventListener('dmr:auth-expired', expired);
-  }, [demoMode]);
+  }, [demoMode, landOnSignIn]);
 
   useEffect(() => {
     if (demoMode) return undefined;
     // No token → nothing to revalidate (sign-in screen / fresh document).
-    if (!getStoredToken()) return undefined;
+    if (!getStoredToken()) {
+      setLoading(false);
+      return undefined;
+    }
     let active = true;
     currentUserRequest()
       .then((value) => {
-        if (!active) return;
+        if (!active || isSigningOut()) return;
         // Identity-stable update: re-setting an equivalent user would re-run
         // this effect (it depends on `user`) and loop /auth/me forever.
         setUser((prev) => (prev && prev.username === value.username && prev.role === value.role ? prev : value));
         setCachedUser(value);
       })
       .catch((cause) => {
-        if (!active) return;
+        if (!active || isSigningOut()) return;
         if (isSessionInvalid(cause)) {
-          // Definitive: the server rejected this (stale) session. Clear it and
-          // go to a fresh sign-in document QUIETLY — no "session expired"
-          // note: the user did nothing wrong; a plain sign-in screen is the
-          // honest state. The full reload also guarantees the next sign-in
-          // starts with no module cache of this user.
-          clearSession();
-          setUser(null);
-          hardNavigate("/");
+          landOnSignIn();
         } else if (!getCachedUser()) {
           // No cached identity to keep showing — sign-in it is, but the
           // token is KEPT so a hiccup right after login doesn't loop.
@@ -152,7 +139,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         if (active) setLoading(false);
       });
     return () => { active = false; };
-  }, [demoMode, user]);
+  }, [demoMode, user, landOnSignIn]);
 
   const isAuthenticated = !!user;
 
@@ -167,26 +154,39 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
    *  document (no reload) — the session cannot be lost in transit, even when
    *  the browser refuses to persist the token. */
   const adoptSession = useCallback((value: AuthenticatedUser) => {
+    endSignOut();
     lastAdoptedAtRef.current = Date.now();
+    setLoading(false);
     setCachedUser(value); // no-op-safe when storage is blocked (memory bag)
     setUser(value);
   }, []);
 
-  const logout = useCallback(async () => {
+  const logout = useCallback(async (reason?: "idle" | "expired") => {
+    beginSignOut();
     try {
       await logoutRequest();
+    } catch {
+      // Local clear still completes when the office is unavailable.
     } finally {
+      try {
+        if (reason) sessionStorage.setItem(IDLE_SIGNOUT_KEY, reason);
+        else sessionStorage.removeItem(IDLE_SIGNOUT_KEY);
+      } catch {
+        // notice is cosmetic
+      }
       clearSession();
+      setLoading(false);
       setUser(null);
-      // Wipe every cached business dataset before the sign-in screen returns,
-      // so the next identity — whoever it is — starts with nothing of this
-      // user's data on the machine.
       sweepWorkspaceCaches();
-      hardNavigate('/');
+      navigate("/", { replace: true });
+      window.setTimeout(() => endSignOut(), 1500);
     }
-  }, []);
+  }, [navigate]);
 
-  const value = useMemo(() => ({ isAuthenticated, loading, user, login, adoptSession, logout }), [isAuthenticated, loading, login, adoptSession, logout, user]);
+  const value = useMemo(
+    () => ({ isAuthenticated, loading, user, login, adoptSession, logout }),
+    [isAuthenticated, loading, user, login, adoptSession, logout],
+  );
 
   return (
     <AuthContext.Provider value={value}>

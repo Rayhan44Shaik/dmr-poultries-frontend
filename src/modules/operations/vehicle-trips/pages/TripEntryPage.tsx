@@ -25,7 +25,6 @@ import { useBirdTypes } from "../../../masters/bird-types/hooks/useBirdTypes";
 import { useSafeNotification } from "../../../../hooks/useSafeNotification";
 import { useI18n } from "../../../../i18n";
 import { CAPABILITIES, useCan } from "../../../auth/permissions";
-import { getQuarterSampleInfo } from "../../../../sample/quarterSample";
 
 // --- Utils ---
 import { canEditItem } from "../../../../utils/dateUtils";
@@ -313,11 +312,6 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
       if (!trip.tripDate) {
         const initialDate = getTripEntryDate();
         setTrip((prev) => ({ ...prev, tripDate: initialDate }));
-        void getQuarterSampleInfo().then((info) => {
-          if (info?.quarter.today) {
-            setTrip((prev) => (prev.id ? prev : { ...prev, tripDate: info.quarter.today }));
-          }
-        });
       }
       isInitialMount.current = false;
     }

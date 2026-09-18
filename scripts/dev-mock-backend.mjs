@@ -7,7 +7,8 @@
 // Collection Report correctly shows its error state. Run this stub to explore
 // the UI with deterministic sample data:
 //
-//   npm run mock:backend        # serves sample JSON on port 4000 (all interfaces)
+//   npm run mock:trips          # serves sample JSON on port 4100 (all interfaces)
+//   (Port 4000 is reserved for the real backend — this stub defaults to 4100.)
 //
 // Served today: /api/health, /api/masters/{shops,employees,vehicles,farms,
 // bird-types}, /api/trips (+ /api/trips/:id, POST /api/trips/:id/steps/deliveries
@@ -37,14 +38,20 @@
 // trip-history modal show rich sample rows; complete the Pending TRP trip from
 // Trip List to watch a newly completed trip appear there too.
 //
-// For REAL data, run the actual ERP backend on port 4000 instead — no config
-// change needed (the Vite dev proxy targets 127.0.0.1:4000).
+// For REAL data, use `npm run dev` (real backend on port 4000). Do NOT run this
+// stub alongside normal development — Vite's /api proxy targets 127.0.0.1:4000.
 // ─────────────────────────────────────────────────────────────────────────────
 
 import http from "node:http";
 import { buildSampleEmiVehicles } from "./fixtures/emi-vehicles.mjs";
 
-const PORT = Number(process.env.MOCK_BACKEND_PORT ?? 4000);
+const PORT = Number(process.env.PORT ?? process.env.MOCK_BACKEND_PORT ?? 4100);
+if (PORT === 4000 && process.env.SAMPLE_ALLOW_PORT_4000 !== "1") {
+  console.error(
+    "[mock-backend] REFUSING port 4000 — reserved for the real backend. Default is 4100."
+  );
+  process.exit(1);
+}
 
 // ── Sample masters ───────────────────────────────────────────────────────────
 // ── Sample Shops (100) ───────────────────────────────────────────────────────

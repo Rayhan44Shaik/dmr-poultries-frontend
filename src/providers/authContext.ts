@@ -11,7 +11,7 @@ export interface AuthContextValue {
    *  used right after a direct API sign-in, so no reload can lose the
    *  session (storage-blocked browsers would bounce back to sign-in). */
   adoptSession: (user: AuthenticatedUser) => void;
-  logout: () => Promise<void>;
+  logout: (reason?: "idle" | "expired") => Promise<void>;
 }
 
 export const AuthContext = createContext<AuthContextValue | undefined>(undefined);

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { AlertCircle } from "lucide-react";
 import { Cell, Pie, PieChart, ResponsiveContainer, Sector, type PieSectorShapeProps } from "recharts";
 import { useI18n } from "../../../i18n";
 import { formatINRCompact } from "../../../utils/format";
@@ -186,54 +187,22 @@ export default function CollectionsPie({
     </div>
   );
 
-  // ── Loading / empty: preserve the same chart-then-footer geometry. ─────
+  // Empty period: static empty state (never spin forever on []).
   if (chartData.length === 0) {
     return (
-      <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col" aria-busy="true">
-        <div className="min-h-[21.25rem] w-full flex-1" style={{ minHeight: "21.25rem" }}>
-          <div className="flex h-full w-full items-center justify-center">
-          <div className="relative aspect-square w-full max-w-[560px]" style={{ aspectRatio: "1 / 1" }}>
-            <svg viewBox="0 0 400 400" className="h-full w-full" aria-hidden="true">
-              <circle
-                cx="200"
-                cy="200"
-                r={PIE_TRACK.radius}
-                fill="none"
-                stroke="#eef2f7"
-                strokeWidth={PIE_TRACK.strokeWidth}
-              />
-              <g
-                className="animate-[spin_1.6s_linear_infinite]"
-                style={{ transformBox: "view-box", transformOrigin: "200px 200px" }}
-              >
-                <circle
-                  cx="200"
-                  cy="200"
-                  r={PIE_TRACK.radius}
-                  fill="none"
-                  stroke="#cbd5e1"
-                  strokeWidth={PIE_TRACK.strokeWidth}
-                  strokeDasharray="429 143"
-                  strokeLinecap="round"
-                />
-              </g>
-            </svg>
-            <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
-              <span className="animate-pulse text-[10px] font-bold uppercase tracking-[0.16em] text-slate-400">
-                {t("ops.dashboard.collection_streams_total")}
-              </span>
-              <span className="h-6 w-24 animate-pulse rounded-md bg-slate-100" />
-            </div>
-          </div>
-          </div>
+      <div className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
+        <div
+          className="flex min-h-[21.25rem] w-full flex-1 flex-col items-center justify-center rounded-xl border border-dashed border-slate-200 bg-slate-50/60 p-4 text-center"
+          style={{ minHeight: "21.25rem" }}
+        >
+          <AlertCircle className="h-8 w-8 text-slate-300" aria-hidden="true" />
+          <p className="mt-3 text-sm font-black text-slate-700">
+            {t("ops.dashboard.collection_streams_empty")}
+          </p>
+          <p className="mx-auto mt-1 max-w-sm text-xs font-semibold text-slate-500">
+            {t("ops.dashboard.collection_streams_empty_hint")}
+          </p>
         </div>
-        {!hideStats && (
-          <div className="mt-3 grid w-full shrink-0 grid-cols-2 gap-2 border-t border-slate-100 pt-3 sm:grid-cols-3">
-            {[0, 1, 2].map((i) => (
-              <div key={i} className="h-[3.25rem] animate-pulse rounded-xl bg-slate-100/80" />
-            ))}
-          </div>
-        )}
       </div>
     );
   }

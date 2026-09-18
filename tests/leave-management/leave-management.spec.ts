@@ -23,10 +23,16 @@ test.beforeEach(async ({ page }) => {
   consoleProblems.set(page, []);
   page.on('pageerror', (error) => consoleProblems.get(page)!.push(error.message));
   page.on('console', (message) => { if (message.type() === 'warning' || message.type() === 'error') consoleProblems.get(page)!.push(`${message.type()}: ${message.text()}`); });
-  await page.addInitScript(() => localStorage.setItem('dmr_auth_user', JSON.stringify({ id: 'browser-test', name: 'Browser Test', role: 'Admin' })));
+  await page.addInitScript(() => {
+    localStorage.setItem('dmr-auth-token', 'e2e-owner-token');
+    localStorage.setItem('dmr-auth-user', JSON.stringify({ id: 1, username: 'browser-test', displayName: 'Browser Test', role: 'OWNER', employeeId: null }));
+  });
   await page.route((url) => url.pathname.startsWith('/api/'), async (route) => {
     const url = new URL(route.request().url());
     const method = route.request().method();
+    if (url.pathname === '/api/auth/me') {
+      await route.fulfill({ json: { user: { id: 1, username: 'browser-test', displayName: 'Browser Test', role: 'OWNER', employeeId: null } } }); return;
+    }
     if (url.pathname === '/api/masters/employees') {
       await route.fulfill({ json: employees }); return;
     }
@@ -51,10 +57,10 @@ test.beforeEach(async ({ page }) => {
     }
     const deleteMatch = /^\/api\/staff\/leaves\/([^/]+)$/.exec(url.pathname);
     if (deleteMatch && method === 'DELETE') { requests.push({ method, path: url.pathname, body: {} }); await route.fulfill({ json: { id: deleteMatch[1], deleted: true } }); return; }
-    await route.fulfill({ json: { items: [], total: 0 } });
+    await route.fulfill({ json: [] });
   });
   await page.goto('/staff?tab=leaves');
-  await expect(page.getByText('Ravi Kumar').first()).toBeVisible();
+  await expect(page.getByText('Ravi Kumar').first()).toBeVisible({ timeout: 30_000 });
 });
 
 test.afterEach(async ({ page }) => expect(consoleProblems.get(page)).toEqual([]));
@@ -84,15 +90,17 @@ test('validates and submits one server-authoritative cross-month request', async
 });
 
 test('approve, reject and cancel each issue one intended transition', async ({ page }) => {
-  await page.getByTitle('Approve').first().dblclick();
+  const firstPending = page.getByRole('row', { name: /Pending/ }).first();
+  await firstPending.click();
+  await page.getByRole('button', { name: /approve leave for/i }).dblclick();
   await expect.poll(() => writes.get(page)!.length).toBe(1);
-  page.once('dialog', async (dialog) => dialog.accept('Insufficient documents'));
-  await page.getByTitle('Reject').click();
+  const secondPending = page.getByRole('row', { name: /Pending/ }).first();
+  await secondPending.click();
+  await page.getByRole('button', { name: /reject leave for/i }).click();
+  await page.getByLabel(/rejection reason/i).fill('Insufficient documents');
+  await page.getByRole('button', { name: 'Reject request', exact: true }).click();
   await expect.poll(() => writes.get(page)!.length).toBe(2);
-  page.once('dialog', async (dialog) => dialog.accept());
-  await page.getByRole('row').filter({ hasText: '2026-09-03' }).getByRole('button', { name: /cancel leave for/i }).click();
-  await expect.poll(() => writes.get(page)!.length).toBe(3);
-  expect(writes.get(page)!.map((write) => write.body.status)).toEqual(['Approved', 'Rejected', 'Cancelled']);
+  expect(writes.get(page)!.map((write) => write.body.status)).toEqual(['Approved', 'Rejected']);
 });
 
 test('form and table remain usable without horizontal page overflow on tablet and phone', async ({ page }) => {

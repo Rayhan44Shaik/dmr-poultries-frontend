@@ -9,74 +9,49 @@ npm install
 npm run dev
 ```
 
-### Demo / sample data (no database required)
+### Demo / sample data (OPT-IN only — not normal runtime)
 
-The repo ships a deterministic in-memory sample API so **every page of every
-module** renders fully populated — no PostgreSQL needed. `npm run dev` starts it
-automatically next to Vite, so there is nothing else to run:
+**Normal development uses the real backend and PostgreSQL:**
 
 ```bash
 npm install
-npm run dev          # sample API on :4000 + Vite on :5173, /api proxied
+npm run backend:install   # once
+npm run backend:migrate   # once (and after SQL migrations)
+npm run dev               # real API on :4000 + Vite on :5173, /api → real backend
 ```
 
-`npm run dev` is `concurrently` over two scripts:
+`npm run dev` is `concurrently` over:
 
 | Script | What it does |
 |---|---|
-| `npm run dev:sample-api` | `scripts/quarter-sample-data.mjs` on port 4000 (the Vite `/api` proxy target) |
-| `npm run dev:web` | Vite only — use this when you run the real backend instead |
+| `npm run dev:api` | Real Express backend (`../../backend`) on port **4000** |
+| `npm run dev:web` | Vite only (proxies `/api` → `http://127.0.0.1:4000`) |
 
-If something already listens on 4000 (the real backend, say), the sample server
-prints that and exits without failing the dev command.
+The in-memory quarter sample API is **never** started by `npm run dev`. Use it only when you intentionally want demo data without PostgreSQL:
+
+```bash
+npm run dev:sample        # sample API on :4100 + Vite (Vite still proxies to :4000)
+npm run mock:backend      # sample API alone on :4100
+```
+
+Port **4000 is reserved for the real backend**. The sample server defaults to
+**4100** and refuses to bind 4000 unless `SAMPLE_ALLOW_PORT_4000=1`.
 
 - The sample API serves a rolling **92-day quarter ending today** (200 shops, 150
-  employees, 10 farms, 24 vehicles, ~640 trips, ~7,700 delivery lines, ~4,700
-  collections, plus banks, market rates, permits, EMI schedules, salaries,
-  leaves, duty roster, payments and farm payments). Anchoring on today keeps the
-  today/this-week/this-month dashboard tiles populated; `SAMPLE_TODAY=YYYY-MM-DD`
-  pins the anchor when you need a byte-identical dataset.
-  `GET /api/quarter-summary` returns the row-count manifest. Writes are held
-  in memory for the current demo session, and the related Operations, ledger,
-  Masters and dashboard endpoints re-aggregate immediately; restarting the
-  sample API restores the original deterministic quarter.
-- `.env.development` sets `VITE_DEMO_MODE=1`, so `npm run dev` skips the login
-  gate and signs you in as the demo Owner. `VITE_DEMO_MODE` is only honoured when
-  `import.meta.env.DEV` is true, so a production build can never bypass auth —
-  drop the variable (or use `?demo=1` per URL) to exercise real login.
-- Pages can tell they are on sample data: `/api/quarter-summary` and the
-  `/api/operations/dashboard` payload carry `sample: true` plus the quarter
-  window. The Operations overview opens on the complete rolling quarter and
-  shows a compact **Quarter Operations Map**: Trip List, Rate Entry, Shop Sales,
-  Collection Report, Pending Collections, Mortality, Fuel Expenses and Orders
-  each get a live count and a direct link. Changing the overview calendar
-  re-aggregates these counts for that exact range. A real production payload
-  has no sample manifest, so the map is omitted there.
-- `npm run mock:backend` is kept as an alias for `dev:sample-api` (start just the
-  sample API); `npm run mock:trips` serves the older, trip-wizard-focused sample
-  (`scripts/dev-mock-backend.mjs`) with in-memory wizard save/submit support.
-- Auth is stubbed by the sample API, so any credentials work too.
-- Run `npm run verify:quarter-data` to launch an isolated sample API and audit
-  the Operations data hand-offs (collections, rates, shop sales, fuel, ledger
-  and dashboard). It stops automatically and never touches the running preview.
-- Run `npm run verify:fleet-sync` while the dev server is running for a read-only
-  audit of Fleet maintenance, meter history, permits/scans, EMI schedules, fuel
-  readings and analytics through the actual frontend mappers. Set `API` to audit
-  a sample API at a different URL. The audit never adds or changes records.
-  Fleet Analytics defaults to the advertised sample quarter (Reset restores it)
-  and reloads when revisiting its tab. Real-backend deployments retain the
-  current-week default. FASTAG remains the existing construction placeholder.
-- Run `npm run verify:staff-sync` for the Staff-module twin: it replays every
-  Staff page's exact API sequence against an isolated quarter sample server —
-  Duty Planner weeks (current/previous/upcoming), Leaves (list, filters,
-  report, approve/reject), Salary Register (all quarter months, lifecycle,
-  payslip PDF, email/WhatsApp counters), Driver/Supervisor Performance and the
-  staff dashboard card — and asserts each page's view-model contract.
-- To work against the real backend instead, run it on port 4000 and start the
-  frontend alone with `npm run dev:web`.
-
-Full module-by-module verification steps live in
-[`docs/QUARTER_SAMPLE_DATA_TESTING_GUIDE.md`](./docs/QUARTER_SAMPLE_DATA_TESTING_GUIDE.md).
+  employees, 10 farms, 24 vehicles, ~640 trips, etc.). Pin with
+  `SAMPLE_TODAY=YYYY-MM-DD` when you need a byte-identical dataset.
+  `GET /api/quarter-summary` returns the row-count manifest (sample only).
+- `.env.development` sets `VITE_DEMO_MODE=0`, so `npm run dev` opens the login
+  gate. `?demo=1` still skips the gate in DEV only; production builds never bypass auth.
+- Pages can tell they are on sample data only when the sample server is what
+  answers `/api` (it sets `sample: true`). Against the real backend those badges
+  stay off.
+- `npm run mock:trips` serves the older trip-wizard stub (`scripts/dev-mock-backend.mjs`)
+  on port **4100** (same 4000 refuse rule).
+- Run `npm run verify:quarter-data` / `verify:staff-sync` to launch an **isolated**
+  sample API on an ephemeral port — they never steal 4000 or touch live Postgres.
+- Full sample verification steps:
+  [`docs/QUARTER_SAMPLE_DATA_TESTING_GUIDE.md`](./docs/QUARTER_SAMPLE_DATA_TESTING_GUIDE.md).
 
 ### Navigation
 

@@ -1,9 +1,8 @@
 // Dev-SSR harness: run the REAL service layer of every Operations module tab
-// (the exact functions each page calls — trip list, trip entry, orders,
-// shop sales, rate entry, collection entry/pending/report, mortality, fuel)
-// through the same module graph `npm run dev` serves, against the live
-// quarter sample API. This proves scripts/quarter-sample-data.mjs is
-// perfectly mapped to the Operations module pages — no new sample data,
+// through the same module graph `npm run dev` serves, against CHECK_API_BASE
+// (default http://127.0.0.1:4000/api — the real backend). Historically also
+// used to prove scripts/quarter-sample-data.mjs when that OPT-IN sample server
+// was started on an isolated port (4100). Not part of normal app runtime.
 // just the existing dataset read through the frontend's own mappers.
 import "./dashboard-sync-check-stub";
 import { apiClient, apiGet } from "../src/api";
@@ -20,7 +19,7 @@ import {
 } from "../src/sample/quarterSample";
 
 // Harness-only redirect: Node has no same-origin /api reverse proxy, so the
-// shared client points straight at the sample API. No app code changes.
+// shared client points at the API under test. Default is the REAL backend.
 apiClient.defaults.baseURL = process.env.CHECK_API_BASE || "http://127.0.0.1:4000/api";
 
 type CheckResult = { tab: string; check: string; ok: boolean; detail: string };

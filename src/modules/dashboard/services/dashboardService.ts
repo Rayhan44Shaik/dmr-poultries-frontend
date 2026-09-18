@@ -809,9 +809,7 @@ export function mapDashboardResponse(
   };
 }
 
-/** GET /api/operations/dashboard.
- *  In the dev preview the demo dataset is aggregated for the exact
- *  start/end window selected, so every KPI/chart/panel matches the range. */
+/** GET /api/operations/dashboard — live backend/database only. */
 export async function loadOperationsDashboard(
   from?: Date | null,
   to?: Date | null,
@@ -825,29 +823,18 @@ export async function loadOperationsDashboard(
   if (fromDate) params.fromDate = fromDate;
   if (toDate) params.toDate = toDate;
 
-  try {
-    const { data } = await apiGet<OperationsDashboardApiResponse>(
-      DASHBOARD_PATH,
-      {
-        params: Object.keys(params).length > 0 ? params : undefined,
-      },
-    );
-    return enrichOperationsDashboardData(
-      mapDashboardResponse(data),
-      fromDate || undefined,
-      toDate || undefined,
-      options?.withSpanFleet ?? true,
-    );
-  } catch {
-    // The development preview has no production dashboard API. Use a complete
-    // in-memory showcase so every Operations Dashboard panel can be reviewed;
-    // production continues to use the real API/local fallback only.
-    if (import.meta.env.DEV) return demoDashboard(from ?? null, to ?? null);
-    // Offline fallback — derive the same KPI surface from the localStorage
-    // stores the entry flows write to, so the overview stays usable when the
-    // local PostgreSQL backend is not running.
-    return offlineDashboard();
-  }
+  const { data } = await apiGet<OperationsDashboardApiResponse>(
+    DASHBOARD_PATH,
+    {
+      params: Object.keys(params).length > 0 ? params : undefined,
+    },
+  );
+  return enrichOperationsDashboardData(
+    mapDashboardResponse(data),
+    fromDate || undefined,
+    toDate || undefined,
+    options?.withSpanFleet ?? true,
+  );
 }
 
 function dashboardDateParams(
@@ -858,12 +845,6 @@ function dashboardDateParams(
   if (fromDate) params.fromDate = fromDate;
   if (toDate) params.toDate = toDate;
   return Object.keys(params).length > 0 ? params : undefined;
-}
-
-function parseDashboardDate(value?: string): Date | null {
-  if (!value) return null;
-  const parsed = new Date(`${value}T00:00:00`);
-  return Number.isNaN(parsed.getTime()) ? null : parsed;
 }
 
 function toCollectionRecoverySnapshot(
@@ -882,433 +863,24 @@ export async function loadCollectionRecoveryData(
   fromDate?: string,
   toDate?: string,
 ): Promise<CollectionRecoverySnapshot> {
-  try {
-    const { data } = await apiGet<OperationsDashboardApiResponse>(
-      DASHBOARD_PATH,
-      {
-        params: dashboardDateParams(fromDate, toDate),
-      },
-    );
-    return toCollectionRecoverySnapshot(
-      // The recovery card refreshes only its own rows — skip the two span
-      // trip fetches it would otherwise duplicate in the background.
-      await enrichOperationsDashboardData(
-        mapDashboardResponse(data),
-        fromDate,
-        toDate,
-        false,
-      ),
-    );
-  } catch {
-    if (import.meta.env.DEV) {
-      return toCollectionRecoverySnapshot(
-        demoDashboard(parseDashboardDate(fromDate), parseDashboardDate(toDate)),
-      );
-    }
-    throw new Error("Unable to refresh collection recovery data");
-  }
-}
-
-// ── Dev-only showcase: deterministic 180-day ledger ─────────────────────────
-// Every day is a self-contained record (trips, weight, sales, collections,
-// expenses and per-shop / per-payment-mode splits). A dashboard for any range
-// is a pure aggregation of the days inside that window, so the numbers always
-// match the selected start/end dates — 7D, 15D, 1M, QTR or a custom range.
-
-const DEMO_SHOPS = [
-  "Sri Balaji Poultry Traders",
-  "Venkatadri Egg Suppliers",
-  "Annapurna Farms Outlet",
-  "Kakatiya Poultry Point",
-];
-const DEMO_VEHICLES = [
-  "AP-16-XY-4821",
-  "AP-16-AB-7314",
-  "AP-16-CD-1908",
-  "AP-16-FG-5527",
-  "AP-16-HJ-8840",
-];
-const DEMO_DAYS = 180;
-
-interface DemoDay {
-  date: string;
-  trips: number;
-  weight: number;
-  sales: number;
-  collections: number;
-  pending: number;
-  fuel: number;
-  tripCost: number;
-  maintenance: number;
-  mortality: number;
-  cash: number;
-  union: number;
-  hdfc: number;
-  shopSales: number[];
-  shopPending: number[];
-  topShop: number;
-}
-
-/** Stable pseudo-random in [0,1) from an integer seed (no day-to-day drift). */
-const seeded = (seed: number): number => {
-  const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
-  return x - Math.floor(x);
-};
-
-const demoDateKey = (offset: number): string => {
-  const value = new Date();
-  value.setHours(0, 0, 0, 0);
-  value.setDate(value.getDate() - offset);
-  const y = value.getFullYear();
-  const m = String(value.getMonth() + 1).padStart(2, "0");
-  const d = String(value.getDate()).padStart(2, "0");
-  return `${y}-${m}-${d}`;
-};
-
-const round100 = (n: number) => Math.round(n / 100) * 100;
-
-let demoTimelineCache: DemoDay[] | null = null;
-
-function getDemoTimeline(): DemoDay[] {
-  if (demoTimelineCache) return demoTimelineCache;
-  const days: DemoDay[] = [];
-  // Index 0 is today, so slice(0, n) always means "last n days".
-  for (let i = 0; i < DEMO_DAYS; i += 1) {
-    const r = (k: number) => seeded(i * 17 + k * 7 + 3);
-    // Weekends run slightly lighter; trips land between 4 and 11.
-    const dateValue = new Date();
-    dateValue.setDate(dateValue.getDate() - i);
-    const weekend =
-      dateValue.getDay() === 0 ? 0.72 : dateValue.getDay() === 6 ? 0.82 : 1;
-    const trips = Math.max(3, Math.round((5 + r(1) * 6) * weekend));
-    const weight = Math.round(trips * (740 + r(2) * 240));
-    const sales = round100(weight * (15.1 + r(3) * 1.1));
-    const collections = round100(sales * (0.76 + r(4) * 0.12));
-    const pending = sales - collections;
-    const fuel = round100(trips * (700 + r(5) * 280));
-    const tripCost = round100(trips * (540 + r(6) * 240));
-    const maintenance = r(7) < 0.32 ? round100(1600 + r(8) * 3400) : 0;
-    const mortality = trips * (3 + Math.floor(r(9) * 4));
-    // Payment-mode split of the day's collections.
-    const cashShare = 0.36 + r(10) * 0.1;
-    const unionShare = 0.3 + r(11) * 0.08;
-    const cash = round100(collections * cashShare);
-    const union = round100(collections * unionShare);
-    const hdfc = Math.max(0, collections - cash - union);
-    // Shop split: 4 weighted shares, normalised to the day's sales/pending.
-    const rawShares = [
-      0.3 + r(12) * 0.08,
-      0.24 + r(13) * 0.08,
-      0.2 + r(14) * 0.07,
-      0,
-    ];
-    rawShares[3] = Math.max(
-      0.08,
-      1 - rawShares[0] - rawShares[1] - rawShares[2],
-    );
-    const shopSales = rawShares.map((share) => round100(sales * share));
-    const shopPending = rawShares.map((share) => Math.round(pending * share));
-    // Reconcile rounding onto the largest share so totals stay exact.
-    const salesDelta = sales - shopSales.reduce((a, b) => a + b, 0);
-    const pendingDelta = pending - shopPending.reduce((a, b) => a + b, 0);
-    let topShop = 0;
-    rawShares.forEach((share, idx) => {
-      if (share > rawShares[topShop]) topShop = idx;
-    });
-    shopSales[topShop] += salesDelta;
-    shopPending[topShop] += pendingDelta;
-    days.push({
-      date: demoDateKey(i),
-      trips,
-      weight,
-      sales,
-      collections,
-      pending,
-      fuel,
-      tripCost,
-      maintenance,
-      mortality,
-      cash,
-      union,
-      hdfc,
-      shopSales,
-      shopPending,
-      topShop,
-    });
-  }
-  demoTimelineCache = days;
-  return days;
-}
-
-/** Aggregate the demo ledger for [from, to] (inclusive, local midnight). */
-function demoDashboard(from: Date | null, to: Date | null): DashboardData {
-  const timeline = getDemoTimeline();
-  const keyOf = (d: Date) => {
-    const v = new Date(d);
-    v.setHours(0, 0, 0, 0);
-    // floor (not round): today's midnight is a positive fraction of a day ago.
-    return demoDateKey(Math.floor((Date.now() - v.getTime()) / 86_400_000));
-  };
-  // Default window is the last 7 days when no range is selected.
-  const fromKey = from ? keyOf(from) : timeline[6].date;
-  const toKey = to ? keyOf(to) : timeline[0].date;
-  // Timeline is today-first; charts and tables want oldest-first.
-  const days = timeline
-    .filter((d) => d.date >= fromKey && d.date <= toKey)
-    .reverse();
-
-  const sum = (pick: (d: DemoDay) => number) =>
-    days.reduce((acc, d) => acc + pick(d), 0);
-  const empty: DashboardData = {
-    totalTrips: 0,
-    totalSalesWeight: 0,
-    totalSalesAmount: 0,
-    totalBirds: 0,
-    totalCollections: 0,
-    pendingCollections: 0,
-    totalExpenses: 0,
-    fuelExpense: 0,
-    tripExpense: 0,
-    todaysTrips: 0,
-    weeklyTrips: 0,
-    monthlyTrips: 0,
-    trendData: [],
-    topShops: [],
-    collectionsByMode: [],
-    expensesByCategory: [],
-    mortalityData: [],
-    recentTrips: [],
-    activeVehicles: 18,
-    activeDrivers: 24,
-    activeHelpers: 31,
-    totalShops: 100,
-    totalFarms: 24,
-    collectionPerformanceByShop: [],
-    usedVehicles: 14,
-    usedDrivers: 20,
-    usedHelpers: 26,
-    usedShops: 38,
-    usedFarms: 12,
-    sampleQuarter: null,
-  };
-  if (days.length === 0) return empty;
-
-  // Fixed-semantics counters (independent of the chosen window).
-  const todaysTrips = timeline[0].trips;
-  const weeklyTrips = timeline.slice(0, 7).reduce((acc, d) => acc + d.trips, 0);
-  const monthStartKey = demoDateKey(0).slice(0, 8) + "01";
-  const monthlyTrips = timeline
-    .filter((d) => d.date >= monthStartKey)
-    .reduce((acc, d) => acc + d.trips, 0);
-
-  // Recent trips: one row per most-recent day in the window, with trip numbers
-  // derived from absolute trip counts so they are stable across ranges.
-  const recentDays = days.slice(-3).reverse();
-  const recentTrips = recentDays.map((d) => {
-    const offsetFromToday = timeline.findIndex((p) => p.date === d.date);
-    const tripsNewer = timeline
-      .slice(0, offsetFromToday)
-      .reduce((a, p) => a + p.trips, 0);
-    // Number the day's last trip; stable across windows because it is derived
-    // only from absolute trip counts.
-    const tripId = 2601 - tripsNewer - (d.trips - 1);
-    return {
-      id: tripId,
-      tripNo: `TRP-${tripId}`,
-      vehicleNo:
-        DEMO_VEHICLES[
-          Math.floor(seeded(offsetFromToday * 31 + 5) * DEMO_VEHICLES.length)
-        ],
-      shopName: DEMO_SHOPS[d.topShop],
-      weight: Math.round(d.weight / d.trips),
-      status: offsetFromToday === 0 ? "Pending" : "Completed",
-    };
-  });
-
-  const fuel = sum((d) => d.fuel);
-  const tripCost = sum((d) => d.tripCost);
-  const maintenance = sum((d) => d.maintenance);
-  const shopSalesTotals = DEMO_SHOPS.map((_, idx) =>
-    sum((d) => d.shopSales[idx]),
+  const { data } = await apiGet<OperationsDashboardApiResponse>(
+    DASHBOARD_PATH,
+    {
+      params: dashboardDateParams(fromDate, toDate),
+    },
   );
-  const shopPendingTotals = DEMO_SHOPS.map((_, idx) =>
-    sum((d) => d.shopPending[idx]),
-  );
-
-  return {
-    totalTrips: sum((d) => d.trips),
-    totalSalesWeight: sum((d) => d.weight),
-    totalSalesAmount: sum((d) => d.sales),
-    totalCollections: sum((d) => d.collections),
-    pendingCollections: sum((d) => d.pending),
-    totalExpenses: fuel + tripCost + maintenance,
-    fuelExpense: fuel,
-    tripExpense: tripCost,
-    todaysTrips,
-    weeklyTrips,
-    monthlyTrips,
-    trendData: days.map((d) => ({
-      date: d.date,
-      trips: d.trips,
-      weight: d.weight,
-      mortality: d.mortality,
-    })),
-    topShops: DEMO_SHOPS.map((shopName, idx) => ({
-      shopName,
-      amount: shopSalesTotals[idx],
-    })).sort((a, b) => b.amount - a.amount),
-    collectionsByMode: [
-      { name: "Cash", value: sum((d) => d.cash) },
-      { name: "Union Bank", value: sum((d) => d.union) },
-      { name: "HDFC Bank", value: sum((d) => d.hdfc) },
-    ],
-    expensesByCategory: [
-      { name: "Fuel", value: fuel },
-      { name: "Trip", value: tripCost },
-      { name: "Maintenance", value: maintenance },
-    ],
-    mortalityData: days.map((d) => ({ date: d.date, mortality: d.mortality })),
-    recentTrips,
-    activeVehicles: 18,
-    activeDrivers: 24,
-    activeHelpers: 31,
-    totalShops: 100,
-    totalFarms: 24,
-    collectionPerformanceByShop: DEMO_SHOPS.map((shopName, idx) => ({
-      shopName,
-      salesAmount: shopSalesTotals[idx],
-      collectionAmount: Math.max(
-        0,
-        shopSalesTotals[idx] - shopPendingTotals[idx],
-      ),
-      outstandingAmount: shopPendingTotals[idx],
-    })),
-    usedVehicles: 14,
-    usedDrivers: 20,
-    usedHelpers: 26,
-    usedShops: 38,
-    usedFarms: 12,
-    sampleQuarter: null,
-  };
-}
-
-/** LocalStorage-derived fallback for GET /api/operations/dashboard. */
-function offlineDashboard(): DashboardData {
-  const read = <T>(key: string): T[] => {
-    try {
-      const raw = localStorage.getItem(key);
-      return raw ? (JSON.parse(raw) as T[]) : [];
-    } catch {
-      return [];
-    }
-  };
-  const num = (v: unknown) => {
-    const n = Number(v);
-    return Number.isFinite(n) ? n : 0;
-  };
-
-  type TripRow = {
-    tripDate?: string;
-    status?: string;
-    totalWeight?: number;
-    totalDeliveredWeight?: number;
-    totalBirds?: number;
-  };
-  type SaleRow = {
-    tripDate?: string;
-    shopName?: string;
-    totalWeight?: number;
-    totalBirds?: number;
-    amount?: number;
-  };
-  type CollectionRow = {
-    collectionDate?: string;
-    shopName?: string;
-    amount?: number;
-    status?: string;
-  };
-  type FuelRow = { date?: string; amount?: number };
-
-  const trips = read<TripRow>("vehicleTrips");
-  const sales = read<SaleRow>("shopSales");
-  const collections = read<CollectionRow>("dmr-collections");
-  const fuel = read<FuelRow>("dmr-fuel-expenses");
-
-  const today = toBusinessDate(new Date());
-  const weekAgo = new Date(Date.now() - 6 * 86400000)
-    .toISOString()
-    .slice(0, 10);
-  const monthStart = new Date(
-    new Date().getFullYear(),
-    new Date().getMonth(),
-    1,
-  )
-    .toISOString()
-    .slice(0, 10);
-
-  const sumRows = (rows: { amount?: number }[]) =>
-    rows.reduce((acc, r) => acc + num(r.amount), 0);
-  const approvedCollections = collections.filter(
-    (c) => (c.status ?? "Approved") === "Approved",
-  );
-  const shopNames = new Set([
-    ...sales.map((row) => String(row.shopName ?? "").trim()),
-    ...approvedCollections.map((row) => String(row.shopName ?? "").trim()),
-  ]);
-  shopNames.delete("");
-  const collectionPerformanceByShop = [...shopNames].map((shopName) => {
-    const salesAmount = sumRows(
-      sales.filter((row) => row.shopName === shopName),
-    );
-    const collectionAmount = sumRows(
-      approvedCollections.filter((row) => row.shopName === shopName),
-    );
-    return {
-      shopName,
-      salesAmount,
-      collectionAmount,
-      outstandingAmount: Math.max(0, salesAmount - collectionAmount),
-    };
-  });
-
-  return {
-    totalTrips: trips.length,
-    totalSalesWeight: sales.reduce((acc, s) => acc + num(s.totalWeight), 0),
-    totalSalesAmount: sumRows(sales),
-    totalCollections: sumRows(approvedCollections),
-    pendingCollections: sumRows(
-      collections.filter((c) => c.status === "Pending"),
+  return toCollectionRecoverySnapshot(
+    // The recovery card refreshes only its own rows — skip the two span
+    // trip fetches it would otherwise duplicate in the background.
+    await enrichOperationsDashboardData(
+      mapDashboardResponse(data),
+      fromDate,
+      toDate,
+      false,
     ),
-    totalExpenses: sumRows(fuel),
-    fuelExpense: sumRows(fuel),
-    tripExpense: trips.reduce(
-      (acc, t) => acc + num((t as { expense?: number }).expense),
-      0,
-    ),
-    todaysTrips: trips.filter((t) => t.tripDate === today).length,
-    weeklyTrips: trips.filter((t) => t.tripDate && t.tripDate >= weekAgo)
-      .length,
-    monthlyTrips: trips.filter((t) => t.tripDate && t.tripDate >= monthStart)
-      .length,
-    trendData: [],
-    topShops: [],
-    collectionsByMode: [],
-    expensesByCategory: [],
-    mortalityData: [],
-    recentTrips: [],
-    activeVehicles: 0,
-    activeDrivers: 0,
-    activeHelpers: 0,
-    totalShops: 0,
-    totalFarms: 0,
-    collectionPerformanceByShop,
-    usedVehicles: 0,
-    usedDrivers: 0,
-    usedHelpers: 0,
-    usedShops: 0,
-    usedFarms: 0,
-    sampleQuarter: null,
-  };
+  );
 }
 
 export { handleApiError };
+
+
