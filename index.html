@@ -68,26 +68,26 @@
     <style>
       html {
         font-size: calc(100% * var(--dmr-font-scale, 1));
-        background: #064e3b;
+        background: #ffffff;
       }
-      body { background: #064e3b; }
+      body { background: #ffffff; }
       #root { background: #f8fafc; min-height: 100vh; }
     </style>
     <!-- Inter is bundled locally via @fontsource/inter (src/index.css) — no
          external font request; the app is self-contained and deterministic. -->
     <style>
       /* Static boot splash — visible on FIRST paint, identical to the
-         AuthGate splash that replaces it, so loading is one continuous
-         branded screen (never a white flash with a bare spinner). */
+         AuthGate splash that replaces it: white background, bobbing hen,
+         DMR Poultries wordmark, indeterminate progress bar. */
       #app-splash {
         min-height: 100dvh;
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        background: linear-gradient(135deg, #065f46 0%, #064e3b 45%, #020617 100%);
+        background: #ffffff;
         font-family: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
-        color: #ffffff;
+        color: #0f172a;
       }
       #app-splash .splash-hen {
         width: calc(112px * var(--dmr-font-scale, 1));
@@ -96,32 +96,32 @@
         animation: splash-bob 1.9s ease-in-out infinite;
       }
       #app-splash .splash-title {
-        margin-top: calc(24px * var(--dmr-font-scale, 1));
+        margin-top: calc(20px * var(--dmr-font-scale, 1));
         font-size: calc(30px * var(--dmr-font-scale, 1));
         font-weight: 700;
         letter-spacing: -0.02em;
-        color: #ffffff;
+        color: #0f172a;
       }
       #app-splash .splash-track {
         margin-top: calc(24px * var(--dmr-font-scale, 1));
         width: 176px;
         height: 4px;
         border-radius: 999px;
-        background: rgba(255, 255, 255, 0.15);
+        background: #e2e8f0;
         overflow: hidden;
       }
       #app-splash .splash-bar {
         width: 33%;
         height: 100%;
         border-radius: 999px;
-        background: linear-gradient(to right, #6ee7b7, #99f6e4);
+        background: #059669;
         animation: splash-bar 1.5s cubic-bezier(0.45, 0, 0.55, 1) infinite;
       }
       #app-splash .splash-sub {
         margin-top: calc(16px * var(--dmr-font-scale, 1));
         font-size: calc(14px * var(--dmr-font-scale, 1));
         font-weight: 500;
-        color: rgba(209, 250, 229, 0.8);
+        color: #64748b;
       }
       #app-splash .splash-dots span {
         display: inline-block;
@@ -131,7 +131,7 @@
       #app-splash .splash-dots span:nth-child(3) { animation-delay: 0.4s; }
       @keyframes splash-bob {
         0%, 100% { transform: translateY(0) rotate(0deg); }
-        50% { transform: translateY(-12px) rotate(-2.5deg); }
+        50% { transform: translateY(-10px) rotate(-2.5deg); }
       }
       @keyframes splash-bar {
         0% { transform: translateX(-110%); }

@@ -63,7 +63,10 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 import http from "node:http";
-import { randomUUID } from "node:crypto";
+import { createHmac, randomUUID } from "node:crypto";
+import { tmpdir } from "node:os";
+import { readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
 
 const PORT = Number(process.env.PORT ?? process.env.MOCK_BACKEND_PORT ?? 4000);
 
@@ -4779,21 +4782,83 @@ const USERS = {
   },
 };
 
-/** Issued bearer tokens → username. Fresh per server start (like any
- *  in-memory session store); a token that stops resolving answers 401. */
-const SESSIONS = new Map();
+/**
+ * Stateless signed tokens: `sample.<username>.<hmac>`. They survive server
+ * restarts (dev restarts constantly), so a signed-in user is never bounced
+ * back to the sign-in screen by a redeplo. `randomUUID` was dropped for this;
+ * only logout revocation stays in memory.
+ */
+// Random per install, persisted to the OS temp dir: tokens stay valid across
+// dev-server restarts (the file outlives the process) but are unforgeable.
+// (A fixed secret would make every login mint the SAME token string — which
+// logout revocation would then permanently kill: logout → re-login → still
+// revoked → bounced to the sign-in screen forever. Never do that.)
+const SECRET_FILE = path.join(tmpdir(), "dmr-sample-token-secret");
+let SAMPLE_TOKEN_SECRET = null;
+try {
+  SAMPLE_TOKEN_SECRET = readFileSync(SECRET_FILE, "utf8").trim() || null;
+} catch {
+  SAMPLE_TOKEN_SECRET = null;
+}
+if (!SAMPLE_TOKEN_SECRET) {
+  SAMPLE_TOKEN_SECRET = randomUUID();
+  try {
+    writeFileSync(SECRET_FILE, SAMPLE_TOKEN_SECRET);
+  } catch {
+    // unwritable temp dir — fall back to a per-boot secret (restarts then
+    // need one fresh sign-in, exactly like a normal backend restart)
+  }
+}
+
+function sign(username, version) {
+  return createHmac("sha256", SAMPLE_TOKEN_SECRET).update(`${username}:${version}`).digest("hex").slice(0, 32);
+}
+
+/**
+ * Per-user session VERSION, persisted next to the secret. The token carries
+ * the version it was issued at; logout bumps the version, which invalidates
+ * every older token — so a re-login mints a fresh, working one. Without this,
+ * deterministic tokens + logout revocation deadlock: the new login returns
+ * the same string the revocation list still rejects (the exact sign-in loop).
+ */
+const VERSIONS_FILE = path.join(tmpdir(), "dmr-sample-session-versions.json");
+const VERSIONS = (() => {
+  try {
+    return JSON.parse(readFileSync(VERSIONS_FILE, "utf8"));
+  } catch {
+    return {};
+  }
+})();
+
+function saveVersions() {
+  try {
+    writeFileSync(VERSIONS_FILE, JSON.stringify(VERSIONS));
+  } catch {
+    // versions then reset on restart — worst case one extra sign-in
+  }
+}
+
+function sessionVersion(username) {
+  return String(VERSIONS[username] ?? 0);
+}
 
 function issueToken(username) {
-  const token = `sample-${username}-${randomUUID()}`;
-  SESSIONS.set(token, username);
-  return token;
+  const version = sessionVersion(username);
+  return `sample.${username}.${version}.${sign(username, version)}`;
 }
 
 function sessionUserFromRequest(req) {
   const header = String(req.headers.authorization ?? "");
   const token = header.startsWith("Bearer ") ? header.slice(7) : null;
-  if (!token || !SESSIONS.has(token)) return null;
-  return USERS[SESSIONS.get(token)] ?? null;
+  if (!token) return null;
+  const parts = token.split(".");
+  if (parts.length !== 4 || parts[0] !== "sample") return null;
+  const username = parts[1];
+  const version = parts[2];
+  if (!USERS[username]) return null;
+  if (sessionVersion(username) !== version) return null; // logged out / superseded
+  if (sign(username, version) !== parts[3]) return null;
+  return USERS[username];
 }
 
 // ── Supervisor API scope (server-side enforcement) ─────────────────────────
@@ -5183,7 +5248,11 @@ const server = http.createServer(async (req, res) => {
     if (p === "/api/auth/logout" && method === "POST") {
       const header = String(req.headers.authorization ?? "");
       const token = header.startsWith("Bearer ") ? header.slice(7) : null;
-      if (token) SESSIONS.delete(token);
+      const parts = token ? token.split(".") : [];
+      if (parts.length === 4 && USERS[parts[1]]) {
+        VERSIONS[parts[1]] = Number(parts[2] ?? 0) + 1;
+        saveVersions();
+      }
       return send(200, { ok: true });
     }
     if (p === "/api/bootstrap")
