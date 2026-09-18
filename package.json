@@ -34,6 +34,7 @@
     "test:orders-navigation": "tsx --test src/modules/orders/utils/ordersNavigation.test.ts src/modules/orders/utils/assignmentSort.test.ts src/modules/orders/utils/collectionWindow.test.ts",
     "test:e2e:orders": "playwright test --config tests/orders/playwright.config.ts",
     "test:orders-performance": "tsx --test src/modules/orders/utils/orderAssignmentIndex.test.ts src/modules/operations/vehicle-trips/services/tripHeaderApiService.timestamps.test.ts",
+    "test:orders-contract": "node -r ../../backend/tests/helpers/osUserInfoShim.cjs --import tsx --test src/modules/orders/services/ordersService.contract.test.ts",
     "test:fleet": "tsx --test src/modules/fleet-operations/activeFleetScope.test.ts src/modules/fleet-operations/services/fleetSessionCache.test.ts",
     "test:emi-preview": "tsx --test tests/emi/emi-preview.test.ts tests/emi/emi-model.test.ts",
     "test:payslip": "tsx tests/payslip/payslip-pdf.smoke.mjs",

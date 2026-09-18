@@ -83,19 +83,17 @@ const num = (v: unknown): number => {
  * per-day read-only assignment views.
  */
 export async function fetchOrdersData(): Promise<OrdersFetch> {
-  // Sample-data mode makes NO request at all (see sampleOrdersData.ts): the
-  // bundled trips go through the very same derivation below, so every Orders
-  // rule (containers, capacity, uniqueness, progress) still applies.
-  let trips: Trip[];
-  let vehicleList: Array<{ id: number; noOfBoxes?: number }>;
   const [liveTrips, vehicles] = await Promise.all([
     // Orders classifies collection/assignment from persisted delivery rows.
     // The summary list omits them — always hydrate with full=true.
     listTrips({ full: true }),
     loadVehicles().catch(() => [] as Vehicle[]),
   ]);
-  trips = uniqueTripsById(liveTrips);
-  vehicleList = vehicles.map((v) => ({ id: v.id, noOfBoxes: v.noOfBoxes }));
+  const trips = uniqueTripsById(liveTrips);
+  const vehicleList: Array<{ id: number; noOfBoxes?: number }> = vehicles.map((v) => ({
+    id: v.id,
+    noOfBoxes: v.noOfBoxes,
+  }));
 
   // Per-fetch only: reuse sorted rows without caching business data across saves.
   const sortedRows = new Map<Trip, ShopDelivery[]>();
@@ -110,9 +108,7 @@ export async function fetchOrdersData(): Promise<OrdersFetch> {
   const assignmentIndex = indexOrderAssignments(trips, orderedRows);
 
   const today = localToday();
-  // Ten calendar days always contain the sample generator's latest eight
-  // operating days (Sundays are closed). This keeps every Order day advertised
-  // by the quarter overview reachable from the single date picker.
+  // Keep the operational picker bounded while deriving every row from live data.
   const days = Array.from({ length: 10 }, (_, i) => addLocalDays(today, i - 9));
 
   // ── Per-day collections (one container per operational day) ─────────────
@@ -391,33 +387,101 @@ function toOrderPayload(rows: OrderShopRow[]): Record<string, unknown> {
 export async function saveCollection(
   containerId: number | null,
   tripNo: string | null,
-  rows: OrderShopRow[]
+  rows: OrderShopRow[],
+  options: {
+    operationalDay?: string;
+    onContainerCreated?: (trip: Trip) => void;
+  } = {}
 ): Promise<Trip> {
+  const container = await ensureCollectionContainer(containerId, options.operationalDay);
+  options.onContainerCreated?.(container);
   const body: Record<string, unknown> = {
     ...toOrderPayload(rows),
     mode: "save",
-    ...(containerId == null && tripNo ? { tripNo } : {}),
   };
-  const id = containerId ?? 0;
-  const { data } = await apiPost<RawTrip>(`/trips/${id}/steps/deliveries`, body);
-  return mapApiTripToTrip(data, {} as Trip);
+  void tripNo;
+  const { data } = await apiPost<RawTrip>(
+    `/trips/${container.id}/steps/deliveries`,
+    body
+  );
+  return mapApiTripToTrip(data, container);
 }
 
 /** Finish Collection (Tab 1) — final validation already done by the caller. */
 export async function finishCollection(
   containerId: number | null,
   tripNo: string | null,
-  rows: OrderShopRow[]
+  rows: OrderShopRow[],
+  options: {
+    operationalDay?: string;
+    onContainerCreated?: (trip: Trip) => void;
+  } = {}
 ): Promise<Trip> {
+  const container = await ensureCollectionContainer(containerId, options.operationalDay);
+  options.onContainerCreated?.(container);
   const body: Record<string, unknown> = {
     ...toOrderPayload(rows),
     mode: "save",
     startStepSubmitted: true,
-    ...(containerId == null && tripNo ? { tripNo } : {}),
   };
-  const id = containerId ?? 0;
-  const { data } = await apiPost<RawTrip>(`/trips/${id}/steps/deliveries`, body);
-  return mapApiTripToTrip(data, {} as Trip);
+  void tripNo;
+  const { data } = await apiPost<RawTrip>(
+    `/trips/${container.id}/steps/deliveries`,
+    body
+  );
+  return mapApiTripToTrip(data, container);
+}
+
+async function ensureCollectionContainer(
+  containerId: number | null,
+  operationalDay?: string
+): Promise<Trip> {
+  if (Number.isSafeInteger(containerId) && Number(containerId) > 0) {
+    return { id: Number(containerId) } as Trip;
+  }
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(operationalDay ?? "")) {
+    throw new Error("A valid operational day is required to create the order collection.");
+  }
+
+  const before = uniqueTripsById(await listTrips({ full: true }));
+  const existing = before.find(
+    (trip) => trip.tripDate === operationalDay && isOrderContainer(trip)
+  );
+  if (existing) return existing;
+
+  const beforeIds = new Set(before.map((trip) => trip.id));
+  try {
+    const { data } = await apiPost<RawTrip>("/trips", {
+      tripDate: operationalDay,
+      remarks: "[ORDER_COLLECTION]",
+    });
+    const created = mapApiTripToTrip(data, {} as Trip);
+    if (!Number.isSafeInteger(created.id) || created.id <= 0 || !created.tripNo) {
+      throw new Error("The server created an invalid order collection container.");
+    }
+    return created;
+  } catch (createError) {
+    try {
+      const after = uniqueTripsById(await listTrips({ full: true }));
+      const committed = after.find(
+        (trip) => trip.tripDate === operationalDay && isOrderContainer(trip)
+      );
+      if (committed) return committed;
+      const candidates = after.filter(
+        (trip) =>
+          !beforeIds.has(trip.id) &&
+          trip.tripDate === operationalDay &&
+          trip.deleted !== true &&
+          (trip.vehicleId == null || trip.vehicleId === 0) &&
+          !trip.vehicleNo &&
+          rowsInSequence(trip).length === 0
+      );
+      if (candidates.length === 1 && candidates[0].id > 0) return candidates[0];
+    } catch {
+      // Preserve the useful create failure when reconciliation itself fails.
+    }
+    throw createError;
+  }
 }
 
 /** Map persisted rows (after a save) back to editor rows. */

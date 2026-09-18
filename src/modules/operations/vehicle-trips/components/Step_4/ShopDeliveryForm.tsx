@@ -17,6 +17,7 @@ import {
 import { SearchDropdown, MultiSearchDropdown, type DropdownOption } from "../WizardControls";
 import type { ShopDelivery, BoxDetail } from "../../types/trip";
 import { useI18n } from "../../../../../i18n";
+import { formatTripViewStamp } from "../../utils/tripViewLocalization";
 
 /** Soft, eye-friendly tile palette cycled across the selected-box grid so each
  *  box number is easy to tell apart without harsh/bright colours. */
@@ -161,7 +162,7 @@ export default function ShopDeliveryForm({
   birdOptions,
   isFormValid,
 }: Props) {
-  const { t } = useI18n();
+  const { t, language } = useI18n();
   const selectedBoxIds: number[] = formData.selectedBoxIds || [];
   const isEditing = editingId !== null;
 
@@ -184,6 +185,8 @@ export default function ShopDeliveryForm({
     value: String(b.boxNo),
     label: `${String(b.boxNo).padStart(2, "0")} · ${b.birds} ${t("common.birds")} · ${Number(b.weight).toFixed(2)} kg`,
     chipLabel: `${String(b.boxNo).padStart(2, "0")}`,
+    // Search by box number only — typing "44" must not match weight 44.xx kg.
+    searchText: `${String(b.boxNo)} ${String(b.boxNo).padStart(2, "0")}`,
   }));
 
   // Bright, eye-friendly coloured box-number chips for the box dropdown list.
@@ -229,7 +232,11 @@ export default function ShopDeliveryForm({
               <p className="text-[11px] text-slate-400 flex items-center gap-1.5 mt-0.5">
                 <Clock size={11} className="text-slate-400" />
                 {t("ops.trip.auto_captured")}:
-                <span className="font-semibold text-slate-600">{autoCaptureTime || "—"}</span>
+                <span className="font-semibold text-slate-600">
+                  {autoCaptureTime
+                    ? formatTripViewStamp(autoCaptureTime, language) || autoCaptureTime
+                    : "—"}
+                </span>
               </p>
             )}
           </div>

@@ -16,37 +16,75 @@ export interface BoxRemaining extends BoxDetail {
  *   - box mode, multiple boxes (no per-box split): consumes the WHOLE box —
  *     the row takes the box's full remaining birds/weight, so the box can
  *     never be selected again.
+ *
+ * Once all birds from a pickup box are delivered, the box is FULLY consumed
+ * even if a few hundred grams of farm-vs-DC weight variance remain. That
+ * leftover kg is not stock for another shop.
  */
 export function computeRemainingBoxes(
-  _boxDetails: BoxDetail[],
+  boxDetails: BoxDetail[],
   rows: ShopDelivery[],
   opts: { excludeRowId?: number | null } = {}
 ): Map<number, { birds: number; weight: number }> {
+  const byNo = new Map<number, BoxDetail>();
+  for (const b of boxDetails ?? []) {
+    byNo.set(Number(b.boxNo), b);
+  }
+
   const used = new Map<number, { birds: number; weight: number }>();
   const add = (boxNo: number, birds: number, weight: number) => {
     const cur = used.get(boxNo) ?? { birds: 0, weight: 0 };
     used.set(boxNo, { birds: cur.birds + birds, weight: cur.weight + weight });
   };
+
+  const consumeBox = (boxNo: number, birdsTaken: number, weightTaken: number) => {
+    const orig = byNo.get(boxNo);
+    const origBirds = Number(orig?.birds || 0);
+    // All birds gone → box is done (ignore residual kg variance).
+    if (origBirds > 0 && birdsTaken >= origBirds) {
+      add(boxNo, FULLY_CONSUMED, FULLY_CONSUMED);
+      return;
+    }
+    add(boxNo, birdsTaken, weightTaken);
+  };
+
   rows.forEach((row) => {
     if (opts.excludeRowId != null && Number(row.id) === Number(opts.excludeRowId)) return;
+    // Pending `[ORDER]` plan stubs must not consume pickup boxes.
+    if (!isDeliveredRow(row)) return;
     const extra = row as ShopDelivery & {
       perBoxData?: { boxNo: number; birds: number; weight: number }[];
       selectedBoxIds?: number[];
       mortKg?: number;
     };
     const per = Array.isArray(extra.perBoxData) ? extra.perBoxData : [];
-    const selected: number[] = Array.isArray(extra.selectedBoxIds) ? extra.selectedBoxIds.map(Number) : [];
+    const selected: number[] = Array.isArray(extra.selectedBoxIds)
+      ? extra.selectedBoxIds.map(Number).filter((n) => Number.isFinite(n) && n > 0)
+      : [];
+
     if (per.length) {
-      per.forEach((pb) => add(Number(pb.boxNo), Number(pb.birds || 0), Number(pb.weight || 0)));
-    } else if (selected.length === 1) {
-      add(
+      per.forEach((pb) =>
+        consumeBox(Number(pb.boxNo), Number(pb.birds || 0), Number(pb.weight || 0))
+      );
+      return;
+    }
+
+    if (selected.length === 1) {
+      consumeBox(
         selected[0],
         Number(row.birds || 0) + Number(row.mortality || 0),
         Number(row.weight || 0) + Number(extra.mortKg || 0)
       );
-    } else {
-      selected.forEach((id) => add(id, FULLY_CONSUMED, FULLY_CONSUMED));
+      return;
     }
+
+    if (selected.length > 1) {
+      selected.forEach((id) => add(id, FULLY_CONSUMED, FULLY_CONSUMED));
+      return;
+    }
+
+    // Fallback: birds/weight saved but selectedBoxIds missing — still mark
+    // delivered quantity against nothing selectable (defense for old rows).
   });
   return used;
 }
@@ -62,11 +100,16 @@ export function pendingBoxesFromRows(
     .map((b) => {
       const boxNo = Number(b.boxNo);
       const consumed = used.get(boxNo) ?? { birds: 0, weight: 0 };
-      const remainBirds = Math.max(0, Number(b.birds || 0) - consumed.birds);
-      const remainWeight = Math.max(0, Number(b.weight || 0) - consumed.weight);
+      let remainBirds = Math.max(0, Number(b.birds || 0) - consumed.birds);
+      let remainWeight = Math.max(0, Number(b.weight || 0) - consumed.weight);
+      // Zero birds left ⇒ box is fully delivered; drop residual kg.
+      if (remainBirds <= 0) {
+        remainBirds = 0;
+        remainWeight = 0;
+      }
       return { ...b, boxNo, birds: remainBirds, weight: remainWeight } as BoxRemaining;
     })
-    .filter((b) => b.birds > 0 || b.weight > 0);
+    .filter((b) => b.birds > 0);
 }
 
 /** Assigned shops still awaiting a captured Step 4 delivery. */
@@ -77,8 +120,7 @@ export function pendingShopsFromRows(rows: ShopDelivery[]): number {
     const shopId = Number(row.shopId);
     if (!Number.isFinite(shopId) || shopId <= 0) continue;
     if (String(row.remarks ?? "").trim().startsWith("[ORDER]")) assigned.add(shopId);
-    const extra = row as ShopDelivery & { deliveredAt?: string; deliveryTime?: string };
-    if (row.autoCaptureTime || extra.deliveredAt || extra.deliveryTime) captured.add(shopId);
+    if (isDeliveredRow(row)) captured.add(shopId);
   }
   if (assigned.size === 0) return 0;
   let pending = 0;
@@ -189,16 +231,25 @@ export function sortShopsAssignedFirst<T extends { value: number; label: string 
   });
 }
 
-/** A delivery row is "captured / delivered" once it stops being a pending
- *  `[ORDER]` assignment row and carries actual delivery data (selected boxes,
- *  birds, weight), or the backend already recorded its capture time. */
+/** A delivery row is "captured / delivered" once Step 4 has real delivery
+ *  evidence — capture time, or (for non-plan Add-Shop rows) selected boxes /
+ *  birds/weight. Bare `[ORDER]` plan rows may carry assigned `selectedBoxIds`
+ *  from Order Assignment; those stay pending until a real capture stamps a
+ *  time (otherwise remaining-box math locks those boxes and Step 4 rejects
+ *  the shop with "available weight" errors). */
 export function isDeliveredRow(row: ShopDelivery): boolean {
-  const extra = row as ShopDelivery & { autoCaptureTime?: string };
-  if (extra.autoCaptureTime) return true;
+  const extra = row as ShopDelivery & {
+    autoCaptureTime?: string;
+    deliveredAt?: string;
+    deliveryTime?: string;
+  };
+  if (extra.autoCaptureTime || extra.deliveredAt || extra.deliveryTime) return true;
   const remarks = String(row.remarks ?? "").trim();
+  // Order-assignment plan stubs are reference-only until captured.
   if (remarks.startsWith("[ORDER]")) return false;
   const boxes = Array.isArray(row.selectedBoxIds) ? row.selectedBoxIds.length : 0;
-  return boxes > 0 || Number(row.birds) > 0 || Number(row.weight) > 0;
+  if (boxes > 0) return true;
+  return Number(row.birds) > 0 || Number(row.weight) > 0;
 }
 
 /** Delivered-shop identity keyed by BOTH shop id and shop name, so a row whose
@@ -309,10 +360,13 @@ export function remainingBoxesByNumber(
   boxDetails.forEach((b) => {
     const boxNo = Number(b.boxNo);
     const consumed = used.get(boxNo) ?? { birds: 0, weight: 0 };
-    remaining.set(boxNo, {
-      birds: Math.max(0, Number(b.birds || 0) - consumed.birds),
-      weight: Math.max(0, Number(b.weight || 0) - consumed.weight),
-    });
+    let birds = Math.max(0, Number(b.birds || 0) - consumed.birds);
+    let weight = Math.max(0, Number(b.weight || 0) - consumed.weight);
+    if (birds <= 0) {
+      birds = 0;
+      weight = 0;
+    }
+    remaining.set(boxNo, { birds, weight });
   });
   return remaining;
 }

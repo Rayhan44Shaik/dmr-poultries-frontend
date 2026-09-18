@@ -20,7 +20,7 @@ interface Props {
   birdTypes: any[];
   trip: Trip;
   updateDeliveries: (rows: ShopDelivery[], persistToStorage?: boolean, silent?: boolean) => void;
-  submitDeliveriesStep: () => boolean | Promise<boolean>;
+  submitDeliveriesStep: () => boolean | string | Promise<boolean | string>;
   saveDeliveriesProgress?: (rows: ShopDelivery[]) => Promise<boolean>;
   clearForm: () => void;
   readOnly?: boolean;
@@ -151,9 +151,12 @@ export default function StepDeliveries({
 
   const canLock = validationResult.valid;
 
-  const handleLockDeliveries = async (): Promise<boolean> => {
+  const handleLockDeliveries = async (): Promise<boolean | string> => {
+    // Balance is also checked in Step_4 before confirm; keep this guard so a
+    // direct call cannot submit with a mismatch. Plan stubs never create a
+    // balanceError (getDeliveriesBalanceError uses isCountedDeliveryRow).
     if (!canLock) {
-      return false;
+      return t("ops.trip.balance_mismatch_fix");
     }
     setIsStepEditing(false);
     setEditingShopId(null);

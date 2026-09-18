@@ -28,14 +28,15 @@ import {
   step4ShopsCount,
 } from "./remainingBoxes";
 import { computeDeliveryKpiTotals } from "./deliveryKpis";
-import { formatIstStamp } from "../../services/tripHeaderApiService";
 import { formatTripViewStamp, localizeTripViewText } from "../../utils/tripViewLocalization";
 import type { DeliveriesBalanceError } from "../../../../../shared/trip/validation";
+import { validateDeliveriesStep } from "../../../../../shared/trip/validation";
 import type { ShopDelivery, BoxDetail, Trip } from "../../types/trip";
 import type { DeliveryEmailStatusValue } from "../../services/deliveryEmailService";
 import type { DeliveryWhatsAppStatusValue } from "../../services/deliveryWhatsAppService";
 import { WizardActionBar, WizardStepNotice } from "../WizardStepUI";
 import { useI18n } from "../../../../../i18n";
+import { translateValidationMessage } from "../../utils/translateValidation";
 import { uiActionIconMotionClass } from "../../../../../shared/ui/uiTokens";
 import { TripTimestampDisplay } from "../TripTimestampDisplay";
 
@@ -60,7 +61,7 @@ interface Props {
   stepNumber?: number | string;
   updateDeliveries?: (rows: ShopDelivery[], persist?: boolean, silent?: boolean) => void;
   saveDeliveries?: () => Promise<boolean>;
-  submitDeliveries?: () => boolean | Promise<boolean>;
+  submitDeliveries?: () => boolean | string | Promise<boolean | string>;
   onClose?: () => void;
   persistedRows?: ShopDelivery[];
   balanceError?: DeliveriesBalanceError;
@@ -345,8 +346,38 @@ export default function UnLoadingTable({
   const [isSaving, setIsSaving] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const submitLockRef = useRef(false);
+  const autosaveTimerRef = useRef<number | undefined>(undefined);
+  const autosaveInFlightRef = useRef(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" | "warning" | "info" } | null>(null);
+  const toastTimerRef = useRef<number | undefined>(undefined);
   const hasUnsavedChanges = JSON.stringify(safeRows) !== JSON.stringify(persistedRows ?? []);
+
+  // Auto-clear notices (Progress saved / shop saved) after 5 seconds.
+  useEffect(() => {
+    window.clearTimeout(toastTimerRef.current);
+    if (!toast) return;
+    toastTimerRef.current = window.setTimeout(() => setToast(null), 5000);
+    return () => window.clearTimeout(toastTimerRef.current);
+  }, [toast]);
+
+  // Quiet autosave whenever delivery rows change (keeps Step 4 in sync with
+  // the server so assigned shops / boxes never drift).
+  useEffect(() => {
+    if (readOnly || !saveDeliveries || !hasUnsavedChanges || isSubmitting || showForm) return;
+    window.clearTimeout(autosaveTimerRef.current);
+    autosaveTimerRef.current = window.setTimeout(() => {
+      if (autosaveInFlightRef.current || isSaving) return;
+      autosaveInFlightRef.current = true;
+      void (async () => {
+        try {
+          await saveDeliveries();
+        } finally {
+          autosaveInFlightRef.current = false;
+        }
+      })();
+    }, 1200);
+    return () => window.clearTimeout(autosaveTimerRef.current);
+  }, [safeRows, readOnly, saveDeliveries, hasUnsavedChanges, isSubmitting, showForm, isSaving]);
 
   // ─── Confirmation Modal State ────────────────────────────────────
   const [confirmation, setConfirmation] = useState<{
@@ -376,6 +407,7 @@ export default function UnLoadingTable({
     setFormData,
     validationErrors,
     usedBoxIds,
+    availableBoxDetails,
     farmBirds,
     farmWeight,
     boxCount,
@@ -525,11 +557,69 @@ export default function UnLoadingTable({
     if (readOnly || isSubmitting) return;
 
     // Field-level balance rules block submission BEFORE any confirmation —
-    // the inline panel below the table explains exactly what is wrong.
+    // the inline panel + WizardStepNotice explain exactly what is wrong.
+    // Shops (N) plan stubs are reference-only and never create a balanceError.
     if (balanceError) {
       setShowBalanceError(true);
+      setToast({ message: t("ops.trip.balance_mismatch_fix"), type: "error" });
       return;
     }
+
+    // Local validate so missing shop/bird-type (and similar) show in the same
+    // notice slot — still ignoring uncaptured [ORDER] plan rows.
+    const localValidation = validateDeliveriesStep(
+      { dcWeight: Number(safeTrip?.dcWeight || 0), totalBirds: Number(safeTrip?.totalBirds || 0) },
+      safeRows
+    );
+    if (!localValidation.valid) {
+      setToast({
+        message:
+          translateValidationMessage(t, localValidation.errors[0] || "") ||
+          t("ops.trip.failed_submit_delivery"),
+        type: "error",
+      });
+      return;
+    }
+
+    const runSubmit = async () => {
+      if (submitLockRef.current || isSubmitting) return;
+      submitLockRef.current = true;
+      setIsSubmitting(true);
+      try {
+        let result: boolean | string = true;
+        if (submitDeliveries) {
+          result = await submitDeliveries();
+        } else if (updateDeliveries) {
+          updateDeliveries(safeRows);
+          result = true;
+        } else {
+          result = t("ops.trip.failed_submit_delivery");
+        }
+
+        if (result === true) {
+          setHasBeenSubmitted(true);
+          setToast({ message: t("ops.trip.step4_submitted"), type: "success" });
+          if (showForm) closeForm();
+          return;
+        }
+
+        const errorMessage =
+          typeof result === "string" && result.trim()
+            ? result
+            : t("ops.trip.failed_submit_delivery");
+        setToast({ message: errorMessage, type: "error" });
+        if (balanceError) setShowBalanceError(true);
+      } catch (error) {
+        const message =
+          error instanceof Error && error.message
+            ? error.message
+            : t("ops.trip.failed_submit_delivery");
+        setToast({ message, type: "error" });
+      } finally {
+        submitLockRef.current = false;
+        setIsSubmitting(false);
+      }
+    };
 
     if (!hasBeenSubmitted) {
       setConfirmation({
@@ -541,30 +631,7 @@ export default function UnLoadingTable({
         type: "info",
         onConfirm: () => {
           setConfirmation((prev) => ({ ...prev, isOpen: false }));
-          void (async () => {
-            if (submitLockRef.current || isSubmitting) return;
-            submitLockRef.current = true;
-            setIsSubmitting(true);
-            try {
-              let success = true;
-              if (submitDeliveries) {
-                success = (await submitDeliveries()) !== false;
-              } else if (updateDeliveries) {
-                updateDeliveries(safeRows);
-              }
-              if (success) {
-                setHasBeenSubmitted(true);
-                setToast({ message: t("ops.trip.step4_submitted"), type: "success" });
-                if (showForm) closeForm();
-                // Do not call onClose — parent advances to Step 5 with the same trip.
-              } else {
-                setToast({ message: t("ops.trip.failed_submit_delivery"), type: "error" });
-              }
-            } finally {
-              submitLockRef.current = false;
-              setIsSubmitting(false);
-            }
-          })();
+          void runSubmit();
         },
         onCancel: () => setConfirmation((prev) => ({ ...prev, isOpen: false })),
       });
@@ -578,22 +645,7 @@ export default function UnLoadingTable({
         type: "info",
         onConfirm: () => {
           setConfirmation((prev) => ({ ...prev, isOpen: false }));
-          void (async () => {
-            if (submitLockRef.current || isSubmitting) return;
-            submitLockRef.current = true;
-            setIsSubmitting(true);
-            try {
-              const success = submitDeliveries ? (await submitDeliveries()) !== false : false;
-              if (success) {
-                setHasBeenSubmitted(true);
-                setToast({ message: t("ops.trip.step4_submitted"), type: "success" });
-                if (showForm) closeForm();
-              }
-            } finally {
-              submitLockRef.current = false;
-              setIsSubmitting(false);
-            }
-          })();
+          void runSubmit();
         },
         onCancel: () => setConfirmation((prev) => ({ ...prev, isOpen: false })),
       });
@@ -640,21 +692,29 @@ export default function UnLoadingTable({
 
   const openEditForm = (row: ShopDelivery) => {
     const rowWithExtra = row as any;
+    const isUncapturedOrderPlan =
+      String(row.remarks ?? "").trim().startsWith("[ORDER]") &&
+      !rowWithExtra.autoCaptureTime &&
+      !rowWithExtra.deliveredAt &&
+      !rowWithExtra.deliveryTime;
     setEditingId(row.id);
     setMode(rowWithExtra.deliveryMode || "box");
     setAutoCaptureTime(rowWithExtra.autoCaptureTime || "");
     setFormData({
       shopId: row.shopId,
       shopName: row.shopName,
-      birdTypeId: row.birdTypeId,
-      birdType: row.birdType,
+      birdTypeId: row.birdTypeId || tripBirdTypeId || 0,
+      birdType: row.birdType || tripBirdType || "",
+      // Keep assigned boxes from Order Assignment as a starting selection.
       selectedBoxIds: rowWithExtra.selectedBoxIds || [],
-      birds: row.birds,
-      weight: row.weight,
-      mortality: row.mortality || 0,
-      mortWeight: rowWithExtra.mortKg || 0,
+      // Planned order quantities are reference only — never treat them as
+      // delivered weight/birds until the driver actually captures.
+      birds: isUncapturedOrderPlan ? 0 : row.birds,
+      weight: isUncapturedOrderPlan ? 0 : row.weight,
+      mortality: isUncapturedOrderPlan ? 0 : row.mortality || 0,
+      mortWeight: isUncapturedOrderPlan ? 0 : rowWithExtra.mortKg || 0,
       remarks: row.remarks || "",
-      perBoxData: rowWithExtra.perBoxData || [],
+      perBoxData: isUncapturedOrderPlan ? [] : rowWithExtra.perBoxData || [],
     });
     setShowForm(true);
   };
@@ -789,20 +849,37 @@ export default function UnLoadingTable({
       clientKey: editingId
         ? (safeRows.find((r) => r.id === editingId) as ShopDelivery | undefined)?.clientKey || `ck-${editingId}`
         : (typeof crypto !== "undefined" && crypto.randomUUID ? crypto.randomUUID() : `ck-${Date.now()}`),
-      // Each shop captures its OWN time at the moment its delivery is saved.
-      // The capture time is IMMUTABLE: an edit preserves the original value
-      // and never re-stamps it.
-      autoCaptureTime: editingId !== null
-        ? (autoCaptureTime || (safeRows.find((r) => r.id === editingId) as any)?.autoCaptureTime || undefined)
-        : formatIstStamp(new Date().toISOString()),
+      // Persist ISO so the backend stores auto_capture_time. Display stays IST
+      // via formatIstStamp. First capture of a plan row (editingId set, no prior
+      // time) also stamps now — otherwise cards show "—".
+      autoCaptureTime: (() => {
+        const existing = String(
+          editingId !== null
+            ? autoCaptureTime ||
+                (safeRows.find((r) => r.id === editingId) as ShopDelivery & { autoCaptureTime?: string } | undefined)
+                  ?.autoCaptureTime ||
+                ""
+            : ""
+        ).trim();
+        if (existing) {
+          if (/^\d{4}-\d{2}-\d{2}T/.test(existing)) return existing;
+          // Legacy IST display stamp — keep it; backend now parses IST.
+          if (/^\d{1,2}-\d{1,2}-\d{4}\s+\d{1,2}:\d{2}/.test(existing)) return existing;
+          const parsed = new Date(existing);
+          if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+        }
+        return new Date().toISOString();
+      })(),
     };
 
     if (editingId !== null) {
       setRows((prev) => prev.map((r) => (r.id === editingId ? newRow : r)));
       if (onSaveRow) onSaveRow(newRow);
     } else {
-      if (onSaveRow) onSaveRow(newRow);
+      // Let onSaveRow own persistence when provided; still update local rows
+      // once so KPIs / remaining boxes refresh immediately.
       setRows((prev) => [newRow, ...prev]);
+      if (onSaveRow) onSaveRow(newRow);
     }
 
     setToast({ message: t("ops.trip.shop_saved", { name: formData.shopName }), type: "success" });
@@ -1157,7 +1234,7 @@ export default function UnLoadingTable({
           deliveredBirds={deliveredBirds}
           deliveredWeight={deliveredWeight}
           usedBoxIds={usedBoxIds}
-          safeBoxDetails={safeBoxDetails}
+          safeBoxDetails={availableBoxDetails}
           readOnly={false}
           autoCaptureTime={autoCaptureTime}
           editingId={editingId}

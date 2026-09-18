@@ -3,7 +3,7 @@ import { defineConfig, devices } from '@playwright/test';
 // Read-only checks against the running sample preview. Start npm run dev first.
 export default defineConfig({
   testDir: '.',
-  testMatch: 'orders-tabs.spec.ts',
+  testMatch: /orders-(tabs|live-workflow)\.spec\.ts/,
   workers: 1,
   timeout: 60_000,
   use: {

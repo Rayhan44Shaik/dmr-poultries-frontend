@@ -5,8 +5,10 @@ import {
   assignedShopOrderFromRows,
   captureRemarksFor,
   computeRemainingBoxes,
+  isDeliveredRow,
   pendingBoxesFromRows,
   pendingShopsFromRows,
+  remainingBoxesByNumber,
   sortShopsAssignedFirst,
   step4ShopsCount,
 } from "./remainingBoxes";
@@ -82,12 +84,57 @@ test("remaining boxes: box-mode multi-box row consumes every selected box fully"
   assert.equal(pending[0].weight, 510);
 });
 
-test("remaining boxes: box-mode single-box row consumes birds + mortality", () => {
-  const boxes = [box(1, 30, 500), box(2, 26, 480)];
-  const rows = [row({ birds: 29, weight: 490, mortality: 1, mortKg: 10, selectedBoxIds: [1] })];
+test("remaining boxes: full bird delivery clears residual weight variance (0 birds / leftover kg)", () => {
+  // KRUPA case: farm 15 birds / 38.90 kg, delivered 15 / 38.30 → 0.60 kg must NOT stay selectable.
+  const boxes = [box(43, 15, 38.9), box(44, 20, 50)];
+  const rows = [
+    row({
+      birds: 15,
+      weight: 38.3,
+      mortality: 0,
+      mortKg: 0,
+      selectedBoxIds: [43],
+      perBoxData: [],
+    }),
+  ];
   const pending = pendingBoxesFromRows(boxes, rows);
-  assert.deepEqual(pending.map((b) => b.boxNo), [2]);
-  assert.equal(pending[0].birds, 26);
+  assert.deepEqual(pending.map((b) => b.boxNo), [44]);
+  assert.equal(pending.some((b) => b.boxNo === 43), false);
+  const remain = remainingBoxesByNumber(boxes, rows);
+  assert.equal(remain.get(43)?.birds, 0);
+  assert.equal(remain.get(43)?.weight, 0);
+});
+
+test("isDeliveredRow: [ORDER] plan row with assigned boxes is still pending", () => {
+  const planWithBoxes = row({
+    shopId: 9,
+    birds: 54,
+    weight: 100,
+    remarks: "[ORDER] O:TR-20260918-002",
+    selectedBoxIds: [1],
+  });
+  assert.equal(
+    isDeliveredRow(planWithBoxes),
+    false,
+    "assignment selectedBoxIds alone are not a Step 4 capture"
+  );
+  const capturedPlan = row({
+    shopId: 9,
+    birds: 54,
+    weight: 100,
+    remarks: "[ORDER] O:TR-20260918-002",
+    selectedBoxIds: [1],
+    autoCaptureTime: "10:00",
+  });
+  assert.equal(isDeliveredRow(capturedPlan), true);
+  const emptyPlan = row({
+    shopId: 9,
+    birds: 50,
+    weight: 100,
+    remarks: "[ORDER] O:TR-20260918-002",
+    selectedBoxIds: [],
+  });
+  assert.equal(isDeliveredRow(emptyPlan), false, "planned quantities alone are not a capture");
 });
 
 test("remaining boxes: weight-mode per-box data consumes exact split", () => {

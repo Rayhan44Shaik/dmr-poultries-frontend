@@ -91,7 +91,7 @@ import {
   collectionRowWeightKg,
   weightForBirds,
 } from "../utils/ordersUtils";
-import { handleApiError } from "../../../api";
+import { ordersErrorMessage } from "../utils/ordersErrorMessage";
 import {
   finishCollection,
   saveCollection,
@@ -873,7 +873,7 @@ function CollectionEntries({
     let onVehicles = 0;
     for (const row of entered) {
       if (row.village) cities.add(row.village);
-      if (collection?.shops.has(row.shopId)) onVehicles += 1;
+      if (collection?.shops.get(row.shopId) != null) onVehicles += 1;
     }
     return {
       cities: cities.size,
@@ -895,7 +895,7 @@ function CollectionEntries({
       // its decimals (2dp) instead of being floored like a count.
       const n =
         field === "weight"
-          ? Math.max(0, Math.min(999999, Number(raw) || 0))
+          ? Number(Math.max(0, Math.min(999999, Number(raw) || 0)).toFixed(2))
           : Math.max(0, Math.min(9999, Math.floor(Number(raw) || 0)));
       setEntries((prev) => {
         const row = prev.get(shopId);
@@ -938,6 +938,12 @@ function CollectionEntries({
           containerRef.current.id,
           containerRef.current.tripNo,
           toOrderShopRows(Array.from(next.values()), shopId),
+          {
+            operationalDay: day,
+            onContainerCreated: (trip) => {
+              containerRef.current = { id: trip.id, tripNo: trip.tripNo };
+            },
+          },
         );
         containerRef.current = { id: updated.id, tripNo: updated.tripNo };
         setEntries(next);
@@ -948,12 +954,12 @@ function CollectionEntries({
           "success",
         );
       } catch (error) {
-        showNotification(handleApiError(error), "error");
+        showNotification(ordersErrorMessage(error), "error");
       } finally {
         persistLockRef.current = false;
       }
     },
-    [entries, onSaved, showNotification, to],
+    [entries, onSaved, showNotification, to, day],
   );
 
   const {
@@ -985,10 +991,54 @@ function CollectionEntries({
     window.setTimeout(() => setSavedFlash(false), 1_400);
   }, []);
 
+  const validateEntries = useCallback(
+    (all: EntryRow[]): boolean => {
+      const activeIds = new Set(shops.map((shop) => shop.id));
+      const seen = new Set<number>();
+      for (const row of all) {
+        const hasValue = row.boxes > 0 || row.birds > 0 || row.weight > 0;
+        if (!hasValue) continue;
+        if (!Number.isSafeInteger(row.shopId) || row.shopId <= 0 || !activeIds.has(row.shopId)) {
+          showNotification("A selected shop is no longer active. Refresh the order list.", "error");
+          return false;
+        }
+        if (!row.shopName.trim()) {
+          showNotification("Every order row must have a valid shop name.", "error");
+          return false;
+        }
+        if (seen.has(row.shopId)) {
+          showNotification(`Duplicate shop row: ${row.shopName}.`, "error");
+          return false;
+        }
+        seen.add(row.shopId);
+        if (!Number.isSafeInteger(row.boxes) || row.boxes <= 0 || row.boxes > 9999) {
+          showNotification(`Enter whole-number boxes from 1 to 9,999 for ${row.shopName}.`, "error");
+          return false;
+        }
+        if (!Number.isSafeInteger(row.birds) || row.birds < 0 || row.birds > 9999) {
+          showNotification(`Enter a valid whole-number bird count for ${row.shopName}.`, "error");
+          return false;
+        }
+        if (!Number.isFinite(row.weight) || row.weight < 0 || row.weight > 999999 || Number(row.weight.toFixed(2)) !== row.weight) {
+          showNotification(`Enter a valid weight with at most 2 decimals for ${row.shopName}.`, "error");
+          return false;
+        }
+        if (row.weight > 0 && row.birds === 0) {
+          showNotification(`Enter birds for ${row.shopName} when a weight is supplied.`, "error");
+          return false;
+        }
+      }
+      return true;
+    },
+    [shops, showNotification],
+  );
+
   // ── Save Progress (no final validation) ───────────────────────────────────
   const handleSave = useCallback(async () => {
     if (persistLockRef.current || busy || !isEditable) return;
-    const rows = toOrderShopRows(Array.from(entries.values()));
+    const allEntries = Array.from(entries.values());
+    if (!validateEntries(allEntries)) return;
+    const rows = toOrderShopRows(allEntries);
     if (rows.length === 0) {
       showNotification(to("orders.add_at_least_one_shop"), "info");
       return;
@@ -1000,6 +1050,12 @@ function CollectionEntries({
         containerRef.current.id,
         containerRef.current.tripNo,
         rows,
+        {
+          operationalDay: day,
+          onContainerCreated: (trip) => {
+            containerRef.current = { id: trip.id, tripNo: trip.tripNo };
+          },
+        },
       );
       containerRef.current = { id: updated.id, tripNo: updated.tripNo };
       // Authoritative values come from the API response — never a stale
@@ -1021,12 +1077,12 @@ function CollectionEntries({
       showNotification(to("orders.collection_saved"), "success");
       flashSaved();
     } catch (error) {
-      showNotification(handleApiError(error), "error");
+      showNotification(ordersErrorMessage(error), "error");
     } finally {
       persistLockRef.current = false;
       setSaving(false);
     }
-  }, [busy, isEditable, entries, onSaved, showNotification, flashSaved, to]);
+  }, [busy, isEditable, entries, validateEntries, onSaved, showNotification, flashSaved, to, day]);
 
   // ── The clock finishes the day (no Finish button) ─────────────────────────
   // A day's window is 48h from its start, so the 16th is filed at the 18th
@@ -1042,6 +1098,7 @@ function CollectionEntries({
     const all = Array.from(entriesRef.current.values());
     const enteredRows = all.filter((r) => r.birds > 0 || r.boxes > 0);
     if (enteredRows.length === 0) return false;
+    if (!validateEntries(all)) return false;
     persistLockRef.current = true;
     setFinishing(true);
     try {
@@ -1049,6 +1106,12 @@ function CollectionEntries({
         containerRef.current.id,
         containerRef.current.tripNo,
         toOrderShopRows(all),
+        {
+          operationalDay: day,
+          onContainerCreated: (trip) => {
+            containerRef.current = { id: trip.id, tripNo: trip.tripNo };
+          },
+        },
       );
       containerRef.current = { id: updated.id, tripNo: updated.tripNo };
       const missingBoxes = enteredRows.filter((r) => !(r.boxes > 0)).length;
@@ -1063,13 +1126,13 @@ function CollectionEntries({
       onFinished(updated);
       return true;
     } catch (error) {
-      showNotification(handleApiError(error), "error");
+      showNotification(ordersErrorMessage(error), "error");
       return false;
     } finally {
       persistLockRef.current = false;
       setFinishing(false);
     }
-  }, [onFinished, showNotification, to]);
+  }, [onFinished, showNotification, to, day, validateEntries]);
 
   const autoSubmittedDayRef = useRef<string | null>(null);
   useEffect(() => {

@@ -4,7 +4,7 @@ import {
   Plus, Trash2, FileText, AlertTriangle, Camera, Download
 } from "lucide-react";
 import type { Trip, BoxDetail } from "../types/trip";
-import { getVehicles } from "../../../masters/vehicles/services/vehicleService";
+import { getVehicles, loadVehicles } from "../../../masters/vehicles/services/vehicleService";
 import { generatePickupReportPDF } from "../utils/generatePickupPDF";
 import { StepCloseButton, WizardActionBar, WizardStepNotice } from "./WizardStepUI";
 import { TripNoBadge } from "./TripNoBadge";
@@ -165,20 +165,61 @@ export default function StepPickup({
     const details = trip.boxDetails || [];
     return details.length > 0 ? details.map((d) => ({ ...d, uid: generateUid() })) : [makeRow(1)];
   });
+  /** After Add Box, focus the new row's Birds field. */
+  const pendingBirdsFocusUidRef = useRef<string | null>(null);
+  const birdsInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
+  const addBoxButtonRef = useRef<HTMLButtonElement | null>(null);
 
-  const maxBoxes = useMemo(() => {
+  const [maxBoxes, setMaxBoxes] = useState<number>(() => {
     if (trip.vehicleBoxCapacity && trip.vehicleBoxCapacity > 0) return trip.vehicleBoxCapacity;
     try {
       const vehicles = getVehicles();
       const matched = vehicles.find(
         (v) =>
+          (trip.vehicleId && v.id === trip.vehicleId) ||
           v.vehicleNumber?.trim().toLowerCase() === trip.vehicleNo?.trim().toLowerCase()
       );
       return matched?.noOfBoxes && matched.noOfBoxes > 0 ? matched.noOfBoxes : 0;
     } catch {
       return 0;
     }
-  }, [trip.vehicleNo, trip.vehicleBoxCapacity]);
+  });
+
+  // Resolve capacity from Vehicle Master (no_of_boxes) so Boxes shows "0 / N".
+  useEffect(() => {
+    let cancelled = false;
+    const fromTrip =
+      trip.vehicleBoxCapacity && trip.vehicleBoxCapacity > 0 ? trip.vehicleBoxCapacity : 0;
+    if (fromTrip > 0) {
+      setMaxBoxes(fromTrip);
+      return;
+    }
+
+    void (async () => {
+      try {
+        const vehicles = await loadVehicles();
+        if (cancelled) return;
+        const matched = vehicles.find(
+          (v) =>
+            (trip.vehicleId && v.id === trip.vehicleId) ||
+            v.vehicleNumber?.trim().toLowerCase() === trip.vehicleNo?.trim().toLowerCase()
+        );
+        const capacity = matched?.noOfBoxes && matched.noOfBoxes > 0 ? matched.noOfBoxes : 0;
+        setMaxBoxes(capacity);
+        if (capacity > 0 && capacity !== trip.vehicleBoxCapacity) {
+          updateTrip({ vehicleBoxCapacity: capacity });
+        }
+      } catch {
+        if (!cancelled) setMaxBoxes(0);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+    // updateTrip is not memoized; omit it to avoid refetching on every parent render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- vehicle identity + capacity are the inputs
+  }, [trip.vehicleId, trip.vehicleNo, trip.vehicleBoxCapacity]);
 
   const [photos, setPhotos] = useState<PickupPhoto[]>(() => photosFromTrip(trip));
   const persistedPhotos = useMemo(() => photosFromTrip({
@@ -207,6 +248,60 @@ export default function StepPickup({
 
   // ─── Toast state ────────────────────────────────────────────────────
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
+  const toastTimerRef = useRef<number | undefined>(undefined);
+
+  // Auto-clear notices (e.g. "Progress saved.") after 5 seconds.
+  useEffect(() => {
+    window.clearTimeout(toastTimerRef.current);
+    if (!toast) return;
+    toastTimerRef.current = window.setTimeout(() => setToast(null), 5000);
+    return () => window.clearTimeout(toastTimerRef.current);
+  }, [toast]);
+
+  // Quiet autosave for Step 3 — persist box/photo progress while editing so
+  // assigned shops in Step 4 always see the latest pickup boxes.
+  const pickupAutosaveTimerRef = useRef<number | undefined>(undefined);
+  const pickupAutosaveBusyRef = useRef(false);
+  const pickupLocked = Boolean(trip.pickupStepSubmitted) && !editable && !isLocalEditing;
+  useEffect(() => {
+    if (pickupLocked || !savePickupProgress || !trip.id || isSubmitting || isSaving) return;
+    window.clearTimeout(pickupAutosaveTimerRef.current);
+    pickupAutosaveTimerRef.current = window.setTimeout(() => {
+      if (pickupAutosaveBusyRef.current) return;
+      pickupAutosaveBusyRef.current = true;
+      void (async () => {
+        try {
+          await savePickupProgress({
+            boxDetails: rows.map(
+              (row) =>
+                Object.fromEntries(
+                  Object.entries(row).filter(([key]) => key !== "uid")
+                ) as BoxDetail
+            ),
+            removedBoxNos,
+            ...(photos[0]
+              ? {
+                  dcPhotoKey: photos[0].key,
+                  dcPhotoMime: photos[0].mime,
+                  dcPhotoData: photos[0].data,
+                }
+              : {}),
+            ...(photos[1]
+              ? {
+                  dcPhotoKey2: photos[1].key,
+                  dcPhotoMime2: photos[1].mime,
+                  dcPhotoData2: photos[1].data,
+                }
+              : {}),
+          } as Partial<Trip>);
+        } finally {
+          pickupAutosaveBusyRef.current = false;
+        }
+      })();
+    }, 1200);
+    return () => window.clearTimeout(pickupAutosaveTimerRef.current);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rows, photos, removedBoxNos, pickupLocked, trip.id, isSubmitting, isSaving]);
 
   // ─── One operation per intentional action ─────────────────────────────
   // Guards the read-only view's DC-photo download and Pickup KPI PDF at the
@@ -289,13 +384,24 @@ export default function StepPickup({
   const totals = useMemo(() => calculatePickupTotals(rows), [rows]);
 
   // ─── Row operations with Max Box Limit Check ───────────────────────
-  const addRow = () => {
+  /** After Add Box, focus the new row's Birds field once it mounts. */
+  useEffect(() => {
+    const uid = pendingBirdsFocusUidRef.current;
+    if (!uid) return;
+    const el = birdsInputRefs.current.get(uid);
+    if (!el) return;
+    el.focus();
+    el.select();
+    pendingBirdsFocusUidRef.current = null;
+  }, [rows]);
+
+  const addRow = (options?: { focusBirds?: boolean }) => {
     if (maxBoxes > 0 && rows.length >= maxBoxes) {
       setToast({
         message: t("ops.trip.box_limit_exceeded", { max: maxBoxes }),
         type: "error",
       });
-      return;
+      return false;
     }
     if (rows.length > 0) {
       const lastRow = rows[rows.length - 1];
@@ -304,10 +410,15 @@ export default function StepPickup({
           message: t("ops.trip.fill_current_box"),
           type: "error",
         });
-        return;
+        return false;
       }
     }
-    setRows((prev) => [...prev, makeRow(prev.length + 1)]);
+    const nextRow = makeRow(rows.length + 1);
+    if (options?.focusBirds) {
+      pendingBirdsFocusUidRef.current = nextRow.uid;
+    }
+    setRows((prev) => [...prev, nextRow]);
+    return true;
   };
 
   // ANY box can be deleted. Remaining boxes automatically shift into the
@@ -337,6 +448,46 @@ export default function StepPickup({
 
   const blockScrollAndArrows = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === "ArrowUp" || e.key === "ArrowDown") e.preventDefault();
+  };
+
+  /** Tab order: Birds → Weight → Add Box → (Tab/Enter adds) → Birds of new box. */
+  const handleBirdsKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    _uid: string
+  ) => {
+    blockScrollAndArrows(e);
+    // Default Tab moves to Weight in the same cell group (next focusable).
+  };
+
+  const handleWeightKeyDown = (
+    e: React.KeyboardEvent<HTMLInputElement>,
+    uid: string
+  ) => {
+    blockScrollAndArrows(e);
+    if (e.key !== "Tab" || e.shiftKey) return;
+
+    const isLast = rows.length > 0 && rows[rows.length - 1]?.uid === uid;
+    if (!isLast) return;
+
+    const canShowAdd =
+      isLastRowComplete && maxBoxes > 0 && rows.length < maxBoxes;
+    if (!canShowAdd) return;
+
+    // Jump straight to Add Box (skip delete + any other chrome).
+    e.preventDefault();
+    requestAnimationFrame(() => addBoxButtonRef.current?.focus());
+  };
+
+  const handleAddBoxKeyDown = (e: React.KeyboardEvent<HTMLButtonElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      addRow({ focusBirds: true });
+      return;
+    }
+    if (e.key === "Tab" && !e.shiftKey) {
+      e.preventDefault();
+      addRow({ focusBirds: true });
+    }
   };
 
   const getBoxDetails = (): BoxDetail[] => rows.map((row) => {
@@ -965,7 +1116,9 @@ export default function StepPickup({
                           >
                             <button
                               type="button"
-                              onClick={addRow}
+                              ref={addBoxButtonRef}
+                              onClick={() => addRow({ focusBirds: true })}
+                              onKeyDown={handleAddBoxKeyDown}
                               className="w-full h-8 text-[11px] font-bold uppercase tracking-wide text-blue-500 bg-blue-50/70 hover:bg-blue-50/70 border border-blue-100 rounded-lg"
                             >
                               <Plus size={12} className="inline mr-1" /> {t("ops.trip.add_box")}
@@ -979,13 +1132,17 @@ export default function StepPickup({
                         <td className={`text-center px-1 py-1.5 font-bold text-slate-700 text-[13px] bg-white border-r border-slate-200 ${groupIdx > 0 ? 'pl-4' : ''}`}>{row.boxNo}</td>
                         <td className="px-1 py-1.5 bg-white border-r border-slate-200">
                           <input
+                            ref={(el) => {
+                              if (el) birdsInputRefs.current.set(row.uid, el);
+                              else birdsInputRefs.current.delete(row.uid);
+                            }}
                             type="number"
                             step="1"
                             min="0"
                             value={row.birds || ""}
                             onChange={(e) => updateRow(row.uid, "birds", parseInt(e.target.value) || 0)}
                             onWheel={(e) => e.currentTarget.blur()}
-                            onKeyDown={blockScrollAndArrows}
+                            onKeyDown={(e) => handleBirdsKeyDown(e, row.uid)}
                             placeholder="0"
                             className="mini-input hide-spinner"
                           />
@@ -999,12 +1156,13 @@ export default function StepPickup({
                               value={row.weight || ""}
                               onChange={(e) => updateRow(row.uid, "weight", parseFloat(e.target.value) || 0)}
                               onWheel={(e) => e.currentTarget.blur()}
-                              onKeyDown={blockScrollAndArrows}
+                              onKeyDown={(e) => handleWeightKeyDown(e, row.uid)}
                               placeholder="0.00"
                               className="mini-input hide-spinner"
                             />
                             <button
                               type="button"
+                              tabIndex={-1}
                               onClick={() => removeRow(row.uid)}
                               disabled={rows.length === 1}
                               className="mini-delete shrink-0"
@@ -1037,7 +1195,7 @@ export default function StepPickup({
             </table>
           </div>
           <p className="text-[11px] text-slate-400 mt-1.5">
-            {t("ops.trip.use_tab_navigate")}
+            {t("ops.trip.box_tab_hint")}
             {!isLastRowComplete && rows.length > 0 && (
               <span className="text-amber-500 ml-2">⚠️ {t("ops.trip.fill_current_box_warn")}</span>
             )}

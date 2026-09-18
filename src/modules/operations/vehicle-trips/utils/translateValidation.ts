@@ -39,6 +39,8 @@ const FIXED: Record<string, string> = {
 
   // validateDeliveriesStep (Step 4)
   "Please add at least one shop delivery.": "ops.trip.validate.add_shop_delivery",
+  "Each delivered shop must have a shop selected.": "ops.trip.validate.delivery_shop_required",
+  "Each delivered shop must have a bird type selected.": "ops.trip.validate.delivery_bird_type_required",
 
   // validateEndStep (Step 5)
   "Valid End Meter reading is required.": "ops.trip.validate.end_meter_required",

@@ -843,7 +843,13 @@ export default function DieselExpensesTable({
       cancelEdit();
       notifyUser(t("ops.trip.row_submitted", { row: num }), "success");
     } catch (err) {
-      notifyUser(handleApiError(err), "error");
+      const raw = handleApiError(err);
+      const lower = raw.toLowerCase();
+      const message =
+        lower === "not found" || lower.includes("was not found")
+          ? t("ops.trip.failed_save_diesel")
+          : raw || t("ops.trip.failed_save_diesel");
+      notifyUser(message, "error");
     } finally {
       setBusyRow(null);
     }
@@ -925,17 +931,6 @@ export default function DieselExpensesTable({
       )}
 
       <div className="relative rounded-xl border border-slate-200 overflow-x-auto shadow-sm bg-white">
-        {toastMessage && (
-          <div
-            className={`absolute top-2 right-2 z-50 text-white px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 text-[13px] font-medium ${
-              toastMessage.type === "error" ? "bg-red-500" : toastMessage.type === "success" ? "bg-emerald-500" : "bg-amber-500"
-            }`}
-          >
-            <AlertTriangle size={15} className="shrink-0" />
-            <span>{toastMessage.message}</span>
-          </div>
-        )}
-
         <table className="w-full min-w-[920px] border-collapse text-[13px] table-fixed">
           <colgroup>
             {/* Compact S.No / Ltr / Rate; free space to GPS + bill */}
@@ -1287,7 +1282,21 @@ export default function DieselExpensesTable({
         const showBottomReason = reason && !isMeterReason;
         return (
           <div className="space-y-2">
-            {showBottomReason ? (
+            {toastMessage ? (
+              <div
+                className={`flex items-start gap-2 rounded-lg border px-3 py-2 text-[13px] font-semibold leading-snug ${
+                  toastMessage.type === "error"
+                    ? "border-red-100 bg-red-50/70 text-red-500"
+                    : toastMessage.type === "success"
+                      ? "border-emerald-100 bg-emerald-50/70 text-emerald-600"
+                      : "border-amber-100 bg-amber-50/70 text-amber-700"
+                }`}
+                role="status"
+              >
+                <AlertTriangle size={14} className="shrink-0 mt-0.5" />
+                <span className="min-w-0 break-words">{toastMessage.message}</span>
+              </div>
+            ) : showBottomReason ? (
               <p className="text-[13px] font-semibold text-red-500 bg-red-50/70 border border-red-100 rounded-lg px-3 py-2">
                 {reason}
               </p>

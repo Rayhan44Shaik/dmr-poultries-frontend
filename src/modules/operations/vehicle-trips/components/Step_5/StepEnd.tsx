@@ -19,6 +19,25 @@ import { formatTripViewStamp } from "../../utils/tripViewLocalization";
 import { TripTimestampDisplay } from "../TripTimestampDisplay";
 import type { Step5DraftFields } from "../../../../../shared/trip/step5DraftStore";
 
+/** System `order:<tripNo>` tags written by Finish Assignment — not user notes. */
+function splitRemarks(raw: unknown): { orderTags: string[]; userNotes: string } {
+  const parts = String(raw ?? "")
+    .split("|")
+    .map((p) => p.trim())
+    .filter(Boolean);
+  const orderTags = parts.filter((p) => p.toLowerCase().startsWith("order:"));
+  const userNotes = parts.filter((p) => !p.toLowerCase().startsWith("order:")).join(" | ");
+  return { orderTags, userNotes };
+}
+
+function mergeRemarks(orderTags: string[], userNotes: string): string {
+  const notes = String(userNotes ?? "").trim();
+  const tags = orderTags.map((t) => t.trim()).filter(Boolean);
+  if (!notes) return tags.join(" | ");
+  if (!tags.length) return notes;
+  return [...tags, notes].join(" | ");
+}
+
 // ─── ConfirmationModal ────────────────────────────────────────────
 function ConfirmationModal({ isOpen, title, message, confirmLabel = "ops.trip.yes_proceed", cancelLabel = "common.cancel", onConfirm, onCancel, type = "warning" }: {
   isOpen: boolean;
@@ -162,7 +181,8 @@ export default function StepEnd({
       startMeter: tripData.openingMeter || 0,
       endMeter: (tripData as any).endMeter ?? (tripData as any).closingMeter ?? "",
       destinationTolls: (tripData as any).destinationTolls ?? (tripData as any).deliveryTolls ?? "",
-      remarks: (tripData as any).remarks ?? "",
+      // Only free-text notes in the editable field — keep order: tags aside.
+      remarks: splitRemarks((tripData as any).remarks).userNotes,
     };
     // Copy any already-flattened diesel* fields from the trip record.
     Object.keys(tripData).forEach(key => {

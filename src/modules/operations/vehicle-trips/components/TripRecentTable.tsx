@@ -200,24 +200,34 @@ function TripRecentTable({
   const startIndex = (safeCurrentPage - 1) * pageSize;
   const paginatedTrips = filteredTrips.slice(startIndex, startIndex + pageSize);
 
-  const selectedTrip = safeTrips.find((t) => t.id === selectedTripId) || null;
+  const selectedTrip = safeTrips.find((t) => Number(t.id) === Number(selectedTripId)) || null;
+
+  // Prefer createdAt; fall back to tripDate so a missing stamp never disables actions.
+  const selectedCreatedRef =
+    String(selectedTrip?.createdAt || selectedTrip?.tripDate || "").trim();
+  const selectedIsDraft = selectedTrip ? listStatus(selectedTrip) === "Draft" : false;
 
   const canEdit = selectedTrip
-    ? canEditItem(selectedTrip.createdAt || "") && !selectedTrip.deleted
+    ? canEditItem(selectedCreatedRef) && !selectedTrip.deleted
     : false;
+  // Draft trips are always deletable for roles that have onDelete (Owner).
+  // Pending/Completed still follow the 10-day window.
   const canDelete = selectedTrip
-    ? canDeleteItem(selectedTrip.createdAt || "") && !selectedTrip.deleted && !!onDelete && !isPending(Number(selectedTrip.id))
+    ? !selectedTrip.deleted &&
+      !!onDelete &&
+      !isPending(Number(selectedTrip.id)) &&
+      (selectedIsDraft || canDeleteItem(selectedCreatedRef))
     : false;
 
   const handleRowClick = (trip: Trip) => {
     if (trip.deleted) return;
     if (isPending(Number(trip.id))) return;
-    setSelectedTripId(trip.id === selectedTripId ? null : trip.id);
+    setSelectedTripId(Number(trip.id) === Number(selectedTripId) ? null : Number(trip.id));
   };
 
   const selectRowFromKeyboard = useCallback((trip: Trip) => {
     if (trip.deleted || isPending(Number(trip.id))) return;
-    setSelectedTripId(trip.id);
+    setSelectedTripId(Number(trip.id));
   }, [isPending]);
 
   const handleRowKeyDown = useCallback((event: React.KeyboardEvent<HTMLTableRowElement>, rowIndex: number) => {
@@ -414,7 +424,7 @@ function TripRecentTable({
                 <tr><td colSpan={12} className="py-16 text-center text-slate-400"><History size={24} className="mx-auto mb-2" /> {t("empty.no_trips")}</td></tr>
               ) : (
                 paginatedTrips.map((trip, index) => {
-                  const isSelected = trip.id === selectedTripId;
+                  const isSelected = Number(trip.id) === Number(selectedTripId);
                   const isDeleted = trip.deleted === true;
                   return (
                     <tr

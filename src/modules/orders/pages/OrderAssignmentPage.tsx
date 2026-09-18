@@ -118,6 +118,7 @@ import {
   WhatsAppIcon,
   onOrdersNumberWheel,
 } from "../components/OrdersCommon";
+import { ordersErrorMessage } from "../utils/ordersErrorMessage";
 import {
   compareAssignmentRows,
   type AssignmentSort,
@@ -1383,8 +1384,8 @@ function AssignmentEditor({
         return false;
       }
       return true;
-    } catch {
-      showNotification(to("orders.refresh_failed"), "error");
+    } catch (error) {
+      showNotification(ordersErrorMessage(error), "error");
       return false;
     } finally {
       setConflictChecking(false);
@@ -1414,8 +1415,8 @@ function AssignmentEditor({
       setSavedSnapshot(selectionSnapshot(vehicleTripId, selected));
       showNotification(to("orders.assignment_saved"), "success");
       onChanged();
-    } catch {
-      showNotification(to("orders.refresh_failed"), "error");
+    } catch (error) {
+      showNotification(ordersErrorMessage(error), "error");
     } finally {
       persistLockRef.current = false;
       setSaving(false);
@@ -1467,9 +1468,9 @@ function AssignmentEditor({
         ]);
         showNotification(to("orders.assignment_finished"), "success");
         onFinished(trip);
-      } catch {
+      } catch (error) {
         persistLockRef.current = false;
-        showNotification(to("orders.refresh_failed"), "error");
+        showNotification(ordersErrorMessage(error), "error");
       } finally {
         setSaving(false);
       }
@@ -1589,9 +1590,9 @@ function AssignmentEditor({
             selectionSnapshot(vehicleTripId, reorderedSelection ?? selected),
           );
           onChanged();
-        } catch {
+        } catch (error) {
           persistLockRef.current = false;
-          showNotification(to("orders.refresh_failed"), "error");
+          showNotification(ordersErrorMessage(error), "error");
           return null;
         }
       }
@@ -1677,11 +1678,11 @@ function AssignmentEditor({
   // ── Collected-shops search + filter ─────────────────────────────────────
   // Search and city come from the separate filter card. Status stays local
   // to this pool; none of these filters changes the selected-shop draft.
-  // Defaults to PENDING — with ~100 collected shops the operator almost always
-  // wants the ones still waiting for a vehicle, not the already-assigned rows.
+  // Default to the complete collected population. Operators can narrow to
+  // pending/assigned, but a saved assignment must never make a shop disappear.
   const [poolFilter, setPoolFilter] = useState<
     "all" | "pending" | "assigned" | "this_vehicle"
-  >("pending");
+  >("all");
   const thisTripNo = vehicle?.trip.tripNo ?? "";
   // Trip numbers still open for assignment — a part on any other trip means
   // that share was submitted (or delivered) and is frozen.
@@ -1802,7 +1803,7 @@ function AssignmentEditor({
   const [lastResetVersion, setLastResetVersion] = useState(resetVersion);
   if (lastResetVersion !== resetVersion) {
     setLastResetVersion(resetVersion);
-    setPoolFilter("pending");
+    setPoolFilter("all");
     setAvailablePage(1);
   }
 

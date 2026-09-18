@@ -156,17 +156,46 @@ export type DeliveriesBalanceError = {
   };
 } | null;
 
+/**
+ * Rows that count toward Step 4 submit / bird-weight balance.
+ *
+ * Pending `[ORDER]` assignment plan stubs are reference-only (e.g. Shops (1)
+ * still to visit) — they must never block submit or skew the pickup balance.
+ * A plan row becomes counted once it has a capture time or selected boxes.
+ */
+export function isCountedDeliveryRow(row: ShopDelivery): boolean {
+  const extra = row as ShopDelivery & {
+    autoCaptureTime?: string | null;
+    deliveredAt?: string | null;
+    deliveryTime?: string | null;
+    selectedBoxIds?: number[];
+  };
+  if (extra.autoCaptureTime || extra.deliveredAt || extra.deliveryTime) return true;
+  const remarks = String(row.remarks ?? "").trim();
+  // Order-assignment plan stubs may carry selectedBoxIds before capture —
+  // they must not count toward balance / submit until actually captured.
+  if (remarks.startsWith("[ORDER]")) return false;
+  const boxes = Array.isArray(extra.selectedBoxIds) ? extra.selectedBoxIds.length : 0;
+  if (boxes > 0) return true;
+  return Number(row.birds) > 0 || Number(row.weight) > 0;
+}
+
 export function getDeliveriesBalanceError(
   trip: Pick<Trip, "dcWeight" | "totalBirds">,
   rows: ShopDelivery[],
   weightToleranceKg = DELIVERY_WEIGHT_TOLERANCE_KG
 ): DeliveriesBalanceError {
+  const counted = (rows ?? []).filter(isCountedDeliveryRow);
+  // No captured deliveries yet (e.g. only Shops(N) plan stubs) — not a
+  // balance mismatch; validateDeliveriesStep asks for a real delivery instead.
+  if (counted.length === 0) return null;
+
   const pickupBirds = Number(trip.totalBirds || 0);
   const pickupWeight = Number(trip.dcWeight || 0);
-  const totalMortalityCount = rows.reduce((sum, row) => sum + Number(row.mortality || 0), 0);
-  const totalBirdsDelivered = rows.reduce((sum, row) => sum + Number(row.birds || 0), 0);
-  const totalDeliveredWeight = rows.reduce((sum, row) => sum + Number(row.weight || 0), 0);
-  const mortalityWeight = rows.reduce((sum, row) => sum + Number(row.mortKg || 0), 0);
+  const totalMortalityCount = counted.reduce((sum, row) => sum + Number(row.mortality || 0), 0);
+  const totalBirdsDelivered = counted.reduce((sum, row) => sum + Number(row.birds || 0), 0);
+  const totalDeliveredWeight = counted.reduce((sum, row) => sum + Number(row.weight || 0), 0);
+  const mortalityWeight = counted.reduce((sum, row) => sum + Number(row.mortKg || 0), 0);
 
   const error: NonNullable<DeliveriesBalanceError> = {};
 
@@ -200,8 +229,17 @@ export function validateDeliveriesStep(
   rows: ShopDelivery[],
   weightToleranceKg = DELIVERY_WEIGHT_TOLERANCE_KG
 ): TripValidationResult {
-  if (required("deliveries") && !rows.length) {
+  const counted = (rows ?? []).filter(isCountedDeliveryRow);
+  if (required("deliveries") && counted.length === 0) {
     return result(["Please add at least one shop delivery."]);
+  }
+  for (const row of counted) {
+    if (!row.shopId) {
+      return result(["Each delivered shop must have a shop selected."]);
+    }
+    if (!row.birdTypeId) {
+      return result(["Each delivered shop must have a bird type selected."]);
+    }
   }
   const balanceError = getDeliveriesBalanceError(trip, rows, weightToleranceKg);
   if (balanceError?.birds) {

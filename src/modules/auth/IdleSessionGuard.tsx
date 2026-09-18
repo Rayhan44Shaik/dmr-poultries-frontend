@@ -3,13 +3,11 @@
 // Idle auto-logout.
 //
 // While a user is signed in, ANY of these reset a fresh 10-minute timer:
-//   mouse movement, mouse/touch presses, key presses, scrolling, wheel,
-//   window focus, tab visibility.
-// If the timer ever completes — i.e. genuinely no input for 10 minutes — the
-// session is ended and the app drops back to the sign-in screen, where a
-// notice explains why. A visible warning banner appears for the final minute
-// with a "Stay signed in" button. Moving the cursor during that last minute
-// also restarts the FULL 10-minute clock (not just the warning countdown).
+//   mouse movement, mouse/touch presses, key presses (including Tab),
+//   scrolling, wheel, window focus, tab visibility, form input.
+// Logout happens only after a full stretch with no mouse AND no keyboard
+// (and no other listed) activity. A visible warning banner appears for the
+// final minute with a "Stay signed in" button.
 // -----------------------------------------------------------------------------
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Clock3 } from "lucide-react";
@@ -20,7 +18,7 @@ import { useI18n } from "../../i18n";
 const IDLE_TIMEOUT_MS = 10 * 60 * 1000;
 /** How long before the deadline the warning banner appears. */
 const WARNING_BEFORE_MS = 60 * 1000;
-/** Activity events are coalesced outside the warning window. */
+/** UI/warning clears are coalesced; the activity timestamp itself is not. */
 const RESET_THROTTLE_MS = 1000;
 
 /** sessionStorage flag the LoginPage reads to explain the signed-out state. */
@@ -29,11 +27,19 @@ export const IDLE_SIGNOUT_KEY = "dmr:signout-reason";
 const ACTIVITY_EVENTS: readonly (keyof WindowEventMap)[] = [
   "pointermove",
   "pointerdown",
+  "pointerup",
+  "mousemove",
+  "mousedown",
+  "mouseup",
   "keydown",
+  "keyup",
+  "keypress",
   "wheel",
   "touchstart",
+  "touchmove",
   "scroll",
   "focus",
+  "input",
 ];
 
 export default function IdleSessionGuard() {
@@ -61,16 +67,22 @@ export default function IdleSessionGuard() {
 
     let throttled = false;
     const markActivity = () => {
-      // During the final warning minute, every movement must restart the FULL
-      // 10-minute timer immediately (no throttle) — that's the product rule.
-      if (!warningActiveRef.current) {
-        if (throttled) return;
-        throttled = true;
-        window.setTimeout(() => {
-          throttled = false;
-        }, RESET_THROTTLE_MS);
-      }
+      // Always bump the idle clock — keyboard (Tab) and mouse must both count,
+      // even when UI warning-clear is throttled.
       lastActivityRef.current = Date.now();
+
+      // During the final warning minute, clear the banner immediately.
+      if (warningActiveRef.current) {
+        warningActiveRef.current = false;
+        setWarningSecondsLeft(null);
+        return;
+      }
+
+      if (throttled) return;
+      throttled = true;
+      window.setTimeout(() => {
+        throttled = false;
+      }, RESET_THROTTLE_MS);
       warningActiveRef.current = false;
       setWarningSecondsLeft(null);
     };
@@ -80,7 +92,8 @@ export default function IdleSessionGuard() {
     };
 
     // capture: input inside modals, grids and React portals all bubbles to
-    // window anyway, but capture guarantees nothing stops it.
+    // window anyway, but capture guarantees nothing stops it — including Tab
+    // handled by focusable controls that call preventDefault.
     ACTIVITY_EVENTS.forEach((event) =>
       window.addEventListener(event, markActivity, { capture: true, passive: true }),
     );

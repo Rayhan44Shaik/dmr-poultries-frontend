@@ -286,8 +286,9 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   };
 
   const handleEdit = (selectedTrip: Trip) => {
-    const targetStep = getLastSubmittedTripStep(selectedTrip);
-    if (targetStep == null) return;
+    // Prefer last submitted step for edit; if none yet, resume the next incomplete step.
+    const targetStep =
+      getLastSubmittedTripStep(selectedTrip) ?? getNextIncompleteTripStep(selectedTrip);
     void openExistingTrip(
       selectedTrip,
       targetStep,
@@ -431,8 +432,10 @@ function TripEntryPage({ embedded = false }: TripEntryPageProps) {
   // bypasses the sequence (direct state/URL manipulation included).
   const effectiveViewStepIndex = clampTripStepIndex(trip, viewStepIndex);
 
-  const [vehicleOpts, setVehicleOpts] = useState<Array<{ id: number; vehicleNumber: string }>>([]);
-  const [employeeOpts, setEmployeeOpts] = useState<Array<{ id: number; employeeName: string; department: string }>>([]);
+  const [vehicleOpts, setVehicleOpts] = useState<Array<{ id: number; vehicleNumber: string; noOfBoxes?: number }>>([]);
+  const [employeeOpts, setEmployeeOpts] = useState<
+    Array<{ id: number; employeeName: string; department: string; lockedByTripNo?: string | null }>
+  >([]);
 
   useEffect(() => {
     if (entryScreen !== "form") return;

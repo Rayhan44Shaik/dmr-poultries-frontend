@@ -402,25 +402,26 @@ export function useTripEntry(
     }
   };
 
-  const submitDeliveriesStep = async (): Promise<boolean> => {
+  /**
+   * Submit Step 4. Returns `true` on success, or an error message string so the
+   * Step 4 notice can show the same detail as the shell toast. Pending `[ORDER]`
+   * plan stubs (Shops N) are ignored by validateDeliveriesStep.
+   */
+  const submitDeliveriesStep = async (): Promise<boolean | string> => {
     const current = tripRef.current;
     if (!current.id) {
-      notifyRef.current?.(translate("ops.trip.trip_id_missing"), "error");
-      return false;
+      const msg = translate("ops.trip.trip_id_missing");
+      notifyRef.current?.(msg, "error");
+      return msg;
     }
     const wasSubmitted = Boolean(current.deliveryStepSubmitted);
-    if (!current.deliveries || current.deliveries.length === 0) {
-      return false;
-    }
-
-    const validation = validateDeliveriesStep(current, current.deliveries);
+    const validation = validateDeliveriesStep(current, current.deliveries ?? []);
     if (!validation.valid) {
-      return false;
-    }
-    for (const row of current.deliveries) {
-      if (!row.shopId || !row.birdTypeId) {
-        return false;
-      }
+      const msg =
+        translateValidationMessage(translate, validation.errors[0] || "") ||
+        translate("ops.trip.failed_submit_delivery");
+      notifyRef.current?.(msg, "error");
+      return msg;
     }
 
     const lockKey = "submit:deliveries";
@@ -437,12 +438,12 @@ export function useTripEntry(
     } catch (error) {
       const message = handleApiError(error);
       const apiErr = error as { status?: number; code?: string };
-      if (apiErr?.code === "NETWORK_ERROR" || message.toLowerCase().includes("unable to reach")) {
-        notifyRef.current?.(translate("ops.trip.unable_to_connect"), "error");
-      } else {
-        notifyRef.current?.(message, "error");
-      }
-      return false;
+      const msg =
+        apiErr?.code === "NETWORK_ERROR" || message.toLowerCase().includes("unable to reach")
+          ? translate("ops.trip.unable_to_connect")
+          : message || translate("ops.trip.failed_submit_delivery");
+      notifyRef.current?.(msg, "error");
+      return msg;
     } finally {
       releaseOperationLock(lockKey);
       setHeaderLoading(false);

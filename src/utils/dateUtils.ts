@@ -26,11 +26,14 @@ export function formatDateRange(monday: Date, sunday: Date) {
 /**
  * Checks if an item (created on `createdDate`) can be edited or deleted.
  * Allowed only within 10 days from creation.
+ * Missing/invalid dates fail open so Draft trips never strand without actions.
  */
 export function canEditItem(createdDate: string): boolean {
-  const created = new Date(createdDate);
-  const now = new Date();
-  const diffDays = Math.floor((now.getTime() - created.getTime()) / (1000 * 60 * 60 * 24));
+  const raw = String(createdDate ?? "").trim();
+  if (!raw) return true;
+  const created = new Date(raw);
+  if (Number.isNaN(created.getTime())) return true;
+  const diffDays = Math.floor((Date.now() - created.getTime()) / (1000 * 60 * 60 * 24));
   return diffDays <= 10;
 }
 

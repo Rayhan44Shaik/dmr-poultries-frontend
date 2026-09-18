@@ -31,14 +31,12 @@ import {
   resolveOrdersTab,
 } from "../utils/ordersNavigation";
 import { ORDERS_PAGES } from "../routes/ordersRoutes";
-import { DatabaseZap } from "lucide-react";
 import { useI18n } from "../../../i18n";
 // The SAME modal shell the Trip List view uses, so the Pending/Completed view
 // opens identically — the panel scales in small→full instead of a plain box.
 import AppShellModal from "../../../ui/AppShellModal";
 import { useSafeNotification } from "../../../hooks/useSafeNotification";
 import type { Trip } from "../../../shared/trip";
-import { ORDERS_SAMPLE_DATA_ENABLED } from "../services/sampleOrdersData";
 import {
   fetchOrdersData,
   buildShopDirectory,
@@ -623,19 +621,6 @@ const OrdersPage: React.FC = () => {
 
   return (
     <div className="orders-workspace">
-      {/* No tab strip — see the header note. The only thing that used to live
-          here is the honest marker for a page running on bundled sample data. */}
-      {ORDERS_SAMPLE_DATA_ENABLED && (
-        <div className="flex justify-end px-1 pt-1">
-          <span
-            title={to("orders.sample_hint")}
-            className="inline-flex items-center gap-1.5 rounded-xl border border-amber-200 bg-amber-50 px-2.5 py-1 text-[10px] font-bold text-amber-700 md:text-[11px]"
-          >
-            <DatabaseZap size={12} />
-            {to("orders.sample_badge")}
-          </span>
-        </div>
-      )}
       <div className="orders-page-content">
         {error && data && (
           <OrdersErrorState

@@ -17,7 +17,17 @@ const VISIBLE_ITEMS = 5;
 const ITEM_HEIGHT = 36; // h-9
 const LIST_MAX_HEIGHT = VISIBLE_ITEMS * ITEM_HEIGHT;
 
-export type DropdownOption = { value: string; label: string; chipLabel?: string; /** Original-language term retained for search. */ searchText?: string };
+export type DropdownOption = {
+  value: string;
+  label: string;
+  chipLabel?: string;
+  /** Original-language term retained for search. */
+  searchText?: string;
+  /** When true, option is visible but not selectable. */
+  disabled?: boolean;
+  /** Optional secondary hint (e.g. locked-by trip). */
+  hint?: string;
+};
 
 /** Soft-coloured icon chip ("logo") shown beside every field label. */
 export const FieldLabel = React.memo(function FieldLabel({
@@ -142,7 +152,10 @@ function useDropdownPanel() {
     (options: DropdownOption[]) => {
       const q = query.trim().toLowerCase();
       if (!q) return options;
-      return options.filter((option) => option.label.toLowerCase().includes(q));
+      return options.filter((option) => {
+        const haystack = (option.searchText || option.label || "").toLowerCase();
+        return haystack.includes(q);
+      });
     },
     [query]
   );
@@ -294,12 +307,14 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
 
   const toggle = useCallback(
     (value: string) => {
+      const option = options.find((opt) => opt.value === value);
+      if (option?.disabled && !selectedSet.has(value)) return;
       const next = selectedSet.has(value)
         ? selectedValues.filter((v) => v !== value)
         : [...selectedValues, value];
       onChange(next);
     },
-    [selectedSet, selectedValues, onChange]
+    [selectedSet, selectedValues, onChange, options]
   );
 
   return (
@@ -377,15 +392,21 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
           {selectAllLabel && (
             <button
               type="button"
-              onClick={() => onChange(options.map((opt) => opt.value))}
+              onClick={() =>
+                onChange(
+                  options.filter((opt) => !opt.disabled).map((opt) => opt.value)
+                )
+              }
               className={`w-full flex items-center gap-2 px-3 h-9 text-xs font-semibold text-left border-b border-slate-100 hover:bg-slate-50 transition ${
-                selectedValues.length === options.length && options.length > 0
+                selectedValues.length === options.filter((opt) => !opt.disabled).length &&
+                options.filter((opt) => !opt.disabled).length > 0
                   ? "text-blue-500 bg-blue-50/70"
                   : "text-slate-700"
               }`}
             >
               <span className="w-3.5 shrink-0">
-                {selectedValues.length === options.length && options.length > 0 && (
+                {selectedValues.length === options.filter((opt) => !opt.disabled).length &&
+                  options.filter((opt) => !opt.disabled).length > 0 && (
                   <Check size={13} className="text-blue-500" />
                 )}
               </span>
@@ -413,13 +434,19 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
           >
             {filtered(options).map((option) => {
               const isSelected = selectedSet.has(option.value);
+              const isLocked = Boolean(option.disabled) && !isSelected;
               return (
                 <li key={option.value}>
                   <button
                     type="button"
+                    disabled={isLocked}
                     onClick={() => toggle(option.value)}
-                    className={`w-full flex items-center gap-2 px-3 h-9 text-xs font-medium text-left truncate hover:bg-slate-50 transition ${
-                      isSelected ? "text-emerald-500 bg-emerald-50/70" : "text-slate-700"
+                    className={`w-full flex items-center gap-2 px-3 h-9 text-xs font-medium text-left truncate transition ${
+                      isLocked
+                        ? "text-slate-400 bg-slate-50/80 cursor-not-allowed"
+                        : isSelected
+                          ? "text-emerald-500 bg-emerald-50/70 hover:bg-slate-50"
+                          : "text-slate-700 hover:bg-slate-50"
                     }`}
                   >
                     <span className="w-3.5 shrink-0">
@@ -428,7 +455,12 @@ export const MultiSearchDropdown = React.memo(function MultiSearchDropdown({
                     {renderOptionLabel ? (
                       renderOptionLabel(option)
                     ) : (
-                      <span className="truncate">{option.label}</span>
+                      <span className="truncate flex-1">
+                        {option.label}
+                        {option.hint ? (
+                          <span className="ml-1 font-normal text-slate-400">{option.hint}</span>
+                        ) : null}
+                      </span>
                     )}
                   </button>
                 </li>

@@ -36,8 +36,13 @@ import { useI18n } from "../../../../i18n";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import { localizeTripViewText } from "../utils/tripViewLocalization";
 
-type VehicleOption = { id: number; vehicleNumber: string };
-type EmployeeOption = { id: number; employeeName: string; department: string };
+type VehicleOption = { id: number; vehicleNumber: string; noOfBoxes?: number };
+type EmployeeOption = {
+  id: number;
+  employeeName: string;
+  department: string;
+  lockedByTripNo?: string | null;
+};
 type SaveStatus = "idle" | "saving" | "saved";
 
 interface Props {
@@ -199,7 +204,7 @@ const VehicleField = React.memo(function VehicleField({
   options: VehicleOption[];
   disabled: boolean;
   invalid?: boolean;
-  onSelect: (vehicleId: number, vehicleNo: string) => void;
+  onSelect: (vehicleId: number, vehicleNo: string, noOfBoxes?: number) => void;
 }) {
   const { t, language } = useI18n();
   const dropdownOptions = useMemo<DropdownOption[]>(
@@ -210,7 +215,7 @@ const VehicleField = React.memo(function VehicleField({
     (value: string) => {
       const id = Number(value) || 0;
       const option = options.find((o) => o.id === id);
-      onSelect(id, option?.vehicleNumber || "");
+      onSelect(id, option?.vehicleNumber || "", option?.noOfBoxes);
     },
     [options, onSelect]
   );
@@ -347,7 +352,17 @@ const HelpersField = React.memo(function HelpersField({
 }) {
   const { t, language } = useI18n();
   const dropdownOptions = useMemo<DropdownOption[]>(
-    () => options.map((option) => ({ value: option.employeeName, label: localizeTripViewText(option.employeeName, language), searchText: option.employeeName || "" })),
+    () =>
+      options.map((option) => {
+        const locked = Boolean(option.lockedByTripNo);
+        return {
+          value: option.employeeName,
+          label: localizeTripViewText(option.employeeName, language),
+          searchText: option.employeeName || "",
+          disabled: locked,
+          hint: locked ? `(${option.lockedByTripNo})` : undefined,
+        };
+      }),
     [options, language]
   );
 
@@ -387,7 +402,17 @@ const LoadersField = React.memo(function LoadersField({
 }) {
   const { t, language } = useI18n();
   const dropdownOptions = useMemo<DropdownOption[]>(
-    () => options.map((option) => ({ value: option.employeeName, label: localizeTripViewText(option.employeeName, language), searchText: option.employeeName || "" })),
+    () =>
+      options.map((option) => {
+        const locked = Boolean(option.lockedByTripNo);
+        return {
+          value: option.employeeName,
+          label: localizeTripViewText(option.employeeName, language),
+          searchText: option.employeeName || "",
+          disabled: locked,
+          hint: locked ? `(${option.lockedByTripNo})` : undefined,
+        };
+      }),
     [options, language]
   );
 
@@ -666,9 +691,11 @@ function StepStart({
     });
   }, []);
 
-  const handleVehicleSelect = useCallback((vehicleId: number, vehicleNo: string) => {
+  const handleVehicleSelect = useCallback((vehicleId: number, vehicleNo: string, noOfBoxes?: number) => {
     patchForm({ vehicleId, vehicleNo });
-  }, [patchForm]);
+    const capacity = Number(noOfBoxes) > 0 ? Number(noOfBoxes) : undefined;
+    updateTrip({ vehicleId, vehicleNo, vehicleBoxCapacity: capacity });
+  }, [patchForm, updateTrip]);
 
   const handleSupervisorSelect = useCallback((supervisorId: number, supervisorName: string) => {
     patchForm({ supervisorId, supervisorName });

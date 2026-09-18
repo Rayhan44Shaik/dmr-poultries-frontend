@@ -153,10 +153,11 @@ export function useShopDeliveryForm(
   );
 
   // Fully consumed boxes cannot be selected again (pending remaining stays selectable).
+  // Birds remaining ≤ 0 means the box is done — residual kg is not selectable stock.
   const usedBoxIds = useMemo<number[]>(() => {
     const used: number[] = [];
     remainingByBox.forEach((remain, boxNo) => {
-      if (remain.birds <= 0 && remain.weight <= 0) used.push(boxNo);
+      if (remain.birds <= 0) used.push(boxNo);
     });
     return used;
   }, [remainingByBox]);
@@ -168,7 +169,8 @@ export function useShopDeliveryForm(
         return { ...b, birds: remain.birds, weight: remain.weight };
       })
       .filter(
-        (b: BoxDetail) => !usedBoxIds.includes(b.boxNo) || formData.selectedBoxIds.includes(b.boxNo)
+        (b: BoxDetail) =>
+          (b.birds > 0 && (!usedBoxIds.includes(b.boxNo) || formData.selectedBoxIds.includes(b.boxNo)))
       );
   }, [safeBoxDetails, usedBoxIds, formData.selectedBoxIds, remainingByBox]);
 

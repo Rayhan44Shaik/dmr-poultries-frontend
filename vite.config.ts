@@ -51,7 +51,7 @@ const OPTIMIZE_DEPS = [
 // Shared by the dev server AND `vite preview`.
 const API_PROXY: Record<string, ProxyOptions> = {
   '/api': {
-    target: 'http://127.0.0.1:4000',
+    target: process.env.VITE_DEV_API_PROXY_TARGET ?? 'http://127.0.0.1:4000',
     changeOrigin: false,
     // When the backend is not running, answer /api requests with a clean
     // 502 JSON instead of letting the SPA history fallback return

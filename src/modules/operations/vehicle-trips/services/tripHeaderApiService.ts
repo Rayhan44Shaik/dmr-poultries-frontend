@@ -272,7 +272,8 @@ export function mapApiTripToTrip(raw: ApiTripRecord, existing?: Trip): Trip {
     dcPhotoKey2: raw.dcPhotoKey2 != null ? str(raw.dcPhotoKey2) : defaults.dcPhotoKey2,
     dcPhotoMime2: raw.dcPhotoMime2 != null ? str(raw.dcPhotoMime2) : defaults.dcPhotoMime2,
     dcPhotoData2: raw.dcPhotoData2 != null ? str(raw.dcPhotoData2) : defaults.dcPhotoData2,
-    vehicleBoxCapacity: numOrNull(raw.vehicleBoxCapacity) ?? defaults.vehicleBoxCapacity,
+    vehicleBoxCapacity:
+      numOrNull(raw.vehicleBoxCapacity ?? raw.vehicle_box_capacity) ?? defaults.vehicleBoxCapacity,
     destinationTolls: num(raw.destinationTolls ?? raw.destination_tolls, defaults.destinationTolls),
     meals: num(raw.meals, defaults.meals),
     loading: num(raw.loading, defaults.loading),
@@ -769,11 +770,21 @@ export async function saveTripStepProgress(
 }
 
 export type AvailableTripResources = {
-  vehicles: Array<{ id: number; vehicleNumber: string }>;
+  vehicles: Array<{ id: number; vehicleNumber: string; noOfBoxes?: number }>;
   drivers: Array<{ id: number; employeeName: string; department: string }>;
   supervisors: Array<{ id: number; employeeName: string; department: string }>;
-  helpers: Array<{ id: number; employeeName: string; department: string }>;
-  loaders: Array<{ id: number; employeeName: string; department: string }>;
+  helpers: Array<{
+    id: number;
+    employeeName: string;
+    department: string;
+    lockedByTripNo?: string | null;
+  }>;
+  loaders: Array<{
+    id: number;
+    employeeName: string;
+    department: string;
+    lockedByTripNo?: string | null;
+  }>;
 };
 
 export async function fetchAvailableResources(tripId?: number | null): Promise<AvailableTripResources> {

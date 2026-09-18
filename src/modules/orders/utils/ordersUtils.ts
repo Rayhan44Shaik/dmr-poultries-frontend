@@ -31,13 +31,26 @@ export function isOrderPlanRow(row: ShopDelivery): boolean {
   return isOrderPlanRemarks(row.remarks);
 }
 
-/** True when Step 4 actually captured this delivery (real delivery data). */
+/** True when Step 4 actually captured this delivery (real delivery data).
+ *
+ * Order Assignment plan rows (`[ORDER] …`) often carry planned birds/weight/
+ * and even assigned `selectedBoxIds` before any delivery — those must stay
+ * "pending" until a real capture stamps a time. Add-Shop captures (no
+ * `[ORDER]` marker) count as soon as they have boxes/birds/weight.
+ */
 export function isCapturedRow(row: ShopDelivery): boolean {
-  return Boolean(
+  if (
     row.autoCaptureTime ||
-      (row as { deliveredAt?: string }).deliveredAt ||
-      (row as { deliveryTime?: string }).deliveryTime
-  );
+    (row as { deliveredAt?: string }).deliveredAt ||
+    (row as { deliveryTime?: string }).deliveryTime
+  ) {
+    return true;
+  }
+  // Planned `[ORDER]` quantities / assigned boxes are NOT a capture.
+  if (isOrderPlanRow(row)) return false;
+  const boxes = Array.isArray(row.selectedBoxIds) ? row.selectedBoxIds.length : 0;
+  if (boxes > 0) return true;
+  return num(row.birds) > 0 || num(row.weight) > 0;
 }
 
 /** The persisted delivery rows of a trip, in delivery (serial) order. */
@@ -101,7 +114,8 @@ export function isOrderContainer(trip: Trip): boolean {
     trip.deleted !== true &&
     (trip.vehicleId == null || trip.vehicleId === 0) &&
     !trip.vehicleNo &&
-    hasOrderRows(trip)
+    (String(trip.remarks ?? "").trim() === "[ORDER_COLLECTION]" ||
+      hasOrderRows(trip))
   );
 }
 

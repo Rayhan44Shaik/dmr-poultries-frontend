@@ -3,6 +3,7 @@ import test from "node:test";
 import {
   DELIVERY_WEIGHT_TOLERANCE_KG,
   getDeliveriesBalanceError,
+  isCountedDeliveryRow,
   validateDeliveriesStep,
 } from "./validation";
 
@@ -129,4 +130,56 @@ test("Step 4 balance error: full balance is null", () => {
     row({ birds: 54, weight: 950, mortality: 2, mortKg: 45 }),
   ]);
   assert.equal(balance, null);
+});
+// --- Pending [ORDER] / Shops(N) plan stubs must not block submit ---
+test("Step 4: uncaptured [ORDER] plan stub is ignored for balance and validate", () => {
+  const planStub = row({
+    id: 99,
+    shopId: 9,
+    shopName: "Pending Shop",
+    birdTypeId: 0,
+    birdType: "",
+    birds: 12,
+    weight: 200,
+    remarks: "[ORDER] O:TR-20260918-002",
+  });
+  const captured = row({
+    id: 1,
+    birds: 56,
+    weight: 950,
+    mortality: 0,
+    mortKg: 45,
+    autoCaptureTime: "2026-09-18T10:00:00+05:30",
+  });
+  assert.equal(isCountedDeliveryRow(planStub), false);
+  assert.equal(isCountedDeliveryRow(captured), true);
+  assert.equal(getDeliveriesBalanceError(trip({ totalBirds: 56 }), [captured, planStub]), null);
+  assert.equal(validateDeliveriesStep(trip({ totalBirds: 56 }), [captured, planStub]).valid, true);
+});
+
+test("Step 4: only [ORDER] plan stubs still require a real delivery", () => {
+  const planOnly = row({
+    shopId: 9,
+    birdTypeId: 0,
+    birds: 12,
+    weight: 200,
+    remarks: "[ORDER] O:TR-REF",
+  });
+  const result = validateDeliveriesStep(trip(), [planOnly]);
+  assert.equal(result.valid, false);
+  assert.match(result.errors[0], /add at least one shop delivery/);
+  assert.equal(getDeliveriesBalanceError(trip(), [planOnly]), null);
+});
+
+test("Step 4: [ORDER] row with capture time counts toward balance", () => {
+  const capturedPlan = row({
+    birds: 56,
+    weight: 950,
+    mortality: 0,
+    mortKg: 45,
+    remarks: "[ORDER] O:TR-REF",
+    autoCaptureTime: "10:00",
+  });
+  assert.equal(isCountedDeliveryRow(capturedPlan), true);
+  assert.equal(validateDeliveriesStep(trip({ totalBirds: 56 }), [capturedPlan]).valid, true);
 });
