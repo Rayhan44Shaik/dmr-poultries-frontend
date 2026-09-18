@@ -1,7 +1,9 @@
 export const FONT_SCALE_STORAGE_KEY = "dmr_font_scale";
 export const LEGACY_FONT_SIZE_STORAGE_KEY = "dmr_font_size";
 
-export const FONT_SCALE_LEVELS = [1, 1.1, 1.2, 1.3, 1.4, 1.5] as const;
+// 70% → 150% in 10% steps. DEFAULT_FONT_SCALE stays 1 (100%); the smaller
+// levels are opt-in, so nothing below 100% is ever applied automatically.
+export const FONT_SCALE_LEVELS = [0.7, 0.8, 0.9, 1, 1.1, 1.2, 1.3, 1.4, 1.5] as const;
 
 export type FontScale = (typeof FONT_SCALE_LEVELS)[number];
 
@@ -26,7 +28,7 @@ export function isFontScale(value: unknown): value is FontScale {
 }
 
 /**
- * Converts persisted input into one of the six supported levels.
+ * Converts persisted input into one of the supported levels (70%–150%).
  * Malformed values fall back to 100%; finite unsupported values are clamped
  * and snapped to the nearest 10% step so an arbitrary value can never escape.
  */
@@ -62,9 +64,10 @@ export function formatFontScale(scale: FontScale): string {
 }
 
 /**
- * The legacy setting changed a 16px root to 15/16/17px. The new feature has a
- * strict 100% minimum, so Small and Medium converge to 100%, while Large snaps
- * from 106.25% to the nearest supported level (110%).
+ * The legacy setting changed a 16px root to 15/16/17px. A returning user keeps
+ * the size they already had, so Small and Medium converge to 100% while Large
+ * snaps from 106.25% to the nearest supported level (110%). Migration never
+ * drops anyone onto the newer 70–90% levels.
  */
 export function migrateLegacyFontSize(value: unknown): FontScale {
   if (typeof value !== "string") return DEFAULT_FONT_SCALE;
