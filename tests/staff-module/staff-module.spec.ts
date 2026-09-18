@@ -26,8 +26,9 @@ test('Salary Register renders only authoritative API rows', async ({ page }) => 
 
 test('Driver Performance renders backend KPIs and ranking row', async ({ page }) => {
   await page.goto('/staff?tab=driver-performance');
-  await expect(page.getByText('Production Staff').first()).toBeVisible();
-  await expect(page.getByText('AP-01').first()).toBeVisible();
+  const driverRow = page.getByRole('row').filter({ hasText: 'Production Staff' });
+  await expect(driverRow).toBeVisible();
+  await expect(driverRow).toContainText('120');
 });
 
 test('Supervisor Performance renders backend delivery metrics', async ({ page }) => {

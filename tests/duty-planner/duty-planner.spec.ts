@@ -131,7 +131,7 @@ test('compact filters use one panel, with a short calendar and Download beside R
       await filters.getByRole('button', { name: mode, exact: true }).click();
       await expect(downloadButton(page)).toBeEnabled();
       const role = (await filters.getByRole('button', { name: 'Filter employee roles' }).boundingBox())!;
-      const search = (await filters.getByRole('searchbox', { name: 'Search employees' }).boundingBox())!;
+      const search = (await filters.getByRole('textbox', { name: 'Search employees' }).boundingBox())!;
       const chips = (await filters.getByRole('group', { name: 'Selected role filters' }).boundingBox())!;
       const actions = (await filters.getByRole('group', { name: 'Duty Planner actions' }).boundingBox())!;
       expect(Math.abs(role.y - search.y)).toBeLessThan(2);
@@ -155,7 +155,7 @@ test('automatically saves Office and Collection only for non-crew, with Sunday w
   await expect(dayCell(page, 'Anil Accounts', TEST_TODAY)).toHaveText('Office');
   await expect(dayCell(page, 'Collection Staff', TEST_TODAY)).toHaveText('Collection');
   expect(backend.writes.map((entry) => [entry.employeeId, entry.date, entry.dutyType])).toEqual([[3, TEST_TODAY, 'Office'], [5, TEST_TODAY, 'Collection']]);
-  await expect(dayCell(page, 'Mohan Helper', TEST_TODAY)).toHaveText('');
+  await expect(dayCell(page, 'Mohan Helper', TEST_TODAY)).toHaveText('—');
   await expect(weekTable(page).locator('td[data-date="2026-09-08"]')).toHaveText(['', '', '', '', '']);
   await page.reload();
   await expect(downloadButton(page)).toBeEnabled();
@@ -280,7 +280,7 @@ test('monthly Excel matches individual table counts and has no grand totals', as
 
 test('custom ranges include both boundaries and match the employee search', async ({ page }) => {
   await setCustomRange(page, '30/12/2025', '03/01/2026');
-  await filterBar(page).getByRole('searchbox', { name: 'Search employees' }).fill('  rAvI  ');
+  await filterBar(page).getByRole('textbox', { name: 'Search employees' }).fill('  rAvI  ');
   await expect(matrix(page).locator('tbody tr')).toHaveCount(1);
   await expect(row(page, 'Ravi Kumar').getByRole('cell').last()).toHaveText('2');
   const { workbook, filename } = await downloadWorkbook(page);
@@ -305,7 +305,7 @@ test('missing/reversed ranges and empty filters cannot export stale data', async
   await expect(filterBar(page)).toContainText('The to date must be on or after the from date.');
   await expect(downloadButton(page)).toBeDisabled();
   await setCustomRange(page, '01/09/2026', '07/09/2026');
-  await filterBar(page).getByRole('searchbox', { name: 'Search employees' }).fill('no such employee');
+  await filterBar(page).getByRole('textbox', { name: 'Search employees' }).fill('no such employee');
   await expect(downloadButton(page)).toBeDisabled();
   await expect(filterBar(page)).toContainText('No employees match');
   await filterBar(page).getByRole('button', { name: 'Reset', exact: true }).click();
