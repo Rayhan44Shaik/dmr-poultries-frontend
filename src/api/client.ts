@@ -64,7 +64,11 @@ apiClient.interceptors.response.use(
     return response;
   },
   (error) => {
-    if (error?.response?.status === 401 && !String(error?.config?.url ?? "").includes("/auth/login")) {
+    // A deliberate sign-out EXPECTS companion 401s (in-flight dashboard
+    // prefetches etc. after the server invalidated the token) — they must not
+    // fire the session-expired event on top of the logout flow.
+    const url = String(error?.config?.url ?? "");
+    if (error?.response?.status === 401 && !url.includes("/auth/login") && !url.includes("/auth/logout")) {
       window.dispatchEvent(new Event("dmr:auth-expired"));
     }
     return Promise.reject(toApiError(error));

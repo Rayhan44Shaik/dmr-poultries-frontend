@@ -64,8 +64,7 @@
 
 import http from "node:http";
 import { createHmac, randomUUID } from "node:crypto";
-import { tmpdir } from "node:os";
-import { readFileSync, writeFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 const PORT = Number(process.env.PORT ?? process.env.MOCK_BACKEND_PORT ?? 4000);
@@ -4803,7 +4802,15 @@ const USERS = {
 // (A fixed secret would make every login mint the SAME token string — which
 // logout revocation would then permanently kill: logout → re-login → still
 // revoked → bounced to the sign-in screen forever. Never do that.)
-const SECRET_FILE = path.join(tmpdir(), "dmr-sample-token-secret");
+// Kept INSIDE the repo workspace (gitignored): unlike /tmp it survives
+// sandbox restarts, so users are never bounced to sign-in by a rotated key.
+const KEY_DIR = path.join(process.cwd(), ".auth-session");
+try {
+  mkdirSync(KEY_DIR, { recursive: true });
+} catch {
+  // unwritable — fall back to the OS temp dir below
+}
+const SECRET_FILE = path.join(KEY_DIR, "token-secret");
 let SAMPLE_TOKEN_SECRET = null;
 try {
   SAMPLE_TOKEN_SECRET = readFileSync(SECRET_FILE, "utf8").trim() || null;
@@ -4831,7 +4838,7 @@ function sign(username, version) {
  * deterministic tokens + logout revocation deadlock: the new login returns
  * the same string the revocation list still rejects (the exact sign-in loop).
  */
-const VERSIONS_FILE = path.join(tmpdir(), "dmr-sample-session-versions.json");
+const VERSIONS_FILE = path.join(KEY_DIR, "session-versions.json");
 const VERSIONS = (() => {
   try {
     return JSON.parse(readFileSync(VERSIONS_FILE, "utf8"));

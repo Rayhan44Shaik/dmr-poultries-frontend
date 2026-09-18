@@ -63,12 +63,19 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
   // The `dmr:auth-expired` listener is ALWAYS on for the life of the document:
   // a 401 from any endpoint (a genuinely dead session) ends it and lands on a
-  // fresh sign-in document. A separate effect below (re)starts /auth/me
-  // revalidation whenever a session exists — including one adopted in-SPA
-  // right after sign-in, where the boot effect saw no token yet.
+  // fresh sign-in document. It NEVER overwrites the idle-signout reason — an
+  // in-flight request 401ing right after the idle logout must not replace the
+  // "signed out after 10 minutes of inactivity" note with "session expired".
   useEffect(() => {
     if (demoMode) return undefined;
     const expired = () => {
+      try {
+        if (sessionStorage.getItem(IDLE_SIGNOUT_KEY) !== "idle") {
+          sessionStorage.setItem(IDLE_SIGNOUT_KEY, "expired");
+        }
+      } catch {
+        // storage blocked — the notice is cosmetic
+      }
       clearSession();
       setUser(null);
       hardNavigate('/');
@@ -93,15 +100,11 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
       .catch((cause) => {
         if (!active) return;
         if (isSessionInvalid(cause)) {
-          // Definitive: the server rejected this session. Clear everything and
-          // go to the sign-in screen through a FULL reload — the next sign-in
-          // then starts from a fresh document, so no module cache of this user
-          // can ever be inherited by the next one.
-          try {
-            sessionStorage.setItem(IDLE_SIGNOUT_KEY, "expired");
-          } catch {
-            // storage blocked — the notice is cosmetic
-          }
+          // Definitive: the server rejected this (stale) session. Clear it and
+          // go to a fresh sign-in document QUIETLY — no "session expired"
+          // note: the user did nothing wrong; a plain sign-in screen is the
+          // honest state. The full reload also guarantees the next sign-in
+          // starts with no module cache of this user.
           clearSession();
           setUser(null);
           hardNavigate("/");
