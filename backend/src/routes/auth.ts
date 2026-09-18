@@ -121,3 +121,57 @@ authRouter.post("/logout", (req, res) => {
   if (token) sessions.delete(token);
   res.json({ ok: true });
 });
+
+// ── Supervisor API scope ────────────────────────────────────────────────────
+// Mirrors the sample server: an authenticated supervisor may only touch the
+// entry workspace's endpoints, never a delete/approve route, never owner
+// data (accounts, salaries, rates, shop sales, dashboards). The UI hides
+// these paths; this middleware makes that absolute.
+
+const SUPERVISOR_DENIED_PREFIXES = [
+  "/api/masters/banks", "/api/masters/market-rates", "/api/masters/resolve-location",
+  "/api/operations/dashboard", "/api/operations/rate-entry", "/api/operations/shop-sales",
+  "/api/operations/mortality", "/api/operations/shop-ledger",
+  "/api/operations/collection-entry/report", "/api/operations/collections/report",
+  "/api/accounts/", "/api/fleet/analytics", "/api/fleet/reports", "/api/fleet/dashboard",
+  "/api/reports/", "/api/staff/salaries", "/api/staff/performance", "/api/staff/advances",
+  "/api/staff/dashboard", "/api/quarter-summary", "/api/bootstrap",
+];
+
+const SUPERVISOR_ALLOWED_PREFIXES = [
+  "/api/masters/shops", "/api/masters/employees", "/api/masters/farms",
+  "/api/masters/vehicles", "/api/masters/bird-types",
+  "/api/trips", "/api/operations/trip-list", "/api/operations/vehicle-trips/",
+  "/api/operations/collection-entry", "/api/operations/collections/",
+  "/api/operations/fuel-expenses",
+  "/api/fleet/maintenance", "/api/fleet/permits", "/api/fleet/emis", "/api/fleet/fastag",
+  "/api/fleet/vehicles/",
+  "/api/staff/leaves", "/api/staff/duty-planner", "/api/staff/attendance/",
+];
+
+export function supervisorApiAllowed(method: string, path: string): boolean {
+  if (SUPERVISOR_DENIED_PREFIXES.some((prefix) => path.startsWith(prefix))) return false;
+  if (!SUPERVISOR_ALLOWED_PREFIXES.some((prefix) => path === prefix || path.startsWith(prefix + "/"))) return false;
+  if (path.startsWith("/api/masters/") && method !== "GET") return false;
+  if (method === "DELETE") return false;
+  if (method !== "GET" && /(\/approve|\/reject)$/.test(path)) return false;
+  if (/^\/api\/operations\/collection-entry\/\d+\/status$/.test(path)) return false;
+  if (/^\/api\/staff\/leaves\/[^/]+\/status$/.test(path)) return false;
+  return true;
+}
+
+/** Mount directly under the /api router, after /auth and /health. */
+export function requireScoped(req: Request, res: Response, next: NextFunction): void {
+  const account = accountForRequest(req);
+  if (!account) {
+    res.status(401).json({ error: "unauthenticated", message: "Sign in to continue." });
+    return;
+  }
+  (req as Request & { account?: Account }).account = account;
+  const path = String(req.originalUrl ?? req.url).split("?")[0];
+  if (account.role !== "OWNER" && !supervisorApiAllowed(req.method, path)) {
+    res.status(403).json({ error: "forbidden", message: "Your role cannot access this data." });
+    return;
+  }
+  next();
+}

@@ -191,8 +191,10 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
   const pendingCollections = useSyncExternalStore(subscribePendingCollectionSnapshot, getPendingCollectionSnapshot, getPendingCollectionSnapshot);
   const pendingApprovals = usePendingApprovals();
 
-  // Single app-wide poller for pending approval counts (bell + sidebar badges).
-  useEffect(() => startApprovalPolling(), []);
+  // Single app-wide poller for pending approval counts (bell + sidebar
+  // badges). Owner-only: an entry-only role must not pull approval queues
+  // (payment/rate/collection values) over the network at all.
+  useEffect(() => (canApproveAnything ? startApprovalPolling() : undefined), [canApproveAnything]);
   const [notificationPhase, setNotificationPhase] = useState<'idle' | 'loading' | 'error'>('idle');
   const notificationRead = useRef(false);
   const notificationMounted = useRef(false);
@@ -211,35 +213,41 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
       .finally(() => { notificationRead.current = false; });
   }, [pendingCollections.loaded]);
 
-  /* ----- Data-driven notifications (existing services only) ----- */
+  /* ----- Data-driven notifications (existing services only) -----
+     Role-scoped: the bell only ever shows items that belong to the signed-in
+     role. Approval queues and money summaries (overdue/pending ₹ totals) are
+     OWNER business — a supervisor's bell stays limited to their own work
+     (trips on the road, fleet documents expiring). */
   const notifications = useMemo<NotificationItem[]>(() => {
     const items: NotificationItem[] = [];
     try {
-      const pending = pendingCollections.items;
-      const overdue = pending.filter((p) => p.overdueDays > 0);
-      const totalPending = pending.reduce((sum, p) => sum + (p.currentPending || 0), 0);
-      if (overdue.length > 0) {
-        items.push({
-          id: "overdue-collections",
-          icon: ShieldAlert,
-          tone: "danger",
-          title: t("header.overdueCollections", { count: overdue.length }),
-          description: t("header.overdueCollectionDesc", {
-            amount: formatINR(overdue.reduce((s, p) => s + (p.currentPending || 0), 0)),
-          }),
-          time: formatRelativeTime(new Date()),
-          path: "/operations?tab=pending-collections",
-        });
-      } else if (pending.length > 0) {
-        items.push({
-          id: "pending-collections",
-          icon: Clock3,
-          tone: "info",
-          title: t("header.pendingCollectionsTitle", { count: pending.length }),
-          description: t("header.pendingCollectionsDesc", { amount: formatINR(totalPending) }),
-          time: formatRelativeTime(new Date()),
-          path: "/operations?tab=pending-collections",
-        });
+      if (canApproveAnything) {
+        const pending = pendingCollections.items;
+        const overdue = pending.filter((p) => p.overdueDays > 0);
+        const totalPending = pending.reduce((sum, p) => sum + (p.currentPending || 0), 0);
+        if (overdue.length > 0) {
+          items.push({
+            id: "overdue-collections",
+            icon: ShieldAlert,
+            tone: "danger",
+            title: t("header.overdueCollections", { count: overdue.length }),
+            description: t("header.overdueCollectionDesc", {
+              amount: formatINR(overdue.reduce((s, p) => s + (p.currentPending || 0), 0)),
+            }),
+            time: formatRelativeTime(new Date()),
+            path: "/operations?tab=pending-collections",
+          });
+        } else if (pending.length > 0) {
+          items.push({
+            id: "pending-collections",
+            icon: Clock3,
+            tone: "info",
+            title: t("header.pendingCollectionsTitle", { count: pending.length }),
+            description: t("header.pendingCollectionsDesc", { amount: formatINR(totalPending) }),
+            time: formatRelativeTime(new Date()),
+            path: "/operations?tab=pending-collections",
+          });
+        }
       }
 
       const trips = tripService.getAll();
@@ -292,7 +300,9 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
 
   /* ----- Pending-approval notifications (trips · bills · rates · payments · leaves) ----- */
   const approvalNotifications = useMemo<NotificationItem[]>(() => {
-    if (!pendingApprovals.loaded) return [];
+    // Approval queues exist for the role that approves — never for the
+    // entry-only role, whose data the queues also summarize.
+    if (!canApproveAnything || !pendingApprovals.loaded) return [];
     const now = formatRelativeTime(new Date());
     const items: NotificationItem[] = [];
     const q = pendingApprovals;
@@ -352,7 +362,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
       });
     }
     return items;
-  }, [pendingApprovals]);
+  }, [pendingApprovals, canApproveAnything]);
 
   // Approval alerts lead the bell; operational alerts follow. Every row must
   // also lead somewhere the signed-in role may open — a supervisor never sees
@@ -475,7 +485,7 @@ function Header({ onMenuClick, menuOpen = false, onOpenCommand }: HeaderProps) {
       <Dropdown
         width="w-[360px] max-w-[calc(100vw-2rem)]"
         trigger={(open, toggle) => (
-          <IconButton label={t("header.notifications")} onClick={() => { toggle(); if (!open) loadCollectionNotifications(); }} badge={notificationBadge}>
+          <IconButton label={t("header.notifications")} onClick={() => { toggle(); if (!open && canApproveAnything) loadCollectionNotifications(); }} badge={notificationBadge}>
             <Bell size={18} />
           </IconButton>
         )}

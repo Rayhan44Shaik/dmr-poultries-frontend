@@ -4796,6 +4796,53 @@ function sessionUserFromRequest(req) {
   return USERS[SESSIONS.get(token)] ?? null;
 }
 
+// ── Supervisor API scope (server-side enforcement) ─────────────────────────
+// The UI hides what a supervisor may not do; this matrix makes it absolute.
+// Even with devtools open, a supervisor token cannot read owner data
+// (accounts, salaries, rates, shop sales, dashboards, masters beyond the
+// reference lists) and can never reach a delete / approve / reject route.
+const SUPERVISOR_DENIED_PREFIXES = [
+  "/api/masters/banks", "/api/masters/market-rates", "/api/masters/resolve-location",
+  "/api/operations/dashboard", "/api/operations/rate-entry", "/api/operations/shop-sales",
+  "/api/operations/mortality", "/api/operations/shop-ledger",
+  "/api/operations/collection-entry/report", "/api/operations/collections/report",
+  "/api/accounts/", "/api/fleet/analytics", "/api/fleet/reports", "/api/fleet/dashboard",
+  "/api/reports/", "/api/staff/salaries", "/api/staff/performance", "/api/staff/advances",
+  "/api/staff/dashboard", "/api/quarter-summary", "/api/bootstrap",
+];
+
+const SUPERVISOR_ALLOWED_PREFIXES = [
+  // Reference masters (read-only fuel for their pages' dropdowns).
+  "/api/masters/shops", "/api/masters/employees", "/api/masters/farms",
+  "/api/masters/vehicles", "/api/masters/bird-types",
+  // Trips: entry, list, steps, diesel, status flow.
+  "/api/trips", "/api/operations/trip-list", "/api/operations/vehicle-trips/",
+  // Collections: entry + pending views (no approve/delete routes).
+  "/api/operations/collection-entry", "/api/operations/collections/",
+  // Fuel, maintenance, permits, EMI, FASTag.
+  "/api/operations/fuel-expenses",
+  "/api/fleet/maintenance", "/api/fleet/permits", "/api/fleet/emis", "/api/fleet/fastag",
+  "/api/fleet/vehicles/",
+  // Leaves (add) + Duty planner (assign) + its attendance helper.
+  "/api/staff/leaves", "/api/staff/duty-planner", "/api/staff/attendance/",
+];
+
+function supervisorApiAllowed(method, path) {
+  // 1. Owner-only sections are refused outright.
+  if (SUPERVISOR_DENIED_PREFIXES.some((prefix) => path.startsWith(prefix))) return false;
+  // 2. Only the entry workspace's endpoints exist for this role.
+  if (!SUPERVISOR_ALLOWED_PREFIXES.some((prefix) => path === prefix || path.startsWith(prefix + "/") || (prefix.endsWith("/") && path.startsWith(prefix)))) return false;
+  // 3. Masters are reference data: read-only.
+  if (path.startsWith("/api/masters/") && method !== "GET") return false;
+  // 4. Entry-only: no destructive method anywhere, and no approve/reject.
+  if (method === "DELETE") return false;
+  if (method !== "GET" && /(\/approve|\/reject)$/.test(path)) return false;
+  // Approve/reject of collections and leaves travel as status PATCHes.
+  if (/^\/api\/operations\/collection-entry\/\d+\/status$/.test(path)) return false;
+  if (/^\/api\/staff\/leaves\/[^/]+\/status$/.test(path)) return false;
+  return true;
+}
+
 // Back-compat: the desktop bootstrap flow still reads a single USER shape.
 const USER = USERS.owner;
 
@@ -5048,6 +5095,20 @@ const server = http.createServer(async (req, res) => {
   const m = (re) => p.match(re);
 
   try {
+    // ── Role-scoped API guard ─────────────────────────────────────────────
+    // /api/auth/* and the health probes are open; EVERY other endpoint needs
+    // a valid bearer token, and a supervisor token is held to its whitelist.
+    const authFree = p.startsWith("/api/auth/") || p === "/api/health" || p === "/api/sync/health";
+    if (!authFree) {
+      const account = sessionUserFromRequest(req);
+      if (!account) {
+        return send(401, { error: "unauthenticated", message: "Sign in to continue." });
+      }
+      if (account.role !== "OWNER" && !supervisorApiAllowed(method, p)) {
+        return send(403, { error: "forbidden", message: "Your role cannot access this data." });
+      }
+    }
+
     // ── Meta / auth ────────────────────────────────────────────────────────
     if (p === "/api/health" || p === "/api/sync/health") {
       // Desktop probes this to detect the sample server. Mobile additionally

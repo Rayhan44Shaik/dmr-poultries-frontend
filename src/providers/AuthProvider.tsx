@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { currentUserRequest, loginRequest, logoutRequest, storeToken, type AuthenticatedUser } from '../modules/auth/authApi';
+import { sweepWorkspaceCaches } from '../modules/auth/cacheSweep';
 import { AuthContext } from './authContext';
 
 interface AuthProviderProps {
@@ -13,6 +14,20 @@ const DEMO_USER: AuthenticatedUser = {
   role: 'OWNER',
   employeeId: null,
 };
+
+/**
+ * End the SPA session by navigating the document. A full load guarantees every
+ * module-level cache (approval snapshot, collection snapshot, trip service,
+ * master caches) is rebuilt from scratch under the new identity — nothing
+ * in-memory can cross from one user's session into the next.
+ */
+function hardNavigate(to: string): void {
+  try {
+    window.location.replace(to);
+  } catch {
+    // navigation blocked (sandboxed preview) — SPA fallback below still runs
+  }
+}
 
 export const AuthProvider = ({ children }: AuthProviderProps) => {
   // Development-only preview bypass. It can be enabled for this server with
@@ -35,11 +50,12 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     }).finally(() => { if (active) setLoading(false); });
     const expired = () => {
       storeToken(null);
-      setUser(null);
+      // A dead session mid-app: hard-navigate so no fetched data lingers.
+      hardNavigate('/');
     };
     window.addEventListener('dmr:auth-expired', expired);
     return () => { active = false; window.removeEventListener('dmr:auth-expired', expired); };
-  }, []);
+  }, [demoMode]);
 
   const isAuthenticated = !!user;
 
@@ -50,7 +66,16 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
   }, []);
 
   const logout = useCallback(async () => {
-    try { await logoutRequest(); } finally { setUser(null); }
+    try {
+      await logoutRequest();
+    } finally {
+      setUser(null);
+      // Wipe every cached business dataset before the sign-in screen returns,
+      // so the next identity — whoever it is — starts with nothing of this
+      // user's data on the machine.
+      sweepWorkspaceCaches();
+      hardNavigate('/');
+    }
   }, []);
 
   const value = useMemo(() => ({ isAuthenticated, loading, user, login, logout }), [isAuthenticated, loading, login, logout, user]);

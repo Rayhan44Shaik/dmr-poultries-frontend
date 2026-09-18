@@ -6,19 +6,18 @@
 // toggle on this screen — just the brand mark and the form.
 
 import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
 import { ArrowRight, Building2, Eye, EyeOff, Info, Lock, ShieldCheck, Truck, User } from "lucide-react";
 import BrandMark from "../../ui/BrandMark";
 import { useAuth } from "../../providers/authContext";
 import { useI18n } from "../../i18n";
 import { landingPathForRole } from "./permissions";
 import { IDLE_SIGNOUT_KEY } from "./IdleSessionGuard";
+import { getLastUsername, setLastUsername, sweepWorkspaceCaches } from "./cacheSweep";
 
 const inputClass =
   "w-full rounded-lg border border-slate-200 bg-white py-2.5 pl-10 pr-10 text-sm text-slate-800 shadow-sm outline-none transition placeholder:text-slate-400 focus:border-brand-500 focus:ring-2 focus:ring-brand-500/20";
 
 export default function LoginPage() {
-  const navigate = useNavigate();
   const { login } = useAuth();
   const { t } = useI18n();
   const [showPassword, setShowPassword] = useState(false);
@@ -53,10 +52,18 @@ export default function LoginPage() {
     setError("");
     try {
       const signedIn = await login(user, pass);
-      navigate(landingPathForRole(signedIn?.role ?? null));
+      // Cross-user isolation: when the identity changes on this machine,
+      // every cached business dataset is swept BEFORE the (full-page) landing
+      // navigation rebuilds all module caches under the new session.
+      const previous = getLastUsername();
+      if (previous !== signedIn.username) sweepWorkspaceCaches();
+      setLastUsername(signedIn.username);
+      // Full navigation (not SPA route change): every module-level cache —
+      // approval snapshot, collection snapshot, trip service — starts clean
+      // for this role, so no data can leak across sessions via devtools.
+      window.location.replace(landingPathForRole(signedIn.role));
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : t("auth.login.failed"));
-    } finally {
       setBusy(false);
     }
   };
@@ -114,10 +121,9 @@ export default function LoginPage() {
       <div className="flex flex-1 items-center justify-center p-6">
         <div className="w-full max-w-[400px] animate-fade-in-up">
           <div className="rounded-xl border border-slate-200/80 bg-white p-7 shadow-card-lg">
-            {/* Brand mark — big, centred, no inline logo beside the title. */}
-            <div className="flex flex-col items-center text-center">
-              <BrandMark size="2xl" variant="plain" label="DMR Poultries" />
-              <h2 className="mt-3 text-xl font-bold tracking-tight text-slate-900">{t("auth.login.welcome")}</h2>
+            {/* No logo on the card — just the words. */}
+            <div className="text-center">
+              <h2 className="text-xl font-bold tracking-tight text-slate-900">{t("auth.login.welcome")}</h2>
               <p className="mt-1 text-sm text-slate-400">{t("auth.login.subtitle")}</p>
             </div>
 
