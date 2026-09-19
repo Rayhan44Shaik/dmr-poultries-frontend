@@ -453,6 +453,9 @@ export default function StepEnd({
     for (const key of EXPENSE_KEYS) {
       expenses[key] = expenseValue(sheetData[key]);
     }
+    // Always preserve Finish Assignment `order:` tags when saving remarks.
+    const { orderTags } = splitRemarks(trip.remarks);
+    const remarks = mergeRemarks(orderTags, String(sheetData.remarks ?? ""));
 
     return {
       ...expenses,
@@ -460,7 +463,7 @@ export default function StepEnd({
       closingMeter: Number(sheetData.endMeter) || 0,
       destinationTolls: sheetData.destinationTolls === "" ? 0 : Number(sheetData.destinationTolls),
       deliveryTolls: sheetData.destinationTolls === "" ? 0 : Number(sheetData.destinationTolls),
-      remarks: sheetData.remarks,
+      remarks,
       totalExpenses: totalAllExpenses,
       totalDieselAmount,
       remainingBalance,
@@ -884,6 +887,24 @@ export default function StepEnd({
               {errorMsg}
             </div>
           ) : null}
+
+          {(() => {
+            const { orderTags } = splitRemarks(trip.remarks);
+            if (!orderTags.length) return null;
+            return (
+              <div className="flex flex-wrap items-center gap-1.5 px-0.5">
+                {orderTags.map((tag) => (
+                  <span
+                    key={tag}
+                    className="inline-flex items-center rounded-md border border-slate-200 bg-slate-50 px-2 py-0.5 text-[11px] font-semibold text-slate-500"
+                    title={t("ops.trip.order_assignment_tag")}
+                  >
+                    {tag}
+                  </span>
+                ))}
+              </div>
+            );
+          })()}
 
           <div className="border border-slate-200 rounded-lg p-2.5 bg-white">
             <textarea

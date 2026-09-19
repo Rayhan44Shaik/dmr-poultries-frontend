@@ -746,6 +746,7 @@ export default {
   'ops.trip.optional_delivery_notes': 'ఐచ్ఛిక డెలివరీ గమనికలు',
   'ops.trip.optional_notes': 'ఐచ్ఛిక గమనికలు',
   'ops.trip.optional_trip_notes': 'ఐచ్ఛిక ట్రిప్ గమనికలు',
+  'ops.trip.order_assignment_tag': 'ఆర్డర్ అసైన్‌మెంట్ రిఫరెన్స్',
   'ops.trip.pdf_generation_failed': 'పీడీఎఫ్ రూపొందించడం విఫలమైంది.',
   'ops.trip.pending_boxes_pdf_ok': 'పెండింగ్ బాక్సుల పీడీఎఫ్ రూపొందించబడింది.',
   'ops.trip.per_box_allocation': 'ప్రతి బాక్స్ కేటాయింపు',

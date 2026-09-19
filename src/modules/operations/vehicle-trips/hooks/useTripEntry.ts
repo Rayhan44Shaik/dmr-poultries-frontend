@@ -267,11 +267,13 @@ export function useTripEntry(
 
   const saveStepProgress = async (
     step: "start" | "farm" | "pickup" | "deliveries" | "expenses",
-    data: Partial<Trip> = {}
+    data: Partial<Trip> = {},
+    opts: { silent?: boolean } = {}
   ): Promise<boolean> => {
+    const silent = Boolean(opts.silent);
     const current = { ...tripRef.current, ...data } as Trip;
     if (!current.id) {
-      notifyRef.current?.(translate("ops.trip.submit_start_first"), "error");
+      if (!silent) notifyRef.current?.(translate("ops.trip.submit_start_first"), "error");
       return false;
     }
 
@@ -292,32 +294,48 @@ export function useTripEntry(
       deliveries: "Delivery",
       expenses: "End",
     }[step];
-    const lockKey = `save:${step}`;
+    const lockKey = silent ? `save-silent:${step}` : `save:${step}`;
     if (!acquireOperationLock(lockKey)) return false;
-    setHeaderLoading(true);
+    // Silent background saves must never flash header loading or remount forms.
+    if (!silent) setHeaderLoading(true);
     try {
       const saved = await saveTripStepProgress(current.id, step, current);
-      applySavedTrip(saved);
+      if (silent) {
+        // Keep the live working copy untouched. Only refresh concurrency
+        // metadata — never setTrip / applySavedTrip (that remounts Step 3).
+        tripRef.current = {
+          ...tripRef.current,
+          updatedAt: saved.updatedAt ?? tripRef.current.updatedAt,
+          version: saved.version ?? tripRef.current.version,
+        };
+        setSavedTrip((prev) => ({
+          ...prev,
+          updatedAt: saved.updatedAt ?? prev.updatedAt,
+          version: saved.version ?? prev.version,
+        }));
+      } else {
+        applySavedTrip(saved);
+      }
       return true;
     } catch (error) {
-      if (step === "farm" || step === "pickup") {
+      if (!silent && (step === "farm" || step === "pickup")) {
         notifyRef.current?.(handleApiError(error), "error");
-      } else {
+      } else if (!silent) {
         console.error(`Unable to save ${label.toLowerCase()} details:`, error);
       }
       return false;
     } finally {
       releaseOperationLock(lockKey);
-      setHeaderLoading(false);
+      if (!silent) setHeaderLoading(false);
     }
   };
 
-  const saveStartProgress = (data: Partial<Trip> = {}) =>
-    saveStepProgress("start", data);
-  const saveFarmProgress = (data: Partial<Trip> = {}) =>
-    saveStepProgress("farm", data);
-  const savePickupProgress = (data: Partial<Trip> = {}) =>
-    saveStepProgress("pickup", data);
+  const saveStartProgress = (data: Partial<Trip> = {}, opts?: { silent?: boolean }) =>
+    saveStepProgress("start", data, opts);
+  const saveFarmProgress = (data: Partial<Trip> = {}, opts?: { silent?: boolean }) =>
+    saveStepProgress("farm", data, opts);
+  const savePickupProgress = (data: Partial<Trip> = {}, opts?: { silent?: boolean }) =>
+    saveStepProgress("pickup", data, opts);
   const saveDeliveriesProgress = async (rows: ShopDelivery[]): Promise<boolean> => {
     const current = tripRef.current;
     if (!current.id) {

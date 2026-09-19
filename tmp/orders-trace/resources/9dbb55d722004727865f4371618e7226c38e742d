@@ -1,0 +1,85 @@
+# Instructions
+
+- Following Playwright test failed.
+- Explain why, be concise, respect Playwright best practices.
+- Provide a snippet of code with the fix, if possible.
+
+# Test info
+
+- Name: orders\orders-live-workflow.spec.ts >> real collection persists with a positive container id and no trip-zero request
+- Location: tests\orders\orders-live-workflow.spec.ts:6:1
+
+# Error details
+
+```
+Error: expect(locator).toBeVisible() failed
+
+Locator: locator('#orders-panel-collection')
+Expected: visible
+Timeout: 20000ms
+Error: element(s) not found
+
+Call log:
+  - Expect "toBeVisible" with timeout 20000ms
+  - waiting for locator('#orders-panel-collection')
+
+```
+
+```yaml
+- text: DMR Poultries Checking your session
+- button "Reload"
+- text: Taking too long? Tap to reload
+```
+
+# Test source
+
+```ts
+  1  | import { test, expect } from "@playwright/test";
+  2  | 
+  3  | const COLLECTION = "/operations/orders/collection";
+  4  | const ASSIGNMENT = "/operations/orders/assignment";
+  5  | 
+  6  | test("real collection persists with a positive container id and no trip-zero request", async ({ page }) => {
+  7  |   const requests: string[] = [];
+  8  |   page.on("request", (request) => requests.push(`${request.method()} ${request.url()}`));
+  9  | 
+  10 |   await page.goto("/");
+  11 |   await page.locator("#login-username").fill("test-owner-4100");
+  12 |   await page.locator("#login-password").fill("Test-only-password-123!");
+  13 |   await page.getByRole("checkbox", { name: /remember me/i }).check();
+  14 |   await page.getByRole("button", { name: /sign in/i }).click();
+  15 |   await expect(page).toHaveURL(/dashboard/);
+  16 | 
+  17 |   await page.locator(`a[href="${COLLECTION}"]`).first().click();
+  18 |   await expect(page.locator("#orders-panel-collection")).toBeVisible({ timeout: 20_000 });
+  19 |   const row = page.locator("tbody tr", { hasText: "Orders E2E Shop 1" });
+  20 |   await expect(row).toBeVisible();
+  21 |   await row.getByRole("spinbutton", { name: /No\. of Birds/i }).fill("200");
+  22 |   await row.getByRole("spinbutton", { name: /No\. of Boxes/i }).fill("20");
+  23 |   await row.getByRole("spinbutton", { name: /^Weight/i }).fill("400");
+  24 | 
+  25 |   const saveResponse = page.waitForResponse(
+  26 |     (response) => response.request().method() === "POST" && /\/api\/trips\/\d+\/steps\/deliveries$/.test(response.url()),
+  27 |   );
+  28 |   await page.getByRole("button", { name: /save progress/i }).click();
+  29 |   const saved = await saveResponse;
+  30 |   expect(saved.status()).toBe(200);
+  31 |   const savedBody = await saved.json();
+  32 |   expect(savedBody.id).toBeGreaterThan(0);
+  33 |   expect(savedBody.tripNo).toBeTruthy();
+  34 |   expect(new URL(saved.url()).pathname).toBe(`/api/trips/${savedBody.id}/steps/deliveries`);
+  35 |   expect(requests.some((request) => /\/trips\/0\//.test(request))).toBe(false);
+  36 | 
+  37 |   await page.reload();
+> 38 |   await expect(page.locator("#orders-panel-collection")).toBeVisible({ timeout: 20_000 });
+     |                                                          ^ Error: expect(locator).toBeVisible() failed
+  39 |   const refreshed = page.locator("tbody tr", { hasText: "Orders E2E Shop 1" });
+  40 |   await expect(refreshed.getByRole("spinbutton", { name: /No\. of Birds/i })).toHaveValue("200");
+  41 |   await expect(refreshed.getByRole("spinbutton", { name: /No\. of Boxes/i })).toHaveValue("20");
+  42 |   await expect(refreshed.getByRole("spinbutton", { name: /^Weight/i })).toHaveValue("400");
+  43 | 
+  44 |   await page.goto(ASSIGNMENT);
+  45 |   await expect(page.getByText("Orders E2E Shop 1", { exact: true }).first()).toBeVisible();
+  46 | });
+  47 | 
+```

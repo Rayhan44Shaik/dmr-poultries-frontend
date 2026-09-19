@@ -25,7 +25,7 @@ interface Props {
   updateTrip: (updates: Partial<Trip>) => void;
   updateBoxDetails: (rows: BoxDetail[], persistToStorage?: boolean, silent?: boolean) => void;
   submitPickupStep: (data: Partial<Trip>) => boolean | Promise<boolean>;
-  savePickupProgress?: (data: Partial<Trip>) => Promise<boolean>;
+  savePickupProgress?: (data: Partial<Trip>, opts?: { silent?: boolean }) => Promise<boolean>;
   editable?: boolean;
   canEdit?: boolean;
   /** Bottom Cancel → leave wizard / Create New Trip. */
@@ -258,50 +258,77 @@ export default function StepPickup({
     return () => window.clearTimeout(toastTimerRef.current);
   }, [toast]);
 
-  // Quiet autosave for Step 3 — persist box/photo progress while editing so
-  // assigned shops in Step 4 always see the latest pickup boxes.
+  // Background autosave for Step 3 — persists after typing settles. Uses
+  // silent mode so the server response never remounts box inputs / moves the
+  // caret, and never flashes header loading.
   const pickupAutosaveTimerRef = useRef<number | undefined>(undefined);
   const pickupAutosaveBusyRef = useRef(false);
+  const [lastSavedFingerprint, setLastSavedFingerprint] = useState("");
+  const pickupDraftFingerprint = useMemo(
+    () =>
+      JSON.stringify({
+        boxes: rows.map((row) =>
+          Object.fromEntries(Object.entries(row).filter(([key]) => key !== "uid"))
+        ),
+        removedBoxNos,
+        photoKeys: photos.map((p) => p.key),
+      }),
+    [rows, removedBoxNos, photos]
+  );
+  const hasUnsavedChanges = pickupDraftFingerprint !== lastSavedFingerprint;
   const pickupLocked = Boolean(trip.pickupStepSubmitted) && !editable && !isLocalEditing;
   useEffect(() => {
     if (pickupLocked || !savePickupProgress || !trip.id || isSubmitting || isSaving) return;
+    if (pickupDraftFingerprint === lastSavedFingerprint) return;
+
     window.clearTimeout(pickupAutosaveTimerRef.current);
     pickupAutosaveTimerRef.current = window.setTimeout(() => {
       if (pickupAutosaveBusyRef.current) return;
+      const boxDetails = rows.map(
+        (row) =>
+          Object.fromEntries(Object.entries(row).filter(([key]) => key !== "uid")) as BoxDetail
+      );
+      const payload = {
+        boxDetails,
+        removedBoxNos,
+        ...(photos[0]
+          ? {
+              dcPhotoKey: photos[0].key,
+              dcPhotoMime: photos[0].mime,
+              dcPhotoData: photos[0].data,
+            }
+          : {}),
+        ...(photos[1]
+          ? {
+              dcPhotoKey2: photos[1].key,
+              dcPhotoMime2: photos[1].mime,
+              dcPhotoData2: photos[1].data,
+            }
+          : {}),
+      } as Partial<Trip>;
+      const fingerprint = JSON.stringify({
+        boxes: boxDetails,
+        removedBoxNos,
+        photoKeys: photos.map((p) => p.key),
+      });
+      if (fingerprint === lastSavedFingerprint) return;
       pickupAutosaveBusyRef.current = true;
       void (async () => {
         try {
-          await savePickupProgress({
-            boxDetails: rows.map(
-              (row) =>
-                Object.fromEntries(
-                  Object.entries(row).filter(([key]) => key !== "uid")
-                ) as BoxDetail
-            ),
-            removedBoxNos,
-            ...(photos[0]
-              ? {
-                  dcPhotoKey: photos[0].key,
-                  dcPhotoMime: photos[0].mime,
-                  dcPhotoData: photos[0].data,
-                }
-              : {}),
-            ...(photos[1]
-              ? {
-                  dcPhotoKey2: photos[1].key,
-                  dcPhotoMime2: photos[1].mime,
-                  dcPhotoData2: photos[1].data,
-                }
-              : {}),
-          } as Partial<Trip>);
+          const ok = await savePickupProgress?.(payload, { silent: true });
+          if (ok) {
+            setLastSavedFingerprint(fingerprint);
+            setSavedPhotoKeys(photos.map((p) => p.key));
+          }
         } finally {
           pickupAutosaveBusyRef.current = false;
         }
       })();
-    }, 1200);
+    }, 2500);
+
     return () => window.clearTimeout(pickupAutosaveTimerRef.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rows, photos, removedBoxNos, pickupLocked, trip.id, isSubmitting, isSaving]);
+  }, [pickupDraftFingerprint, lastSavedFingerprint, pickupLocked, trip.id, isSubmitting, isSaving]);
 
   // ─── One operation per intentional action ─────────────────────────────
   // Guards the read-only view's DC-photo download and Pickup KPI PDF at the
@@ -350,15 +377,6 @@ export default function StepPickup({
     onCancel: () => {},
   });
 
-  const hasUnsavedChanges = useMemo(() => {
-    const currentBoxes = rows.map((row) => {
-      return Object.fromEntries(Object.entries(row).filter(([key]) => key !== "uid")) as BoxDetail;
-    });
-    const savedBoxes = trip.boxDetails || [];
-    return JSON.stringify(currentBoxes) !== JSON.stringify(savedBoxes) ||
-      JSON.stringify(photos.map((p) => p.key)) !== JSON.stringify(savedPhotoKeys);
-  }, [rows, trip.boxDetails, photos, savedPhotoKeys]);
-
   useEffect(() => {
     let cancelled = false;
     const nextPhotos = persistedPhotos;
@@ -370,16 +388,29 @@ export default function StepPickup({
     return () => { cancelled = true; };
   }, [persistedPhotos]);
 
+  // Hydrate rows only when the trip identity changes or edit mode opens.
+  // Do NOT depend on trip.boxDetails — background autosave must never remount
+  // inputs (new UIDs) or the caret jumps while typing.
   useEffect(() => {
     const details = persistedBoxDetails || [];
     let cancelled = false;
     queueMicrotask(() => {
       if (cancelled) return;
-      setRows(details.length > 0 ? details.map((d) => ({ ...d, uid: generateUid() })) : [makeRow(1)]);
+      const nextRows =
+        details.length > 0 ? details.map((d) => ({ ...d, uid: generateUid() })) : [makeRow(1)];
+      setRows(nextRows);
       setRemovedBoxNos([]);
+      setLastSavedFingerprint(
+        JSON.stringify({
+          boxes: details,
+          removedBoxNos: [] as number[],
+          photoKeys: (persistedPhotos || []).map((p) => p.key),
+        })
+      );
     });
     return () => { cancelled = true; };
-  }, [trip.id, isLocalEditing, persistedBoxDetails]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trip.id, isLocalEditing]);
 
   const totals = useMemo(() => calculatePickupTotals(rows), [rows]);
 
@@ -632,8 +663,9 @@ export default function StepPickup({
   const handleSaveProgress = async () => {
     if (!savePickupProgress) return;
     setIsSaving(true);
+    const boxDetails = getBoxDetails();
     const success = await savePickupProgress({
-      boxDetails: getBoxDetails(),
+      boxDetails,
       removedBoxNos,
       ...photoFields(),
     } as Partial<Trip>);
@@ -643,6 +675,13 @@ export default function StepPickup({
     if (success) {
       setSavedPhotoKeys(photos.map((photo) => photo.key));
       setRemovedBoxNos([]);
+      setLastSavedFingerprint(
+        JSON.stringify({
+          boxes: boxDetails,
+          removedBoxNos: [],
+          photoKeys: photos.map((p) => p.key),
+        })
+      );
     }
     setIsSaving(false);
   };
@@ -1084,7 +1123,10 @@ export default function StepPickup({
             </span>
           </div>
 
-          <div className="border border-slate-200 rounded-xl overflow-hidden shadow-xs max-h-80 overflow-y-auto">
+          <div
+            data-pickup-boxes
+            className="border border-slate-200 rounded-xl overflow-hidden shadow-xs max-h-80 overflow-y-auto"
+          >
             <table className="w-full table-fixed border-collapse text-[13px]">
               <colgroup>
                 {Array.from({ length: 12 }).map((_, i) => (

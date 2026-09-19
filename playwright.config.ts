@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import { defineConfig, devices } from '@playwright/test';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
+const useExistingOrdersEnvironment = process.env.ORDERS_E2E_EXISTING === '1';
 
 /**
  * Two webServers, started in order:
@@ -13,7 +14,7 @@ const here = path.dirname(fileURLToPath(import.meta.url));
  * tests/e2e/trip-workflow.e2e.spec.ts and fails loudly if seed state is missing.
  */
 export default defineConfig({
-  testDir: './tests/e2e',
+  testDir: './tests',
   fullyParallel: false,
   forbidOnly: !!process.env.CI,
   retries: 0,
@@ -22,7 +23,7 @@ export default defineConfig({
   use: {
     // Dedicated E2E port so a developer's own `npm run dev` on :5173 (pointed
     // at a real backend) is never reused for the isolated E2E run.
-    baseURL: 'http://localhost:5199',
+    baseURL: useExistingOrdersEnvironment ? 'http://127.0.0.1:5174' : 'http://localhost:5199',
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
     video: 'off',
@@ -30,7 +31,7 @@ export default defineConfig({
   projects: [
     {
       name: 'trip-workflow',
-      testMatch: /trip-workflow\.e2e\.spec\.ts/,
+      testMatch: /(?:trip-workflow\.e2e|orders-live-workflow)\.spec\.ts/,
       use: { ...devices['Desktop Chrome'] },
     },
     {
@@ -39,7 +40,7 @@ export default defineConfig({
       use: { ...devices['Desktop Chrome'] },
     },
   ],
-  webServer: [
+  webServer: useExistingOrdersEnvironment ? undefined : [
     {
       command: 'node --import tsx tests/e2eHarness.ts',
       cwd: path.resolve(here, '../../backend'),

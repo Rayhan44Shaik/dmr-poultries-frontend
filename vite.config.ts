@@ -126,7 +126,10 @@ const dmrInstanceStamp = {
 }
 
 export default defineConfig({
-  base: './',
+  // History routes are served from the origin root. A relative asset base
+  // resolves bundles below the current deep URL after refresh and leaves the
+  // static session splash mounted because the application never boots.
+  base: '/',
   plugins: [
     react(),
     tailwindcss(),

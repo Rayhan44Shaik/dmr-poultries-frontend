@@ -751,6 +751,7 @@ export default {
   'ops.trip.optional_delivery_notes': 'Optional delivery notes',
   'ops.trip.optional_notes': 'Optional notes',
   'ops.trip.optional_trip_notes': 'Optional trip notes',
+  'ops.trip.order_assignment_tag': 'Order assignment reference',
   'ops.trip.pdf_generation_failed': 'PDF generation failed.',
   'ops.trip.pending_boxes_pdf_ok': 'Pending boxes PDF generated.',
   'ops.trip.per_box_allocation': 'Per-box allocation',
