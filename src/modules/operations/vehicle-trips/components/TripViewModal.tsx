@@ -80,7 +80,7 @@ const noopFalse = () => false;
  * Recent / Trip List step views embed the SAME locked step components as Trip Entry
  * so layout + fonts match exactly (shared StepKpiCard typography).
  */
-function Step1View({ trip }: { trip: Trip }) {
+function Step1View({ trip, onClose }: { trip: Trip; onClose: () => void }) {
   const viewTrip: Trip = { ...trip, startStepSubmitted: true };
   return (
     <StepStart
@@ -95,14 +95,15 @@ function Step1View({ trip }: { trip: Trip }) {
       employeeOptions={[]}
       editable={false}
       canEdit={false}
-      clearForm={noop}
+      onCancel={onClose}
+      clearForm={onClose}
       subscribeHeaderSaveStatus={() => noop}
       getHeaderSaveStatus={() => "idle"}
     />
   );
 }
 
-function Step2View({ trip, birdTypes }: { trip: Trip; birdTypes: BirdType[] }) {
+function Step2View({ trip, birdTypes, onClose }: { trip: Trip; birdTypes: BirdType[]; onClose: () => void }) {
   const viewTrip: Trip = { ...trip, farmStepSubmitted: true };
   return (
     <StepFarm
@@ -114,12 +115,13 @@ function Step2View({ trip, birdTypes }: { trip: Trip; birdTypes: BirdType[] }) {
       birdTypes={birdTypes}
       editable={false}
       canEdit={false}
-      clearForm={noop}
+      onCancel={onClose}
+      clearForm={onClose}
     />
   );
 }
 
-function Step3View({ trip }: { trip: Trip }) {
+function Step3View({ trip, onClose }: { trip: Trip; onClose: () => void }) {
   const viewTrip: Trip = { ...trip, pickupStepSubmitted: true };
   return (
     <StepPickup
@@ -130,7 +132,8 @@ function Step3View({ trip }: { trip: Trip }) {
       submitPickupStep={noopFalse}
       editable={false}
       canEdit={false}
-      clearForm={noop}
+      onCancel={onClose}
+      clearForm={onClose}
     />
   );
 }
@@ -144,6 +147,7 @@ function Step4View({
   whatsappState,
   onSendOneEmail,
   onSendOneWhatsApp,
+  onClose,
 }: {
   trip: Trip;
   shops: Shop[];
@@ -153,6 +157,7 @@ function Step4View({
   whatsappState: ReturnType<typeof useTripDeliveryWhatsApps>;
   onSendOneEmail: (delivery: ShopDelivery) => void;
   onSendOneWhatsApp: (delivery: ShopDelivery) => void;
+  onClose: () => void;
 }) {
   const { t, language } = useI18n();
   const viewTrip: Trip = { ...trip, deliveryStepSubmitted: true };
@@ -166,7 +171,8 @@ function Step4View({
       trip={viewTrip}
       updateDeliveries={noop}
       submitDeliveriesStep={noopFalse}
-      clearForm={noop}
+      clearForm={onClose}
+      onCancel={onClose}
       canEdit={false}
       editable={false}
       boxDetails={trip.boxDetails || []}
@@ -194,7 +200,7 @@ function Step4View({
   );
 }
 
-function Step5View({ trip }: { trip: Trip }) {
+function Step5View({ trip, onClose }: { trip: Trip; onClose: () => void }) {
   const viewTrip: Trip = {
     ...trip,
     expensesStepSubmitted: true,
@@ -206,8 +212,8 @@ function Step5View({ trip }: { trip: Trip }) {
       updateTrip={noop}
       canEdit={false}
       editable={false}
-      clearForm={noop}
-      onCancel={noop}
+      clearForm={onClose}
+      onCancel={onClose}
     />
   );
 }
@@ -330,11 +336,15 @@ function TripViewModal({
   const renderStepContent = () => {
     switch (safeViewStepIndex) {
       case 0:
-        return isStartCompleted ? <Step1View trip={viewTrip} /> : emptyStep;
+        return isStartCompleted ? <Step1View trip={viewTrip} onClose={onClose} /> : emptyStep;
       case 1:
-        return trip.farmStepSubmitted ? <Step2View trip={viewTrip} birdTypes={displayBirdTypes} /> : emptyStep;
+        return trip.farmStepSubmitted ? (
+          <Step2View trip={viewTrip} birdTypes={displayBirdTypes} onClose={onClose} />
+        ) : (
+          emptyStep
+        );
       case 2:
-        return trip.pickupStepSubmitted ? <Step3View trip={viewTrip} /> : emptyStep;
+        return trip.pickupStepSubmitted ? <Step3View trip={viewTrip} onClose={onClose} /> : emptyStep;
       case 3:
         return isDeliveryCompleted ? (
           <Step4View
@@ -346,12 +356,13 @@ function TripViewModal({
             whatsappState={whatsappState}
             onSendOneEmail={handleSendOneEmail}
             onSendOneWhatsApp={handleSendOneWhatsApp}
+            onClose={onClose}
           />
         ) : (
           emptyStep
         );
       case 4:
-        return isEndCompleted ? <Step5View trip={viewTrip} /> : emptyStep;
+        return isEndCompleted ? <Step5View trip={viewTrip} onClose={onClose} /> : emptyStep;
       default:
         return null;
     }

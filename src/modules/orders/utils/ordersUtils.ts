@@ -717,7 +717,7 @@ export function farmCityOf(trip: Pick<Trip, "farmAddress" | "sourceFarm">): stri
     if (FARM_AREA_WORDS.test(seg) || FARM_PLOT_WORDS.test(seg)) continue;
     const place = seg.replace(FARM_PLACE_SUFFIX, "").replace(/[,.\s]+$/, "").trim();
     // A bare number / initials is not a city either.
-    if (place && /[A-Za-z\u0C00-\u0C7F]/.test(place)) return place;
+    if (place && /(?:[A-Za-z]|\p{Script=Telugu})/u.test(place)) return place;
   }
   // Every segment was structural — drop the area words from the last one.
   const last = (segments[segments.length - 1] ?? raw)

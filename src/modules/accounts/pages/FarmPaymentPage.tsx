@@ -56,22 +56,18 @@ function formFromApiRow(trip: Trip, apiRow?: TripFarmPayment): Partial<FarmPayme
 type FarmerPaymentPageProps = { embedded?: boolean };
 
 /**
- * The window this page opens with: the last COMPLETE week, Monday to Sunday.
- * "This week" is still running — its Sunday has not happened yet — so a
- * current-week total always reads as a shortfall. Starting one week back means
- * the table, the totals bar and every trip in it cover the same seven days.
+ * Default window: last 14 days through today so newly completed trips that
+ * already appear on Trip List also land here without clearing filters.
+ * (Previously opened on the last *complete* Mon–Sun week, which hid same-week
+ * completions such as TR-20260918-001.)
  */
-function lastCompleteWeek(): { from: string; to: string } {
+function recentTripsRange(): { from: string; to: string } {
   const iso = (d: Date) =>
     `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
   const today = new Date();
-  const thisMonday = new Date(today);
-  thisMonday.setDate(today.getDate() - ((today.getDay() + 6) % 7)); // getDay: 0=Sun
-  const from = new Date(thisMonday);
-  from.setDate(thisMonday.getDate() - 7);
-  const to = new Date(thisMonday);
-  to.setDate(thisMonday.getDate() - 1); // the Sunday that just closed
-  return { from: iso(from), to: iso(to) };
+  const from = new Date(today);
+  from.setDate(today.getDate() - 13);
+  return { from: iso(from), to: iso(today) };
 }
 
 /** One figure in the totals bar under the table — a compact caption/value pair
@@ -116,8 +112,8 @@ export function FarmerPaymentPage({ embedded = false }: FarmerPaymentPageProps) 
   const apiFarmByTripRef = useRef<Map<string, TripFarmPayment>>(new Map());
 
   // Filter states
-  // Opens on the last complete week (Mon-Sun); see lastCompleteWeek().
-  const [defaultRange] = useState(lastCompleteWeek);
+  // Opens on the last 14 days (through today); see recentTripsRange().
+  const [defaultRange] = useState(recentTripsRange);
   const [dateFrom, setDateFrom] = useState(defaultRange.from);
   const [dateTo, setDateTo] = useState(defaultRange.to);
   const [selectedFarm, setSelectedFarm] = useState('All');

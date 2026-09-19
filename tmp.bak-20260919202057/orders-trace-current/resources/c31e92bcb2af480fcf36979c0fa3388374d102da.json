@@ -1,0 +1,1 @@
+{"error":"Duplicate record: (trip_id, shop_id, birds, weight)=(1, 1, 100, 0.000) already exists.","message":"Duplicate record: (trip_id, shop_id, birds, weight)=(1, 1, 100, 0.000) already exists.","details":{"constraint":"idx_trip_deliveries_no_dup_sale","detail":"Key (trip_id, shop_id, birds, weight)=(1, 1, 100, 0.000) already exists."}}

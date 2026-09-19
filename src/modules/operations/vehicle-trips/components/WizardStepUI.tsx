@@ -4,17 +4,19 @@ import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 export { TripNoBadge } from "./TripNoBadge";
 
 /**
- * Top-right Close (X) — shown ONLY while a submitted step is in Edit mode.
- * Animates in when Edit is clicked; returns to locked submitted/view mode.
- * Never shown on locked/submitted/view (no edit) headers.
- * Distinct from bottom Cancel, which leaves the wizard entirely.
+ * Top-right Close (X).
+ * - Locked / submitted view → closes the open trip and returns to Create New Trip
+ *   (same animated X as Trip List view).
+ * - Edit mode on a submitted step → exits edit back to the locked view.
+ * Distinct from bottom Cancel only when used in edit mode; on locked view both
+ * close the wizard.
  */
 export function StepCloseButton({
   onClose,
   animated = true,
 }: {
   onClose?: () => void;
-  /** Fade/scale entrance when Edit opens (default true). */
+  /** Fade/scale entrance (default true). */
   animated?: boolean;
 }) {
   const { t } = useI18n();
@@ -24,14 +26,13 @@ export function StepCloseButton({
       type="button"
       onClick={onClose}
       aria-label={t("common.close")}
-      className={`group relative bg-white hover:bg-slate-50 p-2 rounded-lg border border-slate-200 text-slate-500 hover:text-slate-700 shadow-sm active:scale-95 origin-center transition-colors ${
+      className={`group relative inline-flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition-all hover:-translate-y-0.5 hover:border-red-100 hover:bg-red-50 hover:text-red-500 active:scale-95 ${
         animated ? "animate-scale-in" : ""
       }`}
     >
-      <X
-        size={14}
-        className={animated ? uiActionIconMotionClass.close : undefined}
-      />
+      <span className={`inline-flex ${animated ? uiActionIconMotionClass.close : ""}`}>
+        <X size={16} />
+      </span>
     </button>
   );
 }

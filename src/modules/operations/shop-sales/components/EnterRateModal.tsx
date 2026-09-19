@@ -242,8 +242,18 @@ export default function EnterRateModal({
         }
         case "shopName":
           return ra.shopName.localeCompare(rb.shopName) * dir;
-        case "time":
+        case "time": {
+          const ta = String(
+            (ra as { autoCaptureTime?: string }).autoCaptureTime || ""
+          );
+          const tb = String(
+            (rb as { autoCaptureTime?: string }).autoCaptureTime || ""
+          );
+          if (ta || tb) {
+            if (ta !== tb) return ta.localeCompare(tb) * dir;
+          }
           return (a.originalIndex - b.originalIndex) * dir;
+        }
         case "birds":
           return (ra.birds - rb.birds) * dir;
         case "weight":

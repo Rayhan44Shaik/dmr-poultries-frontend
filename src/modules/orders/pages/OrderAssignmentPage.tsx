@@ -108,7 +108,6 @@ import {
   ordersTableZebraRow,
 } from "../utils/ordersTableStyles";
 import {
-  ORDERS_NO_SPINNER,
   OrdersEmptyState,
   OrdersMultiSelect,
   OrdersTableSkeleton,
@@ -116,8 +115,11 @@ import {
   OrdersDropdown,
   SequenceArrows,
   WhatsAppIcon,
-  onOrdersNumberWheel,
 } from "../components/OrdersCommon";
+import {
+  ORDERS_NO_SPINNER,
+  onOrdersNumberWheel,
+} from "../utils/ordersInputUtils";
 import { ordersErrorMessage } from "../utils/ordersErrorMessage";
 import {
   compareAssignmentRows,

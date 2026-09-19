@@ -43,6 +43,8 @@ vite.config.d.ts
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+# Local Playwright / debug dumps (locked files crash Vite watch on Windows)
+/tmp/
 Duty-Report-*.pdf
 
 Duty-Planner-*.xlsx

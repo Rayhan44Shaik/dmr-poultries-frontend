@@ -61,6 +61,26 @@ interface OrdersPdfPreviewProps {
   onSubmitTrip: () => Promise<string | null>;
 }
 
+const Fact = ({
+  label,
+  value,
+}: {
+  label: string;
+  value: string | number;
+}) => (
+  <div className="min-w-0 rounded-lg border border-slate-200/80 bg-slate-50/80 px-2 py-1.5">
+    <p className="text-[9px] font-medium uppercase tracking-wide text-slate-400">
+      {label}
+    </p>
+    <p
+      className="truncate text-[11px] font-bold text-slate-800"
+      title={String(value)}
+    >
+      {value}
+    </p>
+  </div>
+);
+
 const OrdersPdfPreview: React.FC<OrdersPdfPreviewProps> = ({
   orderTrip,
   supervisorMobile,
@@ -75,7 +95,6 @@ const OrdersPdfPreview: React.FC<OrdersPdfPreviewProps> = ({
 }) => {
   const trip = orderTrip.trip;
   const progress = orderTrip.progress;
-  const [building, setBuilding] = useState(true);
   const [result, setResult] = useState<OrdersPdfResult | null>(null);
   const [buildError, setBuildError] = useState("");
   const [sending, setSending] = useState(false);
@@ -93,7 +112,6 @@ const OrdersPdfPreview: React.FC<OrdersPdfPreviewProps> = ({
   useEffect(() => {
     let alive = true;
     let url: string | null = null;
-    setBuilding(true);
     generateOrdersPdf({
       trip,
       supervisorMobile,
@@ -108,18 +126,18 @@ const OrdersPdfPreview: React.FC<OrdersPdfPreviewProps> = ({
         }
         url = built.url;
         setResult(built);
+        setBuildError("");
       })
       .catch(() => {
         if (alive) setBuildError(ordersTranslate("orders.pdf_failed"));
       })
-      .finally(() => {
-        if (alive) setBuilding(false);
-      });
     return () => {
       alive = false;
       if (url) URL.revokeObjectURL(url);
     };
   }, [trip, supervisorMobile, progress, breakdown, ordersTranslate]);
+
+  const building = result === null && !buildError;
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -188,26 +206,6 @@ const OrdersPdfPreview: React.FC<OrdersPdfPreviewProps> = ({
         : status === "not_delivered"
           ? ordersTranslate("orders.status_pending")
           : ordersTranslate("orders.not_listed_deliveries");
-
-  const Fact = ({
-    label,
-    value,
-  }: {
-    label: string;
-    value: string | number;
-  }) => (
-    <div className="min-w-0 rounded-lg border border-slate-200/80 bg-slate-50/80 px-2 py-1.5">
-      <p className="text-[9px] font-medium uppercase tracking-wide text-slate-400">
-        {label}
-      </p>
-      <p
-        className="truncate text-[11px] font-bold text-slate-800"
-        title={String(value)}
-      >
-        {value}
-      </p>
-    </div>
-  );
 
   return (
     <div

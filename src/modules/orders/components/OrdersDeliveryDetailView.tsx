@@ -292,6 +292,7 @@ function OrdersDeliveryDetailView({
   pdfBusy,
   onClose,
   onWhatsApp,
+  onRecordDelivery,
   onSaveProgress,
   onSubmitTrip,
 }: Props) {
@@ -303,6 +304,21 @@ function OrdersDeliveryDetailView({
   const [sortKey, setSortKey] = useState<ReportSortKey>("time_first");
   // "Check PDF" popup (preview -> download / send / correct).
   const [pdfOpen, setPdfOpen] = useState(false);
+  const [deliveryBoxes, setDeliveryBoxes] = useState<Record<number, string>>({});
+  const [recordingShopId, setRecordingShopId] = useState<number | null>(null);
+
+  const recordDelivery = async (row: ShopDeliveryBreakdown) => {
+    if (recordingShopId !== null) return;
+    const boxes = Number(deliveryBoxes[row.shopId] ?? "");
+    if (!Number.isInteger(boxes) || boxes <= 0 || boxes > row.pendingBoxes) return;
+    setRecordingShopId(row.shopId);
+    try {
+      await onRecordDelivery(row, boxes);
+      setDeliveryBoxes((current) => ({ ...current, [row.shopId]: "" }));
+    } finally {
+      setRecordingShopId(null);
+    }
+  };
 
   const breakdown = useMemo(
     () =>
@@ -869,7 +885,54 @@ function OrdersDeliveryDetailView({
                             {formatDeliveredAtLabel(row.deliveredAt)}
                           </td>
                           <td className={reportTdClass}>
-                            <DeliveryStatusCell row={row} to={to} />
+                            <div className="flex min-w-[11rem] flex-col items-start gap-2">
+                              <DeliveryStatusCell row={row} to={to} />
+                              {row.status !== "not_listed" && row.pendingBoxes > 0 && (
+                                <div className="flex items-center gap-1.5">
+                                  <input
+                                    type="number"
+                                    min={1}
+                                    max={row.pendingBoxes}
+                                    step={1}
+                                    inputMode="numeric"
+                                    aria-label={`Delivery boxes — ${row.shopName}`}
+                                    value={deliveryBoxes[row.shopId] ?? ""}
+                                    disabled={recordingShopId !== null}
+                                    onChange={(event) =>
+                                      setDeliveryBoxes((current) => ({
+                                        ...current,
+                                        [row.shopId]: event.target.value,
+                                      }))
+                                    }
+                                    onKeyDown={(event) => {
+                                      if (event.key === "Enter") {
+                                        event.preventDefault();
+                                        void recordDelivery(row);
+                                      }
+                                    }}
+                                    className="h-8 w-20 rounded-lg border border-slate-200 px-2 text-right text-xs font-bold tabular-nums text-slate-800 outline-none focus:border-emerald-400 focus:ring-2 focus:ring-emerald-100 disabled:bg-slate-100"
+                                  />
+                                  <button
+                                    type="button"
+                                    aria-label={`Record delivery — ${row.shopName}`}
+                                    disabled={
+                                      recordingShopId !== null ||
+                                      !Number.isInteger(Number(deliveryBoxes[row.shopId])) ||
+                                      Number(deliveryBoxes[row.shopId]) <= 0 ||
+                                      Number(deliveryBoxes[row.shopId]) > row.pendingBoxes
+                                    }
+                                    onClick={() => void recordDelivery(row)}
+                                    className="inline-flex h-8 items-center gap-1 rounded-lg bg-emerald-600 px-2.5 text-[11px] font-bold text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300"
+                                  >
+                                    <Check size={13} />
+                                    {recordingShopId === row.shopId ? "Saving…" : "Record"}
+                                  </button>
+                                  <span className="text-[10px] font-semibold text-slate-400">
+                                    max {formatCount(row.pendingBoxes)}
+                                  </span>
+                                </div>
+                              )}
+                            </div>
                           </td>
                         </tr>
                       );

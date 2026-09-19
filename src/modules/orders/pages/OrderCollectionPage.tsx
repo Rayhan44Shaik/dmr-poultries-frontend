@@ -115,15 +115,17 @@ import {
   ordersTableZebraRow,
 } from "../utils/ordersTableStyles";
 import {
-  ORDERS_NO_SPINNER,
   OrdersDateControl,
   OrdersEmptyState,
   OrdersDropdown,
   OrdersMultiSelect,
   OrdersSearchInput,
   OrdersStatusBadge,
-  onOrdersNumberWheel,
 } from "../components/OrdersCommon";
+import {
+  ORDERS_NO_SPINNER,
+  onOrdersNumberWheel,
+} from "../utils/ordersInputUtils";
 
 /** Fixed page size — 10 rows per page (global pagination component). */
 

@@ -32,25 +32,6 @@ import {
 } from "../utils/ordersUtils";
 import type { OrdersT } from "../i18n/ordersI18n";
 
-// ─── Numeric fields (module-wide behaviour) ──────────────────────────────────
-
-/**
- * Orders' quantity fields show NO native up/down spinner and never react to
- * the mouse wheel: a wheel scroll over a focused field blurs it instead of
- * stepping the value, so birds / boxes / assigned-boxes quantities can never
- * be changed by accident while scrolling the table.
- *
- * `.no-spinner` (src/index.css) hides the browser's spinner arrows; the wheel
- * handler is attached to every numeric input in the module.
- */
-export const ORDERS_NO_SPINNER = "no-spinner";
-
-export function onOrdersNumberWheel(
-  event: React.WheelEvent<HTMLInputElement>,
-): void {
-  event.currentTarget.blur();
-}
-
 // ─── Status badge ────────────────────────────────────────────────────────────
 
 const STATUS_TONES: Record<string, string> = {

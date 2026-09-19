@@ -158,6 +158,20 @@ export default defineConfig({
     },
     // Also covers the relative /api/mobile URLs used by mobile code.
     proxy: API_PROXY,
+    // Playwright traces under tmp/ (and other artefacts) are frequently
+    // locked on Windows. Watching them crashes the whole Vite process with
+    // EBUSY — never watch them.
+    watch: {
+      ignored: [
+        '**/tmp/**',
+        '**/test-results/**',
+        '**/playwright-report/**',
+        '**/blob-report/**',
+        '**/playwright/.cache/**',
+        '**/.scratch/**',
+        '**/.auth-session/**',
+      ],
+    },
   },
   preview: {
     host: true,

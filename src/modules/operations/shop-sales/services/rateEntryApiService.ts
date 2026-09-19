@@ -37,6 +37,7 @@ export interface RateEntryDeliveryDto {
   amount: number;
   remarks: string;
   deliveryMode: "box" | "weight";
+  autoCaptureTime?: string | null;
   marketRate: {
     shopId: number | null;
     shopName: string;
@@ -147,6 +148,7 @@ function mapRowToTrip(row: RateEntryTripDto, withDeliveries: boolean): Trip {
           rate: d.rate,
           amount: num(d.amount),
           remarks: d.remarks,
+          autoCaptureTime: d.autoCaptureTime ?? undefined,
           // Carry the backend market/reference rate for display (read-only).
           marketRate: d.marketRate,
         }))

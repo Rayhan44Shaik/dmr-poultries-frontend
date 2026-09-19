@@ -232,7 +232,14 @@ export default function StepFarm({
           </div>
           <div className="flex items-center gap-2 shrink-0">
 
-            {/* Locked / view: pencil only — no top Close X */}
+            {/* Locked / view: Close X → Create New Trip (Trip List style) */}
+            <StepCloseButton
+              onClose={() => {
+                if (onCancel) onCancel();
+                else _clearForm?.();
+              }}
+              animated
+            />
             {canEdit && (
               <button
                 type="button"

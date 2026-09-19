@@ -89,7 +89,19 @@ export async function fetchOrdersData(): Promise<OrdersFetch> {
     listTrips({ full: true }),
     loadVehicles().catch(() => [] as Vehicle[]),
   ]);
-  const trips = uniqueTripsById(liveTrips);
+  return buildOrdersData(uniqueTripsById(liveTrips), vehicles);
+}
+
+/**
+ * Pure projection of persisted API records into the three Orders views.
+ * Keeping this separate from transport lets unit tests exercise the exact
+ * production classification and synchronization logic without a sample store.
+ */
+export function buildOrdersData(
+  persistedTrips: Trip[],
+  vehicles: Vehicle[] = [],
+): OrdersFetch {
+  const trips = uniqueTripsById(persistedTrips);
   const vehicleList: Array<{ id: number; noOfBoxes?: number }> = vehicles.map((v) => ({
     id: v.id,
     noOfBoxes: v.noOfBoxes,

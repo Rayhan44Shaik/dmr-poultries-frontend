@@ -3,6 +3,7 @@ import type { Trip } from "./types";
 export type TripStepKey = "start" | "farm" | "pickup" | "deliveries" | "expenses";
 export type TripFieldKind =
   | "computed"
+  | "date"
   | "select"
   | "multi-select"
   | "number"
@@ -34,7 +35,7 @@ export interface TripFieldDefinition {
 }
 
 export const TRIP_FIELD_DEFINITIONS = {
-  tripDate: { key: "tripDate", step: "start", label: "Trip Date", kind: "computed", required: true, readOnly: true },
+  tripDate: { key: "tripDate", step: "start", label: "Trip Date", kind: "date", required: true, readOnly: false },
   startTime: { key: "startTime", step: "start", label: "Start Time", kind: "computed", required: false, readOnly: true },
   vehicleId: { key: "vehicleId", step: "start", label: "Vehicle No.", kind: "select", required: true, optionSource: "vehicles" },
   supervisorId: { key: "supervisorId", step: "start", label: "Supervisor", kind: "select", required: true, optionSource: "supervisors" },

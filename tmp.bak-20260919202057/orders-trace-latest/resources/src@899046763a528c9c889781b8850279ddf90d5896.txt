@@ -1,0 +1,112 @@
+import { test, expect } from "@playwright/test";
+
+const COLLECTION = "/operations/orders/collection";
+const ASSIGNMENT = "/operations/orders/assignment";
+const TRACKING = "/operations/orders/delivery-tracking";
+
+test("real collection persists with a positive container id and no trip-zero request", async ({ page }) => {
+  const requests: string[] = [];
+  page.on("request", (request) => requests.push(`${request.method()} ${request.url()}`));
+
+  await page.goto("/");
+  await page.locator("#login-username").fill("test-owner-4100");
+  await page.locator("#login-password").fill("Test-only-password-123!");
+  await page.getByRole("checkbox", { name: /remember me/i }).check();
+  await page.getByRole("button", { name: /sign in/i }).click();
+  await expect(page).toHaveURL(/dashboard/);
+
+  await page.locator(`a[href="${COLLECTION}"]`).first().click();
+  await expect(page.locator("#orders-panel-collection")).toBeVisible({ timeout: 20_000 });
+  const row = page.locator("tbody tr", { hasText: "Orders E2E Shop 1" });
+  await expect(row).toBeVisible();
+  await row.getByRole("spinbutton", { name: /No\. of Birds/i }).fill("200");
+  await row.getByRole("spinbutton", { name: /No\. of Boxes/i }).fill("20");
+  await row.getByRole("spinbutton", { name: /^Weight/i }).fill("400");
+
+  const saveResponse = page.waitForResponse(
+    (response) => response.request().method() === "POST" && /\/api\/trips\/\d+\/steps\/deliveries$/.test(response.url()),
+  );
+  await page.getByRole("button", { name: /save progress/i }).click();
+  const saved = await saveResponse;
+  expect(saved.status()).toBe(200);
+  const savedBody = await saved.json();
+  expect(savedBody.id).toBeGreaterThan(0);
+  expect(savedBody.tripNo).toBeTruthy();
+  expect(new URL(saved.url()).pathname).toBe(`/api/trips/${savedBody.id}/steps/deliveries`);
+  expect(requests.some((request) => /\/trips\/0\//.test(request))).toBe(false);
+
+  await page.reload();
+  await expect(page.locator("#orders-panel-collection")).toBeVisible({ timeout: 20_000 });
+  const refreshed = page.locator("tbody tr", { hasText: "Orders E2E Shop 1" });
+  await expect(refreshed.getByRole("spinbutton", { name: /No\. of Birds/i })).toHaveValue("200");
+  await expect(refreshed.getByRole("spinbutton", { name: /No\. of Boxes/i })).toHaveValue("20");
+  await expect(refreshed.getByRole("spinbutton", { name: /^Weight/i })).toHaveValue("400");
+
+  await page.goto(ASSIGNMENT);
+  await expect(page.getByText("Orders E2E Shop 1", { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(/1 collected · 0 assigned · 1 available/)).toBeVisible();
+  await page.getByRole("button", { name: /Assign Shops/ }).click();
+  await page.getByRole("checkbox", { name: "Select — Orders E2E Shop 1" }).check();
+  await page.getByRole("button", { name: "Save Progress", exact: true }).click();
+  await expect(page.getByText("Assignment progress saved", { exact: true })).toBeVisible();
+
+  await page.reload();
+  await expect(page.locator("#orders-panel-assignment")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(/1 collected · 1 assigned · 0 available/)).toBeVisible();
+  const vehicleButton = page.getByRole("button", { name: /Assign Shops/ });
+  const vehicleButtonText = await vehicleButton.innerText();
+  const vehicleTripNo = vehicleButtonText.match(/TR-\d{8}-\d+/)?.[0];
+  expect(vehicleTripNo).toBeTruthy();
+  await vehicleButton.click();
+  await expect(page.getByRole("checkbox", { name: "Select — Orders E2E Shop 1" })).toBeChecked();
+  await page.getByRole("button", { name: "Review & Submit", exact: true }).click();
+  await page.getByRole("button", { name: "Download PDF", exact: true }).click();
+  await page.getByRole("button", { name: "Submit Order Assignment", exact: true }).click();
+  await expect(page).toHaveURL(new RegExp(`${TRACKING}$`));
+  await expect(page.locator("#orders-panel-tracking")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(vehicleTripNo!, { exact: true }).first()).toBeVisible();
+
+  const openDelivery = async () => {
+    await page.getByRole("row").filter({ hasText: vehicleTripNo! }).first().click();
+    await page.getByRole("button", { name: `View — ${vehicleTripNo}` }).click();
+    await expect(page.getByText("Orders E2E Shop 1", { exact: true }).last()).toBeVisible();
+  };
+  await openDelivery();
+  await page.getByRole("spinbutton", { name: "Delivery boxes — Orders E2E Shop 1" }).fill("10");
+  await page.getByRole("button", { name: "Record delivery — Orders E2E Shop 1" }).click();
+  await expect(page.getByText("10", { exact: true }).filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByText(/PART DELIVERED/i, { exact: true })).toBeVisible();
+
+  await page.reload();
+  await expect(page.locator("#orders-panel-tracking")).toBeVisible({ timeout: 20_000 });
+  await openDelivery();
+  const remaining = page.getByRole("spinbutton", { name: "Delivery boxes — Orders E2E Shop 1" });
+  await expect(remaining).toHaveAttribute("max", "10");
+  await remaining.fill("10");
+  await page.getByRole("button", { name: "Record delivery — Orders E2E Shop 1" }).click();
+  await expect(page.getByText(/^DELIVERED$/i, { exact: true })).toBeVisible();
+  await expect(page.getByText("Pending Boxes").first().locator("..")).toContainText("0");
+
+  await page.reload();
+  await expect(page.locator("#orders-panel-tracking")).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByText(vehicleTripNo!, { exact: true }).first()).toBeVisible();
+  const vehicleTripResponse = await page.request.get("/api/trips");
+  expect(vehicleTripResponse.status()).toBe(200);
+  const vehicleTrips = await vehicleTripResponse.json();
+  const vehicleTrip = (Array.isArray(vehicleTrips) ? vehicleTrips : vehicleTrips.data ?? []).find(
+    (trip: { tripNo?: string }) => trip.tripNo === vehicleTripNo,
+  );
+  expect(vehicleTrip?.id).toBeGreaterThan(0);
+  const persisted = await page.request.get(`/api/trips/${vehicleTrip.id}`);
+  expect(persisted.status()).toBe(200);
+  const persistedBody = await persisted.json();
+  expect(persistedBody.id).toBe(vehicleTrip.id);
+  expect(persistedBody.status).not.toBe("Completed");
+  const captures = (persistedBody.deliveries ?? []).filter(
+    (row: { shopId?: number; autoCaptureTime?: string | null }) =>
+      Number(row.shopId) > 0 && Boolean(row.autoCaptureTime),
+  );
+  expect(captures).toHaveLength(2);
+  expect(captures.reduce((sum: number, row: { boxNo?: number }) => sum + Number(row.boxNo ?? 0), 0)).toBe(20);
+  expect(requests.some((request) => /\/trips\/0\//.test(request))).toBe(false);
+});

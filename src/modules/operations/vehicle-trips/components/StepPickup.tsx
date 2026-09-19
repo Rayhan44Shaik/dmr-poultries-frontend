@@ -38,10 +38,10 @@ interface Props {
 type Row = BoxDetail & { uid: string };
 type PickupPhoto = { key: string; mime: string; data: string };
 const generateUid = () => Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
-const makeRow = (boxNo: number): Row => ({
+const makeRow = (boxNo: number, defaultBirds = 0): Row => ({
   uid: generateUid(),
   boxNo,
-  birds: 0,
+  birds: defaultBirds > 0 ? defaultBirds : 0,
   weight: 0,
   avgWeight: null,
 });
@@ -169,6 +169,34 @@ export default function StepPickup({
   const pendingBirdsFocusUidRef = useRef<string | null>(null);
   const birdsInputRefs = useRef<Map<string, HTMLInputElement>>(new Map());
   const addBoxButtonRef = useRef<HTMLButtonElement | null>(null);
+
+  // Temporary session default for NEW box bird counts only — never persisted,
+  // never shown on Trip List / Recent Activity. Changing 18→15 does not rewrite
+  // boxes that already have birds or weight entered.
+  const [defaultBoxSizeDraft, setDefaultBoxSizeDraft] = useState("");
+  const [appliedDefaultBoxSize, setAppliedDefaultBoxSize] = useState(0);
+  useEffect(() => {
+    setDefaultBoxSizeDraft("");
+    setAppliedDefaultBoxSize(0);
+  }, [trip.id]);
+
+  const applyDefaultBoxSize = () => {
+    const n = Math.floor(Number(defaultBoxSizeDraft));
+    if (!Number.isFinite(n) || n <= 0 || n > 999) {
+      setToast({ message: t("ops.trip.default_box_size_invalid"), type: "error" });
+      return;
+    }
+    setAppliedDefaultBoxSize(n);
+    setDefaultBoxSizeDraft(String(n));
+    // Only fill blank draft rows (no birds and no weight yet). Already-entered
+    // boxes keep whatever the user typed.
+    setRows((prev) =>
+      prev.map((row) => {
+        if (row.birds > 0 || row.weight > 0) return row;
+        return { ...row, birds: n, avgWeight: calculateBoxAvgWeight(n, row.weight) };
+      })
+    );
+  };
 
   const [maxBoxes, setMaxBoxes] = useState<number>(() => {
     if (trip.vehicleBoxCapacity && trip.vehicleBoxCapacity > 0) return trip.vehicleBoxCapacity;
@@ -444,7 +472,7 @@ export default function StepPickup({
         return false;
       }
     }
-    const nextRow = makeRow(rows.length + 1);
+    const nextRow = makeRow(rows.length + 1, appliedDefaultBoxSize);
     if (options?.focusBirds) {
       pendingBirdsFocusUidRef.current = nextRow.uid;
     }
@@ -795,7 +823,14 @@ export default function StepPickup({
           </div>
           <div className="flex items-center gap-2 shrink-0">
 
-            {/* Locked / view: pencil only — no top Close X */}
+            {/* Locked / view: Close X → Create New Trip (Trip List style) */}
+            <StepCloseButton
+              onClose={() => {
+                if (onCancel) onCancel();
+                else clearForm?.();
+              }}
+              animated
+            />
             {canEdit && (
               <button
                 type="button"
@@ -1114,13 +1149,50 @@ export default function StepPickup({
 
         {/* Entry Table Container */}
         <div>
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between gap-3 mb-2 flex-wrap">
             <span className="text-[15px] font-semibold text-slate-600 flex items-center gap-2">
               <span className="h-6 w-6 rounded-md bg-violet-50/80 text-violet-500 flex items-center justify-center shrink-0">
                 <Package size={14} />
               </span>
               {t("ops.trip.box_entries", { max: maxBoxes || "—" })}
             </span>
+            <label className="inline-flex items-center gap-1.5 shrink-0">
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 whitespace-nowrap">
+                {t("ops.trip.default_box_size")}
+              </span>
+              <input
+                type="number"
+                min={1}
+                max={999}
+                step={1}
+                inputMode="numeric"
+                placeholder="18"
+                value={defaultBoxSizeDraft}
+                onChange={(e) => setDefaultBoxSizeDraft(e.target.value.replace(/[^\d]/g, "").slice(0, 3))}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    applyDefaultBoxSize();
+                  }
+                }}
+                onWheel={(e) => e.currentTarget.blur()}
+                className="mini-input hide-spinner w-12 h-7 text-center text-[12px] font-bold tabular-nums"
+                title={t("ops.trip.default_box_size_hint")}
+                aria-label={t("ops.trip.default_box_size")}
+              />
+              <button
+                type="button"
+                onClick={applyDefaultBoxSize}
+                className="h-7 px-2 rounded-md text-[10px] font-bold uppercase tracking-wide text-violet-700 bg-violet-50 border border-violet-100 hover:bg-violet-100/80 active:scale-95 transition"
+              >
+                {t("ops.trip.default_box_size_apply")}
+              </button>
+              {appliedDefaultBoxSize > 0 && (
+                <span className="text-[10px] font-semibold text-emerald-600 tabular-nums">
+                  {t("ops.trip.default_box_size_active", { n: appliedDefaultBoxSize })}
+                </span>
+              )}
+            </label>
           </div>
 
           <div

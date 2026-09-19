@@ -25,12 +25,11 @@ import AppShellModal from "../../../ui/AppShellModal";
 import { ViewLanguageToggle } from "../../../ui/ViewLanguageToggle";
 import { uiActionIconMotionClass } from "../../../shared/ui/uiTokens";
 import { formatVehicleNumber } from "../../../utils/format";
+import { SequenceArrows, WhatsAppIcon } from "./OrdersCommon";
 import {
   ORDERS_NO_SPINNER,
-  SequenceArrows,
-  WhatsAppIcon,
   onOrdersNumberWheel,
-} from "./OrdersCommon";
+} from "../utils/ordersInputUtils";
 import PdfBlobPreview from "../../reports/components/PdfBlobPreview";
 import type { Trip } from "../../../shared/trip";
 import type { OrdersT } from "../i18n/ordersI18n";
@@ -184,7 +183,6 @@ const OrdersWhatsAppConfirmPopup: React.FC<Props> = ({
     let alive = true;
     let url: string | null = null;
     const key = buildKey;
-    setBuildError("");
     generateAssignmentSheetPdf({
       trip,
       supervisorMobile,

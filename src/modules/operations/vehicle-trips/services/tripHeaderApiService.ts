@@ -646,6 +646,20 @@ export async function submitStep1(trip: Partial<Trip>): Promise<Trip> {
   return mapApiTripToTrip(data, trip as Trip);
 }
 
+/**
+ * GET /api/trips/next-number?date=YYYY-MM-DD — preview next TR-YYYYMMDD-NNN
+ * for the selected business date (counts Draft/Pending/Completed/Deleted).
+ * Authoritative number is assigned only on POST /steps/start.
+ */
+export async function fetchNextTripNo(
+  tripDate: string
+): Promise<{ tripDate: string; tripNo: string; sequence: number }> {
+  const { data } = await apiGet<{ tripDate: string; tripNo: string; sequence: number }>(
+    `${TRIPS_PATH}/next-number?date=${encodeURIComponent(tripDate)}`
+  );
+  return data;
+}
+
 export type TripWizardStep = "start" | "farm" | "pickup" | "deliveries" | "expenses";
 
 /**

@@ -22,9 +22,11 @@ import type { Trip } from "../types/trip";
 import { validateStartStep } from "../../../../shared/trip/validation";
 import {
   fetchLastClosingMeter,
+  fetchNextTripNo,
   formatStartTimeForDisplay,
   formatIstStamp,
 } from "../services/tripHeaderApiService";
+import { DatePicker } from "../../../../components/common/DatePicker";
 import { StepCloseButton, WizardActionBar, WizardStepNotice, type WizardNoticeState } from "./WizardStepUI";
 import { TripNoBadge } from "./TripNoBadge";
 import { FieldLabel, SearchDropdown, MultiSearchDropdown, StepKpiCard, type DropdownOption } from "./WizardControls";
@@ -35,6 +37,21 @@ import {
 import { useI18n } from "../../../../i18n";
 import { uiActionIconMotionClass } from "../../../../shared/ui/uiTokens";
 import { localizeTripViewText } from "../utils/tripViewLocalization";
+
+/** Match backend tripNumbering bounds (Asia/Kolkata business calendar). */
+const TRIP_DATE_MAX_PAST_DAYS = 730;
+const TRIP_DATE_MAX_FUTURE_DAYS = 14;
+
+function localTodayYmd(): string {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+function shiftYmd(ymd: string, days: number): string {
+  const [y, m, d] = ymd.split("-").map(Number);
+  const utc = new Date(Date.UTC(y, m - 1, d + days, 12, 0, 0));
+  return `${utc.getUTCFullYear()}-${String(utc.getUTCMonth() + 1).padStart(2, "0")}-${String(utc.getUTCDate()).padStart(2, "0")}`;
+}
 
 type VehicleOption = { id: number; vehicleNumber: string; noOfBoxes?: number };
 type EmployeeOption = {
@@ -71,6 +88,7 @@ interface Props {
 }
 
 type Step1FormState = {
+  tripDate: string;
   vehicleId: number;
   vehicleNo: string;
   driverId: number;
@@ -81,19 +99,6 @@ type Step1FormState = {
   loaders: string[];
   openingMeterText: string;
   advanceText: string;
-};
-
-const EMPTY_FORM: Step1FormState = {
-  vehicleId: 0,
-  vehicleNo: "",
-  driverId: 0,
-  driverName: "",
-  supervisorId: 0,
-  supervisorName: "",
-  helpers: [],
-  loaders: [],
-  openingMeterText: "",
-  advanceText: "",
 };
 
 function formatNumericField(value: number | undefined | null): string {
@@ -109,6 +114,7 @@ function parseNumericField(text: string): number | null {
 
 function tripToForm(trip: Trip): Step1FormState {
   return {
+    tripDate: trip.tripDate || localTodayYmd(),
     vehicleId: trip.vehicleId,
     vehicleNo: trip.vehicleNo,
     driverId: trip.driverId,
@@ -124,6 +130,7 @@ function tripToForm(trip: Trip): Step1FormState {
 
 function formHasEdits(form: Step1FormState): boolean {
   return Boolean(
+    form.tripDate ||
     form.vehicleId ||
     form.driverId ||
     form.supervisorId ||
@@ -136,6 +143,7 @@ function formHasEdits(form: Step1FormState): boolean {
 
 function formToTripPatch(form: Step1FormState): Partial<Trip> {
   return {
+    tripDate: form.tripDate,
     vehicleId: form.vehicleId,
     vehicleNo: form.vehicleNo,
     driverId: form.driverId,
@@ -150,10 +158,26 @@ function formToTripPatch(form: Step1FormState): Partial<Trip> {
 }
 
 
-// ── Read-only computed fields ────────────────────────────────────────────────
+// ── Trip date (editable on first create; locked after submit) ────────────────
 
-const TripDateField = React.memo(function TripDateField({ tripDate }: { tripDate: string }) {
+const TripDateField = React.memo(function TripDateField({
+  tripDate,
+  editable,
+  disabled,
+  language,
+  onChange,
+}: {
+  tripDate: string;
+  editable: boolean;
+  disabled?: boolean;
+  language: "en" | "te";
+  onChange?: (date: string) => void;
+}) {
   const { t } = useI18n();
+  const today = localTodayYmd();
+  const minDate = shiftYmd(today, -TRIP_DATE_MAX_PAST_DAYS);
+  const maxDate = shiftYmd(today, TRIP_DATE_MAX_FUTURE_DAYS);
+
   return (
     <div>
       <FieldLabel
@@ -162,9 +186,29 @@ const TripDateField = React.memo(function TripDateField({ tripDate }: { tripDate
         label={t("ops.trip.field.trip_date")}
         required={TRIP_FIELD_DEFINITIONS.tripDate.required}
       />
-      <div className="mt-1 h-[42px] bg-white border border-slate-200 rounded-xl px-4 flex items-center text-sm font-medium text-slate-800">
-        {tripDate || <span className="text-slate-400 font-normal text-xs">--</span>}
-      </div>
+      {editable ? (
+        <div className="mt-1">
+          <DatePicker
+            value={tripDate}
+            onChange={(value) => onChange?.(value)}
+            language={language}
+            disabled={disabled}
+            minDate={minDate}
+            maxDate={maxDate}
+            hideClear
+            hideThisWeek
+            placeholder={t("ops.trip.select_trip_date")}
+            className="w-full text-sm font-medium"
+          />
+          <p className="mt-1.5 text-[11px] text-slate-500 leading-snug">
+            {t("ops.trip.trip_date_number_hint")}
+          </p>
+        </div>
+      ) : (
+        <div className="mt-1 h-[42px] bg-white border border-slate-200 rounded-xl px-4 flex items-center text-sm font-medium text-slate-800">
+          {tripDate || <span className="text-slate-400 font-normal text-xs">--</span>}
+        </div>
+      )}
     </div>
   );
 });
@@ -594,11 +638,49 @@ function StepStart({
     tripNo: string;
     tripDate: string;
   } | null>(null);
+  const [previewTripNo, setPreviewTripNo] = useState<string>("");
 
   const loadedTripIdRef = useRef(tripId);
   const formRef = useRef(form);
   useEffect(() => { formRef.current = form; }, [form]);
   const submitLockRef = useRef(false);
+
+  // Preview next TR-YYYYMMDD-NNN for the selected date (create only).
+  // Server remains authoritative on submit; this is operator guidance.
+  useEffect(() => {
+    if (startStepSubmitted || tripId > 0) {
+      setPreviewTripNo("");
+      return;
+    }
+    const date = form.tripDate?.trim();
+    if (!date || !/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+      setPreviewTripNo("");
+      return;
+    }
+    let cancelled = false;
+    const timer = window.setTimeout(() => {
+      fetchNextTripNo(date)
+        .then((preview) => {
+          if (!cancelled) setPreviewTripNo(preview.tripNo);
+        })
+        .catch(() => {
+          if (!cancelled) setPreviewTripNo("");
+        });
+    }, 200);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [form.tripDate, startStepSubmitted, tripId]);
+
+  const handleTripDateChange = useCallback(
+    (date: string) => {
+      if (!date) return;
+      setForm((prev) => ({ ...prev, tripDate: date }));
+      updateTrip({ tripDate: date });
+    },
+    [updateTrip]
+  );
 
   // Opening-meter reference: the vehicle's latest recorded reading. Used for
   // field-level validation only — the backend remains the authority on submit.
@@ -663,8 +745,9 @@ function StepStart({
     loadedTripIdRef.current = tripId;
 
     if (tripId === 0 && previousId !== 0) {
-      formRef.current = EMPTY_FORM;
-      setForm(EMPTY_FORM);
+      const reset = tripToForm(loadSnapshot);
+      formRef.current = reset;
+      setForm(reset);
       return;
     }
 
@@ -811,7 +894,6 @@ function StepStart({
     const candidate = {
       ...loadSnapshot,
       ...patch,
-      tripDate: loadSnapshot.tripDate,
       startStepSubmitted: false,
     } as Trip;
     const validation = validateStartStep(candidate);
@@ -866,7 +948,14 @@ function StepStart({
             <TripNoBadge tripNo={loadSnapshot.tripNo || tripNo} />
           </div>
           <div className="flex items-center gap-2 shrink-0">
-            {/* Locked / view: pencil only — no top Close X */}
+            {/* Locked / view: Close X → Create New Trip (Trip List style) */}
+            <StepCloseButton
+              onClose={() => {
+                if (onCancel) onCancel();
+                else clearForm?.();
+              }}
+              animated
+            />
             {canEdit && (
               <button
                 type="button"
@@ -980,7 +1069,10 @@ function StepStart({
               <Clock size={18} className="text-indigo-500" />
               {t("ops.trip.title.start")}
             </h3>
-            <TripNoBadge tripNo={tripNo || loadSnapshot.tripNo} />
+            <TripNoBadge
+              tripNo={tripNo || loadSnapshot.tripNo || previewTripNo}
+              provisional={!tripNo && !loadSnapshot.tripNo && Boolean(previewTripNo)}
+            />
           </div>
           <div className="flex items-center gap-2 shrink-0">
             {/* Part E: no top-right X in first-submit / Edit mode — the bottom
@@ -1002,7 +1094,13 @@ function StepStart({
         {/* Field order: Trip Date, Start Time, Vehicle No., Supervisor, Driver,
             Helpers, Loaders, Advance — Opening Meter LAST. */}
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-5 sm:gap-x-6 gap-y-4 sm:gap-y-5">
-          <TripDateField tripDate={loadSnapshot.tripDate} />
+          <TripDateField
+            tripDate={form.tripDate || loadSnapshot.tripDate}
+            editable={!startStepSubmitted}
+            disabled={inputsLocked || startStepSubmitted}
+            language={language}
+            onChange={handleTripDateChange}
+          />
           <StartTimeField startTime={startTime} />
           <VehicleField
             vehicleId={form.vehicleId}

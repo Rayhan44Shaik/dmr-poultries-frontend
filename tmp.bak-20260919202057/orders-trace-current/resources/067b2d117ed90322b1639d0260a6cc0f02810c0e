@@ -1,0 +1,467 @@
+# Instructions
+
+- Following Playwright test failed.
+- Explain why, be concise, respect Playwright best practices.
+- Provide a snippet of code with the fix, if possible.
+
+# Test info
+
+- Name: orders\orders-live-workflow.spec.ts >> real collection persists with a positive container id and no trip-zero request
+- Location: tests\orders\orders-live-workflow.spec.ts:7:1
+
+# Error details
+
+```
+Error: expect(locator).toBeVisible() failed
+
+Locator: getByText('10 boxes delivered — Orders E2E Shop 1', { exact: true })
+Expected: visible
+Timeout: 15000ms
+Error: element(s) not found
+
+Call log:
+  - Expect "toBeVisible" with timeout 15000ms
+  - waiting for getByText('10 boxes delivered — Orders E2E Shop 1', { exact: true })
+
+```
+
+```yaml
+- banner:
+  - button "Toggle navigation"
+  - link "Operations":
+    - /url: /operations?tab=trip-entry
+  - link "Orders":
+    - /url: /operations/orders/collection
+  - heading "Delivery" [level=1]
+  - button "Search pages… ⌘K"
+  - 'button "Current font size: 100%"': 100%
+  - button "Change language": EN
+  - button "Notifications": "1"
+  - button "Quick add"
+  - button "T Test Owner Owner"
+- main:
+  - region "Delivery tracking filters":
+    - text: From
+    - textbox "DD/MM/YYYY": 14/09/2026
+    - button "Open calendar"
+    - text: To
+    - textbox "DD/MM/YYYY": 19/09/2026
+    - button "Open calendar"
+    - text: Delivery Status
+    - combobox "Delivery Status": All
+    - text: Difference
+    - combobox "Difference": All
+    - text: Sort
+    - combobox "Sort": "Date: Newest first"
+    - text: Search
+    - textbox "Search trip, vehicle, supervisor, mobile, driver, shop no, shop, city…"
+    - button "Reset"
+    - button "Refresh"
+  - heading "Pending & In Progress" [level=3]
+  - text: 1 trips
+  - table:
+    - rowgroup:
+      - row "# Trip No Date Vehicle No Supervisor Driver Shops Boxes Del. Boxes Del. Birds":
+        - columnheader "#"
+        - columnheader "Trip No"
+        - columnheader "Date"
+        - columnheader "Vehicle No"
+        - columnheader "Supervisor"
+        - columnheader "Driver"
+        - columnheader "Shops"
+        - columnheader "Boxes"
+        - columnheader "Del. Boxes"
+        - columnheader "Del. Birds"
+    - rowgroup:
+      - row "1 TR-20260919-001 Sat, 19 Sep 2026 ORD-E2E-TRUCK-01 Orders E2E Supervisor Orders E2E Driver 1 0 Delivered 20 10 100":
+        - cell "1"
+        - cell "TR-20260919-001"
+        - cell "Sat, 19 Sep 2026"
+        - cell "ORD-E2E-TRUCK-01"
+        - cell "Orders E2E Supervisor"
+        - cell "Orders E2E Driver"
+        - cell "1 0 Delivered"
+        - cell "20"
+        - cell "10"
+        - cell "100"
+  - paragraph: Showing 1–1 of 1
+  - text: Rows per page
+  - button "10"
+  - navigation "Master directory pages":
+    - button "Previous page" [disabled]: Previous
+    - button "Page 1": "1"
+    - button "Next page" [disabled]: Next
+  - heading "Completed" [level=3]
+  - text: 0 trips 14/09/2026 → 19/09/2026
+  - table:
+    - rowgroup:
+      - row "# Trip No Date Vehicle No Supervisor Driver Shops Boxes Del. Boxes Del. Birds":
+        - columnheader "#"
+        - columnheader "Trip No"
+        - columnheader "Date"
+        - columnheader "Vehicle No"
+        - columnheader "Supervisor"
+        - columnheader "Driver"
+        - columnheader "Shops"
+        - columnheader "Boxes"
+        - columnheader "Del. Boxes"
+        - columnheader "Del. Birds"
+    - rowgroup:
+      - row "No completed trips in the selected range":
+        - cell "No completed trips in the selected range"
+  - text: "Total Shops: 1 Total Birds: 200 Total Boxes: 20 Total Weight (KG): 400.00 Delivered Birds: 100 Delivered Boxes: 10 Delivered Weight: 0.00"
+- complementary:
+  - text: DMR Poultries
+  - button "Collapse to icons"
+  - navigation:
+    - paragraph: Overview
+    - list:
+      - listitem:
+        - link "Dashboard":
+          - /url: /dashboard
+    - paragraph: Masters
+    - list:
+      - listitem:
+        - link "Shops":
+          - /url: /masters?tab=shops
+      - listitem:
+        - link "Farms":
+          - /url: /masters?tab=farms
+      - listitem:
+        - link "Vehicles":
+          - /url: /masters?tab=vehicles
+      - listitem:
+        - link "Employees":
+          - /url: /masters?tab=employees
+      - listitem:
+        - link "Banks":
+          - /url: /masters?tab=banks
+      - listitem:
+        - link "Bird Types":
+          - /url: /masters?tab=birdTypes
+      - listitem:
+        - link "Market Rates":
+          - /url: /accounts?tab=market-rate
+    - paragraph: Operations
+    - list:
+      - listitem:
+        - link "Trip Entry":
+          - /url: /operations?tab=trip-entry
+      - listitem:
+        - link "Trip List":
+          - /url: /operations?tab=trip-list
+      - listitem:
+        - link "Rate Entry":
+          - /url: /operations?tab=rate-entry
+      - listitem:
+        - link "Shop Sales":
+          - /url: /operations?tab=shop-sales
+      - listitem:
+        - link "Collection Entry":
+          - /url: /operations?tab=collection
+      - listitem:
+        - link "Pending Collections":
+          - /url: /operations?tab=pending-collections
+      - listitem:
+        - link "Weight Loss / Mortality":
+          - /url: /operations?tab=mortality
+      - listitem:
+        - link "Fuel Expenses":
+          - /url: /operations?tab=fuel-expenses
+      - listitem:
+        - link "Collection":
+          - /url: /operations/orders/collection
+      - listitem:
+        - link "Assignment":
+          - /url: /operations/orders/assignment
+      - listitem:
+        - link "Delivery":
+          - /url: /operations/orders/delivery-tracking
+    - paragraph: Vehicles
+    - list:
+      - listitem:
+        - link "Maintenance Entry":
+          - /url: /fleet?tab=entry
+      - listitem:
+        - link "Maintenance Timeline":
+          - /url: /fleet?tab=history
+      - listitem:
+        - link "Permits & Documents":
+          - /url: /fleet?tab=permits
+      - listitem:
+        - link "EMI":
+          - /url: /fleet?tab=emi
+      - listitem:
+        - link "FASTag":
+          - /url: /fleet?tab=fastag
+    - paragraph: Staff
+    - list:
+      - listitem:
+        - link "Duty Planner":
+          - /url: /staff?tab=duty-planner
+      - listitem:
+        - link "Salary Register":
+          - /url: /staff?tab=salary-sheet
+      - listitem:
+        - link "Leaves":
+          - /url: /staff?tab=leaves
+      - listitem:
+        - link "Driver Performance":
+          - /url: /staff?tab=driver-performance
+      - listitem:
+        - link "Supervisor Performance":
+          - /url: /staff?tab=supervisor-performance
+    - paragraph: Accounts
+    - list:
+      - listitem:
+        - link "Analysis":
+          - /url: /accounts?tab=summary
+      - listitem:
+        - link "Payment Register":
+          - /url: /accounts?tab=paid-payments
+      - listitem:
+        - link "Farm Payment":
+          - /url: /accounts?tab=farm-payment
+    - paragraph: Reports
+    - list:
+      - listitem:
+        - link "Shop Ledger":
+          - /url: /reports?tab=shopLedger
+      - listitem:
+        - link "Collection Report":
+          - /url: /operations?tab=collection-report
+      - listitem:
+        - link "Vehicle Analytics":
+          - /url: /fleet?tab=analytics
+    - paragraph: Settings
+    - list:
+      - listitem:
+        - link "System Settings":
+          - /url: /settings?tab=appearance
+- dialog:
+  - heading "TR-20260919-001" [level=2]
+  - text: DELIVERY REPORT • EN In Progress ORD-E2E-TRUCK-01 · Orders E2E Supervisor
+  - button "Delivery Report — check before sending"
+  - button "Change view language":
+    - text: తెలుగు
+    - tooltip "Change only this view language"
+  - button "Close view"
+  - heading "TRIP DETAILS" [level=3]
+  - term: Trip No
+  - definition: TR-20260919-001
+  - term: Date
+  - definition: 2026-09-19
+  - term: Vehicle No
+  - definition: ORD-E2E-TRUCK-01
+  - term: Supervisor
+  - definition: Orders E2E Supervisor
+  - term: Supervisor Mobile
+  - definition: "9700000202"
+  - term: Driver
+  - definition: Orders E2E Driver
+  - heading "DELIVERY SUMMARY" [level=3]
+  - term: Delivered
+  - definition: 0 / 1 Delivered
+  - term: Collected Boxes
+  - definition: "20"
+  - term: Assigned Boxes
+  - definition: "20"
+  - term: Delivered Boxes
+  - definition: "10"
+  - term: Pending Boxes
+  - definition: "10"
+  - term: Delivered Birds
+  - definition: "100"
+  - term: Delivered Weight
+  - definition: "0.00"
+  - term: Pending
+  - definition: "0"
+  - term: Part Delivered
+  - definition: "1"
+  - heading "SHOP DELIVERY REPORT" [level=3]
+  - text: Listed Not listed Sort
+  - button "Sort": "Delivery time: First → Last"
+  - textbox "Search shop, city, status…"
+  - text: Status
+  - button "Status": All
+  - table:
+    - rowgroup:
+      - row "S.No Shop Name City Coll. Boxes Ass. Boxes Del. Boxes Pend. Boxes Del. Birds Del. Wt (kg) Time Delivery Status":
+        - columnheader "S.No"
+        - columnheader "Shop Name"
+        - columnheader "City"
+        - columnheader "Coll. Boxes"
+        - columnheader "Ass. Boxes"
+        - columnheader "Del. Boxes"
+        - columnheader "Pend. Boxes"
+        - columnheader "Del. Birds"
+        - columnheader "Del. Wt (kg)"
+        - columnheader "Time"
+        - columnheader "Delivery Status"
+    - rowgroup:
+      - row "1 Orders E2E Shop 1 1 Orders Village 20 20 10 10 100 — 19-09-2026 20:02:06 IST Part Delivered Record delivery — Orders E2E Shop 1 max 10":
+        - cell "1"
+        - cell "Orders E2E Shop 1 1"
+        - cell "Orders Village"
+        - cell "20"
+        - cell "20"
+        - cell "10"
+        - cell "10"
+        - cell "100"
+        - cell "—"
+        - cell "19-09-2026 20:02:06 IST"
+        - cell "Part Delivered Record delivery — Orders E2E Shop 1 max 10":
+          - text: Part Delivered
+          - spinbutton "Delivery boxes — Orders E2E Shop 1"
+          - button "Record delivery — Orders E2E Shop 1" [disabled]: Record
+          - text: max 10
+  - text: Showing 1–1 of 1
+  - table:
+    - rowgroup:
+      - row "TOTAL ORDERED TOTAL DELIVERED Pending Boxes Difference":
+        - columnheader
+        - columnheader "TOTAL ORDERED"
+        - columnheader "TOTAL DELIVERED"
+        - columnheader "Pending Boxes"
+        - columnheader "Difference"
+    - rowgroup:
+      - row "boxes 20 10 10 −10":
+        - cell "boxes"
+        - cell "20"
+        - cell "10"
+        - cell "10"
+        - cell "−10"
+      - row "birds 200 100 100 −100":
+        - cell "birds"
+        - cell "200"
+        - cell "100"
+        - cell "100"
+        - cell "−100"
+      - row "Weight (KG) 400.00 0.00 400.00 −400.00":
+        - cell "Weight (KG)"
+        - cell "400.00"
+        - cell "0.00"
+        - cell "400.00"
+        - cell "−400.00"
+```
+
+# Test source
+
+```ts
+  1   | import { test, expect } from "@playwright/test";
+  2   | 
+  3   | const COLLECTION = "/operations/orders/collection";
+  4   | const ASSIGNMENT = "/operations/orders/assignment";
+  5   | const TRACKING = "/operations/orders/delivery-tracking";
+  6   | 
+  7   | test("real collection persists with a positive container id and no trip-zero request", async ({ page }) => {
+  8   |   const requests: string[] = [];
+  9   |   page.on("request", (request) => requests.push(`${request.method()} ${request.url()}`));
+  10  | 
+  11  |   await page.goto("/");
+  12  |   await page.locator("#login-username").fill("test-owner-4100");
+  13  |   await page.locator("#login-password").fill("Test-only-password-123!");
+  14  |   await page.getByRole("checkbox", { name: /remember me/i }).check();
+  15  |   await page.getByRole("button", { name: /sign in/i }).click();
+  16  |   await expect(page).toHaveURL(/dashboard/);
+  17  | 
+  18  |   await page.locator(`a[href="${COLLECTION}"]`).first().click();
+  19  |   await expect(page.locator("#orders-panel-collection")).toBeVisible({ timeout: 20_000 });
+  20  |   const row = page.locator("tbody tr", { hasText: "Orders E2E Shop 1" });
+  21  |   await expect(row).toBeVisible();
+  22  |   await row.getByRole("spinbutton", { name: /No\. of Birds/i }).fill("200");
+  23  |   await row.getByRole("spinbutton", { name: /No\. of Boxes/i }).fill("20");
+  24  |   await row.getByRole("spinbutton", { name: /^Weight/i }).fill("400");
+  25  | 
+  26  |   const saveResponse = page.waitForResponse(
+  27  |     (response) => response.request().method() === "POST" && /\/api\/trips\/\d+\/steps\/deliveries$/.test(response.url()),
+  28  |   );
+  29  |   await page.getByRole("button", { name: /save progress/i }).click();
+  30  |   const saved = await saveResponse;
+  31  |   expect(saved.status()).toBe(200);
+  32  |   const savedBody = await saved.json();
+  33  |   expect(savedBody.id).toBeGreaterThan(0);
+  34  |   expect(savedBody.tripNo).toBeTruthy();
+  35  |   expect(new URL(saved.url()).pathname).toBe(`/api/trips/${savedBody.id}/steps/deliveries`);
+  36  |   expect(requests.some((request) => /\/trips\/0\//.test(request))).toBe(false);
+  37  | 
+  38  |   await page.reload();
+  39  |   await expect(page.locator("#orders-panel-collection")).toBeVisible({ timeout: 20_000 });
+  40  |   const refreshed = page.locator("tbody tr", { hasText: "Orders E2E Shop 1" });
+  41  |   await expect(refreshed.getByRole("spinbutton", { name: /No\. of Birds/i })).toHaveValue("200");
+  42  |   await expect(refreshed.getByRole("spinbutton", { name: /No\. of Boxes/i })).toHaveValue("20");
+  43  |   await expect(refreshed.getByRole("spinbutton", { name: /^Weight/i })).toHaveValue("400");
+  44  | 
+  45  |   await page.goto(ASSIGNMENT);
+  46  |   await expect(page.getByText("Orders E2E Shop 1", { exact: true }).first()).toBeVisible();
+  47  |   await expect(page.getByText(/1 collected · 0 assigned · 1 available/)).toBeVisible();
+  48  |   await page.getByRole("button", { name: /Assign Shops/ }).click();
+  49  |   await page.getByRole("checkbox", { name: "Select — Orders E2E Shop 1" }).check();
+  50  |   await page.getByRole("button", { name: "Save Progress", exact: true }).click();
+  51  |   await expect(page.getByText("Assignment progress saved", { exact: true })).toBeVisible();
+  52  | 
+  53  |   await page.reload();
+  54  |   await expect(page.locator("#orders-panel-assignment")).toBeVisible({ timeout: 20_000 });
+  55  |   await expect(page.getByText(/1 collected · 1 assigned · 0 available/)).toBeVisible();
+  56  |   const vehicleButton = page.getByRole("button", { name: /Assign Shops/ });
+  57  |   const vehicleButtonText = await vehicleButton.innerText();
+  58  |   const vehicleTripNo = vehicleButtonText.match(/TR-\d{8}-\d+/)?.[0];
+  59  |   expect(vehicleTripNo).toBeTruthy();
+  60  |   await vehicleButton.click();
+  61  |   await expect(page.getByRole("checkbox", { name: "Select — Orders E2E Shop 1" })).toBeChecked();
+  62  |   await page.getByRole("button", { name: "Review & Submit", exact: true }).click();
+  63  |   await page.getByRole("button", { name: "Download PDF", exact: true }).click();
+  64  |   await page.getByRole("button", { name: "Submit Order Assignment", exact: true }).click();
+  65  |   await expect(page).toHaveURL(new RegExp(`${TRACKING}$`));
+  66  |   await expect(page.locator("#orders-panel-tracking")).toBeVisible({ timeout: 20_000 });
+  67  |   await expect(page.getByText(vehicleTripNo!, { exact: true }).first()).toBeVisible();
+  68  | 
+  69  |   const openDelivery = async () => {
+  70  |     await page.getByRole("row").filter({ hasText: vehicleTripNo! }).first().click();
+  71  |     await page.getByRole("button", { name: `View — ${vehicleTripNo}` }).click();
+  72  |     await expect(page.getByText("Orders E2E Shop 1", { exact: true }).last()).toBeVisible();
+  73  |   };
+  74  |   await openDelivery();
+  75  |   await page.getByRole("spinbutton", { name: "Delivery boxes — Orders E2E Shop 1" }).fill("10");
+  76  |   await page.getByRole("button", { name: "Record delivery — Orders E2E Shop 1" }).click();
+  77  |   await expect(page.getByText("10 boxes delivered — Orders E2E Shop 1", { exact: true })).toBeVisible();
+  78  |   await expect(page.getByText("10", { exact: true }).filter({ visible: true }).first()).toBeVisible();
+  79  |   await expect(page.getByText(/PART DELIVERED/i, { exact: true }).last()).toBeVisible();
+  80  | 
+  81  |   await page.reload();
+  82  |   await expect(page.locator("#orders-panel-tracking")).toBeVisible({ timeout: 20_000 });
+  83  |   await openDelivery();
+  84  |   const remaining = page.getByRole("spinbutton", { name: "Delivery boxes — Orders E2E Shop 1" });
+  85  |   await expect(remaining).toHaveAttribute("max", "10");
+  86  |   await remaining.fill("10");
+  87  |   await page.getByRole("button", { name: "Record delivery — Orders E2E Shop 1" }).click();
+> 88  |   await expect(page.getByText("10 boxes delivered — Orders E2E Shop 1", { exact: true })).toBeVisible();
+      |                                                                                           ^ Error: expect(locator).toBeVisible() failed
+  89  |   await expect(page.getByText(/^DELIVERED$/i, { exact: true }).last()).toBeVisible();
+  90  |   await expect(page.getByText("Pending Boxes").first().locator("..")).toContainText("0");
+  91  | 
+  92  |   await page.reload();
+  93  |   await expect(page.locator("#orders-panel-tracking")).toBeVisible({ timeout: 20_000 });
+  94  |   await expect(page.getByText(vehicleTripNo!, { exact: true }).first()).toBeVisible();
+  95  |   const vehicleTripResponse = await page.request.get("/api/trips");
+  96  |   expect(vehicleTripResponse.status()).toBe(200);
+  97  |   const vehicleTrips = await vehicleTripResponse.json();
+  98  |   const vehicleTrip = (Array.isArray(vehicleTrips) ? vehicleTrips : vehicleTrips.data ?? []).find(
+  99  |     (trip: { tripNo?: string }) => trip.tripNo === vehicleTripNo,
+  100 |   );
+  101 |   expect(vehicleTrip?.id).toBeGreaterThan(0);
+  102 |   const persisted = await page.request.get(`/api/trips/${vehicleTrip.id}`);
+  103 |   expect(persisted.status()).toBe(200);
+  104 |   const persistedBody = await persisted.json();
+  105 |   expect(persistedBody.id).toBe(vehicleTrip.id);
+  106 |   expect(persistedBody.status).not.toBe("Completed");
+  107 |   const captures = (persistedBody.deliveries ?? []).filter(
+  108 |     (row: { shopId?: number; autoCaptureTime?: string | null }) =>
+  109 |       Number(row.shopId) > 0 && Boolean(row.autoCaptureTime),
+  110 |   );
+  111 |   expect(captures).toHaveLength(2);
+  112 |   expect(captures.reduce((sum: number, row: { boxNo?: number }) => sum + Number(row.boxNo ?? 0), 0)).toBe(20);
+  113 |   expect(requests.some((request) => /\/trips\/0\//.test(request))).toBe(false);
+  114 | });
+  115 | 
+```

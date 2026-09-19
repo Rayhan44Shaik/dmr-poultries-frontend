@@ -22,6 +22,7 @@ test("toStep1Payload keeps explicit 0 and sends empty as null, without startTime
   });
   assert.equal(payload.openingMeter, 0);
   assert.equal(payload.advanceAmount, 0);
+  assert.equal(payload.tripDate, "2026-08-17");
   assert.equal("startTime" in payload, false);
   assert.equal("tripNo" in payload, false);
 
@@ -32,6 +33,20 @@ test("toStep1Payload keeps explicit 0 and sends empty as null, without startTime
   });
   assert.equal(empty.openingMeter, null);
   assert.equal(empty.advanceAmount, null);
+  assert.equal(empty.tripDate, "2026-08-17");
+});
+
+test("selected tripDate is forwarded for server-side TR-YYYYMMDD-NNN allocation", () => {
+  const payload = toStep1Payload({
+    ...createEmptyTrip({ tripDate: "2026-08-13" }),
+    vehicleId: 9,
+    driverId: 8,
+    supervisorId: 7,
+    helpers: ["H1"],
+    loaders: ["L1"],
+  });
+  assert.equal(payload.tripDate, "2026-08-13");
+  assert.equal("tripNo" in payload, false);
 });
 
 test("mapApiTripToTrip preserves null KM/Advance instead of coercing to 0", () => {

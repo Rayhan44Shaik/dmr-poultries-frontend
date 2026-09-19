@@ -1,0 +1,406 @@
+# Instructions
+
+- Following Playwright test failed.
+- Explain why, be concise, respect Playwright best practices.
+- Provide a snippet of code with the fix, if possible.
+
+# Test info
+
+- Name: orders\orders-live-workflow.spec.ts >> real collection persists with a positive container id and no trip-zero request
+- Location: tests\orders\orders-live-workflow.spec.ts:7:1
+
+# Error details
+
+```
+Error: expect(received).toHaveLength(expected)
+
+Expected length: 2
+Received length: 1
+Received array:  [{"amount": 0, "autoCaptureTime": "2026-09-19T14:27:33.000Z", "birdType": "", "birdTypeId": null, "birds": 100, "boxNo": 10, "clientKey": "dlv-1-2", "deliveryMode": "box", "farmBirds": null, "farmWeight": null, "id": 5, "mortKg": 0, "mortality": 0, "perBoxData": [], "rate": null, "remarks": "[ORDER] O:TR-20260919-002", "selectedBoxIds": [], "serialNo": 2, "shopId": 1, "shopName": "Orders E2E Shop 1", "weight": 0}]
+```
+
+# Page snapshot
+
+```yaml
+- generic [ref=f5e3]:
+  - generic [ref=f5e4]:
+    - banner [ref=f5e5]:
+      - button "Toggle navigation" [ref=f5e6]
+      - generic [ref=f5e8]:
+        - link "Operations" [ref=f5e9] [cursor=pointer]:
+          - /url: /operations?tab=trip-entry
+        - link "Orders" [ref=f5e12] [cursor=pointer]:
+          - /url: /operations/orders/collection
+        - heading "Delivery" [level=1] [ref=f5e15]
+      - button "Search pages… ⌘K" [ref=f5e16]:
+        - generic [ref=f5e20]: Search pages…
+        - generic [ref=f5e21]: ⌘K
+      - 'button "Current font size: 100%" [ref=f5e23]':
+        - generic [ref=f5e24]: A
+        - generic [ref=f5e25]: 100%
+      - button "Change language" [ref=f5e29]:
+        - generic [ref=f5e33]: EN
+      - button "Notifications" [ref=f5e37]:
+        - generic [ref=f5e41]: "1"
+      - button "Quick add" [ref=f5e43]
+      - button "T Test Owner Owner" [ref=f5e49]:
+        - generic [ref=f5e50]: T
+        - generic [ref=f5e51]:
+          - generic [ref=f5e52]: Test Owner
+          - generic [ref=f5e53]: Owner
+    - main [ref=f5e57]:
+      - generic [ref=f5e63]:
+        - region "Delivery tracking filters" [ref=f5e64]:
+          - generic [ref=f5e65]:
+            - generic [ref=f5e66]:
+              - generic [ref=f5e67]: From
+              - generic [ref=f5e72]:
+                - textbox "DD/MM/YYYY" [ref=f5e73]: 14/09/2026
+                - button "Open calendar" [ref=f5e75]
+            - generic [ref=f5e78]:
+              - generic [ref=f5e79]: To
+              - generic [ref=f5e84]:
+                - textbox "DD/MM/YYYY" [ref=f5e85]: 19/09/2026
+                - button "Open calendar" [ref=f5e87]
+            - generic [ref=f5e90]:
+              - generic [ref=f5e91]: Delivery Status
+              - combobox "Delivery Status" [ref=f5e98]:
+                - generic [ref=f5e99]: All
+            - generic [ref=f5e102]:
+              - generic [ref=f5e103]: Difference
+              - combobox "Difference" [ref=f5e107]:
+                - generic [ref=f5e108]: All
+          - generic [ref=f5e111]:
+            - generic [ref=f5e112]:
+              - generic [ref=f5e113]: Sort
+              - combobox "Sort" [ref=f5e119]:
+                - generic [ref=f5e120]: "Date: Newest first"
+            - generic [ref=f5e123]:
+              - generic [ref=f5e124]: Search
+              - textbox "Search trip, vehicle, supervisor, mobile, driver, shop no, shop, city…" [ref=f5e130]
+            - generic [ref=f5e131]:
+              - button "Reset" [ref=f5e132]
+              - button "Refresh" [ref=f5e137]
+        - generic [ref=f5e142]:
+          - generic [ref=f5e143]:
+            - heading "Pending & In Progress" [level=3] [ref=f5e148]
+            - generic [ref=f5e149]: 1 trips
+          - generic [ref=f5e150]:
+            - table [ref=f5e151]:
+              - rowgroup [ref=f5e152]:
+                - row [ref=f5e153]:
+                  - columnheader "#" [ref=f5e154]
+                  - columnheader "Trip No" [ref=f5e157]
+                  - columnheader "Date" [ref=f5e163]
+                  - columnheader "Vehicle No" [ref=f5e168]
+                  - columnheader "Supervisor" [ref=f5e176]
+                  - columnheader "Driver" [ref=f5e191]
+                  - columnheader "Shops" [ref=f5e197]
+                  - columnheader "Boxes" [ref=f5e203]
+                  - columnheader "Del. Boxes" [ref=f5e209]
+                  - columnheader "Del. Birds" [ref=f5e217]
+              - rowgroup [ref=f5e224]:
+                - row [ref=f5e225] [cursor=pointer]:
+                  - cell "1" [ref=f5e226]
+                  - cell "TR-20260919-001" [ref=f5e227]
+                  - cell "Sat, 19 Sep 2026" [ref=f5e229]
+                  - cell "ORD-E2E-TRUCK-01" [ref=f5e230]
+                  - cell "Orders E2E Supervisor" [ref=f5e231]
+                  - cell "Orders E2E Driver" [ref=f5e232]
+                  - cell "1 0 Delivered" [ref=f5e233]:
+                    - generic [ref=f5e234]:
+                      - generic [ref=f5e235]: "1"
+                      - generic [ref=f5e236]: 0 Delivered
+                  - cell "20" [ref=f5e237]
+                  - cell "10" [ref=f5e238]
+                  - cell "100" [ref=f5e239]
+            - generic [ref=f5e240]:
+              - paragraph [ref=f5e241]: Showing 1–1 of 1
+              - generic [ref=f5e242]:
+                - generic [ref=f5e243]: Rows per page
+                - button "10" [ref=f5e245]
+              - navigation "Master directory pages" [ref=f5e249]:
+                - button "Previous page" [disabled] [ref=f5e250]:
+                  - generic [ref=f5e253]: Previous
+                - button "Page 1" [ref=f5e254]: "1"
+                - button "Next page" [disabled] [ref=f5e255]:
+                  - generic [ref=f5e256]: Next
+        - generic [ref=f5e259]:
+          - generic [ref=f5e260]:
+            - heading "Completed" [level=3] [ref=f5e265]
+            - generic [ref=f5e266]: 0 trips
+            - generic [ref=f5e267]: 14/09/2026 → 19/09/2026
+          - table [ref=f5e274]:
+            - rowgroup [ref=f5e275]:
+              - row [ref=f5e276]:
+                - columnheader "#" [ref=f5e277]
+                - columnheader "Trip No" [ref=f5e280]
+                - columnheader "Date" [ref=f5e286]
+                - columnheader "Vehicle No" [ref=f5e291]
+                - columnheader "Supervisor" [ref=f5e299]
+                - columnheader "Driver" [ref=f5e314]
+                - columnheader "Shops" [ref=f5e320]
+                - columnheader "Boxes" [ref=f5e326]
+                - columnheader "Del. Boxes" [ref=f5e332]
+                - columnheader "Del. Birds" [ref=f5e340]
+            - rowgroup [ref=f5e347]:
+              - row [ref=f5e348]:
+                - cell "No completed trips in the selected range" [ref=f5e349]
+        - generic [ref=f5e350]:
+          - generic [ref=f5e351]: "Total Shops: 1"
+          - generic [ref=f5e352]: "Total Birds: 200"
+          - generic [ref=f5e353]: "Total Boxes: 20"
+          - generic [ref=f5e354]: "Total Weight (KG): 400.00"
+          - generic [ref=f5e355]: "Delivered Birds: 100"
+          - generic [ref=f5e356]: "Delivered Boxes: 10"
+          - generic [ref=f5e357]: "Delivered Weight: 0.00"
+  - complementary [ref=f5e358]:
+    - generic [ref=f5e359]:
+      - generic [ref=f5e360]: DMR Poultries
+      - button "Collapse to icons" [ref=f5e365]
+    - navigation [ref=f5e370]:
+      - generic [ref=f5e371]:
+        - paragraph [ref=f5e372]: Overview
+        - list [ref=f5e373]:
+          - listitem [ref=f5e374]:
+            - link "Dashboard" [ref=f5e375] [cursor=pointer]:
+              - /url: /dashboard
+      - generic [ref=f5e383]:
+        - paragraph [ref=f5e384]: Masters
+        - list [ref=f5e385]:
+          - listitem [ref=f5e386]:
+            - link "Shops" [ref=f5e387] [cursor=pointer]:
+              - /url: /masters?tab=shops
+          - listitem [ref=f5e394]:
+            - link "Farms" [ref=f5e395] [cursor=pointer]:
+              - /url: /masters?tab=farms
+          - listitem [ref=f5e401]:
+            - link "Vehicles" [ref=f5e402] [cursor=pointer]:
+              - /url: /masters?tab=vehicles
+          - listitem [ref=f5e409]:
+            - link "Employees" [ref=f5e410] [cursor=pointer]:
+              - /url: /masters?tab=employees
+          - listitem [ref=f5e418]:
+            - link "Banks" [ref=f5e419] [cursor=pointer]:
+              - /url: /masters?tab=banks
+          - listitem [ref=f5e424]:
+            - link "Bird Types" [ref=f5e425] [cursor=pointer]:
+              - /url: /masters?tab=birdTypes
+          - listitem [ref=f5e432]:
+            - link "Market Rates" [ref=f5e433] [cursor=pointer]:
+              - /url: /accounts?tab=market-rate
+      - generic [ref=f5e439]:
+        - paragraph [ref=f5e440]: Operations
+        - list [ref=f5e441]:
+          - listitem [ref=f5e442]:
+            - link "Trip Entry" [ref=f5e443] [cursor=pointer]:
+              - /url: /operations?tab=trip-entry
+          - listitem [ref=f5e451]:
+            - link "Trip List" [ref=f5e452] [cursor=pointer]:
+              - /url: /operations?tab=trip-list
+          - listitem [ref=f5e459]:
+            - link "Rate Entry" [ref=f5e460] [cursor=pointer]:
+              - /url: /operations?tab=rate-entry
+          - listitem [ref=f5e466]:
+            - link "Shop Sales" [ref=f5e467] [cursor=pointer]:
+              - /url: /operations?tab=shop-sales
+          - listitem [ref=f5e473]:
+            - link "Collection Entry" [ref=f5e474] [cursor=pointer]:
+              - /url: /operations?tab=collection
+          - listitem [ref=f5e479]:
+            - link "Pending Collections" [ref=f5e480] [cursor=pointer]:
+              - /url: /operations?tab=pending-collections
+          - listitem [ref=f5e486]:
+            - link "Weight Loss / Mortality" [ref=f5e487] [cursor=pointer]:
+              - /url: /operations?tab=mortality
+          - listitem [ref=f5e494]:
+            - link "Fuel Expenses" [ref=f5e495] [cursor=pointer]:
+              - /url: /operations?tab=fuel-expenses
+          - listitem [ref=f5e501]: Orders
+          - listitem [ref=f5e504]:
+            - link "Collection" [ref=f5e505] [cursor=pointer]:
+              - /url: /operations/orders/collection
+          - listitem [ref=f5e511]:
+            - link "Assignment" [ref=f5e512] [cursor=pointer]:
+              - /url: /operations/orders/assignment
+          - listitem [ref=f5e525]:
+            - link "Delivery" [ref=f5e526] [cursor=pointer]:
+              - /url: /operations/orders/delivery-tracking
+      - generic [ref=f5e534]:
+        - paragraph [ref=f5e535]: Vehicles
+        - list [ref=f5e536]:
+          - listitem [ref=f5e537]:
+            - link "Maintenance Entry" [ref=f5e538] [cursor=pointer]:
+              - /url: /fleet?tab=entry
+          - listitem [ref=f5e543]:
+            - link "Maintenance Timeline" [ref=f5e544] [cursor=pointer]:
+              - /url: /fleet?tab=history
+          - listitem [ref=f5e551]:
+            - link "Permits & Documents" [ref=f5e552] [cursor=pointer]:
+              - /url: /fleet?tab=permits
+          - listitem [ref=f5e558]:
+            - link "EMI" [ref=f5e559] [cursor=pointer]:
+              - /url: /fleet?tab=emi
+          - listitem [ref=f5e565]:
+            - link "FASTag" [ref=f5e566] [cursor=pointer]:
+              - /url: /fleet?tab=fastag
+      - generic [ref=f5e573]:
+        - paragraph [ref=f5e574]: Staff
+        - list [ref=f5e575]:
+          - listitem [ref=f5e576]:
+            - link "Duty Planner" [ref=f5e577] [cursor=pointer]:
+              - /url: /staff?tab=duty-planner
+          - listitem [ref=f5e584]:
+            - link "Salary Register" [ref=f5e585] [cursor=pointer]:
+              - /url: /staff?tab=salary-sheet
+          - listitem [ref=f5e591]:
+            - link "Leaves" [ref=f5e592] [cursor=pointer]:
+              - /url: /staff?tab=leaves
+          - listitem [ref=f5e597]:
+            - link "Driver Performance" [ref=f5e598] [cursor=pointer]:
+              - /url: /staff?tab=driver-performance
+          - listitem [ref=f5e606]:
+            - link "Supervisor Performance" [ref=f5e607] [cursor=pointer]:
+              - /url: /staff?tab=supervisor-performance
+      - generic [ref=f5e614]:
+        - paragraph [ref=f5e615]: Accounts
+        - list [ref=f5e616]:
+          - listitem [ref=f5e617]:
+            - link "Analysis" [ref=f5e618] [cursor=pointer]:
+              - /url: /accounts?tab=summary
+          - listitem [ref=f5e623]:
+            - link "Payment Register" [ref=f5e624] [cursor=pointer]:
+              - /url: /accounts?tab=paid-payments
+          - listitem [ref=f5e629]:
+            - link "Farm Payment" [ref=f5e630] [cursor=pointer]:
+              - /url: /accounts?tab=farm-payment
+      - generic [ref=f5e636]:
+        - paragraph [ref=f5e637]: Reports
+        - list [ref=f5e638]:
+          - listitem [ref=f5e639]:
+            - link "Shop Ledger" [ref=f5e640] [cursor=pointer]:
+              - /url: /reports?tab=shopLedger
+          - listitem [ref=f5e645]:
+            - link "Collection Report" [ref=f5e646] [cursor=pointer]:
+              - /url: /operations?tab=collection-report
+          - listitem [ref=f5e651]:
+            - link "Vehicle Analytics" [ref=f5e652] [cursor=pointer]:
+              - /url: /fleet?tab=analytics
+      - generic [ref=f5e657]:
+        - paragraph [ref=f5e658]: Settings
+        - list [ref=f5e659]:
+          - listitem [ref=f5e660]:
+            - link "System Settings" [ref=f5e661] [cursor=pointer]:
+              - /url: /settings?tab=appearance
+```
+
+# Test source
+
+```ts
+  9   |   page.on("request", (request) => requests.push(`${request.method()} ${request.url()}`));
+  10  | 
+  11  |   await page.goto("/");
+  12  |   await page.locator("#login-username").fill("test-owner-4100");
+  13  |   await page.locator("#login-password").fill("Test-only-password-123!");
+  14  |   await page.getByRole("checkbox", { name: /remember me/i }).check();
+  15  |   await page.getByRole("button", { name: /sign in/i }).click();
+  16  |   await expect(page).toHaveURL(/dashboard/);
+  17  | 
+  18  |   await page.locator(`a[href="${COLLECTION}"]`).first().click();
+  19  |   await expect(page.locator("#orders-panel-collection")).toBeVisible({ timeout: 20_000 });
+  20  |   const row = page.locator("tbody tr", { hasText: "Orders E2E Shop 1" });
+  21  |   await expect(row).toBeVisible();
+  22  |   await row.getByRole("spinbutton", { name: /No\. of Birds/i }).fill("200");
+  23  |   await row.getByRole("spinbutton", { name: /No\. of Boxes/i }).fill("20");
+  24  |   await row.getByRole("spinbutton", { name: /^Weight/i }).fill("400");
+  25  | 
+  26  |   const saveResponse = page.waitForResponse(
+  27  |     (response) => response.request().method() === "POST" && /\/api\/trips\/\d+\/steps\/deliveries$/.test(response.url()),
+  28  |   );
+  29  |   await page.getByRole("button", { name: /save progress/i }).click();
+  30  |   const saved = await saveResponse;
+  31  |   expect(saved.status()).toBe(200);
+  32  |   const savedBody = await saved.json();
+  33  |   expect(savedBody.id).toBeGreaterThan(0);
+  34  |   expect(savedBody.tripNo).toBeTruthy();
+  35  |   expect(new URL(saved.url()).pathname).toBe(`/api/trips/${savedBody.id}/steps/deliveries`);
+  36  |   expect(requests.some((request) => /\/trips\/0\//.test(request))).toBe(false);
+  37  | 
+  38  |   await page.reload();
+  39  |   await expect(page.locator("#orders-panel-collection")).toBeVisible({ timeout: 20_000 });
+  40  |   const refreshed = page.locator("tbody tr", { hasText: "Orders E2E Shop 1" });
+  41  |   await expect(refreshed.getByRole("spinbutton", { name: /No\. of Birds/i })).toHaveValue("200");
+  42  |   await expect(refreshed.getByRole("spinbutton", { name: /No\. of Boxes/i })).toHaveValue("20");
+  43  |   await expect(refreshed.getByRole("spinbutton", { name: /^Weight/i })).toHaveValue("400");
+  44  | 
+  45  |   await page.goto(ASSIGNMENT);
+  46  |   await expect(page.getByText("Orders E2E Shop 1", { exact: true }).first()).toBeVisible();
+  47  |   await expect(page.getByText(/1 collected · 0 assigned · 1 available/)).toBeVisible();
+  48  |   await page.getByRole("button", { name: /Assign Shops/ }).click();
+  49  |   await page.getByRole("checkbox", { name: "Select — Orders E2E Shop 1" }).check();
+  50  |   await page.getByRole("button", { name: "Save Progress", exact: true }).click();
+  51  |   await expect(page.getByText("Assignment progress saved", { exact: true })).toBeVisible();
+  52  | 
+  53  |   await page.reload();
+  54  |   await expect(page.locator("#orders-panel-assignment")).toBeVisible({ timeout: 20_000 });
+  55  |   await expect(page.getByText(/1 collected · 1 assigned · 0 available/)).toBeVisible();
+  56  |   const vehicleButton = page.getByRole("button", { name: /Assign Shops/ });
+  57  |   const vehicleButtonText = await vehicleButton.innerText();
+  58  |   const vehicleTripNo = vehicleButtonText.match(/TR-\d{8}-\d+/)?.[0];
+  59  |   expect(vehicleTripNo).toBeTruthy();
+  60  |   await vehicleButton.click();
+  61  |   await expect(page.getByRole("checkbox", { name: "Select — Orders E2E Shop 1" })).toBeChecked();
+  62  |   await page.getByRole("button", { name: "Review & Submit", exact: true }).click();
+  63  |   await page.getByRole("button", { name: "Download PDF", exact: true }).click();
+  64  |   await page.getByRole("button", { name: "Submit Order Assignment", exact: true }).click();
+  65  |   await expect(page).toHaveURL(new RegExp(`${TRACKING}$`));
+  66  |   await expect(page.locator("#orders-panel-tracking")).toBeVisible({ timeout: 20_000 });
+  67  |   await expect(page.getByText(vehicleTripNo!, { exact: true }).first()).toBeVisible();
+  68  | 
+  69  |   const openDelivery = async () => {
+  70  |     await page.getByRole("row").filter({ hasText: vehicleTripNo! }).first().click();
+  71  |     await page.getByRole("button", { name: `View — ${vehicleTripNo}` }).click();
+  72  |     await expect(page.getByText("Orders E2E Shop 1", { exact: true }).last()).toBeVisible();
+  73  |   };
+  74  |   await openDelivery();
+  75  |   await page.getByRole("spinbutton", { name: "Delivery boxes — Orders E2E Shop 1" }).fill("10");
+  76  |   await page.getByRole("button", { name: "Record delivery — Orders E2E Shop 1" }).click();
+  77  |   await expect(page.getByText("10", { exact: true }).filter({ visible: true }).first()).toBeVisible();
+  78  |   await expect(page.getByText(/PART DELIVERED/i, { exact: true })).toBeVisible();
+  79  | 
+  80  |   await page.reload();
+  81  |   await expect(page.locator("#orders-panel-tracking")).toBeVisible({ timeout: 20_000 });
+  82  |   await openDelivery();
+  83  |   const remaining = page.getByRole("spinbutton", { name: "Delivery boxes — Orders E2E Shop 1" });
+  84  |   await expect(remaining).toHaveAttribute("max", "10");
+  85  |   await remaining.fill("10");
+  86  |   await page.getByRole("button", { name: "Record delivery — Orders E2E Shop 1" }).click();
+  87  |   await expect(page.getByText(/^DELIVERED$/i, { exact: true })).toBeVisible();
+  88  |   await expect(page.getByText("Pending Boxes").first().locator("..")).toContainText("0");
+  89  | 
+  90  |   await page.reload();
+  91  |   await expect(page.locator("#orders-panel-tracking")).toBeVisible({ timeout: 20_000 });
+  92  |   await expect(page.getByText(vehicleTripNo!, { exact: true }).first()).toBeVisible();
+  93  |   const vehicleTripResponse = await page.request.get("/api/trips");
+  94  |   expect(vehicleTripResponse.status()).toBe(200);
+  95  |   const vehicleTrips = await vehicleTripResponse.json();
+  96  |   const vehicleTrip = (Array.isArray(vehicleTrips) ? vehicleTrips : vehicleTrips.data ?? []).find(
+  97  |     (trip: { tripNo?: string }) => trip.tripNo === vehicleTripNo,
+  98  |   );
+  99  |   expect(vehicleTrip?.id).toBeGreaterThan(0);
+  100 |   const persisted = await page.request.get(`/api/trips/${vehicleTrip.id}`);
+  101 |   expect(persisted.status()).toBe(200);
+  102 |   const persistedBody = await persisted.json();
+  103 |   expect(persistedBody.id).toBe(vehicleTrip.id);
+  104 |   expect(persistedBody.status).not.toBe("Completed");
+  105 |   const captures = (persistedBody.deliveries ?? []).filter(
+  106 |     (row: { shopId?: number; autoCaptureTime?: string | null }) =>
+  107 |       Number(row.shopId) > 0 && Boolean(row.autoCaptureTime),
+  108 |   );
+> 109 |   expect(captures).toHaveLength(2);
+      |                    ^ Error: expect(received).toHaveLength(expected)
+  110 |   expect(captures.reduce((sum: number, row: { boxNo?: number }) => sum + Number(row.boxNo ?? 0), 0)).toBe(20);
+  111 |   expect(requests.some((request) => /\/trips\/0\//.test(request))).toBe(false);
+  112 | });
+  113 | 
+```
